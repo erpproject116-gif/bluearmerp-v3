@@ -15,7 +15,45 @@ In **Render → your service → Environment**, add:
 
 Do **not** set `PORT` — Render injects it automatically.
 
-Optional override: `DATABASE_URL` (full Postgres DSN, e.g. Supabase pooler on port 6543).
+Optional override: `DATABASE_URL` (full Postgres DSN).
+
+**Render requires the Supabase Session pooler — not `db.*.supabase.co`.**
+
+Direct host `db.YOUR_REF.supabase.co` (ports 5432 or 6543) is **IPv6-only**. Render cannot reach it (`network is unreachable`). Changing only the port to 6543 on the same host **does not fix this**.
+
+### Correct connection string (copy from Supabase)
+
+1. Supabase Dashboard → your project → **Connect** (top bar) or **Settings → Database**
+2. Under **Connection pooling**, choose **Session mode**
+3. Copy the full **URI**. It must look like:
+
+```
+postgresql://postgres.hqmhlvahlvrtxtwecdip:[YOUR-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
+```
+
+Notice:
+- **User** is `postgres.YOUR_PROJECT_REF` (not plain `postgres`)
+- **Host** is `aws-0-REGION.pooler.supabase.com` (not `db.*.supabase.co`)
+- **Port** is `5432` on the pooler host (session mode)
+
+4. Paste the entire URI as **`DATABASE_URL`** on Render → Save → redeploy
+
+### Wrong (will fail on Render)
+
+```
+postgresql://postgres:pass@db.hqmhlvahlvrtxtwecdip.supabase.co:5432/postgres   ❌ IPv6 direct
+postgresql://postgres:pass@db.hqmhlvahlvrtxtwecdip.supabase.co:6543/postgres   ❌ still wrong host
+```
+
+See [Supabase: Connect to your database](https://supabase.com/docs/guides/database/connecting-to-postgres) — use **Shared pooler, session mode** for IPv4 networks like Render.
+
+Verify:
+
+```bash
+curl https://bluearmerp-v3.onrender.com/health/db
+```
+
+Expected: `"success":true` with `"auth_me_query_john":1` — not `"DB unreachable"`.
 
 ## Service settings
 

@@ -5,9 +5,15 @@ body {
   @apply bg-body font-sans text-text-primary antialiased;
 }
 
+.erp-data-table-scroll {
+  overflow: auto;
+  max-width: 100%;
+}
+
 .erp-grid {
   table-layout: fixed;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
 }
 
 .erp-grid th,
@@ -15,4 +21,38 @@ body {
   overflow-wrap: anywhere;
   word-break: break-word;
   vertical-align: top;
+}
+
+.erp-grid th {
+  position: relative;
+  overflow: hidden;
+}
+
+.erp-grid td {
+  overflow: hidden;
+}
+
+.erp-grid-col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.erp-grid-col-resizer:hover {
+  background: color-mix(in srgb, var(--color-brand-600, #465fff) 35%, transparent);
+}
+
+body.erp-col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.erp-col-resizing .erp-grid-col-resizer {
+  background: color-mix(in srgb, var(--color-brand-600, #465fff) 35%, transparent);
 }

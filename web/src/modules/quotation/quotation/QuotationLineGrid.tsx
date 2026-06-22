@@ -4,6 +4,8 @@ import { apiFetch } from "../../../shared/api";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
+import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
+import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { QuotationItemSearchModal } from "./QuotationItemSearchModal";
 
 export type QuotationLineRow = {
@@ -50,6 +52,23 @@ function parseNum(s: string) {
 function money(n: number) {
   return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+const QUOTATION_LINE_COLUMNS = [
+  { key: "line_no", header: "#", width: 40 },
+  { key: "item_code", header: "Item Code", width: 100 },
+  { key: "item_name", header: "Item Name", width: 140 },
+  { key: "description", header: "Description", width: 140 },
+  { key: "qty", header: "Qty", width: 72 },
+  { key: "basis", header: "Basis", width: 100 },
+  { key: "unit_price", header: "Unit Price", width: 100 },
+  { key: "unit_non_vat", header: "Unit (Non-VAT)", width: 110 },
+  { key: "non_vat_total", header: "Non-VAT Total", width: 110 },
+  { key: "tax", header: "Tax", width: 90 },
+  { key: "unit_vat_inc", header: "Unit (VAT inc.)", width: 110 },
+  { key: "line_total", header: "Line Total", width: 110 },
+  { key: "remark", header: "Remark", width: 120 },
+  { key: "actions", header: "", width: 72 },
+] as const;
 
 /** Preview line amounts using Tax Management rate (server-authoritative). */
 export async function previewQuotationLineAmounts(
@@ -193,6 +212,10 @@ export function QuotationLineGrid(props: Props) {
     };
   };
 
+  const { widthFor, onResizeStart, tableWidth } = useResizableColumns(() =>
+    QUOTATION_LINE_COLUMNS.map((c) => ({ key: c.key, width: c.width })),
+  );
+
   return (
     <div class="col-span-full">
       <div class="mb-2 flex items-center justify-between">
@@ -204,50 +227,47 @@ export function QuotationLineGrid(props: Props) {
       <Show when={!props.taxTypeId()}>
         <p class="mb-2 text-xs text-amber-700">Select a transaction type to apply tax rates to line amounts.</p>
       </Show>
-      <div class="overflow-x-auto rounded-lg border border-stroke">
-        <table class="erp-grid min-w-full text-xs">
+      <DataTableScroll class="rounded-lg border border-stroke">
+        <table class="erp-grid text-xs" style={{ width: `${tableWidth()}px`, "min-width": "100%" }}>
           <thead class="bg-slate-50 text-left uppercase text-text-secondary">
             <tr>
-              <th class="px-2 py-2">#</th>
-              <th class="px-2 py-2">Item Code</th>
-              <th class="px-2 py-2">Item Name</th>
-              <th class="px-2 py-2">Description</th>
-              <th class="px-2 py-2 text-right">Qty</th>
-              <th class="px-2 py-2">Basis</th>
-              <th class="px-2 py-2 text-right">Unit Price</th>
-              <th class="px-2 py-2 text-right">Unit (Non-VAT)</th>
-              <th class="px-2 py-2 text-right">Non-VAT Total</th>
-              <th class="px-2 py-2 text-right">Tax</th>
-              <th class="px-2 py-2 text-right">Unit (VAT inc.)</th>
-              <th class="px-2 py-2 text-right">Line Total</th>
-              <th class="px-2 py-2">Remark</th>
-              <th class="px-2 py-2" />
+              {QUOTATION_LINE_COLUMNS.map((c) => (
+                <ResizableTh
+                  columnKey={c.key}
+                  width={widthFor(c.key)}
+                  onResizeStart={onResizeStart}
+                  resizable={c.key !== "actions"}
+                  class={`px-2 py-2${c.key.includes("unit") || c.key === "qty" || c.key === "tax" || c.key === "line_total" || c.key === "non_vat_total" ? " text-right" : ""}`}
+                >
+                  {c.header}
+                </ResizableTh>
+              ))}
             </tr>
           </thead>
           <tbody>
             <For each={props.lines()}>
               {(line, idx) => (
                 <tr class="border-t border-stroke/60">
-                  <td class="px-2 py-1">{line.line_no}</td>
-                  <td class="px-2 py-1">
+                  <ResizableTd width={widthFor("line_no")} class="px-2 py-1">{line.line_no}</ResizableTd>
+                  <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
-                      class={`${inputClass} cursor-pointer`}
+                      class={`${inputClass} w-full cursor-pointer`}
                       value={line.item_code}
                       readOnly
                       onDblClick={() => openSearch(idx())}
                       title="Double-click to search items"
                     />
-                  </td>
-                  <td class="px-2 py-1">
-                    <input class={inputClass} value={line.item_name} onInput={(e) => void updateLine(idx(), { item_name: e.currentTarget.value })} />
-                  </td>
-                  <td class="px-2 py-1">
-                    <input class={inputClass} value={line.description} onInput={(e) => void updateLine(idx(), { description: e.currentTarget.value })} />
-                  </td>
-                  <td class="px-2 py-1">
-                    <input type="number" class={`${inputClass} text-right`} value={line.qty} onInput={(e) => void updateLine(idx(), { qty: e.currentTarget.value })} />
-                  </td>
-                  <td class="px-2 py-1">
+                  </ResizableTd>
+                  <ResizableTd width={widthFor("item_name")} class="px-2 py-1">
+                    <input class={`${inputClass} w-full`} value={line.item_name} onInput={(e) => void updateLine(idx(), { item_name: e.currentTarget.value })} />
+                  </ResizableTd>
+                  <ResizableTd width={widthFor("description")} class="px-2 py-1">
+                    <input class={`${inputClass} w-full`} value={line.description} onInput={(e) => void updateLine(idx(), { description: e.currentTarget.value })} />
+                  </ResizableTd>
+                  <ResizableTd width={widthFor("qty")} class="px-2 py-1">
+                    <input type="number" class={`${inputClass} w-full text-right`} value={line.qty} onInput={(e) => void updateLine(idx(), { qty: e.currentTarget.value })} />
+                  </ResizableTd>
+                  <ResizableTd width={widthFor("basis")} class="px-2 py-1">
                     <select
                       class={inputClass}
                       value={line.input_basis}
@@ -256,23 +276,23 @@ export function QuotationLineGrid(props: Props) {
                       <option value="vat_inc_unit">VAT inc.</option>
                       <option value="non_vat_unit">Non-VAT</option>
                     </select>
-                  </td>
-                  <td class="px-2 py-1">
-                    <input type="number" class={`${inputClass} text-right`} value={line.unit_price} onInput={(e) => void updateLine(idx(), { unit_price: e.currentTarget.value })} />
-                  </td>
-                  <td class="px-2 py-1 text-right">{money(parseNum(line.unit_non_vat))}</td>
-                  <td class="px-2 py-1 text-right">{money(parseNum(line.non_vat_total))}</td>
-                  <td class="px-2 py-1 text-right">{money(parseNum(line.tax_amount))}</td>
-                  <td class="px-2 py-1 text-right">{money(parseNum(line.unit_vat_inc))}</td>
-                  <td class="px-2 py-1 text-right">{money(parseNum(line.line_total))}</td>
-                  <td class="px-2 py-1">
-                    <input class={inputClass} value={line.remark} onInput={(e) => void updateLine(idx(), { remark: e.currentTarget.value })} />
-                  </td>
-                  <td class="px-2 py-1">
+                  </ResizableTd>
+                  <ResizableTd width={widthFor("unit_price")} class="px-2 py-1">
+                    <input type="number" class={`${inputClass} w-full text-right`} value={line.unit_price} onInput={(e) => void updateLine(idx(), { unit_price: e.currentTarget.value })} />
+                  </ResizableTd>
+                  <ResizableTd width={widthFor("unit_non_vat")} class="px-2 py-1 text-right">{money(parseNum(line.unit_non_vat))}</ResizableTd>
+                  <ResizableTd width={widthFor("non_vat_total")} class="px-2 py-1 text-right">{money(parseNum(line.non_vat_total))}</ResizableTd>
+                  <ResizableTd width={widthFor("tax")} class="px-2 py-1 text-right">{money(parseNum(line.tax_amount))}</ResizableTd>
+                  <ResizableTd width={widthFor("unit_vat_inc")} class="px-2 py-1 text-right">{money(parseNum(line.unit_vat_inc))}</ResizableTd>
+                  <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{money(parseNum(line.line_total))}</ResizableTd>
+                  <ResizableTd width={widthFor("remark")} class="px-2 py-1">
+                    <input class={`${inputClass} w-full`} value={line.remark} onInput={(e) => void updateLine(idx(), { remark: e.currentTarget.value })} />
+                  </ResizableTd>
+                  <ResizableTd width={widthFor("actions")} class="px-2 py-1">
                     <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeLine(idx())}>
                       Remove
                     </button>
-                  </td>
+                  </ResizableTd>
                 </tr>
               )}
             </For>
@@ -292,7 +312,7 @@ export function QuotationLineGrid(props: Props) {
             </tr>
           </tfoot>
         </table>
-      </div>
+      </DataTableScroll>
 
       <QuotationItemSearchModal
         open={searchOpen()}

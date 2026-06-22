@@ -4,6 +4,8 @@ import {
   downloadItemsImportTemplate,
   importItemsCsv,
 } from "./itemsCsvImport";
+import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
+import { useResizableColumns } from "./useResizableColumns";
 
 export type Column<T> = {
   key: string;
@@ -11,6 +13,10 @@ export type Column<T> = {
   render?: (row: T) => JSX.Element;
   clickable?: boolean;
   sortable?: boolean;
+  width?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  resizable?: boolean;
 };
 
 type Props<T extends { id: number }> = {
@@ -47,6 +53,15 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const [focusIdx, setFocusIdx] = createSignal(0);
   const [importing, setImporting] = createSignal(false);
   let fileInputEl: HTMLInputElement | undefined;
+
+  const columnDefs = () =>
+    props.columns.map((c) => ({
+      key: c.key,
+      width: c.width,
+      minWidth: c.minWidth,
+      maxWidth: c.maxWidth,
+    }));
+  const { widthFor, onResizeStart, tableWidth } = useResizableColumns(columnDefs);
 
   const handleImportFile = async (file: File) => {
     if (!props.itemsCsvImport) return;
@@ -246,20 +261,25 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
         <p class="p-8 text-center text-sm text-text-secondary">Loading…</p>
       </Show>
       <Show when={!props.loading || props.rows.length > 0}>
-        <div class="max-h-[calc(100vh-16rem)] overflow-auto">
-          <table class="erp-grid min-w-full text-left text-sm">
+        <DataTableScroll maxHeight="calc(100vh - 16rem)">
+          <table
+            class="erp-grid text-left text-sm"
+            style={{ width: `${tableWidth()}px`, "min-width": "100%" }}
+          >
             <thead class="sticky top-0 border-b border-stroke bg-slate-50">
               <tr>
                 {props.columns.map((c) => {
                   const sortable = c.sortable !== false && Boolean(props.onSort);
                   const active = props.sortKey === c.key;
                   return (
-                    <th
-                      class="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-text-secondary"
-                      classList={{
-                        "cursor-pointer select-none hover:text-brand-600": sortable,
-                        "text-brand-600": active,
-                      }}
+                    <ResizableTh
+                      columnKey={c.key}
+                      width={widthFor(c.key)}
+                      onResizeStart={onResizeStart}
+                      resizable={c.resizable !== false}
+                      class={`px-5 py-3 text-xs font-semibold uppercase tracking-wide text-text-secondary${
+                        sortable ? " cursor-pointer select-none hover:text-brand-600" : ""
+                      }${active ? " text-brand-600" : ""}`}
                       onClick={() => sortable && props.onSort?.(c.key)}
                     >
                       <span class="inline-flex items-center gap-1">
@@ -268,7 +288,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                           <span aria-hidden="true">{props.sortOrder === "asc" ? "↑" : "↓"}</span>
                         </Show>
                       </span>
-                    </th>
+                    </ResizableTh>
                   );
                 })}
               </tr>
@@ -289,12 +309,13 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                     const clickable = c.clickable ?? (c.key === props.codeKey || c.key === props.nameKey);
                     const cellContent = c.render ? c.render(row) : String(val ?? "");
                     return (
-                      <td
-                        class="px-5 py-3"
-                        classList={{
-                          "cursor-pointer font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline": clickable,
-                          "text-text-primary": !clickable,
-                        }}
+                      <ResizableTd
+                        width={widthFor(c.key)}
+                        class={`px-5 py-3${
+                          clickable
+                            ? " cursor-pointer font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline"
+                            : " text-text-primary"
+                        }`}
                         onClick={(e) => {
                           if (clickable) {
                             e.stopPropagation();
@@ -307,7 +328,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                         ) : (
                           cellContent
                         )}
-                      </td>
+                      </ResizableTd>
                     );
                   })}
                 </tr>
@@ -317,7 +338,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           <Show when={props.rows.length === 0 && !props.loading}>
             <p class="p-8 text-center text-sm text-text-secondary">No rows yet. Press F2 to create one.</p>
           </Show>
-        </div>
+        </DataTableScroll>
         <Show when={props.total !== undefined && props.page !== undefined && props.pageSize !== undefined}>
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3">
             <span class="text-sm text-text-secondary">

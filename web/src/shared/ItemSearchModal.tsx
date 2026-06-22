@@ -1,6 +1,8 @@
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "./api";
 import { Field, inputClass } from "./SpreadsheetGrid";
+import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
+import { useResizableColumns } from "./useResizableColumns";
 
 export type ItemSearchRow = {
   id: number;
@@ -53,6 +55,15 @@ type Props = {
   onSelect: (row: ItemSearchRow) => void;
   contextLocationId?: number | null;
 };
+
+const ITEM_SEARCH_COLUMNS = [
+  { key: "select", header: "Select", width: 88 },
+  { key: "item_code", header: "Item Code", width: 120 },
+  { key: "item_name", header: "Item Name [Spec]", width: 220 },
+  { key: "sales_price", header: "Sale Price", width: 110 },
+  { key: "default_loc", header: "Default Loc. Inv.", width: 130 },
+  { key: "total_inv", header: "Total Inv.", width: 110 },
+] as const;
 
 export function ItemSearchModal(props: Props) {
   const [tab, setTab] = createSignal<"filters" | "results">("filters");
@@ -126,6 +137,10 @@ export function ItemSearchModal(props: Props) {
       return { ...f, item_types: [...set] };
     });
   };
+
+  const { widthFor, onResizeStart, tableWidth } = useResizableColumns(() =>
+    ITEM_SEARCH_COLUMNS.map((c) => ({ key: c.key, width: c.width })),
+  );
 
   return (
     <Show when={props.open}>
@@ -251,22 +266,26 @@ export function ItemSearchModal(props: Props) {
           </Show>
 
           <Show when={tab() === "results"}>
-            <div class="max-h-[60vh] overflow-auto p-5">
+            <DataTableScroll class="max-h-[60vh] p-5">
               <Show when={searching()}>
                 <p class="text-sm text-text-secondary">Searching…</p>
               </Show>
               <Show when={!searching() && results().length === 0}>
                 <p class="text-sm text-text-secondary">No results. Set filters and click Search.</p>
               </Show>
-              <table class="erp-grid min-w-full text-sm">
+              <table class="erp-grid text-sm" style={{ width: `${tableWidth()}px`, "min-width": "100%" }}>
                 <thead>
                   <tr class="border-b border-stroke text-left text-xs uppercase text-text-secondary">
-                    <th class="py-2 pr-4">Select</th>
-                    <th class="py-2 pr-4">Item Code</th>
-                    <th class="py-2 pr-4">Item Name [Spec]</th>
-                    <th class="py-2 pr-4 text-right">Sale Price</th>
-                    <th class="py-2 pr-4 text-right">Default Loc. Inv.</th>
-                    <th class="py-2 text-right">Total Inv.</th>
+                    {ITEM_SEARCH_COLUMNS.map((c) => (
+                      <ResizableTh
+                        columnKey={c.key}
+                        width={widthFor(c.key)}
+                        onResizeStart={onResizeStart}
+                        class={`py-2 pr-4${c.key === "sales_price" || c.key === "default_loc" || c.key === "total_inv" ? " text-right" : ""}`}
+                      >
+                        {c.header}
+                      </ResizableTh>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -276,19 +295,27 @@ export function ItemSearchModal(props: Props) {
                         class="cursor-pointer border-b border-stroke/60 hover:bg-brand-50"
                         onDblClick={() => props.onSelect(row)}
                       >
-                        <td class="py-2 pr-4">
+                        <ResizableTd width={widthFor("select")} class="py-2 pr-4">
                           <button type="button" class="rounded border border-stroke px-2 py-0.5 text-xs hover:bg-brand-50" onClick={() => props.onSelect(row)}>
                             Select
                           </button>
-                        </td>
-                        <td class="py-2 pr-4 font-medium text-brand-600">{row.item_code}</td>
-                        <td class="py-2 pr-4">
+                        </ResizableTd>
+                        <ResizableTd width={widthFor("item_code")} class="py-2 pr-4 font-medium text-brand-600">
+                          {row.item_code}
+                        </ResizableTd>
+                        <ResizableTd width={widthFor("item_name")} class="py-2 pr-4">
                           {row.item_name}
                           {row.spec_name ? ` [${row.spec_name}]` : ""}
-                        </td>
-                        <td class="py-2 pr-4 text-right">{money(row.sales_price)}</td>
-                        <td class="py-2 pr-4 text-right">{formatQty(row.default_location_qty)}</td>
-                        <td class="py-2 text-right">{formatQty(row.total_inv_qty)}</td>
+                        </ResizableTd>
+                        <ResizableTd width={widthFor("sales_price")} class="py-2 pr-4 text-right">
+                          {money(row.sales_price)}
+                        </ResizableTd>
+                        <ResizableTd width={widthFor("default_loc")} class="py-2 pr-4 text-right">
+                          {formatQty(row.default_location_qty)}
+                        </ResizableTd>
+                        <ResizableTd width={widthFor("total_inv")} class="py-2 text-right">
+                          {formatQty(row.total_inv_qty)}
+                        </ResizableTd>
                       </tr>
                     )}
                   </For>
@@ -307,7 +334,7 @@ export function ItemSearchModal(props: Props) {
                   </button>
                 </div>
               </Show>
-            </div>
+            </DataTableScroll>
           </Show>
         </div>
       </div>

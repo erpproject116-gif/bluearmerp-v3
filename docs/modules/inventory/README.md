@@ -41,7 +41,7 @@ Five-digit `char(5)` per tenant via `allocate_tenant_code(tenant_id, entity_type
 
 ## UI
 
-Shared `SpreadsheetGrid`: F2 new, Enter edit, arrows navigate, click code/name for modal.
+Shared `SpreadsheetGrid`: F2 new, Enter edit, arrows navigate, click code/name for modal. **Resizable columns** (drag header edge) with horizontal scroll when wider than viewport — see `docs/golden-rules.md`.
 
 ## List SQL
 
