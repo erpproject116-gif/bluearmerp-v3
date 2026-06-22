@@ -18,6 +18,18 @@ export const supabase = createClient(url || "http://localhost", anon || "anon", 
 // Dev: Vite proxies /api → localhost:8080. Ignore VITE_API_BASE_URL in dev to avoid wrong ports.
 export const apiBase = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "");
 
+export const apiConfigured = import.meta.env.DEV || Boolean(apiBase);
+
+export function apiNetworkErrorMessage(): string {
+  if (import.meta.env.DEV) {
+    return "Could not connect to the API. Start the Go server: cd api && go run ./cmd/server";
+  }
+  if (!apiBase) {
+    return "API URL is not configured. Set VITE_API_BASE_URL on Vercel to your Render URL, then redeploy.";
+  }
+  return `Could not reach the API at ${apiBase}. Check that Render is live (/health) and CORS_ORIGIN is https://bluearmerp-v3.vercel.app`;
+}
+
 export async function getAccessToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;

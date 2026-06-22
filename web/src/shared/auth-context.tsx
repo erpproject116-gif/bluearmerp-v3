@@ -1,6 +1,6 @@
 import { createContext, onCleanup, onMount, useContext, type ParentComponent } from "solid-js";
 import { createStore } from "solid-js/store";
-import { apiFetch, supabase } from "./api";
+import { apiFetch, apiNetworkErrorMessage, supabase } from "./api";
 
 export type MeData = {
   user: {
@@ -89,7 +89,7 @@ export const AuthProvider: ParentComponent = (props) => {
         me: null,
         loading: false,
         bootstrapError: "network",
-        bootstrapMessage: "Could not connect to the API on port 8080.",
+        bootstrapMessage: apiNetworkErrorMessage(),
       });
     }
   };

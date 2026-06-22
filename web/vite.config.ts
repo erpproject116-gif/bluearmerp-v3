@@ -2,12 +2,19 @@ import { defineConfig, loadEnv } from "vite";
 import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
 
+/** Local .env files + Vercel/CI process.env (dashboard vars are not in .env files). */
 function pickEnv(env: Record<string, string>, key: string, viteKey: string) {
-  return env[viteKey] || env[key] || "";
+  return (
+    env[viteKey] ||
+    env[key] ||
+    process.env[viteKey] ||
+    process.env[key] ||
+    ""
+  );
 }
 
 export default defineConfig(({ mode }) => {
-  // web/.env.local (user's file) + optional repo-root .env
+  // web/.env.local (local) + optional repo-root .env
   const webEnv = loadEnv(mode, ".", "");
   const rootEnv = loadEnv(mode, "..", "");
   const merged = { ...rootEnv, ...webEnv };
@@ -17,6 +24,12 @@ export default defineConfig(({ mode }) => {
   const apiBase =
     mode === "development" ? "" : pickEnv(merged, "VITE_API_BASE_URL", "VITE_API_BASE_URL");
   const demoSignInEnabled = pickEnv(merged, "VITE_DEMO_SIGNIN_ENABLED", "VITE_DEMO_SIGNIN_ENABLED") === "true";
+
+  if (mode === "production" && !apiBase) {
+    console.warn(
+      "[vite] VITE_API_BASE_URL is empty — set it in Vercel Environment Variables and redeploy.",
+    );
+  }
 
   return {
     plugins: [solid(), tailwindcss()],

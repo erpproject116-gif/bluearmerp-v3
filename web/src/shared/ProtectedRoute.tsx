@@ -1,6 +1,6 @@
 import { type ParentComponent, Show } from "solid-js";
 import { Navigate, useNavigate } from "@solidjs/router";
-import { supabase } from "../shared/api";
+import { supabase, apiNetworkErrorMessage } from "../shared/api";
 import { useAuth } from "../shared/auth-context";
 import { needsSignInRedirect, SessionLoading } from "./AuthRedirect";
 
@@ -24,14 +24,8 @@ export const ProtectedRoute: ParentComponent = (props) => {
               fallback={
                 <div class="flex min-h-screen items-center justify-center bg-body p-6">
                   <div class="max-w-lg rounded-xl border border-stroke bg-white p-6 shadow-sm">
-                    <p class="text-sm font-medium text-text-primary">Cannot reach the API</p>
-                    <p class="mt-2 text-sm text-text-secondary">
-                      Check that the Go API is running and{" "}
-                      <code class="text-brand-600">VITE_API_BASE_URL</code> points to it in production.
-                    </p>
-                    {auth.bootstrapMessage && (
-                      <p class="mt-2 text-xs text-text-secondary">{auth.bootstrapMessage}</p>
-                    )}
+                        <p class="text-sm font-medium text-text-primary">Cannot reach the API</p>
+                        <p class="mt-2 text-sm text-text-secondary">{apiNetworkErrorMessage()}</p>
                     <div class="mt-5">
                       <button
                         type="button"
