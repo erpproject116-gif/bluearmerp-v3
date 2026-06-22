@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (updated for invite-first provisioning)
 
 ## Context
 
@@ -10,14 +10,17 @@ Bluearm ERP v3 uses Supabase Auth for identity and a Go API for business logic. 
 
 ## Decision
 
-1. **Supabase Auth** issues JWTs (Google OAuth + email/password for demo).
-2. **Go middleware** validates JWT (HS256 with `SUPABASE_JWT_SECRET`) and loads `users` + `tenants` in one query.
-3. **MVP provisioning:** users must have a pre-existing `public.users` row with `auth_user_id` linked after Google sign-in.
-4. **Default platform superadmins:** `itsjohnranel@gmail.com` and `bluearmph@gmail.com` on tenant `BLUEARM`, seeded via `scripts/seed-platform-owners.sql` and linked via `scripts/link-platform-owners.sql`.
-5. **Future modules:** tenants with `auto_enable_all_modules = true` (BLUEARM) receive new `module_registry` rows automatically via DB trigger; platform superadmins also receive all modules in `/auth/me`.
-6. **Demo tenant** `DEMO000` is separate for public demo sign-in.
+1. **Supabase Auth** issues JWTs (Google OAuth in production; optional email/password demo locally).
+2. **Go middleware** validates JWT (JWKS ES256 and/or legacy HS256) and loads `users` + `tenants`.
+3. **Invite-first provisioning:** admins create `users` rows with `status = invited`; on first Google sign-in the API auto-links `auth_user_id` when JWT `email` matches the invited row.
+4. **Bootstrap superadmins:** `itsjohnranel@gmail.com` and `bluearmph@gmail.com` on tenant `BLUEARM` via `scripts/seed-platform-owners.sql` + one-time `scripts/link-platform-owners.sql`.
+5. **Roles:** `tenant_roles` per tenant; `users.tenant_role` stores `role_code`. Permissions `can_manage_users` and `can_manage_form_settings` drive UI and API gates.
+6. **Future modules:** tenants with `auto_enable_all_modules = true` receive new registry rows via DB trigger.
+7. **Demo tenant** `DEMO000` remains for local dev when `VITE_DEMO_SIGNIN_ENABLED=true`.
 
 ## Consequences
 
-- First-time Google users without a `users` row receive 401 from `/api/v1/auth/me` until linked via `scripts/link-demo-auth-user.sql`.
-- RLS may be enabled for defense-in-depth; Go remains the primary authorization gate.
+- Day-to-day onboarding uses **User Management → Invite** instead of SQL link scripts.
+- Google email must match the invited email exactly (case-insensitive).
+- If the same email is invited on multiple tenants, auto-link returns forbidden (contact admin).
+- Platform bootstrap still requires `link-platform-owners.sql` for the first superadmins.

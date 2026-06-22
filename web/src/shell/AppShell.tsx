@@ -2,7 +2,7 @@ import type { ParentComponent } from "solid-js";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { supabase } from "../shared/api";
-import { useAuth } from "../shared/auth-context";
+import { useAuth, canManageUsers } from "../shared/auth-context";
 import { ModuleIcon } from "./ModuleIcon";
 import { ShellProvider, useShell } from "./shell-context";
 import { appModules, featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
@@ -73,6 +73,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         <nav class="flex-1 space-y-1">
           <For each={appModules.filter((m) => {
             const codes = auth.me?.enabled_module_codes;
+            if (m.id === "user_management" && !canManageUsers(auth.me)) return false;
             if (!codes?.length) return true;
             return codes.includes(m.id);
           })}>

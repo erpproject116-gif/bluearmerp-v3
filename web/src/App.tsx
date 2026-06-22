@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
-import { Navigate, Route, Router, type RouteSectionProps } from "@solidjs/router";
+import { Route, Router, type RouteSectionProps } from "@solidjs/router";
 import { AppShell } from "./shell/AppShell";
 import { AuthProvider } from "./shared/auth-context";
 import { ToastProvider } from "./shared/toast";
+import { AuthEntryRedirect } from "./shared/AuthRedirect";
 import { ProtectedRoute } from "./shared/ProtectedRoute";
 import SignInPage from "./modules/auth/SignInPage";
 import AuthCallbackPage from "./modules/auth/AuthCallbackPage";
@@ -37,6 +38,9 @@ import QuotationStatusPage from "./modules/quotation/quotation/QuotationStatusPa
 import OutstandingQuoteStatusPage from "./modules/quotation/quotation/OutstandingQuoteStatusPage";
 import QuotationPrintPage from "./modules/quotation/quotation/QuotationPrintPage";
 import QuotationStatusPrintPage from "./modules/quotation/quotation/QuotationStatusPrintPage";
+import UsersPage from "./modules/user-management/users/UsersPage";
+import RolesPage from "./modules/user-management/roles/RolesPage";
+import { AdminModuleRoute } from "./shared/AdminModuleRoute";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,7 +68,7 @@ export default function App() {
         <Router>
         <Route path="/signin" component={SignInPage} />
         <Route path="/auth/callback" component={AuthCallbackPage} />
-        <Route path="/" component={() => <Navigate href="/app/inventory/partners" />} />
+        <Route path="/" component={AuthEntryRedirect} />
         <Route path="/app/inventory/after-sales/repair-orders/:orderId/receipt" component={RepairOrderReceiptPrintPage} />
         <Route path="/app/inventory/after-sales/repair-orders/:orderId/warranty" component={RepairOrderWarrantyPrintPage} />
         <Route path="/app/inventory/after-sales/repair-orders/status/print" component={RepairOrderStatusPrintPage} />
@@ -98,7 +102,18 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
+          <Route path="/user-management/users" component={() => (
+            <AdminModuleRoute>
+              <UsersPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/roles" component={() => (
+            <AdminModuleRoute>
+              <RolesPage />
+            </AdminModuleRoute>
+          )} />
         </Route>
+        <Route path="*" component={AuthEntryRedirect} />
       </Router>
       </AuthProvider>
       </ToastProvider>

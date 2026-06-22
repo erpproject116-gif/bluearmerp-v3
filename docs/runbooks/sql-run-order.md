@@ -57,6 +57,7 @@ export DATABASE_URL="postgresql://postgres:YOUR_DB_PASSWORD@db.YOUR_REF.supabase
 | 9 | `api/migrations/009_inv_stock_balances.sql` | Location-level inventory balances |
 | 10 | `api/migrations/010_quotation_tax_mngt.sql` | Quotation module registry, tax types, currencies |
 | 11 | `api/migrations/011_quotations.sql` | Quotations, lines, slips, attachments |
+| 12 | `api/migrations/012_user_management.sql` | User Management module, tenant roles, invites |
 
 ```bash
 export DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -71,6 +72,7 @@ psql "$DATABASE_URL" -f api/migrations/008_repair_order_status.sql
 psql "$DATABASE_URL" -f api/migrations/009_inv_stock_balances.sql
 psql "$DATABASE_URL" -f api/migrations/010_quotation_tax_mngt.sql
 psql "$DATABASE_URL" -f api/migrations/011_quotations.sql
+psql "$DATABASE_URL" -f api/migrations/012_user_management.sql
 ```
 
 **Do not skip migrations.** Seeds depend on tables created here.

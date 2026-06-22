@@ -69,6 +69,24 @@ export const appModules: AppModule[] = [
       },
     ],
   },
+  {
+    id: "user_management",
+    label: "User Management",
+    href: "/app/user-management/users",
+    basePath: "/app/user-management",
+    features: [
+      {
+        label: "Users",
+        href: "/app/user-management/users",
+        settingsHref: "/app/user-management/users",
+      },
+      {
+        label: "Roles",
+        href: "/app/user-management/roles",
+        settingsHref: "/app/user-management/roles",
+      },
+    ],
+  },
 ];
 
 export function resolveModule(pathname: string): AppModule | undefined {

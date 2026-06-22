@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -17,19 +18,23 @@ type contextKey string
 const UserContextKey contextKey = "tenantUser"
 
 type TenantUser struct {
-	AuthUserID            string
-	AppUserID             int64
-	TenantID              int64
-	Email                 string
-	FullName              string
-	IsPlatformSuperadmin  bool
-	IsTenantOwner         bool
-	IsStoreAdmin          bool
-	AutoEnableAllModules  bool
+	AuthUserID               string
+	AppUserID                int64
+	TenantID                 int64
+	Email                    string
+	FullName                 string
+	TenantRole               string
+	IsPlatformSuperadmin     bool
+	IsTenantOwner            bool
+	IsStoreAdmin             bool
+	canManageUsersRole       bool
+	canManageFormSettingsRole bool
+	AutoEnableAllModules     bool
 }
 
 type Claims struct {
-	Sub string `json:"sub"`
+	Sub   string `json:"sub"`
+	Email string `json:"email"`
 	jwt.RegisteredClaims
 }
 
@@ -55,7 +60,22 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 
 			user, err := loadTenantUser(r.Context(), pool, claims.Sub)
 			if err != nil {
-				response.Err(w, http.StatusForbidden, "No tenant profile for this account.", "ERR_FORBIDDEN")
+				if errorsIsNoProfile(err) && claims.Email != "" {
+					linkErr := tryAutoLinkInvitedUser(r.Context(), pool, claims.Sub, claims.Email)
+					if linkErr == nil {
+						user, err = loadTenantUser(r.Context(), pool, claims.Sub)
+					} else if linkErr == ErrAmbiguousInvite {
+						response.Err(w, http.StatusForbidden,
+							"This email is invited on multiple tenants. Contact your administrator.",
+							"ERR_FORBIDDEN")
+						return
+					}
+				}
+			}
+			if err != nil {
+				response.Err(w, http.StatusForbidden,
+					"No tenant profile for this account. Ask an administrator to invite you, then sign in with Google using the invited email.",
+					"ERR_FORBIDDEN")
 				return
 			}
 
@@ -63,6 +83,10 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func errorsIsNoProfile(err error) bool {
+	return err == ErrNoTenantProfile || err == pgx.ErrNoRows
 }
 
 func FromContext(ctx context.Context) (TenantUser, bool) {
@@ -85,12 +109,16 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		  u.tenant_id,
 		  u.email,
 		  u.full_name,
+		  u.tenant_role,
 		  coalesce(pu.is_active, false) and pu.role = 'superadmin',
 		  t.owner_user_id = u.id,
-		  u.tenant_role = 'store_admin',
+		  coalesce(tr.can_manage_form_settings, false),
+		  coalesce(tr.can_manage_users, false),
 		  t.auto_enable_all_modules
 		from public.users u
 		join public.tenants t on t.id = u.tenant_id
+		left join public.tenant_roles tr
+		  on tr.tenant_id = u.tenant_id and tr.role_code = u.tenant_role and tr.is_active = true
 		left join public.platform_users pu on pu.auth_user_id = u.auth_user_id
 		where u.auth_user_id = $1::uuid
 		  and u.status = 'active'
@@ -98,15 +126,27 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		limit 1`
 	var tu TenantUser
 	tu.AuthUserID = authUserID
+	var canFormSettings, canManageUsers bool
 	err := pool.QueryRow(ctx, q, authUserID).Scan(
 		&tu.AppUserID,
 		&tu.TenantID,
 		&tu.Email,
 		&tu.FullName,
+		&tu.TenantRole,
 		&tu.IsPlatformSuperadmin,
 		&tu.IsTenantOwner,
-		&tu.IsStoreAdmin,
+		&canFormSettings,
+		&canManageUsers,
 		&tu.AutoEnableAllModules,
 	)
-	return tu, err
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return TenantUser{}, ErrNoTenantProfile
+		}
+		return TenantUser{}, err
+	}
+	tu.canManageFormSettingsRole = canFormSettings
+	tu.canManageUsersRole = canManageUsers
+	tu.IsStoreAdmin = tu.CanManageFormSettings()
+	return tu, nil
 }

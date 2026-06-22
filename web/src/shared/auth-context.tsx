@@ -7,9 +7,11 @@ export type MeData = {
     id: number;
     email: string;
     full_name: string;
+    tenant_role?: string;
     is_platform_superadmin?: boolean;
     is_tenant_owner?: boolean;
     is_store_admin?: boolean;
+    can_manage_users?: boolean;
     can_manage_custom_fields?: boolean;
   };
   tenant: {
@@ -25,12 +27,13 @@ export type MeData = {
 export function canManageFormSettings(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  return Boolean(
-    u.can_manage_custom_fields ||
-      u.is_platform_superadmin ||
-      u.is_tenant_owner ||
-      u.is_store_admin,
-  );
+  return Boolean(u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin);
+}
+
+export function canManageUsers(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  return Boolean(u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner);
 }
 
 export type BootstrapError = "network" | "unauthorized" | "forbidden" | null;

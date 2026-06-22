@@ -19,7 +19,7 @@ insert into public.tenants (
 insert into public.tenant_modules (tenant_id, module_code, is_enabled)
 select t.id, m.module_code, true
 from public.tenants t
-cross join (values ('core'), ('inventory'), ('quotation')) as m(module_code)
+cross join (values ('core'), ('inventory'), ('quotation'), ('user_management')) as m(module_code)
 where t.company_code = 'DEMO000'
 on conflict (tenant_id, module_code) do update set is_enabled = true;
 

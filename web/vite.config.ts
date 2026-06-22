@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
   const supabaseAnon = pickEnv(merged, "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY");
   const apiBase =
     mode === "development" ? "" : pickEnv(merged, "VITE_API_BASE_URL", "VITE_API_BASE_URL");
+  const demoSignInEnabled = pickEnv(merged, "VITE_DEMO_SIGNIN_ENABLED", "VITE_DEMO_SIGNIN_ENABLED") === "true";
 
   return {
     plugins: [solid(), tailwindcss()],
@@ -24,6 +25,7 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
       "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabaseAnon),
       "import.meta.env.VITE_API_BASE_URL": JSON.stringify(apiBase),
+      "import.meta.env.VITE_DEMO_SIGNIN_ENABLED": JSON.stringify(demoSignInEnabled),
     },
     server: {
       port: 5173,

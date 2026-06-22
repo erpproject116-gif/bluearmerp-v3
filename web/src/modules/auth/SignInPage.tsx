@@ -1,7 +1,10 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onMount, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { supabase, supabaseConfigured } from "../../shared/api";
 import { useAuth } from "../../shared/auth-context";
+import { SessionLoading } from "../../shared/AuthRedirect";
+
+const demoSignInEnabled = import.meta.env.VITE_DEMO_SIGNIN_ENABLED === true;
 
 export default function SignInPage() {
   const navigate = useNavigate();
@@ -12,6 +15,12 @@ export default function SignInPage() {
   onMount(() => {
     const msg = new URLSearchParams(window.location.search).get("error");
     if (msg) setError(decodeURIComponent(msg));
+  });
+
+  createEffect(() => {
+    if (!auth.loading && auth.me) {
+      navigate("/app/inventory/partners", { replace: true });
+    }
   });
 
   const signInGoogle = async () => {
@@ -53,7 +62,9 @@ export default function SignInPage() {
   };
 
   return (
-    <div class="flex min-h-screen bg-body">
+    <Show when={!auth.loading} fallback={<SessionLoading />}>
+      <Show when={!auth.me} fallback={<SessionLoading />}>
+        <div class="flex min-h-screen bg-body">
       <div class="hidden w-1/2 flex-col justify-between bg-brand-600 p-12 text-white lg:flex">
         <div class="flex items-center gap-3">
           <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-bold">B</div>
@@ -105,25 +116,31 @@ export default function SignInPage() {
               </svg>
               Continue with Google
             </button>
-            <button
-              type="button"
-              class="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
-              disabled={loading()}
-              onClick={() => void signInDemo()}
-            >
-              Try free demo
-            </button>
+            <Show when={demoSignInEnabled}>
+              <button
+                type="button"
+                class="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
+                disabled={loading()}
+                onClick={() => void signInDemo()}
+              >
+                Try free demo
+              </button>
+            </Show>
           </div>
 
           <Show when={error()}>
             <p class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error()}</p>
           </Show>
 
-          <p class="mt-8 text-xs text-text-secondary">
-            Demo tenant DEMO000 · Platform owners use Google sign-in
-          </p>
+          <Show when={demoSignInEnabled}>
+            <p class="mt-8 text-xs text-text-secondary">
+              Demo tenant DEMO000 · Platform owners use Google sign-in
+            </p>
+          </Show>
         </div>
       </div>
-    </div>
+        </div>
+      </Show>
+    </Show>
   );
 }
