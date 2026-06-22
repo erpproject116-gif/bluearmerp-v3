@@ -204,6 +204,10 @@
     display: none !important;
   }
 
+  .erp-grid-col-resizer {
+    display: none !important;
+  }
+
   .quotation-print {
     background: #fff;
     padding: 0;

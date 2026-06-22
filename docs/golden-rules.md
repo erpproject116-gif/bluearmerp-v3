@@ -13,6 +13,26 @@ All list grids (`SpreadsheetGrid`, line-item grids, search result tables, report
 
 Implementation reference: `web/src/shared/SpreadsheetGrid.tsx`.
 
+## Print preview
+
+Printable document pages (packing slips, quotations, status reports) should use `PrintPreviewTable` from `web/src/shared/PrintPreviewTable.tsx` so users can **resize columns before printing**.
+
+- Wrap line tables in `PrintPreviewTable` with column definitions and `render` callbacks.
+- Show a short hint above the print toolbar: *"Drag column edges to resize before printing."*
+- `@media print` hides resize handles (`.erp-grid-col-resizer`) via shared CSS.
+- Reference: `web/src/modules/sales/sales/PackingSlipPrintPage.tsx`.
+
+## Document autosave
+
+Document entry modals (Sales, Sales Order, Quotation) use `useDocumentDraft` from `web/src/shared/useDocumentDraft.tsx`:
+
+- Debounced `PUT /api/v1/drafts/{entity_type}` (default 1.5s) while the modal is open.
+- On reopen, show banner: *"Temporarily saved at {time}. Apply | Delete"*.
+- **Apply** restores draft payload into the form; **Delete** clears the server draft.
+- **Clear on successful Save** — call `draft.clearOnSave()` after POST/PATCH succeeds.
+- Drafts are per-user WIP only; list APIs never return draft data.
+- Committed changes still go to `audit_logs` on save.
+
 ## Spreadsheet list grids (existing)
 
 - F2 new row · ↑↓ navigate · Enter edit · sortable headers · toolbar search · pagination.

@@ -14,13 +14,16 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quotation"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/salesorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/usermgmt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/drafts"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/formfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/health"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -49,7 +52,7 @@ func main() {
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORSOrigins(),
-		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
 	}))
@@ -64,9 +67,12 @@ func main() {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Get("/auth/me", auth.MeHandler(pool))
 			customfields.RegisterRoutes(protected, pool)
+			drafts.RegisterRoutes(protected, pool)
 			formfields.RegisterRoutes(protected, pool)
+			activitylog.RegisterRoutes(protected, pool)
 			inventory.RegisterRoutes(protected, pool)
 			quotation.RegisterRoutes(protected, pool)
+			sales.RegisterRoutes(protected, pool)
 			salesorder.RegisterRoutes(protected, pool)
 			usermgmt.RegisterRoutes(protected, pool)
 		})

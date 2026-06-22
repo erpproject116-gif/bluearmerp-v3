@@ -59,6 +59,8 @@ export DATABASE_URL="postgresql://postgres:YOUR_DB_PASSWORD@db.YOUR_REF.supabase
 | 11 | `api/migrations/011_quotations.sql` | Quotations, lines, slips, attachments |
 | 12 | `api/migrations/012_user_management.sql` | User Management module, tenant roles, invites |
 | 13 | `api/migrations/013_sales_order.sql` | Sales Order module, releases, stock movements |
+| 14 | `api/migrations/014_sales.sql` | Sales module, SO slip lines, activity log permission |
+| 15 | `api/migrations/015_document_drafts.sql` | Document autosave drafts table |
 
 ```bash
 export DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -75,6 +77,8 @@ psql "$DATABASE_URL" -f api/migrations/010_quotation_tax_mngt.sql
 psql "$DATABASE_URL" -f api/migrations/011_quotations.sql
 psql "$DATABASE_URL" -f api/migrations/012_user_management.sql
 psql "$DATABASE_URL" -f api/migrations/013_sales_order.sql
+psql "$DATABASE_URL" -f api/migrations/014_sales.sql
+psql "$DATABASE_URL" -f api/migrations/015_document_drafts.sql
 ```
 
 **Do not skip migrations.** Seeds depend on tables created here.
@@ -92,6 +96,7 @@ psql "$DATABASE_URL" -f api/migrations/013_sales_order.sql
 | 3 | `scripts/seed-demo-inventory.sql` | Inventory dummy rows for **DEMO000** only |
 | 4 | `scripts/seed-demo-quotations.sql` | Demo quotations for **DEMO000** + **BLUEARM** |
 | 5 | `scripts/seed-demo-sales-orders.sql` | Demo sales orders for **DEMO000** + **BLUEARM** |
+| 6 | `scripts/seed-demo-sales.sql` | Demo sales (SI) from released SO lines for **DEMO000** + **BLUEARM** |
 
 **Manual equivalent:**
 
@@ -101,6 +106,7 @@ psql "$DATABASE_URL" -f scripts/seed-platform-owners.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-quotations.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql
 ```
 
 **Re-run safety:** All seed files use `ON CONFLICT` / idempotent patterns where possible.

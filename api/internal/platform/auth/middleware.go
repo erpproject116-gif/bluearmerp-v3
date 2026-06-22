@@ -28,9 +28,10 @@ type TenantUser struct {
 	IsPlatformSuperadmin     bool
 	IsTenantOwner            bool
 	IsStoreAdmin             bool
-	canManageUsersRole       bool
+	canManageUsersRole        bool
 	canManageFormSettingsRole bool
-	AutoEnableAllModules     bool
+	canViewActivityLogsRole   bool
+	AutoEnableAllModules      bool
 }
 
 type Claims struct {
@@ -133,6 +134,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		  t.owner_user_id = u.id,
 		  coalesce(tr.can_manage_form_settings, false),
 		  coalesce(tr.can_manage_users, false),
+		  coalesce(tr.can_view_activity_logs, false),
 		  t.auto_enable_all_modules
 		from public.users u
 		join public.tenants t on t.id = u.tenant_id
@@ -145,7 +147,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		limit 1`
 	var tu TenantUser
 	tu.AuthUserID = authUserID
-	var canFormSettings, canManageUsers bool
+	var canFormSettings, canManageUsers, canViewActivityLogs bool
 	err := pool.QueryRow(ctx, q, authUserID).Scan(
 		&tu.AppUserID,
 		&tu.TenantID,
@@ -156,6 +158,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		&tu.IsTenantOwner,
 		&canFormSettings,
 		&canManageUsers,
+		&canViewActivityLogs,
 		&tu.AutoEnableAllModules,
 	)
 	if err != nil {
@@ -166,6 +169,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 	}
 	tu.canManageFormSettingsRole = canFormSettings
 	tu.canManageUsersRole = canManageUsers
+	tu.canViewActivityLogsRole = canViewActivityLogs
 	tu.IsStoreAdmin = tu.CanManageFormSettings()
 	return tu, nil
 }

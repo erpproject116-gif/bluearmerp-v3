@@ -13,6 +13,7 @@ export type MeData = {
     is_store_admin?: boolean;
     can_manage_users?: boolean;
     can_manage_custom_fields?: boolean;
+    can_view_activity_logs?: boolean;
   };
   tenant: {
     id: number;
@@ -34,6 +35,12 @@ export function canManageUsers(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
   return Boolean(u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner);
+}
+
+export function canViewActivityLogs(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  return Boolean(u.can_view_activity_logs || u.is_platform_superadmin || u.is_tenant_owner);
 }
 
 export type BootstrapError = "network" | "unauthorized" | "forbidden" | null;

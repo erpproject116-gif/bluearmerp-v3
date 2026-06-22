@@ -46,9 +46,18 @@ import OutstandingSOStatusPage from "./modules/sales-order/sales-order/Outstandi
 import ReleaseSalesOrderPage from "./modules/sales-order/sales-order/ReleaseSalesOrderPage";
 import SalesOrderPrintPage from "./modules/sales-order/sales-order/SalesOrderPrintPage";
 import SalesOrderStatusPrintPage from "./modules/sales-order/sales-order/SalesOrderStatusPrintPage";
+import SalesListPage from "./modules/sales/sales/SalesListPage";
+import SalesNewPage from "./modules/sales/sales/SalesNewPage";
+import SalesSettingsPage from "./modules/sales/sales/SalesSettingsPage";
+import SalesStatusPage from "./modules/sales/sales/SalesStatusPage";
+import PreInvoicingStatusPage from "./modules/sales/sales/PreInvoicingStatusPage";
+import ChangeSalesPriceBatchPage from "./modules/sales/sales/ChangeSalesPriceBatchPage";
+import PackingSlipPrintPage from "./modules/sales/sales/PackingSlipPrintPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
+import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
+import { ActivityLogRoute } from "./shared/ActivityLogRoute";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +93,7 @@ export default function App() {
         <Route path="/app/quotation/quotations/status/print" component={QuotationStatusPrintPage} />
         <Route path="/app/sales-order/sales-orders/:salesOrderId/print" component={SalesOrderPrintPage} />
         <Route path="/app/sales-order/sales-orders/status/print" component={SalesOrderStatusPrintPage} />
+        <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
         <Route path="/app" component={AppLayout}>
           <Route path="/inventory/partners" component={PartnersPage} />
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
@@ -118,6 +128,17 @@ export default function App() {
           <Route path="/sales-order/sales-orders/release" component={ReleaseSalesOrderPage} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
           <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
+          <Route path="/sales/sales/new" component={SalesNewPage} />
+          <Route path="/sales/sales/status" component={SalesStatusPage} />
+          <Route path="/sales/sales/pre-invoicing" component={PreInvoicingStatusPage} />
+          <Route path="/sales/sales/price-batch" component={ChangeSalesPriceBatchPage} />
+          <Route path="/sales/sales/settings" component={SalesSettingsPage} />
+          <Route path="/sales/sales" component={SalesListPage} />
+          <Route path="/activity-logs" component={() => (
+            <ActivityLogRoute>
+              <ActivityLogListPage />
+            </ActivityLogRoute>
+          )} />
           <Route path="/user-management/users" component={() => (
             <AdminModuleRoute>
               <UsersPage />

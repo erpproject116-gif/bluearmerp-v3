@@ -70,6 +70,27 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "sales",
+    label: "Sales",
+    href: "/app/sales/sales",
+    basePath: "/app/sales",
+    features: [
+      { label: "New Sales", href: "/app/sales/sales/new", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
+      {
+        label: "Pre-invoicing Status",
+        href: "/app/sales/sales/pre-invoicing",
+        settingsHref: "/app/sales/sales/settings",
+      },
+      {
+        label: "Change Sales Price-Batch",
+        href: "/app/sales/sales/price-batch",
+        settingsHref: "/app/sales/sales/settings",
+      },
+    ],
+  },
+  {
     id: "sales_order",
     label: "Sales Order",
     href: "/app/sales-order/sales-orders",
@@ -87,6 +108,19 @@ export const appModules: AppModule[] = [
         label: "Release Sales Order",
         href: "/app/sales-order/sales-orders/release",
         settingsHref: "/app/sales-order/sales-orders/settings",
+      },
+    ],
+  },
+  {
+    id: "activity_logs",
+    label: "Activity Logs",
+    href: "/app/activity-logs",
+    basePath: "/app/activity-logs",
+    features: [
+      {
+        label: "Activity Logs",
+        href: "/app/activity-logs",
+        settingsHref: "/app/activity-logs",
       },
     ],
   },

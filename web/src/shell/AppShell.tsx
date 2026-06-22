@@ -2,7 +2,7 @@ import type { ParentComponent } from "solid-js";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { supabase } from "../shared/api";
-import { useAuth, canManageUsers } from "../shared/auth-context";
+import { useAuth, canManageUsers, canViewActivityLogs } from "../shared/auth-context";
 import { ModuleIcon } from "./ModuleIcon";
 import { ShellProvider, useShell } from "./shell-context";
 import { appModules, featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
@@ -74,6 +74,8 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <For each={appModules.filter((m) => {
             const codes = auth.me?.enabled_module_codes;
             if (m.id === "user_management" && !canManageUsers(auth.me)) return false;
+            if (m.id === "activity_logs" && !canViewActivityLogs(auth.me)) return false;
+            if (m.id === "activity_logs" || m.id === "user_management") return true;
             if (!codes?.length) return true;
             return codes.includes(m.id);
           })}>

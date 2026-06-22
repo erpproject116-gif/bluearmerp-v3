@@ -1,0 +1,34 @@
+/** Shared sales document types (print, modals). */
+export type SalesDetail = {
+  id: number;
+  order_date: string;
+  date_seq: number;
+  date_no_display: string;
+  sales_no: string;
+  tax_type_id: number;
+  tax_type_name?: string;
+  currency_id: number;
+  currency_code?: string;
+  partner_id: number;
+  customer_name: string;
+  pic_user_id?: number | null;
+  pic_name: string;
+  location_id: number;
+  location_name?: string;
+  project_id?: number | null;
+  project_name?: string | null;
+  due_date?: string | null;
+  terms_of_payment?: string | null;
+  payment_terms?: string | null;
+  si_dr_no?: string | null;
+  notes?: string | null;
+  progress_status: string;
+  invoicing_status: boolean;
+  template_code: string;
+  sales_category?: string | null;
+  source_sales_order_id?: number | null;
+  subtotal: number;
+  tax_total: number;
+  grand_total: number;
+  lines?: unknown[];
+};

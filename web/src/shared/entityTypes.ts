@@ -41,3 +41,13 @@ export const SALES_ORDER_SETTINGS_HREF = {
 } as const;
 
 export type SalesOrderFeature = keyof typeof SALES_ORDER_ENTITY;
+
+export const SALES_ENTITY = {
+  sales: "sa_sales",
+} as const;
+
+export const SALES_SETTINGS_HREF = {
+  sales: "/app/sales/sales/settings",
+} as const;
+
+export type SalesFeature = keyof typeof SALES_ENTITY;
