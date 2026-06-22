@@ -247,7 +247,7 @@ export function QuotationLineGrid(props: Props) {
           <tbody>
             <For each={props.lines()}>
               {(line, idx) => (
-                <tr class="border-t border-stroke/60">
+                <tr>
                   <ResizableTd width={widthFor("line_no")} class="px-2 py-1">{line.line_no}</ResizableTd>
                   <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
@@ -297,7 +297,7 @@ export function QuotationLineGrid(props: Props) {
               )}
             </For>
           </tbody>
-          <tfoot class="border-t-2 border-stroke bg-slate-50 font-semibold">
+          <tfoot class="bg-slate-50 font-semibold">
             <tr>
               <td colSpan={4} class="px-2 py-2 text-right">
                 Totals

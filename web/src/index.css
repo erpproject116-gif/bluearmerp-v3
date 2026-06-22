@@ -14,6 +14,7 @@ body {
   table-layout: fixed;
   width: max-content;
   min-width: 100%;
+  border-collapse: collapse;
 }
 
 .erp-grid th,
@@ -21,6 +22,12 @@ body {
   overflow-wrap: anywhere;
   word-break: break-word;
   vertical-align: top;
+  border: 1px solid color-mix(in srgb, var(--color-stroke) 72%, transparent);
+}
+
+.erp-grid thead th {
+  border-bottom-color: var(--color-stroke);
+  background-color: #f8fafc;
 }
 
 .erp-grid th {

@@ -275,7 +275,7 @@ export function ItemSearchModal(props: Props) {
               </Show>
               <table class="erp-grid text-sm" style={{ width: `${tableWidth()}px`, "min-width": "100%" }}>
                 <thead>
-                  <tr class="border-b border-stroke text-left text-xs uppercase text-text-secondary">
+                  <tr class="text-left text-xs uppercase text-text-secondary">
                     {ITEM_SEARCH_COLUMNS.map((c) => (
                       <ResizableTh
                         columnKey={c.key}
@@ -292,7 +292,7 @@ export function ItemSearchModal(props: Props) {
                   <For each={results()}>
                     {(row) => (
                       <tr
-                        class="cursor-pointer border-b border-stroke/60 hover:bg-brand-50"
+                        class="cursor-pointer hover:bg-brand-50"
                         onDblClick={() => props.onSelect(row)}
                       >
                         <ResizableTd width={widthFor("select")} class="py-2 pr-4">

@@ -101,7 +101,7 @@ export function EditableLineGrid(props: Props) {
       </div>
       <DataTableScroll class="rounded-xl border border-stroke">
         <table class="erp-grid text-left text-sm" style={{ width: `${tableWidth()}px`, "min-width": "100%" }}>
-          <thead class="border-b border-stroke bg-slate-50 text-xs uppercase text-text-secondary">
+          <thead class="bg-slate-50 text-xs uppercase text-text-secondary">
             <tr>
               {REPAIR_LINE_COLUMNS.map((c) => (
                 <ResizableTh
@@ -119,7 +119,7 @@ export function EditableLineGrid(props: Props) {
           <tbody>
             <For each={props.lines()}>
               {(row, index) => (
-                <tr class="border-b border-stroke/60">
+                <tr>
                   <ResizableTd width={widthFor("line_no")} class="px-2 py-1 text-text-secondary">
                     {row.line_no}
                   </ResizableTd>

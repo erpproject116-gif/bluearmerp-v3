@@ -266,7 +266,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             class="erp-grid text-left text-sm"
             style={{ width: `${tableWidth()}px`, "min-width": "100%" }}
           >
-            <thead class="sticky top-0 border-b border-stroke bg-slate-50">
+            <thead class="sticky top-0 z-[1] bg-slate-50">
               <tr>
                 {props.columns.map((c) => {
                   const sortable = c.sortable !== false && Boolean(props.onSort);
@@ -296,7 +296,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             <tbody>
               {props.rows.map((row, idx) => (
                 <tr
-                  class="cursor-pointer border-b border-stroke/60 transition hover:bg-slate-50"
+                  class="cursor-pointer transition hover:bg-slate-50"
                   classList={{ "bg-brand-50": idx === focusIdx() || props.selectedId === row.id }}
                   onClick={() => {
                     setFocusIdx(idx);

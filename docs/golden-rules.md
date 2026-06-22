@@ -8,7 +8,8 @@ All list grids (`SpreadsheetGrid`, line-item grids, search result tables, report
 
 1. **Resizable columns** — drag the right edge of a column header to adjust width (min 72px, max 640px by default).
 2. **Horizontal scroll** — when total column width exceeds the viewport, the table scrolls horizontally inside `erp-data-table-scroll` (never clip or squash columns below min width).
-3. **Shared primitives** — use `useResizableColumns`, `DataTableScroll`, `ResizableTh`, and `ResizableTd` from `web/src/shared/` (or extend `SpreadsheetGrid`).
+3. **Subtle cell borders** — all `erp-grid` tables use light grid lines via shared CSS (`web/src/index.css`); do not add per-row `border-b` that duplicates cell borders.
+4. **Shared primitives** — use `useResizableColumns`, `DataTableScroll`, `ResizableTh`, and `ResizableTd` from `web/src/shared/` (or extend `SpreadsheetGrid`).
 
 Implementation reference: `web/src/shared/SpreadsheetGrid.tsx`.
 

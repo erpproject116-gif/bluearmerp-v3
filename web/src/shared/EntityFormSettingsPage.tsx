@@ -166,8 +166,8 @@ export function EntityFormSettingsPage(props: Props) {
       </Show>
 
       <div class="overflow-hidden rounded-xl border border-stroke bg-white shadow-sm">
-        <table class="w-full text-left text-sm">
-          <thead class="border-b border-stroke bg-slate-50 text-xs uppercase tracking-wide text-text-secondary">
+        <table class="erp-grid w-full text-left text-sm">
+          <thead class="text-xs uppercase tracking-wide text-text-secondary">
             <tr>
               <th class="px-4 py-3 font-semibold">Field</th>
               <th class="px-4 py-3 font-semibold">Type</th>
@@ -189,7 +189,7 @@ export function EntityFormSettingsPage(props: Props) {
             </Show>
             <For each={sortedRows()}>
               {(row, index) => (
-                <tr class="border-b border-stroke last:border-0">
+                <tr>
                   <td class="px-4 py-3">
                     <span class="font-medium text-text-primary">{row.field_key}</span>
                     <span class="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-text-secondary">{row.kind}</span>
