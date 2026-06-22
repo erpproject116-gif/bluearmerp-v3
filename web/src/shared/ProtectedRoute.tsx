@@ -1,4 +1,4 @@
-import { type ParentComponent, Show } from "solid-js";
+import { type ParentComponent, Show, createSignal, onMount } from "solid-js";
 import { Navigate, useNavigate } from "@solidjs/router";
 import { supabase, apiNetworkErrorMessage } from "../shared/api";
 import { useAuth } from "../shared/auth-context";
@@ -7,6 +7,16 @@ import { needsSignInRedirect, SessionLoading } from "./AuthRedirect";
 export const ProtectedRoute: ParentComponent = (props) => {
   const auth = useAuth();
   const navigate = useNavigate();
+  const [signedInAs, setSignedInAs] = createSignal("");
+
+  onMount(() => {
+    void supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
+      if (user?.email) {
+        setSignedInAs(user.id ? `${user.email} · ${user.id}` : user.email);
+      }
+    });
+  });
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -49,6 +59,11 @@ export const ProtectedRoute: ParentComponent = (props) => {
                   </p>
                   {auth.bootstrapMessage && (
                     <p class="mt-2 text-xs text-text-secondary">{auth.bootstrapMessage}</p>
+                  )}
+                  {signedInAs() && (
+                    <p class="mt-3 rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-text-secondary">
+                      Signed in as: {signedInAs()}
+                    </p>
                   )}
                   <div class="mt-5 flex gap-2">
                     <button
