@@ -26,10 +26,10 @@ import (
 func main() {
 	cfg := config.Load()
 	if cfg.DatabaseURL == "" {
-		log.Fatal("Database not configured: set SUPABASE_URL + SUPABASE_DB_PASSWORD (or DATABASE_URL override). See .env.example")
+		log.Fatal(config.DatabaseConfigError())
 	}
 	if cfg.SupabaseURL == "" && cfg.SupabaseJWTSecret == "" {
-		log.Fatal("Set SUPABASE_URL (JWKS) and/or SUPABASE_JWT_SECRET in .env")
+		log.Fatal("auth not configured: set SUPABASE_URL (JWKS) and/or SUPABASE_JWT_SECRET")
 	}
 
 	ctx := context.Background()

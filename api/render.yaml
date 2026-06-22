@@ -1,0 +1,20 @@
+# Render Blueprint — optional; documents required env for the Go API.
+# Dashboard: New → Blueprint, or create Web Service manually with Root Directory = api.
+#
+# Secrets must be set in Render → Environment before the service will start.
+
+services:
+  - type: web
+    name: bluearm-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_DB_PASSWORD
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
