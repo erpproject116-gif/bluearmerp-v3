@@ -1,0 +1,35 @@
+---
+description: Tenant-defined custom form fields on create/edit modals (admin+ roles)
+alwaysApply: true
+---
+
+# Custom form fields (golden rule)
+
+When adding **new entry** flows (create/edit modals) in any module or feature, the platform must support **tenant-defined custom fields** configurable by **store admin**, **superadmin**, and **owner** roles.
+
+## Who can configure
+
+- `store_admin`, `superadmin`, `owner` (tenant-scoped; respect RLS and module permissions)
+
+## Supported field types (minimum set)
+
+| Type | Control |
+|------|---------|
+| Short text | textbox |
+| Long text | textarea |
+| Single choice | radio, dropdown |
+| Multi choice | checkbox group |
+| Number | number input |
+| Number range | min/max pair |
+| Date | date picker |
+| Date range | start/end date pickers |
+
+## Implementation expectations
+
+1. **Schema** — per-entity custom field definitions (label, type, options, required, sort order) stored per tenant.
+2. **API** — CRUD for field definitions (admin+ only); read definitions on list/get; validate and persist values on create/update.
+3. **UI — Settings page** — admins manage custom fields on the feature **Settings** page (`EntityFormSettingsPage`), not inside create/edit modals. See `.cursor/rules/form-field-settings.mdc`.
+4. **UI — modals** — use `CustomFieldsSection` from `web/src/shared/CustomFieldsSection.tsx` inside every create/edit `EntityModal` (render values only). Admins configure fields via the **cog icon** beside **+ New row** on each grid (not in the header nav).
+4. **Grids** — optional: show high-value custom columns when configured; keep sort/filter rules explicit per field type.
+
+New features must not hard-code a closed field set only — plan for the custom-field extension point from the start.

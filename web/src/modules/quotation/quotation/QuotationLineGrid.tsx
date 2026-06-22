@@ -1,0 +1,305 @@
+import { createSignal, For, Show } from "solid-js";
+import type { Accessor, Setter } from "solid-js";
+import { apiFetch } from "../../../shared/api";
+import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
+import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
+import { inputClass } from "../../../shared/SpreadsheetGrid";
+import { QuotationItemSearchModal } from "./QuotationItemSearchModal";
+
+export type QuotationLineRow = {
+  line_no: number;
+  item_id?: number | null;
+  item_code: string;
+  item_name: string;
+  description: string;
+  qty: string;
+  unit_price: string;
+  input_basis: "vat_inc_unit" | "non_vat_unit";
+  unit_non_vat: string;
+  non_vat_total: string;
+  tax_amount: string;
+  unit_vat_inc: string;
+  line_total: string;
+  remark: string;
+};
+
+export function emptyQuotationLine(lineNo: number, salesPrice = "", inputBasis: QuotationLineRow["input_basis"] = "vat_inc_unit"): QuotationLineRow {
+  return {
+    line_no: lineNo,
+    item_id: null,
+    item_code: "",
+    item_name: "",
+    description: "",
+    qty: "1",
+    unit_price: salesPrice,
+    input_basis: inputBasis,
+    unit_non_vat: "",
+    non_vat_total: "",
+    tax_amount: "",
+    unit_vat_inc: "",
+    line_total: "",
+    remark: "",
+  };
+}
+
+function parseNum(s: string) {
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function money(n: number) {
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Preview line amounts using Tax Management rate (server-authoritative). */
+export async function previewQuotationLineAmounts(
+  taxTypeId: number,
+  line: Pick<QuotationLineRow, "qty" | "unit_price" | "input_basis">,
+): Promise<Partial<QuotationLineRow>> {
+  if (parseNum(line.qty) <= 0 || parseNum(line.unit_price) <= 0) return {};
+  const res = await apiFetch<{
+    unit_non_vat: number;
+    non_vat_total: number;
+    tax_amount: number;
+    unit_vat_inc: number;
+    line_total: number;
+  }>(`/api/v1/quotation/tax-types/${taxTypeId}/preview`, {
+    method: "POST",
+    body: JSON.stringify({
+      unit_price: parseNum(line.unit_price),
+      qty: parseNum(line.qty),
+      input_basis: line.input_basis,
+    }),
+  });
+  if (!res.success || !res.data) return {};
+  const d = res.data;
+  return {
+    unit_non_vat: String(d.unit_non_vat),
+    non_vat_total: String(d.non_vat_total),
+    tax_amount: String(d.tax_amount),
+    unit_vat_inc: String(d.unit_vat_inc),
+    line_total: String(d.line_total),
+  };
+}
+
+/** Recompute all line tax/amount columns for a new transaction type. */
+export async function recalculateQuotationLines(
+  lines: QuotationLineRow[],
+  taxTypeId: number,
+  taxMeta: TaxTypeMeta,
+): Promise<QuotationLineRow[]> {
+  const basis = defaultInputBasis(taxMeta.tax_mode);
+  return Promise.all(
+    lines.map(async (ln) => {
+      const merged: QuotationLineRow = { ...ln, input_basis: basis };
+      if (parseNum(merged.qty) <= 0 || parseNum(merged.unit_price) <= 0) return merged;
+      const amounts = await previewQuotationLineAmounts(taxTypeId, merged);
+      return { ...merged, ...amounts };
+    }),
+  );
+}
+
+type Props = {
+  lines: Accessor<QuotationLineRow[]>;
+  onChange: Setter<QuotationLineRow[]>;
+  taxTypeId: () => number | null;
+  taxTypeMeta: () => TaxTypeMeta | null;
+  locationId: () => number | null;
+};
+
+export function QuotationLineGrid(props: Props) {
+  const [searchOpen, setSearchOpen] = createSignal(false);
+  const [searchLineIdx, setSearchLineIdx] = createSignal<number | null>(null);
+
+  const previewLine = async (line: QuotationLineRow): Promise<Partial<QuotationLineRow>> => {
+    const taxId = props.taxTypeId();
+    if (!taxId) return {};
+    return previewQuotationLineAmounts(taxId, line);
+  };
+
+  const updateLine = async (idx: number, patch: Partial<QuotationLineRow>) => {
+    const next = props.lines().map((ln, i) => (i === idx ? { ...ln, ...patch } : ln));
+    props.onChange(next);
+    const merged = next[idx];
+    if (patch.qty !== undefined || patch.unit_price !== undefined || patch.input_basis !== undefined) {
+      const amounts = await previewLine(merged);
+      props.onChange(next.map((ln, i) => (i === idx ? { ...ln, ...amounts } : ln)));
+    }
+  };
+
+  const addLine = () => {
+    const meta = props.taxTypeMeta();
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    props.onChange([...props.lines(), emptyQuotationLine(props.lines().length + 1, "", basis)]);
+  };
+
+  const removeLine = (idx: number) => {
+    const meta = props.taxTypeMeta();
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const next = props.lines().filter((_, i) => i !== idx).map((ln, i) => ({ ...ln, line_no: i + 1 }));
+    props.onChange(next.length ? next : [emptyQuotationLine(1, "", basis)]);
+  };
+
+  const openSearch = (idx: number) => {
+    setSearchLineIdx(idx);
+    setSearchOpen(true);
+  };
+
+  const applyItems = (items: ItemSearchRow[]) => {
+    const idx = searchLineIdx();
+    if (idx == null) return;
+    const meta = props.taxTypeMeta();
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const current = [...props.lines()];
+    const first = items[0];
+    current[idx] = {
+      ...current[idx],
+      item_id: first.id,
+      item_code: first.item_code,
+      item_name: first.item_name,
+      unit_price: String(first.sales_price ?? 0),
+      input_basis: basis,
+    };
+    for (let i = 1; i < items.length; i++) {
+      const it = items[i];
+      current.push(emptyQuotationLine(current.length + 1, String(it.sales_price ?? 0), basis));
+      const last = current.length - 1;
+      current[last] = {
+        ...current[last],
+        item_id: it.id,
+        item_code: it.item_code,
+        item_name: it.item_name,
+      };
+    }
+    const numbered = current.map((ln, i) => ({ ...ln, line_no: i + 1 }));
+    props.onChange(numbered);
+    void Promise.all(numbered.map((ln, i) => previewLine(ln).then((amounts) => ({ i, amounts })))).then((results) => {
+      props.onChange((prev) =>
+        prev.map((ln, i) => {
+          const hit = results.find((r) => r.i === i);
+          return hit ? { ...ln, ...hit.amounts } : ln;
+        }),
+      );
+    });
+  };
+
+  const totals = () => {
+    const lines = props.lines();
+    return {
+      qty: lines.reduce((s, ln) => s + parseNum(ln.qty), 0),
+      nonVat: lines.reduce((s, ln) => s + parseNum(ln.non_vat_total), 0),
+      tax: lines.reduce((s, ln) => s + parseNum(ln.tax_amount), 0),
+      grand: lines.reduce((s, ln) => s + parseNum(ln.line_total), 0),
+    };
+  };
+
+  return (
+    <div class="col-span-full">
+      <div class="mb-2 flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-text-primary">Line items</h3>
+        <button type="button" class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50" onClick={addLine}>
+          + Line
+        </button>
+      </div>
+      <Show when={!props.taxTypeId()}>
+        <p class="mb-2 text-xs text-amber-700">Select a transaction type to apply tax rates to line amounts.</p>
+      </Show>
+      <div class="overflow-x-auto rounded-lg border border-stroke">
+        <table class="erp-grid min-w-full text-xs">
+          <thead class="bg-slate-50 text-left uppercase text-text-secondary">
+            <tr>
+              <th class="px-2 py-2">#</th>
+              <th class="px-2 py-2">Item Code</th>
+              <th class="px-2 py-2">Item Name</th>
+              <th class="px-2 py-2">Description</th>
+              <th class="px-2 py-2 text-right">Qty</th>
+              <th class="px-2 py-2">Basis</th>
+              <th class="px-2 py-2 text-right">Unit Price</th>
+              <th class="px-2 py-2 text-right">Unit (Non-VAT)</th>
+              <th class="px-2 py-2 text-right">Non-VAT Total</th>
+              <th class="px-2 py-2 text-right">Tax</th>
+              <th class="px-2 py-2 text-right">Unit (VAT inc.)</th>
+              <th class="px-2 py-2 text-right">Line Total</th>
+              <th class="px-2 py-2">Remark</th>
+              <th class="px-2 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            <For each={props.lines()}>
+              {(line, idx) => (
+                <tr class="border-t border-stroke/60">
+                  <td class="px-2 py-1">{line.line_no}</td>
+                  <td class="px-2 py-1">
+                    <input
+                      class={`${inputClass} cursor-pointer`}
+                      value={line.item_code}
+                      readOnly
+                      onDblClick={() => openSearch(idx())}
+                      title="Double-click to search items"
+                    />
+                  </td>
+                  <td class="px-2 py-1">
+                    <input class={inputClass} value={line.item_name} onInput={(e) => void updateLine(idx(), { item_name: e.currentTarget.value })} />
+                  </td>
+                  <td class="px-2 py-1">
+                    <input class={inputClass} value={line.description} onInput={(e) => void updateLine(idx(), { description: e.currentTarget.value })} />
+                  </td>
+                  <td class="px-2 py-1">
+                    <input type="number" class={`${inputClass} text-right`} value={line.qty} onInput={(e) => void updateLine(idx(), { qty: e.currentTarget.value })} />
+                  </td>
+                  <td class="px-2 py-1">
+                    <select
+                      class={inputClass}
+                      value={line.input_basis}
+                      onChange={(e) => void updateLine(idx(), { input_basis: e.currentTarget.value as QuotationLineRow["input_basis"] })}
+                    >
+                      <option value="vat_inc_unit">VAT inc.</option>
+                      <option value="non_vat_unit">Non-VAT</option>
+                    </select>
+                  </td>
+                  <td class="px-2 py-1">
+                    <input type="number" class={`${inputClass} text-right`} value={line.unit_price} onInput={(e) => void updateLine(idx(), { unit_price: e.currentTarget.value })} />
+                  </td>
+                  <td class="px-2 py-1 text-right">{money(parseNum(line.unit_non_vat))}</td>
+                  <td class="px-2 py-1 text-right">{money(parseNum(line.non_vat_total))}</td>
+                  <td class="px-2 py-1 text-right">{money(parseNum(line.tax_amount))}</td>
+                  <td class="px-2 py-1 text-right">{money(parseNum(line.unit_vat_inc))}</td>
+                  <td class="px-2 py-1 text-right">{money(parseNum(line.line_total))}</td>
+                  <td class="px-2 py-1">
+                    <input class={inputClass} value={line.remark} onInput={(e) => void updateLine(idx(), { remark: e.currentTarget.value })} />
+                  </td>
+                  <td class="px-2 py-1">
+                    <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeLine(idx())}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              )}
+            </For>
+          </tbody>
+          <tfoot class="border-t-2 border-stroke bg-slate-50 font-semibold">
+            <tr>
+              <td colSpan={4} class="px-2 py-2 text-right">
+                Totals
+              </td>
+              <td class="px-2 py-2 text-right">{totals().qty.toLocaleString("en-PH", { maximumFractionDigits: 4 })}</td>
+              <td colSpan={3} />
+              <td class="px-2 py-2 text-right">{money(totals().nonVat)}</td>
+              <td class="px-2 py-2 text-right">{money(totals().tax)}</td>
+              <td />
+              <td class="px-2 py-2 text-right">{money(totals().grand)}</td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <QuotationItemSearchModal
+        open={searchOpen()}
+        contextLocationId={props.locationId()}
+        onClose={() => setSearchOpen(false)}
+        onConfirm={applyItems}
+      />
+    </div>
+  );
+}

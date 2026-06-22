@@ -1,0 +1,14 @@
+---
+description: Quotation module — documents, status reports, print
+globs:
+  - web/src/modules/quotation/**
+  - api/internal/modules/quotation/**
+---
+
+# Quotation module
+
+- Top-level module at `/app/quotation`; Tax Management is a **sub-branch** (sidebar only).
+- Transaction types come from Tax Management (`quo_tax_types`), not hardcoded in quotation UI.
+- Line totals recomputed server-side via `taxcalc.ComputeLine` on save.
+- Status and Outstanding reports: **filter-first** (F8), no auto-load.
+- Grids use `erp-grid` class for stretch + wrap.

@@ -1,0 +1,55 @@
+---
+description: Form field Settings nav and page for every datagrid with new-row modals
+alwaysApply: true
+---
+
+# Form field settings (golden rule)
+
+Every **datagrid / datatable** that has a **+ New row** (create/edit modal) must also expose a **Settings** nav tab beside the feature in the module header.
+
+## Header navigation
+
+- Do **not** add Settings to the module header nav links.
+- Settings is accessed from the grid toolbar only (see below).
+
+## Grid toolbar
+
+- Pass `settingsHref` to `SpreadsheetGrid` beside **+ New row**.
+- Render as a **cog icon** button (built into `SpreadsheetGrid`); link to the feature settings route (e.g. `/app/inventory/partners/settings`).
+- Register settings routes in `web/src/App.tsx`; hrefs live in `web/src/shared/entityTypes.ts` (`INVENTORY_SETTINGS_HREF`) or equivalent per module.
+
+## Settings page
+
+Use `EntityFormSettingsPage` from `web/src/shared/EntityFormSettingsPage.tsx` (or a thin wrapper per feature).
+
+Admins can configure **all form fields** for the new-row modal:
+
+| Field kind | Configurable |
+|------------|--------------|
+| Standard (built-in) | Label override, visible, required, disabled |
+| Custom (tenant-defined) | Label, visible, required, active; add new; remove (soft-delete) |
+
+## API
+
+- `GET/PATCH /api/v1/form-field-settings?entity_type=…` — merged standard + custom settings (`api/internal/platform/formfields`).
+- `POST/DELETE /api/v1/custom-fields` — create / deactivate custom field definitions.
+- Standard field registry per entity lives in `api/internal/platform/formfields/registry.go`.
+- DB: `tenant_standard_field_settings` (migration `005_form_field_settings.sql`).
+
+## Create/edit modal
+
+1. Wrap standard fields with `ModalField` + `useFormFieldSettings` so visibility, labels, required, and disabled state come from settings.
+2. Render custom values with `CustomFieldsSection` (read-only config; no inline field builder).
+3. Validate with `buildRequiredChecks` + `validateCustomFields` before save.
+
+## New features checklist
+
+When adding a new grid with new-row modals:
+
+1. Add entity type to `formfields/registry.go` and `web/src/shared/entityTypes.ts` (include `INVENTORY_SETTINGS_HREF` entry).
+2. Add feature in `modules.ts` and routes in `App.tsx` (grid + settings page).
+3. Create `*SettingsPage.tsx` wrapper using `EntityFormSettingsPage`.
+4. Pass `settingsHref` to `SpreadsheetGrid`; use `ModalField` / `CustomFieldsSection` in the modal.
+5. Run migration if new standard-field table changes are needed.
+
+See also: `.cursor/rules/custom-form-fields.mdc` for custom field types and admin roles.

@@ -1,0 +1,34 @@
+# For detailed configuration reference documentation, visit:
+# https://supabase.com/docs/guides/local-development/cli/config
+project_id = "bluearm-erp-v3"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.migrations]
+enabled = true
+schema_paths = ["../api/migrations/*.sql"]
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql", "../scripts/seed-platform-owners.sql", "../scripts/seed-demo-inventory.sql"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/auth/callback"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.external.google]
+enabled = false
+# Enable in Dashboard for hosted; set client_id and secret locally when ready.

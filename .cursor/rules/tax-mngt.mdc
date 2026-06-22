@@ -1,0 +1,14 @@
+---
+description: Tax Management sub-branch under Quotation
+globs:
+  - web/src/modules/quotation/tax-mngt/**
+  - api/internal/modules/quotation/tax_types.go
+  - api/internal/modules/quotation/currencies.go
+  - api/internal/platform/taxcalc/**
+---
+
+# Tax Management
+
+- Sub-branch nav: `web/src/shell/tax-mngt-nav.ts`, header `TaxMngtHeaderNav`.
+- Owns `quo_tax_types` and `quo_currencies`; `rate_percent` + `tax_mode` drive `taxcalc.ComputeLine` on quotations.
+- Preview endpoint: `POST /api/v1/quotation/tax-types/{id}/preview`.

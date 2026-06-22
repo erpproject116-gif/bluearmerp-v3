@@ -1,0 +1,193 @@
+package inventory
+
+import (
+	"context"
+	"encoding/csv"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+)
+
+const (
+	itemImportMaxRows  = 500
+	itemImportMaxBytes = 5 << 20
+)
+
+var itemImportHeaders = []string{"item_name", "purchase_price", "sales_price", "vip_price", "status"}
+var itemImportExample = []string{"Widget A", "100.00", "150.00", "140.00", "active"}
+
+type importRowError struct {
+	Row     int    `json:"row"`
+	Message string `json:"message"`
+}
+
+type importResult struct {
+	Created   int              `json:"created"`
+	Failed    int              `json:"failed"`
+	RowErrors []importRowError `json:"row_errors,omitempty"`
+}
+
+func itemImportTemplateHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="items-import-template.csv"`)
+		cw := csv.NewWriter(w)
+		_ = cw.Write(itemImportHeaders)
+		_ = cw.Write(itemImportExample)
+		cw.Flush()
+	}
+}
+
+func itemImportCSVHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		if err := r.ParseMultipartForm(itemImportMaxBytes); err != nil {
+			response.Validation(w, map[string]string{"file": "Invalid upload."})
+			return
+		}
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			response.Validation(w, map[string]string{"file": "CSV file is required."})
+			return
+		}
+		defer file.Close()
+
+		records, err := csv.NewReader(file).ReadAll()
+		if err != nil {
+			response.Validation(w, map[string]string{"file": "Could not read CSV."})
+			return
+		}
+		if len(records) < 2 {
+			response.Validation(w, map[string]string{"file": "CSV must include a header row and at least one data row."})
+			return
+		}
+		colIdx, err := mapCSVHeaders(records[0], itemImportHeaders)
+		if err != nil {
+			response.Validation(w, map[string]string{"file": err.Error()})
+			return
+		}
+
+		dataRows := records[1:]
+		if len(dataRows) > itemImportMaxRows {
+			response.Validation(w, map[string]string{"file": fmt.Sprintf("Maximum %d rows per import.", itemImportMaxRows)})
+			return
+		}
+
+		result := importResult{}
+		for i, raw := range dataRows {
+			rowNum := i + 2
+			if isEmptyCSVRow(raw) {
+				continue
+			}
+			row := extractCSVRow(raw, colIdx, itemImportHeaders)
+			if err := importItemRow(r.Context(), pool, tu, row); err != nil {
+				result.Failed++
+				result.RowErrors = append(result.RowErrors, importRowError{Row: rowNum, Message: err.Error()})
+				continue
+			}
+			result.Created++
+		}
+		if result.Created == 0 && result.Failed == 0 {
+			response.Validation(w, map[string]string{"file": "No data rows found."})
+			return
+		}
+		msg := fmt.Sprintf("Imported %d row(s).", result.Created)
+		if result.Failed > 0 {
+			msg = fmt.Sprintf("Imported %d row(s); %d failed.", result.Created, result.Failed)
+		}
+		response.OK(w, result, msg)
+	}
+}
+
+func mapCSVHeaders(headerRow []string, expected []string) (map[string]int, error) {
+	idx := map[string]int{}
+	for i, h := range headerRow {
+		key := strings.ToLower(strings.TrimSpace(h))
+		if key == "" {
+			continue
+		}
+		idx[key] = i
+	}
+	for _, col := range expected {
+		if _, ok := idx[col]; !ok {
+			return nil, fmt.Errorf("missing required column: %s", col)
+		}
+	}
+	return idx, nil
+}
+
+func extractCSVRow(raw []string, colIdx map[string]int, headers []string) map[string]string {
+	row := make(map[string]string, len(headers))
+	for _, col := range headers {
+		i := colIdx[col]
+		if i < len(raw) {
+			row[col] = strings.TrimSpace(raw[i])
+		}
+	}
+	return row
+}
+
+func isEmptyCSVRow(row []string) bool {
+	for _, c := range row {
+		if strings.TrimSpace(c) != "" {
+			return false
+		}
+	}
+	return true
+}
+
+func importItemRow(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, row map[string]string) error {
+	purchase, err := parseCSVFloat(row["purchase_price"], "purchase_price")
+	if err != nil {
+		return err
+	}
+	sales, err := parseCSVFloat(row["sales_price"], "sales_price")
+	if err != nil {
+		return err
+	}
+	vip, err := parseCSVFloat(row["vip_price"], "vip_price")
+	if err != nil {
+		return err
+	}
+	body := itemBody{
+		ItemName:      row["item_name"],
+		PurchasePrice: purchase,
+		SalesPrice:    sales,
+		VipPrice:      vip,
+		Status:        row["status"],
+	}
+	if strings.TrimSpace(body.ItemName) == "" {
+		return fmt.Errorf("item name is required")
+	}
+	_, _, err = createWithCode(ctx, pool, tu, "item", func(ctx context.Context, tx pgxpoolConn, code string) (int64, Item, error) {
+		var out Item
+		err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, status) values ($1,$2,$3,$4,$5,$6,$7)
+			returning id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8, status`,
+			tu.TenantID, code, strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, defaultStatus(body.Status)).
+			Scan(&out.ID, &out.ItemCode, &out.ItemName, &out.PurchasePrice, &out.SalesPrice, &out.VipPrice, &out.Status)
+		if err == nil {
+			_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "inventory.item.import", "inv_item", &out.ID, nil, body)
+		}
+		return out.ID, out, err
+	})
+	return err
+}
+
+func parseCSVFloat(raw, field string) (float64, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a number", field)
+	}
+	return v, nil
+}

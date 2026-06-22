@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+api/.env
+web/.env
+web/.env.local
+*.exe
+api/bin/
+.tmp-perf.json
+.DS_Store

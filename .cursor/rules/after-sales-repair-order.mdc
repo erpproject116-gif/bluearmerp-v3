@@ -1,0 +1,48 @@
+---
+description: After-Sales Repair Order — nav, numbering, item search, grid settings
+alwaysApply: false
+globs: web/src/modules/inventory/after-sales/**,api/internal/modules/inventory/repair_orders.go,api/internal/modules/inventory/repair_order_status.go,api/internal/modules/inventory/item_search.go
+---
+
+# After-Sales Repair Order
+
+## Navigation
+
+- **After-Sales** is a sidebar sub-branch under **Inventory** (`subBranches` in [`modules.ts`](web/src/shell/modules.ts)), not a header feature tab.
+- Sub-nav renders in the **sticky header** as flat feature pills (same pattern as Partners/Locations) via [`AfterSalesHeaderNav.tsx`](web/src/shell/AfterSalesHeaderNav.tsx).
+- Link config: [`after-sales-nav.ts`](web/src/shell/after-sales-nav.ts).
+- Register Repair routes are placeholders until the next epic.
+
+## Numbering (per tenant, per calendar day)
+
+- **Date-no display:** `MM/DD/YYYY-#` from `order_date` + `date_seq`.
+- **Repair Order No.:** `YYMMDD` + 9-digit zero-padded daily counter (e.g. `260616000000001`).
+- Allocated atomically via `allocate_repair_order_sequences()` in migration `007_repair_orders.sql`.
+
+## Grid golden rules
+
+- **+ New row** opens [`RepairOrderModal`](web/src/modules/inventory/after-sales/RepairOrderModal.tsx).
+- **Cog icon** → `/app/inventory/after-sales/repair-orders/settings` (`EntityFormSettingsPage`).
+- **Print** (Receipt) and **Warranty** (Details) open print views in a new tab; data from `GET /api/v1/inventory/repair-orders/{id}/print?doc=receipt|warranty`.
+
+## Repair Order Status report
+
+- Route: `/app/inventory/after-sales/repair-orders/status` — filter first (F8), then line-level grid.
+- **Date-No** click → `RepairOrderModal`. **Progress** inline → `PATCH .../progress-status`.
+- Line **remark** column: migration `008_repair_order_status.sql`; editable in `EditableLineGrid`.
+- Print: `/repair-orders/status/print?...` (browser print). Excel: `GET .../status-report/export`.
+
+## Item picker
+
+- Double-click **Item Code** in [`EditableLineGrid`](web/src/shared/EditableLineGrid.tsx) → [`ItemSearchModal`](web/src/shared/ItemSearchModal.tsx).
+- **Submit-to-search only** — `POST /api/v1/inventory/items/search`; no live filter-as-you-type.
+- Extended item columns live in migration `006_item_master_extended.sql`.
+
+## API
+
+- `GET/POST/PATCH/DELETE /api/v1/inventory/repair-orders`
+- `GET /api/v1/inventory/repair-orders/preview-sequences?order_date=YYYY-MM-DD`
+- `GET /api/v1/inventory/repair-orders/status-report` (line-level, filtered)
+- `GET /api/v1/inventory/repair-orders/status-report/export` (CSV)
+- `PATCH /api/v1/inventory/repair-orders/{id}/progress-status`
+- `GET /api/v1/inventory/after-sales/users?q=` (PIC lookup)

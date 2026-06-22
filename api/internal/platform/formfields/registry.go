@@ -1,0 +1,96 @@
+package formfields
+
+type StandardField struct {
+	FieldKey        string `json:"field_key"`
+	Label           string `json:"label"`
+	FieldType       string `json:"field_type"`
+	DefaultRequired bool   `json:"default_required"`
+	DefaultDisabled bool   `json:"default_disabled"`
+	SortOrder       int    `json:"sort_order"`
+}
+
+var standardRegistry = map[string][]StandardField{
+	"inv_partner": {
+		{FieldKey: "partner_kind", Label: "Kind", FieldType: "select", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "company_name", Label: "Company name", FieldType: "text", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "ceo_name", Label: "CEO name", FieldType: "text", SortOrder: 30},
+		{FieldKey: "phone", Label: "Phone", FieldType: "text", SortOrder: 40},
+		{FieldKey: "mobile", Label: "Mobile", FieldType: "text", SortOrder: 50},
+		{FieldKey: "email", Label: "Email", FieldType: "text", SortOrder: 60},
+		{FieldKey: "address", Label: "Address", FieldType: "textarea", SortOrder: 70},
+		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 80},
+	},
+	"inv_location": {
+		{FieldKey: "location_name", Label: "Location name", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "location_type", Label: "Type", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "production_process", Label: "Production process", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+	},
+	"inv_project": {
+		{FieldKey: "project_name", Label: "Project name", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+	},
+	"inv_department": {
+		{FieldKey: "department_name", Label: "Department name", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+	},
+	"inv_item": {
+		{FieldKey: "item_name", Label: "Item name", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "purchase_price", Label: "Purchase price", FieldType: "number", SortOrder: 20},
+		{FieldKey: "sales_price", Label: "Sales price", FieldType: "number", SortOrder: 30},
+		{FieldKey: "vip_price", Label: "VIP price", FieldType: "number", SortOrder: 40},
+		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 50},
+	},
+	"inv_repair_order": {
+		{FieldKey: "order_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "partner_id", Label: "Customer", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "pic_name", Label: "PIC", FieldType: "text", SortOrder: 30},
+		{FieldKey: "location_id", Label: "Location", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", DefaultRequired: true, SortOrder: 50},
+		{FieldKey: "scheduled_completion_date", Label: "Scheduled completion date", FieldType: "date", SortOrder: 60},
+		{FieldKey: "latest_update", Label: "Latest update", FieldType: "textarea", SortOrder: 70},
+		{FieldKey: "repair_details", Label: "Repair details", FieldType: "textarea", SortOrder: 80},
+		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 90},
+		{FieldKey: "project_name", Label: "Project name", FieldType: "text", SortOrder: 100},
+		{FieldKey: "technician_name", Label: "Technician", FieldType: "text", SortOrder: 110},
+	},
+	"quo_tax_type": {
+		{FieldKey: "name", Label: "Name", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "tax_mode", Label: "Tax mode", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "rate_percent", Label: "Rate %", FieldType: "number", SortOrder: 30},
+		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+	},
+	"quo_currency": {
+		{FieldKey: "currency_code", Label: "Code", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "name", Label: "Name", FieldType: "text", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+	},
+	"quo_quotation": {
+		{FieldKey: "order_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "partner_id", Label: "Customer", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "location_id", Label: "Location-Out", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "tax_type_id", Label: "Transaction type", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+		{FieldKey: "currency_id", Label: "Currency", FieldType: "select", DefaultRequired: true, SortOrder: 50},
+		{FieldKey: "pic_name", Label: "PIC", FieldType: "text", SortOrder: 60},
+		{FieldKey: "quotation_validity_text", Label: "Quotation validity", FieldType: "text", SortOrder: 70},
+		{FieldKey: "payment_terms", Label: "Payment terms", FieldType: "text", SortOrder: 80},
+		{FieldKey: "note_for_pic_only", Label: "Note for PIC only", FieldType: "textarea", SortOrder: 90},
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 100},
+		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 110},
+	},
+}
+
+func StandardFields(entityType string) []StandardField {
+	fields := standardRegistry[entityType]
+	if fields == nil {
+		return []StandardField{}
+	}
+	out := make([]StandardField, len(fields))
+	copy(out, fields)
+	return out
+}
+
+func ValidEntityType(entityType string) bool {
+	_, ok := standardRegistry[entityType]
+	return ok
+}

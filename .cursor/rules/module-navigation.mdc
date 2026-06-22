@@ -1,0 +1,34 @@
+---
+description: Module vs feature navigation — sidebar modules, header feature nav
+alwaysApply: true
+---
+
+# Module navigation (golden rule)
+
+Bluearm ERP organizes the UI in two navigation layers:
+
+1. **Sidebar — modules only** (`web/src/shell/modules.ts` → `appModules`)
+   - One nav link per enabled ERP module (e.g. Inventory).
+   - Link targets the module’s default feature route (`href`).
+   - Active when `pathname.startsWith(module.basePath)`.
+
+2. **Header — active module + features**
+   - Subtitle: module label (e.g. “Inventory”).
+   - Title (`h1`): current feature label (e.g. “Partners”).
+   - Horizontal feature nav: all features for the active module.
+   - Sign out stays on the right.
+
+## Adding a new module
+
+1. Register in `appModules` with `id`, `label`, `href`, `basePath`, and `features[]`.
+2. Add routes under `/app/<module>/…` in `App.tsx`.
+3. Do **not** add feature links to the sidebar.
+4. Module links use subtle icons via `ModuleIcon` in `web/src/shell/ModuleIcon.tsx`.
+5. Sidebar collapse state lives in `ShellProvider` (`web/src/shell/shell-context.tsx`), persisted to `localStorage`.
+
+## Adding a feature to a module
+
+1. Append to the module’s `features` array in `modules.ts`.
+2. Add the route and page under `web/src/modules/<module>/`.
+
+`AppShell.tsx` derives sidebar and header nav from `appModules` — keep it generic; avoid hard-coding feature lists in the shell.

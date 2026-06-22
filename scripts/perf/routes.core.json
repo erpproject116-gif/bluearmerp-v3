@@ -1,0 +1,43 @@
+[
+  {
+    "id": "health",
+    "path": "/health",
+    "expectedStatuses": [200],
+    "auth": false
+  },
+  {
+    "id": "auth.me",
+    "path": "/api/v1/auth/me",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "inventory.partners.list",
+    "path": "/api/v1/inventory/partners?page=1&pageSize=50&sort=partner_code&order=asc&status=active",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "inventory.locations.list",
+    "path": "/api/v1/inventory/locations?page=1&pageSize=50&sort=location_code&order=asc&status=active",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "inventory.projects.list",
+    "path": "/api/v1/inventory/projects?page=1&pageSize=50&sort=project_code&order=asc&status=active",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "inventory.departments.list",
+    "path": "/api/v1/inventory/departments?page=1&pageSize=50&sort=department_code&order=asc&status=active",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "inventory.items.list",
+    "path": "/api/v1/inventory/items?page=1&pageSize=50&sort=item_code&order=asc&status=active",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "inventory.partners.next_code",
+    "path": "/api/v1/inventory/partners/next-code",
+    "expectedStatuses": [200, 401]
+  }
+]

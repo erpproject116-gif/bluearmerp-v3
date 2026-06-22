@@ -1,0 +1,432 @@
+package customfields
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+)
+
+var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+
+type Definition struct {
+	ID         int64           `json:"id"`
+	EntityType string          `json:"entity_type"`
+	FieldKey   string          `json:"field_key"`
+	Label      string          `json:"label"`
+	FieldType  string          `json:"field_type"`
+	Options    json.RawMessage `json:"options,omitempty"`
+	IsRequired bool            `json:"is_required"`
+	SortOrder  int             `json:"sort_order"`
+	IsActive   bool            `json:"is_active"`
+}
+
+type definitionBody struct {
+	EntityType string          `json:"entity_type"`
+	FieldKey   string          `json:"field_key"`
+	Label      string          `json:"label"`
+	FieldType  string          `json:"field_type"`
+	Options    json.RawMessage `json:"options"`
+	IsRequired bool            `json:"is_required"`
+	SortOrder  int             `json:"sort_order"`
+}
+
+var allowedTypes = map[string]bool{
+	"text": true, "textarea": true, "number": true, "select": true, "radio": true,
+	"checkbox": true, "date": true, "date_range": true, "number_range": true,
+}
+
+type querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+func CanManage(tu auth.TenantUser) bool {
+	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.IsStoreAdmin
+}
+
+func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.Route("/custom-fields", func(cr chi.Router) {
+		cr.Get("/", listDefinitionsHandler(pool))
+		cr.Post("/", createDefinitionHandler(pool))
+		cr.Patch("/{id}", updateDefinitionHandler(pool))
+		cr.Delete("/{id}", deleteDefinitionHandler(pool))
+	})
+}
+
+func listDefinitionsHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		entityType := strings.TrimSpace(r.URL.Query().Get("entity_type"))
+		if entityType == "" {
+			response.Validation(w, map[string]string{"entity_type": "Entity type is required."})
+			return
+		}
+		activeOnly := r.URL.Query().Get("active_only") != "false"
+		defs, err := ListDefinitions(r.Context(), pool, tu.TenantID, entityType, activeOnly)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load custom fields.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, defs, "OK")
+	}
+}
+
+func createDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		if !CanManage(tu) {
+			response.Err(w, http.StatusForbidden, "Only admins can manage custom fields.", "ERR_FORBIDDEN")
+			return
+		}
+		var body definitionBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if errs := ValidateDefinitionInput(body.EntityType, body.FieldKey, body.Label, body.FieldType, true); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+		opts := body.Options
+		if len(opts) == 0 {
+			opts = json.RawMessage(`{}`)
+		}
+		var id int64
+		err := pool.QueryRow(r.Context(), `
+			insert into public.tenant_custom_field_definitions
+			  (tenant_id, entity_type, field_key, label, field_type, options, is_required, sort_order)
+			values ($1, $2, $3, $4, $5, $6, $7, $8)
+			returning id`,
+			tu.TenantID, body.EntityType, body.FieldKey, strings.TrimSpace(body.Label),
+			body.FieldType, opts, body.IsRequired, body.SortOrder).Scan(&id)
+		if err != nil {
+			if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
+				response.Validation(w, map[string]string{"field_key": "Field key already exists for this entity."})
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to create custom field.", "ERR_INTERNAL")
+			return
+		}
+		def, _ := getDefinition(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, def, "Created.")
+	}
+}
+
+func updateDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		if !CanManage(tu) {
+			response.Err(w, http.StatusForbidden, "Only admins can manage custom fields.", "ERR_FORBIDDEN")
+			return
+		}
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body struct {
+			Label      *string          `json:"label"`
+			FieldType  *string          `json:"field_type"`
+			Options    *json.RawMessage `json:"options"`
+			IsRequired *bool            `json:"is_required"`
+			SortOrder  *int             `json:"sort_order"`
+			IsActive   *bool            `json:"is_active"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			update public.tenant_custom_field_definitions set
+			  label = coalesce($1, label),
+			  field_type = coalesce($2, field_type),
+			  options = coalesce($3, options),
+			  is_required = coalesce($4, is_required),
+			  sort_order = coalesce($5, sort_order),
+			  is_active = coalesce($6, is_active),
+			  updated_at = now()
+			where id = $7 and tenant_id = $8`,
+			body.Label, body.FieldType, body.Options, body.IsRequired, body.SortOrder, body.IsActive, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Custom field not found.", "ERR_NOT_FOUND")
+			return
+		}
+		def, _ := getDefinition(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, def, "Updated.")
+	}
+}
+
+func deleteDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		if !CanManage(tu) {
+			response.Err(w, http.StatusForbidden, "Only admins can manage custom fields.", "ERR_FORBIDDEN")
+			return
+		}
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			update public.tenant_custom_field_definitions
+			set is_active = false, updated_at = now()
+			where id = $1 and tenant_id = $2`, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Custom field not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.OK(w, nil, "Deleted.")
+	}
+}
+
+func getDefinition(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Definition, error) {
+	var d Definition
+	err := pool.QueryRow(ctx, `
+		select id, entity_type, field_key, label, field_type, options, is_required, sort_order, is_active
+		from public.tenant_custom_field_definitions
+		where id = $1 and tenant_id = $2`, id, tenantID).
+		Scan(&d.ID, &d.EntityType, &d.FieldKey, &d.Label, &d.FieldType, &d.Options, &d.IsRequired, &d.SortOrder, &d.IsActive)
+	return d, err
+}
+
+func ListDefinitions(ctx context.Context, conn querier, tenantID int64, entityType string, activeOnly bool) ([]Definition, error) {
+	q := `
+		select id, entity_type, field_key, label, field_type, options, is_required, sort_order, is_active
+		from public.tenant_custom_field_definitions
+		where tenant_id = $1 and entity_type = $2`
+	if activeOnly {
+		q += ` and is_active = true`
+	}
+	q += ` order by sort_order, id`
+	rows, err := conn.Query(ctx, q, tenantID, entityType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Definition
+	for rows.Next() {
+		var d Definition
+		if err := rows.Scan(&d.ID, &d.EntityType, &d.FieldKey, &d.Label, &d.FieldType, &d.Options, &d.IsRequired, &d.SortOrder, &d.IsActive); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	if out == nil {
+		out = []Definition{}
+	}
+	return out, nil
+}
+
+func LoadValues(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entityType string, entityID int64) (map[string]any, error) {
+	rows, err := pool.Query(ctx, `
+		select field_key, value_json
+		from public.tenant_custom_field_values
+		where tenant_id = $1 and entity_type = $2 and entity_id = $3`, tenantID, entityType, entityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]any{}
+	for rows.Next() {
+		var key string
+		var raw []byte
+		if err := rows.Scan(&key, &raw); err != nil {
+			return nil, err
+		}
+		var v any
+		if err := json.Unmarshal(raw, &v); err != nil {
+			return nil, err
+		}
+		out[key] = v
+	}
+	return out, nil
+}
+
+func LoadValuesBatch(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entityType string, entityIDs []int64) (map[int64]map[string]any, error) {
+	out := map[int64]map[string]any{}
+	if len(entityIDs) == 0 {
+		return out, nil
+	}
+	rows, err := pool.Query(ctx, `
+		select entity_id, field_key, value_json
+		from public.tenant_custom_field_values
+		where tenant_id = $1 and entity_type = $2 and entity_id = any($3::bigint[])`, tenantID, entityType, entityIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var entityID int64
+		var key string
+		var raw []byte
+		if err := rows.Scan(&entityID, &key, &raw); err != nil {
+			return nil, err
+		}
+		if out[entityID] == nil {
+			out[entityID] = map[string]any{}
+		}
+		var v any
+		if err := json.Unmarshal(raw, &v); err != nil {
+			return nil, err
+		}
+		out[entityID][key] = v
+	}
+	return out, nil
+}
+
+func ValidateAndSave(ctx context.Context, conn pgx.Tx, tenantID int64, entityType string, entityID int64, values map[string]any) map[string]string {
+	defs, err := ListDefinitions(ctx, conn, tenantID, entityType, true)
+	if err != nil {
+		return map[string]string{"custom_values": "Failed to load field definitions."}
+	}
+	if values == nil {
+		values = map[string]any{}
+	}
+	errs := map[string]string{}
+	defByKey := map[string]Definition{}
+	for _, d := range defs {
+		defByKey[d.FieldKey] = d
+		val, ok := values[d.FieldKey]
+		if d.IsRequired && (!ok || isEmpty(val)) {
+			errs["custom_values."+d.FieldKey] = fmt.Sprintf("%s is required.", d.Label)
+		}
+	}
+	for key, val := range values {
+		if !keyPattern.MatchString(key) {
+			errs["custom_values."+key] = "Invalid field key."
+			continue
+		}
+		def, ok := defByKey[key]
+		if !ok {
+			continue
+		}
+		if isEmpty(val) {
+			_, _ = conn.Exec(ctx, `
+				delete from public.tenant_custom_field_values
+				where tenant_id = $1 and entity_type = $2 and entity_id = $3 and field_key = $4`,
+				tenantID, entityType, entityID, key)
+			continue
+		}
+		normalized, err := normalizeValue(def, val)
+		if err != nil {
+			errs["custom_values."+key] = err.Error()
+			continue
+		}
+		raw, _ := json.Marshal(normalized)
+		_, err = conn.Exec(ctx, `
+			insert into public.tenant_custom_field_values (tenant_id, entity_type, entity_id, field_key, value_json, updated_at)
+			values ($1, $2, $3, $4, $5, now())
+			on conflict (tenant_id, entity_type, entity_id, field_key)
+			do update set value_json = excluded.value_json, updated_at = now()`,
+			tenantID, entityType, entityID, key, raw)
+		if err != nil {
+			errs["custom_values."+key] = "Failed to save value."
+		}
+	}
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
+}
+
+func ValidateDefinitionInput(entityType, fieldKey, label, fieldType string, create bool) map[string]string {
+	errs := map[string]string{}
+	if strings.TrimSpace(entityType) == "" {
+		errs["entity_type"] = "Entity type is required."
+	}
+	if create && !keyPattern.MatchString(fieldKey) {
+		errs["field_key"] = "Use lowercase letters, numbers, underscores; start with a letter."
+	}
+	if strings.TrimSpace(label) == "" {
+		errs["label"] = "Label is required."
+	}
+	if !allowedTypes[fieldType] {
+		errs["field_type"] = "Unsupported field type."
+	}
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
+}
+
+func isEmpty(v any) bool {
+	if v == nil {
+		return true
+	}
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t) == ""
+	case []any:
+		return len(t) == 0
+	case map[string]any:
+		if len(t) == 0 {
+			return true
+		}
+		for _, sub := range t {
+			if !isEmpty(sub) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeValue(def Definition, val any) (any, error) {
+	switch def.FieldType {
+	case "text", "textarea", "date":
+		s, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("Must be text.")
+		}
+		return strings.TrimSpace(s), nil
+	case "number":
+		switch n := val.(type) {
+		case float64:
+			return n, nil
+		case json.Number:
+			f, err := n.Float64()
+			if err != nil {
+				return nil, fmt.Errorf("Must be a number.")
+			}
+			return f, nil
+		default:
+			return nil, fmt.Errorf("Must be a number.")
+		}
+	case "select", "radio":
+		s, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("Must be a single choice.")
+		}
+		return strings.TrimSpace(s), nil
+	case "checkbox":
+		switch t := val.(type) {
+		case bool:
+			return t, nil
+		case []any:
+			return t, nil
+		default:
+			return nil, fmt.Errorf("Must be boolean or list.")
+		}
+	case "date_range", "number_range":
+		m, ok := val.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("Must be a range object.")
+		}
+		return m, nil
+	default:
+		return val, nil
+	}
+}
