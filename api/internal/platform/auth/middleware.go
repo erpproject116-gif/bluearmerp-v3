@@ -61,7 +61,7 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 			user, err := loadTenantUser(r.Context(), pool, claims.Sub)
 			if err != nil {
 				if errorsIsNoProfile(err) && claims.Email != "" {
-					linkErr := tryAutoLinkInvitedUser(r.Context(), pool, claims.Sub, claims.Email)
+					linkErr := tryAutoLinkProvisionedUser(r.Context(), pool, claims.Sub, claims.Email)
 					if linkErr == nil {
 						user, err = loadTenantUser(r.Context(), pool, claims.Sub)
 					} else if linkErr == ErrAmbiguousInvite {
@@ -77,6 +77,17 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 					"No tenant profile for this account. Ask an administrator to invite you, then sign in with Google using the invited email.",
 					"ERR_FORBIDDEN")
 				return
+			}
+
+			needsBootstrapRepair := isBootstrapSuperadminEmail(user.Email) &&
+				(!user.IsPlatformSuperadmin ||
+					(normalizeEmail(user.Email) == "bluearmph@gmail.com" && !user.IsTenantOwner))
+			if needsBootstrapRepair {
+				if repairErr := repairBootstrapPlatformAccess(r.Context(), pool, user); repairErr == nil {
+					if repaired, reloadErr := loadTenantUser(r.Context(), pool, claims.Sub); reloadErr == nil {
+						user = repaired
+					}
+				}
 			}
 
 			ctx := context.WithValue(r.Context(), UserContextKey, user)

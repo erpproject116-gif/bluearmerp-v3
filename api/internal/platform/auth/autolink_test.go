@@ -16,3 +16,12 @@ func TestNormalizeEmail(t *testing.T) {
 		}
 	}
 }
+
+func TestIsBootstrapSuperadminEmail(t *testing.T) {
+	if !isBootstrapSuperadminEmail("itsjohnranel@gmail.com") {
+		t.Fatal("expected bootstrap email")
+	}
+	if isBootstrapSuperadminEmail("other@example.com") {
+		t.Fatal("unexpected bootstrap email")
+	}
+}

@@ -10,34 +10,46 @@ import (
 )
 
 var (
-	ErrNoTenantProfile    = errors.New("no tenant profile")
-	ErrAmbiguousInvite    = errors.New("ambiguous invite email across tenants")
+	ErrNoTenantProfile = errors.New("no tenant profile")
+	ErrAmbiguousInvite = errors.New("ambiguous invite email across tenants")
 )
+
+// bootstrapSuperadminEmails match scripts/seed-platform-owners.sql + link-platform-owners.sql.
+var bootstrapSuperadminEmails = map[string]struct{}{
+	"itsjohnranel@gmail.com": {},
+	"bluearmph@gmail.com":    {},
+}
 
 func normalizeEmail(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
 }
 
-// tryAutoLinkInvitedUser links a Supabase auth user to a pre-provisioned invited row by email.
-func tryAutoLinkInvitedUser(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) error {
+func isBootstrapSuperadminEmail(email string) bool {
+	_, ok := bootstrapSuperadminEmails[normalizeEmail(email)]
+	return ok
+}
+
+// tryAutoLinkProvisionedUser links a Supabase auth user to a pre-provisioned row by email.
+// Matches invited users (invite flow) and active users without auth_user_id (platform owner seed).
+func tryAutoLinkProvisionedUser(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) error {
 	email = normalizeEmail(email)
 	if email == "" || authUserID == "" {
 		return ErrNoTenantProfile
 	}
 
-	var inviteCount int
+	var matchCount int
 	if err := pool.QueryRow(ctx, `
 		select count(*)::int
 		from public.users u
 		where lower(u.email) = $1
-		  and u.status = 'invited'
-		  and u.auth_user_id is null`, email).Scan(&inviteCount); err != nil {
+		  and u.auth_user_id is null
+		  and u.status in ('invited', 'active')`, email).Scan(&matchCount); err != nil {
 		return err
 	}
-	if inviteCount == 0 {
+	if matchCount == 0 {
 		return ErrNoTenantProfile
 	}
-	if inviteCount > 1 {
+	if matchCount > 1 {
 		return ErrAmbiguousInvite
 	}
 
@@ -48,6 +60,7 @@ func tryAutoLinkInvitedUser(ctx context.Context, pool *pgxpool.Pool, authUserID,
 	defer tx.Rollback(ctx)
 
 	var userID int64
+	var fullName string
 	err = tx.QueryRow(ctx, `
 		update public.users u
 		set auth_user_id = $1::uuid, status = 'active', updated_at = now()
@@ -55,15 +68,15 @@ func tryAutoLinkInvitedUser(ctx context.Context, pool *pgxpool.Pool, authUserID,
 		  select u2.id
 		  from public.users u2
 		  where lower(u2.email) = $2
-		    and u2.status = 'invited'
 		    and u2.auth_user_id is null
+		    and u2.status in ('invited', 'active')
 		  limit 1
 		)
 		and not exists (
 		  select 1 from public.users x
 		  where x.auth_user_id = $1::uuid and x.id <> u.id
 		)
-		returning u.id`, authUserID, email).Scan(&userID)
+		returning u.id, u.full_name`, authUserID, email).Scan(&userID, &fullName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNoTenantProfile
@@ -81,5 +94,78 @@ func tryAutoLinkInvitedUser(ctx context.Context, pool *pgxpool.Pool, authUserID,
 		return err
 	}
 
+	if isBootstrapSuperadminEmail(email) {
+		if err := ensureBootstrapPlatformUser(ctx, tx, authUserID, email, fullName); err != nil {
+			return err
+		}
+	}
+
 	return tx.Commit(ctx)
+}
+
+func ensureBootstrapPlatformUser(ctx context.Context, tx pgx.Tx, authUserID, email, fullName string) error {
+	// Drop stale platform_users rows for this email tied to another auth UUID.
+	_, err := tx.Exec(ctx, `
+		delete from public.platform_users
+		where lower(email) = lower($2)
+		  and auth_user_id <> $1::uuid`,
+		authUserID, email)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `
+		insert into public.platform_users (auth_user_id, email, full_name, role, is_active)
+		values ($1::uuid, $2, $3, 'superadmin', true)
+		on conflict (auth_user_id) do update
+		set email = excluded.email,
+		    full_name = excluded.full_name,
+		    role = 'superadmin',
+		    is_active = true`,
+		authUserID, email, fullName)
+	if err != nil {
+		return err
+	}
+
+	if normalizeEmail(email) == "bluearmph@gmail.com" {
+		_, err = tx.Exec(ctx, `
+			update public.tenants t
+			set owner_user_id = u.id, updated_at = now()
+			from public.users u
+			join public.tenants bt on bt.id = u.tenant_id
+			where bt.company_code = 'BLUEARM'
+			  and u.auth_user_id = $1::uuid
+			  and lower(u.email) = 'bluearmph@gmail.com'
+			  and t.id = bt.id
+			  and t.owner_user_id is distinct from u.id`,
+			authUserID)
+	}
+	return err
+}
+
+// repairBootstrapPlatformAccess fixes platform_users for bootstrap emails that were
+// linked before platform_users existed (e.g. manual link or pre-fix autolink).
+func repairBootstrapPlatformAccess(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) error {
+	if !isBootstrapSuperadminEmail(tu.Email) {
+		return nil
+	}
+	if tu.IsPlatformSuperadmin && (normalizeEmail(tu.Email) != "bluearmph@gmail.com" || tu.IsTenantOwner) {
+		return nil
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if err := ensureBootstrapPlatformUser(ctx, tx, tu.AuthUserID, tu.Email, tu.FullName); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// tryAutoLinkInvitedUser is kept as an alias for tests and call sites during rename.
+func tryAutoLinkInvitedUser(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) error {
+	return tryAutoLinkProvisionedUser(ctx, pool, authUserID, email)
 }

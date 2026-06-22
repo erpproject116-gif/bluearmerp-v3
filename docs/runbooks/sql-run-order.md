@@ -175,6 +175,7 @@ psql "$DATABASE_URL" -f scripts/verify-demo-inventory.sql
 | Load demo inventory data | `scripts/seed-demo-inventory.sql` |
 | Link demo password user | `scripts/link-demo-auth-user.sql` |
 | Check superadmin setup | `scripts/verify-platform-owners.sql` |
+| Fix linked Gmail missing superadmin | `scripts/repair-platform-owners.sql` |
 | Check demo inventory counts | `scripts/verify-demo-inventory.sql` |
 
 ---
