@@ -1,10 +1,16 @@
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { EditableLineGrid, emptyLine, type RepairLineRow } from "../../../shared/EditableLineGrid";
 import { INVENTORY_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import {
+  formatFileSize,
+  listRepairOrderAttachments,
+  uploadRepairOrderAttachment,
+  type RepairOrderAttachment,
+} from "../../../shared/repairOrderAttachments";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useCustomValues } from "../../../shared/useCustomValues";
@@ -126,6 +132,14 @@ export function RepairOrderModal(props: Props) {
   const [latestUpdate, setLatestUpdate] = createSignal("");
   const [repairDetails, setRepairDetails] = createSignal("");
   const [lines, setLines] = createSignal<RepairLineRow[]>([emptyLine(1)]);
+  const [attachments, setAttachments] = createSignal<RepairOrderAttachment[]>([]);
+  const [uploading, setUploading] = createSignal(false);
+
+  const loadAttachments = async (orderId: number) => {
+    const res = await listRepairOrderAttachments(orderId);
+    if (res.success && res.data) setAttachments(res.data);
+    else setAttachments([]);
+  };
 
   const loadPreview = async (date: string) => {
     const res = await apiFetch<{ date_no_display: string; repair_order_no: string }>(
@@ -160,6 +174,7 @@ export function RepairOrderModal(props: Props) {
       setRepairDetails(ed.repair_details ?? "");
       setLines(linesFromDetail(ed.lines));
       loadCustom(ed.custom_values ?? {});
+      void loadAttachments(ed.id);
     } else {
       setOrderDate(todayISO());
       setPartnerId(null);
@@ -177,6 +192,7 @@ export function RepairOrderModal(props: Props) {
       setLatestUpdate("");
       setRepairDetails("");
       setLines([emptyLine(1)]);
+      setAttachments([]);
       loadCustom({});
       void loadPreview(todayISO());
     }
@@ -337,8 +353,53 @@ export function RepairOrderModal(props: Props) {
       <Field label="Repair details" span="full">
         <textarea class={inputClass} rows={2} value={repairDetails()} onInput={(e) => setRepairDetails(e.currentTarget.value)} />
       </Field>
-      <div class="col-span-full rounded-lg border border-dashed border-stroke bg-slate-50 px-4 py-3 text-sm text-text-secondary">
-        Attachments — coming in next epic (max 25 MB per file)
+      <div class="col-span-full rounded-lg border border-stroke bg-slate-50 px-4 py-3">
+        <div class="mb-2 flex items-center justify-between">
+          <span class="text-sm font-medium text-text-primary">Attachments</span>
+          <Show when={props.editing}>
+            <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
+              {uploading() ? "Uploading…" : "Upload file"}
+              <input
+                type="file"
+                class="hidden"
+                disabled={uploading()}
+                onChange={(e) => {
+                  const file = e.currentTarget.files?.[0];
+                  e.currentTarget.value = "";
+                  const orderId = props.editing?.id;
+                  if (!file || !orderId) return;
+                  setUploading(true);
+                  void uploadRepairOrderAttachment(orderId, file).then((res) => {
+                    setUploading(false);
+                    if (!res.success) {
+                      toast.warning(res.message ?? "Upload failed.");
+                      return;
+                    }
+                    toast.success("File uploaded.");
+                    void loadAttachments(orderId);
+                  });
+                }}
+              />
+            </label>
+          </Show>
+        </div>
+        <Show
+          when={props.editing}
+          fallback={<p class="text-sm text-text-secondary">Save the repair order first to attach files (max 25 MB each).</p>}
+        >
+          <Show when={attachments().length > 0} fallback={<p class="text-sm text-text-secondary">No attachments yet.</p>}>
+            <ul class="space-y-1 text-sm">
+              <For each={attachments()}>
+                {(a) => (
+                  <li class="flex justify-between gap-2 text-text-primary">
+                    <span>{a.file_name}</span>
+                    <span class="text-text-secondary">{formatFileSize(a.size_bytes)}</span>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </Show>
       </div>
       <LookupCombo
         label="Project"

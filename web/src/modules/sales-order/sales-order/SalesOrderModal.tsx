@@ -4,6 +4,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
+import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
@@ -177,6 +178,64 @@ export function SalesOrderModal(props: Props) {
   const [lines, setLines] = createSignal<SalesOrderLineRow[]>([emptySalesOrderLine(1)]);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
+
+  const buildDraftPayload = () => ({
+    order_date: orderDate(),
+    tax_type_id: taxTypeId(),
+    currency_id: currencyId(),
+    partner_id: partnerId(),
+    customer_label: customerLabel(),
+    pic_user_id: picUserId(),
+    pic_name: picName(),
+    location_id: locationId(),
+    location_label: locationLabel(),
+    project_id: projectId(),
+    project_label: projectLabel(),
+    project_name: projectName(),
+    due_date: dueDate(),
+    delivery_date: deliveryDate(),
+    reference: reference(),
+    mop: mop(),
+    payment_terms: paymentTerms(),
+    delivery_remarks: deliveryRemarks(),
+    notes: notes(),
+    progress_status: progressStatus(),
+    source_quotation_id: sourceQuotationId(),
+    lines: lines(),
+  });
+
+  const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
+    setOrderDate(payload.order_date);
+    setTaxTypeId(payload.tax_type_id);
+    setCurrencyId(payload.currency_id);
+    setPartnerId(payload.partner_id);
+    setCustomerLabel(payload.customer_label);
+    setPicUserId(payload.pic_user_id);
+    setPicName(payload.pic_name);
+    setLocationId(payload.location_id);
+    setLocationLabel(payload.location_label);
+    setProjectId(payload.project_id);
+    setProjectLabel(payload.project_label);
+    setProjectName(payload.project_name);
+    setDueDate(payload.due_date);
+    setDeliveryDate(payload.delivery_date);
+    setReference(payload.reference);
+    setMop(payload.mop);
+    setPaymentTerms(payload.payment_terms);
+    setDeliveryRemarks(payload.delivery_remarks);
+    setNotes(payload.notes);
+    setProgressStatus(payload.progress_status);
+    setSourceQuotationId(payload.source_quotation_id);
+    setLines(payload.lines);
+  };
+
+  const draft = useDocumentDraft({
+    entityType: SALES_ORDER_ENTITY.salesOrder,
+    draftKey: props.editing ? `edit-${props.editing.id}` : "new",
+    getPayload: buildDraftPayload,
+    onApply: applyDraftPayload,
+    enabled: () => props.open && !props.editing,
+  });
 
   const onTaxTypeChange = async (newId: number | null) => {
     setTaxTypeId(newId);
@@ -377,6 +436,7 @@ export function SalesOrderModal(props: Props) {
     );
     setSaving(false);
     if (!ok) return;
+    await draft.clearOnSave();
     props.onSaved();
     props.onClose();
   };
@@ -390,6 +450,7 @@ export function SalesOrderModal(props: Props) {
         onSave={() => void save()}
         saving={saving()}
       >
+        <draft.DraftBanner />
         <Field label="Date-no">
           <input class={inputClass} value={dateNoDisplay()} readOnly />
         </Field>

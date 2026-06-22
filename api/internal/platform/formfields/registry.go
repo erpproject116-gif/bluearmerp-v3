@@ -96,6 +96,14 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 130},
 		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", DefaultRequired: true, SortOrder: 140},
 	},
+	"fin_official_receipt": {
+		{FieldKey: "receipt_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "partner_id", Label: "Customer", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "currency_id", Label: "Currency", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "payment_method", Label: "Payment method", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+		{FieldKey: "reference_no", Label: "Reference no.", FieldType: "text", SortOrder: 50},
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 60},
+	},
 	"quo_quotation": {
 		{FieldKey: "order_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
 		{FieldKey: "partner_id", Label: "Customer", FieldType: "select", DefaultRequired: true, SortOrder: 20},

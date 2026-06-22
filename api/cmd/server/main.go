@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quotation"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
@@ -73,6 +74,7 @@ func main() {
 			inventory.RegisterRoutes(protected, pool)
 			quotation.RegisterRoutes(protected, pool)
 			sales.RegisterRoutes(protected, pool)
+			finance.RegisterRoutes(protected, pool)
 			salesorder.RegisterRoutes(protected, pool)
 			usermgmt.RegisterRoutes(protected, pool)
 		})

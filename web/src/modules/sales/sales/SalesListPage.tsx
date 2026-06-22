@@ -12,6 +12,7 @@ import {
   type SalesRow,
 } from "../../../shared/useSalesList";
 import { useToast } from "../../../shared/toast";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { SalesLayout } from "../SalesLayout";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesModal, type SalesDetail } from "./SalesModal";
@@ -155,6 +156,14 @@ export function SalesListPageInner(props: PageOptions = {}) {
               >
                 Print
               </button>
+            ),
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="sales" targetType="sa_sales" targetId={r.id} />
             ),
           },
         ]}

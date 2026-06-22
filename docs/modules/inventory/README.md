@@ -75,7 +75,23 @@ Not a full inventory ledger — quotations and outstanding reports **read** bala
 | New Repair Order | modal / `/repair-orders/new` | `POST /api/v1/inventory/repair-orders` |
 | Item picker search | modal | `POST /api/v1/inventory/items/search` |
 | Form settings | `/repair-orders/settings` | `GET/PATCH /api/v1/form-field-settings?entity_type=inv_repair_order` |
+| Attachments | Repair Order modal | `GET/POST /api/v1/inventory/repair-orders/{id}/attachments` (`REPAIR_ORDER_UPLOAD_DIR`, 25 MB) |
 
-Migrations: `006_item_master_extended.sql`, `007_repair_orders.sql`, `008_repair_order_status.sql`.
+### Register Repair
 
-File attachments and Register Repair are follow-up epics.
+| Feature | Route | API |
+|---------|-------|-----|
+| Repair List | `/app/inventory/after-sales/register-repair` | `GET/POST/PATCH/DELETE /api/v1/inventory/repair-registrations` |
+| New Repair | `/register-repair/new` | `POST /api/v1/inventory/repair-registrations` |
+| Repair Status | `/register-repair/status` | `GET /api/v1/inventory/repair-registrations/status-report` |
+| A/S Consumption | `/register-repair/consumption` | `GET /api/v1/inventory/repair-registrations/consumption-report` |
+| Convert to RO | list → Convert | `POST /api/v1/inventory/repair-registrations/{id}/convert-to-repair-order` |
+
+### Stock ledger
+
+| Feature | Route | API |
+|---------|-------|-----|
+| Stock Movements | `/app/inventory/stock-movements` | `GET /api/v1/inventory/stock-movements` |
+| Stock Adjustment | modal on movements page | `POST /api/v1/inventory/stock-adjustments` |
+
+Migrations: `006_item_master_extended.sql`, `007_repair_orders.sql`, `008_repair_order_status.sql`, `016_inventory_followups.sql`.

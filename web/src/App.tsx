@@ -21,7 +21,11 @@ import RepairOrderListPage from "./modules/inventory/after-sales/RepairOrderList
 import RepairOrderNewPage from "./modules/inventory/after-sales/RepairOrderNewPage";
 import RepairOrderStatusPage from "./modules/inventory/after-sales/RepairOrderStatusPage";
 import RepairOrderSettingsPage from "./modules/inventory/after-sales/RepairOrderSettingsPage";
-import RegisterRepairPlaceholder from "./modules/inventory/after-sales/RegisterRepairPlaceholder";
+import RegisterRepairListPage from "./modules/inventory/after-sales/RegisterRepairListPage";
+import RegisterRepairNewPage from "./modules/inventory/after-sales/RegisterRepairNewPage";
+import RegisterRepairStatusPage from "./modules/inventory/after-sales/RegisterRepairStatusPage";
+import RegisterRepairConsumptionPage from "./modules/inventory/after-sales/RegisterRepairConsumptionPage";
+import StockMovementsPage from "./modules/inventory/StockMovementsPage";
 import {
   RepairOrderReceiptPrintPage,
   RepairOrderWarrantyPrintPage,
@@ -53,6 +57,11 @@ import SalesStatusPage from "./modules/sales/sales/SalesStatusPage";
 import PreInvoicingStatusPage from "./modules/sales/sales/PreInvoicingStatusPage";
 import ChangeSalesPriceBatchPage from "./modules/sales/sales/ChangeSalesPriceBatchPage";
 import PackingSlipPrintPage from "./modules/sales/sales/PackingSlipPrintPage";
+import OfficialReceiptListPage from "./modules/finance/official-receipts/OfficialReceiptListPage";
+import OfficialReceiptNewPage from "./modules/finance/official-receipts/OfficialReceiptNewPage";
+import OfficialReceiptSettingsPage from "./modules/finance/official-receipts/OfficialReceiptSettingsPage";
+import ArByCustomerPage from "./modules/finance/reports/ArByCustomerPage";
+import ReceiptStatusPage from "./modules/finance/reports/ReceiptStatusPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
 import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
@@ -105,14 +114,15 @@ export default function App() {
           <Route path="/inventory/departments/settings" component={DepartmentsSettingsPage} />
           <Route path="/inventory/items" component={ItemsPage} />
           <Route path="/inventory/items/settings" component={ItemsSettingsPage} />
+          <Route path="/inventory/stock-movements" component={StockMovementsPage} />
           <Route path="/inventory/after-sales/repair-orders/new" component={RepairOrderNewPage} />
           <Route path="/inventory/after-sales/repair-orders/status" component={RepairOrderStatusPage} />
           <Route path="/inventory/after-sales/repair-orders/settings" component={RepairOrderSettingsPage} />
           <Route path="/inventory/after-sales/repair-orders" component={RepairOrderListPage} />
-          <Route path="/inventory/after-sales/register-repair" component={RegisterRepairPlaceholder} />
-          <Route path="/inventory/after-sales/register-repair/new" component={RegisterRepairPlaceholder} />
-          <Route path="/inventory/after-sales/register-repair/status" component={RegisterRepairPlaceholder} />
-          <Route path="/inventory/after-sales/register-repair/consumption" component={RegisterRepairPlaceholder} />
+          <Route path="/inventory/after-sales/register-repair/new" component={RegisterRepairNewPage} />
+          <Route path="/inventory/after-sales/register-repair/status" component={RegisterRepairStatusPage} />
+          <Route path="/inventory/after-sales/register-repair/consumption" component={RegisterRepairConsumptionPage} />
+          <Route path="/inventory/after-sales/register-repair" component={RegisterRepairListPage} />
           <Route path="/quotation/tax-mngt/tax-types/settings" component={TaxTypeSettingsPage} />
           <Route path="/quotation/tax-mngt/tax-types" component={TaxTypeListPage} />
           <Route path="/quotation/tax-mngt/currencies/settings" component={CurrencySettingsPage} />
@@ -134,6 +144,11 @@ export default function App() {
           <Route path="/sales/sales/price-batch" component={ChangeSalesPriceBatchPage} />
           <Route path="/sales/sales/settings" component={SalesSettingsPage} />
           <Route path="/sales/sales" component={SalesListPage} />
+          <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
+          <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
+          <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />
+          <Route path="/finance/reports/ar-by-customer" component={ArByCustomerPage} />
+          <Route path="/finance/reports/receipt-status" component={ReceiptStatusPage} />
           <Route path="/activity-logs" component={() => (
             <ActivityLogRoute>
               <ActivityLogListPage />

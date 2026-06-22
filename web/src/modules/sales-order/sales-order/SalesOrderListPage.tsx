@@ -11,6 +11,7 @@ import {
   type SalesOrderRow,
 } from "../../../shared/useSalesOrderList";
 import { useToast } from "../../../shared/toast";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { SalesOrderLayout } from "../SalesOrderLayout";
 import { CreatedSlipModal } from "./CreatedSlipModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -139,6 +140,14 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
               >
                 Print
               </button>
+            ),
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="sales_order" targetType="so_sales_order" targetId={r.id} />
             ),
           },
           { key: "pic_name", header: "PIC" },

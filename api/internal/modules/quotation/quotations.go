@@ -511,6 +511,8 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		validityDays := resolveValidityDays(body)
 		validUntil := computeValidUntil(orderDate, validityDays)
 
+		before, _ := loadQuotation(r.Context(), pool, tu.TenantID, id)
+
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
@@ -549,7 +551,7 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "quotation.update", "quo_quotation", &id, nil, body)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "quotation.update", "quo_quotation", &id, before, body)
 		q, _ := loadQuotation(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, q, "Updated.")
 	}

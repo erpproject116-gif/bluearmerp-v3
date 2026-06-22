@@ -1,0 +1,139 @@
+import { createSignal } from "solid-js";
+import { apiFetch } from "../../shared/api";
+import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { submitEntity } from "../../shared/handleSaveResult";
+import { useToast } from "../../shared/toast";
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+};
+
+async function fetchItems(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; item_code: string; item_name: string }[]>(`/api/v1/inventory/items?${qs}`);
+  return (res.data ?? []).map((i) => ({ id: i.id, label: `${i.item_code} — ${i.item_name}` }));
+}
+
+async function fetchLocations(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
+  return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
+}
+
+export function StockAdjustmentModal(props: Props) {
+  const toast = useToast();
+  const [saving, setSaving] = createSignal(false);
+  const [itemId, setItemId] = createSignal<number | null>(null);
+  const [itemLabel, setItemLabel] = createSignal("");
+  const [locationId, setLocationId] = createSignal<number | null>(null);
+  const [locationLabel, setLocationLabel] = createSignal("");
+  const [qtyDelta, setQtyDelta] = createSignal("");
+  const [reason, setReason] = createSignal("");
+
+  const reset = () => {
+    setItemId(null);
+    setItemLabel("");
+    setLocationId(null);
+    setLocationLabel("");
+    setQtyDelta("");
+    setReason("");
+  };
+
+  const save = async () => {
+    if (!itemId() || !locationId()) {
+      toast.warning("Item and location are required.");
+      return;
+    }
+    const qty = Number(qtyDelta());
+    if (!qtyDelta() || qty === 0 || Number.isNaN(qty)) {
+      toast.warning("Enter a non-zero quantity change.");
+      return;
+    }
+    if (!reason().trim()) {
+      toast.warning("Reason is required.");
+      return;
+    }
+    setSaving(true);
+    const ok = await submitEntity(
+      () =>
+        apiFetch("/api/v1/inventory/stock-adjustments", {
+          method: "POST",
+          body: JSON.stringify({
+            item_id: itemId(),
+            location_id: locationId(),
+            qty_delta: qty,
+            reason: reason().trim(),
+          }),
+        }),
+      toast,
+      "Stock adjusted.",
+    );
+    setSaving(false);
+    if (!ok) return;
+    reset();
+    props.onSaved();
+    props.onClose();
+  };
+
+  return (
+    <EntityModal
+      open={props.open}
+      title="Stock adjustment"
+      onClose={() => {
+        reset();
+        props.onClose();
+      }}
+      onSave={() => void save()}
+      saving={saving()}
+    >
+      <LookupCombo
+        label="Item *"
+        value={itemLabel}
+        selectedId={itemId}
+        onInput={setItemLabel}
+        onSelect={(o) => {
+          setItemId(o.id);
+          setItemLabel(o.label);
+        }}
+        onClear={() => {
+          setItemId(null);
+          setItemLabel("");
+        }}
+        fetchOptions={fetchItems}
+      />
+      <LookupCombo
+        label="Location *"
+        value={locationLabel}
+        selectedId={locationId}
+        onInput={setLocationLabel}
+        onSelect={(o) => {
+          setLocationId(o.id);
+          setLocationLabel(o.label);
+        }}
+        onClear={() => {
+          setLocationId(null);
+          setLocationLabel("");
+        }}
+        fetchOptions={fetchLocations}
+      />
+      <Field label="Qty change *">
+        <input
+          type="number"
+          step="any"
+          class={inputClass}
+          value={qtyDelta()}
+          placeholder="Positive to add, negative to remove"
+          onInput={(e) => setQtyDelta(e.currentTarget.value)}
+        />
+      </Field>
+      <Field label="Reason *" span="full">
+        <textarea class={inputClass} rows={2} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} />
+      </Field>
+    </EntityModal>
+  );
+}

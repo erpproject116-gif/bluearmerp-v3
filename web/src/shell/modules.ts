@@ -35,6 +35,7 @@ export const appModules: AppModule[] = [
       { label: "Projects", href: "/app/inventory/projects", settingsHref: "/app/inventory/projects/settings" },
       { label: "Departments", href: "/app/inventory/departments", settingsHref: "/app/inventory/departments/settings" },
       { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings" },
+      { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements" },
     ],
     subBranches: [
       {
@@ -88,6 +89,18 @@ export const appModules: AppModule[] = [
         href: "/app/sales/sales/price-batch",
         settingsHref: "/app/sales/sales/settings",
       },
+    ],
+  },
+  {
+    id: "finance",
+    label: "Finance",
+    href: "/app/finance/official-receipts",
+    basePath: "/app/finance",
+    features: [
+      { label: "New Official Receipt", href: "/app/finance/official-receipts/new", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Official Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Receipt Status", href: "/app/finance/reports/receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
     ],
   },
   {

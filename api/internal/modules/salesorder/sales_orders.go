@@ -557,6 +557,8 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		subtotal, taxTotal, grandTotal := sumSalesOrderTotals(computed)
 
+		before, _ := loadSalesOrder(r.Context(), pool, tu.TenantID, id)
+
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
@@ -595,7 +597,7 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.update", "so_sales_order", &id, nil, body)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.update", "so_sales_order", &id, before, body)
 		so, _ := loadSalesOrder(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, so, "Updated.")
 	}

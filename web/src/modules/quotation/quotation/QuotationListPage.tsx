@@ -11,6 +11,7 @@ import {
   type QuotationRow,
 } from "../../../shared/useQuotationList";
 import { useToast } from "../../../shared/toast";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { QuotationLayout } from "../QuotationLayout";
 import { CreatedSlipModal } from "./CreatedSlipModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -161,6 +162,14 @@ export function QuotationListPageInner(props: PageOptions = {}) {
               >
                 Print
               </button>
+            ),
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="quotation" targetType="quo_quotation" targetId={r.id} />
             ),
           },
         ]}

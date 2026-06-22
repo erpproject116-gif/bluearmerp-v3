@@ -1,6 +1,7 @@
 import { createEffect, createResource, Show } from "solid-js";
 import { useParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
+import { PrintPreviewTable } from "../../../shared/PrintPreviewTable";
 import {
   fetchSalesOrderPrint,
   formatMoney,
@@ -39,6 +40,7 @@ function SalesOrderPrintView() {
       </Show>
       <Show when={data()}>{(payload) => <PrintDocument payload={payload()} />}</Show>
       <div class="quotation-print__toolbar no-print">
+        <p class="text-xs text-text-secondary mb-2">Drag column edges to resize before printing.</p>
         <button type="button" class="quotation-print__btn" onClick={() => window.print()}>
           Print
         </button>
@@ -118,43 +120,31 @@ function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
         </div>
       </section>
 
-      <table class="quotation-print__table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Item Code</th>
-            <th>Description</th>
-            <th class="num">Qty</th>
-            <th class="num">Unit (Non-VAT)</th>
-            <th class="num">Non-VAT Total</th>
-            <th class="num">Tax</th>
-            <th class="num">Line Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines().length === 0 ? (
-            <tr>
-              <td colSpan={8}>No line items.</td>
-            </tr>
-          ) : (
-            lines().map((ln) => (
-              <tr>
-                <td>{ln.line_no}</td>
-                <td>{ln.item_code || "—"}</td>
-                <td>
-                  {ln.item_name}
-                  {ln.description ? ` — ${ln.description}` : ""}
-                </td>
-                <td class="num">{ln.qty}</td>
-                <td class="num">{formatMoney(ln.unit_non_vat)}</td>
-                <td class="num">{formatMoney(ln.non_vat_total)}</td>
-                <td class="num">{formatMoney(ln.tax_amount)}</td>
-                <td class="num">{formatMoney(ln.line_total)}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      <PrintPreviewTable
+        class="mb-4"
+        emptyMessage="No line items."
+        columns={[
+          { key: "line_no", header: "#", width: 48, align: "center", render: (ln) => ln.line_no },
+          { key: "item_code", header: "Item Code", width: 100, render: (ln) => ln.item_code || "—" },
+          {
+            key: "description",
+            header: "Description",
+            width: 240,
+            render: (ln) => (
+              <>
+                {ln.item_name}
+                {ln.description ? ` — ${ln.description}` : ""}
+              </>
+            ),
+          },
+          { key: "qty", header: "Qty", width: 72, align: "right", render: (ln) => ln.qty },
+          { key: "unit_non_vat", header: "Unit (Non-VAT)", width: 110, align: "right", render: (ln) => formatMoney(ln.unit_non_vat) },
+          { key: "non_vat_total", header: "Non-VAT Total", width: 110, align: "right", render: (ln) => formatMoney(ln.non_vat_total) },
+          { key: "tax_amount", header: "Tax", width: 90, align: "right", render: (ln) => formatMoney(ln.tax_amount) },
+          { key: "line_total", header: "Line Total", width: 110, align: "right", render: (ln) => formatMoney(ln.line_total) },
+        ]}
+        rows={lines()}
+      />
 
       <div class="quotation-print__totals">
         <div class="quotation-print__totals-row">

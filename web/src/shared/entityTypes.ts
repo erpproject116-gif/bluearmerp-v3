@@ -51,3 +51,13 @@ export const SALES_SETTINGS_HREF = {
 } as const;
 
 export type SalesFeature = keyof typeof SALES_ENTITY;
+
+export const FINANCE_ENTITY = {
+  officialReceipt: "fin_official_receipt",
+} as const;
+
+export const FINANCE_SETTINGS_HREF = {
+  officialReceipt: "/app/finance/official-receipts/settings",
+} as const;
+
+export type FinanceFeature = keyof typeof FINANCE_ENTITY;
