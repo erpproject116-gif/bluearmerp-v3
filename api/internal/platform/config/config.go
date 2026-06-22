@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -47,6 +48,26 @@ func Load() Config {
 		DemoEmail:           envOr("DEMO_USER_EMAIL", "demo@demo.bluearm.local"),
 		DemoPassword:        os.Getenv("DEMO_USER_PASSWORD"),
 	}
+}
+
+// CORSOrigins splits CORS_ORIGIN on commas (e.g. production + local dev).
+func (c Config) CORSOrigins() []string {
+	raw := strings.TrimSpace(c.CORSOrigin)
+	if raw == "" {
+		return []string{"http://localhost:5173"}
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"http://localhost:5173"}
+	}
+	return out
 }
 
 func envOr(key, fallback string) string {

@@ -11,7 +11,7 @@ In **Render → your service → Environment**, add:
 | `SUPABASE_URL` | Supabase → Settings → API → Project URL |
 | `SUPABASE_JWT_SECRET` | Supabase → Settings → API → JWT Secret |
 | `SUPABASE_DB_PASSWORD` | Supabase → Settings → Database → Database password |
-| `CORS_ORIGIN` | Your Vercel URL, e.g. `https://your-app.vercel.app` (no trailing slash) |
+| `CORS_ORIGIN` | Your Vercel URL, e.g. `https://bluearmerp-v3.vercel.app` (no trailing slash). Comma-separate for multiple origins: `https://bluearmerp-v3.vercel.app,http://localhost:5173` |
 
 Do **not** set `PORT` — Render injects it automatically.
 
@@ -32,6 +32,17 @@ curl https://YOUR-SERVICE.onrender.com/health
 ```
 
 Expected: JSON with `"status":"ok"`.
+
+### Verify CORS (browser calls fail but `/health` works)
+
+```bash
+curl.exe -s -i -X OPTIONS "https://YOUR-SERVICE.onrender.com/api/v1/auth/me" ^
+  -H "Origin: https://bluearmerp-v3.vercel.app" ^
+  -H "Access-Control-Request-Method: GET" ^
+  -H "Access-Control-Request-Headers: authorization,content-type"
+```
+
+You must see `access-control-allow-origin: https://bluearmerp-v3.vercel.app`. If that header is **missing**, `CORS_ORIGIN` on Render is wrong (often still the default `http://localhost:5173`). Update it and **Save** — Render restarts the service automatically.
 
 ## Passwords with special characters
 
