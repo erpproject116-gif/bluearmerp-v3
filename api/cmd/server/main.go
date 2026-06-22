@@ -16,6 +16,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quotation"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/salesorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/usermgmt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
@@ -66,6 +67,7 @@ func main() {
 			formfields.RegisterRoutes(protected, pool)
 			inventory.RegisterRoutes(protected, pool)
 			quotation.RegisterRoutes(protected, pool)
+			salesorder.RegisterRoutes(protected, pool)
 			usermgmt.RegisterRoutes(protected, pool)
 		})
 	})

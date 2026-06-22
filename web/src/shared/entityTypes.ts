@@ -31,3 +31,13 @@ export const QUOTATION_SETTINGS_HREF = {
 } as const;
 
 export type QuotationFeature = keyof typeof QUOTATION_ENTITY;
+
+export const SALES_ORDER_ENTITY = {
+  salesOrder: "so_sales_order",
+} as const;
+
+export const SALES_ORDER_SETTINGS_HREF = {
+  salesOrder: "/app/sales-order/sales-orders/settings",
+} as const;
+
+export type SalesOrderFeature = keyof typeof SALES_ORDER_ENTITY;

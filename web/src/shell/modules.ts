@@ -70,6 +70,27 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "sales_order",
+    label: "Sales Order",
+    href: "/app/sales-order/sales-orders",
+    basePath: "/app/sales-order",
+    features: [
+      { label: "New Sales Order", href: "/app/sales-order/sales-orders/new", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Sales Order List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Sales Order Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
+      {
+        label: "Outstanding SO Status",
+        href: "/app/sales-order/sales-orders/outstanding",
+        settingsHref: "/app/sales-order/sales-orders/settings",
+      },
+      {
+        label: "Release Sales Order",
+        href: "/app/sales-order/sales-orders/release",
+        settingsHref: "/app/sales-order/sales-orders/settings",
+      },
+    ],
+  },
+  {
     id: "user_management",
     label: "User Management",
     href: "/app/user-management/users",

@@ -38,6 +38,14 @@ import QuotationStatusPage from "./modules/quotation/quotation/QuotationStatusPa
 import OutstandingQuoteStatusPage from "./modules/quotation/quotation/OutstandingQuoteStatusPage";
 import QuotationPrintPage from "./modules/quotation/quotation/QuotationPrintPage";
 import QuotationStatusPrintPage from "./modules/quotation/quotation/QuotationStatusPrintPage";
+import SalesOrderListPage from "./modules/sales-order/sales-order/SalesOrderListPage";
+import SalesOrderNewPage from "./modules/sales-order/sales-order/SalesOrderNewPage";
+import SalesOrderSettingsPage from "./modules/sales-order/sales-order/SalesOrderSettingsPage";
+import SalesOrderStatusPage from "./modules/sales-order/sales-order/SalesOrderStatusPage";
+import OutstandingSOStatusPage from "./modules/sales-order/sales-order/OutstandingSOStatusPage";
+import ReleaseSalesOrderPage from "./modules/sales-order/sales-order/ReleaseSalesOrderPage";
+import SalesOrderPrintPage from "./modules/sales-order/sales-order/SalesOrderPrintPage";
+import SalesOrderStatusPrintPage from "./modules/sales-order/sales-order/SalesOrderStatusPrintPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
@@ -74,6 +82,8 @@ export default function App() {
         <Route path="/app/inventory/after-sales/repair-orders/status/print" component={RepairOrderStatusPrintPage} />
         <Route path="/app/quotation/quotations/:quotationId/print" component={QuotationPrintPage} />
         <Route path="/app/quotation/quotations/status/print" component={QuotationStatusPrintPage} />
+        <Route path="/app/sales-order/sales-orders/:salesOrderId/print" component={SalesOrderPrintPage} />
+        <Route path="/app/sales-order/sales-orders/status/print" component={SalesOrderStatusPrintPage} />
         <Route path="/app" component={AppLayout}>
           <Route path="/inventory/partners" component={PartnersPage} />
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
@@ -102,6 +112,12 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
+          <Route path="/sales-order/sales-orders/new" component={SalesOrderNewPage} />
+          <Route path="/sales-order/sales-orders/status" component={SalesOrderStatusPage} />
+          <Route path="/sales-order/sales-orders/outstanding" component={OutstandingSOStatusPage} />
+          <Route path="/sales-order/sales-orders/release" component={ReleaseSalesOrderPage} />
+          <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
+          <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
           <Route path="/user-management/users" component={() => (
             <AdminModuleRoute>
               <UsersPage />
