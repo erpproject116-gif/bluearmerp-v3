@@ -59,3 +59,20 @@ left join public.tenants t
   on t.id = u.tenant_id and t.company_code = 'BLUEARM'
 where lower(au.email) in ('itsjohnranel@gmail.com', 'bluearmph@gmail.com')
 order by au.email;
+
+-- 5) Schema required by API auth query (migration 012)
+select exists (
+  select 1 from information_schema.tables
+  where table_schema = 'public' and table_name = 'tenant_roles'
+) as tenant_roles_table;
+
+-- 6) Exact API /auth/me SQL (expect api_auth_me_rows = 1)
+select count(*)::int as api_auth_me_rows
+from public.users u
+join public.tenants t on t.id = u.tenant_id
+left join public.tenant_roles tr
+  on tr.tenant_id = u.tenant_id and tr.role_code = u.tenant_role and tr.is_active = true
+left join public.platform_users pu on pu.auth_user_id = u.auth_user_id
+where u.auth_user_id = '400b6912-fa01-46e2-9192-abc514741c22'::uuid
+  and u.status = 'active'
+  and t.status not in ('suspended', 'cancelled');

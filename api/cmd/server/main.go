@@ -21,6 +21,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/formfields"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/health"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -55,6 +56,7 @@ func main() {
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		response.OK(w, map[string]string{"status": "ok"}, "OK")
 	})
+	r.Get("/health/db", health.DBHandler(pool, cfg))
 
 	r.Route("/api/v1", func(api chi.Router) {
 		api.Group(func(protected chi.Router) {

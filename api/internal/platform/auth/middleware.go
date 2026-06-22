@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -73,9 +74,16 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 				}
 			}
 			if err != nil {
-				response.Err(w, http.StatusForbidden,
-					"No tenant profile for this account. Ask an administrator to invite you, then sign in with Google using the invited email.",
-					"ERR_FORBIDDEN")
+				if errorsIsNoProfile(err) {
+					response.Err(w, http.StatusForbidden,
+						"No tenant profile for this account. Ask an administrator to invite you, then sign in with Google using the invited email.",
+						"ERR_FORBIDDEN")
+					return
+				}
+				log.Printf("auth: loadTenantUser(%s): %v", claims.Sub, err)
+				response.Err(w, http.StatusInternalServerError,
+					"Database error during sign-in. Ensure migrations 001–012 are applied on the API database.",
+					"ERR_INTERNAL")
 				return
 			}
 

@@ -48,6 +48,27 @@ You must see `access-control-allow-origin: https://bluearmerp-v3.vercel.app`. If
 
 If `SUPABASE_DB_PASSWORD` contains `$`, `@`, or `#`, paste the value **literally** in the Render Environment UI. No shell quoting needed in the dashboard.
 
+**Recommended if auth works in SQL but `/auth/me` returns 403:** set **`DATABASE_URL`** explicitly from Supabase → Settings → Database → **Connection string** → URI (use the pooler or direct string with the password already URL-encoded). Remove reliance on `SUPABASE_DB_PASSWORD` assembly — a truncated password at `$` connects to the wrong DB or an empty dataset.
+
+Your project ref from local config should match Render `SUPABASE_URL`: `https://hqmhlvahlvrtxtwecdip.supabase.co`.
+
+## Verify database (not just process health)
+
+```bash
+curl https://YOUR-SERVICE.onrender.com/health/db
+```
+
+After deploying the latest API, expect:
+
+| Field | Healthy |
+|-------|---------|
+| `supabase_project_ref` | `hqmhlvahlvrtxtwecdip` |
+| `users_linked_active` | `>= 1` |
+| `tenant_roles_table` | `true` |
+| `auth_me_query_john` | `1` |
+
+If `auth_me_query_john` is `0` on Render but query **#6** in `scripts/diagnose-auth-provision.sql` returns `1` in Supabase SQL Editor, Render is pointed at the **wrong database**.
+
 ## Wire Vercel
 
 Set `VITE_API_BASE_URL=https://YOUR-SERVICE.onrender.com` and redeploy the web app.

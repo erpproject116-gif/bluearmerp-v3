@@ -58,3 +58,8 @@ func projectRefFromURL(raw string) string {
 	}
 	return ""
 }
+
+// ProjectRefFromURL extracts the Supabase project ref from the API URL (for health checks).
+func ProjectRefFromURL(raw string) string {
+	return projectRefFromURL(raw)
+}
