@@ -48,6 +48,8 @@ func registerUserRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/users", listUsers(pool))
 	r.Post("/invites", createInvite(pool))
 	r.Patch("/users/{id}", patchUser(pool))
+	r.Get("/users/{id}/groups", getUserGroups(pool))
+	r.Put("/users/{id}/groups", putUserGroups(pool))
 	r.Post("/invites/{id}/revoke", revokeInvite(pool))
 }
 
@@ -338,6 +340,50 @@ func patchUser(pool *pgxpool.Pool) http.HandlerFunc {
 			"tenant_role": role, "status": status,
 		})
 		response.OK(w, row, "User updated.")
+	}
+}
+
+func getUserGroups(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		ids, err := loadUserGroupIDs(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load groups.", "ERR_INTERNAL")
+			return
+		}
+		if ids == nil {
+			ids = []int64{}
+		}
+		response.OK(w, map[string]any{"group_ids": ids}, "OK")
+	}
+}
+
+func putUserGroups(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body struct {
+			GroupIDs []int64 `json:"group_ids"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Err(w, http.StatusBadRequest, "Invalid JSON body.", "ERR_BAD_REQUEST")
+			return
+		}
+		if err := saveUserGroups(r.Context(), pool, tu.TenantID, id, body.GroupIDs); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update groups.", "ERR_INTERNAL")
+			return
+		}
+		ids, _ := loadUserGroupIDs(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, map[string]any{"group_ids": ids}, "Groups updated.")
 	}
 }
 

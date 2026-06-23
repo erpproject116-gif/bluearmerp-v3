@@ -72,7 +72,9 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
 		return nil
 	}
-	rows, err := pool.Query(ctx, `
+	perms := map[string]string{}
+
+	roleRows, err := pool.Query(ctx, `
 		select rp.permission_code, rp.access_level
 		from public.tenant_role_permissions rp
 		where rp.tenant_id = $1 and rp.role_code = $2`,
@@ -80,17 +82,40 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
-	perms := map[string]string{}
-	for rows.Next() {
+	for roleRows.Next() {
 		var code, lvl string
-		if err := rows.Scan(&code, &lvl); err != nil {
+		if err := roleRows.Scan(&code, &lvl); err != nil {
+			roleRows.Close()
 			return err
 		}
 		perms[code] = lvl
 	}
-	if err := rows.Err(); err != nil {
+	roleRows.Close()
+	if err := roleRows.Err(); err != nil {
+		return err
+	}
+
+	groupRows, err := pool.Query(ctx, `
+		select gp.permission_code, gp.access_level
+		from public.tenant_user_group_members gm
+		join public.tenant_user_group_permissions gp
+		  on gp.group_id = gm.group_id and gp.tenant_id = gm.tenant_id
+		join public.tenant_user_groups g on g.id = gm.group_id and g.is_active = true
+		where gm.tenant_id = $1 and gm.user_id = $2`,
+		tu.TenantID, tu.AppUserID)
+	if err != nil {
+		return err
+	}
+	for groupRows.Next() {
+		var code, lvl string
+		if err := groupRows.Scan(&code, &lvl); err != nil {
+			groupRows.Close()
+			return err
+		}
+		perms[code] = mergeAccess(perms[code], lvl)
+	}
+	groupRows.Close()
+	if err := groupRows.Err(); err != nil {
 		return err
 	}
 
@@ -102,14 +127,15 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 	if err != nil {
 		return err
 	}
-	defer ovRows.Close()
 	for ovRows.Next() {
 		var code, lvl string
 		if err := ovRows.Scan(&code, &lvl); err != nil {
+			ovRows.Close()
 			return err
 		}
 		perms[code] = lvl
 	}
+	ovRows.Close()
 	if err := ovRows.Err(); err != nil {
 		return err
 	}
@@ -117,6 +143,24 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 		tu.permissions = perms
 	}
 	return nil
+}
+
+func accessRank(level string) int {
+	switch level {
+	case AccessWrite:
+		return 2
+	case AccessRead:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func mergeAccess(current, next string) string {
+	if accessRank(next) > accessRank(current) {
+		return next
+	}
+	return current
 }
 
 func (tu TenantUser) legacyPermissionLevel(code string) string {

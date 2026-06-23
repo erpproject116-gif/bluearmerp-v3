@@ -16,15 +16,20 @@ import (
 )
 
 type ActivityLogRow struct {
-	ID          int64           `json:"id"`
-	ActorUserID *int64          `json:"actor_user_id,omitempty"`
-	ActorName   *string         `json:"actor_name,omitempty"`
-	ActionCode  string          `json:"action_code"`
-	TargetType  string          `json:"target_type"`
-	TargetID    *int64          `json:"target_id,omitempty"`
-	OldValues   json.RawMessage `json:"old_values,omitempty"`
-	NewValues   json.RawMessage `json:"new_values,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
+	ID             int64           `json:"id"`
+	ActorUserID    *int64          `json:"actor_user_id,omitempty"`
+	ActorName      *string         `json:"actor_name,omitempty"`
+	ActionCode     string          `json:"action_code"`
+	TargetType     string          `json:"target_type"`
+	TargetID       *int64          `json:"target_id,omitempty"`
+	EntityLabel    string          `json:"entity_label"`
+	ReferenceLabel string          `json:"reference_label"`
+	ReferenceNo    string          `json:"reference_no"`
+	Summary        string          `json:"summary"`
+	Details        []string        `json:"details,omitempty"`
+	OldValues      json.RawMessage `json:"old_values,omitempty"`
+	NewValues      json.RawMessage `json:"new_values,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
 }
 
 func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
@@ -95,6 +100,11 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, v+".%")
 			n++
 		}
+		if v := strings.TrimSpace(q.Get("reference_no")); v != "" {
+			where += fmt.Sprintf(` and coalesce(ref.reference_no, '') ilike $%d`, n)
+			args = append(args, "%"+v+"%")
+			n++
+		}
 
 		sortCol := p.Sort
 		if sortCol == "" {
@@ -116,12 +126,14 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 			  al.old_values,
 			  al.new_values,
 			  al.created_at,
+			  coalesce(ref.reference_no, '') as reference_no,
 			  count(*) over() as total_count
 			from public.audit_logs al
 			left join public.users u on u.id = al.actor_user_id
+			%s
 			where %s
 			order by %s %s
-			limit $%d offset $%d`, where, sortCol, order, n, n+1)
+			limit $%d offset $%d`, auditLogReferenceLateralSQL, where, sortCol, order, n, n+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), sql, args...)
@@ -136,6 +148,7 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row ActivityLogRow
 			var actorName *string
+			var oldJSON, newJSON []byte
 			if err := rows.Scan(
 				&row.ID,
 				&row.ActorUserID,
@@ -143,9 +156,10 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.ActionCode,
 				&row.TargetType,
 				&row.TargetID,
-				&row.OldValues,
-				&row.NewValues,
+				&oldJSON,
+				&newJSON,
 				&row.CreatedAt,
+				&row.ReferenceNo,
 				&total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to list activity logs.", "ERR_INTERNAL")
@@ -154,6 +168,15 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 			if actorName != nil && strings.TrimSpace(*actorName) != "" {
 				row.ActorName = actorName
 			}
+			row.OldValues = oldJSON
+			row.NewValues = newJSON
+			row.EntityLabel = entityLabel(row.TargetType)
+			row.ReferenceLabel = referenceLabel(row.TargetType)
+			actor := ""
+			if row.ActorName != nil {
+				actor = *row.ActorName
+			}
+			row.Summary, row.Details = formatActivitySummary(actor, row.ActionCode, row.TargetType, row.ReferenceNo, oldJSON, newJSON)
 			out = append(out, row)
 		}
 		if out == nil {

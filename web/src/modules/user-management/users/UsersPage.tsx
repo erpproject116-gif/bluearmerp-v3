@@ -12,9 +12,12 @@ import {
   type TenantUserRow,
 } from "../../../shared/useUserManagement";
 import {
+  fetchUserGroups,
+  saveUserGroups,
   saveUserPermissionOverrides,
   useInvalidatePermissions,
   usePermissionRegistry,
+  useUserGroupList,
   useUserPermissions,
 } from "../../../shared/usePermissions";
 
@@ -39,11 +42,13 @@ export default function UsersPage() {
   const [inviteRole, setInviteRole] = createSignal("member");
   const [editRole, setEditRole] = createSignal("member");
   const [editStatus, setEditStatus] = createSignal("active");
+  const [editGroupIds, setEditGroupIds] = createSignal<number[]>([]);
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateUserManagement();
   const permInvalidate = useInvalidatePermissions();
   const roles = useTenantRoleList();
+  const groups = useUserGroupList();
   const registry = usePermissionRegistry();
   const userPerms = useUserPermissions(permUserId);
 
@@ -63,11 +68,16 @@ export default function UsersPage() {
     setInviteOpen(true);
   };
 
-  const openEdit = (row: TenantUserRow) => {
+  const openEdit = async (row: TenantUserRow) => {
     setEditing(row);
     setEditRole(row.tenant_role);
     setEditStatus(row.status);
+    setEditGroupIds([]);
     setEditOpen(true);
+    const res = await fetchUserGroups(row.id);
+    if (res.success && res.data?.group_ids) {
+      setEditGroupIds(res.data.group_ids);
+    }
   };
 
   const openPermissions = (row: TenantUserRow) => {
@@ -148,6 +158,18 @@ export default function UsersPage() {
       toast,
       "User updated.",
     );
+    if (!ok) {
+      setSaving(false);
+      return;
+    }
+    if (!row.is_owner) {
+      const groupRes = await saveUserGroups(row.id, editGroupIds());
+      if (!groupRes.success) {
+        toast.warning(groupRes.message ?? "User saved but groups could not be updated.");
+        setSaving(false);
+        return;
+      }
+    }
     setSaving(false);
     if (!ok) return;
     setEditOpen(false);
@@ -352,6 +374,32 @@ export default function UsersPage() {
                   </Show>
                 </select>
               </Field>
+              <Show when={!row().is_owner}>
+                <Field label="Groups">
+                  <p class="mb-2 text-xs text-text-secondary">
+                    Users can belong to multiple groups. Access merges with role permissions (highest level wins).
+                  </p>
+                  <div class="max-h-40 overflow-y-auto rounded-lg border border-stroke p-2">
+                    <For each={groups.data ?? []}>
+                      {(g) => (
+                        <label class="flex cursor-pointer items-center gap-2 py-1 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={editGroupIds().includes(g.id)}
+                            disabled={!g.is_active}
+                            onChange={() =>
+                              setEditGroupIds((ids) =>
+                                ids.includes(g.id) ? ids.filter((x) => x !== g.id) : [...ids, g.id],
+                              )
+                            }
+                          />
+                          <span>{g.group_name}</span>
+                        </label>
+                      )}
+                    </For>
+                  </div>
+                </Field>
+              </Show>
             </>
           )}
         </Show>
@@ -367,15 +415,16 @@ export default function UsersPage() {
         singleColumn
       >
         <p class="mb-3 text-sm text-text-secondary">
-          Override role defaults per feature. Choose <strong>Role</strong> to inherit from{" "}
-          <span class="font-medium">{userPerms.data?.tenant_role}</span>.
+          Per-user overrides on top of role and group permissions. Choose <strong>Role</strong> to inherit the
+          effective default from <span class="font-medium">{userPerms.data?.tenant_role}</span> plus all groups.
         </p>
         <PermissionMatrix
           groups={registry.data ?? []}
           values={permValues()}
           allowInherit
-          roleDefaults={userPerms.data?.role_permissions as Record<string, AccessLevel> | undefined}
+          roleDefaults={userPerms.data?.effective as Record<string, AccessLevel> | undefined}
           loading={registry.isLoading || userPerms.isLoading}
+          title="Per-user overrides across the entire app. Effective access is the highest from role, all groups, then these overrides."
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
         />
       </EntityModal>

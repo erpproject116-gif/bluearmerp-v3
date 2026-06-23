@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useListState } from "../../shared/useListState";
@@ -11,12 +11,6 @@ function formatTimestamp(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function summarizeJson(value: Record<string, unknown> | null | undefined): string {
-  if (!value || Object.keys(value).length === 0) return "—";
-  const text = JSON.stringify(value);
-  return text.length > 80 ? `${text.slice(0, 77)}…` : text;
 }
 
 export default function ActivityLogListPage() {
@@ -32,9 +26,11 @@ export default function ActivityLogListPage() {
     actionCode: "",
     targetType: "",
     module: typeof params.module === "string" ? params.module : "",
+    referenceNo: "",
   });
   const [submittedFilters, setSubmittedFilters] = createSignal({ ...draftFilters() });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [expandedId, setExpandedId] = createSignal<number | null>(null);
 
   createEffect(() => {
     const moduleParam = typeof params.module === "string" ? params.module : "";
@@ -57,6 +53,7 @@ export default function ActivityLogListPage() {
       actionCode: f.actionCode || undefined,
       targetType: f.targetType || undefined,
       module: f.module || undefined,
+      referenceNo: f.referenceNo || undefined,
     };
   });
 
@@ -74,6 +71,7 @@ export default function ActivityLogListPage() {
       actionCode: "",
       targetType: "",
       module: moduleParam,
+      referenceNo: "",
     };
     setDraftFilters(cleared);
     setSubmittedFilters(cleared);
@@ -88,6 +86,7 @@ export default function ActivityLogListPage() {
           setDraftFilters={setDraftFilters}
           onSearch={search}
           onReset={reset}
+          showReferenceNo
         />
 
         <Show when={list.error}>
@@ -108,17 +107,30 @@ export default function ActivityLogListPage() {
               sortable: true,
               render: (row) => <span>{row.actor_name ?? (row.actor_user_id ? `#${row.actor_user_id}` : "—")}</span>,
             },
-            { key: "action_code", header: "Action", sortable: true },
-            { key: "target_type", header: "Target type", sortable: true },
             {
-              key: "target_id",
-              header: "Target ID",
-              render: (row) => <span>{row.target_id ?? "—"}</span>,
+              key: "summary",
+              header: "What happened",
+              render: (row) => (
+                <button
+                  type="button"
+                  class="text-left text-sm text-text-primary hover:text-brand-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedId((id) => (id === row.id ? null : row.id));
+                  }}
+                >
+                  {row.summary || row.action_code}
+                </button>
+              ),
             },
             {
-              key: "new_values",
-              header: "Payload",
-              render: (row) => <span class="font-mono text-xs text-text-secondary">{summarizeJson(row.new_values)}</span>,
+              key: "reference_no",
+              header: "Reference",
+              render: (row) => (
+                <span class="text-sm text-text-secondary">
+                  {row.reference_no ? `${row.reference_label ?? ""} ${row.reference_no}`.trim() : "—"}
+                </span>
+              ),
             },
           ]}
           rows={list.data?.rows ?? []}
@@ -128,7 +140,7 @@ export default function ActivityLogListPage() {
           onEdit={() => {}}
           onNew={() => {}}
           codeKey="action_code"
-          nameKey="action_code"
+          nameKey="summary"
           sortKey={sort()}
           sortOrder={order()}
           onSort={toggleSort}
@@ -138,6 +150,26 @@ export default function ActivityLogListPage() {
           onPageChange={setPage}
           onRefresh={() => void list.refetch()}
         />
+
+        <Show when={expandedId()}>
+          {(id) => {
+            const row = () => list.data?.rows.find((r) => r.id === id());
+            return (
+              <Show when={row()}>
+                {(r) => (
+                  <section class="rounded-xl border border-stroke bg-white p-4 text-sm shadow-sm">
+                    <p class="font-medium text-text-primary">{r().summary}</p>
+                    <Show when={(r().details?.length ?? 0) > 0}>
+                      <ul class="mt-2 list-disc space-y-1 pl-5 text-text-secondary">
+                        <For each={r().details ?? []}>{(d) => <li>{d}</li>}</For>
+                      </ul>
+                    </Show>
+                  </section>
+                )}
+              </Show>
+            );
+          }}
+        </Show>
       </div>
     </ActivityLogLayout>
   );

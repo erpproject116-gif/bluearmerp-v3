@@ -189,6 +189,11 @@ export const appModules: AppModule[] = [
         href: "/app/user-management/roles",
         settingsHref: "/app/user-management/roles",
       },
+      {
+        label: "User Groups",
+        href: "/app/user-management/groups",
+        settingsHref: "/app/user-management/groups",
+      },
     ],
   },
 ];

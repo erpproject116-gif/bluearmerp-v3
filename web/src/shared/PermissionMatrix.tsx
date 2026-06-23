@@ -11,6 +11,7 @@ type Props = {
   allowInherit?: boolean;
   roleDefaults?: Record<string, AccessLevel>;
   loading?: boolean;
+  title?: string;
 };
 
 export function PermissionMatrix(props: Props) {
@@ -18,20 +19,30 @@ export function PermissionMatrix(props: Props) {
     if (props.allowInherit) {
       return [
         { key: "inherit" as const, label: "Role", title: "Use role default" },
-        { key: "read" as const, label: "Read", title: "View only" },
-        { key: "write" as const, label: "Write", title: "Create and edit" },
+        { key: "read" as const, label: "Read-only", title: "View only" },
+        { key: "write" as const, label: "Read & Write", title: "Create and edit" },
         { key: "deny" as const, label: "D/A", title: "Do not allow" },
       ];
     }
     return [
-      { key: "read" as const, label: "Read", title: "View only" },
-      { key: "write" as const, label: "Write", title: "Create and edit" },
+      { key: "read" as const, label: "Read-only", title: "View only" },
+      { key: "write" as const, label: "Read & Write", title: "Create and edit" },
       { key: "deny" as const, label: "D/A", title: "Do not allow" },
     ];
   };
 
+  const setModuleLevel = (group: PermissionModuleGroup, level: MatrixValue) => {
+    for (const perm of group.permissions) {
+      props.onChange(perm.permission_code, level);
+    }
+  };
+
   return (
     <Show when={!props.loading} fallback={<p class="text-sm text-text-secondary">Loading permissions…</p>}>
+      <p class="mb-3 text-sm text-text-secondary">
+        {props.title ??
+          "App-wide access for every module and feature. Effective access is the highest level from role, groups, and per-user overrides."}
+      </p>
       <div class="max-h-[min(70vh,560px)] overflow-y-auto rounded-lg border border-stroke">
         <table class="w-full text-left text-sm">
           <thead class="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-text-secondary">
@@ -54,17 +65,46 @@ export function PermissionMatrix(props: Props) {
                     return (
                       <tr classList={{ "border-t border-stroke bg-slate-50/80": isModule, "border-t border-stroke/60": !isModule }}>
                         <td class="px-3 py-2">
-                          <div
-                            classList={{
-                              "font-semibold text-text-primary": isModule,
-                              "pl-4 text-text-primary": !isModule,
-                            }}
-                          >
-                            {perm.label}
+                          <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div
+                                classList={{
+                                  "font-semibold text-text-primary": isModule,
+                                  "pl-4 text-text-primary": !isModule,
+                                }}
+                              >
+                                {perm.label}
+                              </div>
+                              <Show when={props.allowInherit && roleHint()}>
+                                <div class="text-xs text-text-secondary pl-4">Role: {roleHint()}</div>
+                              </Show>
+                            </div>
+                            <Show when={isModule}>
+                              <div class="flex flex-wrap gap-1 text-xs">
+                                <button
+                                  type="button"
+                                  class="rounded border border-stroke px-2 py-0.5 hover:bg-white"
+                                  onClick={() => setModuleLevel(group, "read")}
+                                >
+                                  All read-only
+                                </button>
+                                <button
+                                  type="button"
+                                  class="rounded border border-stroke px-2 py-0.5 hover:bg-white"
+                                  onClick={() => setModuleLevel(group, "write")}
+                                >
+                                  All read & write
+                                </button>
+                                <button
+                                  type="button"
+                                  class="rounded border border-stroke px-2 py-0.5 hover:bg-white"
+                                  onClick={() => setModuleLevel(group, "deny")}
+                                >
+                                  All D/A
+                                </button>
+                              </div>
+                            </Show>
                           </div>
-                          <Show when={props.allowInherit && roleHint()}>
-                            <div class="text-xs text-text-secondary pl-4">Role: {roleHint()}</div>
-                          </Show>
                         </td>
                         <For each={columns()}>
                           {(col) => (
@@ -89,8 +129,9 @@ export function PermissionMatrix(props: Props) {
         </table>
       </div>
       <p class="mt-2 text-xs text-text-secondary">
-        <strong>Read</strong> — view only. <strong>Write</strong> — create and edit. <strong>D/A</strong> — do not allow.
-        {props.allowInherit ? " **Role** — inherit from the user’s assigned role." : null}
+        <strong>Read-only</strong> — view lists and details. <strong>Read & Write</strong> — create and edit.{" "}
+        <strong>D/A</strong> — do not allow.
+        {props.allowInherit ? " **Role** — inherit from the user’s assigned role (groups and overrides can raise access)." : null}
       </p>
     </Show>
   );

@@ -63,6 +63,7 @@ import OfficialReceiptSettingsPage from "./modules/finance/official-receipts/Off
 import ArByCustomerPage from "./modules/finance/reports/ArByCustomerPage";
 import ReceiptStatusPage from "./modules/finance/reports/ReceiptStatusPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
+import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
 import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
 import ChangeLogListPage from "./modules/activity-logs/ChangeLogListPage";
@@ -212,6 +213,11 @@ export default function App() {
           <Route path="/user-management/roles" component={() => (
             <AdminModuleRoute>
               <RolesPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/groups" component={() => (
+            <AdminModuleRoute>
+              <UserGroupsPage />
             </AdminModuleRoute>
           )} />
         </Route>

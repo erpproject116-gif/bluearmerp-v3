@@ -241,6 +241,7 @@ export default function RolesPage() {
           groups={registry.data ?? []}
           values={permValues()}
           loading={registry.isLoading || rolePerms.isLoading}
+          title="App-wide defaults for this role. Users also inherit permissions from any groups they belong to."
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
         />
       </EntityModal>

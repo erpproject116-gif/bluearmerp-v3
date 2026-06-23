@@ -282,3 +282,88 @@ func formatChangeSummary(actorName, actionCode, targetType, referenceNo string, 
 	}
 	return summary, details
 }
+
+func formatActivitySummary(actorName, actionCode, targetType, referenceNo string, oldJSON, newJSON json.RawMessage) (summary string, details []string) {
+	actor := strings.TrimSpace(actorName)
+	if actor == "" {
+		actor = "A user"
+	}
+	entity := entityLabel(targetType)
+	ref := strings.TrimSpace(referenceNo)
+	var refPart string
+	if ref != "" {
+		refPart = fmt.Sprintf(" %s %s", referenceLabel(targetType), ref)
+	}
+
+	if strings.HasSuffix(actionCode, ".create") {
+		newM := asMap(newJSON)
+		details = describeCreatePayload(targetType, newM)
+		if len(details) == 0 {
+			details = []string{fmt.Sprintf("New %s was added", strings.ToLower(entity))}
+		}
+		summary = fmt.Sprintf("%s created %s%s.", actor, entity, refPart)
+		if len(details) > 0 {
+			summary = fmt.Sprintf("%s created %s%s: %s.", actor, entity, refPart, details[0])
+		}
+		return summary, details
+	}
+
+	switch actionCode {
+	case "user.invite":
+		newM := asMap(newJSON)
+		email, _ := newM["email"].(string)
+		if email != "" {
+			return fmt.Sprintf("%s invited %s to the tenant.", actor, email), []string{"Invitation pending Google sign-in"}
+		}
+		return fmt.Sprintf("%s sent a user invitation.", actor), nil
+	case "user.invite_revoke":
+		return fmt.Sprintf("%s revoked a pending invitation.", actor), nil
+	case "crm.job.evaluate":
+		return "System evaluated CRM alert rules.", []string{"Notifications and follow-up tasks may have been generated"}
+	case "role.create", "role.update":
+		return fmt.Sprintf("%s updated a user role.", actor), diffChanges(asMap(oldJSON), asMap(newJSON))
+	case "role.permissions.update":
+		return fmt.Sprintf("%s updated role permissions.", actor), []string{"Permission matrix was changed"}
+	case "user.permissions.update":
+		return fmt.Sprintf("%s updated user permission overrides.", actor), []string{"Per-user permissions were changed"}
+	}
+
+	return formatChangeSummary(actorName, actionCode, targetType, referenceNo, oldJSON, newJSON)
+}
+
+func describeCreatePayload(targetType string, newM map[string]any) []string {
+	if newM == nil {
+		return nil
+	}
+	var hints []string
+	pick := func(keys ...string) {
+		for _, k := range keys {
+			if v, ok := newM[k]; ok && fmt.Sprint(v) != "" && fmt.Sprint(v) != "<nil>" {
+				hints = append(hints, fmt.Sprintf("%s: %s", labelForField(k), formatValue(v)))
+				return
+			}
+		}
+	}
+	switch targetType {
+	case "quo_quotation":
+		pick("reference_no", "partner_id", "grand_total")
+	case "sa_sales":
+		pick("sales_no", "partner_id", "grand_total")
+	case "so_sales_order":
+		pick("sales_order_no", "partner_id", "grand_total")
+	case "fin_official_receipt":
+		pick("receipt_no", "amount_total", "payment_method")
+	case "inv_partner":
+		pick("company_name", "partner_code")
+	case "inv_item":
+		pick("item_code", "item_name")
+	case "user":
+		pick("email", "full_name")
+	default:
+		pick("title", "name", "reference_no", "sales_no")
+	}
+	if len(hints) > 3 {
+		hints = hints[:3]
+	}
+	return hints
+}

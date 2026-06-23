@@ -8,6 +8,11 @@ export type ActivityLogRow = {
   action_code: string;
   target_type: string;
   target_id?: number | null;
+  entity_label?: string;
+  reference_label?: string;
+  reference_no?: string;
+  summary?: string;
+  details?: string[];
   old_values?: Record<string, unknown> | null;
   new_values?: Record<string, unknown> | null;
   created_at: string;
@@ -24,6 +29,7 @@ export type ActivityLogFilters = {
   actionCode?: string;
   targetType?: string;
   module?: string;
+  referenceNo?: string;
 };
 
 export function useActivityLogList(params: () => ActivityLogFilters) {
@@ -41,6 +47,7 @@ export function useActivityLogList(params: () => ActivityLogFilters) {
     if (p.actionCode) qs.set("action_code", p.actionCode);
     if (p.targetType) qs.set("target_type", p.targetType);
     if (p.module) qs.set("module", p.module);
+    if (p.referenceNo) qs.set("reference_no", p.referenceNo);
 
     return {
       queryKey: ["activity-logs", p],
