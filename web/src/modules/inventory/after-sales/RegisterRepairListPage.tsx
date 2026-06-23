@@ -113,8 +113,8 @@ export default function RegisterRepairListPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onEdit={(row) => navigate(`/app/inventory/after-sales/register-repair/new?id=${row.id}`)}
-        onNew={() => navigate("/app/inventory/after-sales/register-repair/new")}
+        onEdit={(row) => navigate(`/app/after-sales/register-repair/new?id=${row.id}`)}
+        onNew={() => navigate("/app/after-sales/register-repair/new")}
         codeKey="registration_no"
         nameKey="date_no_display"
         sortKey={sort()}

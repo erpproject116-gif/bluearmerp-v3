@@ -52,7 +52,7 @@ export function filtersToSearchParams(
 }
 
 export function statusPrintPath(filters: RepairOrderStatusFilters): string {
-  return `/app/inventory/after-sales/repair-orders/status/print?${filtersToSearchParams(filters).toString()}`;
+  return `/app/after-sales/repair-orders/status/print?${filtersToSearchParams(filters).toString()}`;
 }
 
 export function statusExportUrl(filters: RepairOrderStatusFilters): string {

@@ -1,14 +1,13 @@
-import { AFTER_SALES_PREFIX } from "./after-sales-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 import { isSubBranchPath } from "./sub-branch-nav";
 
-export { AFTER_SALES_PREFIX, TAX_MNGT_PREFIX, isSubBranchPath };
+export { TAX_MNGT_PREFIX, isSubBranchPath };
 
 export type ModuleFeature = {
   label: string;
   href: string;
   settingsHref: string;
-  /** Path prefix for sidebar sub-branch detection (e.g. /app/inventory/after-sales). */
+  /** Path prefix for sidebar sub-branch detection (e.g. /app/after-sales). */
   prefix?: string;
   /** Hidden from sales team; requires CRM analytics permission. */
   analyticsOnly?: boolean;
@@ -41,12 +40,47 @@ export const appModules: AppModule[] = [
       { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings" },
       { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements" },
     ],
-    subBranches: [
+  },
+  {
+    id: "after_sales",
+    label: "After-Sales",
+    href: "/app/after-sales/repair-orders",
+    basePath: "/app/after-sales",
+    features: [
       {
-        label: "After-Sales",
-        prefix: AFTER_SALES_PREFIX,
-        href: "/app/inventory/after-sales/repair-orders",
-        settingsHref: "/app/inventory/after-sales/repair-orders/settings",
+        label: "Repair Order List",
+        href: "/app/after-sales/repair-orders",
+        settingsHref: "/app/after-sales/repair-orders/settings",
+      },
+      {
+        label: "New Repair Order",
+        href: "/app/after-sales/repair-orders/new",
+        settingsHref: "/app/after-sales/repair-orders/settings",
+      },
+      {
+        label: "Repair Order Status",
+        href: "/app/after-sales/repair-orders/status",
+        settingsHref: "/app/after-sales/repair-orders/settings",
+      },
+      {
+        label: "New Repair",
+        href: "/app/after-sales/register-repair/new",
+        settingsHref: "/app/after-sales/repair-orders/settings",
+      },
+      {
+        label: "Repair List",
+        href: "/app/after-sales/register-repair",
+        settingsHref: "/app/after-sales/repair-orders/settings",
+      },
+      {
+        label: "Repair Status",
+        href: "/app/after-sales/register-repair/status",
+        settingsHref: "/app/after-sales/repair-orders/settings",
+      },
+      {
+        label: "A/S Consumption",
+        href: "/app/after-sales/register-repair/consumption",
+        settingsHref: "/app/after-sales/repair-orders/settings",
       },
     ],
   },

@@ -12,16 +12,12 @@ import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ModuleIcon } from "./ModuleIcon";
 import { ShellProvider, useShell } from "./shell-context";
 import { appModules, featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
-import { AfterSalesHeaderNav } from "./AfterSalesHeaderNav";
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
-import { afterSalesHeaderTitle } from "./after-sales-nav";
 import { taxMngtHeaderTitle } from "./tax-mngt-nav";
-import { AFTER_SALES_PREFIX } from "./after-sales-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 import { isAnySubBranchPath } from "./sub-branch-nav";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
-  if (prefix === AFTER_SALES_PREFIX) return afterSalesHeaderTitle(pathname);
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
   return "Sub-module";
 }
@@ -284,7 +280,6 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                       ))}
                     </nav>
                   </Show>
-                  <AfterSalesHeaderNav />
                   <TaxMngtHeaderNav />
                 </>
               )}

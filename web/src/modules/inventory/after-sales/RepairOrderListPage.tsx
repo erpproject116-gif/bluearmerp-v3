@@ -52,7 +52,7 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
   const closeModal = () => {
     setModalOpen(false);
     if (loc.pathname.endsWith("/new")) {
-      navigate("/app/inventory/after-sales/repair-orders", { replace: true });
+      navigate("/app/after-sales/repair-orders", { replace: true });
     }
   };
 

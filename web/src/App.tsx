@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
-import { Route, Router, type RouteSectionProps } from "@solidjs/router";
+import { Route, Router, type RouteSectionProps, Navigate, useLocation } from "@solidjs/router";
 import { AppShell } from "./shell/AppShell";
 import { AuthProvider } from "./shared/auth-context";
 import { ToastProvider } from "./shared/toast";
@@ -93,6 +93,12 @@ const queryClient = new QueryClient({
   },
 });
 
+function LegacyInventoryAfterSalesRedirect() {
+  const loc = useLocation();
+  const target = loc.pathname.replace("/app/inventory/after-sales", "/app/after-sales") + (loc.search || "");
+  return <Navigate href={target} />;
+}
+
 function AppLayout(props: RouteSectionProps) {
   return (
     <ProtectedRoute>
@@ -111,9 +117,10 @@ export default function App() {
         <Route path="/signin" component={SignInPage} />
         <Route path="/auth/callback" component={AuthCallbackPage} />
         <Route path="/" component={AuthEntryRedirect} />
-        <Route path="/app/inventory/after-sales/repair-orders/:orderId/receipt" component={RepairOrderReceiptPrintPage} />
-        <Route path="/app/inventory/after-sales/repair-orders/:orderId/warranty" component={RepairOrderWarrantyPrintPage} />
-        <Route path="/app/inventory/after-sales/repair-orders/status/print" component={RepairOrderStatusPrintPage} />
+        <Route path="/app/after-sales/repair-orders/:orderId/receipt" component={RepairOrderReceiptPrintPage} />
+        <Route path="/app/after-sales/repair-orders/:orderId/warranty" component={RepairOrderWarrantyPrintPage} />
+        <Route path="/app/after-sales/repair-orders/status/print" component={RepairOrderStatusPrintPage} />
+        <Route path="/app/inventory/after-sales/*" component={LegacyInventoryAfterSalesRedirect} />
         <Route path="/app/quotation/quotations/:quotationId/print" component={QuotationPrintPage} />
         <Route path="/app/quotation/quotations/status/print" component={QuotationStatusPrintPage} />
         <Route path="/app/sales-order/sales-orders/:salesOrderId/print" component={SalesOrderPrintPage} />
@@ -131,14 +138,14 @@ export default function App() {
           <Route path="/inventory/items" component={ItemsPage} />
           <Route path="/inventory/items/settings" component={ItemsSettingsPage} />
           <Route path="/inventory/stock-movements" component={StockMovementsPage} />
-          <Route path="/inventory/after-sales/repair-orders/new" component={RepairOrderNewPage} />
-          <Route path="/inventory/after-sales/repair-orders/status" component={RepairOrderStatusPage} />
-          <Route path="/inventory/after-sales/repair-orders/settings" component={RepairOrderSettingsPage} />
-          <Route path="/inventory/after-sales/repair-orders" component={RepairOrderListPage} />
-          <Route path="/inventory/after-sales/register-repair/new" component={RegisterRepairNewPage} />
-          <Route path="/inventory/after-sales/register-repair/status" component={RegisterRepairStatusPage} />
-          <Route path="/inventory/after-sales/register-repair/consumption" component={RegisterRepairConsumptionPage} />
-          <Route path="/inventory/after-sales/register-repair" component={RegisterRepairListPage} />
+          <Route path="/after-sales/repair-orders/new" component={RepairOrderNewPage} />
+          <Route path="/after-sales/repair-orders/status" component={RepairOrderStatusPage} />
+          <Route path="/after-sales/repair-orders/settings" component={RepairOrderSettingsPage} />
+          <Route path="/after-sales/repair-orders" component={RepairOrderListPage} />
+          <Route path="/after-sales/register-repair/new" component={RegisterRepairNewPage} />
+          <Route path="/after-sales/register-repair/status" component={RegisterRepairStatusPage} />
+          <Route path="/after-sales/register-repair/consumption" component={RegisterRepairConsumptionPage} />
+          <Route path="/after-sales/register-repair" component={RegisterRepairListPage} />
           <Route path="/quotation/tax-mngt/tax-types/settings" component={TaxTypeSettingsPage} />
           <Route path="/quotation/tax-mngt/tax-types" component={TaxTypeListPage} />
           <Route path="/quotation/tax-mngt/currencies/settings" component={CurrencySettingsPage} />

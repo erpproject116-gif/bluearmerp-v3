@@ -151,6 +151,7 @@ function legacyPermissionLevel(me: MeData, code: string): AccessLevel {
   }
   if (
     code.startsWith("inventory") ||
+    code.startsWith("after_sales") ||
     code.startsWith("quotation") ||
     code.startsWith("sales") ||
     code.startsWith("sales_order")

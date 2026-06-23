@@ -8,10 +8,9 @@ globs: web/src/modules/inventory/after-sales/**,api/internal/modules/inventory/r
 
 ## Navigation
 
-- **After-Sales** is a sidebar sub-branch under **Inventory** (`subBranches` in [`modules.ts`](web/src/shell/modules.ts)), not a header feature tab.
-- Sub-nav renders in the **sticky header** as flat feature pills (same pattern as Partners/Locations) via [`AfterSalesHeaderNav.tsx`](web/src/shell/AfterSalesHeaderNav.tsx).
-- Link config: [`after-sales-nav.ts`](web/src/shell/after-sales-nav.ts).
-- Register Repair routes are placeholders until the next epic.
+- **After-Sales** is a **top-level sidebar module** (`after_sales` in [`modules.ts`](web/src/shell/modules.ts)), sibling to Inventory — not an Inventory sub-branch.
+- Feature tabs (Repair Order List, New Repair Order, Register Repair, etc.) render in the **sticky header** via the standard module feature nav in [`AppShell.tsx`](web/src/shell/AppShell.tsx).
+- Base path: `/app/after-sales`. Legacy `/app/inventory/after-sales/*` URLs redirect to the new paths.
 
 ## Numbering (per tenant, per calendar day)
 
@@ -22,12 +21,12 @@ globs: web/src/modules/inventory/after-sales/**,api/internal/modules/inventory/r
 ## Grid golden rules
 
 - **+ New row** opens [`RepairOrderModal`](web/src/modules/inventory/after-sales/RepairOrderModal.tsx).
-- **Cog icon** → `/app/inventory/after-sales/repair-orders/settings` (`EntityFormSettingsPage`).
+- **Cog icon** → `/app/after-sales/repair-orders/settings` (`EntityFormSettingsPage`).
 - **Print** (Receipt) and **Warranty** (Details) open print views in a new tab; data from `GET /api/v1/inventory/repair-orders/{id}/print?doc=receipt|warranty`.
 
 ## Repair Order Status report
 
-- Route: `/app/inventory/after-sales/repair-orders/status` — filter first (F8), then line-level grid.
+- Route: `/app/after-sales/repair-orders/status` — filter first (F8), then line-level grid.
 - **Date-No** click → `RepairOrderModal`. **Progress** inline → `PATCH .../progress-status`.
 - Line **remark** column: migration `008_repair_order_status.sql`; editable in `EditableLineGrid`.
 - Print: `/repair-orders/status/print?...` (browser print). Excel: `GET .../status-report/export`.
@@ -46,3 +45,8 @@ globs: web/src/modules/inventory/after-sales/**,api/internal/modules/inventory/r
 - `GET /api/v1/inventory/repair-orders/status-report/export` (CSV)
 - `PATCH /api/v1/inventory/repair-orders/{id}/progress-status`
 - `GET /api/v1/inventory/after-sales/users?q=` (PIC lookup)
+
+## Permissions
+
+- Module code: `after_sales` (migration `025_after_sales_module.sql`).
+- Feature permission codes: `after_sales.repair_orders`, `after_sales.register_repair`, etc.

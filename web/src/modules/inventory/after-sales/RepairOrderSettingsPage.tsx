@@ -8,7 +8,7 @@ export default function RepairOrderSettingsPage() {
       <EntityFormSettingsPage
         entityType={INVENTORY_ENTITY.repairOrder}
         featureLabel="Repair Order"
-        listHref="/app/inventory/after-sales/repair-orders"
+        listHref="/app/after-sales/repair-orders"
       />
     </AfterSalesLayout>
   );

@@ -51,7 +51,7 @@ export async function fetchRepairOrderPrint(orderId: number, doc: "receipt" | "w
 export function openRepairOrderPrint(orderId: number, doc: "receipt" | "warranty") {
   const path =
     doc === "receipt"
-      ? `/app/inventory/after-sales/repair-orders/${orderId}/receipt`
-      : `/app/inventory/after-sales/repair-orders/${orderId}/warranty`;
+      ? `/app/after-sales/repair-orders/${orderId}/receipt`
+      : `/app/after-sales/repair-orders/${orderId}/warranty`;
   window.open(path, "_blank", "noopener,noreferrer");
 }

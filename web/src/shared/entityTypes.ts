@@ -13,7 +13,7 @@ export const INVENTORY_SETTINGS_HREF = {
   projects: "/app/inventory/projects/settings",
   departments: "/app/inventory/departments/settings",
   items: "/app/inventory/items/settings",
-  repairOrder: "/app/inventory/after-sales/repair-orders/settings",
+  repairOrder: "/app/after-sales/repair-orders/settings",
 } as const;
 
 export type InventoryFeature = keyof typeof INVENTORY_ENTITY;

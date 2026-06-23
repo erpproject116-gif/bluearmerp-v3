@@ -34,7 +34,7 @@ test.describe("Bluearm ERP v3 smoke", () => {
     await page.goto("/signin");
     await page.getByRole("button", { name: /Try free demo/i }).click();
     await page.waitForURL("**/app/inventory/**", { timeout: 15000 });
-    await page.goto("/app/inventory/after-sales/repair-orders/status");
+    await page.goto("/app/after-sales/repair-orders/status");
     await page.getByRole("button", { name: /Search \(F8\)/i }).click();
     await expect(page.getByRole("heading", { name: "Repair Order Status", level: 2 })).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole("table")).toBeVisible();

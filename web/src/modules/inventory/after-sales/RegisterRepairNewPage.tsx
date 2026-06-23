@@ -132,7 +132,7 @@ export default function RegisterRepairNewPage() {
     );
     setSaving(false);
     if (!ok) return;
-    navigate("/app/inventory/after-sales/register-repair");
+    navigate("/app/after-sales/register-repair");
   };
 
   return (
@@ -140,7 +140,7 @@ export default function RegisterRepairNewPage() {
       <div class="mx-auto max-w-3xl space-y-4 rounded-xl border border-stroke bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold text-text-primary">{editId() ? "Edit Registration" : "New Registration"}</h2>
-          <button type="button" class="text-sm text-text-secondary hover:text-text-primary" onClick={() => navigate("/app/inventory/after-sales/register-repair")}>
+          <button type="button" class="text-sm text-text-secondary hover:text-text-primary" onClick={() => navigate("/app/after-sales/register-repair")}>
             ← Back to list
           </button>
         </div>
@@ -212,7 +212,7 @@ export default function RegisterRepairNewPage() {
 
         <Show when={!readOnly()}>
           <div class="flex justify-end gap-2 pt-2">
-            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => navigate("/app/inventory/after-sales/register-repair")}>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => navigate("/app/after-sales/register-repair")}>
               Cancel
             </button>
             <button

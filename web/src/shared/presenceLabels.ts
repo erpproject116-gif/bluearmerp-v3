@@ -1,5 +1,4 @@
-import { AFTER_SALES_PREFIX, TAX_MNGT_PREFIX, featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "../shell/modules";
-import { afterSalesHeaderTitle } from "../shell/after-sales-nav";
+import { TAX_MNGT_PREFIX, featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "../shell/modules";
 import { taxMngtHeaderTitle } from "../shell/tax-mngt-nav";
 
 /** Human-readable screen label for a route path (used in presence heartbeats). */
@@ -11,7 +10,6 @@ export function describePresencePath(pathname: string): string {
 
   const sub = resolveSubBranch(mod, pathname);
   if (sub) {
-    if (sub.prefix === AFTER_SALES_PREFIX) return afterSalesHeaderTitle(pathname);
     if (sub.prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
     return sub.label;
   }
