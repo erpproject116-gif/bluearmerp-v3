@@ -22,6 +22,11 @@ func datePtrToStr(t *time.Time) *string {
 	return &s
 }
 
+func formatDateNoDisplay(orderDate time.Time, dateSeq int) string {
+	return fmt.Sprintf("%02d/%02d/%04d-%d",
+		orderDate.Month(), orderDate.Day(), orderDate.Year(), dateSeq)
+}
+
 func orderSQL(order string) string {
 	if order == "desc" {
 		return "desc"

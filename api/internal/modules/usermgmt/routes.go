@@ -12,5 +12,6 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		ur.Use(auth.RequireManageUsers)
 		registerUserRoutes(ur, pool)
 		registerRoleRoutes(ur, pool)
+		registerPermissionRoutes(ur, pool)
 	})
 }

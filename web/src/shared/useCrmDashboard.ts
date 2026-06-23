@@ -10,6 +10,7 @@ export type TopItemRow = {
 };
 
 export type CrmDashboardSummary = {
+  scoped_view?: boolean;
   expired_quotations_count: number;
   quotes_expiring_7d: number;
   quotes_not_converted_to_so: number;
@@ -20,7 +21,7 @@ export type CrmDashboardSummary = {
   warranty_follow_ups_due: number;
   unread_notifications_count: number;
   quotes_missing_validity_count?: number;
-  ar_customers_with_balance?: number;
+  customers_with_ar_balance?: number;
 };
 
 export function useCrmDashboard(enabled = true) {

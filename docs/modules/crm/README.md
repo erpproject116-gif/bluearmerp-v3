@@ -94,6 +94,16 @@ Idempotent per rule + entity + day via `dedupe_key`.
 
 ## Seeds
 
-- `scripts/seed-demo-crm.sql` — default alert rules, item warranty/reorder, warranty backfill from demo sales
+- `scripts/seed-demo-crm.sql` — alert rules, item warranty/reorder, low-stock balances, 3 warranty assets, 6 follow-up tasks, 5 notifications
 
 Run order: see [sql-run-order.md](../../runbooks/sql-run-order.md).
+
+### What the seed creates (per DEMO000 + BLUEARM)
+
+| Data | Count / detail |
+|------|----------------|
+| Alert rules | 5 default rules (warranty, quote, stock, digest) |
+| Warranty assets | Sale backfill + 3 standalone serials (active, expiring, expired) |
+| Follow-up tasks | 6 tasks across scheduled / due_soon / overdue / completed |
+| Notifications | 4 unread + 1 read (bell badge shows 4) |
+| Low stock | Printer 00001 qty 3 vs reorder 8 |

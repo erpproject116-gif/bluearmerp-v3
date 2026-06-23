@@ -65,9 +65,12 @@ import ReceiptStatusPage from "./modules/finance/reports/ReceiptStatusPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
 import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
+import ChangeLogListPage from "./modules/activity-logs/ChangeLogListPage";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
 import { ActivityLogRoute } from "./shared/ActivityLogRoute";
 import { CrmRoute } from "./shared/CrmRoute";
+import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
+import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
 import CrmDashboardPage from "./modules/crm/CrmDashboardPage";
 import CrmNotificationsPage from "./modules/crm/CrmNotificationsPage";
 import FollowUpTasksPage from "./modules/crm/FollowUpTasksPage";
@@ -102,6 +105,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
       <AuthProvider>
+        <CrmTaskModalProvider>
         <Router>
         <Route path="/signin" component={SignInPage} />
         <Route path="/auth/callback" component={AuthCallbackPage} />
@@ -179,16 +183,21 @@ export default function App() {
             <CrmRoute><AlertRulesSettingsPage /></CrmRoute>
           )} />
           <Route path="/crm/reports/customer-quotations" component={() => (
-            <CrmRoute><CustomerQuotationsReportPage /></CrmRoute>
+            <CrmRoute><CrmAnalyticsRoute><CustomerQuotationsReportPage /></CrmAnalyticsRoute></CrmRoute>
           )} />
           <Route path="/crm/reports/item-demand" component={() => (
-            <CrmRoute><ItemDemandReportPage /></CrmRoute>
+            <CrmRoute><CrmAnalyticsRoute><ItemDemandReportPage /></CrmAnalyticsRoute></CrmRoute>
           )} />
           <Route path="/crm/reports/conversion" component={() => (
-            <CrmRoute><ConversionFunnelReportPage /></CrmRoute>
+            <CrmRoute><CrmAnalyticsRoute><ConversionFunnelReportPage /></CrmAnalyticsRoute></CrmRoute>
           )} />
           <Route path="/crm/reports/low-stock" component={() => (
-            <CrmRoute><LowStockReportPage /></CrmRoute>
+            <CrmRoute><CrmAnalyticsRoute><LowStockReportPage /></CrmAnalyticsRoute></CrmRoute>
+          )} />
+          <Route path="/activity-logs/changes" component={() => (
+            <ActivityLogRoute>
+              <ChangeLogListPage />
+            </ActivityLogRoute>
           )} />
           <Route path="/activity-logs" component={() => (
             <ActivityLogRoute>
@@ -208,6 +217,7 @@ export default function App() {
         </Route>
         <Route path="*" component={AuthEntryRedirect} />
       </Router>
+        </CrmTaskModalProvider>
       </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>

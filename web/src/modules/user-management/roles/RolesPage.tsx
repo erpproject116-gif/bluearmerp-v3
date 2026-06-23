@@ -1,36 +1,45 @@
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
+import { PermissionMatrix, type MatrixValue } from "../../../shared/PermissionMatrix";
 import {
   useInvalidateUserManagement,
   useTenantRoleList,
   type TenantRoleRow,
 } from "../../../shared/useUserManagement";
+import {
+  saveRolePermissions,
+  useInvalidatePermissions,
+  usePermissionRegistry,
+  useRolePermissions,
+} from "../../../shared/usePermissions";
 
 export default function RolesPage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [permModalOpen, setPermModalOpen] = createSignal(false);
+  const [permRoleId, setPermRoleId] = createSignal<number | null>(null);
+  const [permValues, setPermValues] = createSignal<Record<string, MatrixValue>>({});
   const [editing, setEditing] = createSignal<TenantRoleRow | null>(null);
   const [roleCode, setRoleCode] = createSignal("");
   const [roleName, setRoleName] = createSignal("");
   const [description, setDescription] = createSignal("");
-  const [canManageUsers, setCanManageUsers] = createSignal(false);
-  const [canManageFormSettings, setCanManageFormSettings] = createSignal(false);
   const [isActive, setIsActive] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateUserManagement();
+  const permInvalidate = useInvalidatePermissions();
   const list = useTenantRoleList();
+  const registry = usePermissionRegistry();
+  const rolePerms = useRolePermissions(permRoleId);
 
   const openNew = () => {
     setEditing(null);
     setRoleCode("");
     setRoleName("");
     setDescription("");
-    setCanManageUsers(false);
-    setCanManageFormSettings(false);
     setIsActive(true);
     setModalOpen(true);
   };
@@ -40,11 +49,24 @@ export default function RolesPage() {
     setRoleCode(row.role_code);
     setRoleName(row.role_name);
     setDescription(row.description ?? "");
-    setCanManageUsers(row.can_manage_users);
-    setCanManageFormSettings(row.can_manage_form_settings);
     setIsActive(row.is_active);
     setModalOpen(true);
   };
+
+  const openPermissions = (row: TenantRoleRow) => {
+    setPermRoleId(row.id);
+    setPermModalOpen(true);
+  };
+
+  createEffect(() => {
+    const data = rolePerms.data?.permissions;
+    if (!permModalOpen() || !data) return;
+    const next: Record<string, MatrixValue> = {};
+    for (const [k, v] of Object.entries(data)) {
+      next[k] = v as MatrixValue;
+    }
+    setPermValues(next);
+  });
 
   const save = async () => {
     const name = roleName().trim();
@@ -62,8 +84,6 @@ export default function RolesPage() {
               body: JSON.stringify({
                 role_name: name,
                 description: description(),
-                can_manage_users: canManageUsers(),
-                can_manage_form_settings: canManageFormSettings(),
                 is_active: isActive(),
               }),
             })
@@ -73,8 +93,6 @@ export default function RolesPage() {
                 role_code: roleCode().trim() || undefined,
                 role_name: name,
                 description: description(),
-                can_manage_users: canManageUsers(),
-                can_manage_form_settings: canManageFormSettings(),
               }),
             }),
       toast,
@@ -86,6 +104,26 @@ export default function RolesPage() {
     invalidate.all();
   };
 
+  const savePermissions = async () => {
+    const id = permRoleId();
+    if (id == null) return;
+    setSaving(true);
+    const payload: Record<string, string> = {};
+    for (const [k, v] of Object.entries(permValues())) {
+      if (v === "inherit") continue;
+      payload[k] = v;
+    }
+    const res = await saveRolePermissions(id, payload);
+    setSaving(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not save permissions.");
+      return;
+    }
+    toast.success("Role permissions saved.");
+    setPermModalOpen(false);
+    permInvalidate.role(id);
+  };
+
   const rows = () => list.data ?? [];
 
   return (
@@ -94,16 +132,6 @@ export default function RolesPage() {
         columns={[
           { key: "role_code", header: "Code" },
           { key: "role_name", header: "Name" },
-          {
-            key: "can_manage_users",
-            header: "Manage users",
-            render: (row) => <span>{row.can_manage_users ? "Yes" : "No"}</span>,
-          },
-          {
-            key: "can_manage_form_settings",
-            header: "Form settings",
-            render: (row) => <span>{row.can_manage_form_settings ? "Yes" : "No"}</span>,
-          },
           {
             key: "is_system",
             header: "System",
@@ -118,6 +146,34 @@ export default function RolesPage() {
             key: "user_count",
             header: "Users",
             render: (row) => <span>{row.user_count ?? 0}</span>,
+          },
+          {
+            key: "actions",
+            header: "Actions",
+            render: (row) => (
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="text-sm text-brand-600 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEdit(row);
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="text-sm text-brand-600 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPermissions(row);
+                  }}
+                >
+                  Permissions
+                </button>
+              </div>
+            ),
           },
         ]}
         rows={rows()}
@@ -159,37 +215,34 @@ export default function RolesPage() {
         <Field label="Description">
           <input class={inputClass} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} />
         </Field>
-        <Show when={!editing()?.is_system}>
-          <Field label="Permissions">
-            <div class="space-y-2">
-              <label class="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={canManageUsers()}
-                  onChange={(e) => setCanManageUsers(e.currentTarget.checked)}
-                />
-                Can manage users
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={canManageFormSettings()}
-                  onChange={(e) => setCanManageFormSettings(e.currentTarget.checked)}
-                />
-                Can manage form settings
-              </label>
-              <Show when={editing()}>
-                <label class="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={isActive()} onChange={(e) => setIsActive(e.currentTarget.checked)} />
-                  Active
-                </label>
-              </Show>
-            </div>
+        <Show when={editing()}>
+          <Field label="Active">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={isActive()} onChange={(e) => setIsActive(e.currentTarget.checked)} />
+              Role is active
+            </label>
           </Field>
         </Show>
-        <Show when={editing()?.is_system}>
-          <p class="text-xs text-text-secondary">System roles cannot change permission flags in this MVP.</p>
-        </Show>
+        <p class="text-xs text-text-secondary">
+          Use <strong>Permissions</strong> on the role row to set Read, Write, or D/A for each module and feature.
+        </p>
+      </EntityModal>
+
+      <EntityModal
+        open={permModalOpen()}
+        title={`Permissions — ${rolePerms.data?.role_name ?? "Role"}`}
+        onClose={() => setPermModalOpen(false)}
+        onSave={() => void savePermissions()}
+        saving={saving()}
+        wide
+        singleColumn
+      >
+        <PermissionMatrix
+          groups={registry.data ?? []}
+          values={permValues()}
+          loading={registry.isLoading || rolePerms.isLoading}
+          onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
+        />
       </EntityModal>
     </>
   );

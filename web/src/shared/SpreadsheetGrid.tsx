@@ -383,14 +383,26 @@ export function EntityModal(props: {
   onClose: () => void;
   onSave: () => void;
   saving?: boolean;
+  wide?: boolean;
+  singleColumn?: boolean;
   children: JSX.Element;
 }) {
   return (
     <Show when={props.open}>
       <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-6 sm:items-center">
-        <div class="w-full max-w-4xl rounded-2xl border border-stroke bg-white p-6 shadow-xl">
+        <div
+          class="w-full rounded-2xl border border-stroke bg-white p-6 shadow-xl"
+          classList={{ "max-w-6xl": props.wide, "max-w-4xl": !props.wide }}
+        >
           <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
-          <div class="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">{props.children}</div>
+          <div
+            class="mt-5"
+            classList={{
+              "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3": !props.singleColumn,
+            }}
+          >
+            {props.children}
+          </div>
           <div class="mt-6 flex justify-end gap-3 border-t border-stroke pt-4">
             <button
               type="button"

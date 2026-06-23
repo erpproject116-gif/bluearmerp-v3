@@ -115,6 +115,8 @@ func listWarrantyAssets(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, t)
 			n++
 		}
+		scope, n := tu.PicScopeSQL("wa.pic_user_id", n, &args)
+		where += scope
 		base := fmt.Sprintf(`select wa.id, wa.partner_id, wa.item_id, wa.item_code, wa.item_name, wa.serial_no,
 		  wa.sales_id, wa.sales_line_id, wa.warranty_start, wa.warranty_end, wa.status, wa.pic_user_id, wa.pic_name,
 		  count(*) over()

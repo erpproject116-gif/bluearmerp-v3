@@ -12,6 +12,7 @@ import {
 } from "../../../shared/useSalesOrderList";
 import { useToast } from "../../../shared/toast";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { CreateCrmTaskLink } from "../../../shared/CreateCrmTaskLink";
 import { SalesOrderLayout } from "../SalesOrderLayout";
 import { CreatedSlipModal } from "./CreatedSlipModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -140,6 +141,23 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
               >
                 Print
               </button>
+            ),
+          },
+          {
+            key: "crm_task",
+            header: "CRM",
+            sortable: false,
+            render: (r) => (
+              <CreateCrmTaskLink
+                label="Task"
+                context={{
+                  partner_id: r.partner_id,
+                  partner_name: r.customer_name,
+                  pic_name: r.pic_name,
+                  title: `Follow up — ${r.sales_order_no}`,
+                  notes: `Sales order ${r.sales_order_no} (${r.date_no_display})`,
+                }}
+              />
             ),
           },
           {

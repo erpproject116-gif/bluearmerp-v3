@@ -16,6 +16,10 @@ export type MeData = {
     can_view_activity_logs?: boolean;
     can_view_crm?: boolean;
     can_manage_crm_rules?: boolean;
+    can_view_all_crm?: boolean;
+    can_manage_sales_team?: boolean;
+    can_view_crm_analytics?: boolean;
+    permissions?: Record<string, string> | null;
   };
   tenant: {
     id: number;
@@ -36,6 +40,9 @@ export function canManageFormSettings(me: MeData | null | undefined): boolean {
 export function canManageUsers(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
+  if (u.permissions && Object.keys(u.permissions).length > 0) {
+    return hasPermission(me, "user_management.users", "write");
+  }
   return Boolean(u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner);
 }
 
@@ -57,6 +64,107 @@ export function canManageCrmRules(me: MeData | null | undefined): boolean {
   return Boolean(
     u.can_manage_crm_rules || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin,
   );
+}
+
+export function canViewAllCrm(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  return Boolean(u.can_view_all_crm || u.is_platform_superadmin || u.is_tenant_owner);
+}
+
+export function canManageSalesTeam(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  return Boolean(
+    u.can_manage_sales_team || u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner,
+  );
+}
+
+export function canViewCrmAnalytics(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  if (u.permissions && Object.keys(u.permissions).length > 0) {
+    return hasPermission(me, "crm.reports_customer_quotations", "read");
+  }
+  return Boolean(u.can_view_crm_analytics || u.is_platform_superadmin || u.is_tenant_owner);
+}
+
+export type AccessLevel = "deny" | "read" | "write";
+
+export function permissionLevel(me: MeData | null | undefined, code: string): AccessLevel {
+  const u = me?.user;
+  if (!u) return "deny";
+  if (u.is_platform_superadmin || u.is_tenant_owner) return "write";
+  const perms = u.permissions;
+  if (perms && Object.keys(perms).length > 0) {
+    if (perms[code]) return perms[code] as AccessLevel;
+    const dot = code.lastIndexOf(".");
+    if (dot > 0 && perms[code.slice(0, dot)]) {
+      const parent = perms[code.slice(0, dot)] as AccessLevel;
+      if (parent !== "deny") return parent;
+    }
+    return "deny";
+  }
+  return legacyPermissionLevel(me, code);
+}
+
+export function hasPermission(
+  me: MeData | null | undefined,
+  code: string,
+  min: "read" | "write",
+): boolean {
+  const lvl = permissionLevel(me, code);
+  if (min === "write") return lvl === "write";
+  return lvl === "read" || lvl === "write";
+}
+
+export function hasModuleAccess(me: MeData | null | undefined, moduleId: string): boolean {
+  if (!me) return false;
+  if (hasPermission(me, moduleId, "read")) return true;
+  const u = me.user;
+  if (u?.permissions) {
+    const prefix = `${moduleId}.`;
+    for (const [code, lvl] of Object.entries(u.permissions)) {
+      if (code.startsWith(prefix) && lvl !== "deny") return true;
+    }
+  }
+  return legacyModuleAccess(me, moduleId);
+}
+
+function legacyPermissionLevel(me: MeData, code: string): AccessLevel {
+  if (code.startsWith("user_management") || code === "settings.form_fields") {
+    return canManageUsers(me) ? "write" : "deny";
+  }
+  if (code === "settings.form_fields") {
+    return canManageFormSettings(me) ? "write" : "deny";
+  }
+  if (code.startsWith("activity_logs")) {
+    return canViewActivityLogs(me) ? "read" : "deny";
+  }
+  if (code.startsWith("crm")) {
+    if (!canViewCrm(me)) return "deny";
+    if (code.includes("reports") || code.includes("settings_alert")) {
+      return canViewCrmAnalytics(me) || canManageCrmRules(me) ? "read" : "deny";
+    }
+    return "read";
+  }
+  if (
+    code.startsWith("inventory") ||
+    code.startsWith("quotation") ||
+    code.startsWith("sales") ||
+    code.startsWith("sales_order")
+  ) {
+    return "read";
+  }
+  return "deny";
+}
+
+function legacyModuleAccess(me: MeData, moduleId: string): boolean {
+  if (moduleId === "user_management") return canManageUsers(me);
+  if (moduleId === "activity_logs") return canViewActivityLogs(me);
+  if (moduleId === "crm") return canViewCrm(me);
+  if (moduleId === "finance") return false;
+  return legacyPermissionLevel(me, moduleId) !== "deny";
 }
 
 export type BootstrapError = "network" | "unauthorized" | "forbidden" | null;

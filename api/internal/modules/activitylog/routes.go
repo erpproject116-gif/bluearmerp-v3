@@ -11,5 +11,6 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/activity-logs", func(ar chi.Router) {
 		ar.Use(auth.RequireViewActivityLogs)
 		ar.Get("/", listActivityLogs(pool))
+		ar.Get("/changes", listChangeLogs(pool))
 	})
 }

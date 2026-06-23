@@ -138,6 +138,7 @@ func createRole(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "role.create", "tenant_role", &row.ID, nil, map[string]any{
 			"role_code": row.RoleCode,
 		})
+		_ = saveRolePermissions(r.Context(), pool, tu.TenantID, row.RoleCode, map[string]string{})
 		response.OK(w, row, "Role created.")
 	}
 }

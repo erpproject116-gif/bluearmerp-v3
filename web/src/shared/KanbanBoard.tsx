@@ -68,7 +68,7 @@ function KanbanBoardInner<T>(props: BoardInnerProps<T>) {
     <div class="flex gap-4 overflow-x-auto pb-2">
       <For each={props.columns}>
         {(col) => (
-          <div class="flex w-72 shrink-0 flex-col rounded-xl border border-stroke bg-slate-50">
+          <div class="flex w-80 shrink-0 flex-col rounded-xl border border-stroke bg-slate-50">
             <div class="border-b border-stroke px-3 py-2">
               <h3 class="text-sm font-semibold text-text-primary">
                 {col.label}

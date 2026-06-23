@@ -185,6 +185,9 @@ func listRepairOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 
+		scope, argN := tu.PicScopeSQL("ro.pic_user_id", argN, &args)
+		where += scope
+
 		order := orderSQL(p.Order)
 		q := fmt.Sprintf(`
 			select ro.id, ro.order_date, ro.date_seq, ro.repair_order_no,

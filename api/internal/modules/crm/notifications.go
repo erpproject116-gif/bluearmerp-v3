@@ -80,7 +80,12 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 		if out == nil {
 			out = []Notification{}
 		}
-		response.OKList(w, out, p.Page, p.PageSize, total)
+		var unreadTotal int64
+		_ = pool.QueryRow(r.Context(), `
+			select count(*) from public.crm_notifications
+			where tenant_id = $1 and read_at is null
+			  and (user_id is null or user_id = $2)`, tu.TenantID, tu.AppUserID).Scan(&unreadTotal)
+		response.OKListWithMeta(w, out, p.Page, p.PageSize, total, &unreadTotal)
 	}
 }
 

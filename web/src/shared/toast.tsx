@@ -1,18 +1,33 @@
-import { For, createContext, useContext, type ParentProps } from "solid-js";
+import { For, Show, createContext, useContext, type ParentProps } from "solid-js";
 import { createStore } from "solid-js/store";
 
 export type ToastType = "success" | "error" | "warning";
+
+export type ActionToastInput = {
+  type?: ToastType;
+  title: string;
+  message?: string;
+  actionLabel?: string;
+  href?: string;
+  onAction?: () => void;
+};
 
 type ToastItem = {
   id: number;
   type: ToastType;
   message: string;
+  title?: string;
+  actionLabel?: string;
+  href?: string;
+  onAction?: () => void;
 };
 
 type ToastAPI = {
   success: (message: string) => void;
   error: (message: string) => void;
   warning: (message: string) => void;
+  /** Clickable toast with optional navigation or custom action. */
+  action: (input: ActionToastInput) => void;
 };
 
 const ToastContext = createContext<ToastAPI>();
@@ -38,18 +53,39 @@ export function ToastProvider(props: ParentProps) {
     setState("items", (items) => items.filter((t) => t.id !== id));
   };
 
-  const push = (type: ToastType, message: string) => {
-    const text = message.trim();
-    if (!text) return;
+  const push = (item: Omit<ToastItem, "id">, durationMs: number) => {
+    const text = item.message.trim();
+    const title = item.title?.trim();
+    if (!text && !title) return;
     const id = ++nextToastId;
-    setState("items", (items) => [...items, { id, type, message: text }]);
-    window.setTimeout(() => dismiss(id), type === "error" ? 7000 : 5000);
+    setState("items", (items) => [...items, { ...item, id }]);
+    window.setTimeout(() => dismiss(id), durationMs);
   };
 
   const api: ToastAPI = {
-    success: (message) => push("success", message),
-    error: (message) => push("error", message),
-    warning: (message) => push("warning", message),
+    success: (message) => push({ type: "success", message }, 5000),
+    error: (message) => push({ type: "error", message }, 7000),
+    warning: (message) => push({ type: "warning", message }, 5000),
+    action: (input) =>
+      push(
+        {
+          type: input.type ?? "warning",
+          title: input.title,
+          message: input.message ?? "",
+          actionLabel: input.actionLabel ?? "View",
+          href: input.href,
+          onAction: input.onAction,
+        },
+        input.type === "error" ? 12000 : 10000,
+      ),
+  };
+
+  const runAction = (toast: ToastItem) => {
+    toast.onAction?.();
+    if (toast.href) {
+      window.location.assign(toast.href);
+    }
+    dismiss(toast.id);
   };
 
   return (
@@ -63,21 +99,39 @@ export function ToastProvider(props: ParentProps) {
         <For each={state.items}>
           {(toast) => (
             <div
-              class={`pointer-events-auto flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg ${styles[toast.type]}`}
+              class={`pointer-events-auto rounded-xl border px-4 py-3 text-sm shadow-lg ${styles[toast.type]}`}
               role="alert"
             >
-              <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/70 text-xs font-bold">
-                {icons[toast.type]}
-              </span>
-              <p class="flex-1 leading-snug">{toast.message}</p>
-              <button
-                type="button"
-                class="shrink-0 text-xs opacity-70 hover:opacity-100"
-                aria-label="Dismiss notification"
-                onClick={() => dismiss(toast.id)}
-              >
-                Dismiss
-              </button>
+              <div class="flex items-start gap-3">
+                <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/70 text-xs font-bold">
+                  {icons[toast.type]}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <Show when={toast.title}>
+                    <p class="font-semibold leading-snug">{toast.title}</p>
+                  </Show>
+                  <Show when={toast.message}>
+                    <p class="mt-0.5 leading-snug">{toast.message}</p>
+                  </Show>
+                  <Show when={toast.href || toast.onAction}>
+                    <button
+                      type="button"
+                      class="mt-2 text-xs font-semibold underline underline-offset-2 hover:opacity-80"
+                      onClick={() => runAction(toast)}
+                    >
+                      {toast.actionLabel ?? "View"}
+                    </button>
+                  </Show>
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 text-xs opacity-70 hover:opacity-100"
+                  aria-label="Dismiss notification"
+                  onClick={() => dismiss(toast.id)}
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           )}
         </For>

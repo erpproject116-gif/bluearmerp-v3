@@ -1,4 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
+import { useNavigate } from "@solidjs/router";
+import { crmNotificationHref } from "../../shared/crmNotificationRoutes";
 import {
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
@@ -16,6 +18,7 @@ const severityClass: Record<CrmNotification["severity"], string> = {
 };
 
 export default function CrmNotificationsPage() {
+  const navigate = useNavigate();
   const [page, setPage] = createSignal(1);
   const [unreadOnly, setUnreadOnly] = createSignal(false);
   const pageSize = 25;
@@ -48,6 +51,11 @@ export default function CrmNotificationsPage() {
     }
     toast.success("All notifications marked read.");
     invalidate();
+  };
+
+  const openNotification = async (n: CrmNotification) => {
+    await markRead(n);
+    navigate(crmNotificationHref(n));
   };
 
   return (
@@ -87,9 +95,11 @@ export default function CrmNotificationsPage() {
         </Show>
         <For each={list.data?.rows ?? []}>
           {(n) => (
-            <article
-              class={`rounded-xl border border-stroke border-l-4 bg-white p-4 shadow-sm ${severityClass[n.severity]}`}
+            <button
+              type="button"
+              class={`w-full rounded-xl border border-stroke border-l-4 bg-white p-4 text-left shadow-sm transition hover:bg-slate-50 ${severityClass[n.severity]}`}
               classList={{ "opacity-70": Boolean(n.read_at) }}
+              onClick={() => void openNotification(n)}
             >
               <div class="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -98,18 +108,13 @@ export default function CrmNotificationsPage() {
                     <p class="mt-1 text-sm text-text-secondary">{n.body}</p>
                   </Show>
                   <p class="mt-2 text-xs text-text-secondary">{new Date(n.created_at).toLocaleString()}</p>
+                  <p class="mt-1 text-xs font-medium text-brand-600">Click to open</p>
                 </div>
                 <Show when={!n.read_at}>
-                  <button
-                    type="button"
-                    class="rounded-lg bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600 hover:bg-brand-100"
-                    onClick={() => void markRead(n)}
-                  >
-                    Mark read
-                  </button>
+                  <span class="rounded-lg bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600">Unread</span>
                 </Show>
               </div>
-            </article>
+            </button>
           )}
         </For>
       </div>

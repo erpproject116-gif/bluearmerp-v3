@@ -20,16 +20,16 @@ import (
 const reportExportMaxRows = 5000
 
 func registerReportRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.Get("/reports/customer-quotations-by-item", listCustomerQuotationsByItem(pool))
-	r.Get("/reports/customer-quotations-by-item/export", exportCustomerQuotationsByItem(pool))
-	r.Get("/reports/item-demand", listItemDemand(pool))
-	r.Get("/reports/item-demand/export", exportItemDemand(pool))
-	r.Get("/reports/conversion-funnel", conversionFunnel(pool))
-	r.Get("/reports/conversion-funnel/export", exportConversionFunnel(pool))
-	r.Get("/reports/low-stock", listLowStock(pool))
-	r.Get("/reports/low-stock/export", exportLowStock(pool))
-	r.Get("/reports/expired-quotations", listExpiredQuotations(pool))
-	r.Get("/reports/expired-quotations/export", exportExpiredQuotations(pool))
+	r.Get("/customer-quotations-by-item", listCustomerQuotationsByItem(pool))
+	r.Get("/customer-quotations-by-item/export", exportCustomerQuotationsByItem(pool))
+	r.Get("/item-demand", listItemDemand(pool))
+	r.Get("/item-demand/export", exportItemDemand(pool))
+	r.Get("/conversion-funnel", conversionFunnel(pool))
+	r.Get("/conversion-funnel/export", exportConversionFunnel(pool))
+	r.Get("/low-stock", listLowStock(pool))
+	r.Get("/low-stock/export", exportLowStock(pool))
+	r.Get("/expired-quotations", listExpiredQuotations(pool))
+	r.Get("/expired-quotations/export", exportExpiredQuotations(pool))
 }
 
 func parseOptionalDateRange(r *http.Request) (*time.Time, *time.Time, map[string]string) {

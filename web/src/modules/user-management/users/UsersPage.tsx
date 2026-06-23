@@ -1,15 +1,22 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useListState } from "../../../shared/useListState";
 import { useToast } from "../../../shared/toast";
+import { PermissionMatrix, type AccessLevel, type MatrixValue } from "../../../shared/PermissionMatrix";
 import {
   useInvalidateUserManagement,
   useTenantRoleList,
   useTenantUserList,
   type TenantUserRow,
 } from "../../../shared/useUserManagement";
+import {
+  saveUserPermissionOverrides,
+  useInvalidatePermissions,
+  usePermissionRegistry,
+  useUserPermissions,
+} from "../../../shared/usePermissions";
 
 function statusLabel(status: string) {
   if (status === "invited") return "Invited";
@@ -23,6 +30,9 @@ export default function UsersPage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [inviteOpen, setInviteOpen] = createSignal(false);
   const [editOpen, setEditOpen] = createSignal(false);
+  const [permOpen, setPermOpen] = createSignal(false);
+  const [permUserId, setPermUserId] = createSignal<number | null>(null);
+  const [permValues, setPermValues] = createSignal<Record<string, MatrixValue>>({});
   const [editing, setEditing] = createSignal<TenantUserRow | null>(null);
   const [inviteEmail, setInviteEmail] = createSignal("");
   const [inviteName, setInviteName] = createSignal("");
@@ -32,7 +42,10 @@ export default function UsersPage() {
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateUserManagement();
+  const permInvalidate = useInvalidatePermissions();
   const roles = useTenantRoleList();
+  const registry = usePermissionRegistry();
+  const userPerms = useUserPermissions(permUserId);
 
   const list = useTenantUserList(() => ({
     page: page(),
@@ -55,6 +68,44 @@ export default function UsersPage() {
     setEditRole(row.tenant_role);
     setEditStatus(row.status);
     setEditOpen(true);
+  };
+
+  const openPermissions = (row: TenantUserRow) => {
+    if (row.is_owner) {
+      toast.warning("Tenant owner has full access; permissions cannot be overridden.");
+      return;
+    }
+    setPermUserId(row.id);
+    setPermOpen(true);
+  };
+
+  createEffect(() => {
+    const data = userPerms.data;
+    if (!permOpen() || !data) return;
+    const next: Record<string, MatrixValue> = {};
+    for (const [k, v] of Object.entries(data.overrides)) {
+      next[k] = v as MatrixValue;
+    }
+    setPermValues(next);
+  });
+
+  const saveUserPermissions = async () => {
+    const id = permUserId();
+    if (id == null) return;
+    setSaving(true);
+    const overrides: Record<string, string> = {};
+    for (const [k, v] of Object.entries(permValues())) {
+      if (v !== "inherit") overrides[k] = v;
+    }
+    const res = await saveUserPermissionOverrides(id, overrides);
+    setSaving(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not save permissions.");
+      return;
+    }
+    toast.success("User permission overrides saved.");
+    setPermOpen(false);
+    permInvalidate.user(id);
   };
 
   const sendInvite = async () => {
@@ -165,6 +216,18 @@ export default function UsersPage() {
                 >
                   Edit
                 </button>
+                <Show when={row.status !== "invited" && !row.is_owner}>
+                  <button
+                    type="button"
+                    class="text-sm text-brand-600 hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPermissions(row);
+                    }}
+                  >
+                    Permissions
+                  </button>
+                </Show>
                 <Show when={row.status === "invited" && row.invite_id}>
                   <button
                     type="button"
@@ -292,6 +355,29 @@ export default function UsersPage() {
             </>
           )}
         </Show>
+      </EntityModal>
+
+      <EntityModal
+        open={permOpen()}
+        title={`Permissions — ${userPerms.data?.full_name ?? "User"}`}
+        onClose={() => setPermOpen(false)}
+        onSave={() => void saveUserPermissions()}
+        saving={saving()}
+        wide
+        singleColumn
+      >
+        <p class="mb-3 text-sm text-text-secondary">
+          Override role defaults per feature. Choose <strong>Role</strong> to inherit from{" "}
+          <span class="font-medium">{userPerms.data?.tenant_role}</span>.
+        </p>
+        <PermissionMatrix
+          groups={registry.data ?? []}
+          values={permValues()}
+          allowInherit
+          roleDefaults={userPerms.data?.role_permissions as Record<string, AccessLevel> | undefined}
+          loading={registry.isLoading || userPerms.isLoading}
+          onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
+        />
       </EntityModal>
     </>
   );

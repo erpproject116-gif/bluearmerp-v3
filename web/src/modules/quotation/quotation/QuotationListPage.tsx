@@ -12,6 +12,7 @@ import {
 } from "../../../shared/useQuotationList";
 import { useToast } from "../../../shared/toast";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { CreateCrmTaskLink } from "../../../shared/CreateCrmTaskLink";
 import { QuotationLayout } from "../QuotationLayout";
 import { CreatedSlipModal } from "./CreatedSlipModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -162,6 +163,24 @@ export function QuotationListPageInner(props: PageOptions = {}) {
               >
                 Print
               </button>
+            ),
+          },
+          {
+            key: "crm_task",
+            header: "CRM",
+            sortable: false,
+            render: (r) => (
+              <CreateCrmTaskLink
+                label="Task"
+                context={{
+                  task_type: "quote_follow_up",
+                  quotation_id: r.id,
+                  partner_id: r.partner_id,
+                  partner_name: r.customer_name,
+                  pic_name: r.pic_name,
+                  title: `Follow up — ${r.reference_no}`,
+                }}
+              />
             ),
           },
           {

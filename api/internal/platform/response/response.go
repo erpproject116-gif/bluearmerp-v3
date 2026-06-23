@@ -6,9 +6,10 @@ import (
 )
 
 type Meta struct {
-	Page    int   `json:"page"`
-	PerPage int   `json:"per_page"`
-	Total   int64 `json:"total"`
+	Page        int    `json:"page"`
+	PerPage     int    `json:"per_page"`
+	Total       int64  `json:"total"`
+	UnreadTotal *int64 `json:"unread_total,omitempty"`
 }
 
 type Envelope struct {
@@ -31,12 +32,16 @@ func OK(w http.ResponseWriter, data any, message string) {
 }
 
 func OKList(w http.ResponseWriter, data any, page, perPage int, total int64) {
+	OKListWithMeta(w, data, page, perPage, total, nil)
+}
+
+func OKListWithMeta(w http.ResponseWriter, data any, page, perPage int, total int64, unreadTotal *int64) {
 	w.Header().Set("Cache-Control", "private, max-age=30, stale-while-revalidate=60")
 	JSON(w, http.StatusOK, Envelope{
 		Success: true,
 		Message: "OK",
 		Data:    data,
-		Meta:    &Meta{Page: page, PerPage: perPage, Total: total},
+		Meta:    &Meta{Page: page, PerPage: perPage, Total: total, UnreadTotal: unreadTotal},
 	})
 }
 

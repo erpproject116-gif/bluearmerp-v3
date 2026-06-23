@@ -13,6 +13,7 @@ import {
 } from "../../../shared/useSalesList";
 import { useToast } from "../../../shared/toast";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { CreateCrmTaskLink } from "../../../shared/CreateCrmTaskLink";
 import { SalesLayout } from "../SalesLayout";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesModal, type SalesDetail } from "./SalesModal";
@@ -156,6 +157,23 @@ export function SalesListPageInner(props: PageOptions = {}) {
               >
                 Print
               </button>
+            ),
+          },
+          {
+            key: "crm_task",
+            header: "CRM",
+            sortable: false,
+            render: (r) => (
+              <CreateCrmTaskLink
+                label="Task"
+                context={{
+                  sales_id: r.id,
+                  partner_id: r.partner_id,
+                  partner_name: r.customer_name,
+                  pic_name: r.pic_name,
+                  title: `Follow up — ${r.sales_no}`,
+                }}
+              />
             ),
           },
           {

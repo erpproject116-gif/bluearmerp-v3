@@ -10,6 +10,7 @@ import {
 } from "../../shared/useWarrantyAssets";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
+import { CreateCrmTaskLink } from "../../shared/CreateCrmTaskLink";
 import { CrmLayout } from "./CrmLayout";
 
 export default function WarrantyAssetsPage() {
@@ -106,6 +107,25 @@ export default function WarrantyAssetsPage() {
           { key: "warranty_end", header: "End" },
           { key: "status", header: "Status" },
           { key: "pic_name", header: "PIC" },
+          {
+            key: "crm_task",
+            header: "Task",
+            sortable: false,
+            render: (r) => (
+              <CreateCrmTaskLink
+                label="Task"
+                context={{
+                  task_type: "warranty_follow_up",
+                  warranty_asset_id: r.id,
+                  partner_id: r.partner_id,
+                  partner_name: r.partner_name ?? undefined,
+                  pic_name: r.pic_name,
+                  title: `Warranty follow-up — ${r.serial_no}`,
+                  notes: `${r.item_name} · ends ${r.warranty_end}`,
+                }}
+              />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}

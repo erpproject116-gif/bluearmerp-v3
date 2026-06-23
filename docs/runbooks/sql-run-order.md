@@ -105,7 +105,7 @@ psql "$DATABASE_URL" -f api/migrations/018_crm.sql
 | 5 | `scripts/seed-demo-sales-orders.sql` | Demo sales orders for **DEMO000** + **BLUEARM** |
 | 6 | `scripts/seed-demo-sales.sql` | Demo sales (SI) from released SO lines for **DEMO000** + **BLUEARM** |
 | 7 | `scripts/seed-demo-finance.sql` | Demo official receipt applied to demo sale for **DEMO000** + **BLUEARM** |
-| 8 | `scripts/seed-demo-crm.sql` | CRM alert rules, item warranty/reorder, warranty backfill for **DEMO000** + **BLUEARM** |
+| 8 | `scripts/seed-demo-crm.sql` | CRM alert rules, warranty assets, follow-up tasks, notifications, low-stock demo for **DEMO000** + **BLUEARM** |
 
 **Manual equivalent:**
 

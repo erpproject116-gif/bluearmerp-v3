@@ -24,12 +24,24 @@ func RequireManageUsers(next http.Handler) http.Handler {
 
 // CanManageUsers reports whether the tenant user may access user-management APIs and UI.
 func (tu TenantUser) CanManageUsers() bool {
-	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.canManageUsersRole
+	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+		return true
+	}
+	if tu.permissions != nil {
+		return tu.HasPermission("user_management.users", AccessWrite)
+	}
+	return tu.canManageUsersRole
 }
 
 // CanManageFormSettings reports whether the tenant user may edit form field settings.
 func (tu TenantUser) CanManageFormSettings() bool {
-	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.canManageFormSettingsRole
+	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+		return true
+	}
+	if tu.permissions != nil {
+		return tu.HasPermission("settings.form_fields", AccessWrite)
+	}
+	return tu.canManageFormSettingsRole
 }
 
 // RequireViewActivityLogs blocks handlers unless the caller may view activity logs.
@@ -50,7 +62,13 @@ func RequireViewActivityLogs(next http.Handler) http.Handler {
 
 // CanViewActivityLogs reports whether the tenant user may access activity log APIs and UI.
 func (tu TenantUser) CanViewActivityLogs() bool {
-	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.canViewActivityLogsRole
+	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+		return true
+	}
+	if tu.permissions != nil {
+		return tu.HasPermission("activity_logs.logs", AccessRead)
+	}
+	return tu.canViewActivityLogsRole
 }
 
 // RequireViewCRM blocks handlers unless the caller may view CRM.
@@ -71,7 +89,13 @@ func RequireViewCRM(next http.Handler) http.Handler {
 
 // CanViewCRM reports whether the tenant user may access CRM APIs and UI.
 func (tu TenantUser) CanViewCRM() bool {
-	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.canViewCrmRole
+	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+		return true
+	}
+	if tu.permissions != nil {
+		return tu.HasModuleRead("crm")
+	}
+	return tu.canViewCrmRole
 }
 
 // RequireManageCrmRules blocks handlers unless the caller may manage CRM alert rules.
@@ -92,5 +116,43 @@ func RequireManageCrmRules(next http.Handler) http.Handler {
 
 // CanManageCrmRules reports whether the tenant user may edit CRM alert rules.
 func (tu TenantUser) CanManageCrmRules() bool {
-	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.canManageCrmRulesRole
+	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+		return true
+	}
+	if tu.permissions != nil {
+		return tu.HasPermission("crm.settings_alert_rules", AccessWrite)
+	}
+	return tu.canManageCrmRulesRole
+}
+
+// RequireCrmAnalytics blocks handlers unless the caller may view CRM analytics.
+func RequireCrmAnalytics(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !tu.CanViewCrmAnalytics() {
+			response.Err(w, http.StatusForbidden, "You do not have permission to view CRM analytics.", "ERR_FORBIDDEN")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireManageSalesTeam blocks handlers unless the caller may assign sales team work.
+func RequireManageSalesTeam(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !tu.CanManageSalesTeam() {
+			response.Err(w, http.StatusForbidden, "You do not have permission to manage the sales team.", "ERR_FORBIDDEN")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

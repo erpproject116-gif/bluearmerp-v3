@@ -14,12 +14,15 @@ export type FollowUpTask = {
   pic_user_id?: number | null;
   pic_name: string;
   warranty_asset_id?: number | null;
+  warranty_serial?: string;
   quotation_id?: number | null;
+  quotation_reference?: string;
   sales_id?: number | null;
+  sales_no?: string;
   title: string;
   notes?: string | null;
   completed_at?: string | null;
-  created_at: string;
+  created_at?: string;
 };
 
 export type FollowUpTaskListParams = {
@@ -61,8 +64,13 @@ export async function createFollowUpTask(payload: {
   task_type?: FollowUpTaskType;
   due_date: string;
   partner_id?: number | null;
+  pic_user_id?: number | null;
+  pic_name?: string;
   title: string;
   notes?: string;
+  warranty_asset_id?: number | null;
+  quotation_id?: number | null;
+  sales_id?: number | null;
 }) {
   return apiFetch<FollowUpTask>("/api/v1/crm/follow-up-tasks", {
     method: "POST",

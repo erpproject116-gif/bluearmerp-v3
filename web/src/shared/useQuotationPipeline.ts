@@ -7,8 +7,10 @@ export type QuotationPipelineCard = {
   id: number;
   order_date: string;
   date_no_display: string;
+  reference_no: string;
   customer_name: string;
   partner_id: number;
+  pic_name?: string;
   grand_total: number;
   valid_until?: string | null;
   progress_status: string;

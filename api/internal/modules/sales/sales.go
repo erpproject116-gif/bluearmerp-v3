@@ -228,6 +228,9 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 
+		scope, argN := tu.PicOrCreatedScopeSQL("s", argN, &args)
+		where += scope
+
 		q := fmt.Sprintf(`
 			select s.id, s.order_date, s.date_seq, s.sales_no,
 			  s.tax_type_id, tt.name, s.currency_id, c.currency_code,

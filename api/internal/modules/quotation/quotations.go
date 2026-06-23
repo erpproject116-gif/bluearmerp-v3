@@ -217,6 +217,9 @@ func listQuotations(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 
+		scope, argN := tu.PicOrCreatedScopeSQL("q", argN, &args)
+		where += scope
+
 		q := fmt.Sprintf(`
 			select q.id, q.order_date, q.date_seq, q.reference_no,
 			  q.tax_type_id, tt.name, q.currency_id, c.currency_code,

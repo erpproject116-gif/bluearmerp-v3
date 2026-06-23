@@ -1,6 +1,6 @@
 import { createMemo, createSignal, Show } from "solid-js";
 import { KanbanBoard } from "../../shared/KanbanBoard";
-import { KanbanCard } from "../../shared/KanbanCard";
+import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../shared/ViewModeToggle";
 import { patchQuotationProgress } from "../../shared/useQuotationList";
@@ -19,6 +19,21 @@ import { CrmLayout } from "./CrmLayout";
 const STORAGE_KEY = "crm-quotation-pipeline-view";
 
 const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function humanizeStatus(value: string) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function quoteCardDetails(card: QuotationPipelineCard): KanbanDetailRow[] {
+  const rows: KanbanDetailRow[] = [];
+  if (card.item_name_summary) rows.push({ label: "Items", value: card.item_name_summary });
+  rows.push({ label: "Total", value: `₱ ${money(card.grand_total)}` });
+  if (card.valid_until) rows.push({ label: "Valid until", value: card.valid_until });
+  if (card.pic_name) rows.push({ label: "PIC", value: card.pic_name });
+  rows.push({ label: "Progress", value: humanizeStatus(card.progress_status) });
+  if (card.voucher_status) rows.push({ label: "SO status", value: humanizeStatus(card.voucher_status) });
+  return rows;
+}
 
 /** Map pipeline column drops to quotation progress_status where applicable. */
 function stageToProgress(stage: QuotationPipelineStage): string | null {
@@ -103,10 +118,12 @@ export default function QuotationPipelinePage() {
         <SpreadsheetGrid
           columns={[
             { key: "date_no_display", header: "Quote no.", clickable: true },
+            { key: "reference_no", header: "Reference" },
             { key: "customer_name", header: "Customer", clickable: true },
+            { key: "item_name_summary", header: "Items", render: (r) => r.item_name_summary ?? "—" },
             { key: "pipeline_stage", header: "Stage", render: (r) => PIPELINE_STAGE_LABELS[r.pipeline_stage] },
             { key: "valid_until", header: "Valid until", render: (r) => r.valid_until ?? "—" },
-            { key: "progress_status", header: "Progress" },
+            { key: "progress_status", header: "Progress", render: (r) => humanizeStatus(r.progress_status) },
             { key: "grand_total", header: "Total", render: (r) => money(r.grand_total) },
           ]}
           rows={pagedRows()}
@@ -135,10 +152,18 @@ export default function QuotationPipelinePage() {
           loading={pipeline.isFetching}
           renderCard={(c) => (
             <KanbanCard
-              title={c.date_no_display}
+              title={c.date_no_display || c.reference_no}
               subtitle={c.customer_name}
-              meta={`${money(c.grand_total)}${c.valid_until ? ` · Valid ${c.valid_until}` : ""}`}
-              severity={c.pipeline_stage === "expired" ? "warning" : "info"}
+              badge={c.reference_no}
+              details={quoteCardDetails(c)}
+              meta={c.order_date ? `Quoted ${c.order_date}` : undefined}
+              severity={
+                c.pipeline_stage === "expired"
+                  ? "warning"
+                  : c.pipeline_stage === "won"
+                    ? "info"
+                    : "info"
+              }
             />
           )}
         />

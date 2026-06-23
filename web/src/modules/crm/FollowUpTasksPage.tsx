@@ -1,15 +1,16 @@
 import { createMemo, createSignal, Show } from "solid-js";
 import { KanbanBoard } from "../../shared/KanbanBoard";
-import { KanbanCard } from "../../shared/KanbanCard";
-import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
+import { useCrmTaskModal } from "../../shared/CrmTaskModal";
+import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../shared/ViewModeToggle";
 import {
-  createFollowUpTask,
   patchFollowUpTaskStage,
   useFollowUpTasks,
   useInvalidateFollowUpTasks,
   type FollowUpTask,
   type FollowUpTaskStage,
+  type FollowUpTaskType,
 } from "../../shared/useFollowUpTasks";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
@@ -24,16 +25,37 @@ const BOARD_STAGES: { id: FollowUpTaskStage; label: string }[] = [
 
 const STORAGE_KEY = "crm-follow-up-view";
 
+const TASK_TYPE_LABELS: Record<FollowUpTaskType, string> = {
+  warranty_follow_up: "Warranty follow-up",
+  quote_follow_up: "Quote follow-up",
+  manual: "Manual task",
+};
+
+function truncate(text: string, max: number) {
+  const s = text.trim();
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1)}…`;
+}
+
+function taskCardDetails(task: FollowUpTask): KanbanDetailRow[] {
+  const rows: KanbanDetailRow[] = [{ label: "Due", value: task.due_date }];
+  if (task.partner_name) rows.push({ label: "Customer", value: task.partner_name });
+  if (task.pic_name) rows.push({ label: "PIC", value: task.pic_name });
+  if (task.quotation_reference) rows.push({ label: "Quote", value: task.quotation_reference });
+  if (task.sales_no) rows.push({ label: "Sale", value: task.sales_no });
+  if (task.warranty_serial) rows.push({ label: "Serial", value: task.warranty_serial });
+  if (task.notes?.trim()) rows.push({ label: "Notes", value: truncate(task.notes, 140) });
+  if (task.completed_at) rows.push({ label: "Completed", value: task.completed_at.slice(0, 10) });
+  return rows;
+}
+
 export default function FollowUpTasksPage() {
   const [viewMode, setViewMode] = createSignal<ViewMode>(loadViewMode(STORAGE_KEY));
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("due_date");
-  const [modalOpen, setModalOpen] = createSignal(false);
-  const [newTitle, setNewTitle] = createSignal("");
-  const [newDueDate, setNewDueDate] = createSignal(new Date().toISOString().slice(0, 10));
-  const [saving, setSaving] = createSignal(false);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const toast = useToast();
   const invalidate = useInvalidateFollowUpTasks();
+  const crmTask = useCrmTaskModal();
 
   const list = useFollowUpTasks(() => ({
     page: viewMode() === "board" ? 1 : page(),
@@ -59,28 +81,6 @@ export default function FollowUpTasksPage() {
     invalidate();
   };
 
-  const saveNew = async () => {
-    if (!newTitle().trim()) {
-      toast.warning("Title is required.");
-      return;
-    }
-    setSaving(true);
-    const res = await createFollowUpTask({
-      title: newTitle().trim(),
-      due_date: newDueDate(),
-      task_type: "manual",
-    });
-    setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not create task.");
-      return;
-    }
-    toast.success("Task created.");
-    setModalOpen(false);
-    setNewTitle("");
-    invalidate();
-  };
-
   return (
     <CrmLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -88,7 +88,7 @@ export default function FollowUpTasksPage() {
         <button
           type="button"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          onClick={() => setModalOpen(true)}
+          onClick={() => crmTask.open()}
         >
           + New task
         </button>
@@ -109,7 +109,7 @@ export default function FollowUpTasksPage() {
           selectedId={selectedId()}
           onSelect={setSelectedId}
           onEdit={() => {}}
-          onNew={() => setModalOpen(true)}
+          onNew={() => crmTask.open()}
           codeKey="title"
           nameKey="title"
           sortKey={sort()}
@@ -134,33 +134,14 @@ export default function FollowUpTasksPage() {
           renderCard={(t) => (
             <KanbanCard
               title={t.title}
-              subtitle={t.partner_name ?? undefined}
-              meta={`Due ${t.due_date}${t.pic_name ? ` · ${t.pic_name}` : ""}`}
+              subtitle={TASK_TYPE_LABELS[t.task_type]}
+              badge={BOARD_STAGES.find((s) => s.id === t.stage)?.label ?? t.stage}
+              details={taskCardDetails(t)}
               severity={t.stage === "overdue" ? "critical" : t.stage === "due_soon" ? "warning" : "info"}
             />
           )}
         />
       </Show>
-
-      <EntityModal
-        open={modalOpen()}
-        title="New follow-up task"
-        onClose={() => setModalOpen(false)}
-        onSave={() => void saveNew()}
-        saving={saving()}
-      >
-        <Field label="Title">
-          <input class={inputClass} value={newTitle()} onInput={(e) => setNewTitle(e.currentTarget.value)} />
-        </Field>
-        <Field label="Due date">
-          <input
-            type="date"
-            class={inputClass}
-            value={newDueDate()}
-            onInput={(e) => setNewDueDate(e.currentTarget.value)}
-          />
-        </Field>
-      </EntityModal>
     </CrmLayout>
   );
 }

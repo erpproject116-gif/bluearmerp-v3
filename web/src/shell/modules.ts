@@ -10,6 +10,10 @@ export type ModuleFeature = {
   settingsHref: string;
   /** Path prefix for sidebar sub-branch detection (e.g. /app/inventory/after-sales). */
   prefix?: string;
+  /** Hidden from sales team; requires CRM analytics permission. */
+  analyticsOnly?: boolean;
+  /** Hidden unless user can manage CRM alert rules. */
+  managersOnly?: boolean;
 };
 
 export type AppModule = {
@@ -110,11 +114,12 @@ export const appModules: AppModule[] = [
         label: "Customer × Item",
         href: "/app/crm/reports/customer-quotations",
         settingsHref: "/app/crm/settings/alert-rules",
+        analyticsOnly: true,
       },
-      { label: "Item Demand", href: "/app/crm/reports/item-demand", settingsHref: "/app/crm/settings/alert-rules" },
-      { label: "Conversion Funnel", href: "/app/crm/reports/conversion", settingsHref: "/app/crm/settings/alert-rules" },
-      { label: "Low Stock", href: "/app/crm/reports/low-stock", settingsHref: "/app/crm/settings/alert-rules" },
-      { label: "Alert Rules", href: "/app/crm/settings/alert-rules", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Item Demand", href: "/app/crm/reports/item-demand", settingsHref: "/app/crm/settings/alert-rules", analyticsOnly: true },
+      { label: "Conversion Funnel", href: "/app/crm/reports/conversion", settingsHref: "/app/crm/settings/alert-rules", analyticsOnly: true },
+      { label: "Low Stock", href: "/app/crm/reports/low-stock", settingsHref: "/app/crm/settings/alert-rules", analyticsOnly: true },
+      { label: "Alert Rules", href: "/app/crm/settings/alert-rules", settingsHref: "/app/crm/settings/alert-rules", managersOnly: true },
     ],
   },
   {
@@ -160,6 +165,11 @@ export const appModules: AppModule[] = [
         label: "Activity Logs",
         href: "/app/activity-logs",
         settingsHref: "/app/activity-logs",
+      },
+      {
+        label: "Change Logs",
+        href: "/app/activity-logs/changes",
+        settingsHref: "/app/activity-logs/changes",
       },
     ],
   },

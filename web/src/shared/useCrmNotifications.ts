@@ -36,10 +36,11 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
         return {
           rows: res.data ?? [],
           total: res.meta?.total ?? 0,
-          unreadTotal: (res.meta as { unread_total?: number } | undefined)?.unread_total ?? 0,
+          unreadTotal: Number((res.meta as { unread_total?: number } | undefined)?.unread_total ?? 0),
         };
       },
-      staleTime: 30_000,
+      staleTime: 15_000,
+      refetchInterval: p.enabled !== false ? 60_000 : false,
     };
   });
 }

@@ -33,7 +33,11 @@ type TenantUser struct {
 	canViewActivityLogsRole   bool
 	canViewCrmRole            bool
 	canManageCrmRulesRole     bool
+	canViewAllCrmRole         bool
+	canManageSalesTeamRole    bool
+	canViewCrmAnalyticsRole   bool
 	AutoEnableAllModules      bool
+	permissions               map[string]string
 }
 
 type Claims struct {
@@ -139,6 +143,9 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		  coalesce(tr.can_view_activity_logs, false),
 		  coalesce(tr.can_view_crm, false),
 		  coalesce(tr.can_manage_crm_rules, false),
+		  coalesce(tr.can_view_all_crm, false),
+		  coalesce(tr.can_manage_sales_team, false),
+		  coalesce(tr.can_view_crm_analytics, false),
 		  t.auto_enable_all_modules
 		from public.users u
 		join public.tenants t on t.id = u.tenant_id
@@ -152,6 +159,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 	var tu TenantUser
 	tu.AuthUserID = authUserID
 	var canFormSettings, canManageUsers, canViewActivityLogs, canViewCrm, canManageCrmRules bool
+	var canViewAllCrm, canManageSalesTeam, canViewCrmAnalytics bool
 	err := pool.QueryRow(ctx, q, authUserID).Scan(
 		&tu.AppUserID,
 		&tu.TenantID,
@@ -165,6 +173,9 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		&canViewActivityLogs,
 		&canViewCrm,
 		&canManageCrmRules,
+		&canViewAllCrm,
+		&canManageSalesTeam,
+		&canViewCrmAnalytics,
 		&tu.AutoEnableAllModules,
 	)
 	if err != nil {
@@ -178,6 +189,12 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 	tu.canViewActivityLogsRole = canViewActivityLogs
 	tu.canViewCrmRole = canViewCrm
 	tu.canManageCrmRulesRole = canManageCrmRules
+	tu.canViewAllCrmRole = canViewAllCrm
+	tu.canManageSalesTeamRole = canManageSalesTeam
+	tu.canViewCrmAnalyticsRole = canViewCrmAnalytics
 	tu.IsStoreAdmin = tu.CanManageFormSettings()
+	if err := loadEffectivePermissions(ctx, pool, &tu); err != nil {
+		return TenantUser{}, err
+	}
 	return tu, nil
 }
