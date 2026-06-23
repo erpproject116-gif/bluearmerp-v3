@@ -1,11 +1,13 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { supabase } from "../shared/api";
 import { useAuth, canManageUsers, canViewActivityLogs, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasModuleAccess, hasPermission } from "../shared/auth-context";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
 import { CrmNotificationPoller } from "../shared/CrmNotificationPoller";
+import { PresenceAvatars } from "../shared/PresenceAvatars";
+import { PresenceHeartbeat, signOutWithPresenceClear } from "../shared/PresenceHeartbeat";
+import { UserAvatar } from "../shared/UserAvatar";
 import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ModuleIcon } from "./ModuleIcon";
 import { ShellProvider, useShell } from "./shell-context";
@@ -43,7 +45,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await signOutWithPresenceClear();
     navigate("/signin", { replace: true });
   };
 
@@ -163,13 +165,21 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             <Show
               when={!shell.collapsed()}
               fallback={
-                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-600">
-                  {auth.me!.user.full_name.charAt(0).toUpperCase()}
-                </span>
+                <UserAvatar
+                  name={auth.me!.user.full_name}
+                  avatarUrl={auth.me!.user.avatar_url}
+                  size="sm"
+                  class="ring-2 ring-brand-50"
+                />
               }
             >
-              <p class="truncate text-sm font-medium text-text-primary">{auth.me!.user.full_name}</p>
-              <p class="truncate text-xs text-text-secondary">{auth.me!.tenant.company_name}</p>
+              <div class="flex items-center gap-3">
+                <UserAvatar name={auth.me!.user.full_name} avatarUrl={auth.me!.user.avatar_url} size="sm" />
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-medium text-text-primary">{auth.me!.user.full_name}</p>
+                  <p class="truncate text-xs text-text-secondary">{auth.me!.tenant.company_name}</p>
+                </div>
+              </div>
             </Show>
           </div>
         </Show>
@@ -281,6 +291,8 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             </Show>
           </div>
           <div class="flex shrink-0 items-center gap-2">
+            <PresenceHeartbeat />
+            <PresenceAvatars />
             <CrmNotificationPoller enabled={canViewCrm(auth.me)} />
             <Show when={canViewCrm(auth.me)}>
               <button

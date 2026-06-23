@@ -29,6 +29,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/formfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/health"
 	platformmw "github.com/bluearm/bluearm-erp-v3/api/internal/platform/middleware"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/presence"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -74,6 +75,7 @@ func main() {
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Get("/auth/me", auth.MeHandler(pool))
+			presence.RegisterRoutes(protected, pool)
 			customfields.RegisterRoutes(protected, pool)
 			drafts.RegisterRoutes(protected, pool)
 			formfields.RegisterRoutes(protected, pool)

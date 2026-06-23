@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -82,8 +83,10 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 		}
 	}
 
-	return MePayload{
-		User: map[string]any{
+	var avatarURL *string
+	_ = pool.QueryRow(ctx, `select avatar_url from public.users where id = $1`, tu.AppUserID).Scan(&avatarURL)
+
+	user := map[string]any{
 			"id":                       tu.AppUserID,
 			"email":                    tu.Email,
 			"full_name":                tu.FullName,
@@ -100,7 +103,13 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 			"can_manage_sales_team":    tu.CanManageSalesTeam(),
 			"can_view_crm_analytics":   tu.CanViewCrmAnalytics(),
 			"permissions":              tu.PermissionsMap(),
-		},
+	}
+	if avatarURL != nil && strings.TrimSpace(*avatarURL) != "" {
+		user["avatar_url"] = strings.TrimSpace(*avatarURL)
+	}
+
+	return MePayload{
+		User: user,
 		Tenant: map[string]any{
 			"id":                       tu.TenantID,
 			"company_name":             companyName,

@@ -7,6 +7,7 @@ export type MeData = {
     id: number;
     email: string;
     full_name: string;
+    avatar_url?: string;
     tenant_role?: string;
     is_platform_superadmin?: boolean;
     is_tenant_owner?: boolean;

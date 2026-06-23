@@ -65,6 +65,7 @@ function shouldAutoSuccessToast(path: string, method?: string, options?: ApiFetc
   if (!MUTATING_METHODS.has(m)) return false;
   if (/\/search(\?|$)/.test(path)) return false;
   if (path.includes("/drafts") || path.includes("/draft")) return false;
+  if (path.includes("/presence/")) return false;
   if (path.includes("/import-template")) return false;
   if (path.includes("/preview")) return false;
   if (/\/export(\?|$)/.test(path)) return false;
