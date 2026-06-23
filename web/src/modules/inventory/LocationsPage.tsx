@@ -75,8 +75,8 @@ export default function LocationsPage() {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/inventory/locations/${ed.id}`, { method: "PATCH", body: JSON.stringify(payload) })
-          : apiFetch("/api/v1/inventory/locations", { method: "POST", body: JSON.stringify(payload) }),
+          ? apiFetch(`/api/v1/inventory/locations/${ed.id}`, { method: "PATCH", body: JSON.stringify(payload) }, { silent: true })
+          : apiFetch("/api/v1/inventory/locations", { method: "POST", body: JSON.stringify(payload) }, { silent: true }),
       toast,
       ed ? "Location updated." : "Location created.",
     );

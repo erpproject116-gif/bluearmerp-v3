@@ -11,6 +11,7 @@ import {
   uploadRepairOrderAttachment,
   type RepairOrderAttachment,
 } from "../../../shared/repairOrderAttachments";
+import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useCustomValues } from "../../../shared/useCustomValues";
@@ -263,8 +264,8 @@ export function RepairOrderModal(props: Props) {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/inventory/repair-orders/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) })
-          : apiFetch("/api/v1/inventory/repair-orders", { method: "POST", body: JSON.stringify(body) }),
+          ? apiFetch(`/api/v1/inventory/repair-orders/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+          : apiFetch("/api/v1/inventory/repair-orders", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
       ed ? "Repair order updated." : "Repair order created.",
     );
@@ -289,7 +290,7 @@ export function RepairOrderModal(props: Props) {
         <input class={inputClass} value={repairOrderNo()} readOnly />
       </Field>
       <Field label="Date *">
-        <input type="date" class={inputClass} value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
+        <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
       </Field>
       <LookupCombo
         label="Customer"
@@ -345,7 +346,7 @@ export function RepairOrderModal(props: Props) {
         </select>
       </Field>
       <Field label="Scheduled completion date">
-        <input type="date" class={inputClass} value={scheduledDate()} onInput={(e) => setScheduledDate(e.currentTarget.value)} />
+        <DateInput value={scheduledDate()} onInput={(e) => setScheduledDate(e.currentTarget.value)} />
       </Field>
       <Field label="Latest update" span="full">
         <textarea class={inputClass} rows={2} value={latestUpdate()} onInput={(e) => setLatestUpdate(e.currentTarget.value)} />

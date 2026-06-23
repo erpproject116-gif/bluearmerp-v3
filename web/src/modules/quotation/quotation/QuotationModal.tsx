@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
@@ -362,8 +363,8 @@ export function QuotationModal(props: Props) {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/quotation/quotations/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) })
-          : apiFetch("/api/v1/quotation/quotations", { method: "POST", body: JSON.stringify(body) }),
+          ? apiFetch(`/api/v1/quotation/quotations/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+          : apiFetch("/api/v1/quotation/quotations", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
       ed ? "Quotation updated." : "Quotation created.",
     );
@@ -390,7 +391,7 @@ export function QuotationModal(props: Props) {
         <input class={inputClass} value={referenceNo()} readOnly />
       </Field>
       <Field label="Date *">
-        <input type="date" class={inputClass} value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
+        <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
       </Field>
       <Field label="Transaction type *">
         <select

@@ -67,5 +67,5 @@ export async function patchPriceBatchLines(lines: { line_id: number; unit_non_va
   return apiFetch<{ updated_count: number }>("/api/v1/sales/price-batch/lines", {
     method: "PATCH",
     body: JSON.stringify({ lines }),
-  });
+  }, { silent: true });
 }

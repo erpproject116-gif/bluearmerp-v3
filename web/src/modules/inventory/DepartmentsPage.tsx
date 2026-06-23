@@ -67,8 +67,8 @@ export default function DepartmentsPage() {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/inventory/departments/${ed.id}`, { method: "PATCH", body: JSON.stringify(payload) })
-          : apiFetch("/api/v1/inventory/departments", { method: "POST", body: JSON.stringify(payload) }),
+          ? apiFetch(`/api/v1/inventory/departments/${ed.id}`, { method: "PATCH", body: JSON.stringify(payload) }, { silent: true })
+          : apiFetch("/api/v1/inventory/departments", { method: "POST", body: JSON.stringify(payload) }, { silent: true }),
       toast,
       ed ? "Department updated." : "Department created.",
     );

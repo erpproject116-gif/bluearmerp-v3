@@ -86,7 +86,7 @@ export default function RolesPage() {
                 description: description(),
                 is_active: isActive(),
               }),
-            })
+            }, { silent: true })
           : apiFetch("/api/v1/user-management/roles", {
               method: "POST",
               body: JSON.stringify({
@@ -94,7 +94,7 @@ export default function RolesPage() {
                 role_name: name,
                 description: description(),
               }),
-            }),
+            }, { silent: true }),
       toast,
       ed ? "Role updated." : "Role created.",
     );
@@ -119,7 +119,6 @@ export default function RolesPage() {
       toast.warning(res.message ?? "Could not save permissions.");
       return;
     }
-    toast.success("Role permissions saved.");
     setPermModalOpen(false);
     permInvalidate.role(id);
   };

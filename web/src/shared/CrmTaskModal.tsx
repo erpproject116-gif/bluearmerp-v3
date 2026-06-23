@@ -1,4 +1,5 @@
 import { createContext, createSignal, Show, useContext, type ParentProps } from "solid-js";
+import { DateInput } from "./DateInput";
 import { EntityModal, Field, inputClass } from "./SpreadsheetGrid";
 import {
   createFollowUpTask,
@@ -98,7 +99,6 @@ export function CrmTaskModalProvider(props: ParentProps) {
       toast.warning(res.message ?? "Could not create task.");
       return;
     }
-    toast.success("CRM task created.");
     setOpen(false);
     invalidate();
   };
@@ -122,12 +122,7 @@ export function CrmTaskModalProvider(props: ParentProps) {
           <input class={inputClass} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
         </Field>
         <Field label="Due date">
-          <input
-            type="date"
-            class={inputClass}
-            value={dueDate()}
-            onInput={(e) => setDueDate(e.currentTarget.value)}
-          />
+          <DateInput value={dueDate()} onInput={(e) => setDueDate(e.currentTarget.value)} />
         </Field>
         <Show when={canManageSalesTeam(auth.me)}>
           <Field label="Assign to">

@@ -41,7 +41,7 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
     `/api/v1/drafts/${encodeURIComponent(options.entityType)}?draft_key=${encodeURIComponent(options.draftKey)}`;
 
   const deleteDraft = async () => {
-    await apiFetch(draftPath(), { method: "DELETE" });
+    await apiFetch(draftPath(), { method: "DELETE" }, { silent: true });
     setSavedAt(null);
     setPendingPayload(null);
     setShowBanner(false);
@@ -53,7 +53,7 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
     const res = await apiFetch<{ saved_at: string }>(`/api/v1/drafts/${encodeURIComponent(options.entityType)}`, {
       method: "PUT",
       body: JSON.stringify({ draft_key: options.draftKey, payload }),
-    });
+    }, { silent: true });
     if (res.success && res.data?.saved_at) {
       setSavedAt(res.data.saved_at);
     }

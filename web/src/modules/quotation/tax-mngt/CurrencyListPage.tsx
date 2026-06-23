@@ -59,8 +59,8 @@ export function CurrencyModal(props: {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/quotation/currencies/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) })
-          : apiFetch("/api/v1/quotation/currencies", { method: "POST", body: JSON.stringify(body) }),
+          ? apiFetch(`/api/v1/quotation/currencies/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+          : apiFetch("/api/v1/quotation/currencies", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
       ed ? "Currency updated." : "Currency created.",
     );

@@ -3,6 +3,7 @@ import { apiFetch } from "../../../shared/api";
 import { FINANCE_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { ModalField } from "../../../shared/ModalField";
@@ -205,7 +206,7 @@ export function OfficialReceiptModal(props: Props) {
         apiFetch(props.editing ? `/api/v1/finance/official-receipts/${props.editing.id}` : "/api/v1/finance/official-receipts", {
           method: props.editing ? "PATCH" : "POST",
           body: JSON.stringify(body),
-        }),
+        }, { silent: true }),
       toast,
       props.editing ? "Official receipt updated." : "Official receipt created.",
     );
@@ -223,9 +224,7 @@ export function OfficialReceiptModal(props: Props) {
     >
       <ModalField settings={byKey} fieldKey="receipt_date" fallbackLabel="Date" fallbackRequired>
           {(m) => (
-            <input
-              type="date"
-              class={inputClass}
+            <DateInput
               value={receiptDate()}
               disabled={m.disabled}
               onInput={(e) => setReceiptDate(e.currentTarget.value)}

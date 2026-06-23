@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
@@ -436,8 +437,8 @@ export function SalesModal(props: Props) {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/sales/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) })
-          : apiFetch("/api/v1/sales", { method: "POST", body: JSON.stringify(body) }),
+          ? apiFetch(`/api/v1/sales/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+          : apiFetch("/api/v1/sales", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
       ed ? "Sales updated." : "Sales created.",
     );
@@ -465,10 +466,10 @@ export function SalesModal(props: Props) {
           <input class={inputClass} value={salesNo()} readOnly />
         </Field>
         <Field label="Date *">
-          <input type="date" class={inputClass} value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
+          <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
         </Field>
         <Field label="Due date">
-          <input type="date" class={inputClass} value={dueDate()} onInput={(e) => setDueDate(e.currentTarget.value)} />
+          <DateInput value={dueDate()} onInput={(e) => setDueDate(e.currentTarget.value)} />
         </Field>
         <Field label="Transaction type *">
           <select

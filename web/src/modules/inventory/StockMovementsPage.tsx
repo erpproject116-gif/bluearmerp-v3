@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useListState } from "../../shared/useListState";
@@ -63,11 +64,11 @@ export default function StockMovementsPage() {
       <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <label class="text-sm">
           <span class="mb-1 block text-text-secondary">From</span>
-          <input type="date" class="rounded border border-stroke px-2 py-1.5 text-sm" value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
+          <DateInput class="rounded border border-stroke px-2 py-1.5 text-sm" value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
         </label>
         <label class="text-sm">
           <span class="mb-1 block text-text-secondary">To</span>
-          <input type="date" class="rounded border border-stroke px-2 py-1.5 text-sm" value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
+          <DateInput class="rounded border border-stroke px-2 py-1.5 text-sm" value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
         </label>
         <label class="text-sm">
           <span class="mb-1 block text-text-secondary">Movement type</span>

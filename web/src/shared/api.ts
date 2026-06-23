@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getGlobalToast } from "./toast";
 
 const url = import.meta.env.VITE_SUPABASE_URL ?? "";
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
@@ -49,9 +50,50 @@ export type ApiResult<T> = ApiEnvelope<T> & {
   ok: boolean;
 };
 
+export type ApiFetchOptions = {
+  /** Suppress automatic success toast (e.g. autosave, search, or custom messaging). */
+  silent?: boolean;
+  /** Override the default success toast message. */
+  successMessage?: string;
+};
+
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function shouldAutoSuccessToast(path: string, method?: string, options?: ApiFetchOptions): boolean {
+  if (options?.silent) return false;
+  const m = (method ?? "GET").toUpperCase();
+  if (!MUTATING_METHODS.has(m)) return false;
+  if (/\/search(\?|$)/.test(path)) return false;
+  if (path.includes("/drafts") || path.includes("/draft")) return false;
+  if (path.includes("/import-template")) return false;
+  if (path.includes("/preview")) return false;
+  if (/\/export(\?|$)/.test(path)) return false;
+  if (/\/print(\?|$)/.test(path)) return false;
+  return true;
+}
+
+function defaultSuccessMessage(method?: string, serverMessage?: string, override?: string): string {
+  if (override?.trim()) return override.trim();
+  const msg = serverMessage?.trim();
+  if (msg) return msg;
+  const m = (method ?? "GET").toUpperCase();
+  switch (m) {
+    case "POST":
+      return "Created successfully.";
+    case "PUT":
+    case "PATCH":
+      return "Updated successfully.";
+    case "DELETE":
+      return "Deleted successfully.";
+    default:
+      return "Saved successfully.";
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
+  options?: ApiFetchOptions,
 ): Promise<ApiResult<T>> {
   const token = await getAccessToken();
   const headers = new Headers(init.headers);
@@ -65,5 +107,11 @@ export async function apiFetch<T>(
     throw new Error("ERR_NETWORK");
   }
   const body = (await res.json()) as ApiEnvelope<T>;
-  return { ...body, status: res.status, ok: res.ok };
+  const result = { ...body, status: res.status, ok: res.ok };
+  if (body.success && shouldAutoSuccessToast(path, init.method, options)) {
+    getGlobalToast()?.success(
+      defaultSuccessMessage(init.method, body.message, options?.successMessage),
+    );
+  }
+  return result;
 }

@@ -104,8 +104,8 @@ export default function ItemsPage() {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/inventory/items/${ed.id}`, { method: "PATCH", body: JSON.stringify(payload) })
-          : apiFetch("/api/v1/inventory/items", { method: "POST", body: JSON.stringify(payload) }),
+          ? apiFetch(`/api/v1/inventory/items/${ed.id}`, { method: "PATCH", body: JSON.stringify(payload) }, { silent: true })
+          : apiFetch("/api/v1/inventory/items", { method: "POST", body: JSON.stringify(payload) }, { silent: true }),
       toast,
       ed ? "Item updated." : "Item created.",
     );

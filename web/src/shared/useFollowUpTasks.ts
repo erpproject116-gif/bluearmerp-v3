@@ -75,7 +75,7 @@ export async function createFollowUpTask(payload: {
   return apiFetch<FollowUpTask>("/api/v1/crm/follow-up-tasks", {
     method: "POST",
     body: JSON.stringify(payload),
-  });
+  }, { successMessage: "CRM task created." });
 }
 
 export async function patchFollowUpTask(
@@ -92,7 +92,7 @@ export async function patchFollowUpTaskStage(id: number, stage: FollowUpTaskStag
   return apiFetch(`/api/v1/crm/follow-up-tasks/${id}/stage`, {
     method: "PATCH",
     body: JSON.stringify({ stage }),
-  });
+  }, { successMessage: "Task updated." });
 }
 
 export function useInvalidateFollowUpTasks() {

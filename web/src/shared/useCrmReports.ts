@@ -246,7 +246,7 @@ export async function patchCrmAlertRule(
   return apiFetch(`/api/v1/crm/alert-rules/${id}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
-  });
+  }, { successMessage: "Alert rule updated." });
 }
 
 export function useInvalidateCrmReports() {

@@ -65,13 +65,13 @@ export function EntityFormSettingsPage(props: Props) {
     const res = await apiFetch<{ fields: FormFieldSetting[] }>(
       `/api/v1/form-field-settings?entity_type=${encodeURIComponent(props.entityType)}`,
       { method: "PATCH", body: JSON.stringify({ fields: payload }) },
+      { successMessage: "Form settings saved." },
     );
     setSaving(false);
     if (!res.success) {
       toast.error(res.message ?? "Failed to save form settings.");
       return;
     }
-    toast.success("Form settings saved.");
     setDirty(false);
     invalidate();
     void query.refetch();
@@ -89,24 +89,24 @@ export function EntityFormSettingsPage(props: Props) {
     }
     setAdding(true);
     const key = newKey().trim() || slugKey(newLabel());
+    const label = newLabel().trim();
     const res = await apiFetch("/api/v1/custom-fields", {
       method: "POST",
       body: JSON.stringify({
         entity_type: props.entityType,
         field_key: key,
-        label: newLabel().trim(),
+        label,
         field_type: newType(),
         is_required: newRequired(),
         sort_order: fields().filter((f) => f.kind === "custom").length,
         options: needsChoices ? { choices: parseChoices(newChoices()) } : {},
       }),
-    });
+    }, { successMessage: `Custom field "${label}" added.` });
     setAdding(false);
     if (!res.success) {
       toast.error(res.message ?? "Failed to add custom field.");
       return;
     }
-    toast.success(`Custom field "${newLabel().trim()}" added.`);
     setNewLabel("");
     setNewKey("");
     setNewType("text");
@@ -119,12 +119,13 @@ export function EntityFormSettingsPage(props: Props) {
 
   const removeCustomField = async (id: number | undefined, label: string) => {
     if (!id) return;
-    const res = await apiFetch(`/api/v1/custom-fields/${id}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/v1/custom-fields/${id}`, { method: "DELETE" }, {
+      successMessage: `Custom field "${label}" disabled.`,
+    });
     if (!res.success) {
       toast.error(res.message ?? "Failed to remove custom field.");
       return;
     }
-    toast.success(`Custom field "${label}" disabled.`);
     setDirty(false);
     invalidate();
     void query.refetch();

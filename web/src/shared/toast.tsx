@@ -32,6 +32,12 @@ type ToastAPI = {
 
 const ToastContext = createContext<ToastAPI>();
 
+let globalToast: ToastAPI | null = null;
+
+export function getGlobalToast(): ToastAPI | null {
+  return globalToast;
+}
+
 let nextToastId = 0;
 
 const styles: Record<ToastType, string> = {
@@ -79,6 +85,8 @@ export function ToastProvider(props: ParentProps) {
         input.type === "error" ? 12000 : 10000,
       ),
   };
+
+  globalToast = api;
 
   const runAction = (toast: ToastItem) => {
     toast.onAction?.();

@@ -114,8 +114,8 @@ export default function PartnersPage() {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/inventory/partners/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) })
-          : apiFetch("/api/v1/inventory/partners", { method: "POST", body: JSON.stringify(body) }),
+          ? apiFetch(`/api/v1/inventory/partners/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+          : apiFetch("/api/v1/inventory/partners", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
       ed ? "Partner updated." : "Partner created.",
     );

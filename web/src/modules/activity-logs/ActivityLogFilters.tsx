@@ -1,4 +1,5 @@
 import { Show } from "solid-js";
+import { DateInput } from "../../shared/DateInput";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import type { ActivityLogFilterState } from "./ActivityLogLayout";
 
@@ -13,17 +14,13 @@ export function ActivityLogFilterPanel(props: {
     <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
       <div class="mb-3 flex flex-wrap items-end gap-3">
         <Field label="Date from">
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={props.draftFilters().dateFrom}
             onInput={(e) => props.setDraftFilters((f) => ({ ...f, dateFrom: e.currentTarget.value }))}
           />
         </Field>
         <Field label="Date to">
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={props.draftFilters().dateTo}
             onInput={(e) => props.setDraftFilters((f) => ({ ...f, dateTo: e.currentTarget.value }))}
           />

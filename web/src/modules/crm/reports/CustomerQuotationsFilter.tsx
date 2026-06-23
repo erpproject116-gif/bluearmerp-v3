@@ -1,6 +1,7 @@
 import { createSignal, onMount } from "solid-js";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
-import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { DateInput } from "../../../shared/DateInput";
+import { Field } from "../../../shared/SpreadsheetGrid";
 import { apiFetch } from "../../../shared/api";
 import type { CustomerQuotationsFilters } from "./customerQuotationsFilters";
 
@@ -85,17 +86,13 @@ export function CustomerQuotationsFilter(props: Props) {
           fetchOptions={fetchPartners}
         />
         <Field label="Date from">
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={props.value().date_from ?? ""}
             onInput={(e) => patch({ date_from: e.currentTarget.value || undefined })}
           />
         </Field>
         <Field label="Date to">
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={props.value().date_to ?? ""}
             onInput={(e) => patch({ date_to: e.currentTarget.value || undefined })}
           />

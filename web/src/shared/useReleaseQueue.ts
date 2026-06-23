@@ -64,5 +64,5 @@ export async function postSalesOrderReleases(lines: Array<{ sales_order_line_id:
   return apiFetch<{ released_count: number }>("/api/v1/sales-order/sales-orders/releases", {
     method: "POST",
     body: JSON.stringify({ lines }),
-  });
+  }, { silent: true });
 }

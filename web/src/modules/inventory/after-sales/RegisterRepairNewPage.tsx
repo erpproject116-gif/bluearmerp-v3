@@ -2,6 +2,7 @@ import { createEffect, createSignal, Show } from "solid-js";
 import { useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ItemSearchModal, type ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { submitEntity } from "../../../shared/handleSaveResult";
@@ -124,8 +125,8 @@ export default function RegisterRepairNewPage() {
     const ok = await submitEntity(
       () =>
         id
-          ? apiFetch(`/api/v1/inventory/repair-registrations/${id}`, { method: "PATCH", body: JSON.stringify(body) })
-          : apiFetch("/api/v1/inventory/repair-registrations", { method: "POST", body: JSON.stringify(body) }),
+          ? apiFetch(`/api/v1/inventory/repair-registrations/${id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+          : apiFetch("/api/v1/inventory/repair-registrations", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
       id ? "Registration updated." : "Registration created.",
     );
@@ -152,9 +153,7 @@ export default function RegisterRepairNewPage() {
             <input class={inputClass} value={registrationNo()} readOnly />
           </Field>
           <Field label="Date *">
-            <input
-              type="date"
-              class={inputClass}
+            <DateInput
               value={registrationDate()}
               disabled={readOnly()}
               onInput={(e) => setRegistrationDate(e.currentTarget.value)}

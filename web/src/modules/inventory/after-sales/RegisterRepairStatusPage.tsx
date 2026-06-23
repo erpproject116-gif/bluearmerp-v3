@@ -2,6 +2,7 @@ import { createSignal, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass, SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { AfterSalesLayout } from "./AfterSalesLayout";
 
@@ -84,10 +85,10 @@ export default function RegisterRepairStatusPage() {
         <p class="mb-3 text-sm font-medium text-text-primary">Filter (F8 Search)</p>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="From *">
-            <input type="date" class={inputClass} value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
+            <DateInput value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
           </Field>
           <Field label="To *">
-            <input type="date" class={inputClass} value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
+            <DateInput value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
           </Field>
           <Field label="Status">
             <select class={inputClass} value={status()} onChange={(e) => setStatus(e.currentTarget.value)}>

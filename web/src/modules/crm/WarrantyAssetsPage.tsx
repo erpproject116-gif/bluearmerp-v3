@@ -1,4 +1,5 @@
 import { createSignal, Show } from "solid-js";
+import { DateInput } from "../../shared/DateInput";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import {
   patchWarrantyAsset,
@@ -53,7 +54,6 @@ export default function WarrantyAssetsPage() {
       toast.warning(res.message ?? "Could not update warranty asset.");
       return;
     }
-    toast.success("Warranty asset updated.");
     setModalOpen(false);
     invalidate();
   };
@@ -69,7 +69,6 @@ export default function WarrantyAssetsPage() {
       toast.warning(res.message ?? "Sync failed.");
       return;
     }
-    toast.success("Warranty assets synced from sale.");
     setSyncSalesId("");
     invalidate();
   };
@@ -169,12 +168,7 @@ export default function WarrantyAssetsPage() {
                 <input class={inputClass} value={row().serial_no} readOnly />
               </Field>
               <Field label="Warranty end">
-                <input
-                  type="date"
-                  class={inputClass}
-                  value={editEnd()}
-                  onInput={(e) => setEditEnd(e.currentTarget.value)}
-                />
+                <DateInput value={editEnd()} onInput={(e) => setEditEnd(e.currentTarget.value)} />
               </Field>
               <Field label="Status">
                 <select

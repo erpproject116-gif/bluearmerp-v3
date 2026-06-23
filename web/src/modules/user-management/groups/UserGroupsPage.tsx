@@ -93,7 +93,7 @@ export default function UserGroupsPage() {
                 description: description(),
                 is_active: isActive(),
               }),
-            })
+            }, { silent: true })
           : apiFetch("/api/v1/user-management/groups", {
               method: "POST",
               body: JSON.stringify({
@@ -101,7 +101,7 @@ export default function UserGroupsPage() {
                 group_name: name,
                 description: description(),
               }),
-            }),
+            }, { silent: true }),
       toast,
       ed ? "Group updated." : "Group created.",
     );
@@ -125,7 +125,6 @@ export default function UserGroupsPage() {
       toast.warning(res.message ?? "Could not save permissions.");
       return;
     }
-    toast.success("Group permissions saved.");
     setPermOpen(false);
     permInvalidate.group(id);
   };
@@ -140,7 +139,6 @@ export default function UserGroupsPage() {
       toast.warning(res.message ?? "Could not save members.");
       return;
     }
-    toast.success("Group members updated.");
     setMembersOpen(false);
     permInvalidate.groups();
   };

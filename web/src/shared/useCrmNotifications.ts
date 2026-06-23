@@ -55,11 +55,15 @@ export function useCrmUnreadCount(enabled = true) {
 }
 
 export async function markCrmNotificationRead(id: number) {
-  return apiFetch(`/api/v1/crm/notifications/${id}/read`, { method: "PATCH" });
+  return apiFetch(`/api/v1/crm/notifications/${id}/read`, { method: "PATCH" }, {
+    successMessage: "Notification marked read.",
+  });
 }
 
 export async function markAllCrmNotificationsRead() {
-  return apiFetch("/api/v1/crm/notifications/read-all", { method: "POST" });
+  return apiFetch("/api/v1/crm/notifications/read-all", { method: "POST" }, {
+    successMessage: "All notifications marked read.",
+  });
 }
 
 export function useInvalidateCrmNotifications() {

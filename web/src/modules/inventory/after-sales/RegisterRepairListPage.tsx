@@ -68,13 +68,12 @@ export default function RegisterRepairListPage() {
     const res = await apiFetch(`/api/v1/inventory/repair-registrations/${row.id}/convert-to-repair-order`, {
       method: "POST",
       body: JSON.stringify({ pic_name: "" }),
-    });
+    }, { successMessage: "Converted to repair order." });
     setConvertingId(null);
     if (!res.success) {
       toast.warning(res.message ?? "Conversion failed.");
       return;
     }
-    toast.success("Converted to repair order.");
     invalidate();
   };
 

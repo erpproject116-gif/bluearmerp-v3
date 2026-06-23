@@ -49,7 +49,6 @@ export default function CrmNotificationsPage() {
       toast.warning(res.message ?? "Could not mark all as read.");
       return;
     }
-    toast.success("All notifications marked read.");
     invalidate();
   };
 

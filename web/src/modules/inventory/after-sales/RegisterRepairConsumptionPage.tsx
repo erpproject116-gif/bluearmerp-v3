@@ -1,7 +1,8 @@
 import { createSignal, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
-import { Field, inputClass, SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
+import { DateInput } from "../../../shared/DateInput";
+import { Field, SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { AfterSalesLayout } from "./AfterSalesLayout";
 
 function todayISO() {
@@ -52,10 +53,10 @@ export default function RegisterRepairConsumptionPage() {
         <p class="mb-3 text-xs text-text-secondary">Parts used from repair order lines (qty &gt; 0), grouped by item.</p>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Repair order date from">
-            <input type="date" class={inputClass} value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
+            <DateInput value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
           </Field>
           <Field label="Repair order date to">
-            <input type="date" class={inputClass} value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
+            <DateInput value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
           </Field>
         </div>
         <div class="mt-3 flex gap-2">

@@ -1,6 +1,7 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import {
   formatDisplayDate,
@@ -83,17 +84,13 @@ export function RepairOrderStatusFilter(props: Props) {
 
       <div class="grid gap-4 md:grid-cols-2">
         <Field label="Date from">
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={props.value().date_from}
             onInput={(e) => patch({ date_from: e.currentTarget.value })}
           />
         </Field>
         <Field label="Date to">
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={props.value().date_to}
             onInput={(e) => patch({ date_to: e.currentTarget.value })}
           />

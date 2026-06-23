@@ -6,6 +6,7 @@ import {
 } from "./itemsCsvImport";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
+import { useToast } from "./toast";
 
 export type Column<T> = {
   key: string;
@@ -52,6 +53,7 @@ type Props<T extends { id: number }> = {
 export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const [focusIdx, setFocusIdx] = createSignal(0);
   const [importing, setImporting] = createSignal(false);
+  const toast = useToast();
   let fileInputEl: HTMLInputElement | undefined;
 
   const columnDefs = () =>
@@ -69,7 +71,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
     try {
       const result = await importItemsCsv(file);
       if (!result.ok || !result.data) {
-        alert(result.message ?? "Import failed.");
+        toast.error(result.message ?? "Import failed.");
         return;
       }
       const { created, failed, row_errors: rowErrors } = result.data;
@@ -78,14 +80,18 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           rowErrors
             ?.slice(0, 8)
             .map((e) => `Row ${e.row}: ${e.message}`)
-            .join("\n") ?? "";
-        alert(`Imported ${created} row(s); ${failed} failed.\n${detail}`);
+            .join(" · ") ?? "";
+        toast.warning(`Imported ${created} row(s); ${failed} failed.${detail ? ` ${detail}` : ""}`);
+      } else if (created > 0) {
+        toast.success(`Imported ${created} item(s).`);
+      } else {
+        toast.warning("No rows were imported.");
       }
       if (created > 0) {
         props.onImportComplete?.();
       }
     } catch {
-      alert("Import failed.");
+      toast.error("Import failed.");
     } finally {
       setImporting(false);
       if (fileInputEl) fileInputEl.value = "";

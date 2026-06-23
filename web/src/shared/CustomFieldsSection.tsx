@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { DateInput } from "./DateInput";
 import { Field, inputClass } from "./SpreadsheetGrid";
 import { useFormFieldSettings } from "./useFormFieldSettings";
 
@@ -126,9 +127,7 @@ function SwitchField(props: {
     case "date":
       return (
         <Field label={props.label}>
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={String(props.value ?? "")}
             onInput={(e) => set(e.currentTarget.value)}
           />
@@ -139,15 +138,11 @@ function SwitchField(props: {
       return (
         <Field label={props.label} span="full">
           <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <input
-              type="date"
-              class={inputClass}
+            <DateInput
               value={range.start ?? ""}
               onInput={(e) => set({ ...range, start: e.currentTarget.value })}
             />
-            <input
-              type="date"
-              class={inputClass}
+            <DateInput
               value={range.end ?? ""}
               onInput={(e) => set({ ...range, end: e.currentTarget.value })}
             />

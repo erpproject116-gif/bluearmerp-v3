@@ -1,6 +1,7 @@
 import { createSignal, onMount } from "solid-js";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
-import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { DateInput } from "../../../shared/DateInput";
+import { Field } from "../../../shared/SpreadsheetGrid";
 import { apiFetch } from "../../../shared/api";
 import type { ArByCustomerFilters } from "./arByCustomerFilters";
 
@@ -43,17 +44,13 @@ export function ArByCustomerFilter(props: Props) {
       </div>
       <div class="grid gap-4 md:grid-cols-2">
         <Field label="Date from (optional)">
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={props.value().date_from ?? ""}
             onInput={(e) => patch({ date_from: e.currentTarget.value || undefined })}
           />
         </Field>
         <Field label="Date to (optional)">
-          <input
-            type="date"
-            class={inputClass}
+          <DateInput
             value={props.value().date_to ?? ""}
             onInput={(e) => patch({ date_to: e.currentTarget.value || undefined })}
           />

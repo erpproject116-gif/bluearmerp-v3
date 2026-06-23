@@ -70,8 +70,8 @@ export function TaxTypeModal(props: {
     const ok = await submitEntity(
       () =>
         ed
-          ? apiFetch(`/api/v1/quotation/tax-types/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) })
-          : apiFetch("/api/v1/quotation/tax-types", { method: "POST", body: JSON.stringify(body) }),
+          ? apiFetch(`/api/v1/quotation/tax-types/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+          : apiFetch("/api/v1/quotation/tax-types", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
       ed ? "Tax type updated." : "Tax type created.",
     );

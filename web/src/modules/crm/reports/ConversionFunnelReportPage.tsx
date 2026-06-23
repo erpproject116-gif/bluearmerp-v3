@@ -1,5 +1,6 @@
 import { createSignal, For, onMount, Show } from "solid-js";
-import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { DateInput } from "../../../shared/DateInput";
+import { Field } from "../../../shared/SpreadsheetGrid";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
 import {
@@ -71,17 +72,13 @@ export default function ConversionFunnelReportPage() {
         <p class="text-sm text-text-secondary">Quotes → sales orders → released → sales — Search (F8).</p>
         <div class="mt-4 grid gap-4 md:grid-cols-2">
           <Field label="Date from">
-            <input
-              type="date"
-              class={inputClass}
+            <DateInput
               value={draft().date_from ?? ""}
               onInput={(e) => setDraft((f) => ({ ...f, date_from: e.currentTarget.value || undefined }))}
             />
           </Field>
           <Field label="Date to">
-            <input
-              type="date"
-              class={inputClass}
+            <DateInput
               value={draft().date_to ?? ""}
               onInput={(e) => setDraft((f) => ({ ...f, date_to: e.currentTarget.value || undefined }))}
             />

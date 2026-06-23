@@ -113,7 +113,6 @@ export default function UsersPage() {
       toast.warning(res.message ?? "Could not save permissions.");
       return;
     }
-    toast.success("User permission overrides saved.");
     setPermOpen(false);
     permInvalidate.user(id);
   };
@@ -135,7 +134,7 @@ export default function UsersPage() {
             full_name: fullName,
             tenant_role: inviteRole(),
           }),
-        }),
+        }, { silent: true }),
       toast,
       `User invited. They must sign in with Google using ${email}.`,
     );
@@ -154,7 +153,7 @@ export default function UsersPage() {
         apiFetch(`/api/v1/user-management/users/${row.id}`, {
           method: "PATCH",
           body: JSON.stringify({ tenant_role: editRole(), status: editStatus() }),
-        }),
+        }, { silent: true }),
       toast,
       "User updated.",
     );
@@ -179,9 +178,10 @@ export default function UsersPage() {
   const revokeInvite = async (row: TenantUserRow) => {
     if (!row.invite_id) return;
     if (!confirm(`Revoke invite for ${row.email}?`)) return;
-    const res = await apiFetch(`/api/v1/user-management/invites/${row.invite_id}/revoke`, { method: "POST" });
+    const res = await apiFetch(`/api/v1/user-management/invites/${row.invite_id}/revoke`, { method: "POST" }, {
+      successMessage: "Invite revoked.",
+    });
     if (res.success) {
-      toast.success("Invite revoked.");
       invalidate.all();
     } else {
       toast.warning(res.message ?? "Failed to revoke invite.");

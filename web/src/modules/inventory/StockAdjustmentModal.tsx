@@ -69,7 +69,7 @@ export function StockAdjustmentModal(props: Props) {
             qty_delta: qty,
             reason: reason().trim(),
           }),
-        }),
+        }, { silent: true }),
       toast,
       "Stock adjusted.",
     );

@@ -63,11 +63,13 @@ export async function patchWarrantyAsset(
   return apiFetch(`/api/v1/crm/warranty-assets/${id}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
-  });
+  }, { successMessage: "Warranty asset updated." });
 }
 
 export async function syncWarrantyFromSales(salesId: number) {
-  return apiFetch(`/api/v1/crm/warranty-assets/sync-from-sales/${salesId}`, { method: "POST" });
+  return apiFetch(`/api/v1/crm/warranty-assets/sync-from-sales/${salesId}`, { method: "POST" }, {
+    successMessage: "Warranty assets synced from sale.",
+  });
 }
 
 export function useInvalidateWarrantyAssets() {
