@@ -67,6 +67,17 @@ import RolesPage from "./modules/user-management/roles/RolesPage";
 import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
 import { ActivityLogRoute } from "./shared/ActivityLogRoute";
+import { CrmRoute } from "./shared/CrmRoute";
+import CrmDashboardPage from "./modules/crm/CrmDashboardPage";
+import CrmNotificationsPage from "./modules/crm/CrmNotificationsPage";
+import FollowUpTasksPage from "./modules/crm/FollowUpTasksPage";
+import QuotationPipelinePage from "./modules/crm/QuotationPipelinePage";
+import WarrantyAssetsPage from "./modules/crm/WarrantyAssetsPage";
+import AlertRulesSettingsPage from "./modules/crm/AlertRulesSettingsPage";
+import CustomerQuotationsReportPage from "./modules/crm/reports/CustomerQuotationsReportPage";
+import ItemDemandReportPage from "./modules/crm/reports/ItemDemandReportPage";
+import ConversionFunnelReportPage from "./modules/crm/reports/ConversionFunnelReportPage";
+import LowStockReportPage from "./modules/crm/reports/LowStockReportPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -149,6 +160,36 @@ export default function App() {
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />
           <Route path="/finance/reports/ar-by-customer" component={ArByCustomerPage} />
           <Route path="/finance/reports/receipt-status" component={ReceiptStatusPage} />
+          <Route path="/crm/dashboard" component={() => (
+            <CrmRoute><CrmDashboardPage /></CrmRoute>
+          )} />
+          <Route path="/crm/notifications" component={() => (
+            <CrmRoute><CrmNotificationsPage /></CrmRoute>
+          )} />
+          <Route path="/crm/follow-up-tasks" component={() => (
+            <CrmRoute><FollowUpTasksPage /></CrmRoute>
+          )} />
+          <Route path="/crm/pipelines/quotations" component={() => (
+            <CrmRoute><QuotationPipelinePage /></CrmRoute>
+          )} />
+          <Route path="/crm/warranty-assets" component={() => (
+            <CrmRoute><WarrantyAssetsPage /></CrmRoute>
+          )} />
+          <Route path="/crm/settings/alert-rules" component={() => (
+            <CrmRoute><AlertRulesSettingsPage /></CrmRoute>
+          )} />
+          <Route path="/crm/reports/customer-quotations" component={() => (
+            <CrmRoute><CustomerQuotationsReportPage /></CrmRoute>
+          )} />
+          <Route path="/crm/reports/item-demand" component={() => (
+            <CrmRoute><ItemDemandReportPage /></CrmRoute>
+          )} />
+          <Route path="/crm/reports/conversion" component={() => (
+            <CrmRoute><ConversionFunnelReportPage /></CrmRoute>
+          )} />
+          <Route path="/crm/reports/low-stock" component={() => (
+            <CrmRoute><LowStockReportPage /></CrmRoute>
+          )} />
           <Route path="/activity-logs" component={() => (
             <ActivityLogRoute>
               <ActivityLogListPage />

@@ -14,6 +14,8 @@ export type MeData = {
     can_manage_users?: boolean;
     can_manage_custom_fields?: boolean;
     can_view_activity_logs?: boolean;
+    can_view_crm?: boolean;
+    can_manage_crm_rules?: boolean;
   };
   tenant: {
     id: number;
@@ -41,6 +43,20 @@ export function canViewActivityLogs(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
   return Boolean(u.can_view_activity_logs || u.is_platform_superadmin || u.is_tenant_owner);
+}
+
+export function canViewCrm(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  return Boolean(u.can_view_crm || u.is_platform_superadmin || u.is_tenant_owner);
+}
+
+export function canManageCrmRules(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  return Boolean(
+    u.can_manage_crm_rules || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin,
+  );
 }
 
 export type BootstrapError = "network" | "unauthorized" | "forbidden" | null;

@@ -92,6 +92,32 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "crm",
+    label: "CRM",
+    href: "/app/crm/dashboard",
+    basePath: "/app/crm",
+    features: [
+      { label: "Dashboard", href: "/app/crm/dashboard", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Notifications", href: "/app/crm/notifications", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Follow-up Tasks", href: "/app/crm/follow-up-tasks", settingsHref: "/app/crm/settings/alert-rules" },
+      {
+        label: "Quotation Pipeline",
+        href: "/app/crm/pipelines/quotations",
+        settingsHref: "/app/crm/settings/alert-rules",
+      },
+      { label: "Warranty Registry", href: "/app/crm/warranty-assets", settingsHref: "/app/crm/settings/alert-rules" },
+      {
+        label: "Customer × Item",
+        href: "/app/crm/reports/customer-quotations",
+        settingsHref: "/app/crm/settings/alert-rules",
+      },
+      { label: "Item Demand", href: "/app/crm/reports/item-demand", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Conversion Funnel", href: "/app/crm/reports/conversion", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Low Stock", href: "/app/crm/reports/low-stock", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Alert Rules", href: "/app/crm/settings/alert-rules", settingsHref: "/app/crm/settings/alert-rules" },
+    ],
+  },
+  {
     id: "finance",
     label: "Finance",
     href: "/app/finance/official-receipts",

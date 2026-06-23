@@ -52,3 +52,45 @@ func RequireViewActivityLogs(next http.Handler) http.Handler {
 func (tu TenantUser) CanViewActivityLogs() bool {
 	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.canViewActivityLogsRole
 }
+
+// RequireViewCRM blocks handlers unless the caller may view CRM.
+func RequireViewCRM(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !tu.CanViewCRM() {
+			response.Err(w, http.StatusForbidden, "You do not have permission to view CRM.", "ERR_FORBIDDEN")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// CanViewCRM reports whether the tenant user may access CRM APIs and UI.
+func (tu TenantUser) CanViewCRM() bool {
+	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.canViewCrmRole
+}
+
+// RequireManageCrmRules blocks handlers unless the caller may manage CRM alert rules.
+func RequireManageCrmRules(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !tu.CanManageCrmRules() {
+			response.Err(w, http.StatusForbidden, "You do not have permission to manage CRM rules.", "ERR_FORBIDDEN")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// CanManageCrmRules reports whether the tenant user may edit CRM alert rules.
+func (tu TenantUser) CanManageCrmRules() bool {
+	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.canManageCrmRulesRole
+}

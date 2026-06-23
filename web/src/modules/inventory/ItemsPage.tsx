@@ -18,6 +18,8 @@ type Item = {
   purchase_price: number;
   sales_price: number;
   vip_price: number;
+  warranty_duration_months?: number | null;
+  reorder_level?: number | null;
   status: string;
   custom_values?: Record<string, unknown>;
 };
@@ -30,7 +32,15 @@ export default function ItemsPage() {
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Item | null>(null);
   const [nextCode, setNextCode] = createSignal("");
-  const [form, setForm] = createSignal({ item_name: "", purchase_price: 0, sales_price: 0, vip_price: 0, status: "active" });
+  const [form, setForm] = createSignal({
+    item_name: "",
+    purchase_price: 0,
+    sales_price: 0,
+    vip_price: 0,
+    warranty_duration_months: null as number | null,
+    reorder_level: null as number | null,
+    status: "active",
+  });
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
@@ -50,7 +60,15 @@ export default function ItemsPage() {
     const res = await apiFetch<{ next_code: string }>("/api/v1/inventory/items/next-code");
     setNextCode(res.data?.next_code ?? "-----");
     setEditing(null);
-    setForm({ item_name: "", purchase_price: 0, sales_price: 0, vip_price: 0, status: "active" });
+    setForm({
+      item_name: "",
+      purchase_price: 0,
+      sales_price: 0,
+      vip_price: 0,
+      warranty_duration_months: null,
+      reorder_level: null,
+      status: "active",
+    });
     loadCustom({});
     setModalOpen(true);
   };
@@ -58,7 +76,15 @@ export default function ItemsPage() {
   const openEdit = (row: Item) => {
     setEditing(row);
     setNextCode(row.item_code);
-    setForm({ item_name: row.item_name, purchase_price: row.purchase_price, sales_price: row.sales_price, vip_price: row.vip_price, status: row.status });
+    setForm({
+      item_name: row.item_name,
+      purchase_price: row.purchase_price,
+      sales_price: row.sales_price,
+      vip_price: row.vip_price,
+      warranty_duration_months: row.warranty_duration_months ?? null,
+      reorder_level: row.reorder_level ?? null,
+      status: row.status,
+    });
     loadCustom(row.custom_values ?? {});
     setModalOpen(true);
   };
@@ -98,6 +124,8 @@ export default function ItemsPage() {
           { key: "purchase_price", header: "Purchase", render: (r) => money(r.purchase_price) },
           { key: "sales_price", header: "Sales", render: (r) => money(r.sales_price) },
           { key: "vip_price", header: "VIP", render: (r) => money(r.vip_price) },
+          { key: "warranty_duration_months", header: "Warranty (mo)", render: (r) => r.warranty_duration_months ?? "—" },
+          { key: "reorder_level", header: "Reorder", render: (r) => (r.reorder_level != null ? r.reorder_level : "—") },
           { key: "status", header: "Status" },
         ]}
         rows={list.data?.rows ?? []}
@@ -169,6 +197,46 @@ export default function ItemsPage() {
               value={form().vip_price}
               disabled={m.disabled}
               onInput={(e) => setForm((f) => ({ ...f, vip_price: Number(e.currentTarget.value) }))}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="warranty_duration_months" fallbackLabel="Warranty (months)">
+          {(m) => (
+            <input
+              type="number"
+              min="0"
+              step="1"
+              class={inputClass}
+              value={form().warranty_duration_months ?? ""}
+              disabled={m.disabled}
+              placeholder="No warranty"
+              onInput={(e) => {
+                const v = e.currentTarget.value;
+                setForm((f) => ({
+                  ...f,
+                  warranty_duration_months: v === "" ? null : Number(v),
+                }));
+              }}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="reorder_level" fallbackLabel="Reorder level">
+          {(m) => (
+            <input
+              type="number"
+              min="0"
+              step="0.0001"
+              class={inputClass}
+              value={form().reorder_level ?? ""}
+              disabled={m.disabled}
+              placeholder="Not set"
+              onInput={(e) => {
+                const v = e.currentTarget.value;
+                setForm((f) => ({
+                  ...f,
+                  reorder_level: v === "" ? null : Number(v),
+                }));
+              }}
             />
           )}
         </ModalField>

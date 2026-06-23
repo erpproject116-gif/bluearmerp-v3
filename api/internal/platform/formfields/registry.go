@@ -39,6 +39,8 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "purchase_price", Label: "Purchase price", FieldType: "number", SortOrder: 20},
 		{FieldKey: "sales_price", Label: "Sales price", FieldType: "number", SortOrder: 30},
 		{FieldKey: "vip_price", Label: "VIP price", FieldType: "number", SortOrder: 40},
+		{FieldKey: "warranty_duration_months", Label: "Warranty (months)", FieldType: "number", SortOrder: 45},
+		{FieldKey: "reorder_level", Label: "Reorder level", FieldType: "number", SortOrder: 46},
 		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 50},
 	},
 	"inv_repair_order": {

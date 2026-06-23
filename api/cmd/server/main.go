@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quotation"
@@ -54,7 +55,7 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORSOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CRM-Job-Secret"},
 		AllowCredentials: true,
 	}))
 
@@ -64,6 +65,7 @@ func main() {
 	r.Get("/health/db", health.DBHandler(pool, cfg))
 
 	r.Route("/api/v1", func(api chi.Router) {
+		crm.RegisterJobRoutes(api, pool)
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Get("/auth/me", auth.MeHandler(pool))
@@ -77,6 +79,7 @@ func main() {
 			finance.RegisterRoutes(protected, pool)
 			salesorder.RegisterRoutes(protected, pool)
 			usermgmt.RegisterRoutes(protected, pool)
+			crm.RegisterRoutes(protected, pool)
 		})
 	})
 

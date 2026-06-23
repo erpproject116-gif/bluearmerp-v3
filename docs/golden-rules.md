@@ -41,3 +41,23 @@ Document entry modals (Sales, Sales Order, Quotation) use `useDocumentDraft` fro
 ## Form settings (existing)
 
 Screens with **+ New row** expose form field settings (standard + custom fields, required/disabled).
+
+## Kanban and notification center
+
+### Table ↔ Board toggle
+
+Pipeline pages (Follow-up Tasks, Quotation Pipeline) use `ViewModeToggle` from `web/src/shared/ViewModeToggle.tsx`:
+
+- Segmented control: **Table | Board**
+- Persist choice in `localStorage` per page key
+- Table view: existing `SpreadsheetGrid` or report table
+- Board view: `KanbanBoard` + `KanbanCard` with `@thisbeyond/solid-dnd`
+
+Drag a card to another column → PATCH stage on the API (`/crm/follow-up-tasks/{id}/stage` or quotation progress endpoint).
+
+### Notification bell
+
+- Rendered in `AppShell` when user has `can_view_crm`
+- Unread count from CRM notifications API
+- Dropdown: last 10 items; link to `/app/crm/notifications`
+- Do not duplicate toast notifications for the same CRM alert

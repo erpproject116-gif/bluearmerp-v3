@@ -61,3 +61,17 @@ export const FINANCE_SETTINGS_HREF = {
 } as const;
 
 export type FinanceFeature = keyof typeof FINANCE_ENTITY;
+
+export const CRM_ENTITY = {
+  alertRule: "crm_alert_rule",
+  followUpTask: "crm_follow_up_task",
+  warrantyAsset: "crm_warranty_asset",
+} as const;
+
+export const CRM_SETTINGS_HREF = {
+  alertRules: "/app/crm/settings/alert-rules",
+  followUpTasks: "/app/crm/follow-up-tasks",
+  warrantyAssets: "/app/crm/warranty-assets",
+} as const;
+
+export type CrmFeature = keyof typeof CRM_ENTITY;

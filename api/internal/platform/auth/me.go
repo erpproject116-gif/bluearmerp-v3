@@ -94,6 +94,8 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 			"can_manage_users":         tu.CanManageUsers(),
 			"can_manage_custom_fields": tu.CanManageFormSettings(),
 			"can_view_activity_logs":   tu.CanViewActivityLogs(),
+			"can_view_crm":             tu.CanViewCRM(),
+			"can_manage_crm_rules":     tu.CanManageCrmRules(),
 		},
 		Tenant: map[string]any{
 			"id":                       tu.TenantID,

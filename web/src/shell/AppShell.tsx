@@ -2,7 +2,8 @@ import type { ParentComponent } from "solid-js";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { supabase } from "../shared/api";
-import { useAuth, canManageUsers, canViewActivityLogs } from "../shared/auth-context";
+import { useAuth, canManageUsers, canViewActivityLogs, canViewCrm } from "../shared/auth-context";
+import { CrmNotificationBell } from "../shared/CrmNotificationBell";
 import { ModuleIcon } from "./ModuleIcon";
 import { ShellProvider, useShell } from "./shell-context";
 import { appModules, featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
@@ -75,6 +76,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             const codes = auth.me?.enabled_module_codes;
             if (m.id === "user_management" && !canManageUsers(auth.me)) return false;
             if (m.id === "activity_logs" && !canViewActivityLogs(auth.me)) return false;
+            if (m.id === "crm" && !canViewCrm(auth.me)) return false;
             if (m.id === "activity_logs" || m.id === "user_management") return true;
             if (!codes?.length) return true;
             return codes.includes(m.id);
@@ -261,13 +263,16 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               )}
             </Show>
           </div>
-          <button
-            type="button"
-            class="shrink-0 rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
-            onClick={() => void signOut()}
-          >
-            Sign out
-          </button>
+          <div class="flex shrink-0 items-center gap-2">
+            <CrmNotificationBell enabled={canViewCrm(auth.me)} />
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
+              onClick={() => void signOut()}
+            >
+              Sign out
+            </button>
+          </div>
         </header>
         <main class="flex-1 p-6">{props.children}</main>
       </div>
