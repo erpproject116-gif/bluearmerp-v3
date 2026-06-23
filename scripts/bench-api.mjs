@@ -5,7 +5,7 @@
  *   node scripts/bench-api.mjs
  *   API_BASE=http://localhost:8080 BENCH_TOKEN=<jwt> node scripts/bench-api.mjs
  *
- * Target: p95 < 400ms warm for inventory list routes (with valid token).
+ * Target: p95 < 400ms warm locally (with valid token); CI uses BENCH_P95_MAX_MS=800.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -17,6 +17,7 @@ const routes = JSON.parse(readFileSync(join(__dirname, "perf", "routes.core.json
 const base = (process.env.API_BASE ?? "http://localhost:8080").replace(/\/$/, "");
 const token = process.env.BENCH_TOKEN ?? "";
 const iterations = Number(process.env.BENCH_ITERATIONS ?? 10);
+const warmupIterations = Number(process.env.BENCH_WARMUP ?? 2);
 const p95MaxMs = Number(process.env.BENCH_P95_MAX_MS ?? 400);
 
 function percentile(sorted, p) {
@@ -35,6 +36,9 @@ async function hit(route) {
 }
 
 async function benchRoute(route) {
+  for (let i = 0; i < warmupIterations; i++) {
+    await hit(route);
+  }
   const samples = [];
   for (let i = 0; i < iterations; i++) {
     samples.push(await hit(route));
@@ -52,7 +56,18 @@ for (const route of routes) {
 }
 
 console.log("\nBluearm ERP v3 API bench\n");
-console.log("base:", base, "| iterations:", iterations, "| token:", token ? "yes" : "no");
+console.log(
+  "base:",
+  base,
+  "| iterations:",
+  iterations,
+  "| warmup:",
+  warmupIterations,
+  "| token:",
+  token ? "yes" : "no",
+  "| p95 max:",
+  p95MaxMs + "ms",
+);
 console.log("─".repeat(72));
 let failed = false;
 for (const r of results) {

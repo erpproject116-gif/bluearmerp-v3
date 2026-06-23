@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/filedownload"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -32,6 +33,7 @@ type SalesAttachment struct {
 func registerAttachmentRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/{id}/attachments", uploadSalesAttachment(pool))
 	r.Get("/{id}/attachments", listSalesAttachments(pool))
+	r.Get("/{id}/attachments/{attachmentId}/download", downloadSalesAttachment(pool))
 }
 
 func uploadDir() string {
@@ -187,6 +189,38 @@ func listSalesAttachments(pool *pgxpool.Pool) http.HandlerFunc {
 			out = []SalesAttachment{}
 		}
 		response.OK(w, out, "OK")
+	}
+}
+
+func downloadSalesAttachment(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		salesID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		attachmentID, err := strconv.ParseInt(chi.URLParam(r, "attachmentId"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"attachmentId": "Invalid attachment id."})
+			return
+		}
+		var fileName, storagePath, mime string
+		var createdAt time.Time
+		err = pool.QueryRow(r.Context(), `
+			select a.file_name, a.storage_path, coalesce(a.mime_type, ''), a.created_at
+			from public.sa_sales_attachments a
+			join public.sa_sales s on s.id = a.sales_id
+			where a.id = $1 and a.sales_id = $2 and s.tenant_id = $3`,
+			attachmentID, salesID, tu.TenantID).
+			Scan(&fileName, &storagePath, &mime, &createdAt)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Attachment not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := filedownload.ServeStoredFile(w, r, uploadDir(), storagePath, fileName, mime, createdAt); err != nil {
+			response.Err(w, http.StatusNotFound, "File not found.", "ERR_NOT_FOUND")
+		}
 	}
 }
 

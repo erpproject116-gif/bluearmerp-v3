@@ -229,6 +229,7 @@ func putGroupPermissions(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "group.permissions.update", "tenant_user_group", &id, nil, nil)
+		_ = auth.InvalidateGroupMembers(r.Context(), pool, tu.TenantID, id)
 		perms, _ := loadGroupPermissions(r.Context(), pool, tu.TenantID, id)
 		var code, name string
 		_ = pool.QueryRow(r.Context(), `select group_code, group_name from public.tenant_user_groups where id = $1`, id).Scan(&code, &name)
@@ -293,6 +294,7 @@ func putGroupMembers(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to update members.", "ERR_INTERNAL")
 			return
 		}
+		_ = auth.InvalidateGroupMembers(r.Context(), pool, tu.TenantID, id)
 		getGroupMembers(pool).ServeHTTP(w, r)
 	}
 }

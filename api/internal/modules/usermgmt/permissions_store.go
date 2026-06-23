@@ -111,6 +111,9 @@ func saveRolePermissions(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 			return err
 		}
 	}
+	if err := bumpTenantRoleRevisionTx(ctx, tx, tenantID, roleCode); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
@@ -153,6 +156,9 @@ func saveUserOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID, userID
 			tenantID, userID, code, lvl); err != nil {
 			return err
 		}
+	}
+	if err := bumpUserRevisionTx(ctx, tx, userID); err != nil {
+		return err
 	}
 	return tx.Commit(ctx)
 }
@@ -221,6 +227,9 @@ func saveGroupPermissions(ctx context.Context, pool *pgxpool.Pool, tenantID, gro
 			return err
 		}
 	}
+	if err := bumpGroupMembersRevisionTx(ctx, tx, tenantID, groupID); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
@@ -247,6 +256,9 @@ func saveGroupMembers(ctx context.Context, pool *pgxpool.Pool, tenantID, groupID
 			return err
 		}
 	}
+	if err := bumpGroupMembersRevisionTx(ctx, tx, tenantID, groupID); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
@@ -272,6 +284,9 @@ func saveUserGroups(ctx context.Context, pool *pgxpool.Pool, tenantID, userID in
 			values ($1, $2, $3) on conflict do nothing`, tenantID, gid, userID); err != nil {
 			return err
 		}
+	}
+	if err := bumpUserRevisionTx(ctx, tx, userID); err != nil {
+		return err
 	}
 	return tx.Commit(ctx)
 }

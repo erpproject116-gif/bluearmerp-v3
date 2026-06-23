@@ -1,0 +1,14 @@
+[
+  {
+    "id": "inventory.partners.create",
+    "path": "/api/v1/inventory/partners",
+    "method": "POST",
+    "body": {
+      "partner_kind": "customer",
+      "company_name": "Bench Smoke Partner",
+      "status": "active"
+    },
+    "expectedStatuses": [200, 401],
+    "note": "Local manual smoke only — not run in CI"
+  }
+]

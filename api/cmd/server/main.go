@@ -12,7 +12,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
@@ -22,12 +21,14 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/salesorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/usermgmt"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/drafts"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/formfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/health"
+	platformmw "github.com/bluearm/bluearm-erp-v3/api/internal/platform/middleware"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -41,17 +42,21 @@ func main() {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	pool, err := config.NewPool(ctx, cfg)
 	if err != nil {
 		log.Fatalf("db: %v", err)
 	}
 	defer pool.Close()
+
+	audit.Configure(cfg)
+	audit.StartWorker(pool, cfg)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(platformmw.SelectiveGzip(cfg.GzipEnabled))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORSOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -96,5 +101,8 @@ func main() {
 	<-stop
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	auditCtx, auditCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_ = audit.Shutdown(auditCtx)
+	auditCancel()
 	_ = srv.Shutdown(shutdownCtx)
 }

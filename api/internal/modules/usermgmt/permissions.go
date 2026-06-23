@@ -179,6 +179,7 @@ func putRolePermissions(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "role.permissions.update", "tenant_role", &id, nil, map[string]any{
 			"role_code": roleCode,
 		})
+		_ = auth.InvalidateUsersByTenantRole(r.Context(), pool, tu.TenantID, roleCode)
 		perms, _ := loadRolePermissions(r.Context(), pool, tu.TenantID, roleCode)
 		response.OK(w, rolePermissionsPayload{RoleCode: roleCode, Permissions: perms}, "Permissions saved.")
 	}
@@ -253,6 +254,7 @@ func putUserPermissions(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.permissions.update", "user", &id, nil, body)
+		_ = auth.InvalidateUserByAppUserID(r.Context(), pool, id)
 		var email, fullName, tenantRole string
 		_ = pool.QueryRow(r.Context(), `
 			select email, full_name, tenant_role from public.users where id = $1`, id).

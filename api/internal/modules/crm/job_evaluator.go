@@ -3,6 +3,7 @@ package crm
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -59,6 +61,15 @@ func evaluateAlertsJob(pool *pgxpool.Pool) http.HandlerFunc {
 
 func runAlertEvaluator(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (evaluateAlertsResult, error) {
 	var result evaluateAlertsResult
+	for {
+		n, err := outbox.DrainPending(ctx, pool, handleCRMOutboxEvent)
+		if err != nil {
+			return result, err
+		}
+		if n == 0 {
+			break
+		}
+	}
 	tenantQ := `select id from public.tenants where status = 'active'`
 	args := []any{}
 	if tenantID > 0 {
@@ -328,4 +339,9 @@ func evalQuoteUnconverted(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 		}
 	}
 	return count, rows.Err()
+}
+
+func handleCRMOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event) error {
+	log.Printf("crm outbox: tenant=%d type=%s key=%s", ev.TenantID, ev.EventType, ev.IdempotencyKey)
+	return nil
 }

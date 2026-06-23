@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/filedownload"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -32,6 +33,7 @@ type SalesOrderAttachment struct {
 func registerAttachmentRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/sales-orders/{id}/attachments", uploadSalesOrderAttachment(pool))
 	r.Get("/sales-orders/{id}/attachments", listSalesOrderAttachments(pool))
+	r.Get("/sales-orders/{id}/attachments/{attachmentId}/download", downloadSalesOrderAttachment(pool))
 }
 
 func uploadDir() string {
@@ -187,6 +189,38 @@ func listSalesOrderAttachments(pool *pgxpool.Pool) http.HandlerFunc {
 			out = []SalesOrderAttachment{}
 		}
 		response.OK(w, out, "OK")
+	}
+}
+
+func downloadSalesOrderAttachment(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		attachmentID, err := strconv.ParseInt(chi.URLParam(r, "attachmentId"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"attachmentId": "Invalid attachment id."})
+			return
+		}
+		var fileName, storagePath, mime string
+		var createdAt time.Time
+		err = pool.QueryRow(r.Context(), `
+			select a.file_name, a.storage_path, coalesce(a.mime_type, ''), a.created_at
+			from public.so_sales_order_attachments a
+			join public.so_sales_orders s on s.id = a.sales_order_id
+			where a.id = $1 and a.sales_order_id = $2 and s.tenant_id = $3`,
+			attachmentID, orderID, tu.TenantID).
+			Scan(&fileName, &storagePath, &mime, &createdAt)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Attachment not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := filedownload.ServeStoredFile(w, r, uploadDir(), storagePath, fileName, mime, createdAt); err != nil {
+			response.Err(w, http.StatusNotFound, "File not found.", "ERR_NOT_FOUND")
+		}
 	}
 }
 

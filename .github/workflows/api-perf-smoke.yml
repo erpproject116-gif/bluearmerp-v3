@@ -7,6 +7,8 @@ on:
     paths:
       - "api/**"
       - "scripts/bench-api.mjs"
+      - "scripts/mint-bench-jwt.mjs"
+      - "scripts/seed-ci-bench-auth.sql"
       - "scripts/perf/**"
       - ".github/workflows/api-perf-smoke.yml"
 
@@ -20,6 +22,10 @@ jobs:
         with:
           go-version: "1.23"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Start Postgres
         run: |
           docker run -d --name pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:15
@@ -32,6 +38,7 @@ jobs:
           for f in api/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
           psql "$DATABASE_URL" -f supabase/seed.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
+          psql "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
 
       - name: Start API
         env:
@@ -45,9 +52,19 @@ jobs:
           /tmp/server &
           sleep 2
 
-      - name: Bench (unauthenticated smoke)
+      - name: Bench (unauthenticated health)
         run: node scripts/bench-api.mjs
         env:
           API_BASE: http://localhost:8080
           BENCH_ITERATIONS: "5"
           BENCH_P95_MAX_MS: "2000"
+
+      - name: Bench (authenticated)
+        run: |
+          export BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs)
+          node scripts/bench-api.mjs
+        env:
+          API_BASE: http://localhost:8080
+          SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
+          BENCH_ITERATIONS: "5"
+          BENCH_P95_MAX_MS: "800"

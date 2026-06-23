@@ -59,11 +59,13 @@ curl http://localhost:8080/health
 
 ```bash
 node scripts/bench-api.mjs
-# With JWT for authenticated routes:
-BENCH_TOKEN=<access_token> node scripts/bench-api.mjs
+# Mint CI/demo JWT (after scripts/seed-ci-bench-auth.sql):
+BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs) node scripts/bench-api.mjs
 ```
 
-Target: **p95 < 400ms** for inventory list endpoints (warm).
+Targets: **p95 < 400ms** local (warm); **p95 < 800ms** in CI. See [docs/performance/baseline-and-targets.md](docs/performance/baseline-and-targets.md).
+
+Kill switches and tuning: [docs/adr/0004-performance-patterns.md](docs/adr/0004-performance-patterns.md).
 
 ## E2E smoke
 

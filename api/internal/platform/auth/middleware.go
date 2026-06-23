@@ -37,6 +37,7 @@ type TenantUser struct {
 	canManageSalesTeamRole    bool
 	canViewCrmAnalyticsRole   bool
 	AutoEnableAllModules      bool
+	AuthRevision              int64
 	permissions               map[string]string
 }
 
@@ -66,12 +67,12 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 				return
 			}
 
-			user, err := loadTenantUser(r.Context(), pool, claims.Sub)
+			user, err := resolveTenantUser(r.Context(), pool, claims.Sub)
 			if err != nil {
 				if errorsIsNoProfile(err) && claims.Email != "" {
 					linkErr := tryAutoLinkProvisionedUser(r.Context(), pool, claims.Sub, claims.Email)
 					if linkErr == nil {
-						user, err = loadTenantUser(r.Context(), pool, claims.Sub)
+						user, err = resolveTenantUser(r.Context(), pool, claims.Sub)
 					} else if linkErr == ErrAmbiguousInvite {
 						response.Err(w, http.StatusForbidden,
 							"This email is invited on multiple tenants. Contact your administrator.",
@@ -99,7 +100,8 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 					(normalizeEmail(user.Email) == "bluearmph@gmail.com" && !user.IsTenantOwner))
 			if needsBootstrapRepair {
 				if repairErr := repairBootstrapPlatformAccess(r.Context(), pool, user); repairErr == nil {
-					if repaired, reloadErr := loadTenantUser(r.Context(), pool, claims.Sub); reloadErr == nil {
+					InvalidateUser(claims.Sub)
+					if repaired, reloadErr := resolveTenantUser(r.Context(), pool, claims.Sub); reloadErr == nil {
 						user = repaired
 					}
 				}
@@ -118,6 +120,22 @@ func errorsIsNoProfile(err error) bool {
 func FromContext(ctx context.Context) (TenantUser, bool) {
 	u, ok := ctx.Value(UserContextKey).(TenantUser)
 	return u, ok
+}
+
+func resolveTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) (TenantUser, error) {
+	if cached, rev, ok := cacheGet(authUserID); ok {
+		current, err := currentAuthRevision(ctx, pool, authUserID)
+		if err == nil && current == rev {
+			return cached, nil
+		}
+		InvalidateUser(authUserID)
+	}
+	user, err := loadTenantUser(ctx, pool, authUserID)
+	if err != nil {
+		return TenantUser{}, err
+	}
+	cacheSet(authUserID, user, user.AuthRevision)
+	return user, nil
 }
 
 func bearerToken(r *http.Request) string {
@@ -146,7 +164,8 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		  coalesce(tr.can_view_all_crm, false),
 		  coalesce(tr.can_manage_sales_team, false),
 		  coalesce(tr.can_view_crm_analytics, false),
-		  t.auto_enable_all_modules
+		  t.auto_enable_all_modules,
+		  u.auth_revision
 		from public.users u
 		join public.tenants t on t.id = u.tenant_id
 		left join public.tenant_roles tr
@@ -177,6 +196,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		&canManageSalesTeam,
 		&canViewCrmAnalytics,
 		&tu.AutoEnableAllModules,
+		&tu.AuthRevision,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {

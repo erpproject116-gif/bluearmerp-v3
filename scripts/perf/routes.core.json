@@ -39,5 +39,25 @@
     "id": "inventory.partners.next_code",
     "path": "/api/v1/inventory/partners/next-code",
     "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "sales.list",
+    "path": "/api/v1/sales?page=1&pageSize=50&sort=sales_no&order=desc",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "crm.tasks.list",
+    "path": "/api/v1/crm/follow-up-tasks?page=1&pageSize=50",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "activity.changes.list",
+    "path": "/api/v1/activity-logs/changes?page=1&pageSize=50",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "finance.receipts.list",
+    "path": "/api/v1/finance/official-receipts?page=1&pageSize=50",
+    "expectedStatuses": [200, 401]
   }
 ]

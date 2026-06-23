@@ -80,3 +80,21 @@ Fill values from the Supabase Dashboard.
 - Never commit `.env` or `web/.env.local`
 - Never put `SUPABASE_SERVICE_ROLE_KEY` in the web bundle
 - Rotate keys if they were committed to git
+
+## Performance tuning (API)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `AUTH_CACHE_ENABLED` | `true` | In-process session cache for auth + permissions |
+| `AUTH_CACHE_TTL_SECONDS` | `30` | Max cache entry age; `0` disables cache |
+| `AUTH_CACHE_MAX_ENTRIES` | `10000` | LRU cap |
+| `DB_MAX_CONNS` | `10` | pgxpool max connections (keep below Supabase tier limit) |
+| `DB_MIN_CONNS` | `2` | Warm pool connections |
+| `DB_MAX_CONN_LIFETIME_MIN` | `30` | Recycle connections |
+| `DB_MAX_CONN_IDLE_MIN` | `5` | Idle timeout |
+| `AUDIT_ASYNC` | `true` | Batch non-critical audit rows |
+| `AUDIT_BATCH_SIZE` | `100` | Audit flush batch size |
+| `AUDIT_FLUSH_INTERVAL_MS` | `75` | Audit flush interval |
+| `GZIP_ENABLED` | `false` | Compress responses ≥ 8KB |
+
+See [ADR 0004](../adr/0004-performance-patterns.md) and [baseline-and-targets.md](../performance/baseline-and-targets.md).

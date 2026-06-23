@@ -302,7 +302,7 @@ func patchUser(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		fullName := body.FullName
 
-		q := `update public.users set tenant_role = $1, status = $2, updated_at = now()`
+		q := `update public.users set tenant_role = $1, status = $2, auth_revision = auth_revision + 1, updated_at = now()`
 		args := []any{role, status}
 		n := 3
 		if fullName != nil {
@@ -339,6 +339,7 @@ func patchUser(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.update", "user", &id, nil, map[string]any{
 			"tenant_role": role, "status": status,
 		})
+		_ = auth.InvalidateUserByAppUserID(r.Context(), pool, id)
 		response.OK(w, row, "User updated.")
 	}
 }
@@ -382,6 +383,7 @@ func putUserGroups(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to update groups.", "ERR_INTERNAL")
 			return
 		}
+		_ = auth.InvalidateUserByAppUserID(r.Context(), pool, id)
 		ids, _ := loadUserGroupIDs(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, map[string]any{"group_ids": ids}, "Groups updated.")
 	}

@@ -16,6 +16,15 @@ type Config struct {
 	CORSOrigin            string
 	DemoEmail             string
 	DemoPassword          string
+	DBMaxConns            int
+	DBMinConns            int
+	DBMaxConnLifetimeMin  int
+	DBMaxConnIdleMin      int
+	AuditAsync            bool
+	AuditBatchSize        int
+	AuditFlushIntervalMs  int
+	AuditChannelSize      int
+	GzipEnabled           bool
 }
 
 func Load() Config {
@@ -47,6 +56,15 @@ func Load() Config {
 		CORSOrigin:          cors,
 		DemoEmail:           envOr("DEMO_USER_EMAIL", "demo@demo.bluearm.local"),
 		DemoPassword:        os.Getenv("DEMO_USER_PASSWORD"),
+		DBMaxConns:          ParseIntDefault(os.Getenv("DB_MAX_CONNS"), 10),
+		DBMinConns:          ParseIntDefault(os.Getenv("DB_MIN_CONNS"), 2),
+		DBMaxConnLifetimeMin: ParseIntDefault(os.Getenv("DB_MAX_CONN_LIFETIME_MIN"), 30),
+		DBMaxConnIdleMin:    ParseIntDefault(os.Getenv("DB_MAX_CONN_IDLE_MIN"), 5),
+		AuditAsync:          os.Getenv("AUDIT_ASYNC") != "false",
+		AuditBatchSize:      ParseIntDefault(os.Getenv("AUDIT_BATCH_SIZE"), 100),
+		AuditFlushIntervalMs: ParseIntDefault(os.Getenv("AUDIT_FLUSH_INTERVAL_MS"), 75),
+		AuditChannelSize:    ParseIntDefault(os.Getenv("AUDIT_CHANNEL_SIZE"), 4096),
+		GzipEnabled:         os.Getenv("GZIP_ENABLED") == "true",
 	}
 }
 
