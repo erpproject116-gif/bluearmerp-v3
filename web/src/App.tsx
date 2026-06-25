@@ -69,6 +69,7 @@ import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
 import ChangeLogListPage from "./modules/activity-logs/ChangeLogListPage";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
 import { ActivityLogRoute } from "./shared/ActivityLogRoute";
+import { ChangeLogRoute } from "./shared/ChangeLogRoute";
 import { CrmRoute } from "./shared/CrmRoute";
 import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
 import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
@@ -203,9 +204,9 @@ export default function App() {
             <CrmRoute><CrmAnalyticsRoute><LowStockReportPage /></CrmAnalyticsRoute></CrmRoute>
           )} />
           <Route path="/activity-logs/changes" component={() => (
-            <ActivityLogRoute>
+            <ChangeLogRoute>
               <ChangeLogListPage />
-            </ActivityLogRoute>
+            </ChangeLogRoute>
           )} />
           <Route path="/activity-logs" component={() => (
             <ActivityLogRoute>

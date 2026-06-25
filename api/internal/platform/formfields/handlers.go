@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -73,6 +74,10 @@ func patchSettingsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save form settings.", "ERR_INTERNAL")
 			return
 		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.form_fields.update", "form_field_settings", nil, nil, map[string]any{
+			"entity_type": entityType,
+			"field_count": len(body.Fields),
+		})
 		fields, _ := LoadMergedSettings(r.Context(), pool, tu.TenantID, entityType)
 		response.OK(w, map[string]any{"fields": fields}, "Updated.")
 	}

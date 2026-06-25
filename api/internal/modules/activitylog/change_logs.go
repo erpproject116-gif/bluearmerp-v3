@@ -117,11 +117,13 @@ func listChangeLogs(pool *pgxpool.Pool) http.HandlerFunc {
 		where += ` and al.action_code not like '%.create' and al.action_code <> 'crm.job.evaluate'`
 		where += ` and (
 		  (al.old_values is not null and al.old_values::text not in ('null', '{}'))
-		  or al.action_code ~ '\.(update|delete|progress_status|invoicing_status|stage|release|convert|adjustment|price_batch|import|invite_revoke|attachment\.upload)$'
+		  or al.action_code ~ '\.(update|delete|progress_status|invoicing_status|stage|release|convert|adjustment|price_batch|import_batch|import|invite_revoke|attachment\.upload|members\.update|permissions\.update)$'
 		  or al.action_code like '%.warranty.update'
 		  or al.action_code like '%.rule.update'
 		  or al.action_code like '%.task.update'
 		  or al.action_code like '%.task.stage'
+		  or al.action_code like 'settings.%'
+		  or al.action_code ~ '^api\.(patch|put|delete)\.'
 		)`
 
 		sortCol := p.Sort

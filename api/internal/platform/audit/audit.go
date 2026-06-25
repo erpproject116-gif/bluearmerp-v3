@@ -68,6 +68,7 @@ func IsCriticalActionCode(actionCode string) bool {
 		"role.",
 		"group.",
 		"crm.job.",
+		"settings.",
 	}
 	for _, p := range criticalPrefixes {
 		if strings.HasPrefix(actionCode, p) {
@@ -78,6 +79,7 @@ func IsCriticalActionCode(actionCode string) bool {
 }
 
 func Log(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, oldValues, newValues any) error {
+	markLogged(ctx)
 	if IsCriticalActionCode(actionCode) || !asyncEnabled {
 		return LogSync(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, oldValues, newValues)
 	}

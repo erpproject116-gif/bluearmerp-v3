@@ -70,6 +70,11 @@ var entityLabels = map[string]string{
 	"quo_currency":              "Currency",
 	"tenant_role":               "User role",
 	"user":                      "User",
+	"tenant_user_group":         "User group",
+	"tenant_custom_field":       "Custom field",
+	"form_field_settings":       "Form settings",
+	"document_draft":            "Document draft",
+	"api":                       "API request",
 }
 
 var referenceLabels = map[string]string{
@@ -326,6 +331,30 @@ func formatActivitySummary(actorName, actionCode, targetType, referenceNo string
 		return fmt.Sprintf("%s updated role permissions.", actor), []string{"Permission matrix was changed"}
 	case "user.permissions.update":
 		return fmt.Sprintf("%s updated user permission overrides.", actor), []string{"Per-user permissions were changed"}
+	case "group.update":
+		return fmt.Sprintf("%s updated a user group.", actor), diffChanges(asMap(oldJSON), asMap(newJSON))
+	case "group.members.update":
+		return fmt.Sprintf("%s updated user group membership.", actor), []string{"Group members were changed"}
+	case "settings.form_fields.update":
+		return fmt.Sprintf("%s updated form field settings.", actor), describeSettingsPayload(newJSON)
+	case "settings.custom_field.create":
+		return fmt.Sprintf("%s added a custom form field.", actor), describeCreatePayload("tenant_custom_field", asMap(newJSON))
+	case "settings.custom_field.update":
+		return fmt.Sprintf("%s updated a custom form field.", actor), diffChanges(asMap(oldJSON), asMap(newJSON))
+	case "settings.custom_field.delete":
+		return fmt.Sprintf("%s disabled a custom form field.", actor), describeCreatePayload("tenant_custom_field", asMap(oldJSON))
+	case "settings.draft.delete":
+		return fmt.Sprintf("%s deleted a document draft.", actor), nil
+	}
+
+	if strings.HasPrefix(actionCode, "api.") {
+		newM := asMap(newJSON)
+		path, _ := newM["path"].(string)
+		method, _ := newM["method"].(string)
+		if path != "" {
+			return fmt.Sprintf("%s called %s %s.", actor, method, path), nil
+		}
+		return fmt.Sprintf("%s performed an API action (%s).", actor, actionCode), nil
 	}
 
 	return formatChangeSummary(actorName, actionCode, targetType, referenceNo, oldJSON, newJSON)
@@ -359,6 +388,8 @@ func describeCreatePayload(targetType string, newM map[string]any) []string {
 		pick("item_code", "item_name")
 	case "user":
 		pick("email", "full_name")
+	case "tenant_custom_field":
+		pick("label", "field_key", "entity_type")
 	default:
 		pick("title", "name", "reference_no", "sales_no")
 	}
@@ -366,4 +397,16 @@ func describeCreatePayload(targetType string, newM map[string]any) []string {
 		hints = hints[:3]
 	}
 	return hints
+}
+
+func describeSettingsPayload(newJSON json.RawMessage) []string {
+	m := asMap(newJSON)
+	if m == nil {
+		return []string{"Form settings were saved"}
+	}
+	entity, _ := m["entity_type"].(string)
+	if entity != "" {
+		return []string{fmt.Sprintf("Entity: %s", entity)}
+	}
+	return []string{"Form settings were saved"}
 }

@@ -144,17 +144,24 @@ func patchGroup(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusBadRequest, "Invalid JSON body.", "ERR_BAD_REQUEST")
 			return
 		}
-		var name, description string
-		var isActive bool
-		var sortOrder int
+		var oldName, oldDescription string
+		var oldActive bool
+		var oldSort int
 		err = pool.QueryRow(r.Context(), `
 			select group_name, coalesce(description, ''), is_active, sort_order
 			from public.tenant_user_groups where id = $1 and tenant_id = $2`, id, tu.TenantID).
-			Scan(&name, &description, &isActive, &sortOrder)
+			Scan(&oldName, &oldDescription, &oldActive, &oldSort)
 		if err == pgx.ErrNoRows {
 			response.Err(w, http.StatusNotFound, "Group not found.", "ERR_NOT_FOUND")
 			return
 		}
+		var name, description string
+		var isActive bool
+		var sortOrder int
+		name = oldName
+		description = oldDescription
+		isActive = oldActive
+		sortOrder = oldSort
 		if body.GroupName != nil {
 			name = stringsTrim(*body.GroupName)
 		}
@@ -180,6 +187,9 @@ func patchGroup(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = pool.QueryRow(r.Context(), `select count(*) from public.tenant_user_group_members where group_id = $1`, id).Scan(&row.MemberCount)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "group.update", "tenant_user_group", &id,
+			map[string]any{"group_name": oldName, "description": oldDescription, "is_active": oldActive, "sort_order": oldSort},
+			map[string]any{"group_name": row.GroupName, "description": row.Description, "is_active": row.IsActive, "sort_order": row.SortOrder})
 		response.OK(w, row, "Group updated.")
 	}
 }
@@ -294,6 +304,10 @@ func putGroupMembers(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to update members.", "ERR_INTERNAL")
 			return
 		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "group.members.update", "tenant_user_group", &id, nil, map[string]any{
+			"user_ids": body.UserIDs,
+			"count":    len(body.UserIDs),
+		})
 		_ = auth.InvalidateGroupMembers(r.Context(), pool, tu.TenantID, id)
 		getGroupMembers(pool).ServeHTTP(w, r)
 	}

@@ -44,6 +44,36 @@ func (tu TenantUser) CanManageFormSettings() bool {
 	return tu.canManageFormSettingsRole
 }
 
+// CanViewChangeLogs reports whether the tenant user may access change log APIs and UI.
+func (tu TenantUser) CanViewChangeLogs() bool {
+	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+		return true
+	}
+	if tu.permissions != nil {
+		if tu.HasPermission("activity_logs.changes", AccessRead) {
+			return true
+		}
+		return tu.HasPermission("activity_logs.logs", AccessRead)
+	}
+	return tu.canViewActivityLogsRole
+}
+
+// RequireViewChangeLogs blocks handlers unless the caller may view change logs.
+func RequireViewChangeLogs(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !tu.CanViewChangeLogs() {
+			response.Err(w, http.StatusForbidden, "You do not have permission to view change logs.", "ERR_FORBIDDEN")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // RequireViewActivityLogs blocks handlers unless the caller may view activity logs.
 func RequireViewActivityLogs(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

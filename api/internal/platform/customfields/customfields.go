@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -123,6 +124,12 @@ func createDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Validation(w, map[string]string{"field_key": "Field key already exists for this entity."})
 				return
 			}
+			if isSchemaError(err) {
+				response.Err(w, http.StatusInternalServerError,
+					"Custom field tables are missing. Apply migrations 004_custom_fields.sql and 027_custom_field_persistence.sql on the API database.",
+					"ERR_SCHEMA")
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to create custom field.", "ERR_INTERNAL")
 			return
 		}
@@ -130,6 +137,17 @@ func createDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Custom field was not saved.", "ERR_INTERNAL")
 			return
 		}
+		readBack, readErr := getDefinition(r.Context(), pool, tu.TenantID, def.ID)
+		if readErr != nil || readBack.ID != def.ID {
+			msg := "Custom field was created but could not be read back. Apply migrations 004_custom_fields.sql and 027_custom_field_persistence.sql, then restart the API."
+			if readErr != nil && isSchemaError(readErr) {
+				msg = "Custom field tables are missing. Apply migrations 004_custom_fields.sql and 027_custom_field_persistence.sql on the API database."
+			}
+			response.Err(w, http.StatusInternalServerError, msg, "ERR_SCHEMA")
+			return
+		}
+		def = readBack
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.custom_field.create", "tenant_custom_field", &def.ID, nil, def)
 		response.OK(w, def, "Created.")
 	}
 }
@@ -158,6 +176,7 @@ func updateDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
+		before, _ := getDefinition(r.Context(), pool, tu.TenantID, id)
 		tag, err := pool.Exec(r.Context(), `
 			update public.tenant_custom_field_definitions set
 			  label = coalesce($1, label),
@@ -174,6 +193,7 @@ func updateDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		def, _ := getDefinition(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.custom_field.update", "tenant_custom_field", &id, before, def)
 		response.OK(w, def, "Updated.")
 	}
 }
@@ -190,6 +210,7 @@ func deleteDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		before, _ := getDefinition(r.Context(), pool, tu.TenantID, id)
 		tag, err := pool.Exec(r.Context(), `
 			update public.tenant_custom_field_definitions
 			set is_active = false, updated_at = now()
@@ -198,6 +219,7 @@ func deleteDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Custom field not found.", "ERR_NOT_FOUND")
 			return
 		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.custom_field.delete", "tenant_custom_field", &id, before, nil)
 		response.OK(w, nil, "Deleted.")
 	}
 }
@@ -217,7 +239,7 @@ func ListDefinitions(ctx context.Context, conn querier, tenantID int64, entityTy
 	q := `
 		select id, entity_type, field_key, label, field_type, options, is_required, sort_order, is_active
 		from public.tenant_custom_field_definitions
-		where tenant_id = $1 and btrim(entity_type) = $2`
+		where tenant_id = $1 and btrim(entity_type) = btrim($2::text)`
 	if activeOnly {
 		q += ` and is_active = true`
 	}
@@ -355,6 +377,14 @@ func ValidateAndSave(ctx context.Context, conn pgx.Tx, tenantID int64, entityTyp
 
 func ValidFormEntityType(entityType string) bool {
 	return formEntityTypes[strings.TrimSpace(entityType)]
+}
+
+func isSchemaError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "does not exist") || strings.Contains(msg, "42p01")
 }
 
 func NormalizeFieldKey(label, fieldKey string) string {

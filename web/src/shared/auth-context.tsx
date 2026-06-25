@@ -15,6 +15,7 @@ export type MeData = {
     can_manage_users?: boolean;
     can_manage_custom_fields?: boolean;
     can_view_activity_logs?: boolean;
+    can_view_change_logs?: boolean;
     can_view_crm?: boolean;
     can_manage_crm_rules?: boolean;
     can_view_all_crm?: boolean;
@@ -50,7 +51,23 @@ export function canManageUsers(me: MeData | null | undefined): boolean {
 export function canViewActivityLogs(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  return Boolean(u.can_view_activity_logs || u.is_platform_superadmin || u.is_tenant_owner);
+  if (u.is_platform_superadmin || u.is_tenant_owner) return true;
+  if (u.permissions && Object.keys(u.permissions).length > 0) {
+    return hasPermission(me, "activity_logs.logs", "read");
+  }
+  return Boolean(u.can_view_activity_logs);
+}
+
+export function canViewChangeLogs(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  if (u.is_platform_superadmin || u.is_tenant_owner) return true;
+  if (u.permissions && Object.keys(u.permissions).length > 0) {
+    return (
+      hasPermission(me, "activity_logs.changes", "read") || hasPermission(me, "activity_logs.logs", "read")
+    );
+  }
+  return Boolean(u.can_view_change_logs ?? u.can_view_activity_logs);
 }
 
 export function canViewCrm(me: MeData | null | undefined): boolean {

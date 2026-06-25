@@ -477,6 +477,7 @@ func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		amountTotal := sumApplicationAmounts(body.Applications)
+		before, _ := loadOfficialReceipt(r.Context(), pool, tu.TenantID, id)
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -514,6 +515,7 @@ func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		rec, _ := loadOfficialReceipt(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.receipt.update", "fin_official_receipt", &id, before, rec)
 		response.OK(w, rec, "Updated.")
 	}
 }

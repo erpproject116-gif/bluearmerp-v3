@@ -74,6 +74,7 @@ func main() {
 		crm.RegisterJobRoutes(api, pool)
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
+			protected.Use(audit.Middleware(pool))
 			protected.Get("/auth/me", auth.MeHandler(pool))
 			presence.RegisterRoutes(protected, pool)
 			customfields.RegisterRoutes(protected, pool)

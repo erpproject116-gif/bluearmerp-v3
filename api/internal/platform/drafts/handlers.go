@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -158,6 +159,10 @@ func deleteDraftHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.draft.delete", "document_draft", nil, nil, map[string]any{
+			"entity_type": entityType,
+			"draft_key":   draftKey,
+		})
 		response.OK(w, map[string]any{"deleted": true}, "Draft deleted.")
 	}
 }

@@ -5,24 +5,16 @@ import { FIELD_TYPES } from "./CustomFieldsSection";
 import { Field, inputClass } from "./SpreadsheetGrid";
 import { useAuth, canManageFormSettings } from "./auth-context";
 import { useToast } from "./toast";
-import { type FormFieldSetting, useFormFieldSettings } from "./useFormFieldSettings";
+import {
+  type CustomFieldDefinition,
+  type FormFieldSetting,
+  useFormFieldSettings,
+} from "./useFormFieldSettings";
 
 type Props = {
   entityType: string;
   featureLabel: string;
   listHref: string;
-};
-
-type CreatedDefinition = {
-  id: number;
-  entity_type: string;
-  field_key: string;
-  label: string;
-  field_type: string;
-  options?: { choices?: string[]; is_visible?: boolean };
-  is_required: boolean;
-  sort_order: number;
-  is_active: boolean;
 };
 
 function slugKey(label: string) {
@@ -51,7 +43,7 @@ function formatApiErrors(message?: string, errors?: Record<string, string>) {
 export function EntityFormSettingsPage(props: Props) {
   const auth = useAuth();
   const toast = useToast();
-  const { query, fields, reload } = useFormFieldSettings(props.entityType);
+  const { query, fields, reload, upsertCustomField } = useFormFieldSettings(props.entityType);
 
   const [draft, setDraft] = createSignal<FormFieldSetting[]>([]);
   const [dirty, setDirty] = createSignal(false);
@@ -109,7 +101,7 @@ export function EntityFormSettingsPage(props: Props) {
     setAdding(true);
     const key = slugKey(newKey().trim() || newLabel());
     const label = newLabel().trim();
-    const res = await apiFetch<CreatedDefinition>(
+    const res = await apiFetch<CustomFieldDefinition>(
       "/api/v1/custom-fields",
       {
         method: "POST",
@@ -120,7 +112,7 @@ export function EntityFormSettingsPage(props: Props) {
           field_type: newType(),
           is_required: newRequired(),
           sort_order: fields().filter((f) => f.kind === "custom").length,
-          options: needsChoices ? { choices: parseChoices(newChoices()) } : {},
+          options: needsChoices ? { choices: parseChoices(newChoices()), is_visible: true } : { is_visible: true },
         }),
       },
       { successMessage: `Custom field "${label}" added.` },
@@ -130,22 +122,35 @@ export function EntityFormSettingsPage(props: Props) {
       toast.error(formatApiErrors(res.message, res.errors));
       return;
     }
+    const created = res.data;
+    upsertCustomField(created);
     setNewLabel("");
     setNewKey("");
     setNewType("text");
     setNewRequired(false);
     setNewChoices("");
     setDirty(false);
+
     const refreshed = await reload();
-    const saved = (refreshed.data?.fields ?? []).some(
-      (f) => f.kind === "custom" && f.field_key === res.data!.field_key,
+    const inSettings = refreshed.fields.some(
+      (f) => f.kind === "custom" && (f.id === created.id || f.field_key === created.field_key),
     );
-    if (!saved) {
-      toast.error(
-        "Custom field was not saved. Apply database migration 027_custom_field_persistence.sql and restart the API.",
-      );
+    if (inSettings) return;
+
+    const listRes = await apiFetch<CustomFieldDefinition[]>(
+      `/api/v1/custom-fields?entity_type=${encodeURIComponent(props.entityType)}&active_only=false`,
+      {},
+      { silent: true },
+    );
+    const inDefinitions = (listRes.data ?? []).some((d) => d.id === created.id);
+    if (inDefinitions) {
+      upsertCustomField(created);
       return;
     }
+
+    toast.error(
+      "Custom field was not saved. Run api/migrations/004_custom_fields.sql and 027_custom_field_persistence.sql on the API database, then restart the API.",
+    );
   };
 
   const removeCustomField = async (id: number | undefined, label: string) => {
