@@ -1,6 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
-import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 import { FIELD_TYPES } from "./CustomFieldsSection";
 import { Field, inputClass } from "./SpreadsheetGrid";
@@ -49,28 +48,10 @@ function formatApiErrors(message?: string, errors?: Record<string, string>) {
   return message ?? "Request failed.";
 }
 
-function toMergedField(def: CreatedDefinition): FormFieldSetting {
-  const visible = def.options?.is_visible ?? def.is_active;
-  return {
-    id: def.id,
-    field_key: def.field_key,
-    kind: "custom",
-    label: def.label,
-    field_type: def.field_type,
-    options: def.options,
-    is_visible: visible,
-    is_required: def.is_required,
-    is_disabled: false,
-    is_active: def.is_active,
-    sort_order: def.sort_order + 1000,
-  };
-}
-
 export function EntityFormSettingsPage(props: Props) {
   const auth = useAuth();
   const toast = useToast();
-  const client = useQueryClient();
-  const { query, fields, invalidate } = useFormFieldSettings(props.entityType);
+  const { query, fields, reload } = useFormFieldSettings(props.entityType);
 
   const [draft, setDraft] = createSignal<FormFieldSetting[]>([]);
   const [dirty, setDirty] = createSignal(false);
@@ -112,8 +93,7 @@ export function EntityFormSettingsPage(props: Props) {
       return;
     }
     setDirty(false);
-    invalidate();
-    await query.refetch();
+    await reload();
   };
 
   const addCustomField = async () => {
@@ -146,30 +126,26 @@ export function EntityFormSettingsPage(props: Props) {
       { successMessage: `Custom field "${label}" added.` },
     );
     setAdding(false);
-    if (!res.success || !res.data) {
+    if (!res.success || !res.data?.id) {
       toast.error(formatApiErrors(res.message, res.errors));
       return;
     }
-    const merged = toMergedField(res.data);
-    client.setQueryData(
-      ["form-field-settings", props.entityType],
-      (old: { fields: FormFieldSetting[]; can_manage?: boolean } | undefined) => {
-        if (!old) return { fields: [merged], can_manage: true };
-        const exists = old.fields.some((f) => f.field_key === merged.field_key);
-        return {
-          ...old,
-          fields: exists ? old.fields : [...old.fields, merged],
-        };
-      },
-    );
     setNewLabel("");
     setNewKey("");
     setNewType("text");
     setNewRequired(false);
     setNewChoices("");
     setDirty(false);
-    invalidate();
-    await query.refetch();
+    const refreshed = await reload();
+    const saved = (refreshed.data?.fields ?? []).some(
+      (f) => f.kind === "custom" && f.field_key === res.data!.field_key,
+    );
+    if (!saved) {
+      toast.error(
+        "Custom field was not saved. Apply database migration 027_custom_field_persistence.sql and restart the API.",
+      );
+      return;
+    }
   };
 
   const removeCustomField = async (id: number | undefined, label: string) => {
@@ -182,8 +158,7 @@ export function EntityFormSettingsPage(props: Props) {
       return;
     }
     setDirty(false);
-    invalidate();
-    await query.refetch();
+    await reload();
   };
 
   const sortedRows = () => [...rows()].sort((a, b) => a.sort_order - b.sort_order);

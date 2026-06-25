@@ -20,8 +20,83 @@
   top: 1rem;
   right: 1rem;
   display: flex;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
   z-index: 10;
+  max-width: min(24rem, calc(100vw - 2rem));
+}
+
+.quotation-print__toolbar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.print-layout-customizer {
+  width: 100%;
+  max-height: 50vh;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #fff;
+  padding: 0.75rem;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.08);
+}
+
+.print-layout-customizer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.print-layout-customizer__link {
+  border: none;
+  background: none;
+  color: #2563eb;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.print-layout-customizer__hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.print-layout-customizer__sections {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.print-layout-customizer__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.print-layout-customizer__checks {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.print-layout-customizer__checks--rows {
+  max-height: 10rem;
+  overflow: auto;
+}
+
+.print-layout-customizer__check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #0f172a;
 }
 
 .quotation-print__btn {
@@ -197,6 +272,21 @@
   text-align: center;
   font-size: 0.75rem;
   color: #64748b;
+}
+
+.repair-print__totals {
+  margin-top: 1rem;
+  margin-left: auto;
+  width: min(100%, 18rem);
+}
+
+.repair-print__totals-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 @media print {

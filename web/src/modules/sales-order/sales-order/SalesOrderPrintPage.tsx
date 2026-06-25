@@ -1,7 +1,13 @@
-import { createEffect, createResource, Show } from "solid-js";
+import { createResource, Show } from "solid-js";
 import { useParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
-import { PrintPreviewTable } from "../../../shared/PrintPreviewTable";
+import {
+  DOCUMENT_LINE_COLUMN_META,
+  DocumentLinePrintTable,
+  useDocumentLinePrintLayout,
+  type DocumentLineRow,
+} from "../../../shared/documentLinePrint";
+import { PrintToolbar } from "../../../shared/PrintToolbar";
 import {
   fetchSalesOrderPrint,
   formatMoney,
@@ -24,12 +30,6 @@ function SalesOrderPrintView() {
     },
   );
 
-  createEffect(() => {
-    if (!data()) return;
-    const timer = window.setTimeout(() => window.print(), 350);
-    return () => window.clearTimeout(timer);
-  });
-
   return (
     <div class="quotation-print">
       <Show when={data.loading}>
@@ -39,15 +39,6 @@ function SalesOrderPrintView() {
         <p class="quotation-print__error">{String(data.error)}</p>
       </Show>
       <Show when={data()}>{(payload) => <PrintDocument payload={payload()} />}</Show>
-      <div class="quotation-print__toolbar no-print">
-        <p class="text-xs text-text-secondary mb-2">Drag column edges to resize before printing.</p>
-        <button type="button" class="quotation-print__btn" onClick={() => window.print()}>
-          Print
-        </button>
-        <button type="button" class="quotation-print__btn quotation-print__btn--muted" onClick={() => window.close()}>
-          Close
-        </button>
-      </div>
     </div>
   );
 }
@@ -55,9 +46,11 @@ function SalesOrderPrintView() {
 function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
   const p = () => props.payload;
   const so = () => p().sales_order;
-  const lines = () => so().lines ?? [];
+  const lines = () => (so().lines ?? []) as DocumentLineRow[];
+  const layout = useDocumentLinePrintLayout(lines);
 
   return (
+    <>
     <article class="quotation-print__page">
       <header class="quotation-print__header">
         <div>
@@ -120,31 +113,7 @@ function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
         </div>
       </section>
 
-      <PrintPreviewTable
-        class="mb-4"
-        emptyMessage="No line items."
-        columns={[
-          { key: "line_no", header: "#", width: 48, align: "center", render: (ln) => ln.line_no },
-          { key: "item_code", header: "Item Code", width: 100, render: (ln) => ln.item_code || "—" },
-          {
-            key: "description",
-            header: "Description",
-            width: 240,
-            render: (ln) => (
-              <>
-                {ln.item_name}
-                {ln.description ? ` — ${ln.description}` : ""}
-              </>
-            ),
-          },
-          { key: "qty", header: "Qty", width: 72, align: "right", render: (ln) => ln.qty },
-          { key: "unit_non_vat", header: "Unit (Non-VAT)", width: 110, align: "right", render: (ln) => formatMoney(ln.unit_non_vat) },
-          { key: "non_vat_total", header: "Non-VAT Total", width: 110, align: "right", render: (ln) => formatMoney(ln.non_vat_total) },
-          { key: "tax_amount", header: "Tax", width: 90, align: "right", render: (ln) => formatMoney(ln.tax_amount) },
-          { key: "line_total", header: "Line Total", width: 110, align: "right", render: (ln) => formatMoney(ln.line_total) },
-        ]}
-        rows={lines()}
-      />
+      <DocumentLinePrintTable lines={lines} formatMoney={(n) => formatMoney(n)} layout={layout} />
 
       <div class="quotation-print__totals">
         <div class="quotation-print__totals-row">
@@ -193,6 +162,23 @@ function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
 
       <p class="quotation-print__footer">Generated from Bluearm ERP · {new Date().toLocaleString()}</p>
     </article>
+    <PrintToolbar
+      layout={{
+        columns: DOCUMENT_LINE_COLUMN_META,
+        rows: lines().map((ln) => ({
+          key: ln.line_no,
+          label: `${ln.line_no}. ${ln.item_code || "—"} — ${ln.item_name || "Line"}`,
+        })),
+        hiddenColumns: layout.hiddenColumns,
+        hiddenRows: layout.hiddenRows,
+        onToggleColumn: layout.toggleColumn,
+        onToggleRow: layout.toggleRow,
+        onShowAll: layout.showAll,
+      }}
+      onPrint={() => window.print()}
+      onClose={() => window.close()}
+    />
+    </>
   );
 }
 

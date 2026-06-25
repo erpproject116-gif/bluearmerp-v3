@@ -2,6 +2,21 @@ package formfields
 
 import "encoding/json"
 
+func jsonBool(v any) (bool, bool) {
+	switch t := v.(type) {
+	case bool:
+		return t, true
+	case string:
+		if t == "true" {
+			return true, true
+		}
+		if t == "false" {
+			return false, true
+		}
+	}
+	return false, false
+}
+
 func customFieldVisible(opts json.RawMessage, isActive bool) bool {
 	if !isActive {
 		return false
@@ -10,7 +25,7 @@ func customFieldVisible(opts json.RawMessage, isActive bool) bool {
 	if err := json.Unmarshal(opts, &o); err != nil || o == nil {
 		return true
 	}
-	if v, ok := o["is_visible"].(bool); ok {
+	if v, ok := jsonBool(o["is_visible"]); ok {
 		return v
 	}
 	return true

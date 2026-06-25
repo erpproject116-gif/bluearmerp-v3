@@ -8,7 +8,7 @@ export type FormFieldSetting = {
   kind: "standard" | "custom";
   label: string;
   field_type: string;
-  options?: { choices?: string[] };
+  options?: { choices?: string[]; is_visible?: boolean };
   is_visible: boolean;
   is_required: boolean;
   is_disabled: boolean;
@@ -32,11 +32,13 @@ export function useFormFieldSettings(entityType: string) {
       if (!res.success) throw new Error(res.message ?? "Failed to load form settings");
       return res.data ?? { fields: [] };
     },
-    staleTime: 30_000,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
   }));
 
-  const fields = () => query.data?.fields ?? [];
-  const canManage = () => Boolean(query.data?.can_manage);
+  const fields = createMemo(() => query.data?.fields ?? []);
+  const canManage = createMemo(() => Boolean(query.data?.can_manage));
   const byKey = createMemo(() => {
     const map: Record<string, FormFieldSetting> = {};
     for (const f of fields()) map[f.field_key] = f;
@@ -53,7 +55,12 @@ export function useFormFieldSettings(entityType: string) {
 
   const invalidate = () => void client.invalidateQueries({ queryKey: ["form-field-settings", entityType] });
 
-  return { query, fields, byKey, canManage, activeCustomFields, requiredStandardFields, invalidate };
+  const reload = async () => {
+    invalidate();
+    return query.refetch();
+  };
+
+  return { query, fields, byKey, canManage, activeCustomFields, requiredStandardFields, invalidate, reload };
 }
 
 export function fieldLabel(f: FormFieldSetting | undefined, fallback: string) {

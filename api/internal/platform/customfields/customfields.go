@@ -101,20 +101,23 @@ func createDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
+		entityType := strings.TrimSpace(body.EntityType)
 		body.FieldKey = NormalizeFieldKey(body.Label, body.FieldKey)
-		if errs := ValidateDefinitionInput(body.EntityType, body.FieldKey, body.Label, body.FieldType, true); errs != nil {
+		if errs := ValidateDefinitionInput(entityType, body.FieldKey, body.Label, body.FieldType, true); errs != nil {
 			response.Validation(w, errs)
 			return
 		}
 		opts := mergeDefinitionOptions(body.Options, true)
-		var id int64
+		var def Definition
 		err := pool.QueryRow(r.Context(), `
 			insert into public.tenant_custom_field_definitions
-			  (tenant_id, entity_type, field_key, label, field_type, options, is_required, sort_order)
-			values ($1, $2, $3, $4, $5, $6, $7, $8)
-			returning id`,
-			tu.TenantID, body.EntityType, body.FieldKey, strings.TrimSpace(body.Label),
-			body.FieldType, opts, body.IsRequired, body.SortOrder).Scan(&id)
+			  (tenant_id, entity_type, field_key, label, field_type, options, is_required, sort_order, is_active)
+			values ($1, $2, $3, $4, $5, $6, $7, $8, true)
+			returning id, entity_type, field_key, label, field_type, options, is_required, sort_order, is_active`,
+			tu.TenantID, entityType, body.FieldKey, strings.TrimSpace(body.Label),
+			body.FieldType, opts, body.IsRequired, body.SortOrder).
+			Scan(&def.ID, &def.EntityType, &def.FieldKey, &def.Label, &def.FieldType, &def.Options,
+				&def.IsRequired, &def.SortOrder, &def.IsActive)
 		if err != nil {
 			if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
 				response.Validation(w, map[string]string{"field_key": "Field key already exists for this entity."})
@@ -123,7 +126,10 @@ func createDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create custom field.", "ERR_INTERNAL")
 			return
 		}
-		def, _ := getDefinition(r.Context(), pool, tu.TenantID, id)
+		if def.ID <= 0 {
+			response.Err(w, http.StatusInternalServerError, "Custom field was not saved.", "ERR_INTERNAL")
+			return
+		}
 		response.OK(w, def, "Created.")
 	}
 }
@@ -207,10 +213,11 @@ func getDefinition(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 }
 
 func ListDefinitions(ctx context.Context, conn querier, tenantID int64, entityType string, activeOnly bool) ([]Definition, error) {
+	entityType = strings.TrimSpace(entityType)
 	q := `
 		select id, entity_type, field_key, label, field_type, options, is_required, sort_order, is_active
 		from public.tenant_custom_field_definitions
-		where tenant_id = $1 and entity_type = $2`
+		where tenant_id = $1 and btrim(entity_type) = $2`
 	if activeOnly {
 		q += ` and is_active = true`
 	}
