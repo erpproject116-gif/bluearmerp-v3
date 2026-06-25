@@ -11,6 +11,7 @@ export type ActivityLogFilterState = {
   actorUserId: string;
   actionCode: string;
   targetType: string;
+  targetId: string;
   module: string;
   referenceNo?: string;
 };

@@ -92,6 +92,16 @@ func listChangeLogs(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, v)
 			n++
 		}
+		if v := strings.TrimSpace(q.Get("target_id")); v != "" {
+			id, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || id <= 0 {
+				response.Validation(w, map[string]string{"target_id": "Invalid target id."})
+				return
+			}
+			where += fmt.Sprintf(" and al.target_id = $%d", n)
+			args = append(args, id)
+			n++
+		}
 		if v := strings.TrimSpace(q.Get("module")); v != "" {
 			where += fmt.Sprintf(" and al.action_code like $%d", n)
 			args = append(args, v+".%")

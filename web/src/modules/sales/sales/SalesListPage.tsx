@@ -1,4 +1,4 @@
-import { createSignal, onMount } from "solid-js";
+import { createMemo, createSignal, onMount } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
@@ -13,7 +13,8 @@ import {
 } from "../../../shared/useSalesList";
 import { useToast } from "../../../shared/toast";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
-import { CreateCrmTaskLink } from "../../../shared/CreateCrmTaskLink";
+import { CrmTaskCell } from "../../../shared/CrmTaskCell";
+import { useCrmTaskSummaries } from "../../../shared/useCrmTaskSummaries";
 import { SalesLayout } from "../SalesLayout";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesModal, type SalesDetail } from "./SalesModal";
@@ -50,6 +51,9 @@ export function SalesListPageInner(props: PageOptions = {}) {
     q: q() || undefined,
     progressStatus: statusFilter() || undefined,
   }));
+
+  const salesIds = createMemo(() => (list.data?.rows ?? []).map((r) => r.id));
+  const taskSummaries = useCrmTaskSummaries(() => ({ salesIds: salesIds() }));
 
   const openNew = () => {
     setEditing(null);
@@ -164,8 +168,8 @@ export function SalesListPageInner(props: PageOptions = {}) {
             header: "CRM",
             sortable: false,
             render: (r) => (
-              <CreateCrmTaskLink
-                label="Task"
+              <CrmTaskCell
+                summary={taskSummaries.data?.by_sales[String(r.id)]}
                 context={{
                   sales_id: r.id,
                   partner_id: r.partner_id,

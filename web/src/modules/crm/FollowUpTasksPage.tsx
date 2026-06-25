@@ -1,7 +1,13 @@
-import { createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { KanbanBoard } from "../../shared/KanbanBoard";
 import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
 import { useCrmTaskModal } from "../../shared/CrmTaskModal";
+import {
+  TASK_BOARD_STAGES,
+  taskKanbanSeverity,
+  taskStageLabel,
+} from "../../shared/crmTaskStages";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../shared/ViewModeToggle";
 import {
@@ -15,13 +21,6 @@ import {
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { CrmLayout } from "./CrmLayout";
-
-const BOARD_STAGES: { id: FollowUpTaskStage; label: string }[] = [
-  { id: "scheduled", label: "Scheduled" },
-  { id: "due_soon", label: "Due soon" },
-  { id: "overdue", label: "Overdue" },
-  { id: "completed", label: "Completed" },
-];
 
 const STORAGE_KEY = "crm-follow-up-view";
 
@@ -50,12 +49,29 @@ function taskCardDetails(task: FollowUpTask): KanbanDetailRow[] {
 }
 
 export default function FollowUpTasksPage() {
+  const [searchParams] = useSearchParams();
   const [viewMode, setViewMode] = createSignal<ViewMode>(loadViewMode(STORAGE_KEY));
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("due_date");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const toast = useToast();
   const invalidate = useInvalidateFollowUpTasks();
   const crmTask = useCrmTaskModal();
+
+  const taskFromUrl = createMemo(() => {
+    const raw = searchParams.task;
+    const id = typeof raw === "string" ? Number(raw) : NaN;
+    return Number.isFinite(id) && id > 0 ? id : null;
+  });
+
+  const openTask = (task: FollowUpTask) => {
+    setSelectedId(task.id);
+    crmTask.openTask(task.id);
+  };
+
+  createEffect(() => {
+    const id = taskFromUrl();
+    if (id) crmTask.openTask(id);
+  });
 
   const list = useFollowUpTasks(() => ({
     page: viewMode() === "board" ? 1 : page(),
@@ -65,7 +81,7 @@ export default function FollowUpTasksPage() {
   }));
 
   const boardColumns = createMemo(() =>
-    BOARD_STAGES.map((s) => ({
+    TASK_BOARD_STAGES.map((s) => ({
       id: s.id,
       label: s.label,
       items: (list.data?.rows ?? []).filter((t) => t.stage === s.id),
@@ -88,7 +104,7 @@ export default function FollowUpTasksPage() {
         <button
           type="button"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          onClick={() => crmTask.open()}
+          onClick={() => crmTask.openCreate()}
         >
           + New task
         </button>
@@ -98,18 +114,27 @@ export default function FollowUpTasksPage() {
         <SpreadsheetGrid
           columns={[
             { key: "title", header: "Title", clickable: true },
-            { key: "task_type", header: "Type" },
-            { key: "stage", header: "Stage" },
+            { key: "task_type", header: "Type", render: (r) => TASK_TYPE_LABELS[r.task_type] },
+            {
+              key: "stage",
+              header: "Stage",
+              render: (r) => taskStageLabel(r.stage),
+            },
             { key: "due_date", header: "Due date" },
             { key: "partner_name", header: "Customer", render: (r) => r.partner_name ?? "—" },
+            {
+              key: "notes",
+              header: "Notes",
+              render: (r) => (r.notes?.trim() ? truncate(r.notes, 80) : "—"),
+            },
             { key: "pic_name", header: "PIC" },
           ]}
           rows={list.data?.rows ?? []}
           loading={list.isFetching}
           selectedId={selectedId()}
           onSelect={setSelectedId}
-          onEdit={() => {}}
-          onNew={() => crmTask.open()}
+          onEdit={(row) => openTask(row)}
+          onNew={() => crmTask.openCreate()}
           codeKey="title"
           nameKey="title"
           sortKey={sort()}
@@ -135,9 +160,10 @@ export default function FollowUpTasksPage() {
             <KanbanCard
               title={t.title}
               subtitle={TASK_TYPE_LABELS[t.task_type]}
-              badge={BOARD_STAGES.find((s) => s.id === t.stage)?.label ?? t.stage}
+              badge={taskStageLabel(t.stage)}
               details={taskCardDetails(t)}
-              severity={t.stage === "overdue" ? "critical" : t.stage === "due_soon" ? "warning" : "info"}
+              severity={taskKanbanSeverity(t.stage)}
+              onClick={() => openTask(t)}
             />
           )}
         />

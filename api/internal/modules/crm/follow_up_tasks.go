@@ -74,6 +74,8 @@ type followUpStageBody struct {
 }
 
 func registerFollowUpTaskRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.Post("/follow-up-tasks/summaries", batchFollowUpTaskSummaries(pool))
+	r.Get("/follow-up-tasks/{id}", getFollowUpTask(pool))
 	r.Get("/follow-up-tasks", listFollowUpTasks(pool))
 	r.Post("/follow-up-tasks", createFollowUpTask(pool))
 	r.Patch("/follow-up-tasks/{id}", patchFollowUpTask(pool))
@@ -159,6 +161,45 @@ func listFollowUpTasks(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, id)
 			n++
 		}
+		if v := strings.TrimSpace(q.Get("quotation_id")); v != "" {
+			id, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || id <= 0 {
+				response.Validation(w, map[string]string{"quotation_id": "Invalid quotation id."})
+				return
+			}
+			where += fmt.Sprintf(" and t.quotation_id = $%d", n)
+			args = append(args, id)
+			n++
+		}
+		if v := strings.TrimSpace(q.Get("sales_id")); v != "" {
+			id, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || id <= 0 {
+				response.Validation(w, map[string]string{"sales_id": "Invalid sales id."})
+				return
+			}
+			where += fmt.Sprintf(" and t.sales_id = $%d", n)
+			args = append(args, id)
+			n++
+		}
+		if v := strings.TrimSpace(q.Get("warranty_asset_id")); v != "" {
+			id, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || id <= 0 {
+				response.Validation(w, map[string]string{"warranty_asset_id": "Invalid warranty asset id."})
+				return
+			}
+			where += fmt.Sprintf(" and t.warranty_asset_id = $%d", n)
+			args = append(args, id)
+			n++
+		}
+		if v := strings.TrimSpace(q.Get("q")); v != "" {
+			where += fmt.Sprintf(` and (
+			  t.title ilike $%d or coalesce(t.notes, '') ilike $%d
+			  or coalesce(p.company_name, '') ilike $%d
+			  or coalesce(q.reference_no, '') ilike $%d
+			)`, n, n, n, n)
+			args = append(args, "%"+v+"%")
+			n++
+		}
 		scope, n := tu.PicOrCreatedScopeSQL("t", n, &args)
 		where += scope
 		base := fmt.Sprintf(`%s, count(*) over() %s where %s`, followUpTaskSelect, followUpTaskFrom, where)
@@ -203,10 +244,37 @@ func defaultTaskType(t string) string {
 func defaultTaskStage(s string) string {
 	s = strings.TrimSpace(s)
 	switch s {
-	case "scheduled", "due_soon", "overdue", "completed", "cancelled":
+	case "scheduled", "due_soon", "overdue", "follow_up", "forwarded_sales", "completed", "cancelled", "closed":
 		return s
 	default:
 		return "scheduled"
+	}
+}
+
+func getFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		row, err := scanFollowUpTask(pool.QueryRow(r.Context(), followUpTaskByIDQuery()+" and t.tenant_id = $2", id, tu.TenantID))
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if !tu.CanViewAllCRM() {
+			var picID, createdBy *int64
+			_ = pool.QueryRow(r.Context(), `
+				select pic_user_id, created_by_user_id from public.crm_follow_up_tasks
+				where id = $1 and tenant_id = $2`, id, tu.TenantID).Scan(&picID, &createdBy)
+			if !tu.CanAccessPicRecord(picID, createdBy) {
+				response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
+				return
+			}
+		}
+		response.OK(w, row, "OK")
 	}
 }
 
@@ -232,6 +300,10 @@ func createFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusForbidden, picErr.Error(), "ERR_FORBIDDEN")
 			return
 		}
+		if existingID, err := findOpenLinkedTask(r.Context(), pool, tu.TenantID, body.QuotationID, body.SalesID, body.WarrantyAssetID); err == nil && existingID != nil {
+			conflictWithExistingTask(r.Context(), w, pool, *existingID)
+			return
+		}
 		var id int64
 		err = pool.QueryRow(r.Context(), `
 			insert into public.crm_follow_up_tasks (
@@ -244,6 +316,12 @@ func createFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 			body.WarrantyAssetID, body.QuotationID, body.SalesID,
 			strings.TrimSpace(body.Title), body.Notes, tu.AppUserID).Scan(&id)
 		if err != nil {
+			if strings.Contains(err.Error(), "idx_crm_tasks_open_") || strings.Contains(err.Error(), "duplicate key") {
+				if existingID, findErr := findOpenLinkedTask(r.Context(), pool, tu.TenantID, body.QuotationID, body.SalesID, body.WarrantyAssetID); findErr == nil && existingID != nil {
+					conflictWithExistingTask(r.Context(), w, pool, *existingID)
+					return
+				}
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to create task.", "ERR_INTERNAL")
 			return
 		}
@@ -288,7 +366,7 @@ func patchFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		stage := defaultTaskStage(body.Stage)
 		completedAt := interface{}(nil)
-		if stage == "completed" {
+		if isTerminalTaskStage(stage) && stage != "cancelled" {
 			completedAt = time.Now()
 		}
 		tag, err := pool.Exec(r.Context(), `
@@ -297,7 +375,7 @@ func patchFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 			  partner_id = $4, pic_user_id = $5, pic_name = $6,
 			  warranty_asset_id = $7, quotation_id = $8, sales_id = $9,
 			  title = $10, notes = $11,
-			  completed_at = case when $2 = 'completed' then coalesce(completed_at, now()) else null end,
+			  completed_at = case when $2 in ('completed', 'closed') then coalesce(completed_at, now()) else null end,
 			  updated_at = now()
 			where id = $12 and tenant_id = $13`,
 			defaultTaskType(body.TaskType), stage, due,
@@ -342,7 +420,7 @@ func patchFollowUpTaskStage(pool *pgxpool.Pool) http.HandlerFunc {
 		tag, err := pool.Exec(r.Context(), `
 			update public.crm_follow_up_tasks set
 			  stage = $1,
-			  completed_at = case when $1 = 'completed' then coalesce(completed_at, now()) else null end,
+			  completed_at = case when $1 in ('completed', 'closed') then coalesce(completed_at, now()) else null end,
 			  updated_at = now()
 			where id = $2 and tenant_id = $3`, stage, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {

@@ -1,4 +1,4 @@
-import { createSignal, onMount } from "solid-js";
+import { createMemo, createSignal, onMount } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
@@ -12,7 +12,8 @@ import {
 } from "../../../shared/useQuotationList";
 import { useToast } from "../../../shared/toast";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
-import { CreateCrmTaskLink } from "../../../shared/CreateCrmTaskLink";
+import { CrmTaskCell } from "../../../shared/CrmTaskCell";
+import { useCrmTaskSummaries } from "../../../shared/useCrmTaskSummaries";
 import { QuotationLayout } from "../QuotationLayout";
 import { CreatedSlipModal } from "./CreatedSlipModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -58,6 +59,9 @@ export function QuotationListPageInner(props: PageOptions = {}) {
     q: q() || undefined,
     progressStatus: statusFilter() || undefined,
   }));
+
+  const quotationIds = createMemo(() => (list.data?.rows ?? []).map((r) => r.id));
+  const taskSummaries = useCrmTaskSummaries(() => ({ quotationIds: quotationIds() }));
 
   const openNew = () => {
     setEditing(null);
@@ -170,8 +174,8 @@ export function QuotationListPageInner(props: PageOptions = {}) {
             header: "CRM",
             sortable: false,
             render: (r) => (
-              <CreateCrmTaskLink
-                label="Task"
+              <CrmTaskCell
+                summary={taskSummaries.data?.by_quotation[String(r.id)]}
                 context={{
                   task_type: "quote_follow_up",
                   quotation_id: r.id,

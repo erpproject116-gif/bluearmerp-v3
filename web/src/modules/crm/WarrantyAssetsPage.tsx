@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import { DateInput } from "../../shared/DateInput";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import {
@@ -11,7 +11,8 @@ import {
 } from "../../shared/useWarrantyAssets";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
-import { CreateCrmTaskLink } from "../../shared/CreateCrmTaskLink";
+import { CrmTaskCell } from "../../shared/CrmTaskCell";
+import { useCrmTaskSummaries } from "../../shared/useCrmTaskSummaries";
 import { CrmLayout } from "./CrmLayout";
 
 export default function WarrantyAssetsPage() {
@@ -33,6 +34,9 @@ export default function WarrantyAssetsPage() {
     q: q() || undefined,
     status: statusFilter() || undefined,
   }));
+
+  const warrantyIds = createMemo(() => (list.data?.rows ?? []).map((r) => r.id));
+  const taskSummaries = useCrmTaskSummaries(() => ({ warrantyIds: warrantyIds() }));
 
   const openEdit = (row: WarrantyAsset) => {
     setSelected(row);
@@ -111,8 +115,8 @@ export default function WarrantyAssetsPage() {
             header: "Task",
             sortable: false,
             render: (r) => (
-              <CreateCrmTaskLink
-                label="Task"
+              <CrmTaskCell
+                summary={taskSummaries.data?.by_warranty[String(r.id)]}
                 context={{
                   task_type: "warranty_follow_up",
                   warranty_asset_id: r.id,

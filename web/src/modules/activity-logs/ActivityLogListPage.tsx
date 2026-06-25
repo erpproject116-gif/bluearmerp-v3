@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { entityRecordHref } from "../../shared/entityRoutes";
 import { useListState } from "../../shared/useListState";
 import { useActivityLogList } from "../../shared/useActivityLogList";
 import { ActivityLogFilterPanel, ActivityLogLayout } from "./ActivityLogLayout";
@@ -24,9 +25,10 @@ export default function ActivityLogListPage() {
     dateTo: "",
     actorUserId: "",
     actionCode: "",
-    targetType: "",
+    targetType: typeof params.target_type === "string" ? params.target_type : "",
+    targetId: typeof params.target_id === "string" ? params.target_id : "",
     module: typeof params.module === "string" ? params.module : "",
-    referenceNo: "",
+    referenceNo: typeof params.reference_no === "string" ? params.reference_no : "",
   });
   const [submittedFilters, setSubmittedFilters] = createSignal({ ...draftFilters() });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -34,9 +36,24 @@ export default function ActivityLogListPage() {
 
   createEffect(() => {
     const moduleParam = typeof params.module === "string" ? params.module : "";
-    if (moduleParam && moduleParam !== draftFilters().module) {
-      setDraftFilters((f) => ({ ...f, module: moduleParam }));
-      setSubmittedFilters((f) => ({ ...f, module: moduleParam }));
+    const targetTypeParam = typeof params.target_type === "string" ? params.target_type : "";
+    const targetIdParam = typeof params.target_id === "string" ? params.target_id : "";
+    const refParam = typeof params.reference_no === "string" ? params.reference_no : "";
+    if (
+      moduleParam !== draftFilters().module ||
+      targetTypeParam !== draftFilters().targetType ||
+      targetIdParam !== draftFilters().targetId ||
+      refParam !== draftFilters().referenceNo
+    ) {
+      const next = {
+        ...draftFilters(),
+        module: moduleParam,
+        targetType: targetTypeParam,
+        targetId: targetIdParam,
+        referenceNo: refParam,
+      };
+      setDraftFilters(next);
+      setSubmittedFilters(next);
     }
   });
 
@@ -52,6 +69,7 @@ export default function ActivityLogListPage() {
       actorUserId: f.actorUserId || undefined,
       actionCode: f.actionCode || undefined,
       targetType: f.targetType || undefined,
+      targetId: f.targetId || undefined,
       module: f.module || undefined,
       referenceNo: f.referenceNo || undefined,
     };
@@ -69,9 +87,10 @@ export default function ActivityLogListPage() {
       dateTo: "",
       actorUserId: "",
       actionCode: "",
-      targetType: "",
+      targetType: typeof params.target_type === "string" ? params.target_type : "",
+      targetId: typeof params.target_id === "string" ? params.target_id : "",
       module: moduleParam,
-      referenceNo: "",
+      referenceNo: typeof params.reference_no === "string" ? params.reference_no : "",
     };
     setDraftFilters(cleared);
     setSubmittedFilters(cleared);
@@ -126,11 +145,30 @@ export default function ActivityLogListPage() {
             {
               key: "reference_no",
               header: "Reference",
-              render: (row) => (
-                <span class="text-sm text-text-secondary">
-                  {row.reference_no ? `${row.reference_label ?? ""} ${row.reference_no}`.trim() : "—"}
-                </span>
-              ),
+              render: (row) => {
+                const href =
+                  row.target_type && row.target_id
+                    ? entityRecordHref(row.target_type, row.target_id)
+                    : null;
+                return (
+                  <span class="text-sm text-text-secondary">
+                    {row.reference_no ? (
+                      <>
+                        <span>{row.reference_label ?? ""} </span>
+                        {href ? (
+                          <A href={href} class="font-medium text-brand-600 hover:underline">
+                            {row.reference_no}
+                          </A>
+                        ) : (
+                          <span class="font-medium">{row.reference_no}</span>
+                        )}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </span>
+                );
+              },
             },
           ]}
           rows={list.data?.rows ?? []}

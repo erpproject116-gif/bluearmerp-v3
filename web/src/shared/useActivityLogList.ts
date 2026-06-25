@@ -28,6 +28,7 @@ export type ActivityLogFilters = {
   actorUserId?: string;
   actionCode?: string;
   targetType?: string;
+  targetId?: string;
   module?: string;
   referenceNo?: string;
 };
@@ -46,6 +47,7 @@ export function useActivityLogList(params: () => ActivityLogFilters) {
     if (p.actorUserId) qs.set("actor_user_id", p.actorUserId);
     if (p.actionCode) qs.set("action_code", p.actionCode);
     if (p.targetType) qs.set("target_type", p.targetType);
+    if (p.targetId) qs.set("target_id", p.targetId);
     if (p.module) qs.set("module", p.module);
     if (p.referenceNo) qs.set("reference_no", p.referenceNo);
 

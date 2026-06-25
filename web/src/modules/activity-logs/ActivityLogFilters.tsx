@@ -63,6 +63,15 @@ export function ActivityLogFilterPanel(props: {
             onInput={(e) => props.setDraftFilters((f) => ({ ...f, targetType: e.currentTarget.value }))}
           />
         </Field>
+        <Field label="Target ID">
+          <input
+            type="text"
+            class={inputClass}
+            placeholder="Record id"
+            value={props.draftFilters().targetId ?? ""}
+            onInput={(e) => props.setDraftFilters((f) => ({ ...f, targetId: e.currentTarget.value }))}
+          />
+        </Field>
         <Field label="Module">
           <input
             type="text"

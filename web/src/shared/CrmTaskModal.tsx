@@ -1,9 +1,11 @@
 import { createContext, createSignal, Show, useContext, type ParentProps } from "solid-js";
 import { DateInput } from "./DateInput";
+import { FollowUpTaskDetailModal } from "./FollowUpTaskDetailModal";
 import { EntityModal, Field, inputClass } from "./SpreadsheetGrid";
 import {
   createFollowUpTask,
   useInvalidateFollowUpTasks,
+  type FollowUpTask,
   type FollowUpTaskType,
 } from "./useFollowUpTasks";
 import { useToast } from "./toast";
@@ -24,7 +26,10 @@ export type CrmTaskContext = {
 };
 
 type CrmTaskModalAPI = {
+  /** @deprecated use openCreate */
   open: (context?: CrmTaskContext) => void;
+  openCreate: (context?: CrmTaskContext) => void;
+  openTask: (taskId: number) => void;
 };
 
 const CrmTaskModalContext = createContext<CrmTaskModalAPI>();
@@ -45,7 +50,9 @@ function defaultTitle(ctx: CrmTaskContext) {
 }
 
 export function CrmTaskModalProvider(props: ParentProps) {
-  const [open, setOpen] = createSignal(false);
+  const [createOpen, setCreateOpen] = createSignal(false);
+  const [detailOpen, setDetailOpen] = createSignal(false);
+  const [detailTaskId, setDetailTaskId] = createSignal<number | null>(null);
   const [context, setContext] = createSignal<CrmTaskContext>({});
   const [title, setTitle] = createSignal("");
   const [dueDate, setDueDate] = createSignal(defaultDueDate());
@@ -64,12 +71,21 @@ export function CrmTaskModalProvider(props: ParentProps) {
     setAssigneeId("");
   };
 
+  const openCreate = (ctx: CrmTaskContext = {}) => {
+    setContext(ctx);
+    resetForm(ctx);
+    setCreateOpen(true);
+  };
+
+  const openTask = (taskId: number) => {
+    setDetailTaskId(taskId);
+    setDetailOpen(true);
+  };
+
   const api: CrmTaskModalAPI = {
-    open: (ctx = {}) => {
-      setContext(ctx);
-      resetForm(ctx);
-      setOpen(true);
-    },
+    open: openCreate,
+    openCreate,
+    openTask,
   };
 
   const save = async () => {
@@ -93,23 +109,31 @@ export function CrmTaskModalProvider(props: ParentProps) {
       quotation_id: ctx.quotation_id ?? undefined,
       sales_id: ctx.sales_id ?? undefined,
       warranty_asset_id: ctx.warranty_asset_id ?? undefined,
-    });
+    }, { silent: true });
     setSaving(false);
     if (!res.success) {
+      const existing = res.data as FollowUpTask | undefined;
+      if (res.code === "ERR_CONFLICT" && existing?.id) {
+        setCreateOpen(false);
+        openTask(existing.id);
+        toast.warning("An open task already exists for this record.");
+        return;
+      }
       toast.warning(res.message ?? "Could not create task.");
       return;
     }
-    setOpen(false);
+    setCreateOpen(false);
     invalidate();
+    toast.success("CRM task created.");
   };
 
   return (
     <CrmTaskModalContext.Provider value={api}>
       {props.children}
       <EntityModal
-        open={open()}
+        open={createOpen()}
         title="Create CRM follow-up task"
-        onClose={() => setOpen(false)}
+        onClose={() => setCreateOpen(false)}
         onSave={() => void save()}
         saving={saving()}
       >
@@ -149,6 +173,11 @@ export function CrmTaskModalProvider(props: ParentProps) {
           />
         </Field>
       </EntityModal>
+      <FollowUpTaskDetailModal
+        open={() => detailOpen()}
+        taskId={() => detailTaskId()}
+        onClose={() => setDetailOpen(false)}
+      />
     </CrmTaskModalContext.Provider>
   );
 }

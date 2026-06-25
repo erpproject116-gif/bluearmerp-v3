@@ -1,6 +1,8 @@
 import { Show } from "solid-js";
 import { canViewActivityLogs, useAuth } from "./auth-context";
 
+import { activityLogHref } from "./entityRoutes";
+
 type Props = {
   module: string;
   targetType: string;
@@ -11,7 +13,11 @@ type Props = {
 export function ActivityHistoryLink(props: Props) {
   const auth = useAuth();
   const href = () =>
-    `/app/activity-logs?module=${encodeURIComponent(props.module)}&target_type=${encodeURIComponent(props.targetType)}&target_id=${props.targetId}`;
+    activityLogHref({
+      module: props.module,
+      targetType: props.targetType,
+      targetId: props.targetId,
+    });
 
   return (
     <Show when={canViewActivityLogs(auth.me)}>
