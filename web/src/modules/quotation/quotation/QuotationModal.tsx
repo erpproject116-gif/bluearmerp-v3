@@ -8,6 +8,8 @@ import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
+import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import {
@@ -48,6 +50,7 @@ export type QuotationDetail = {
   tax_total: number;
   grand_total: number;
   created_by_name?: string;
+  custom_values?: Record<string, unknown>;
   lines?: Array<{
     line_no: number;
     item_id?: number | null;
@@ -140,7 +143,8 @@ function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
 
 export function QuotationModal(props: Props) {
   const toast = useToast();
-  const { fields } = useFormFieldSettings(QUOTATION_ENTITY.quotation);
+  const { fields, activeCustomFields } = useFormFieldSettings(QUOTATION_ENTITY.quotation);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const [saving, setSaving] = createSignal(false);
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
@@ -276,6 +280,7 @@ export function QuotationModal(props: Props) {
       setNotes(ed.notes ?? "");
       setProgressStatus(ed.progress_status);
       setLines(linesFromDetail(ed.lines));
+      loadCustom(ed.custom_values ?? {});
     } else {
       setOrderDate(todayISO());
       setPartnerId(null);
@@ -293,6 +298,7 @@ export function QuotationModal(props: Props) {
       setNotes("");
       setProgressStatus("unconfirmed");
       setLines([emptyQuotationLine(1)]);
+      loadCustom({});
       void loadPreview(todayISO());
     }
   });
@@ -324,7 +330,9 @@ export function QuotationModal(props: Props) {
       location_id: locationId(),
       progress_status: progressStatus(),
     };
-    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    const clientError =
+      requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields())) ??
+      validateCustomFields(customValues(), activeCustomFields());
     if (clientError) {
       toast.warning(clientError);
       return;
@@ -356,6 +364,7 @@ export function QuotationModal(props: Props) {
         input_basis: ln.input_basis,
         remark: ln.remark || null,
       })),
+      custom_values: customValues(),
     };
 
     setSaving(true);
@@ -504,6 +513,11 @@ export function QuotationModal(props: Props) {
           <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
         </Field>
       </Show>
+      <CustomFieldsSection
+        entityType={QUOTATION_ENTITY.quotation}
+        values={customValues}
+        onChange={setCustom}
+      />
       <QuotationLineGrid
         lines={lines}
         onChange={setLines}

@@ -46,12 +46,20 @@ var allowedTypes = map[string]bool{
 	"checkbox": true, "date": true, "date_range": true, "number_range": true,
 }
 
+// Keep in sync with formfields/registry.go standardRegistry keys.
+var formEntityTypes = map[string]bool{
+	"inv_partner": true, "inv_location": true, "inv_project": true, "inv_department": true,
+	"inv_item": true, "inv_repair_order": true,
+	"quo_tax_type": true, "quo_currency": true, "quo_quotation": true,
+	"sa_sales": true, "so_sales_order": true, "fin_official_receipt": true,
+}
+
 type querier interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
 func CanManage(tu auth.TenantUser) bool {
-	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.IsStoreAdmin
+	return tu.CanManageFormSettings()
 }
 
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -93,14 +101,12 @@ func createDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
+		body.FieldKey = NormalizeFieldKey(body.Label, body.FieldKey)
 		if errs := ValidateDefinitionInput(body.EntityType, body.FieldKey, body.Label, body.FieldType, true); errs != nil {
 			response.Validation(w, errs)
 			return
 		}
-		opts := body.Options
-		if len(opts) == 0 {
-			opts = json.RawMessage(`{}`)
-		}
+		opts := mergeDefinitionOptions(body.Options, true)
 		var id int64
 		err := pool.QueryRow(r.Context(), `
 			insert into public.tenant_custom_field_definitions
@@ -340,10 +346,52 @@ func ValidateAndSave(ctx context.Context, conn pgx.Tx, tenantID int64, entityTyp
 	return nil
 }
 
+func ValidFormEntityType(entityType string) bool {
+	return formEntityTypes[strings.TrimSpace(entityType)]
+}
+
+func NormalizeFieldKey(label, fieldKey string) string {
+	key := strings.TrimSpace(fieldKey)
+	if key == "" {
+		key = strings.ToLower(strings.TrimSpace(label))
+		key = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(key, "_")
+		key = strings.Trim(key, "_")
+	}
+	key = strings.ToLower(key)
+	key = regexp.MustCompile(`[^a-z0-9_]+`).ReplaceAllString(key, "_")
+	key = strings.Trim(key, "_")
+	if key == "" {
+		key = "field"
+	}
+	if !regexp.MustCompile(`^[a-z]`).MatchString(key) {
+		key = "f_" + key
+	}
+	if len(key) > 64 {
+		key = key[:64]
+	}
+	return key
+}
+
+func mergeDefinitionOptions(opts json.RawMessage, isVisible bool) json.RawMessage {
+	var o map[string]any
+	if len(opts) > 0 {
+		_ = json.Unmarshal(opts, &o)
+	}
+	if o == nil {
+		o = map[string]any{}
+	}
+	o["is_visible"] = isVisible
+	raw, _ := json.Marshal(o)
+	return raw
+}
+
 func ValidateDefinitionInput(entityType, fieldKey, label, fieldType string, create bool) map[string]string {
 	errs := map[string]string{}
-	if strings.TrimSpace(entityType) == "" {
+	entityType = strings.TrimSpace(entityType)
+	if entityType == "" {
 		errs["entity_type"] = "Entity type is required."
+	} else if !ValidFormEntityType(entityType) {
+		errs["entity_type"] = "Unknown entity type."
 	}
 	if create && !keyPattern.MatchString(fieldKey) {
 		errs["field_key"] = "Use lowercase letters, numbers, underscores; start with a letter."

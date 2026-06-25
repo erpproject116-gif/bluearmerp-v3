@@ -1,5 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 import { FIELD_TYPES } from "./CustomFieldsSection";
 import { Field, inputClass } from "./SpreadsheetGrid";
@@ -13,12 +14,26 @@ type Props = {
   listHref: string;
 };
 
+type CreatedDefinition = {
+  id: number;
+  entity_type: string;
+  field_key: string;
+  label: string;
+  field_type: string;
+  options?: { choices?: string[]; is_visible?: boolean };
+  is_required: boolean;
+  sort_order: number;
+  is_active: boolean;
+};
+
 function slugKey(label: string) {
-  return label
+  let key = label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_|_$/g, "")
-    .slice(0, 64) || "field";
+    .replace(/^_|_$/g, "");
+  if (!key) key = "field";
+  if (!/^[a-z]/.test(key)) key = `f_${key}`;
+  return key.slice(0, 64);
 }
 
 function parseChoices(raw: string) {
@@ -28,9 +43,33 @@ function parseChoices(raw: string) {
     .filter(Boolean);
 }
 
+function formatApiErrors(message?: string, errors?: Record<string, string>) {
+  const parts = Object.values(errors ?? {}).filter(Boolean);
+  if (parts.length > 0) return parts.join(" ");
+  return message ?? "Request failed.";
+}
+
+function toMergedField(def: CreatedDefinition): FormFieldSetting {
+  const visible = def.options?.is_visible ?? def.is_active;
+  return {
+    id: def.id,
+    field_key: def.field_key,
+    kind: "custom",
+    label: def.label,
+    field_type: def.field_type,
+    options: def.options,
+    is_visible: visible,
+    is_required: def.is_required,
+    is_disabled: false,
+    is_active: def.is_active,
+    sort_order: def.sort_order + 1000,
+  };
+}
+
 export function EntityFormSettingsPage(props: Props) {
   const auth = useAuth();
   const toast = useToast();
+  const client = useQueryClient();
   const { query, fields, invalidate } = useFormFieldSettings(props.entityType);
 
   const [draft, setDraft] = createSignal<FormFieldSetting[]>([]);
@@ -53,9 +92,9 @@ export function EntityFormSettingsPage(props: Props) {
     setDirty(true);
   };
 
-  const updateRow = (index: number, patch: Partial<FormFieldSetting>) => {
+  const updateRow = (fieldKey: string, patch: Partial<FormFieldSetting>) => {
     if (!dirty()) syncDraft();
-    setDraft((list) => list.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+    setDraft((list) => list.map((r) => (r.field_key === fieldKey ? { ...r, ...patch } : r)));
   };
 
   const save = async () => {
@@ -69,12 +108,12 @@ export function EntityFormSettingsPage(props: Props) {
     );
     setSaving(false);
     if (!res.success) {
-      toast.error(res.message ?? "Failed to save form settings.");
+      toast.error(formatApiErrors(res.message, res.errors));
       return;
     }
     setDirty(false);
     invalidate();
-    void query.refetch();
+    await query.refetch();
   };
 
   const addCustomField = async () => {
@@ -88,25 +127,41 @@ export function EntityFormSettingsPage(props: Props) {
       return;
     }
     setAdding(true);
-    const key = newKey().trim() || slugKey(newLabel());
+    const key = slugKey(newKey().trim() || newLabel());
     const label = newLabel().trim();
-    const res = await apiFetch("/api/v1/custom-fields", {
-      method: "POST",
-      body: JSON.stringify({
-        entity_type: props.entityType,
-        field_key: key,
-        label,
-        field_type: newType(),
-        is_required: newRequired(),
-        sort_order: fields().filter((f) => f.kind === "custom").length,
-        options: needsChoices ? { choices: parseChoices(newChoices()) } : {},
-      }),
-    }, { successMessage: `Custom field "${label}" added.` });
+    const res = await apiFetch<CreatedDefinition>(
+      "/api/v1/custom-fields",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          entity_type: props.entityType,
+          field_key: key,
+          label,
+          field_type: newType(),
+          is_required: newRequired(),
+          sort_order: fields().filter((f) => f.kind === "custom").length,
+          options: needsChoices ? { choices: parseChoices(newChoices()) } : {},
+        }),
+      },
+      { successMessage: `Custom field "${label}" added.` },
+    );
     setAdding(false);
-    if (!res.success) {
-      toast.error(res.message ?? "Failed to add custom field.");
+    if (!res.success || !res.data) {
+      toast.error(formatApiErrors(res.message, res.errors));
       return;
     }
+    const merged = toMergedField(res.data);
+    client.setQueryData(
+      ["form-field-settings", props.entityType],
+      (old: { fields: FormFieldSetting[]; can_manage?: boolean } | undefined) => {
+        if (!old) return { fields: [merged], can_manage: true };
+        const exists = old.fields.some((f) => f.field_key === merged.field_key);
+        return {
+          ...old,
+          fields: exists ? old.fields : [...old.fields, merged],
+        };
+      },
+    );
     setNewLabel("");
     setNewKey("");
     setNewType("text");
@@ -114,7 +169,7 @@ export function EntityFormSettingsPage(props: Props) {
     setNewChoices("");
     setDirty(false);
     invalidate();
-    void query.refetch();
+    await query.refetch();
   };
 
   const removeCustomField = async (id: number | undefined, label: string) => {
@@ -123,12 +178,12 @@ export function EntityFormSettingsPage(props: Props) {
       successMessage: `Custom field "${label}" disabled.`,
     });
     if (!res.success) {
-      toast.error(res.message ?? "Failed to remove custom field.");
+      toast.error(formatApiErrors(res.message, res.errors));
       return;
     }
     setDirty(false);
     invalidate();
-    void query.refetch();
+    await query.refetch();
   };
 
   const sortedRows = () => [...rows()].sort((a, b) => a.sort_order - b.sort_order);
@@ -189,7 +244,7 @@ export function EntityFormSettingsPage(props: Props) {
               </tr>
             </Show>
             <For each={sortedRows()}>
-              {(row, index) => (
+              {(row) => (
                 <tr>
                   <td class="px-4 py-3">
                     <span class="font-medium text-text-primary">{row.field_key}</span>
@@ -201,7 +256,7 @@ export function EntityFormSettingsPage(props: Props) {
                       class={inputClass}
                       value={row.label}
                       disabled={!canEdit()}
-                      onInput={(e) => updateRow(index(), { label: e.currentTarget.value })}
+                      onInput={(e) => updateRow(row.field_key, { label: e.currentTarget.value })}
                     />
                   </td>
                   <td class="px-4 py-3">
@@ -209,7 +264,7 @@ export function EntityFormSettingsPage(props: Props) {
                       type="checkbox"
                       checked={row.is_visible}
                       disabled={!canEdit()}
-                      onChange={(e) => updateRow(index(), { is_visible: e.currentTarget.checked })}
+                      onChange={(e) => updateRow(row.field_key, { is_visible: e.currentTarget.checked })}
                     />
                   </td>
                   <td class="px-4 py-3">
@@ -217,7 +272,7 @@ export function EntityFormSettingsPage(props: Props) {
                       type="checkbox"
                       checked={row.is_required}
                       disabled={!canEdit()}
-                      onChange={(e) => updateRow(index(), { is_required: e.currentTarget.checked })}
+                      onChange={(e) => updateRow(row.field_key, { is_required: e.currentTarget.checked })}
                     />
                   </td>
                   <td class="px-4 py-3">
@@ -226,7 +281,7 @@ export function EntityFormSettingsPage(props: Props) {
                         type="checkbox"
                         checked={row.is_disabled}
                         disabled={!canEdit()}
-                        onChange={(e) => updateRow(index(), { is_disabled: e.currentTarget.checked })}
+                        onChange={(e) => updateRow(row.field_key, { is_disabled: e.currentTarget.checked })}
                       />
                     </Show>
                   </td>
@@ -236,7 +291,12 @@ export function EntityFormSettingsPage(props: Props) {
                         type="checkbox"
                         checked={row.is_active}
                         disabled={!canEdit()}
-                        onChange={(e) => updateRow(index(), { is_active: e.currentTarget.checked, is_visible: e.currentTarget.checked })}
+                        onChange={(e) =>
+                          updateRow(row.field_key, {
+                            is_active: e.currentTarget.checked,
+                            is_visible: e.currentTarget.checked ? row.is_visible : false,
+                          })
+                        }
                       />
                     </Show>
                   </td>

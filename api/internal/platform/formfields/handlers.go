@@ -125,7 +125,7 @@ func LoadMergedSettings(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 			Label:      c.Label,
 			FieldType:  c.FieldType,
 			Options:    c.Options,
-			IsVisible:  c.IsActive,
+			IsVisible:  customFieldVisible(c.Options, c.IsActive),
 			IsRequired: c.IsRequired,
 			IsDisabled: false,
 			IsActive:   c.IsActive,
@@ -194,15 +194,18 @@ func SaveSettings(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entit
 			if f.ID == nil {
 				continue
 			}
+			opts := mergeCustomFieldOptions(f.Options, f.IsVisible)
 			_, err := tx.Exec(ctx, `
 				update public.tenant_custom_field_definitions set
 				  label = $1,
 				  is_required = $2,
 				  is_active = $3,
 				  sort_order = $4,
+				  options = $5,
 				  updated_at = now()
-				where id = $5 and tenant_id = $6 and entity_type = $7`,
-				strings.TrimSpace(f.Label), f.IsRequired, f.IsActive, f.SortOrder, *f.ID, tenantID, entityType)
+				where id = $6 and tenant_id = $7 and entity_type = $8`,
+				strings.TrimSpace(f.Label), f.IsRequired, f.IsActive, customSortOrder(f.SortOrder), opts,
+				*f.ID, tenantID, entityType)
 			if err != nil {
 				return err
 			}

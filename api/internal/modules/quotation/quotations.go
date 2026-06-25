@@ -69,6 +69,7 @@ type Quotation struct {
 	CreatedByName           string          `json:"created_by_name,omitempty"`
 	ItemNameSummary         string          `json:"item_name_summary,omitempty"`
 	Lines                   []QuotationLine `json:"lines,omitempty"`
+	CustomValues            map[string]any  `json:"custom_values,omitempty"`
 }
 
 type quotationLineBody struct {
@@ -100,6 +101,7 @@ type quotationBody struct {
 	Notes                   *string             `json:"notes"`
 	ProgressStatus          string              `json:"progress_status"`
 	Lines                   []quotationLineBody `json:"lines"`
+	CustomValues            map[string]any      `json:"custom_values"`
 }
 
 type computedLine struct {
@@ -356,6 +358,7 @@ func loadQuotation(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		return Quotation{}, err
 	}
 	q.Lines = lines
+	q.CustomValues = attachCustom(ctx, pool, tenantID, entityQuotation, id)
 	return q, nil
 }
 
@@ -464,6 +467,10 @@ func createQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
 			return
 		}
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, entityQuotation, id, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
@@ -547,6 +554,10 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if err := replaceQuotationLines(r.Context(), tx, id, computed); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+			return
+		}
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, entityQuotation, id, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
