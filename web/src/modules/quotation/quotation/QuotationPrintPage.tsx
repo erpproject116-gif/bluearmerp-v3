@@ -16,6 +16,8 @@ import {
   type QuotationPrintPayload,
 } from "./quotationPrint";
 import { progressStatusLabel } from "./progressStatus";
+import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
+import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import "./quotationPrint.css";
 
 function QuotationPrintView() {
@@ -52,19 +54,11 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
   return (
     <>
       <article class="quotation-print__page">
-        <header class="quotation-print__header">
-          <div>
-            <h1 class="quotation-print__company">{p().tenant.company_name}</h1>
-            <Show when={p().tenant.address}>
-              <p class="quotation-print__meta">{p().tenant.address}</p>
-            </Show>
-            <p class="quotation-print__meta">{partyContact(p().tenant)}</p>
-          </div>
-          <div class="quotation-print__doc-title">
-            <h2>Quotation</h2>
-            <p class="quotation-print__meta">{q().reference_no}</p>
-          </div>
-        </header>
+        <PrintBrandingHeader
+          docTitle="Quotation"
+          docSubtitle={q().reference_no}
+          tenantFallbackName={p().tenant.company_name}
+        />
 
         <section class="quotation-print__grid">
           <div>
@@ -146,7 +140,10 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
           </div>
         </footer>
 
-        <p class="quotation-print__footer">Generated from Bluearm ERP · {new Date().toLocaleString()}</p>
+        <PrintBrandingFooter
+          class="quotation-print__footer"
+          defaultFooter={`Generated from Bluearm ERP · ${new Date().toLocaleString()}`}
+        />
       </article>
 
       <PrintToolbar

@@ -12,6 +12,8 @@ import {
   type SalesPrintPayload,
 } from "./salesPrint";
 import type { SalesDetail } from "./SalesModal";
+import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
+import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import "../../quotation/quotation/quotationPrint.css";
 
 type LineRow = NonNullable<SalesDetail["lines"]>[number];
@@ -103,18 +105,10 @@ function PrintDocument(props: { payload: SalesPrintPayload }) {
   return (
     <>
       <article class="quotation-print__page">
-        <header class="quotation-print__header">
-          <div>
-            <h1 class="quotation-print__company">{p().tenant.company_name}</h1>
-            <Show when={p().tenant.address}>
-              <p class="quotation-print__meta">{p().tenant.address}</p>
-            </Show>
-            <p class="quotation-print__meta">{partyContact(p().tenant)}</p>
-          </div>
-          <div class="quotation-print__doc-title">
-            <h2>PACKING SLIP</h2>
-          </div>
-        </header>
+        <PrintBrandingHeader
+          docTitle="PACKING SLIP"
+          tenantFallbackName={p().tenant.company_name}
+        />
 
         <section class="quotation-print__grid">
           <div>
@@ -173,7 +167,10 @@ function PrintDocument(props: { payload: SalesPrintPayload }) {
           </div>
         </footer>
 
-        <p class="quotation-print__footer">Generated from Bluearm ERP · {new Date().toLocaleString()}</p>
+        <PrintBrandingFooter
+          class="quotation-print__footer"
+          defaultFooter={`Generated from Bluearm ERP · ${new Date().toLocaleString()}`}
+        />
       </article>
 
       <PrintToolbar

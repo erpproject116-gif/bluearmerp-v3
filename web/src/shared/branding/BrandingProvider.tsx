@@ -1,5 +1,6 @@
 import { createContext, createEffect, createSignal, onMount, useContext } from "solid-js";
 import { apiAbsoluteUrl, apiFetch, getAccessToken } from "../api";
+import { getGlobalToast } from "../toast";
 import { useAuth } from "../auth-context";
 import { applyBrandingTheme } from "./applyTheme";
 import { DEFAULT_BRANDING } from "./defaults";
@@ -19,7 +20,7 @@ function mergeSettings(raw: Partial<BrandingSettings> | undefined): BrandingSett
 type BrandingContextValue = {
   settings: () => BrandingSettings;
   canManage: () => boolean;
-  logoUrl: () => string | undefined;
+  logoPreviewUrl: () => string | undefined;
   loading: () => boolean;
   refresh: () => Promise<void>;
   save: (patch: Partial<BrandingSettings>) => Promise<boolean>;
@@ -33,13 +34,30 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
   const auth = useAuth();
   const [settings, setSettings] = createSignal<BrandingSettings>(mergeSettings(undefined));
   const [canManage, setCanManage] = createSignal(false);
-  const [logoUrl, setLogoUrl] = createSignal<string | undefined>();
+  const [logoPreviewUrl, setLogoPreviewUrl] = createSignal<string | undefined>();
   const [loading, setLoading] = createSignal(false);
+
+  const loadLogoPreview = async (settings: BrandingSettings) => {
+    const id = settings.receipt.logo_asset_id;
+    if (!id) {
+      setLogoPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return undefined;
+      });
+      return;
+    }
+    const blobUrl = await fetchBrandingLogoBlob(id);
+    setLogoPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return blobUrl ?? undefined;
+    });
+  };
 
   const apply = (s: BrandingSettings) => {
     setSettings(s);
     setBrandingSnapshot(s);
     applyBrandingTheme(s);
+    void loadLogoPreview(s);
   };
 
   const refresh = async () => {
@@ -50,7 +68,6 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
       if (res.success && res.data) {
         apply(mergeSettings(res.data.settings));
         setCanManage(Boolean(res.data.can_manage));
-        setLogoUrl(res.data.logo_url ? apiAbsoluteUrl(res.data.logo_url) : undefined);
       }
     } finally {
       setLoading(false);
@@ -86,8 +103,18 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: fd,
     });
-    const body = await res.json();
-    if (!body.success) return false;
+    let body: { success?: boolean; message?: string };
+    try {
+      body = await res.json();
+    } catch {
+      getGlobalToast()?.error("Logo upload failed — invalid server response.");
+      return false;
+    }
+    if (!body.success) {
+      getGlobalToast()?.error(body.message ?? "Logo upload failed.");
+      return false;
+    }
+    getGlobalToast()?.success(body.message ?? "Logo uploaded.");
     await refresh();
     return true;
   };
@@ -111,7 +138,7 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
   const value: BrandingContextValue = {
     settings,
     canManage,
-    logoUrl,
+    logoPreviewUrl,
     loading,
     refresh,
     save,

@@ -15,6 +15,8 @@ import {
 } from "./repairOrderPrint";
 import "./repairOrderPrint.css";
 import "../../quotation/quotation/quotationPrint.css";
+import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
+import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 
 type Props = { doc: "receipt" | "warranty" };
 
@@ -108,18 +110,11 @@ function PrintDocument(props: { payload: RepairOrderPrintPayload }) {
   return (
     <>
       <article class="repair-print__page">
-        <header class="repair-print__header">
-          <div>
-            <h1 class="repair-print__company">{p().tenant.company_name}</h1>
-            <Show when={p().tenant.address}>
-              <p class="repair-print__meta">{p().tenant.address}</p>
-            </Show>
-            <p class="repair-print__meta">{partyContact(p().tenant)}</p>
-          </div>
-          <div class="repair-print__doc-title">
-            <h2>{p().doc_type === "receipt" ? "Repair Service Receipt" : "Repair Warranty Details"}</h2>
-          </div>
-        </header>
+        <PrintBrandingHeader
+          variant="repair"
+          docTitle={p().doc_type === "receipt" ? "Repair Service Receipt" : "Repair Warranty Details"}
+          tenantFallbackName={p().tenant.company_name}
+        />
 
         <section class="repair-print__grid">
           <div>
@@ -209,7 +204,10 @@ function PrintDocument(props: { payload: RepairOrderPrintPayload }) {
           </div>
         </footer>
 
-        <p class="repair-print__footer">Generated from Bluearm ERP · {new Date().toLocaleString()}</p>
+        <PrintBrandingFooter
+          class="repair-print__footer"
+          defaultFooter={`Generated from Bluearm ERP · ${new Date().toLocaleString()}`}
+        />
       </article>
 
       <PrintToolbar

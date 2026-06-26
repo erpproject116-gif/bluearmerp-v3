@@ -1,7 +1,6 @@
 import { createEffect, createResource, createSignal, For, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
-import { useAuth } from "../../../shared/auth-context";
 import { apiFetch } from "../../../shared/api";
 import {
   defaultStatusFilters,
@@ -10,6 +9,8 @@ import {
   type RepairOrderStatusFilters,
 } from "./repairOrderStatusFilters";
 import type { StatusReportRow } from "../../../shared/useRepairOrderStatusReport";
+import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
+import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import "../after-sales/repairOrderPrint.css";
 import "./statusReportPrint.css";
 
@@ -58,7 +59,6 @@ async function fetchAllStatusRows(filters: RepairOrderStatusFilters) {
 
 function StatusPrintView() {
   const [params] = useSearchParams();
-  const auth = useAuth();
   const [generatedAt] = createSignal(new Date());
 
   const filters = () => parseFiltersFromSearch(params as Record<string, string | string[]>);
@@ -82,15 +82,11 @@ function StatusPrintView() {
       <Show when={data()}>
         {(payload) => (
           <article class="repair-print__page status-report-print">
-            <header class="status-report-print__title">
-              <h1>Repair Order Status</h1>
-              <div class="status-report-print__meta">
-                <span>Company Name : {auth.me?.tenant.company_name ?? "—"}</span>
-                <span>
-                  {formatDisplayDate(filters().date_from)} ~ {formatDisplayDate(filters().date_to)}
-                </span>
-              </div>
-            </header>
+            <PrintBrandingHeader
+              variant="repair"
+              docTitle="Repair Order Status"
+              docSubtitle={`${formatDisplayDate(filters().date_from)} ~ ${formatDisplayDate(filters().date_to)}`}
+            />
             <table class="repair-print__table">
               <thead>
                 <tr>
@@ -136,9 +132,10 @@ function StatusPrintView() {
                 </tr>
               </tfoot>
             </table>
-            <p class="repair-print__footer">
-              [P.1] · {generatedAt().toLocaleString()}
-            </p>
+            <PrintBrandingFooter
+              class="repair-print__footer"
+              defaultFooter={`[P.1] · ${generatedAt().toLocaleString()}`}
+            />
           </article>
         )}
       </Show>

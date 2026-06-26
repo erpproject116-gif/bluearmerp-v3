@@ -7,6 +7,7 @@ import {
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
 import { useToast } from "./toast";
+import { brandingPlaceholder } from "./branding/brandingStore";
 
 export type Column<T> = {
   key: string;
@@ -190,7 +191,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                 <input
                   type="search"
                   class={`${toolbarControlClass} w-full pl-9`}
-                  placeholder={props.searchPlaceholder ?? "Search…"}
+                  placeholder={props.searchPlaceholder ?? brandingPlaceholder("search.item", "Search…")}
                   value={props.search ?? ""}
                   onInput={(e) => props.onSearchChange?.(e.currentTarget.value)}
                 />
@@ -435,7 +436,9 @@ export function EntityModal(props: {
 export function Field(props: { label: string; span?: "full"; children: JSX.Element }) {
   return (
     <label class={props.span === "full" ? "col-span-full block" : "block"}>
-      <span class="mb-1 block text-sm font-medium text-text-primary">{props.label}</span>
+      <span class="mb-1 block text-sm font-medium" style={{ color: "var(--color-label, var(--color-text-primary))" }}>
+        {props.label}
+      </span>
       {props.children}
     </label>
   );

@@ -5,6 +5,8 @@ import { apiFetch } from "../../../shared/api";
 import { defaultStatusFilters, filtersToSearchParams, type SalesStatusFilters } from "../sales/salesStatusFilters";
 import type { SalesStatusReportRow } from "../../../shared/useSalesStatusReport";
 import { formatMoney, formatPrintDate, partyContact, type SalesPrintPayload } from "../sales/salesPrint";
+import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
+import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import { PrintPreviewTable, type PrintPreviewColumn } from "../../../shared/PrintPreviewTable";
 import "../../quotation/quotation/quotationPrint.css";
 
@@ -73,13 +75,10 @@ function SlipDocument(props: { payload: SalesPrintPayload }) {
   const lines = () => (sale().lines ?? []) as SaleLine[];
   return (
     <article class="quotation-print__page print:break-after-page">
-      <header class="quotation-print__header">
-        <div>
-          <h1 class="quotation-print__company">{props.payload.tenant.company_name}</h1>
-          <Show when={props.payload.tenant.address}><p class="quotation-print__meta">{props.payload.tenant.address}</p></Show>
-        </div>
-        <div class="quotation-print__doc-title"><h2>PACKING SLIP</h2></div>
-      </header>
+      <PrintBrandingHeader
+        docTitle="PACKING SLIP"
+        tenantFallbackName={props.payload.tenant.company_name}
+      />
       <section class="quotation-print__grid">
         <div>
           <h3 class="quotation-print__section">Bill To</h3>
@@ -94,6 +93,7 @@ function SlipDocument(props: { payload: SalesPrintPayload }) {
       </section>
       <PrintPreviewTable columns={slipColumns} rows={lines()} />
       <p class="mt-4 text-right font-semibold">Grand Total: {formatMoney(sale().grand_total)}</p>
+      <PrintBrandingFooter />
     </article>
   );
 }

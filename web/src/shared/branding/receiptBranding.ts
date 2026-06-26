@@ -23,8 +23,13 @@ export function resolvePrintCompanyName(
 
 export function resolvePrintHeaderText(templateHeader: string | undefined, branding: BrandingSettings): string {
   if (templateHeader?.trim()) return templateHeader.trim();
-  if (branding.receipt.header_text?.trim()) return branding.receipt.header_text.trim();
-  return formatReceiptContact(branding.receipt).join("\n");
+  const parts: string[] = [];
+  if (branding.receipt.header_text?.trim()) parts.push(branding.receipt.header_text.trim());
+  const contact = formatReceiptContact(branding.receipt);
+  for (const line of contact) {
+    if (!parts.includes(line)) parts.push(line);
+  }
+  return parts.join("\n");
 }
 
 export function resolvePrintFooterText(templateFooter: string | undefined, branding: BrandingSettings): string {

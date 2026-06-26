@@ -16,6 +16,8 @@ import {
   type SalesOrderPrintPayload,
 } from "./salesOrderPrint";
 import { progressStatusLabel } from "./progressStatus";
+import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
+import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import "../../quotation/quotation/quotationPrint.css";
 
 function SalesOrderPrintView() {
@@ -52,19 +54,11 @@ function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
   return (
     <>
     <article class="quotation-print__page">
-      <header class="quotation-print__header">
-        <div>
-          <h1 class="quotation-print__company">{p().tenant.company_name}</h1>
-          <Show when={p().tenant.address}>
-            <p class="quotation-print__meta">{p().tenant.address}</p>
-          </Show>
-          <p class="quotation-print__meta">{partyContact(p().tenant)}</p>
-        </div>
-        <div class="quotation-print__doc-title">
-          <h2>Sales Order</h2>
-          <p class="quotation-print__meta">{so().sales_order_no}</p>
-        </div>
-      </header>
+      <PrintBrandingHeader
+        docTitle="Sales Order"
+        docSubtitle={so().sales_order_no}
+        tenantFallbackName={p().tenant.company_name}
+      />
 
       <section class="quotation-print__grid">
         <div>
@@ -160,7 +154,10 @@ function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
         </div>
       </footer>
 
-      <p class="quotation-print__footer">Generated from Bluearm ERP · {new Date().toLocaleString()}</p>
+      <PrintBrandingFooter
+        class="quotation-print__footer"
+        defaultFooter={`Generated from Bluearm ERP · ${new Date().toLocaleString()}`}
+      />
     </article>
     <PrintToolbar
       layout={{

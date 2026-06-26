@@ -1,12 +1,6 @@
-import { createEffect, createResource, createSignal, For, onCleanup, Show } from "solid-js";
-import { fetchReportLogoBlob } from "../../../shared/reportTemplates/useReportTemplates";
-import { fetchBrandingLogoBlob, useBranding } from "../../../shared/branding/BrandingProvider";
-import {
-  resolveLogoAssetId,
-  resolvePrintCompanyName,
-  resolvePrintFooterText,
-  resolvePrintHeaderText,
-} from "../../../shared/branding/receiptBranding";
+import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
+import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import {
   DISCOUNT_STATUS_COLUMNS,
   showDiscountColumn,
@@ -14,7 +8,6 @@ import {
 } from "./discountStatusColumns";
 import { useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
-import { useAuth } from "../../../shared/auth-context";
 import { apiFetch } from "../../../shared/api";
 import { PrintPageSettingsModal } from "../../../shared/PrintPageSettingsModal";
 import { applyPrintPageSettings, loadPrintPageSettings } from "../../../shared/printPageSettings";
@@ -64,8 +57,6 @@ async function fetchAllRows(filters: SalesDiscountStatusFilters, template: Retur
 }
 
 function PrintView() {
-  const auth = useAuth();
-  const branding = useBranding();
   const [params] = useSearchParams();
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [autoPrinted, setAutoPrinted] = createSignal(false);
@@ -85,32 +76,6 @@ function PrintView() {
     setAutoPrinted(true);
     const timer = window.setTimeout(() => window.print(), 500);
     return () => window.clearTimeout(timer);
-  });
-
-  const [logoUrl, setLogoUrl] = createSignal<string | null>(null);
-
-  createEffect(() => {
-    const tpl = template();
-    const logoId = resolveLogoAssetId(tpl.logoAssetId, branding.settings());
-    if (!logoId) {
-      setLogoUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      return;
-    }
-    const fetcher = tpl.logoAssetId ? fetchReportLogoBlob : fetchBrandingLogoBlob;
-    void fetcher(logoId).then(setLogoUrl);
-  });
-
-  const companyName = () =>
-    resolvePrintCompanyName(undefined, branding.settings(), auth.me?.tenant.company_name);
-  const printHeader = () => resolvePrintHeaderText(template().printHeader, branding.settings());
-  const printFooter = () => resolvePrintFooterText(template().printFooter, branding.settings());
-
-  onCleanup(() => {
-    const url = logoUrl();
-    if (url) URL.revokeObjectURL(url);
   });
 
   const showCol = (key: DiscountColumnKey) =>
@@ -143,23 +108,15 @@ function PrintView() {
       <Show when={data()}>
         {(payload) => (
           <article class="quotation-print__page">
-            <header class="quotation-print__header">
-              <div>
-                <Show when={logoUrl()}>
-                  <img src={logoUrl()!} alt="Logo" class="mb-2 max-h-16 max-w-[10rem] object-contain" />
-                </Show>
-                <h1 class="quotation-print__company">{companyName()}</h1>
-                <Show when={printHeader().trim()}>
-                  <p class="quotation-print__meta whitespace-pre-line">{printHeader()}</p>
-                </Show>
-              </div>
-              <div class="quotation-print__doc-title">
-                <h2>Sales Discount Status</h2>
-                <p class="quotation-print__meta">
-                  {formatDisplayDate(filters().date_from)} ~ {formatDisplayDate(filters().date_to)}
-                </p>
-              </div>
-            </header>
+            <PrintBrandingHeader
+              docTitle="Sales Discount Status"
+              docSubtitle={`${formatDisplayDate(filters().date_from)} ~ ${formatDisplayDate(filters().date_to)}`}
+              overrides={{
+                printHeader: template().printHeader,
+                printFooter: template().printFooter,
+                logoAssetId: template().logoAssetId,
+              }}
+            />
             <Show when={template().viewAsGraph}>
               <SalesDiscountStatusGraph rows={payload().rows} metric="difference_amount" />
             </Show>
@@ -203,11 +160,7 @@ function PrintView() {
                 </tfoot>
               </table>
             </Show>
-            <Show when={printFooter().trim()}>
-              <footer class="mt-6 border-t border-stroke pt-3 text-center text-sm text-text-secondary whitespace-pre-line">
-                {printFooter()}
-              </footer>
-            </Show>
+            <PrintBrandingFooter overrides={{ printFooter: template().printFooter }} />
           </article>
         )}
       </Show>

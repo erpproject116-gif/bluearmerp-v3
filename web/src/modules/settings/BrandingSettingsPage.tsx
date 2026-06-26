@@ -12,6 +12,8 @@ import {
 import type { BrandingColors, BrandingReceipt, BrandingSettings } from "../../shared/branding/types";
 import { StageBadge } from "../../shared/branding/StageBadge";
 import { progressStatusLabel } from "../../shared/branding/progressStatus";
+import { BrandingLogoImage } from "../../shared/branding/BrandingLogoImage";
+import { useToast } from "../../shared/toast";
 
 const COLOR_FIELDS: { key: keyof BrandingColors; label: string }[] = [
   { key: "primary", label: "Primary" },
@@ -42,6 +44,7 @@ const MAX_LOGO_MB = 2;
 export default function BrandingSettingsPage() {
   const auth = useAuth();
   const branding = useBranding();
+  const toast = useToast();
   const [draft, setDraft] = createSignal<BrandingSettings>(DEFAULT_BRANDING);
   const [dirty, setDirty] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
@@ -95,9 +98,12 @@ export default function BrandingSettingsPage() {
   };
 
   const onLogoFile = async (file: File) => {
-    if (file.size > MAX_LOGO_MB * 1024 * 1024) return;
-    await branding.uploadLogo(file);
-    syncDraft();
+    if (file.size > MAX_LOGO_MB * 1024 * 1024) {
+      toast.error(`Logo must be ${MAX_LOGO_MB} MB or smaller.`);
+      return;
+    }
+    const ok = await branding.uploadLogo(file);
+    if (ok) syncDraft();
   };
 
   if (!canManageBranding(auth.me)) {
@@ -187,9 +193,7 @@ export default function BrandingSettingsPage() {
           Default print/receipt branding. Report templates can override these per report.
         </p>
         <div class="mt-4 flex flex-wrap items-start gap-4">
-          <Show when={branding.logoUrl()}>
-            <img src={branding.logoUrl()} alt="Company logo" class="max-h-20 max-w-[12rem] object-contain" />
-          </Show>
+          <BrandingLogoImage />
           <label class="cursor-pointer rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50">
             Upload logo (max {MAX_LOGO_MB} MB)
             <input

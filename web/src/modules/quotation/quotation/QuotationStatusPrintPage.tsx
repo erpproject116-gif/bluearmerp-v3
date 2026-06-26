@@ -1,7 +1,6 @@
 import { createEffect, createResource, createSignal, For, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
-import { useAuth } from "../../../shared/auth-context";
 import { apiFetch } from "../../../shared/api";
 import {
   defaultStatusFilters,
@@ -11,6 +10,8 @@ import {
 } from "./quotationStatusFilters";
 import type { QuotationStatusReportRow } from "../../../shared/useQuotationStatusReport";
 import { progressStatusLabel } from "./progressStatus";
+import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
+import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import "./quotationPrint.css";
 
 function parseFiltersFromSearch(params: Record<string, string | string[]>): QuotationStatusFilters {
@@ -66,7 +67,6 @@ function money(n: number) {
 
 function StatusPrintView() {
   const [params] = useSearchParams();
-  const auth = useAuth();
   const [generatedAt] = createSignal(new Date());
   const filters = () => parseFiltersFromSearch(params as Record<string, string | string[]>);
   const [data] = createResource(filters, fetchAllStatusRows);
@@ -88,17 +88,10 @@ function StatusPrintView() {
       <Show when={data()}>
         {(payload) => (
           <article class="quotation-print__page">
-            <header class="quotation-print__header">
-              <div>
-                <h1 class="quotation-print__company">{auth.me?.tenant.company_name ?? "Company"}</h1>
-              </div>
-              <div class="quotation-print__doc-title">
-                <h2>Quotation Status</h2>
-                <p class="quotation-print__meta">
-                  {formatDisplayDate(filters().date_from)} ~ {formatDisplayDate(filters().date_to)}
-                </p>
-              </div>
-            </header>
+            <PrintBrandingHeader
+              docTitle="Quotation Status"
+              docSubtitle={`${formatDisplayDate(filters().date_from)} ~ ${formatDisplayDate(filters().date_to)}`}
+            />
             <table class="quotation-print__table">
               <thead>
                 <tr>
@@ -144,7 +137,10 @@ function StatusPrintView() {
                 </tr>
               </tfoot>
             </table>
-            <p class="quotation-print__footer">[P.1] · {generatedAt().toLocaleString()}</p>
+            <PrintBrandingFooter
+              class="quotation-print__footer"
+              defaultFooter={`[P.1] · ${generatedAt().toLocaleString()}`}
+            />
           </article>
         )}
       </Show>

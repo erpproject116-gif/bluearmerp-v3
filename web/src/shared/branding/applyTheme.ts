@@ -7,6 +7,7 @@ function setVar(root: HTMLElement, name: string, value?: string) {
 
 export function applyBrandingTheme(settings: BrandingSettings) {
   const root = document.documentElement;
+  const body = document.body;
   const c = settings.colors;
   setVar(root, "--color-brand-500", c.primary);
   setVar(root, "--color-brand-600", c.primary);
@@ -21,6 +22,11 @@ export function applyBrandingTheme(settings: BrandingSettings) {
   setVar(root, "--color-secondary", c.secondary);
   setVar(root, "--color-label", c.label);
   setVar(root, "--color-surface", c.surface);
+
+  if (body) {
+    if (c.background?.trim()) body.style.backgroundColor = c.background.trim();
+    if ((c.heading || c.text)?.trim()) body.style.color = (c.heading || c.text).trim();
+  }
 
   for (const key of STAGE_KEYS) {
     const stage = settings.stages[key];
