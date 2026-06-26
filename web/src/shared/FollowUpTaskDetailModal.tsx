@@ -1,14 +1,12 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createResource, createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { DateInput } from "./DateInput";
 import { EntityModal, Field, inputClass } from "./SpreadsheetGrid";
 import { entityRecordHref } from "./entityRoutes";
 import { TASK_BOARD_STAGES, taskStageBadgeClass, taskStageLabel } from "./crmTaskStages";
+import { useInvalidateCrmTaskSummaries } from "./useCrmTaskSummaries";
 import {
   fetchFollowUpTask,
-  useInvalidateCrmTaskSummaries,
-} from "./useCrmTaskSummaries";
-import {
   patchFollowUpTask,
   patchFollowUpTaskStage,
   useInvalidateFollowUpTasks,
@@ -49,47 +47,42 @@ export function FollowUpTaskDetailModal(props: Props) {
   const toast = useToast();
   const invalidateTasks = useInvalidateFollowUpTasks();
   const invalidateSummaries = useInvalidateCrmTaskSummaries();
-  const [task, setTask] = createSignal<FollowUpTask | null>(null);
-  const [loading, setLoading] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [title, setTitle] = createSignal("");
   const [dueDate, setDueDate] = createSignal("");
   const [notes, setNotes] = createSignal("");
   const [stage, setStage] = createSignal<FollowUpTaskStage>("scheduled");
 
-  const load = async (id: number) => {
-    setLoading(true);
-    setTask(null);
+  const loadId = () => {
+    if (!props.open()) return undefined;
+    const id = props.taskId();
+    if (id == null || !Number.isFinite(id) || id <= 0) return undefined;
+    return id;
+  };
+
+  const [task, { refetch }] = createResource(loadId, async (id) => {
     const res = await fetchFollowUpTask(id);
     if (!res.success || !res.data) {
-      setLoading(false);
-      toast.warning(res.message ?? "Could not load task.");
-      props.onClose();
-      return;
+      throw new Error(res.message ?? "Could not load task.");
     }
-    const t = res.data;
-    setTask(t);
+    return res.data;
+  });
+
+  createEffect(() => {
+    const t = task();
+    if (!t) return;
     setTitle(t.title);
     setDueDate(t.due_date);
     setNotes(t.notes ?? "");
     setStage(t.stage);
-    setLoading(false);
-  };
+  });
 
   createEffect(() => {
-    const id = props.taskId();
-    if (props.open() && id) {
-      void load(id);
-      return;
-    }
-    if (!props.open()) {
-      setTask(null);
-      setLoading(false);
-      setTitle("");
-      setDueDate("");
-      setNotes("");
-      setStage("scheduled");
-    }
+    if (!props.open()) return;
+    const err = task.error;
+    if (!err) return;
+    toast.warning(err instanceof Error ? err.message : "Could not load task.");
+    props.onClose();
   });
 
   const save = async () => {
@@ -100,28 +93,31 @@ export function FollowUpTaskDetailModal(props: Props) {
       return;
     }
     setSaving(true);
-    const res = await patchFollowUpTask(t.id, {
-      task_type: t.task_type,
-      stage: stage(),
-      due_date: dueDate(),
-      partner_id: t.partner_id,
-      pic_user_id: t.pic_user_id,
-      pic_name: t.pic_name,
-      warranty_asset_id: t.warranty_asset_id,
-      quotation_id: t.quotation_id,
-      sales_id: t.sales_id,
-      title: title().trim(),
-      notes: notes().trim() || null,
-    });
-    setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not save task.");
-      return;
+    try {
+      const res = await patchFollowUpTask(t.id, {
+        task_type: t.task_type,
+        stage: stage(),
+        due_date: dueDate(),
+        partner_id: t.partner_id,
+        pic_user_id: t.pic_user_id,
+        pic_name: t.pic_name,
+        warranty_asset_id: t.warranty_asset_id,
+        quotation_id: t.quotation_id,
+        sales_id: t.sales_id,
+        title: title().trim(),
+        notes: notes().trim() || null,
+      });
+      if (!res.success) {
+        toast.warning(res.message ?? "Could not save task.");
+        return;
+      }
+      toast.success("Task updated.");
+      invalidateTasks();
+      invalidateSummaries();
+      props.onClose();
+    } finally {
+      setSaving(false);
     }
-    toast.success("Task updated.");
-    invalidateTasks();
-    invalidateSummaries();
-    props.onClose();
   };
 
   const setStageOnly = async (next: FollowUpTaskStage) => {
@@ -135,8 +131,13 @@ export function FollowUpTaskDetailModal(props: Props) {
     setStage(next);
     invalidateTasks();
     invalidateSummaries();
-    void load(t.id);
+    void refetch();
   };
+
+  const loading = () => props.open() && loadId() != null && task.loading;
+  const loadedTask = () => task();
+  const loadFailed = () =>
+    props.open() && loadId() != null && !task.loading && task.error != null && !loadedTask();
 
   return (
     <EntityModal
@@ -151,23 +152,24 @@ export function FollowUpTaskDetailModal(props: Props) {
       <Show when={loading()}>
         <p class="text-sm text-text-secondary">Loading…</p>
       </Show>
-      <Show when={!loading() && !task()}>
+      <Show when={loadFailed()}>
         <p class="text-sm text-text-secondary">Task details could not be loaded.</p>
       </Show>
-      <Show when={!loading() && task()}>
+      <Show when={!loading() && loadedTask()}>
         {(t) => {
-          const link = () => linkedRecord(t());
+          const current = () => t() as FollowUpTask;
+          const link = () => linkedRecord(current());
           return (
             <>
               <div class="mb-3 flex flex-wrap items-center gap-2">
                 <span class={`rounded-full px-2 py-0.5 text-xs font-medium ${taskStageBadgeClass(stage())}`}>
                   {taskStageLabel(stage())}
                 </span>
-                <Show when={t().partner_name}>
-                  <span class="text-sm text-text-secondary">Customer: {t().partner_name}</span>
+                <Show when={current().partner_name}>
+                  <span class="text-sm text-text-secondary">Customer: {current().partner_name}</span>
                 </Show>
-                <Show when={t().pic_name}>
-                  <span class="text-sm text-text-secondary">PIC: {t().pic_name}</span>
+                <Show when={current().pic_name}>
+                  <span class="text-sm text-text-secondary">PIC: {current().pic_name}</span>
                 </Show>
               </div>
               <Show when={link()}>

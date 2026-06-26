@@ -1,6 +1,5 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
-import type { FollowUpTask } from "./useFollowUpTasks";
 
 export type FollowUpTaskSummary = {
   open_count: number;
@@ -51,8 +50,4 @@ export function useCrmTaskSummaries(params: () => {
 export function useInvalidateCrmTaskSummaries() {
   const client = useQueryClient();
   return () => void client.invalidateQueries({ queryKey: ["crm-task-summaries"] });
-}
-
-export async function fetchFollowUpTask(id: number) {
-  return apiFetch<FollowUpTask>(`/api/v1/crm/follow-up-tasks/${id}`, {}, { silent: true });
 }

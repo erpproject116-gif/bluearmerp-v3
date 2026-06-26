@@ -68,9 +68,16 @@ export default function FollowUpTasksPage() {
     crmTask.openTask(task.id);
   };
 
+  const [urlTaskOpened, setUrlTaskOpened] = createSignal<number | null>(null);
   createEffect(() => {
     const id = taskFromUrl();
-    if (id) crmTask.openTask(id);
+    if (!id) {
+      setUrlTaskOpened(null);
+      return;
+    }
+    if (urlTaskOpened() === id) return;
+    setUrlTaskOpened(id);
+    crmTask.openTask(id);
   });
 
   const list = useFollowUpTasks(() => ({

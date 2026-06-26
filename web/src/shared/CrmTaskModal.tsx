@@ -80,7 +80,9 @@ export function CrmTaskModalProvider(props: ParentProps) {
   };
 
   const openTask = (taskId: number) => {
-    setDetailTaskId(taskId);
+    const id = Number(taskId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    setDetailTaskId(id);
     setDetailOpen(true);
   };
 

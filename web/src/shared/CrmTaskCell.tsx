@@ -33,11 +33,17 @@ function summaryPreview(summary: FollowUpTaskSummary | null | undefined) {
   return "";
 }
 
+function normalizeTaskId(raw: unknown): number | undefined {
+  if (raw == null) return undefined;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 export function CrmTaskCell(props: Props) {
   const auth = useAuth();
   const modal = useCrmTaskModalOptional();
   const summary = () => props.summary;
-  const latestId = () => summary()?.latest_task_id;
+  const latestId = () => normalizeTaskId(summary()?.latest_task_id);
   const preview = () => summaryPreview(summary());
 
   return (

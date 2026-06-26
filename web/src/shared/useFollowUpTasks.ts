@@ -128,3 +128,7 @@ export function useInvalidateFollowUpTasks() {
     void client.invalidateQueries({ queryKey: ["crm-task-summaries"] });
   };
 }
+
+export async function fetchFollowUpTask(id: number) {
+  return apiFetch<FollowUpTask>(`/api/v1/crm/follow-up-tasks/${id}`, {}, { silent: true });
+}
