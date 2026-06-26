@@ -51,6 +51,12 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     return mod ? resolveSubBranch(mod, loc.pathname) : undefined;
   };
 
+  const featureNavModule = () => {
+    const mod = activeModule();
+    if (!mod || activeSubBranch()) return undefined;
+    return mod;
+  };
+
   const signOut = async () => {
     await signOutWithPresenceClear();
     navigate("/signin", { replace: true });
@@ -166,7 +172,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <div
             class="mt-4 rounded-xl border border-stroke erp-panel"
             classList={{
-              "flex justify-center p-2": shell.collapsed(),
+              "flex flex-col items-center gap-2 p-2": shell.collapsed(),
               "px-3 py-3": !shell.collapsed(),
             }}
             title={shell.collapsed() ? auth.me!.user.full_name : undefined}
@@ -174,21 +180,61 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             <Show
               when={!shell.collapsed()}
               fallback={
-                <UserAvatar
-                  name={auth.me!.user.full_name}
-                  avatarUrl={auth.me!.user.avatar_url}
-                  size="sm"
-                  class="ring-2 ring-brand-50"
-                />
+                <>
+                  <UserAvatar
+                    name={auth.me!.user.full_name}
+                    avatarUrl={auth.me!.user.avatar_url}
+                    size="sm"
+                    class="ring-2 ring-brand-50"
+                  />
+                  <Show when={canManageBranding(auth.me)}>
+                    <A
+                      href="/app/settings/branding"
+                      title={brandingLabel("app.branding_link", "Branding")}
+                      class="flex h-8 w-8 items-center justify-center rounded-lg border border-stroke text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                    >
+                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                      </svg>
+                    </A>
+                  </Show>
+                  <button
+                    type="button"
+                    title={brandingLabel("app.sign_out", "Sign out")}
+                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-stroke text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                    onClick={() => void signOut()}
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </button>
+                </>
               }
             >
               <div class="flex items-center gap-3">
                 <UserAvatar name={auth.me!.user.full_name} avatarUrl={auth.me!.user.avatar_url} size="sm" />
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium text-text-primary">{auth.me!.user.full_name}</p>
                   <p class="truncate text-xs text-text-secondary">{auth.me!.tenant.company_name}</p>
                   <AvatarUploadButton class="mt-0.5" />
                 </div>
+              </div>
+              <div class="mt-3 flex flex-col gap-1 border-t border-stroke pt-3">
+                <Show when={canManageBranding(auth.me)}>
+                  <A
+                    href="/app/settings/branding"
+                    class="rounded-lg border border-stroke px-3 py-2 text-center text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                  >
+                    {brandingLabel("app.branding_link", "Branding")}
+                  </A>
+                </Show>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                  onClick={() => void signOut()}
+                >
+                  {brandingLabel("app.sign_out", "Sign out")}
+                </button>
               </div>
             </Show>
           </div>
@@ -228,107 +274,93 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           "ml-[18.125rem]": !shell.collapsed(),
         }}
       >
-        <header class="erp-surface sticky top-0 z-30 flex items-center justify-between border-b border-stroke px-6 py-4 shadow-sm">
-          <div>
-            <Show
-              when={activeModule()}
-              fallback={
-                <>
-                  <p class="text-xs font-medium text-text-secondary">{appTitle()}</p>
-                  <h1 class="text-xl font-semibold text-text-primary">Dashboard</h1>
-                </>
-              }
-            >
-              {(mod) => (
-                <>
-                  <p class="text-xs font-medium text-text-secondary">
-                    <Show
-                      when={activeSubBranch()}
-                      fallback={mod().label}
+        <header class="erp-surface sticky top-0 z-30 border-b border-stroke px-6 py-4 shadow-sm">
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0 flex-1">
+              <Show
+                when={activeModule()}
+                fallback={
+                  <>
+                    <p class="text-xs font-medium text-text-secondary">{appTitle()}</p>
+                    <h1 class="text-xl font-semibold text-text-primary">Dashboard</h1>
+                  </>
+                }
+              >
+                {(mod) => (
+                  <>
+                    <p class="text-xs font-medium text-text-secondary">
+                      <Show when={activeSubBranch()} fallback={mod().label}>
+                        {(branch) => (
+                          <>
+                            <span>{mod().label}</span>
+                            <span class="mx-1.5 text-text-secondary/50" aria-hidden="true">
+                              ›
+                            </span>
+                            <span>{branch().label}</span>
+                          </>
+                        )}
+                      </Show>
+                    </p>
+                    <h1 class="truncate text-xl font-semibold text-text-primary">
+                      {activeSubBranch()
+                        ? subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix)
+                        : activeFeature()
+                          ? featureHeaderTitle(activeFeature()!, loc.pathname)
+                          : mod().label}
+                    </h1>
+                  </>
+                )}
+              </Show>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <PresenceHeartbeat />
+              <PresenceAvatars />
+              <CrmNotificationPoller enabled={canViewCrm(auth.me)} />
+              <Show when={canViewCrm(auth.me)}>
+                <button
+                  type="button"
+                  class="hidden rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 sm:inline-flex"
+                  onClick={() => crmTask.open()}
+                >
+                  + CRM task
+                </button>
+              </Show>
+              <CrmNotificationBell enabled={canViewCrm(auth.me)} />
+            </div>
+          </div>
+          <Show when={featureNavModule()}>
+            {(mod) => (
+              <nav class="erp-header-features mt-3" aria-label={`${mod().label} features`}>
+                {mod()
+                  .features.filter((feature) => {
+                    if (mod().id === "crm") {
+                      if (feature.analyticsOnly && !canViewCrmAnalytics(auth.me)) return false;
+                      if (feature.managersOnly && !canManageCrmRules(auth.me)) return false;
+                    }
+                    const code = permissionCodeForHref(feature.href);
+                    if (code && auth.me?.user?.permissions && Object.keys(auth.me.user.permissions).length > 0) {
+                      return hasPermission(auth.me, code, "read");
+                    }
+                    return true;
+                  })
+                  .map((feature) => (
+                    <A
+                      href={feature.href}
+                      class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                      classList={{
+                        "bg-brand-50 text-brand-600":
+                          loc.pathname === feature.href || loc.pathname === feature.settingsHref,
+                        "text-text-secondary hover:erp-panel hover:text-text-primary":
+                          loc.pathname !== feature.href && loc.pathname !== feature.settingsHref,
+                      }}
                     >
-                      {(branch) => (
-                        <>
-                          <span>{mod().label}</span>
-                          <span class="mx-1.5 text-text-secondary/50" aria-hidden="true">
-                            ›
-                          </span>
-                          <span>{branch().label}</span>
-                        </>
-                      )}
-                    </Show>
-                  </p>
-                  <h1 class="text-xl font-semibold text-text-primary">
-                    {activeSubBranch()
-                      ? subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix)
-                      : activeFeature()
-                        ? featureHeaderTitle(activeFeature()!, loc.pathname)
-                        : mod().label}
-                  </h1>
-                  <Show when={!activeSubBranch()}>
-                    <nav class="mt-3 flex flex-wrap gap-1" aria-label={`${mod().label} features`}>
-                      {mod()
-                        .features.filter((feature) => {
-                          if (mod().id === "crm") {
-                            if (feature.analyticsOnly && !canViewCrmAnalytics(auth.me)) return false;
-                            if (feature.managersOnly && !canManageCrmRules(auth.me)) return false;
-                          }
-                          const code = permissionCodeForHref(feature.href);
-                          if (code && auth.me?.user?.permissions && Object.keys(auth.me.user.permissions).length > 0) {
-                            return hasPermission(auth.me, code, "read");
-                          }
-                          return true;
-                        })
-                        .map((feature) => (
-                        <A
-                          href={feature.href}
-                          class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
-                          classList={{
-                            "bg-brand-50 text-brand-600":
-                              loc.pathname === feature.href || loc.pathname === feature.settingsHref,
-                            "text-text-secondary hover:erp-panel hover:text-text-primary":
-                              loc.pathname !== feature.href && loc.pathname !== feature.settingsHref,
-                          }}
-                        >
-                          {feature.label}
-                        </A>
-                      ))}
-                    </nav>
-                  </Show>
-                  <TaxMngtHeaderNav />
-                </>
-              )}
-            </Show>
-          </div>
-          <div class="flex shrink-0 items-center gap-2">
-            <PresenceHeartbeat />
-            <PresenceAvatars />
-            <CrmNotificationPoller enabled={canViewCrm(auth.me)} />
-            <Show when={canViewCrm(auth.me)}>
-              <button
-                type="button"
-                class="hidden rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 sm:inline-flex"
-                onClick={() => crmTask.open()}
-              >
-                + CRM task
-              </button>
-            </Show>
-            <CrmNotificationBell enabled={canViewCrm(auth.me)} />
-            <Show when={canManageBranding(auth.me)}>
-              <A
-                href="/app/settings/branding"
-                class="hidden rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary sm:inline-flex"
-              >
-                {brandingLabel("app.branding_link", "Branding")}
-              </A>
-            </Show>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
-              onClick={() => void signOut()}
-            >
-              {brandingLabel("app.sign_out", "Sign out")}
-            </button>
-          </div>
+                      {feature.label}
+                    </A>
+                  ))}
+              </nav>
+            )}
+          </Show>
+          <TaxMngtHeaderNav />
         </header>
         <main class="flex-1 p-6">{props.children}</main>
       </div>

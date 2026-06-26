@@ -20,6 +20,30 @@
   background-color: var(--color-panel-strong, #e2e8f0);
 }
 
+.erp-header-features {
+  display: flex;
+  max-width: 100%;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-stroke, #e2e8f0) transparent;
+}
+
+.erp-header-features::-webkit-scrollbar {
+  height: 4px;
+}
+
+.erp-header-features::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: var(--color-stroke, #e2e8f0);
+}
+
+.erp-header-features > a {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .text-label {
   color: var(--color-label, var(--color-text-primary, #475569));
 }
