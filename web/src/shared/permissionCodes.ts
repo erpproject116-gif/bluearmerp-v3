@@ -33,6 +33,8 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/sales/reports/si-receipt-status": "sales.si_receipt_status",
   "/app/sales/reports/ar-by-customer": "sales.ar_by_customer",
   "/app/sales/reports/discount-status": "sales.sales_discount_status",
+  "/app/sales/collective-invoicing/list": "sales.collective_invoice_list",
+  "/app/sales/collective-invoicing/status": "sales.collective_invoice_status",
   "/app/sales/reports/print-slips": "sales.print_sales_slips",
   "/app/finance/official-receipts/new": "finance.official_receipts_new",
   "/app/finance/official-receipts": "finance.official_receipts",

@@ -152,4 +152,57 @@ begin
   end loop;
 end $$;
 
+-- Demo collective invoice (requires migration 033)
+do $$
+declare
+  v_tenant bigint;
+  v_code text;
+  v_sale_id bigint;
+  v_partner_id bigint;
+  v_inv_id bigint;
+  v_date_seq int;
+  v_d date;
+  v_subtotal numeric;
+  v_tax numeric;
+  v_grand numeric;
+begin
+  v_d := current_date;
+  foreach v_code in array array['DEMO000', 'BLUEARM']
+  loop
+    select id into v_tenant from public.tenants where company_code = v_code;
+    if v_tenant is null then continue; end if;
+
+    select s.id, s.partner_id, s.subtotal, s.tax_total, s.grand_total
+    into v_sale_id, v_partner_id, v_subtotal, v_tax, v_grand
+    from public.sa_sales s
+    where s.tenant_id = v_tenant
+      and s.sales_no = to_char(v_d, 'YYMMDD') || '201'
+      and s.deleted_at is null
+      and s.invoicing_status = false
+      and s.progress_status = 'completed'
+      and not exists (select 1 from public.sa_collective_invoice_sales cis where cis.sales_id = s.id)
+    limit 1;
+
+    if v_sale_id is null then continue; end if;
+
+    select date_seq into v_date_seq from public.allocate_collective_invoice_sequences(v_tenant, v_d);
+
+    insert into public.sa_collective_invoices (
+      tenant_id, invoice_date, date_seq, partner_id, status, source,
+      subtotal, tax_total, grand_total, created_by_user_id
+    )
+    values (
+      v_tenant, v_d, v_date_seq, v_partner_id, 'unconfirmed', 'manual',
+      v_subtotal, v_tax, v_grand,
+      (select id from public.users where tenant_id = v_tenant and status = 'active' order by id limit 1)
+    )
+    returning id into v_inv_id;
+
+    insert into public.sa_collective_invoice_sales (collective_invoice_id, sales_id, sort_order)
+    values (v_inv_id, v_sale_id, 1);
+
+    raise notice 'seed-demo-sales: collective invoice % for %', v_inv_id, v_code;
+  end loop;
+end $$;
+
 commit;

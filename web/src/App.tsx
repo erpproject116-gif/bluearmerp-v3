@@ -70,6 +70,11 @@ import SalesDiscountStatusPage from "./modules/sales/reports/SalesDiscountStatus
 import SalesDiscountStatusPrintPage from "./modules/sales/reports/SalesDiscountStatusPrintPage";
 import SalesPrintSlipsLauncherPage from "./modules/sales/reports/SalesPrintSlipsLauncherPage";
 import SalesSlipsPrintPage from "./modules/sales/reports/SalesSlipsPrintPage";
+import CollectiveInvoiceListPage from "./modules/sales/collective-invoicing/CollectiveInvoiceListPage";
+import CollectiveInvoiceStatusPage from "./modules/sales/collective-invoicing/CollectiveInvoiceStatusPage";
+import CollectiveInvoiceSlipPrintPage from "./modules/sales/collective-invoicing/CollectiveInvoiceSlipPrintPage";
+import CollectiveInvoicePrintPage from "./modules/sales/collective-invoicing/CollectiveInvoicePrintPage";
+import CollectiveInvoiceStatusPrintPage from "./modules/sales/collective-invoicing/CollectiveInvoiceStatusPrintPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
 import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
@@ -139,6 +144,9 @@ export default function App() {
         <Route path="/app/sales-order/sales-orders/status/print" component={SalesOrderStatusPrintPage} />
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
         <Route path="/app/sales/reports/discount-status/print" component={SalesDiscountStatusPrintPage} />
+        <Route path="/app/sales/collective-invoicing/status/print" component={CollectiveInvoiceStatusPrintPage} />
+        <Route path="/app/sales/collective-invoicing/:id/slip/print" component={CollectiveInvoiceSlipPrintPage} />
+        <Route path="/app/sales/collective-invoicing/:id/invoice/print" component={CollectiveInvoicePrintPage} />
         <Route path="/app/sales/reports/print-slips/print" component={SalesSlipsPrintPage} />
         <Route path="/app" component={AppLayout}>
           <Route path="/inventory/partners" component={PartnersPage} />
@@ -185,6 +193,8 @@ export default function App() {
           <Route path="/sales/reports/si-receipt-status" component={SalesSiReceiptStatusPage} />
           <Route path="/sales/reports/ar-by-customer" component={SalesArByCustomerPage} />
           <Route path="/sales/reports/discount-status" component={SalesDiscountStatusPage} />
+          <Route path="/sales/collective-invoicing/list" component={CollectiveInvoiceListPage} />
+          <Route path="/sales/collective-invoicing/status" component={CollectiveInvoiceStatusPage} />
           <Route path="/sales/reports/print-slips" component={SalesPrintSlipsLauncherPage} />
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />

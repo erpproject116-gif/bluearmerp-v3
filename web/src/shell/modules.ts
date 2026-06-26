@@ -131,6 +131,8 @@ export const appModules: AppModule[] = [
       { label: "SI Receipt Status", href: "/app/sales/reports/si-receipt-status", settingsHref: "/app/sales/sales/settings" },
       { label: "A/R by Customer", href: "/app/sales/reports/ar-by-customer", settingsHref: "/app/sales/sales/settings" },
       { label: "Sales Discount Status", href: "/app/sales/reports/discount-status", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Invoice List (Inv.)", href: "/app/sales/collective-invoicing/list", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Invoice Status (Inv.)", href: "/app/sales/collective-invoicing/status", settingsHref: "/app/sales/sales/settings" },
       { label: "Print Sales Slips", href: "/app/sales/reports/print-slips", settingsHref: "/app/sales/sales/settings" },
     ],
   },

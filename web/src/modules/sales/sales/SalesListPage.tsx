@@ -13,6 +13,7 @@ import {
 } from "../../../shared/useSalesList";
 import { useToast } from "../../../shared/toast";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { createCollectiveInvoice } from "../../../shared/useCollectiveInvoices";
 import { CrmTaskCell } from "../../../shared/CrmTaskCell";
 import { useCrmTaskSummaries } from "../../../shared/useCrmTaskSummaries";
 import { SalesLayout } from "../SalesLayout";
@@ -39,6 +40,8 @@ export function SalesListPageInner(props: PageOptions = {}) {
     { defaultOrder: "desc" },
   );
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [checkedIds, setCheckedIds] = createSignal<Set<number>>(new Set());
+  const [creatingInvoice, setCreatingInvoice] = createSignal(false);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<SalesDetail | null>(null);
   const [templateCode, setTemplateCode] = createSignal<SalesTemplateCode>(props.templateCode ?? "default");
@@ -92,6 +95,33 @@ export function SalesListPageInner(props: PageOptions = {}) {
     invalidate();
   };
 
+  const toggleChecked = (id: number) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const onCreateCollectiveInvoice = async () => {
+    const ids = [...checkedIds()];
+    if (!ids.length) {
+      toast.warning("Select at least one sale.");
+      return;
+    }
+    setCreatingInvoice(true);
+    const res = await createCollectiveInvoice(ids);
+    setCreatingInvoice(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to create collective invoice.");
+      return;
+    }
+    toast.success("Collective invoice created.");
+    setCheckedIds(new Set<number>());
+    invalidate();
+  };
+
   onMount(() => {
     if (props.templateCode) setTemplateCode(props.templateCode);
     if (props.openNewOnMount || loc.pathname.endsWith("/new")) openNew();
@@ -99,8 +129,32 @@ export function SalesListPageInner(props: PageOptions = {}) {
 
   return (
     <SalesLayout>
+      <div class="mb-3 flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          disabled={creatingInvoice() || checkedIds().size === 0}
+          onClick={() => void onCreateCollectiveInvoice()}
+        >
+          {creatingInvoice() ? "Creating…" : `Create collective invoice (${checkedIds().size})`}
+        </button>
+      </div>
       <SpreadsheetGrid
         columns={[
+          {
+            key: "pick",
+            header: "",
+            sortable: false,
+            render: (r) => (
+              <input
+                type="checkbox"
+                checked={checkedIds().has(r.id)}
+                disabled={r.invoicing_status || r.progress_status !== "completed"}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleChecked(r.id)}
+              />
+            ),
+          },
           {
             key: "progress_status",
             header: "Progress",

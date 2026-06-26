@@ -2,7 +2,8 @@ export type ReportTemplateKey =
   | "sales_discount_status"
   | "sales_status"
   | "sales_order_status"
-  | "official_receipt_status";
+  | "official_receipt_status"
+  | "sales_collective_invoice_status";
 
 export type ReportColumnDef = {
   key: string;
