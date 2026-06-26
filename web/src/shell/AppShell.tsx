@@ -16,6 +16,9 @@ import { appModules, featureHeaderTitle, resolveFeature, resolveModule, resolveS
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
 import { taxMngtHeaderTitle } from "./tax-mngt-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
+import { useBranding } from "../shared/branding/BrandingProvider";
+import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
+import { brandingLabel } from "../shared/branding/brandingStore";
 import { isAnySubBranchPath } from "./sub-branch-nav";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
@@ -29,6 +32,13 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const auth = useAuth();
   const shell = useShell();
   const crmTask = useCrmTaskModal();
+  const branding = useBranding();
+
+  const appTitle = () =>
+    branding.settings().receipt.company_name?.trim() ||
+    auth.me?.tenant.company_name ||
+    "Bluearm";
+  const appTagline = () => brandingLabel("app.tagline", "ERP v3");
 
   const activeModule = () => resolveModule(loc.pathname);
   const activeFeature = () => {
@@ -49,7 +59,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   return (
     <div class="flex min-h-screen bg-body">
       <aside
-        class="fixed inset-y-0 left-0 z-40 flex flex-col border-r border-stroke bg-white py-6 transition-[width,padding] duration-200 ease-in-out"
+        class="erp-surface fixed inset-y-0 left-0 z-40 flex flex-col border-r border-stroke py-6 transition-[width,padding] duration-200 ease-in-out"
         classList={{
           "w-[4.5rem] px-2": shell.collapsed(),
           "w-[18.125rem] px-5": !shell.collapsed(),
@@ -59,19 +69,21 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           class="mb-6 flex items-center gap-3"
           classList={{ "justify-center px-0": shell.collapsed(), "px-2": !shell.collapsed() }}
         >
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white shadow-sm">
-            B
-          </div>
-          <Show when={!shell.collapsed()}>
+          <Show
+            when={!shell.collapsed()}
+            fallback={<AppBrandingMark size="sm" showText={false} />}
+          >
             <div class="min-w-0">
-              <p class="truncate text-lg font-semibold text-text-primary">Bluearm</p>
-              <p class="text-xs text-text-secondary">ERP v3</p>
+              <AppBrandingMark />
+              <p class="text-xs text-text-secondary">{appTagline()}</p>
             </div>
           </Show>
         </div>
 
         <Show when={!shell.collapsed()}>
-          <p class="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">Modules</p>
+          <p class="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            {brandingLabel("app.modules_heading", "Modules")}
+          </p>
         </Show>
 
         <nav class="flex-1 space-y-1">
@@ -100,16 +112,16 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                       "justify-center px-2 py-2.5": shell.collapsed(),
                       "gap-3 px-3 py-2.5": !shell.collapsed(),
                       "bg-brand-50 text-brand-600": moduleActive(),
-                      "bg-slate-50 text-text-primary": moduleExpanded(),
-                      "text-text-secondary hover:bg-slate-50 hover:text-text-primary": !inModule(),
+                      "erp-panel text-text-primary": moduleExpanded(),
+                      "text-text-secondary hover:erp-panel hover:text-text-primary": !inModule(),
                     }}
                   >
                     <span
                       class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
                       classList={{
                         "bg-brand-100 text-brand-600": moduleActive(),
-                        "bg-slate-200 text-text-primary": moduleExpanded(),
-                        "bg-slate-100 text-slate-500": !inModule(),
+                        "erp-panel-strong text-text-primary": moduleExpanded(),
+                        "erp-panel text-text-secondary": !inModule(),
                       }}
                     >
                       <ModuleIcon id={module.id} />
@@ -134,7 +146,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                               class="flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors"
                               classList={{
                                 "bg-brand-50 text-brand-600": branchActive(),
-                                "text-text-secondary hover:bg-slate-50 hover:text-text-primary": !branchActive(),
+                                "text-text-secondary hover:erp-panel hover:text-text-primary": !branchActive(),
                               }}
                             >
                               <span class="truncate">{branch.label}</span>
@@ -152,7 +164,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
         <Show when={auth.me}>
           <div
-            class="mt-4 rounded-xl border border-stroke bg-slate-50"
+            class="mt-4 rounded-xl border border-stroke erp-panel"
             classList={{
               "flex justify-center p-2": shell.collapsed(),
               "px-3 py-3": !shell.collapsed(),
@@ -184,7 +196,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
         <button
           type="button"
-          class="mt-4 flex items-center rounded-lg border border-stroke text-sm text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
+          class="mt-4 flex items-center rounded-lg border border-stroke text-sm text-text-secondary transition hover:erp-panel hover:text-text-primary"
           classList={{
             "mx-auto h-9 w-9 justify-center": shell.collapsed(),
             "w-full justify-center gap-2 px-3 py-2": !shell.collapsed(),
@@ -204,7 +216,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
           </svg>
           <Show when={!shell.collapsed()}>
-            <span>Collapse</span>
+            <span>{brandingLabel("app.collapse_sidebar", "Collapse")}</span>
           </Show>
         </button>
       </aside>
@@ -216,13 +228,13 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           "ml-[18.125rem]": !shell.collapsed(),
         }}
       >
-        <header class="sticky top-0 z-30 flex items-center justify-between border-b border-stroke bg-white px-6 py-4 shadow-sm">
+        <header class="erp-surface sticky top-0 z-30 flex items-center justify-between border-b border-stroke px-6 py-4 shadow-sm">
           <div>
             <Show
               when={activeModule()}
               fallback={
                 <>
-                  <p class="text-xs font-medium text-text-secondary">Bluearm ERP</p>
+                  <p class="text-xs font-medium text-text-secondary">{appTitle()}</p>
                   <h1 class="text-xl font-semibold text-text-primary">Dashboard</h1>
                 </>
               }
@@ -273,7 +285,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                           classList={{
                             "bg-brand-50 text-brand-600":
                               loc.pathname === feature.href || loc.pathname === feature.settingsHref,
-                            "text-text-secondary hover:bg-slate-50 hover:text-text-primary":
+                            "text-text-secondary hover:erp-panel hover:text-text-primary":
                               loc.pathname !== feature.href && loc.pathname !== feature.settingsHref,
                           }}
                         >
@@ -304,17 +316,17 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             <Show when={canManageBranding(auth.me)}>
               <A
                 href="/app/settings/branding"
-                class="hidden rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary sm:inline-flex"
+                class="hidden rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary sm:inline-flex"
               >
-                Branding
+                {brandingLabel("app.branding_link", "Branding")}
               </A>
             </Show>
             <button
               type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
               onClick={() => void signOut()}
             >
-              Sign out
+              {brandingLabel("app.sign_out", "Sign out")}
             </button>
           </div>
         </header>

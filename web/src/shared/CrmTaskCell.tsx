@@ -1,6 +1,7 @@
 import { Show } from "solid-js";
 import { canViewCrm, useAuth } from "./auth-context";
-import { taskStageBadgeClass, taskStageLabel } from "./crmTaskStages";
+import { stageStyle } from "./branding/brandingStore";
+import { taskStageLabel } from "./crmTaskStages";
 import { useCrmTaskModalOptional, type CrmTaskContext } from "./CrmTaskModal";
 import type { FollowUpTaskSummary } from "./useCrmTaskSummaries";
 
@@ -68,7 +69,10 @@ export function CrmTaskCell(props: Props) {
             if (id) modal?.openTask(id);
           }}
         >
-          <span class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${taskStageBadgeClass(summary()?.latest_stage ?? "scheduled")}`}>
+          <span
+            class="rounded px-1.5 py-0.5 text-[10px] font-medium"
+            style={stageStyle(summary()?.latest_stage ?? "scheduled")}
+          >
             {summaryBadge(summary())}
           </span>
           <Show when={preview()}>

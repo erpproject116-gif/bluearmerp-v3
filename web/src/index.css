@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./theme.css";
+@import "./branding-shell.css";
 
 body {
   @apply bg-body font-sans text-text-primary antialiased;
@@ -27,7 +28,7 @@ body {
 
 .erp-grid thead th {
   border-bottom-color: var(--color-stroke);
-  background-color: #f8fafc;
+  background-color: var(--color-panel, #f8fafc);
 }
 
 .erp-grid th {

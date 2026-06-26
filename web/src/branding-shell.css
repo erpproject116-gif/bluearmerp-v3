@@ -1,0 +1,40 @@
+/* Semantic surfaces — values overridden at runtime by applyBrandingTheme() */
+
+.erp-surface {
+  background-color: var(--color-surface, #ffffff);
+}
+
+.erp-panel {
+  background-color: var(--color-panel, #f8fafc);
+}
+
+.erp-panel-strong {
+  background-color: var(--color-panel-strong, #e2e8f0);
+}
+
+.hover\:erp-panel:hover {
+  background-color: var(--color-panel, #f8fafc);
+}
+
+.hover\:erp-panel-strong:hover {
+  background-color: var(--color-panel-strong, #e2e8f0);
+}
+
+.text-label {
+  color: var(--color-label, var(--color-text-primary, #475569));
+}
+
+.text-accent-brand {
+  color: var(--color-accent, var(--color-brand-600, #3c50e0));
+}
+
+.erp-input {
+  border-color: var(--color-stroke, #e2e8f0);
+  background-color: var(--color-surface, #ffffff);
+  color: var(--color-text-primary, #1c2434);
+}
+
+.erp-input:focus {
+  border-color: var(--color-brand-600, #3c50e0);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-50, #ecf3ff) 80%, transparent);
+}

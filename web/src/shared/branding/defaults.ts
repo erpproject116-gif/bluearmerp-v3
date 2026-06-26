@@ -37,6 +37,11 @@ export const DEFAULT_BRANDING: BrandingSettings = {
 };
 
 export const LABEL_PRESETS: { key: string; label: string; fallback: string }[] = [
+  { key: "app.tagline", label: "App tagline (sidebar)", fallback: "ERP v3" },
+  { key: "app.modules_heading", label: "Sidebar modules heading", fallback: "Modules" },
+  { key: "app.sign_out", label: "Sign out button", fallback: "Sign out" },
+  { key: "app.collapse_sidebar", label: "Collapse sidebar", fallback: "Collapse" },
+  { key: "app.branding_link", label: "Branding settings link", fallback: "Branding" },
   { key: "progress.unconfirmed", label: "Stage: Unconfirmed", fallback: "Unconfirmed" },
   { key: "progress.completed", label: "Stage: Completed", fallback: "Completed" },
   { key: "progress.in_progress", label: "Stage: In progress", fallback: "In progress" },

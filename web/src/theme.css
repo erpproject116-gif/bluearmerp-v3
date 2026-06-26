@@ -1,5 +1,5 @@
 @theme {
-  /* TailAdmin-inspired palette (light only) — https://demo.tailadmin.com */
+  /* TailAdmin-inspired palette (light only) — overridden per tenant via applyBrandingTheme() */
   --color-brand-50: #ecf3ff;
   --color-brand-100: #dde9ff;
   --color-brand-500: #3c50e0;
@@ -7,7 +7,13 @@
   --color-brand-700: #3641c9;
   --color-stroke: #e2e8f0;
   --color-body: #f1f5f9;
+  --color-surface: #ffffff;
+  --color-panel: #f8fafc;
+  --color-panel-strong: #e2e8f0;
   --color-text-primary: #1c2434;
   --color-text-secondary: #64748b;
+  --color-label: #475569;
+  --color-accent: #0ea5e9;
+  --color-secondary: #64748b;
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
 }

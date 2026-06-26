@@ -115,11 +115,11 @@ export default function BrandingSettingsPage() {
       <header>
         <h1 class="text-2xl font-semibold text-text-primary">Branding &amp; appearance</h1>
         <p class="mt-1 text-sm text-text-secondary">
-          Customize colors, receipt headers, labels, and stage badges for your store. Saved settings apply for all users in this tenant.
+          Customize colors, logo, labels, and stage badges for the whole app — sidebar, headers, grids, modals, and print/receipt layouts. Saved settings apply for all users in this tenant.
         </p>
       </header>
 
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
         <div class="flex items-center justify-between gap-4">
           <h2 class="text-lg font-medium text-text-primary">Color palette</h2>
           <button
@@ -157,7 +157,7 @@ export default function BrandingSettingsPage() {
         </div>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
         <h2 class="text-lg font-medium text-text-primary">Stage / progress colors</h2>
         <p class="mt-1 text-sm text-text-secondary">Background and text for workflow stage badges.</p>
         <div class="mt-4 space-y-3">
@@ -187,14 +187,14 @@ export default function BrandingSettingsPage() {
         </div>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-medium text-text-primary">Receipt header &amp; footer</h2>
+      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
+        <h2 class="text-lg font-medium text-text-primary">Company logo &amp; print header</h2>
         <p class="mt-1 text-sm text-text-secondary">
-          Default print/receipt branding. Report templates can override these per report.
+          Logo and company details appear in the app sidebar and on printed reports. Report templates can override these per report.
         </p>
         <div class="mt-4 flex flex-wrap items-start gap-4">
           <BrandingLogoImage />
-          <label class="cursor-pointer rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50">
+          <label class="cursor-pointer rounded-lg border border-stroke px-3 py-2 text-sm hover:erp-panel">
             Upload logo (max {MAX_LOGO_MB} MB)
             <input
               type="file"
@@ -237,7 +237,7 @@ export default function BrandingSettingsPage() {
         </div>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
         <h2 class="text-lg font-medium text-text-primary">Custom labels</h2>
         <div class="mt-4 space-y-3">
           <For each={LABEL_PRESETS}>
@@ -256,7 +256,7 @@ export default function BrandingSettingsPage() {
         </div>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
         <h2 class="text-lg font-medium text-text-primary">Custom placeholders</h2>
         <div class="mt-4 space-y-3">
           <For each={PLACEHOLDER_PRESETS}>

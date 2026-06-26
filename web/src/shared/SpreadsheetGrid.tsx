@@ -152,7 +152,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   });
 
   return (
-    <div class="overflow-hidden rounded-xl border border-stroke bg-white shadow-sm">
+    <div class="overflow-hidden rounded-xl border border-stroke erp-surface shadow-sm">
       <div class="border-b border-stroke px-5 py-4">
         <div class="flex flex-wrap items-end gap-3">
           <Show when={props.onStatusChange}>
@@ -203,7 +203,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             <Show when={props.itemsCsvImport}>
               <button
                 type="button"
-                class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
+                class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
                 disabled={importing()}
                 onClick={() => void downloadItemsImportTemplate()}
               >
@@ -211,7 +211,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               </button>
               <button
                 type="button"
-                class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary disabled:opacity-50"
+                class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary disabled:opacity-50"
                 disabled={importing()}
                 onClick={() => fileInputEl?.click()}
               >
@@ -231,7 +231,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             <Show when={props.onRefresh}>
               <button
                 type="button"
-                class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
+                class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
                 onClick={() => props.onRefresh?.()}
               >
                 Refresh
@@ -240,7 +240,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             <Show when={props.settingsHref}>
               <A
                 href={props.settingsHref!}
-                class="inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-stroke text-text-secondary transition hover:bg-slate-50 hover:text-brand-600"
+                class="inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-stroke text-text-secondary transition hover:erp-panel hover:text-brand-600"
                 title="Form settings"
                 aria-label="Form settings"
               >
@@ -273,7 +273,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             class="erp-grid text-left text-sm"
             style={{ width: `${tableWidth()}px`, "min-width": "100%" }}
           >
-            <thead class="sticky top-0 z-[1] bg-slate-50">
+            <thead class="erp-panel sticky top-0 z-[1]">
               <tr>
                 {props.columns.map((c) => {
                   const sortable = c.sortable !== false && Boolean(props.onSort);
@@ -303,7 +303,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             <tbody>
               {props.rows.map((row, idx) => (
                 <tr
-                  class="cursor-pointer transition hover:bg-slate-50"
+                  class="cursor-pointer transition hover:erp-panel"
                   classList={{ "bg-brand-50": idx === focusIdx() || props.selectedId === row.id }}
                   onClick={() => {
                     setFocusIdx(idx);
@@ -398,7 +398,7 @@ export function EntityModal(props: {
     <Show when={props.open}>
       <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-6 sm:items-center">
         <div
-          class="w-full rounded-2xl border border-stroke bg-white p-6 shadow-xl"
+          class="erp-surface w-full rounded-2xl border border-stroke p-6 shadow-xl"
           classList={{ "max-w-6xl": props.wide, "max-w-4xl": !props.wide }}
         >
           <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
@@ -413,7 +413,7 @@ export function EntityModal(props: {
           <div class="mt-6 flex justify-end gap-3 border-t border-stroke pt-4">
             <button
               type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
               onClick={() => props.onClose()}
             >
               Cancel
@@ -449,7 +449,7 @@ export function ModalMessage(props: { children: JSX.Element }) {
 }
 
 export const inputClass =
-  "w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-text-primary shadow-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-50";
+  "erp-input w-full rounded-lg border px-3 py-2 text-sm shadow-sm outline-none transition";
 
 export const toolbarControlClass =
-  "rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-text-primary shadow-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-50";
+  "erp-input rounded-lg border px-3 py-2 text-sm shadow-sm outline-none transition";
