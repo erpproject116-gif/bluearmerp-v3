@@ -1,6 +1,6 @@
 # Collective Invoicing (Sales)
 
-Sales header tabs for collective (batch) invoicing: **Sales Invoice List (Inv.)** and **Sales Invoice Status (Inv.)**.
+Sales sub-branch (sidebar under Sales) for collective (batch) invoicing: **Sales Invoice List (Inv.)** and **Sales Invoice Status (Inv.)** as header tabs within the sub-branch.
 
 ## Routes
 

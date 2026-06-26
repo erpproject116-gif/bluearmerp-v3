@@ -1,7 +1,8 @@
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
+import { COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
 import { isSubBranchPath } from "./sub-branch-nav";
 
-export { TAX_MNGT_PREFIX, isSubBranchPath };
+export { TAX_MNGT_PREFIX, COLLECTIVE_INVOICING_PREFIX, isSubBranchPath };
 
 export type ModuleFeature = {
   label: string;
@@ -131,9 +132,15 @@ export const appModules: AppModule[] = [
       { label: "SI Receipt Status", href: "/app/sales/reports/si-receipt-status", settingsHref: "/app/sales/sales/settings" },
       { label: "A/R by Customer", href: "/app/sales/reports/ar-by-customer", settingsHref: "/app/sales/sales/settings" },
       { label: "Sales Discount Status", href: "/app/sales/reports/discount-status", settingsHref: "/app/sales/sales/settings" },
-      { label: "Sales Invoice List (Inv.)", href: "/app/sales/collective-invoicing/list", settingsHref: "/app/sales/sales/settings" },
-      { label: "Sales Invoice Status (Inv.)", href: "/app/sales/collective-invoicing/status", settingsHref: "/app/sales/sales/settings" },
       { label: "Print Sales Slips", href: "/app/sales/reports/print-slips", settingsHref: "/app/sales/sales/settings" },
+    ],
+    subBranches: [
+      {
+        label: "Collective Invoicing (Sales)",
+        prefix: COLLECTIVE_INVOICING_PREFIX,
+        href: "/app/sales/collective-invoicing/list",
+        settingsHref: "/app/sales/sales/settings",
+      },
     ],
   },
   {
