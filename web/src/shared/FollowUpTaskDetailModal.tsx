@@ -59,9 +59,10 @@ export function FollowUpTaskDetailModal(props: Props) {
 
   const load = async (id: number) => {
     setLoading(true);
+    setTask(null);
     const res = await fetchFollowUpTask(id);
-    setLoading(false);
     if (!res.success || !res.data) {
+      setLoading(false);
       toast.warning(res.message ?? "Could not load task.");
       props.onClose();
       return;
@@ -72,12 +73,23 @@ export function FollowUpTaskDetailModal(props: Props) {
     setDueDate(t.due_date);
     setNotes(t.notes ?? "");
     setStage(t.stage);
+    setLoading(false);
   };
 
   createEffect(() => {
     const id = props.taskId();
-    if (props.open() && id) void load(id);
-    if (!props.open()) setTask(null);
+    if (props.open() && id) {
+      void load(id);
+      return;
+    }
+    if (!props.open()) {
+      setTask(null);
+      setLoading(false);
+      setTitle("");
+      setDueDate("");
+      setNotes("");
+      setStage("scheduled");
+    }
   });
 
   const save = async () => {
@@ -134,9 +146,13 @@ export function FollowUpTaskDetailModal(props: Props) {
       onSave={() => void save()}
       saving={saving()}
       wide
+      singleColumn
     >
       <Show when={loading()}>
         <p class="text-sm text-text-secondary">Loading…</p>
+      </Show>
+      <Show when={!loading() && !task()}>
+        <p class="text-sm text-text-secondary">Task details could not be loaded.</p>
       </Show>
       <Show when={!loading() && task()}>
         {(t) => {

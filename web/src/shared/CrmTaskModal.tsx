@@ -8,6 +8,7 @@ import {
   type FollowUpTask,
   type FollowUpTaskType,
 } from "./useFollowUpTasks";
+import { useInvalidateCrmTaskSummaries } from "./useCrmTaskSummaries";
 import { useToast } from "./toast";
 import { canManageSalesTeam, useAuth } from "./auth-context";
 import { useSalesTeamMembers } from "./useSalesTeamMembers";
@@ -63,6 +64,7 @@ export function CrmTaskModalProvider(props: ParentProps) {
   const auth = useAuth();
   const team = useSalesTeamMembers(() => canManageSalesTeam(auth.me));
   const invalidate = useInvalidateFollowUpTasks();
+  const invalidateSummaries = useInvalidateCrmTaskSummaries();
 
   const resetForm = (ctx: CrmTaskContext) => {
     setTitle(defaultTitle(ctx));
@@ -80,6 +82,11 @@ export function CrmTaskModalProvider(props: ParentProps) {
   const openTask = (taskId: number) => {
     setDetailTaskId(taskId);
     setDetailOpen(true);
+  };
+
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setDetailTaskId(null);
   };
 
   const api: CrmTaskModalAPI = {
@@ -124,6 +131,7 @@ export function CrmTaskModalProvider(props: ParentProps) {
     }
     setCreateOpen(false);
     invalidate();
+    invalidateSummaries();
     toast.success("CRM task created.");
   };
 
@@ -176,7 +184,7 @@ export function CrmTaskModalProvider(props: ParentProps) {
       <FollowUpTaskDetailModal
         open={() => detailOpen()}
         taskId={() => detailTaskId()}
-        onClose={() => setDetailOpen(false)}
+        onClose={closeDetail}
       />
     </CrmTaskModalContext.Provider>
   );
