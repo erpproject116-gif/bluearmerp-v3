@@ -5,6 +5,10 @@ export type ArByCustomerFilters = {
   date_from?: string;
   date_to?: string;
   partner_id?: number | null;
+  location_id?: number | null;
+  department_id?: number | null;
+  project_id?: number | null;
+  pic_user_id?: number | null;
 };
 
 export type ArByCustomerRow = {
@@ -32,6 +36,10 @@ export function arFiltersToSearchParams(
   if (filters.date_from) qs.set("date_from", filters.date_from);
   if (filters.date_to) qs.set("date_to", filters.date_to);
   if (filters.partner_id) qs.set("partner_id", String(filters.partner_id));
+  if (filters.location_id) qs.set("location_id", String(filters.location_id));
+  if (filters.department_id) qs.set("department_id", String(filters.department_id));
+  if (filters.project_id) qs.set("project_id", String(filters.project_id));
+  if (filters.pic_user_id) qs.set("pic_user_id", String(filters.pic_user_id));
   if (extra?.page) qs.set("page", String(extra.page));
   if (extra?.pageSize) qs.set("pageSize", String(extra.pageSize));
   if (extra?.sort) qs.set("sort", extra.sort);

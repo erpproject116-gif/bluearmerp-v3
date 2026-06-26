@@ -127,6 +127,11 @@ export const appModules: AppModule[] = [
         href: "/app/sales/sales/price-batch",
         settingsHref: "/app/sales/sales/settings",
       },
+      { label: "Official Receipt Status", href: "/app/sales/reports/official-receipt-status", settingsHref: "/app/sales/sales/settings" },
+      { label: "SI Receipt Status", href: "/app/sales/reports/si-receipt-status", settingsHref: "/app/sales/sales/settings" },
+      { label: "A/R by Customer", href: "/app/sales/reports/ar-by-customer", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Discount Status", href: "/app/sales/reports/discount-status", settingsHref: "/app/sales/sales/settings" },
+      { label: "Print Sales Slips", href: "/app/sales/reports/print-slips", settingsHref: "/app/sales/sales/settings" },
     ],
   },
   {
@@ -165,7 +170,7 @@ export const appModules: AppModule[] = [
       { label: "New Official Receipt", href: "/app/finance/official-receipts/new", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Official Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Receipt Status", href: "/app/finance/reports/receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "SI Receipt Status", href: "/app/finance/reports/receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
     ],
   },
   {

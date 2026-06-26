@@ -62,6 +62,13 @@ import OfficialReceiptNewPage from "./modules/finance/official-receipts/Official
 import OfficialReceiptSettingsPage from "./modules/finance/official-receipts/OfficialReceiptSettingsPage";
 import ArByCustomerPage from "./modules/finance/reports/ArByCustomerPage";
 import ReceiptStatusPage from "./modules/finance/reports/ReceiptStatusPage";
+import OfficialReceiptStatusPage from "./modules/finance/reports/OfficialReceiptStatusPage";
+import SalesOfficialReceiptStatusPage from "./modules/sales/reports/SalesOfficialReceiptStatusPage";
+import SalesSiReceiptStatusPage from "./modules/sales/reports/SalesSiReceiptStatusPage";
+import SalesArByCustomerPage from "./modules/sales/reports/SalesArByCustomerPage";
+import SalesDiscountStatusPage from "./modules/sales/reports/SalesDiscountStatusPage";
+import SalesPrintSlipsLauncherPage from "./modules/sales/reports/SalesPrintSlipsLauncherPage";
+import SalesSlipsPrintPage from "./modules/sales/reports/SalesSlipsPrintPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
 import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
@@ -127,6 +134,7 @@ export default function App() {
         <Route path="/app/sales-order/sales-orders/:salesOrderId/print" component={SalesOrderPrintPage} />
         <Route path="/app/sales-order/sales-orders/status/print" component={SalesOrderStatusPrintPage} />
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
+        <Route path="/app/sales/reports/print-slips/print" component={SalesSlipsPrintPage} />
         <Route path="/app" component={AppLayout}>
           <Route path="/inventory/partners" component={PartnersPage} />
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
@@ -168,11 +176,17 @@ export default function App() {
           <Route path="/sales/sales/price-batch" component={ChangeSalesPriceBatchPage} />
           <Route path="/sales/sales/settings" component={SalesSettingsPage} />
           <Route path="/sales/sales" component={SalesListPage} />
+          <Route path="/sales/reports/official-receipt-status" component={SalesOfficialReceiptStatusPage} />
+          <Route path="/sales/reports/si-receipt-status" component={SalesSiReceiptStatusPage} />
+          <Route path="/sales/reports/ar-by-customer" component={SalesArByCustomerPage} />
+          <Route path="/sales/reports/discount-status" component={SalesDiscountStatusPage} />
+          <Route path="/sales/reports/print-slips" component={SalesPrintSlipsLauncherPage} />
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />
           <Route path="/finance/reports/ar-by-customer" component={ArByCustomerPage} />
           <Route path="/finance/reports/receipt-status" component={ReceiptStatusPage} />
+          <Route path="/finance/reports/official-receipt-status" component={OfficialReceiptStatusPage} />
           <Route path="/crm/dashboard" component={() => (
             <CrmRoute><CrmDashboardPage /></CrmRoute>
           )} />

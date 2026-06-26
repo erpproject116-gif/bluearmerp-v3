@@ -39,8 +39,8 @@ export function ReceiptStatusFilter(props: Props) {
   return (
     <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
       <div class="mb-4">
-        <h2 class="text-lg font-semibold text-text-primary">Receipt Status</h2>
-        <p class="text-sm text-text-secondary">Sales receipt application status by line — Search (F8).</p>
+        <h2 class="text-lg font-semibold text-text-primary">SI Receipt Status</h2>
+        <p class="text-sm text-text-secondary">Sales invoice line receipt application status — Search (F8).</p>
       </div>
       <div class="grid gap-4 md:grid-cols-2">
         <Field label="Date from (optional)">

@@ -2,6 +2,10 @@ export type ArByCustomerFilters = {
   date_from?: string;
   date_to?: string;
   partner_id?: number | null;
+  location_id?: number | null;
+  department_id?: number | null;
+  project_id?: number | null;
+  pic_user_id?: number | null;
 };
 
 export function todayISO(): string {

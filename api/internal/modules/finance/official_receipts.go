@@ -64,6 +64,9 @@ type receiptBody struct {
 }
 
 func registerOfficialReceiptRoutes(r chi.Router, pool *pgxpool.Pool) {
+	registerBankAccountRoutes(r, pool)
+	registerReceiptJournalRoutes(r, pool)
+	registerORAttachmentRoutes(r, pool)
 	r.Get("/official-receipts/preview-sequences", previewReceiptSequences(pool))
 	r.Get("/official-receipts", listOfficialReceipts(pool))
 	r.Post("/official-receipts", createOfficialReceipt(pool))
@@ -194,7 +197,7 @@ func getOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
-		rec, err := loadOfficialReceipt(r.Context(), pool, tu.TenantID, id)
+		rec, err := loadReceiptJournal(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Official receipt not found.", "ERR_NOT_FOUND")
 			return
@@ -423,12 +426,12 @@ func createOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			insert into public.fin_official_receipts (
 			  tenant_id, receipt_date, date_seq, receipt_no,
 			  partner_id, currency_id, payment_method, reference_no, notes,
-			  amount_total, created_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			  amount_total, created_by_user_id, accounting_slip_no
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 			returning id`,
 			tu.TenantID, receiptDate, dateSeq, receiptNo,
 			body.PartnerID, body.CurrencyID, strings.TrimSpace(body.PaymentMethod),
-			body.ReferenceNo, body.Notes, amountTotal, tu.AppUserID).Scan(&id)
+			body.ReferenceNo, body.Notes, amountTotal, tu.AppUserID, "CR "+receiptNo).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to insert official receipt.", "ERR_INTERNAL")
 			return
@@ -490,11 +493,11 @@ func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			update public.fin_official_receipts set
 			  receipt_date = $1, partner_id = $2, currency_id = $3,
 			  payment_method = $4, reference_no = $5, notes = $6,
-			  amount_total = $7, updated_at = now()
-			where id = $8 and tenant_id = $9 and deleted_at is null`,
+			  amount_total = $7, updated_by_user_id = $8, updated_at = now()
+			where id = $9 and tenant_id = $10 and deleted_at is null`,
 			receiptDate, body.PartnerID, body.CurrencyID,
 			strings.TrimSpace(body.PaymentMethod), body.ReferenceNo, body.Notes,
-			amountTotal, id, tu.TenantID)
+			amountTotal, tu.AppUserID, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Official receipt not found.", "ERR_NOT_FOUND")
 			return

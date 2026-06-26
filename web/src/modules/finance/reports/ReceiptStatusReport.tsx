@@ -52,7 +52,7 @@ export function ReceiptStatusReport(props: Props) {
   return (
     <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
       <div class="border-b border-stroke px-5 py-4 text-center">
-        <h2 class="text-xl font-bold text-text-primary">Receipt Status</h2>
+        <h2 class="text-xl font-bold text-text-primary">SI Receipt Status</h2>
         <div class="mt-2 flex flex-wrap justify-between gap-2 text-sm text-text-secondary">
           <span>Company Name : {companyName()}</span>
           <span>{dateRange()}</span>

@@ -1,13 +1,13 @@
 import { createSignal, onMount } from "solid-js";
+import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field } from "../../../shared/SpreadsheetGrid";
-import { apiFetch } from "../../../shared/api";
-import type { ArByCustomerFilters } from "./arByCustomerFilters";
+import type { OfficialReceiptStatusFilters } from "./officialReceiptStatusFilters";
 
 type Props = {
-  value: () => ArByCustomerFilters;
-  onChange: (next: ArByCustomerFilters) => void;
+  value: () => OfficialReceiptStatusFilters;
+  onChange: (next: OfficialReceiptStatusFilters) => void;
   onSearch: () => void;
   onReset: () => void;
 };
@@ -48,13 +48,15 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name }));
 }
 
-export function ArByCustomerFilter(props: Props) {
+export function OfficialReceiptStatusFilter(props: Props) {
   const [customerLabel, setCustomerLabel] = createSignal("");
   const [locationLabel, setLocationLabel] = createSignal("");
   const [departmentLabel, setDepartmentLabel] = createSignal("");
   const [projectLabel, setProjectLabel] = createSignal("");
   const [picLabel, setPicLabel] = createSignal("");
-  const patch = (p: Partial<ArByCustomerFilters>) => props.onChange({ ...props.value(), ...p });
+  const [createdByLabel, setCreatedByLabel] = createSignal("");
+  const [updatedByLabel, setUpdatedByLabel] = createSignal("");
+  const patch = (p: Partial<OfficialReceiptStatusFilters>) => props.onChange({ ...props.value(), ...p });
 
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -70,41 +72,23 @@ export function ArByCustomerFilter(props: Props) {
   return (
     <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
       <div class="mb-4">
-        <h2 class="text-lg font-semibold text-text-primary">A/R by Customer</h2>
-        <p class="text-sm text-text-secondary">Outstanding balances per customer — Search (F8).</p>
+        <h2 class="text-lg font-semibold text-text-primary">Official Receipt Status</h2>
+        <p class="text-sm text-text-secondary">Official receipt headers by date range — Search (F8).</p>
       </div>
-      <div class="grid gap-4 md:grid-cols-2">
-        <Field label="Date from (optional)">
-          <DateInput
-            value={props.value().date_from ?? ""}
-            onInput={(e) => patch({ date_from: e.currentTarget.value || undefined })}
-          />
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Field label="Date from">
+          <DateInput value={props.value().date_from} onInput={(e) => patch({ date_from: e.currentTarget.value })} />
         </Field>
-        <Field label="Date to (optional)">
-          <DateInput
-            value={props.value().date_to ?? ""}
-            onInput={(e) => patch({ date_to: e.currentTarget.value || undefined })}
-          />
+        <Field label="Date to">
+          <DateInput value={props.value().date_to} onInput={(e) => patch({ date_to: e.currentTarget.value })} />
         </Field>
-        <LookupCombo
-          label="Customer"
-          value={customerLabel}
-          selectedId={() => props.value().partner_id ?? null}
-          onInput={setCustomerLabel}
-          onSelect={(o) => {
-            patch({ partner_id: o.id });
-            setCustomerLabel(o.label);
-          }}
-          onClear={() => {
-            patch({ partner_id: null });
-            setCustomerLabel("");
-          }}
-          fetchOptions={fetchPartners}
-        />
+        <LookupCombo label="Customer" value={customerLabel} selectedId={() => props.value().partner_id ?? null} onInput={setCustomerLabel} onSelect={(o) => { patch({ partner_id: o.id }); setCustomerLabel(o.label); }} onClear={() => { patch({ partner_id: null }); setCustomerLabel(""); }} fetchOptions={fetchPartners} />
         <LookupCombo label="Location" value={locationLabel} selectedId={() => props.value().location_id ?? null} onInput={setLocationLabel} onSelect={(o) => { patch({ location_id: o.id }); setLocationLabel(o.label); }} onClear={() => { patch({ location_id: null }); setLocationLabel(""); }} fetchOptions={fetchLocations} />
         <LookupCombo label="Department" value={departmentLabel} selectedId={() => props.value().department_id ?? null} onInput={setDepartmentLabel} onSelect={(o) => { patch({ department_id: o.id }); setDepartmentLabel(o.label); }} onClear={() => { patch({ department_id: null }); setDepartmentLabel(""); }} fetchOptions={fetchDepartments} />
         <LookupCombo label="Project" value={projectLabel} selectedId={() => props.value().project_id ?? null} onInput={setProjectLabel} onSelect={(o) => { patch({ project_id: o.id }); setProjectLabel(o.label); }} onClear={() => { patch({ project_id: null }); setProjectLabel(""); }} fetchOptions={fetchProjects} />
         <LookupCombo label="PIC" value={picLabel} selectedId={() => props.value().pic_user_id ?? null} onInput={setPicLabel} onSelect={(o) => { patch({ pic_user_id: o.id }); setPicLabel(o.label); }} onClear={() => { patch({ pic_user_id: null }); setPicLabel(""); }} fetchOptions={fetchUsers} />
+        <LookupCombo label="Initial Creator" value={createdByLabel} selectedId={() => props.value().created_by_user_id ?? null} onInput={setCreatedByLabel} onSelect={(o) => { patch({ created_by_user_id: o.id }); setCreatedByLabel(o.label); }} onClear={() => { patch({ created_by_user_id: null }); setCreatedByLabel(""); }} fetchOptions={fetchUsers} />
+        <LookupCombo label="Last Modifier" value={updatedByLabel} selectedId={() => props.value().updated_by_user_id ?? null} onInput={setUpdatedByLabel} onSelect={(o) => { patch({ updated_by_user_id: o.id }); setUpdatedByLabel(o.label); }} onClear={() => { patch({ updated_by_user_id: null }); setUpdatedByLabel(""); }} fetchOptions={fetchUsers} />
       </div>
       <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => props.onSearch()}>

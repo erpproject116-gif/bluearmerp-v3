@@ -58,6 +58,8 @@ func registerReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/ar-by-customer", listArByCustomer(pool))
 	r.Get("/receipt-status/export", exportReceiptStatus(pool))
 	r.Get("/receipt-status", listReceiptStatus(pool))
+	r.Get("/official-receipt-status/export", exportOfficialReceiptStatus(pool))
+	r.Get("/official-receipt-status", listOfficialReceiptStatus(pool))
 }
 
 func parseOptionalDateRange(r *http.Request) (*time.Time, *time.Time, map[string]string) {
@@ -94,7 +96,7 @@ func parseOptionalDateRange(r *http.Request) (*time.Time, *time.Time, map[string
 	return &from, &to, nil
 }
 
-func arByCustomerBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID *int64) (string, []any) {
+func arByCustomerBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID, locationID, departmentID, projectID, picUserID *int64) (string, []any) {
 	args := []any{tenantID}
 	argN := 2
 	dateFilter := ""
@@ -107,6 +109,27 @@ func arByCustomerBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID 
 	if partnerID != nil {
 		partnerFilter = fmt.Sprintf(" and s.partner_id = $%d", argN)
 		args = append(args, *partnerID)
+		argN++
+	}
+	if locationID != nil {
+		partnerFilter += fmt.Sprintf(" and s.location_id = $%d", argN)
+		args = append(args, *locationID)
+		argN++
+	}
+	if departmentID != nil {
+		partnerFilter += fmt.Sprintf(" and s.department_id = $%d", argN)
+		args = append(args, *departmentID)
+		argN++
+	}
+	if projectID != nil {
+		partnerFilter += fmt.Sprintf(" and s.project_id = $%d", argN)
+		args = append(args, *projectID)
+		argN++
+	}
+	if picUserID != nil {
+		partnerFilter += fmt.Sprintf(" and s.pic_user_id = $%d", argN)
+		args = append(args, *picUserID)
+		argN++
 	}
 
 	q := fmt.Sprintf(`
@@ -146,8 +169,12 @@ func listArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "customer_name", allowed)
 		offset := httputil.Offset(p)
 		partnerID, _ := optionalInt64Query(r, "partner_id")
+		locationID, _ := optionalInt64Query(r, "location_id")
+		departmentID, _ := optionalInt64Query(r, "department_id")
+		projectID, _ := optionalInt64Query(r, "project_id")
+		picUserID, _ := optionalInt64Query(r, "pic_user_id")
 
-		base, args := arByCustomerBaseSQL(tu.TenantID, dateFrom, dateTo, partnerID)
+		base, args := arByCustomerBaseSQL(tu.TenantID, dateFrom, dateTo, partnerID, locationID, departmentID, projectID, picUserID)
 		q := fmt.Sprintf(`select * from (%s) ar order by %s %s limit $%d offset $%d`,
 			base, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
 
@@ -191,7 +218,11 @@ func exportArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		partnerID, _ := optionalInt64Query(r, "partner_id")
-		base, args := arByCustomerBaseSQL(tu.TenantID, dateFrom, dateTo, partnerID)
+		locationID, _ := optionalInt64Query(r, "location_id")
+		departmentID, _ := optionalInt64Query(r, "department_id")
+		projectID, _ := optionalInt64Query(r, "project_id")
+		picUserID, _ := optionalInt64Query(r, "pic_user_id")
+		base, args := arByCustomerBaseSQL(tu.TenantID, dateFrom, dateTo, partnerID, locationID, departmentID, projectID, picUserID)
 		q := fmt.Sprintf(`select * from (%s) ar order by customer_name asc limit %d`, base, reportExportMaxRows)
 
 		rows, err := pool.Query(r.Context(), q, args...)

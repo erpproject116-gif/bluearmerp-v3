@@ -55,6 +55,7 @@ var entityLabels = map[string]string{
 	"so_sales_order":            "Sales Order",
 	"quo_quotation":             "Quotation",
 	"fin_official_receipt":      "Official Receipt",
+	"fin_bank_account":          "Bank account",
 	"crm_warranty_asset":        "Warranty record",
 	"crm_follow_up_task":        "Follow-up task",
 	"crm_alert_rule":            "Alert rule",
@@ -345,6 +346,10 @@ func formatActivitySummary(actorName, actionCode, targetType, referenceNo string
 		return fmt.Sprintf("%s disabled a custom form field.", actor), describeCreatePayload("tenant_custom_field", asMap(oldJSON))
 	case "settings.draft.delete":
 		return fmt.Sprintf("%s deleted a document draft.", actor), nil
+	case "finance.receipt.journal.update":
+		return fmt.Sprintf("%s updated an official receipt journal.", actor), diffChanges(asMap(oldJSON), asMap(newJSON))
+	case "finance.bank_account.create":
+		return fmt.Sprintf("%s registered a bank account.", actor), describeCreatePayload("fin_bank_account", asMap(newJSON))
 	}
 
 	if strings.HasPrefix(actionCode, "api.") {

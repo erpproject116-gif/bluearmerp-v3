@@ -13,6 +13,7 @@ declare
   v_sale_id bigint;
   v_grand_total numeric(18,4);
   v_receipt_id bigint;
+  v_bank_id bigint;
   v_d date;
   v_date_seq int;
   v_receipt_no text;
@@ -75,6 +76,26 @@ begin
     values (v_receipt_id, v_sale_id, v_grand_total);
 
     raise notice 'seed-demo-finance: created OR % for sale % (tenant %)', v_receipt_no, v_sale_id, v_code;
+
+    update public.fin_official_receipts
+    set accounting_slip_no = 'CR ' || receipt_no
+    where id = v_receipt_id;
+
+    insert into public.fin_bank_accounts (tenant_id, bank_account_code, bank_account_name, gl_account_code, keyword)
+    values (v_tenant, 'DEMO-BDO', 'BDO Demo Account', '1026', 'demo')
+    on conflict (tenant_id, bank_account_code) do update set bank_account_name = excluded.bank_account_name
+    returning id into v_bank_id;
+
+    insert into public.fin_receipt_journal_lines (
+      official_receipt_id, line_no, bank_account_id,
+      deposit_account_code, deposit_account_name, gl_account_code, gl_account_name, amount
+    )
+    select r.id, 1, b.id, b.bank_account_code, b.bank_account_name, b.gl_account_code, g.account_name, r.amount_total
+    from public.fin_official_receipts r
+    join public.fin_bank_accounts b on b.tenant_id = r.tenant_id and b.bank_account_code = 'DEMO-BDO'
+    join public.fin_gl_accounts g on g.account_code = b.gl_account_code
+    where r.tenant_id = v_tenant and r.receipt_no = to_char(v_d, 'YYMMDD') || '301'
+    on conflict (official_receipt_id, line_no) do nothing;
   end loop;
 end $$;
 
