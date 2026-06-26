@@ -40,6 +40,14 @@ This runbook covers the **DEMO000** demo tenant. For platform superadmins (`itsj
    psql "$DATABASE_URL" -f scripts/verify-demo-quotations.sql
    ```
 
+   **Optional — BLUEARM export list (~250 quotations, 122 customers):**
+
+   ```bash
+   psql "$DATABASE_URL" -f scripts/seed-demo-quotations-export.sql
+   ```
+
+   Regenerate from Excel: `python scripts/generate-quotation-seed-from-export.py path/to/export.xlsx`
+
    Expected for DEMO000 after quotation seed:
 
    | Entity | Count |

@@ -34,3 +34,5 @@ Default filters: `balance_qty > 0` and stock at Location-Out `>= balance_qty` wh
 `009_inv_stock_balances.sql`, `010_quotation_tax_mngt.sql`, `011_quotations.sql`
 
 Seed: `scripts/seed-demo-quotations.sql` after inventory seed.
+
+Optional BLUEARM list export (~250 quotes from real data): `scripts/seed-demo-quotations-export.sql` (generate via `scripts/generate-quotation-seed-from-export.py`).
