@@ -35,6 +35,13 @@ Template columns: `item_name`, `purchase_price`, `sales_price`, `vip_price`, `st
 
 Codes are assigned on insert (same as **+ New row**). Partial success: valid rows are created; failures return `row_errors` with row numbers.
 
+## Demo seed (items)
+
+- Base: `scripts/seed-demo-inventory.sql` (DEMO000 + BLUEARM synthetic catalog)
+- Optional BLUEARM list export: `scripts/seed-demo-items-export.sql` — generate via `scripts/generate-item-seed-from-export.py path/to/item-list.xlsx`
+- Legacy export codes longer than 5 characters are mapped to `char(5)` (last 5 chars) before insert
+- Fixture sample (from screenshots): `scripts/fixtures/item-list-export.xlsx`
+
 ## Codes
 
 Five-digit `char(5)` per tenant via `allocate_tenant_code(tenant_id, entity_type)`.

@@ -48,6 +48,22 @@ This runbook covers the **DEMO000** demo tenant. For platform superadmins (`itsj
 
    Regenerate from Excel: `python scripts/generate-quotation-seed-from-export.py path/to/export.xlsx`
 
+   **Optional — BLUEARM item list export (~27 items from screenshot fixture):**
+
+   ```bash
+   psql "$DATABASE_URL" -f scripts/seed-demo-items-export.sql
+   ```
+
+   Regenerate: `python scripts/generate-item-seed-from-export.py path/to/item-list.xlsx`
+
+   **Optional — BLUEARM sales order list export (11 orders from screenshot fixture):**
+
+   ```bash
+   psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders-export.sql
+   ```
+
+   Regenerate: `python scripts/generate-sales-order-seed-from-export.py path/to/sales-order-list.xlsx`
+
    Expected for DEMO000 after quotation seed:
 
    | Entity | Count |

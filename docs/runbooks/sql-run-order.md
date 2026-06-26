@@ -103,7 +103,9 @@ psql "$DATABASE_URL" -f api/migrations/018_crm.sql
 | 3 | `scripts/seed-demo-inventory.sql` | Inventory dummy rows for **DEMO000** only |
 | 4 | `scripts/seed-demo-quotations.sql` | Demo quotations for **DEMO000** + **BLUEARM** |
 | 4b (optional) | `scripts/seed-demo-quotations-export.sql` | **~250 real quotations** from BLUEARM list export (**BLUEARM** only); run after step 4 |
+| 4c (optional) | `scripts/seed-demo-items-export.sql` | **Item list export** for **BLUEARM** (upserts `inv_items`); run after step 3 |
 | 5 | `scripts/seed-demo-sales-orders.sql` | Demo sales orders for **DEMO000** + **BLUEARM** |
+| 5b (optional) | `scripts/seed-demo-sales-orders-export.sql` | **Sales order list export** for **BLUEARM**; run after step 5 |
 | 6 | `scripts/seed-demo-sales.sql` | Demo sales (SI) from released SO lines for **DEMO000** + **BLUEARM** |
 | 7 | `scripts/seed-demo-finance.sql` | Demo official receipt applied to demo sale for **DEMO000** + **BLUEARM** |
 | 8 | `scripts/seed-demo-crm.sql` | CRM alert rules, warranty assets, follow-up tasks, notifications, low-stock demo for **DEMO000** + **BLUEARM** |
@@ -117,7 +119,10 @@ psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-quotations.sql
 # Optional: BLUEARM production-style quotation list (~250 rows)
 psql "$DATABASE_URL" -f scripts/seed-demo-quotations-export.sql
+# Optional: BLUEARM item list + sales order list exports
+psql "$DATABASE_URL" -f scripts/seed-demo-items-export.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders-export.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-finance.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-crm.sql

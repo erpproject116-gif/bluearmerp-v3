@@ -25,6 +25,13 @@ Commercial sales orders with release tracking and stock deduction.
 - Date-No.: `MM/DD/YYYY-N` via `sales_order_date_seq`
 - Sales Order No.: `YYMMDD###` via `sales_order_no`
 
+## Demo seed (sales orders)
+
+- Base: `scripts/seed-demo-sales-orders.sql` (2 demo SO per tenant)
+- Optional BLUEARM list export: `scripts/seed-demo-sales-orders-export.sql` — generate via `scripts/generate-sales-order-seed-from-export.py path/to/sales-order-list.xlsx`
+- Customers match existing `inv_partners` by `company_name` first; new export-only customers use `S0001`–`S9999` codes
+- Fixture sample (from screenshots): `scripts/fixtures/sales-order-list-export.xlsx`
+
 ## Release and stock
 
 `POST /sales-orders/releases` records `so_sales_order_release_lines` and, when `track_inventory_qty` is true, decrements `inv_item_location_balances` and inserts `inv_stock_movements` (`movement_type = so_release`) in one transaction.
