@@ -1,6 +1,6 @@
 import { createResource, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
-import { inputClass } from "../../../shared/SpreadsheetGrid";
+import { modalDismissClass } from "../../../shared/Modal";
 
 export type CreatedSlipLine = {
   line_id: number;
@@ -42,7 +42,7 @@ export function CreatedSlipModal(props: Props) {
         <div class="w-full max-w-4xl rounded-2xl border border-stroke bg-white p-6 shadow-xl">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-text-primary">Created Slips</h2>
-            <button type="button" class={inputClass} onClick={() => props.onClose()}>
+            <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
               Close
             </button>
           </div>

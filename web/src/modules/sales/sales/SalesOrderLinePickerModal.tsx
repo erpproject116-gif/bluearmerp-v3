@@ -1,6 +1,7 @@
 import { createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
+import { modalDismissClass } from "../../../shared/Modal";
 
 export type OpenSalesOrderLineRow = {
   sales_order_id: number;
@@ -87,7 +88,7 @@ export function SalesOrderLinePickerModal(props: Props) {
         <div class="w-full max-w-5xl rounded-2xl border border-stroke bg-white shadow-xl">
           <div class="flex items-center justify-between border-b border-stroke px-5 py-3">
             <h2 class="text-lg font-semibold text-text-primary">From Sales Order — released lines</h2>
-            <button type="button" class="text-text-secondary hover:text-text-primary" onClick={() => props.onClose()}>
+            <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
               Close
             </button>
           </div>

@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "./api";
 import { Field, inputClass } from "./SpreadsheetGrid";
+import { modalDismissClass } from "./Modal";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
 
@@ -148,7 +149,7 @@ export function ItemSearchModal(props: Props) {
         <div class="w-full max-w-4xl rounded-2xl border border-stroke bg-white shadow-xl">
           <div class="flex items-center justify-between border-b border-stroke px-5 py-3">
             <h2 class="text-lg font-semibold text-text-primary">Search Item</h2>
-            <button type="button" class="text-text-secondary hover:text-text-primary" onClick={() => props.onClose()}>
+            <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
               Close
             </button>
           </div>

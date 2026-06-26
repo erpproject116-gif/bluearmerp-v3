@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { modalDismissClass } from "../../../shared/Modal";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 
 const ITEM_CATEGORIES = [
@@ -120,7 +121,7 @@ export function SalesOrderItemSearchModal(props: Props) {
         <div class="w-full max-w-4xl rounded-2xl border border-stroke bg-white shadow-xl">
           <div class="flex items-center justify-between border-b border-stroke px-5 py-3">
             <h2 class="text-lg font-semibold text-text-primary">Search Items (multi-select)</h2>
-            <button type="button" class="text-text-secondary hover:text-text-primary" onClick={() => props.onClose()}>
+            <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
               Close
             </button>
           </div>
