@@ -1,6 +1,6 @@
 import { For } from "solid-js";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
-import { PROGRESS_STATUS_GROUPS } from "./progressStatus";
+import { progressStatusGroups } from "./progressStatus";
 
 type Props = {
   value: string;
@@ -10,6 +10,7 @@ type Props = {
 };
 
 export function ProgressStatusMenu(props: Props) {
+  const groups = () => progressStatusGroups();
   return (
     <select
       class={props.class ?? inputClass}
@@ -21,7 +22,7 @@ export function ProgressStatusMenu(props: Props) {
         props.onChange(e.currentTarget.value);
       }}
     >
-      <For each={PROGRESS_STATUS_GROUPS}>
+      <For each={groups()}>
         {(group) => (
           <optgroup label={group.label}>
             <For each={group.options}>{(opt) => <option value={opt.value}>{opt.label}</option>}</For>

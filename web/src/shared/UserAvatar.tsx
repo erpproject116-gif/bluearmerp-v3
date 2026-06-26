@@ -1,4 +1,5 @@
 import { Show } from "solid-js";
+import { apiAbsoluteUrl } from "./api";
 
 type Props = {
   name: string;
@@ -28,7 +29,7 @@ export function UserAvatar(props: Props) {
       <Show when={props.avatarUrl?.trim()} fallback={initial()}>
         {(url) => (
           <img
-            src={url()}
+            src={apiAbsoluteUrl(url())}
             alt=""
             class="h-full w-full object-cover"
             referrerpolicy="no-referrer"

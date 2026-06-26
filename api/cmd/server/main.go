@@ -23,6 +23,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/usermgmt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/drafts"
@@ -30,6 +31,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/health"
 	platformmw "github.com/bluearm/bluearm-erp-v3/api/internal/platform/middleware"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/presence"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reporttemplates"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -80,6 +82,8 @@ func main() {
 			customfields.RegisterRoutes(protected, pool)
 			drafts.RegisterRoutes(protected, pool)
 			formfields.RegisterRoutes(protected, pool)
+			reporttemplates.RegisterRoutes(protected, pool)
+			branding.RegisterRoutes(protected, pool)
 			activitylog.RegisterRoutes(protected, pool)
 			inventory.RegisterRoutes(protected, pool)
 			quotation.RegisterRoutes(protected, pool)

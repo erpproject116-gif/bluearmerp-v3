@@ -1,35 +1,41 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
-import type { SalesStatusFilters } from "../modules/sales/sales/salesStatusFilters";
-import { filtersToSearchParams } from "../modules/sales/sales/salesStatusFilters";
+import {
+  filtersToSearchParams,
+  type SalesDiscountStatusFilters,
+} from "../modules/sales/reports/salesDiscountStatusFilters";
 
 export type SalesDiscountStatusRow = {
   sales_id: number;
-  line_id: number;
+  order_date: string;
   date_no_display: string;
-  sales_no: string;
   customer_name: string;
-  item_code: string;
-  item_name: string;
-  qty: number;
-  discount_amount: number;
-  line_total: number;
-  remark?: string | null;
-  location_name: string;
-  department_name?: string;
+  sales_amount: number;
+  invoicing_amount: number;
+  difference_amount: number;
+  remark: string;
+  progress_status: string;
+  approval_line: string;
 };
 
+import type { SalesDiscountStatusTemplate } from "../modules/sales/reports/salesDiscountStatusTemplate";
+
 export type SalesDiscountStatusParams = {
-  filters: SalesStatusFilters;
+  filters: SalesDiscountStatusFilters;
+  template: SalesDiscountStatusTemplate;
   page: number;
   pageSize: number;
-  sort: string;
-  order: "asc" | "desc";
   enabled: boolean;
 };
 
-export function discountStatusExportUrl(filters: SalesStatusFilters): string {
-  return `/api/v1/sales/discount-status-report/export?${filtersToSearchParams(filters).toString()}`;
+export function discountStatusExportUrl(filters: SalesDiscountStatusFilters, template?: SalesDiscountStatusTemplate): string {
+  const qs = filtersToSearchParams(filters, {
+    sort: template?.sortField ?? "order_date",
+    order: template?.sortOrder ?? "desc",
+    sort2: template?.sortField2 || undefined,
+    order2: template?.sortField2 ? template.sortOrder2 : undefined,
+  });
+  return `/api/v1/sales/discount-status-report/export?${qs}`;
 }
 
 export function useSalesDiscountStatusReport(params: () => SalesDiscountStatusParams) {
@@ -38,8 +44,10 @@ export function useSalesDiscountStatusReport(params: () => SalesDiscountStatusPa
     const qs = filtersToSearchParams(p.filters, {
       page: p.page,
       pageSize: p.pageSize,
-      sort: p.sort,
-      order: p.order,
+      sort: p.template.sortField,
+      order: p.template.sortOrder,
+      sort2: p.template.sortField2 || undefined,
+      order2: p.template.sortField2 ? p.template.sortOrder2 : undefined,
     });
     return {
       queryKey: ["sales-discount-status", p],
@@ -47,12 +55,20 @@ export function useSalesDiscountStatusReport(params: () => SalesDiscountStatusPa
       queryFn: async () => {
         const res = await apiFetch<{
           rows: SalesDiscountStatusRow[];
-          summary: { total_qty: number; total_discount_amount: number; total_amount: number };
+          summary: {
+            total_sales_amount: number;
+            total_invoicing_amount: number;
+            total_difference_amount: number;
+          };
         }>(`/api/v1/sales/discount-status-report?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load discount status");
         return {
           rows: res.data?.rows ?? [],
-          summary: res.data?.summary ?? { total_qty: 0, total_discount_amount: 0, total_amount: 0 },
+          summary: res.data?.summary ?? {
+            total_sales_amount: 0,
+            total_invoicing_amount: 0,
+            total_difference_amount: 0,
+          },
           total: res.meta?.total ?? 0,
         };
       },

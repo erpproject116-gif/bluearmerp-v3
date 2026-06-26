@@ -14,6 +14,7 @@ export type MeData = {
     is_store_admin?: boolean;
     can_manage_users?: boolean;
     can_manage_custom_fields?: boolean;
+    can_manage_branding?: boolean;
     can_view_activity_logs?: boolean;
     can_view_change_logs?: boolean;
     can_view_crm?: boolean;
@@ -37,6 +38,15 @@ export function canManageFormSettings(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
   return Boolean(u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin);
+}
+
+export function canManageBranding(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  return Boolean(
+    u.can_manage_branding ??
+      (u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin),
+  );
 }
 
 export function canManageUsers(me: MeData | null | undefined): boolean {

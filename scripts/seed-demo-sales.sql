@@ -104,6 +104,17 @@ begin
     end if;
 
     raise notice 'seed-demo-sales: ensured demo sale for %', v_code;
+
+    -- Demo line discount for Sales Discount Status report
+    update public.sa_sales_lines sl
+    set discount_amount = 250.00,
+        remark = coalesce(nullif(btrim(sl.remark), ''), 'Demo promo discount')
+  from public.sa_sales s
+    where s.id = sl.sales_id
+      and s.tenant_id = v_tenant
+      and s.sales_no = v_ref
+      and s.deleted_at is null
+      and sl.discount_amount = 0;
   end loop;
 end $$;
 

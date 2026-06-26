@@ -1,7 +1,8 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { useAuth, canManageUsers, canViewActivityLogs, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasModuleAccess, hasPermission } from "../shared/auth-context";
+import { useAuth, canManageUsers, canViewActivityLogs, canViewCrm, canViewCrmAnalytics, canManageCrmRules, canManageBranding, hasModuleAccess, hasPermission } from "../shared/auth-context";
+import { AvatarUploadButton } from "../shared/AvatarUploadButton";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
 import { CrmNotificationPoller } from "../shared/CrmNotificationPoller";
@@ -174,6 +175,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 <div class="min-w-0">
                   <p class="truncate text-sm font-medium text-text-primary">{auth.me!.user.full_name}</p>
                   <p class="truncate text-xs text-text-secondary">{auth.me!.tenant.company_name}</p>
+                  <AvatarUploadButton class="mt-0.5" />
                 </div>
               </div>
             </Show>
@@ -299,6 +301,14 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               </button>
             </Show>
             <CrmNotificationBell enabled={canViewCrm(auth.me)} />
+            <Show when={canManageBranding(auth.me)}>
+              <A
+                href="/app/settings/branding"
+                class="hidden rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary sm:inline-flex"
+              >
+                Branding
+              </A>
+            </Show>
             <button
               type="button"
               class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"

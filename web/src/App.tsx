@@ -67,6 +67,7 @@ import SalesOfficialReceiptStatusPage from "./modules/sales/reports/SalesOfficia
 import SalesSiReceiptStatusPage from "./modules/sales/reports/SalesSiReceiptStatusPage";
 import SalesArByCustomerPage from "./modules/sales/reports/SalesArByCustomerPage";
 import SalesDiscountStatusPage from "./modules/sales/reports/SalesDiscountStatusPage";
+import SalesDiscountStatusPrintPage from "./modules/sales/reports/SalesDiscountStatusPrintPage";
 import SalesPrintSlipsLauncherPage from "./modules/sales/reports/SalesPrintSlipsLauncherPage";
 import SalesSlipsPrintPage from "./modules/sales/reports/SalesSlipsPrintPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
@@ -89,6 +90,8 @@ import AlertRulesSettingsPage from "./modules/crm/AlertRulesSettingsPage";
 import CustomerQuotationsReportPage from "./modules/crm/reports/CustomerQuotationsReportPage";
 import ItemDemandReportPage from "./modules/crm/reports/ItemDemandReportPage";
 import ConversionFunnelReportPage from "./modules/crm/reports/ConversionFunnelReportPage";
+import BrandingSettingsPage from "./modules/settings/BrandingSettingsPage";
+import { BrandingProvider } from "./shared/branding/BrandingProvider";
 import LowStockReportPage from "./modules/crm/reports/LowStockReportPage";
 
 const queryClient = new QueryClient({
@@ -120,6 +123,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
       <AuthProvider>
+        <BrandingProvider>
         <CrmTaskModalProvider>
         <Router>
         <Route path="/signin" component={SignInPage} />
@@ -134,6 +138,7 @@ export default function App() {
         <Route path="/app/sales-order/sales-orders/:salesOrderId/print" component={SalesOrderPrintPage} />
         <Route path="/app/sales-order/sales-orders/status/print" component={SalesOrderStatusPrintPage} />
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
+        <Route path="/app/sales/reports/discount-status/print" component={SalesDiscountStatusPrintPage} />
         <Route path="/app/sales/reports/print-slips/print" component={SalesSlipsPrintPage} />
         <Route path="/app" component={AppLayout}>
           <Route path="/inventory/partners" component={PartnersPage} />
@@ -227,6 +232,7 @@ export default function App() {
               <ActivityLogListPage />
             </ActivityLogRoute>
           )} />
+          <Route path="/settings/branding" component={BrandingSettingsPage} />
           <Route path="/user-management/users" component={() => (
             <AdminModuleRoute>
               <UsersPage />
@@ -246,6 +252,7 @@ export default function App() {
         <Route path="*" component={AuthEntryRedirect} />
       </Router>
         </CrmTaskModalProvider>
+        </BrandingProvider>
       </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>

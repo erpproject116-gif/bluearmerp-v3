@@ -1,49 +1,78 @@
 import { createSignal, Show } from "solid-js";
 import { useSalesDiscountStatusReport } from "../../../shared/useSalesDiscountStatusReport";
-import { SalesStatusFilter } from "../sales/SalesStatusFilter";
-import { defaultStatusFilters, type SalesStatusFilters } from "../sales/salesStatusFilters";
 import { SalesLayout } from "../SalesLayout";
+import { SalesDiscountStatusFilter } from "./SalesDiscountStatusFilter";
 import { SalesDiscountStatusReport } from "./SalesDiscountStatusReport";
+import { defaultDiscountStatusFilters, type SalesDiscountStatusFilters } from "./salesDiscountStatusFilters";
+import {
+  loadDiscountStatusTemplate,
+  saveDiscountStatusTemplate,
+  type DiscountSortField,
+  type SalesDiscountStatusTemplate,
+} from "./salesDiscountStatusTemplate";
+
+const SUBTOTAL_PAGE_SIZE = 5000;
 
 export default function SalesDiscountStatusPage() {
-  const [draftFilters, setDraftFilters] = createSignal<SalesStatusFilters>(defaultStatusFilters());
-  const [submittedFilters, setSubmittedFilters] = createSignal<SalesStatusFilters | null>(null);
+  const [draftFilters, setDraftFilters] = createSignal<SalesDiscountStatusFilters>(defaultDiscountStatusFilters());
+  const [submittedFilters, setSubmittedFilters] = createSignal<SalesDiscountStatusFilters | null>(null);
+  const [template, setTemplate] = createSignal<SalesDiscountStatusTemplate>(loadDiscountStatusTemplate());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;
 
+  const useSubtotalMode = () => (submittedFilters() ? template().subtotalBy !== "none" : false);
+  const effectivePageSize = () => (useSubtotalMode() ? SUBTOTAL_PAGE_SIZE : pageSize);
+  const effectivePage = () => (useSubtotalMode() ? 1 : page());
+
   const report = useSalesDiscountStatusReport(() => ({
-    filters: submittedFilters() ?? defaultStatusFilters(),
-    page: page(),
-    pageSize,
-    sort: "order_date",
-    order: "desc",
+    filters: submittedFilters() ?? defaultDiscountStatusFilters(),
+    template: template(),
+    page: effectivePage(),
+    pageSize: effectivePageSize(),
     enabled: submittedFilters() !== null,
   }));
 
+  const toggleSort = (field: DiscountSortField) => {
+    setTemplate((prev) => {
+      const sortOrder: "asc" | "desc" =
+        prev.sortField === field && prev.sortOrder === "desc" ? "asc" : "desc";
+      const next: SalesDiscountStatusTemplate = {
+        ...prev,
+        sortField: field,
+        sortOrder: prev.sortField === field ? sortOrder : "desc",
+      };
+      saveDiscountStatusTemplate(next);
+      return next;
+    });
+  };
+
   return (
     <SalesLayout>
-      <SalesStatusFilter
-        title="Sales Discount Status"
-        subtitle="Lines with discount amount greater than zero — Search (F8)."
+      <SalesDiscountStatusFilter
         value={draftFilters}
         onChange={setDraftFilters}
+        template={template}
+        onTemplateChange={setTemplate}
         onSearch={() => { setSubmittedFilters({ ...draftFilters() }); setPage(1); setGeneratedAt(new Date()); }}
-        onReset={() => { setDraftFilters(defaultStatusFilters()); setSubmittedFilters(null); setPage(1); }}
+        onReset={() => { setDraftFilters(defaultDiscountStatusFilters()); setSubmittedFilters(null); setPage(1); }}
       />
       <Show when={submittedFilters()}>
         <SalesDiscountStatusReport
           filters={submittedFilters()!}
+          template={template()}
           rows={report.data?.rows ?? []}
-          totalQty={report.data?.summary.total_qty ?? 0}
-          totalDiscount={report.data?.summary.total_discount_amount ?? 0}
-          totalAmount={report.data?.summary.total_amount ?? 0}
+          totalSales={report.data?.summary.total_sales_amount ?? 0}
+          totalInvoicing={report.data?.summary.total_invoicing_amount ?? 0}
+          totalDifference={report.data?.summary.total_difference_amount ?? 0}
           totalRows={report.data?.total ?? 0}
-          page={page()}
-          pageSize={pageSize}
+          page={effectivePage()}
+          pageSize={effectivePageSize()}
           loading={report.isFetching}
           generatedAt={generatedAt}
+          subtotalMode={useSubtotalMode()}
           onPageChange={setPage}
+          onSort={toggleSort}
         />
       </Show>
     </SalesLayout>

@@ -19,6 +19,14 @@ export const supabase = createClient(url || "http://localhost", anon || "anon", 
 // Dev: Vite proxies /api → localhost:8080. Ignore VITE_API_BASE_URL in dev to avoid wrong ports.
 export const apiBase = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "");
 
+/** Prefix API-relative paths (e.g. /api/v1/...) for img src and fetch in production. */
+export function apiAbsoluteUrl(path: string): string {
+  if (!path) return path;
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = apiBase || "";
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export const apiConfigured = import.meta.env.DEV || Boolean(apiBase);
 
 export function apiNetworkErrorMessage(): string {

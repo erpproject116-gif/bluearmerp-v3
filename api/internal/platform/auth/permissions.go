@@ -44,6 +44,11 @@ func (tu TenantUser) CanManageFormSettings() bool {
 	return tu.canManageFormSettingsRole
 }
 
+// CanManageBranding reports whether the tenant user may edit tenant branding (colors, receipt header, labels).
+func (tu TenantUser) CanManageBranding() bool {
+	return tu.CanManageFormSettings()
+}
+
 // CanViewChangeLogs reports whether the tenant user may access change log APIs and UI.
 func (tu TenantUser) CanViewChangeLogs() bool {
 	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {

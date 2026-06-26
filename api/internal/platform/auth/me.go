@@ -96,6 +96,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 			"is_store_admin":           tu.IsStoreAdmin,
 			"can_manage_users":         tu.CanManageUsers(),
 			"can_manage_custom_fields": tu.CanManageFormSettings(),
+			"can_manage_branding":      tu.CanManageBranding(),
 			"can_view_activity_logs":   tu.CanViewActivityLogs(),
 			"can_view_change_logs":     tu.CanViewChangeLogs(),
 			"can_view_crm":             tu.CanViewCRM(),
@@ -106,7 +107,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 			"permissions":              tu.PermissionsMap(),
 	}
 	if avatarURL != nil && strings.TrimSpace(*avatarURL) != "" {
-		user["avatar_url"] = strings.TrimSpace(*avatarURL)
+		user["avatar_url"] = resolveBrandingAvatarURL(strings.TrimSpace(*avatarURL))
 	}
 
 	return MePayload{
@@ -121,4 +122,14 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 		EnabledModuleCodes: enabled,
 		Modules:            modules,
 	}, nil
+}
+
+func resolveBrandingAvatarURL(ref string) string {
+	if strings.HasPrefix(ref, "branding-asset:") {
+		id := strings.TrimPrefix(ref, "branding-asset:")
+		if id != "" {
+			return "/api/v1/branding/assets/" + id + "?inline=1"
+		}
+	}
+	return ref
 }
