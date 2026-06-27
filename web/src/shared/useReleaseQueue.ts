@@ -25,6 +25,7 @@ export type ReleaseQueueRow = {
   balance_qty: number;
   location_stock: number;
   track_inventory_qty: boolean;
+  track_serial: boolean;
 };
 
 export function useReleaseQueue(params: () => ReleaseQueueParams) {
@@ -60,9 +61,27 @@ export function useInvalidateReleaseQueue() {
   return () => void client.invalidateQueries({ queryKey: ["sales-order-release-queue"] });
 }
 
-export async function postSalesOrderReleases(lines: Array<{ sales_order_line_id: number; release_qty: number }>) {
+export async function postSalesOrderReleases(
+  lines: Array<{ sales_order_line_id: number; release_qty: number; serial_unit_ids?: number[] }>,
+) {
   return apiFetch<{ released_count: number }>("/api/v1/sales-order/sales-orders/releases", {
     method: "POST",
     body: JSON.stringify({ lines }),
   }, { silent: true });
+}
+
+export type AvailableSerial = {
+  id: number;
+  serial_no: string;
+  status: string;
+  location_id?: number | null;
+  location_name?: string;
+  warranty_end?: string | null;
+};
+
+export async function fetchAvailableSerials(itemId: number, locationId?: number) {
+  const qs = new URLSearchParams({ item_id: String(itemId) });
+  if (locationId) qs.set("location_id", String(locationId));
+  const res = await apiFetch<AvailableSerial[]>(`/api/v1/inventory/serial-units/available?${qs}`);
+  return res.data ?? [];
 }

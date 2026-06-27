@@ -16,6 +16,7 @@ import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { type SerialTraceResult } from "../../../shared/useSerialLotList";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 
 export type RepairOrderDetail = {
@@ -212,6 +213,27 @@ export function RepairOrderModal(props: Props) {
     location_id: locationId(),
     progress_status: progressStatus(),
   });
+
+  const onSerialLotBlur = async (index: number, serialNo: string) => {
+    const trimmed = serialNo.trim();
+    if (!trimmed) return;
+    const qs = new URLSearchParams({ serial_no: trimmed });
+    const res = await apiFetch<SerialTraceResult>(`/api/v1/inventory/serial-units/trace?${qs}`, {}, { silent: true });
+    if (!res.success || !res.data?.unit) return;
+    const unit = res.data.unit;
+    setLines((prev) =>
+      prev.map((ln, i) =>
+        i === index
+          ? {
+              ...ln,
+              item_id: unit.item_id,
+              item_code: unit.item_code,
+              item_name: unit.item_name,
+            }
+          : ln,
+      ),
+    );
+  };
 
   const save = async () => {
     if (!partnerId()) {
@@ -424,7 +446,7 @@ export function RepairOrderModal(props: Props) {
       <Field label="Technician">
         <input class={inputClass} value={technicianName()} onInput={(e) => setTechnicianName(e.currentTarget.value)} />
       </Field>
-      <EditableLineGrid lines={lines} onChange={setLines} />
+      <EditableLineGrid lines={lines} onChange={setLines} onSerialLotBlur={onSerialLotBlur} />
       <CustomFieldsSection entityType={INVENTORY_ENTITY.repairOrder} values={customValues} onChange={setCustom} />
     </WideEntityModal>
   );

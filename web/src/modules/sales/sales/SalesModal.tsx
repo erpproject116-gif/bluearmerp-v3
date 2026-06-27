@@ -428,6 +428,7 @@ export function SalesModal(props: Props) {
         discount_amount: ln.discount_amount === "" ? 0 : Number(ln.discount_amount),
         remark: ln.remark || null,
         serial_lot_no: ln.serial_lot_no || null,
+        serial_unit_ids: ln.serial_unit_ids?.length ? ln.serial_unit_ids : undefined,
         source_sales_order_line_id: ln.source_sales_order_line_id || null,
       })),
     };

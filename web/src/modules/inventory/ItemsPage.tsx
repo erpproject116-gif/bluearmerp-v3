@@ -20,6 +20,8 @@ type Item = {
   vip_price: number;
   warranty_duration_months?: number | null;
   reorder_level?: number | null;
+  track_serial?: boolean;
+  track_lot?: boolean;
   status: string;
   custom_values?: Record<string, unknown>;
 };
@@ -39,6 +41,8 @@ export default function ItemsPage() {
     vip_price: 0,
     warranty_duration_months: null as number | null,
     reorder_level: null as number | null,
+    track_serial: false,
+    track_lot: false,
     status: "active",
   });
   const [saving, setSaving] = createSignal(false);
@@ -67,6 +71,8 @@ export default function ItemsPage() {
       vip_price: 0,
       warranty_duration_months: null,
       reorder_level: null,
+      track_serial: false,
+      track_lot: false,
       status: "active",
     });
     loadCustom({});
@@ -83,6 +89,8 @@ export default function ItemsPage() {
       vip_price: row.vip_price,
       warranty_duration_months: row.warranty_duration_months ?? null,
       reorder_level: row.reorder_level ?? null,
+      track_serial: row.track_serial ?? false,
+      track_lot: row.track_lot ?? false,
       status: row.status,
     });
     loadCustom(row.custom_values ?? {});
@@ -126,6 +134,8 @@ export default function ItemsPage() {
           { key: "vip_price", header: "VIP", render: (r) => money(r.vip_price) },
           { key: "warranty_duration_months", header: "Warranty (mo)", render: (r) => r.warranty_duration_months ?? "—" },
           { key: "reorder_level", header: "Reorder", render: (r) => (r.reorder_level != null ? r.reorder_level : "—") },
+          { key: "track_serial", header: "Serial", render: (r) => (r.track_serial ? "Yes" : "—") },
+          { key: "track_lot", header: "Lot", render: (r) => (r.track_lot ? "Yes" : "—") },
           { key: "status", header: "Status" },
         ]}
         rows={list.data?.rows ?? []}
@@ -240,6 +250,40 @@ export default function ItemsPage() {
             />
           )}
         </ModalField>
+        <Field label="Tracking">
+          <div class="flex flex-wrap gap-6 text-sm">
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form().track_serial}
+                onChange={(e) => {
+                  const checked = e.currentTarget.checked;
+                  setForm((f) => ({
+                    ...f,
+                    track_serial: checked,
+                    track_lot: checked ? false : f.track_lot,
+                  }));
+                }}
+              />
+              Track serial numbers
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form().track_lot}
+                onChange={(e) => {
+                  const checked = e.currentTarget.checked;
+                  setForm((f) => ({
+                    ...f,
+                    track_lot: checked,
+                    track_serial: checked ? false : f.track_serial,
+                  }));
+                }}
+              />
+              Track lot numbers
+            </label>
+          </div>
+        </Field>
         <ModalField settings={byKey} fieldKey="status" fallbackLabel="Status" fallbackRequired>
           {(m) => (
             <select

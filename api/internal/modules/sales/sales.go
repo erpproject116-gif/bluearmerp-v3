@@ -91,6 +91,7 @@ type saleLineBody struct {
 	DiscountAmount         float64 `json:"discount_amount"`
 	Remark                 *string `json:"remark"`
 	SerialLotNo            *string `json:"serial_lot_no"`
+	SerialUnitIDs          []int64 `json:"serial_unit_ids,omitempty"`
 	SourceSalesOrderLineID *int64  `json:"source_sales_order_line_id"`
 }
 
@@ -489,6 +490,11 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if err := insertSaleLines(r.Context(), tx, id, computed); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := applySaleSerialUnits(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.Lines); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
 		}
 

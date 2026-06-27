@@ -3,6 +3,7 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
 import {
+  fetchAvailableSerials,
   postSalesOrderReleases,
   useInvalidateReleaseQueue,
   useReleaseQueue,
@@ -17,6 +18,7 @@ export default function ReleaseSalesOrderPage() {
   const invalidate = useInvalidateReleaseQueue();
   const { page, setPage, q, setQ, sort, order, pageSize } = useListState("order_date", 25, { defaultOrder: "desc" });
   const [releaseQty, setReleaseQty] = createSignal<Record<number, string>>({});
+  const [serialIds, setSerialIds] = createSignal<Record<number, number[]>>({});
   const [submitting, setSubmitting] = createSignal(false);
 
   const queue = useReleaseQueue(() => ({
@@ -37,9 +39,14 @@ export default function ReleaseSalesOrderPage() {
       .map((row) => {
         const qty = Number(releaseQty()[row.sales_order_line_id] ?? "");
         if (!Number.isFinite(qty) || qty <= 0) return null;
-        return { sales_order_line_id: row.sales_order_line_id, release_qty: qty };
+        const ids = serialIds()[row.sales_order_line_id];
+        return {
+          sales_order_line_id: row.sales_order_line_id,
+          release_qty: qty,
+          ...(ids?.length ? { serial_unit_ids: ids } : {}),
+        };
       })
-      .filter((ln): ln is { sales_order_line_id: number; release_qty: number } => ln != null);
+      .filter((ln) => ln != null);
 
     if (lines.length === 0) {
       toast.warning("Enter release quantity for at least one line.");
@@ -57,7 +64,21 @@ export default function ReleaseSalesOrderPage() {
 
     toast.success(res.message ?? `Released ${res.data?.released_count ?? lines.length} line(s).`);
     setReleaseQty({});
+    setSerialIds({});
     invalidate();
+  };
+
+  const pickSerials = async (row: ReleaseQueueRow) => {
+    if (!row.item_id) return;
+    const avail = await fetchAvailableSerials(row.item_id, row.location_id);
+    if (avail.length === 0) {
+      toast.warning("No serials available at this location.");
+      return;
+    }
+    const qty = Number(releaseQty()[row.sales_order_line_id] ?? row.balance_qty);
+    const picked = avail.slice(0, Math.max(1, Math.floor(qty))).map((s) => s.id);
+    setSerialIds((prev) => ({ ...prev, [row.sales_order_line_id]: picked }));
+    toast.success(`Selected ${picked.length} serial(s).`);
   };
 
   const fillBalance = (row: ReleaseQueueRow) => {
@@ -107,19 +128,20 @@ export default function ReleaseSalesOrderPage() {
                 <th class="px-3 py-2 text-right">Balance</th>
                 <th class="px-3 py-2 text-right">Loc. Stock</th>
                 <th class="px-3 py-2 text-right">Release Qty</th>
+                <th class="px-3 py-2">Serials</th>
               </tr>
             </thead>
             <tbody>
               <Show when={queue.isFetching}>
                 <tr>
-                  <td colSpan={10} class="px-3 py-8 text-center text-text-secondary">
+                  <td colSpan={11} class="px-3 py-8 text-center text-text-secondary">
                     Loading…
                   </td>
                 </tr>
               </Show>
               <Show when={!queue.isFetching && (queue.data?.rows ?? []).length === 0}>
                 <tr>
-                  <td colSpan={10} class="px-3 py-8 text-center text-text-secondary">
+                  <td colSpan={11} class="px-3 py-8 text-center text-text-secondary">
                     No lines in the release queue.
                   </td>
                 </tr>
@@ -151,6 +173,17 @@ export default function ReleaseSalesOrderPage() {
                         value={releaseQty()[row.sales_order_line_id] ?? ""}
                         onInput={(e) => setQty(row.sales_order_line_id, e.currentTarget.value)}
                       />
+                    </td>
+                    <td class="px-3 py-2">
+                      <Show when={row.track_serial}>
+                        <button
+                          type="button"
+                          class="text-xs text-brand-600 hover:underline"
+                          onClick={() => void pickSerials(row)}
+                        >
+                          Pick ({(serialIds()[row.sales_order_line_id] ?? []).length})
+                        </button>
+                      </Show>
                     </td>
                   </tr>
                 )}

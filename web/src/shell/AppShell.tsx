@@ -15,9 +15,11 @@ import { ShellProvider, useShell } from "./shell-context";
 import { appModules, featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
 import { CollectiveInvoicingHeaderNav } from "./CollectiveInvoicingHeaderNav";
+import { SerialLotHeaderNav } from "./SerialLotHeaderNav";
 import { taxMngtHeaderTitle } from "./tax-mngt-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 import { collectiveInvoicingHeaderTitle, COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
+import { serialLotHeaderTitle, SERIAL_LOT_PREFIX } from "./serial-lot-nav";
 import { useBranding } from "../shared/branding/BrandingProvider";
 import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
@@ -26,6 +28,7 @@ import { isAnySubBranchPath } from "./sub-branch-nav";
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
   if (prefix === COLLECTIVE_INVOICING_PREFIX) return collectiveInvoicingHeaderTitle(pathname);
+  if (prefix === SERIAL_LOT_PREFIX) return serialLotHeaderTitle(pathname);
   return "Sub-module";
 }
 
@@ -365,6 +368,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           </Show>
           <TaxMngtHeaderNav />
           <CollectiveInvoicingHeaderNav />
+          <SerialLotHeaderNav />
         </header>
         <main class="flex-1 p-6">{props.children}</main>
       </div>

@@ -107,6 +107,7 @@ psql "$DATABASE_URL" -f api/migrations/018_crm.sql
 | 5 | `scripts/seed-demo-sales-orders.sql` | Demo sales orders for **DEMO000** + **BLUEARM** |
 | 5b (optional) | `scripts/seed-demo-sales-orders-export.sql` | **Sales order list export** for **BLUEARM**; run after step 5 |
 | 5c (optional) | `scripts/seed-demo-purchase-requests.sql` | Demo purchase requests for **DEMO000** + **BLUEARM**; run after step 3 (inventory) |
+| 5d (optional) | `scripts/seed-demo-serial-lot.sql` | Serial-tracked items, PO, GRN, demo serial units; run after 5c and migrations 040-044 |
 | 6 | `scripts/seed-demo-sales.sql` | Demo sales (SI) from released SO lines for **DEMO000** + **BLUEARM** |
 | 7 | `scripts/seed-demo-finance.sql` | Demo official receipt applied to demo sale for **DEMO000** + **BLUEARM** |
 | 8 | `scripts/seed-demo-crm.sql` | CRM alert rules, warranty assets, follow-up tasks, notifications, low-stock demo for **DEMO000** + **BLUEARM** |
@@ -125,6 +126,7 @@ psql "$DATABASE_URL" -f scripts/seed-demo-items-export.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders-export.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-serial-lot.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-finance.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-crm.sql

@@ -1,8 +1,9 @@
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 import { COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
+import { SERIAL_LOT_PREFIX } from "./serial-lot-nav";
 import { isSubBranchPath } from "./sub-branch-nav";
 
-export { TAX_MNGT_PREFIX, COLLECTIVE_INVOICING_PREFIX, isSubBranchPath };
+export { TAX_MNGT_PREFIX, COLLECTIVE_INVOICING_PREFIX, SERIAL_LOT_PREFIX, isSubBranchPath };
 
 export type ModuleFeature = {
   label: string;
@@ -40,6 +41,14 @@ export const appModules: AppModule[] = [
       { label: "Departments", href: "/app/inventory/departments", settingsHref: "/app/inventory/departments/settings" },
       { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings" },
       { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements" },
+    ],
+    subBranches: [
+      {
+        label: "Serial & Lot",
+        prefix: SERIAL_LOT_PREFIX,
+        href: "/app/inventory/serial-lot/registry",
+        settingsHref: "/app/inventory/serial-lot/settings",
+      },
     ],
   },
   {
@@ -212,6 +221,7 @@ export const appModules: AppModule[] = [
       { label: "New Purchase Request", href: "/app/purchase-request/purchase-requests/new", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       { label: "Purchase Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Purchase Order List", href: "/app/purchase-request/purchase-orders", settingsHref: "/app/purchase-request/purchase-requests/settings" },
     ],
   },
   {

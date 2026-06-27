@@ -16,7 +16,9 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/goodsreceipt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaseorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaserequest"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quotation"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
@@ -92,6 +94,8 @@ func main() {
 			finance.RegisterRoutes(protected, pool)
 			salesorder.RegisterRoutes(protected, pool)
 			purchaserequest.RegisterRoutes(protected, pool)
+			purchaseorder.RegisterRoutes(protected, pool)
+			goodsreceipt.RegisterRoutes(protected, pool)
 			usermgmt.RegisterRoutes(protected, pool)
 			crm.RegisterRoutes(protected, pool)
 		})

@@ -43,6 +43,10 @@ func orderSQL(order string) string {
 	return "asc"
 }
 
+func boolOrFalse(v *bool) bool {
+	return v != nil && *v
+}
+
 func createWithCode[T any](ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, entity string, insert func(context.Context, pgxpoolConn, string) (int64, T, error)) (int64, T, error) {
 	var zero T
 	tx, err := pool.Begin(ctx)

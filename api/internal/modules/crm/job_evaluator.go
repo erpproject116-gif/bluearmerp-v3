@@ -204,6 +204,7 @@ func evalWarrantyFollowUp(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 			return notifCount, taskCount, err
 		}
 		key := dedupeKey(rule.RuleType, rule.ID, "crm_warranty_asset", assetID, today)
+		key = fmt.Sprintf("%s:lead%d", key, rule.LeadValue)
 		title := fmt.Sprintf("Warranty follow-up: %s", serial)
 		body := fmt.Sprintf("%s warranty ends on %s.", itemName, warrantyEnd.Format("2006-01-02"))
 		ok, err := insertNotification(ctx, pool, tenantID, picUserID, rule.ID, "warning", title, body, "crm_warranty_asset", assetID, key)

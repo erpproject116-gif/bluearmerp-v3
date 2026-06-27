@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { fetchAvailableSerials } from "../../../shared/useReleaseQueue";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
@@ -27,6 +28,7 @@ export type SalesLineRow = {
   discount_amount: string;
   remark: string;
   serial_lot_no: string;
+  serial_unit_ids?: number[];
   source_sales_order_line_id?: number | null;
 };
 
@@ -233,6 +235,20 @@ export function SalesLineGrid(props: Props) {
     props.onChange(next.length ? next : [emptySalesLine(1, "", basis)]);
   };
 
+  const pickSerialsForLine = async (idx: number) => {
+    const line = props.lines()[idx];
+    if (!line.item_id) return;
+    const loc = props.locationId();
+    const avail = await fetchAvailableSerials(line.item_id, loc ?? undefined);
+    if (avail.length === 0) return;
+    const qty = Math.max(1, Math.floor(parseNum(line.qty)));
+    const picked = avail.slice(0, qty);
+    await updateLine(idx, {
+      serial_unit_ids: picked.map((s) => s.id),
+      serial_lot_no: picked.map((s) => s.serial_no).join(", "),
+    });
+  };
+
   const openSearch = (idx: number) => {
     setSearchLineIdx(idx);
     setSearchOpen(true);
@@ -372,7 +388,14 @@ export function SalesLineGrid(props: Props) {
                       <input type="number" class={`${inputClass} w-full text-right`} value={line.discount_amount} onInput={(e) => void updateLine(idx(), { discount_amount: e.currentTarget.value })} />
                     </ResizableTd>
                     <ResizableTd width={widthFor("serial_lot_no")} class="px-2 py-1">
-                      <input class={`${inputClass} w-full`} value={line.serial_lot_no} onInput={(e) => void updateLine(idx(), { serial_lot_no: e.currentTarget.value })} />
+                      <div class="flex items-center gap-1">
+                        <input class={`${inputClass} min-w-0 flex-1`} value={line.serial_lot_no} readOnly={Boolean(line.serial_unit_ids?.length)} onInput={(e) => void updateLine(idx(), { serial_lot_no: e.currentTarget.value })} />
+                        <Show when={line.item_id}>
+                          <button type="button" class="shrink-0 text-xs text-brand-600 hover:underline" onClick={() => void pickSerialsForLine(idx())}>
+                            Pick
+                          </button>
+                        </Show>
+                      </div>
                     </ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">

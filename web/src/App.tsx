@@ -26,6 +26,12 @@ import RegisterRepairNewPage from "./modules/inventory/after-sales/RegisterRepai
 import RegisterRepairStatusPage from "./modules/inventory/after-sales/RegisterRepairStatusPage";
 import RegisterRepairConsumptionPage from "./modules/inventory/after-sales/RegisterRepairConsumptionPage";
 import StockMovementsPage from "./modules/inventory/StockMovementsPage";
+import SerialRegistryListPage from "./modules/inventory/serial-lot/SerialRegistryListPage";
+import LotBatchesListPage from "./modules/inventory/serial-lot/LotBatchesListPage";
+import SerialMovementsListPage from "./modules/inventory/serial-lot/SerialMovementsListPage";
+import SerialTracePage from "./modules/inventory/serial-lot/SerialTracePage";
+import SerialReceivePage from "./modules/inventory/serial-lot/SerialReceivePage";
+import SerialLotSettingsPage from "./modules/inventory/serial-lot/SerialLotSettingsPage";
 import {
   RepairOrderReceiptPrintPage,
   RepairOrderWarrantyPrintPage,
@@ -56,6 +62,7 @@ import PurchaseRequestSettingsPage from "./modules/purchase-request/purchase-req
 import PurchaseRequestStatusPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPage";
 import PurchaseRequestPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestPrintPage";
 import PurchaseRequestStatusPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPrintPage";
+import PurchaseOrderListPage from "./modules/purchase-request/purchase-order/PurchaseOrderListPage";
 import SalesListPage from "./modules/sales/sales/SalesListPage";
 import SalesNewPage from "./modules/sales/sales/SalesNewPage";
 import SalesSettingsPage from "./modules/sales/sales/SalesSettingsPage";
@@ -168,6 +175,12 @@ export default function App() {
           <Route path="/inventory/items" component={ItemsPage} />
           <Route path="/inventory/items/settings" component={ItemsSettingsPage} />
           <Route path="/inventory/stock-movements" component={StockMovementsPage} />
+          <Route path="/inventory/serial-lot/registry" component={SerialRegistryListPage} />
+          <Route path="/inventory/serial-lot/lots" component={LotBatchesListPage} />
+          <Route path="/inventory/serial-lot/movements" component={SerialMovementsListPage} />
+          <Route path="/inventory/serial-lot/trace" component={SerialTracePage} />
+          <Route path="/inventory/serial-lot/receive" component={SerialReceivePage} />
+          <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
           <Route path="/after-sales/repair-orders/new" component={RepairOrderNewPage} />
           <Route path="/after-sales/repair-orders/status" component={RepairOrderStatusPage} />
           <Route path="/after-sales/repair-orders/settings" component={RepairOrderSettingsPage} />
@@ -195,6 +208,7 @@ export default function App() {
           <Route path="/purchase-request/purchase-requests/status" component={PurchaseRequestStatusPage} />
           <Route path="/purchase-request/purchase-requests/settings" component={PurchaseRequestSettingsPage} />
           <Route path="/purchase-request/purchase-requests" component={PurchaseRequestListPage} />
+          <Route path="/purchase-request/purchase-orders" component={PurchaseOrderListPage} />
           <Route path="/sales/sales/new" component={SalesNewPage} />
           <Route path="/sales/sales/status" component={SalesStatusPage} />
           <Route path="/sales/sales/pre-invoicing" component={PreInvoicingStatusPage} />

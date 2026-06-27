@@ -1,0 +1,1108 @@
+package purchaseorder
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
+)
+
+type PurchaseOrderLine struct {
+	ID                    int64   `json:"id,omitempty"`
+	LineNo                int     `json:"line_no"`
+	PurchaseRequestLineID *int64  `json:"purchase_request_line_id,omitempty"`
+	PartnerID             *int64  `json:"partner_id,omitempty"`
+	PartnerCode           string  `json:"partner_code"`
+	PartnerName           string  `json:"partner_name"`
+	ItemID                *int64  `json:"item_id,omitempty"`
+	ItemCode              string  `json:"item_code"`
+	ItemName              string  `json:"item_name"`
+	SpecName              *string `json:"spec_name,omitempty"`
+	Description           *string `json:"description,omitempty"`
+	Qty                   float64 `json:"qty"`
+	ReceivedQty           float64 `json:"received_qty"`
+	UnitNonVat            float64 `json:"unit_non_vat"`
+	NonVatTotal           float64 `json:"non_vat_total"`
+	TaxAmount             float64 `json:"tax_amount"`
+	UnitVatInc            float64 `json:"unit_vat_inc"`
+	LineTotal             float64 `json:"line_total"`
+	Remark                *string `json:"remark,omitempty"`
+}
+
+type PurchaseOrder struct {
+	ID                int64               `json:"id"`
+	OrderDate         string              `json:"order_date"`
+	DateSeq           int                 `json:"date_seq"`
+	DateNoDisplay     string              `json:"date_no_display"`
+	PurchaseOrderNo   string              `json:"purchase_order_no"`
+	PurchaseRequestID *int64              `json:"purchase_request_id,omitempty"`
+	TaxTypeID         int64               `json:"tax_type_id"`
+	TaxTypeName       string              `json:"tax_type_name,omitempty"`
+	CurrencyID        int64               `json:"currency_id"`
+	CurrencyCode      string              `json:"currency_code,omitempty"`
+	PartnerID         *int64              `json:"partner_id,omitempty"`
+	PartnerName       string              `json:"partner_name"`
+	PicUserID         *int64              `json:"pic_user_id,omitempty"`
+	PicName           string              `json:"pic_name"`
+	LocationID        int64               `json:"location_id"`
+	LocationName      string              `json:"location_name,omitempty"`
+	ProjectID         *int64              `json:"project_id,omitempty"`
+	ProjectName       *string             `json:"project_name,omitempty"`
+	Status            string              `json:"status"`
+	Reference         *string             `json:"reference,omitempty"`
+	Notes             *string             `json:"notes,omitempty"`
+	Subtotal          float64             `json:"subtotal"`
+	TaxTotal          float64             `json:"tax_total"`
+	GrandTotal        float64             `json:"grand_total"`
+	CreatedByUserID   *int64              `json:"created_by_user_id,omitempty"`
+	CreatedByName     string              `json:"created_by_name,omitempty"`
+	ItemNameSummary   string              `json:"item_name_summary,omitempty"`
+	Lines             []PurchaseOrderLine `json:"lines,omitempty"`
+}
+
+type purchaseOrderLineBody struct {
+	LineNo                int     `json:"line_no"`
+	PurchaseRequestLineID *int64  `json:"purchase_request_line_id"`
+	PartnerID             *int64  `json:"partner_id"`
+	PartnerCode           string  `json:"partner_code"`
+	PartnerName           string  `json:"partner_name"`
+	ItemID                *int64  `json:"item_id"`
+	ItemCode              string  `json:"item_code"`
+	ItemName              string  `json:"item_name"`
+	SpecName              *string `json:"spec_name"`
+	Description           *string `json:"description"`
+	Qty                   float64 `json:"qty"`
+	UnitPrice             float64 `json:"unit_price"`
+	InputBasis            string  `json:"input_basis"`
+	Remark                *string `json:"remark"`
+}
+
+type purchaseOrderBody struct {
+	OrderDate         string                  `json:"order_date"`
+	DateSeq           *int                    `json:"date_seq"`
+	PurchaseRequestID *int64                  `json:"purchase_request_id"`
+	TaxTypeID         int64                   `json:"tax_type_id"`
+	CurrencyID        int64                   `json:"currency_id"`
+	PartnerID         *int64                  `json:"partner_id"`
+	PicUserID         *int64                  `json:"pic_user_id"`
+	PicName           string                  `json:"pic_name"`
+	LocationID        int64                   `json:"location_id"`
+	ProjectID         *int64                  `json:"project_id"`
+	ProjectName       *string                 `json:"project_name"`
+	Reference         *string                 `json:"reference"`
+	Notes             *string                 `json:"notes"`
+	Lines             []purchaseOrderLineBody `json:"lines"`
+}
+
+type fromPurchaseRequestBody struct {
+	OrderDate *string `json:"order_date"`
+	DateSeq   *int    `json:"date_seq"`
+	Reference *string `json:"reference"`
+	Notes     *string `json:"notes"`
+}
+
+type computedLine struct {
+	LineNo                int
+	PurchaseRequestLineID *int64
+	PartnerID             *int64
+	PartnerCode           string
+	PartnerName           string
+	ItemID                *int64
+	ItemCode              string
+	ItemName              string
+	SpecName              *string
+	Description           *string
+	Qty                   float64
+	InputBasis            string
+	Amounts               taxcalc.LineAmounts
+	Remark                *string
+}
+
+const hybridPartnerLateral = `
+left join lateral (
+  select ln.partner_id, coalesce(p.company_name, ln.partner_name, '') as company_name
+  from public.po_purchase_order_lines ln
+  left join public.inv_partners p on p.id = ln.partner_id
+  where ln.purchase_order_id = po.id
+  order by ln.line_no
+  limit 1
+) line_partner on true
+left join public.inv_partners hp on hp.id = po.partner_id`
+
+func registerPurchaseOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.Get("/purchase-orders/preview-sequences", previewPurchaseOrderSequences(pool))
+	r.Get("/purchase-orders", listPurchaseOrders(pool))
+	r.Post("/purchase-orders", createPurchaseOrder(pool))
+	r.Post("/purchase-orders/from-purchase-request/{prId}", createFromPurchaseRequest(pool))
+	r.Get("/purchase-orders/{id}", getPurchaseOrder(pool))
+	r.Patch("/purchase-orders/{id}/confirm", confirmPurchaseOrder(pool))
+	r.Patch("/purchase-orders/{id}", updatePurchaseOrder(pool))
+	r.Delete("/purchase-orders/{id}", deletePurchaseOrder(pool))
+}
+
+func previewPurchaseOrderSequences(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		dateStr := strings.TrimSpace(r.URL.Query().Get("order_date"))
+		if dateStr == "" {
+			dateStr = time.Now().Format("2006-01-02")
+		}
+		orderDate, err := parseDate(dateStr)
+		if err != nil {
+			response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
+			return
+		}
+		var dateSeq int
+		var purchaseOrderNo string
+		err = pool.QueryRow(r.Context(),
+			`select date_seq, purchase_order_no from public.preview_purchase_order_sequences($1, $2::date)`,
+			tu.TenantID, orderDate).Scan(&dateSeq, &purchaseOrderNo)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to preview sequences.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{
+			"date_seq":          dateSeq,
+			"purchase_order_no": purchaseOrderNo,
+			"date_no_display":   formatDateNoDisplay(orderDate, dateSeq),
+		}, "OK")
+	}
+}
+
+func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
+	allowed := map[string]string{
+		"order_date":        "po.order_date",
+		"purchase_order_no": "po.purchase_order_no",
+		"partner_name":      "coalesce(hp.company_name, line_partner.company_name, '')",
+		"grand_total":       "po.grand_total",
+		"status":            "po.status",
+		"created_at":        "po.created_at",
+		"updated_at":        "po.updated_at",
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		sortByModified := strings.EqualFold(r.URL.Query().Get("sort_by_modified"), "true") ||
+			r.URL.Query().Get("sort_by_modified") == "1"
+		defaultSort := "order_date"
+		if sortByModified {
+			defaultSort = "updated_at"
+		}
+		p := httputil.ParseListParams(r, defaultSort, allowed)
+		if sortByModified {
+			p.Sort = "updated_at"
+			p.Order = "desc"
+		}
+		offset := httputil.Offset(p)
+
+		where := "po.tenant_id = $1 and po.deleted_at is null"
+		args := []any{tu.TenantID}
+		argN := 2
+
+		if p.Q != "" {
+			where += fmt.Sprintf(` and (
+				po.purchase_order_no ilike $%d or
+				coalesce(hp.company_name, line_partner.company_name, '') ilike $%d or
+				exists (
+					select 1 from public.po_purchase_order_lines ln
+					where ln.purchase_order_id = po.id and ln.item_name ilike $%d
+				))`, argN, argN, argN)
+			args = append(args, "%"+p.Q+"%")
+			argN++
+		}
+
+		if fromStr := strings.TrimSpace(r.URL.Query().Get("date_from")); fromStr != "" {
+			if from, err := parseDate(fromStr); err == nil {
+				where += fmt.Sprintf(" and po.order_date >= $%d::date", argN)
+				args = append(args, from)
+				argN++
+			}
+		}
+		if toStr := strings.TrimSpace(r.URL.Query().Get("date_to")); toStr != "" {
+			if to, err := parseDate(toStr); err == nil {
+				where += fmt.Sprintf(" and po.order_date <= $%d::date", argN)
+				args = append(args, to)
+				argN++
+			}
+		}
+		if poNo := strings.TrimSpace(r.URL.Query().Get("purchase_order_no")); poNo != "" {
+			where += fmt.Sprintf(" and po.purchase_order_no ilike $%d", argN)
+			args = append(args, "%"+poNo+"%")
+			argN++
+		}
+		if id, ok := optionalInt64Query(r, "location_id"); ok {
+			where += fmt.Sprintf(" and po.location_id = $%d", argN)
+			args = append(args, *id)
+			argN++
+		}
+		if id, ok := optionalInt64Query(r, "project_id"); ok {
+			where += fmt.Sprintf(" and po.project_id = $%d", argN)
+			args = append(args, *id)
+			argN++
+		}
+		if id, ok := optionalInt64Query(r, "partner_id"); ok {
+			where += fmt.Sprintf(` and (
+				po.partner_id = $%d or exists (
+					select 1 from public.po_purchase_order_lines ln
+					where ln.purchase_order_id = po.id and ln.partner_id = $%d
+				))`, argN, argN)
+			args = append(args, *id)
+			argN++
+		}
+		if id, ok := optionalInt64Query(r, "item_id"); ok {
+			where += fmt.Sprintf(` and exists (
+				select 1 from public.po_purchase_order_lines ln
+				where ln.purchase_order_id = po.id and ln.item_id = $%d)`, argN)
+			args = append(args, *id)
+			argN++
+		}
+		if id, ok := optionalInt64Query(r, "purchase_request_id"); ok {
+			where += fmt.Sprintf(" and po.purchase_request_id = $%d", argN)
+			args = append(args, *id)
+			argN++
+		}
+		status := strings.TrimSpace(r.URL.Query().Get("status"))
+		if isValidPOStatus(status) {
+			where += fmt.Sprintf(" and po.status = $%d", argN)
+			args = append(args, status)
+			argN++
+		} else if p.Status != "" && isValidPOStatus(p.Status) {
+			where += fmt.Sprintf(" and po.status = $%d", argN)
+			args = append(args, p.Status)
+			argN++
+		}
+
+		scope, argN := tu.PicOrCreatedScopeSQL("po", argN, &args)
+		where += scope
+
+		sortCol := allowed[p.Sort]
+		if sortCol == "" {
+			sortCol = allowed[defaultSort]
+		}
+
+		q := fmt.Sprintf(`
+			select po.id, po.order_date, po.date_seq, po.purchase_order_no,
+			  po.purchase_request_id,
+			  po.tax_type_id, tt.name, po.currency_id, c.currency_code,
+			  coalesce(po.partner_id, line_partner.partner_id),
+			  coalesce(hp.company_name, line_partner.company_name, ''),
+			  po.pic_user_id, po.pic_name,
+			  po.location_id, po.status, po.grand_total::float8,
+			  coalesce(u.full_name, ''),
+			  (select ln.item_name from public.po_purchase_order_lines ln
+			   where ln.purchase_order_id = po.id order by ln.line_no limit 1),
+			  (select count(*)::int from public.po_purchase_order_lines ln where ln.purchase_order_id = po.id),
+			  count(*) over()
+			from public.po_purchase_orders po
+			%s
+			join public.quo_tax_types tt on tt.id = po.tax_type_id
+			join public.quo_currencies c on c.id = po.currency_id
+			left join public.users u on u.id = po.created_by_user_id
+			where %s
+			order by %s %s
+			limit $%d offset $%d`,
+			hybridPartnerLateral, where, sortCol, orderSQL(p.Order), argN, argN+1)
+		args = append(args, p.PageSize, offset)
+
+		rows, err := pool.Query(r.Context(), q, args...)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list purchase orders.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		var out []PurchaseOrder
+		var total int64
+		for rows.Next() {
+			var row PurchaseOrder
+			var orderDate time.Time
+			var partnerID *int64
+			var firstItemName *string
+			var lineCount int
+			if err := rows.Scan(
+				&row.ID, &orderDate, &row.DateSeq, &row.PurchaseOrderNo,
+				&row.PurchaseRequestID,
+				&row.TaxTypeID, &row.TaxTypeName, &row.CurrencyID, &row.CurrencyCode,
+				&partnerID, &row.PartnerName, &row.PicUserID, &row.PicName,
+				&row.LocationID, &row.Status, &row.GrandTotal,
+				&row.CreatedByName, &firstItemName, &lineCount, &total,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read purchase orders.", "ERR_INTERNAL")
+				return
+			}
+			row.PartnerID = partnerID
+			row.OrderDate = dateToStr(orderDate)
+			row.DateNoDisplay = formatDateNoDisplay(orderDate, row.DateSeq)
+			row.ItemNameSummary = formatItemNameSummary(firstItemName, lineCount)
+			out = append(out, row)
+		}
+		if out == nil {
+			out = []PurchaseOrder{}
+		}
+		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}
+
+func getPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		po, err := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.OK(w, po, "OK")
+	}
+}
+
+func loadPurchaseOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (PurchaseOrder, error) {
+	var po PurchaseOrder
+	var orderDate time.Time
+	var partnerID *int64
+	var createdByName *string
+
+	err := pool.QueryRow(ctx, `
+		select po.id, po.order_date, po.date_seq, po.purchase_order_no,
+		  po.purchase_request_id,
+		  po.tax_type_id, tt.name, po.currency_id, c.currency_code,
+		  coalesce(po.partner_id, line_partner.partner_id),
+		  coalesce(hp.company_name, line_partner.company_name, ''),
+		  po.pic_user_id, po.pic_name,
+		  po.location_id, l.location_name, po.project_id, po.project_name,
+		  po.status, po.reference, po.notes,
+		  po.subtotal::float8, po.tax_total::float8, po.grand_total::float8,
+		  po.created_by_user_id, u.full_name
+		from public.po_purchase_orders po
+		`+hybridPartnerLateral+`
+		join public.quo_tax_types tt on tt.id = po.tax_type_id
+		join public.quo_currencies c on c.id = po.currency_id
+		join public.inv_locations l on l.id = po.location_id
+		left join public.users u on u.id = po.created_by_user_id
+		where po.id = $1 and po.tenant_id = $2 and po.deleted_at is null`,
+		id, tenantID).Scan(
+		&po.ID, &orderDate, &po.DateSeq, &po.PurchaseOrderNo,
+		&po.PurchaseRequestID,
+		&po.TaxTypeID, &po.TaxTypeName, &po.CurrencyID, &po.CurrencyCode,
+		&partnerID, &po.PartnerName,
+		&po.PicUserID, &po.PicName,
+		&po.LocationID, &po.LocationName, &po.ProjectID, &po.ProjectName,
+		&po.Status, &po.Reference, &po.Notes,
+		&po.Subtotal, &po.TaxTotal, &po.GrandTotal,
+		&po.CreatedByUserID, &createdByName,
+	)
+	if err != nil {
+		return PurchaseOrder{}, err
+	}
+	po.PartnerID = partnerID
+	po.OrderDate = dateToStr(orderDate)
+	po.DateNoDisplay = formatDateNoDisplay(orderDate, po.DateSeq)
+	if createdByName != nil {
+		po.CreatedByName = *createdByName
+	}
+
+	lines, err := loadPurchaseOrderLines(ctx, pool, id)
+	if err != nil {
+		return PurchaseOrder{}, err
+	}
+	po.Lines = lines
+	return po, nil
+}
+
+func loadPurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, purchaseOrderID int64) ([]PurchaseOrderLine, error) {
+	rows, err := pool.Query(ctx, `
+		select id, line_no, purchase_request_line_id,
+		  partner_id, partner_code, partner_name,
+		  item_id, item_code, item_name, spec_name, description,
+		  qty::float8, received_qty::float8,
+		  unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
+		  unit_vat_inc::float8, line_total::float8, remark
+		from public.po_purchase_order_lines
+		where purchase_order_id = $1
+		order by line_no`, purchaseOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var lines []PurchaseOrderLine
+	for rows.Next() {
+		var ln PurchaseOrderLine
+		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.PurchaseRequestLineID,
+			&ln.PartnerID, &ln.PartnerCode, &ln.PartnerName,
+			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.SpecName, &ln.Description,
+			&ln.Qty, &ln.ReceivedQty,
+			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark); err != nil {
+			return nil, err
+		}
+		lines = append(lines, ln)
+	}
+	if lines == nil {
+		lines = []PurchaseOrderLine{}
+	}
+	return lines, nil
+}
+
+func createPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		var body purchaseOrderBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if errs := validatePurchaseOrderBody(body, true); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+
+		orderDate, err := parseDate(body.OrderDate)
+		if err != nil {
+			response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
+			return
+		}
+
+		tt, err := loadTaxCalcType(r.Context(), pool, tu.TenantID, body.TaxTypeID)
+		if err != nil {
+			response.Validation(w, map[string]string{"tax_type_id": "Tax type not found."})
+			return
+		}
+
+		computed, errs := computePurchaseOrderLines(tt, body.Lines)
+		if errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+		if len(computed) == 0 {
+			response.Validation(w, map[string]string{"lines": "At least one line with quantity is required."})
+			return
+		}
+
+		headerPartnerID := resolveHeaderPartnerID(body.PartnerID, computed)
+		subtotal, taxTotal, grandTotal := sumPurchaseOrderTotals(computed)
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		dateSeq, purchaseOrderNo, seqErrs := allocatePurchaseOrderSequences(r.Context(), tx, tu.TenantID, orderDate, body.DateSeq, 0)
+		if seqErrs != nil {
+			response.Validation(w, seqErrs)
+			return
+		}
+
+		var id int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.po_purchase_orders (
+			  tenant_id, order_date, date_seq, purchase_order_no,
+			  purchase_request_id, tax_type_id, currency_id, partner_id,
+			  pic_user_id, pic_name, location_id, project_id, project_name,
+			  status, reference, notes,
+			  subtotal, tax_total, grand_total, created_by_user_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'draft',$14,$15,$16,$17,$18,$19)
+			returning id`,
+			tu.TenantID, orderDate, dateSeq, purchaseOrderNo,
+			body.PurchaseRequestID, body.TaxTypeID, body.CurrencyID, headerPartnerID,
+			body.PicUserID, strings.TrimSpace(body.PicName), body.LocationID, body.ProjectID, body.ProjectName,
+			body.Reference, body.Notes,
+			subtotal, taxTotal, grandTotal, tu.AppUserID).Scan(&id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to insert purchase order.", "ERR_INTERNAL")
+			return
+		}
+
+		if _, err := insertPurchaseOrderLines(r.Context(), tx, id, computed); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.create", "po_purchase_order", &id, nil, body)
+		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, po, "Created.")
+	}
+}
+
+func createFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		prID, err := strconv.ParseInt(chi.URLParam(r, "prId"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"prId": "Invalid purchase request id."})
+			return
+		}
+
+		var body fromPurchaseRequestBody
+		if r.ContentLength > 0 {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				response.Validation(w, map[string]string{"body": "Invalid JSON."})
+				return
+			}
+		}
+
+		var prTaxTypeID, prCurrencyID, prLocationID int64
+		var prPartnerID, prPicUserID, prProjectID *int64
+		var prPicName string
+		var prProjectName, prReference, prNotes *string
+		err = pool.QueryRow(r.Context(), `
+			select tax_type_id, currency_id, partner_id, pic_user_id, pic_name,
+			  location_id, project_id, project_name, reference, notes
+			from public.pr_purchase_requests
+			where id = $1 and tenant_id = $2 and deleted_at is null`,
+			prID, tu.TenantID).Scan(
+			&prTaxTypeID, &prCurrencyID, &prPartnerID, &prPicUserID, &prPicName,
+			&prLocationID, &prProjectID, &prProjectName, &prReference, &prNotes,
+		)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Purchase request not found.", "ERR_NOT_FOUND")
+			return
+		}
+
+		orderDate := time.Now()
+		if body.OrderDate != nil && strings.TrimSpace(*body.OrderDate) != "" {
+			orderDate, err = parseDate(*body.OrderDate)
+			if err != nil {
+				response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
+				return
+			}
+		}
+
+		tt, err := loadTaxCalcType(r.Context(), pool, tu.TenantID, prTaxTypeID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load tax type.", "ERR_INTERNAL")
+			return
+		}
+
+		rows, err := pool.Query(r.Context(), `
+			select ln.id, ln.line_no, ln.partner_id, ln.partner_code, ln.partner_name,
+			  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
+			  ln.qty::float8, ln.input_basis, ln.unit_non_vat::float8, ln.unit_vat_inc::float8,
+			  ln.remark, coalesce(sl.slipped, 0)::float8
+			from public.pr_purchase_request_lines ln
+			left join (
+			  select purchase_request_line_id, sum(qty) as slipped
+			  from public.pr_purchase_request_slip_lines
+			  group by purchase_request_line_id
+			) sl on sl.purchase_request_line_id = ln.id
+			where ln.purchase_request_id = $1
+			order by ln.line_no`, prID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load purchase request lines.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		var computed []computedLine
+		lineNo := 0
+		for rows.Next() {
+			var prLineID int64
+			var lnLineNo int
+			var partnerID, itemID *int64
+			var partnerCode, partnerName, itemCode, itemName string
+			var specName, description, remark *string
+			var qty, unitNonVat, unitVatInc, slipped float64
+			var inputBasis string
+			if err := rows.Scan(&prLineID, &lnLineNo, &partnerID, &partnerCode, &partnerName,
+				&itemID, &itemCode, &itemName, &specName, &description,
+				&qty, &inputBasis, &unitNonVat, &unitVatInc, &remark, &slipped); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
+				return
+			}
+			openQty := qty - slipped
+			if openQty <= 0 {
+				continue
+			}
+			if inputBasis == "" {
+				inputBasis = taxcalc.InputVatIncUnit
+			}
+			unitPrice := unitVatInc
+			if inputBasis == taxcalc.InputNonVatUnit {
+				unitPrice = unitNonVat
+			}
+			lineNo++
+			amounts := taxcalc.ComputeLine(tt, unitPrice, openQty, inputBasis)
+			prLineIDCopy := prLineID
+			computed = append(computed, computedLine{
+				LineNo:                lineNo,
+				PurchaseRequestLineID: &prLineIDCopy,
+				PartnerID:             partnerID,
+				PartnerCode:           partnerCode,
+				PartnerName:           partnerName,
+				ItemID:                itemID,
+				ItemCode:              itemCode,
+				ItemName:              itemName,
+				SpecName:              specName,
+				Description:           description,
+				Qty:                   openQty,
+				InputBasis:            inputBasis,
+				Amounts:               amounts,
+				Remark:                remark,
+			})
+		}
+		if len(computed) == 0 {
+			response.Validation(w, map[string]string{"lines": "No open lines available on this purchase request."})
+			return
+		}
+
+		headerPartnerID := resolveHeaderPartnerID(prPartnerID, computed)
+		subtotal, taxTotal, grandTotal := sumPurchaseOrderTotals(computed)
+
+		reference := prReference
+		if body.Reference != nil {
+			reference = body.Reference
+		}
+		notes := prNotes
+		if body.Notes != nil {
+			notes = body.Notes
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		dateSeq, purchaseOrderNo, seqErrs := allocatePurchaseOrderSequences(r.Context(), tx, tu.TenantID, orderDate, body.DateSeq, 0)
+		if seqErrs != nil {
+			response.Validation(w, seqErrs)
+			return
+		}
+
+		prIDCopy := prID
+		var id int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.po_purchase_orders (
+			  tenant_id, order_date, date_seq, purchase_order_no,
+			  purchase_request_id, tax_type_id, currency_id, partner_id,
+			  pic_user_id, pic_name, location_id, project_id, project_name,
+			  status, reference, notes,
+			  subtotal, tax_total, grand_total, created_by_user_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'draft',$14,$15,$16,$17,$18,$19)
+			returning id`,
+			tu.TenantID, orderDate, dateSeq, purchaseOrderNo,
+			&prIDCopy, prTaxTypeID, prCurrencyID, headerPartnerID,
+			prPicUserID, strings.TrimSpace(prPicName), prLocationID, prProjectID, prProjectName,
+			reference, notes,
+			subtotal, taxTotal, grandTotal, tu.AppUserID).Scan(&id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to insert purchase order.", "ERR_INTERNAL")
+			return
+		}
+
+		if _, err := insertPurchaseOrderLines(r.Context(), tx, id, computed); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.create_from_pr", "po_purchase_order", &id, nil, map[string]any{"purchase_request_id": prID})
+		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, po, "Created.")
+	}
+}
+
+func updatePurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body purchaseOrderBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if errs := validatePurchaseOrderBody(body, false); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+
+		orderDate, err := parseDate(body.OrderDate)
+		if err != nil {
+			response.Validation(w, map[string]string{"order_date": "Invalid date."})
+			return
+		}
+
+		var currentStatus string
+		if err := pool.QueryRow(r.Context(), `
+			select status from public.po_purchase_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null`,
+			id, tu.TenantID).Scan(&currentStatus); err != nil {
+			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if currentStatus != "draft" {
+			response.Err(w, http.StatusConflict, "Only draft purchase orders can be updated.", "ERR_CONFLICT")
+			return
+		}
+
+		tt, err := loadTaxCalcType(r.Context(), pool, tu.TenantID, body.TaxTypeID)
+		if err != nil {
+			response.Validation(w, map[string]string{"tax_type_id": "Tax type not found."})
+			return
+		}
+
+		computed, errs := computePurchaseOrderLines(tt, body.Lines)
+		if errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+		if len(computed) == 0 {
+			response.Validation(w, map[string]string{"lines": "At least one line with quantity is required."})
+			return
+		}
+
+		headerPartnerID := resolveHeaderPartnerID(body.PartnerID, computed)
+		subtotal, taxTotal, grandTotal := sumPurchaseOrderTotals(computed)
+		before, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var dateSeq int
+		if err := tx.QueryRow(r.Context(), `
+			select date_seq from public.po_purchase_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null`,
+			id, tu.TenantID).Scan(&dateSeq); err != nil {
+			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if body.DateSeq != nil && *body.DateSeq > 0 && *body.DateSeq != dateSeq {
+			if err := assertDateSeqAvailable(r.Context(), tx, tu.TenantID, orderDate, *body.DateSeq, id); err != nil {
+				response.Validation(w, map[string]string{"date_seq": err.Error()})
+				return
+			}
+			dateSeq = *body.DateSeq
+		}
+
+		tag, err := tx.Exec(r.Context(), `
+			update public.po_purchase_orders set
+			  order_date = $1, date_seq = $2,
+			  purchase_request_id = $3, tax_type_id = $4, currency_id = $5, partner_id = $6,
+			  pic_user_id = $7, pic_name = $8, location_id = $9,
+			  project_id = $10, project_name = $11,
+			  reference = $12, notes = $13,
+			  subtotal = $14, tax_total = $15, grand_total = $16, updated_at = now()
+			where id = $17 and tenant_id = $18 and deleted_at is null and status = 'draft'`,
+			orderDate, dateSeq,
+			body.PurchaseRequestID, body.TaxTypeID, body.CurrencyID, headerPartnerID,
+			body.PicUserID, strings.TrimSpace(body.PicName), body.LocationID,
+			body.ProjectID, body.ProjectName,
+			body.Reference, body.Notes,
+			subtotal, taxTotal, grandTotal, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
+			return
+		}
+
+		if err := replacePurchaseOrderLines(r.Context(), tx, id, computed); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.update", "po_purchase_order", &id, before, body)
+		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, po, "Updated.")
+	}
+}
+
+func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+
+		before, err := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if before.Status != "draft" {
+			response.Err(w, http.StatusConflict, "Only draft purchase orders can be confirmed.", "ERR_CONFLICT")
+			return
+		}
+		if len(before.Lines) == 0 {
+			response.Validation(w, map[string]string{"lines": "Purchase order has no lines."})
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to confirm.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		tag, err := tx.Exec(r.Context(), `
+			update public.po_purchase_orders
+			set status = 'confirmed', updated_at = now()
+			where id = $1 and tenant_id = $2 and deleted_at is null and status = 'draft'`,
+			id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
+			return
+		}
+
+		slipRef := before.PurchaseOrderNo
+		dateNoDisplay := before.DateNoDisplay
+		for _, ln := range before.Lines {
+			if ln.PurchaseRequestLineID == nil {
+				continue
+			}
+			_, err := tx.Exec(r.Context(), `
+				insert into public.pr_purchase_request_slip_lines (
+				  purchase_request_line_id, slip_type, slip_ref, slip_date_no, qty
+				) values ($1, 'purchase_order', $2, $3, $4)`,
+				*ln.PurchaseRequestLineID, slipRef, dateNoDisplay, ln.Qty)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to record slip lines.", "ERR_INTERNAL")
+				return
+			}
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to confirm.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.confirm", "po_purchase_order", &id, before, nil)
+		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, po, "Confirmed.")
+	}
+}
+
+func deletePurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var status string
+		if err := pool.QueryRow(r.Context(), `
+			select status from public.po_purchase_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null`,
+			id, tu.TenantID).Scan(&status); err != nil {
+			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if status != "draft" {
+			response.Err(w, http.StatusConflict, "Only draft purchase orders can be deleted.", "ERR_CONFLICT")
+			return
+		}
+		softDelete(pool, w, r, "po_purchase_orders", "purchase_order.delete", "po_purchase_order")
+	}
+}
+
+func allocatePurchaseOrderSequences(ctx context.Context, tx pgx.Tx, tenantID int64, orderDate time.Time, requestedSeq *int, excludeID int64) (dateSeq int, purchaseOrderNo string, errs map[string]string) {
+	if requestedSeq != nil && *requestedSeq > 0 {
+		dateSeq = *requestedSeq
+		if err := assertDateSeqAvailable(ctx, tx, tenantID, orderDate, dateSeq, excludeID); err != nil {
+			return 0, "", map[string]string{"date_seq": err.Error()}
+		}
+		var refSeq int
+		if err := tx.QueryRow(ctx, `
+			insert into public.tenant_daily_sequences (tenant_id, sequence_key, bucket_date, last_value)
+			values ($1, 'purchase_order_no', $2::date, 1)
+			on conflict (tenant_id, sequence_key, bucket_date)
+			do update set last_value = tenant_daily_sequences.last_value + 1
+			returning last_value`, tenantID, orderDate).Scan(&refSeq); err != nil {
+			return 0, "", map[string]string{"body": "Failed to allocate reference number."}
+		}
+		prefix := orderDate.Format("060102")
+		purchaseOrderNo = fmt.Sprintf("%s%03d", prefix, refSeq)
+		if _, err := tx.Exec(ctx, `
+			insert into public.tenant_daily_sequences (tenant_id, sequence_key, bucket_date, last_value)
+			values ($1, 'purchase_order_date_seq', $2::date, $3)
+			on conflict (tenant_id, sequence_key, bucket_date)
+			do update set last_value = greatest(tenant_daily_sequences.last_value, excluded.last_value)`,
+			tenantID, orderDate, dateSeq); err != nil {
+			return 0, "", map[string]string{"body": "Failed to update date sequence."}
+		}
+		return dateSeq, purchaseOrderNo, nil
+	}
+	if err := tx.QueryRow(ctx,
+		`select date_seq, purchase_order_no from public.allocate_purchase_order_sequences($1, $2::date)`,
+		tenantID, orderDate).Scan(&dateSeq, &purchaseOrderNo); err != nil {
+		return 0, "", map[string]string{"body": "Failed to allocate sequences."}
+	}
+	return dateSeq, purchaseOrderNo, nil
+}
+
+func assertDateSeqAvailable(ctx context.Context, tx pgx.Tx, tenantID int64, orderDate time.Time, dateSeq int, excludeID int64) error {
+	var exists bool
+	err := tx.QueryRow(ctx, `
+		select exists(
+		  select 1 from public.po_purchase_orders
+		  where tenant_id = $1 and order_date = $2::date and date_seq = $3
+		    and deleted_at is null and ($4 = 0 or id <> $4)
+		)`, tenantID, orderDate, dateSeq, excludeID).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to validate date sequence")
+	}
+	if exists {
+		return fmt.Errorf("Date-No sequence already used for this date.")
+	}
+	return nil
+}
+
+func resolveHeaderPartnerID(header *int64, lines []computedLine) *int64 {
+	if header != nil && *header > 0 {
+		return header
+	}
+	for _, ln := range lines {
+		if ln.PartnerID != nil && *ln.PartnerID > 0 {
+			return ln.PartnerID
+		}
+	}
+	return nil
+}
+
+func insertPurchaseOrderLines(ctx context.Context, tx pgx.Tx, purchaseOrderID int64, lines []computedLine) ([]int64, error) {
+	var ids []int64
+	for i, ln := range lines {
+		lineNo := ln.LineNo
+		if lineNo <= 0 {
+			lineNo = i + 1
+		}
+		var id int64
+		err := tx.QueryRow(ctx, `
+			insert into public.po_purchase_order_lines (
+			  purchase_order_id, purchase_request_line_id, line_no,
+			  partner_id, partner_code, partner_name,
+			  item_id, item_code, item_name, spec_name, description,
+			  qty, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+			returning id`,
+			purchaseOrderID, ln.PurchaseRequestLineID, lineNo,
+			ln.PartnerID, strings.TrimSpace(ln.PartnerCode), strings.TrimSpace(ln.PartnerName),
+			ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.SpecName, ln.Description,
+			ln.Qty, ln.InputBasis, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
+			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark).Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+func replacePurchaseOrderLines(ctx context.Context, tx pgx.Tx, purchaseOrderID int64, lines []computedLine) error {
+	if _, err := tx.Exec(ctx, `delete from public.po_purchase_order_lines where purchase_order_id = $1`, purchaseOrderID); err != nil {
+		return err
+	}
+	_, err := insertPurchaseOrderLines(ctx, tx, purchaseOrderID, lines)
+	return err
+}
+
+func computePurchaseOrderLines(tt taxcalc.TaxType, lines []purchaseOrderLineBody) ([]computedLine, map[string]string) {
+	errs := map[string]string{}
+	var out []computedLine
+	for i, ln := range lines {
+		if ln.Qty <= 0 {
+			continue
+		}
+		inputBasis := ln.InputBasis
+		if inputBasis == "" {
+			inputBasis = taxcalc.InputVatIncUnit
+		}
+		if inputBasis != taxcalc.InputVatIncUnit && inputBasis != taxcalc.InputNonVatUnit {
+			errs[fmt.Sprintf("lines[%d].input_basis", i)] = "Must be vat_inc_unit or non_vat_unit."
+			continue
+		}
+		amounts := taxcalc.ComputeLine(tt, ln.UnitPrice, ln.Qty, inputBasis)
+		out = append(out, computedLine{
+			LineNo:                ln.LineNo,
+			PurchaseRequestLineID: ln.PurchaseRequestLineID,
+			PartnerID:             ln.PartnerID,
+			PartnerCode:           ln.PartnerCode,
+			PartnerName:           ln.PartnerName,
+			ItemID:                ln.ItemID,
+			ItemCode:              ln.ItemCode,
+			ItemName:              ln.ItemName,
+			SpecName:              ln.SpecName,
+			Description:           ln.Description,
+			Qty:                   ln.Qty,
+			InputBasis:            inputBasis,
+			Amounts:               amounts,
+			Remark:                ln.Remark,
+		})
+	}
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	return out, nil
+}
+
+func sumPurchaseOrderTotals(lines []computedLine) (subtotal, taxTotal, grandTotal float64) {
+	for _, ln := range lines {
+		subtotal += ln.Amounts.NonVatTotal
+		taxTotal += ln.Amounts.TaxAmount
+		grandTotal += ln.Amounts.LineTotal
+	}
+	return subtotal, taxTotal, grandTotal
+}
+
+func validatePurchaseOrderBody(b purchaseOrderBody, create bool) map[string]string {
+	errs := map[string]string{}
+	if create && strings.TrimSpace(b.OrderDate) == "" {
+		errs["order_date"] = "Order date is required."
+	}
+	if b.TaxTypeID <= 0 {
+		errs["tax_type_id"] = "Transaction type is required."
+	}
+	if b.CurrencyID <= 0 {
+		errs["currency_id"] = "Currency is required."
+	}
+	if b.LocationID <= 0 {
+		errs["location_id"] = "Location is required."
+	}
+	if b.DateSeq != nil && *b.DateSeq <= 0 {
+		errs["date_seq"] = "Date sequence must be positive."
+	}
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
+}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
@@ -30,11 +31,13 @@ type releaseQueueRow struct {
 	BalanceQty      float64 `json:"balance_qty"`
 	LocationStock   float64 `json:"location_stock"`
 	TrackInventory  bool    `json:"track_inventory_qty"`
+	TrackSerial      bool    `json:"track_serial"`
 }
 
 type releaseLineBody struct {
 	SalesOrderLineID int64   `json:"sales_order_line_id"`
 	ReleaseQty       float64 `json:"release_qty"`
+	SerialUnitIDs    []int64 `json:"serial_unit_ids,omitempty"`
 }
 
 func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
@@ -71,6 +74,7 @@ func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
 			  (ln.qty - coalesce(rel.released, 0))::float8,
 			  coalesce(bal.qty_on_hand, 0)::float8,
 			  coalesce(i.track_inventory_qty, false),
+			  coalesce(i.track_serial, false),
 			  count(*) over()
 			from public.so_sales_orders so
 			join public.inv_partners p on p.id = so.partner_id
@@ -106,7 +110,7 @@ func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.SalesOrderNo,
 				&row.ProgressStatus, &row.CustomerName, &row.LocationID, &row.LocationName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
-				&row.OrderQty, &row.BalanceQty, &row.LocationStock, &row.TrackInventory, &total,
+				&row.OrderQty, &row.BalanceQty, &row.LocationStock, &row.TrackInventory, &row.TrackSerial, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read release queue.", "ERR_INTERNAL")
 				return
@@ -159,12 +163,13 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			var tenantID, locationID int64
 			var itemID *int64
 			var lineQty, released float64
-			var trackInventory bool
+			var trackInventory, trackSerial bool
 
 			err := tx.QueryRow(r.Context(), `
 				select so.tenant_id, so.location_id, ln.item_id, ln.qty::float8,
 				  coalesce(rel.released, 0)::float8,
-				  coalesce(i.track_inventory_qty, false)
+				  coalesce(i.track_inventory_qty, false),
+				  coalesce(i.track_serial, false)
 				from public.so_sales_order_lines ln
 				join public.so_sales_orders so on so.id = ln.sales_order_id
 				left join public.inv_items i on i.id = ln.item_id
@@ -174,7 +179,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 				  group by sales_order_line_id
 				) rel on rel.sales_order_line_id = ln.id
 				where ln.id = $1 and so.deleted_at is null`,
-				item.SalesOrderLineID).Scan(&tenantID, &locationID, &itemID, &lineQty, &released, &trackInventory)
+				item.SalesOrderLineID).Scan(&tenantID, &locationID, &itemID, &lineQty, &released, &trackInventory, &trackSerial)
 			if err != nil {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].sales_order_line_id", i): "Line not found."})
 				return
@@ -188,6 +193,17 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			if item.ReleaseQty > balance+0.0001 {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): fmt.Sprintf("Exceeds balance (%.4f available).", balance)})
 				return
+			}
+
+			if trackSerial {
+				if len(item.SerialUnitIDs) == 0 {
+					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): "Serial selection required for tracked items."})
+					return
+				}
+				if float64(len(item.SerialUnitIDs)) != item.ReleaseQty {
+					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): "Serial count must match release quantity."})
+					return
+				}
 			}
 
 			var releaseLineID int64
@@ -235,6 +251,34 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 				if err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
 					return
+				}
+			}
+
+			if trackSerial && itemID != nil {
+				for _, unitID := range item.SerialUnitIDs {
+					var serialNo string
+					err := tx.QueryRow(r.Context(), `
+						select serial_no from public.inv_serial_units
+						where id = $1 and tenant_id = $2 and item_id = $3 and location_id = $4
+						  and status in ('in_stock', 'reserved')
+						for update`, unitID, tenantID, *itemID, locationID).Scan(&serialNo)
+					if err != nil {
+						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): fmt.Sprintf("Serial %d not available at location.", unitID)})
+						return
+					}
+					_, err = tx.Exec(r.Context(), `
+						update public.inv_serial_units
+						set status = 'reserved', sales_order_release_line_id = $1, updated_at = now()
+						where id = $2`, releaseLineID, unitID)
+					if err != nil {
+						response.Err(w, http.StatusInternalServerError, "Failed to reserve serial.", "ERR_INTERNAL")
+						return
+					}
+					loc := locationID
+					if err := inventory.InsertSerialEvent(r.Context(), tx, tenantID, unitID, "reserved", &loc, &loc, "so_release_line", releaseLineID, &tu.AppUserID); err != nil {
+						response.Err(w, http.StatusInternalServerError, "Failed to record serial event.", "ERR_INTERNAL")
+						return
+					}
 				}
 			}
 

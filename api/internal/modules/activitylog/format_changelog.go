@@ -18,6 +18,8 @@ var fieldLabels = map[string]string{
 	"warranty_end":             "Warranty end date",
 	"warranty_start":           "Warranty start date",
 	"warranty_duration_months": "Warranty (months)",
+	"track_serial":             "Track serial",
+	"track_lot":                "Track lot",
 	"reorder_level":            "Reorder level",
 	"partner_id":               "Customer",
 	"pic_name":                 "PIC",

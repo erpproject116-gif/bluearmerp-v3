@@ -36,6 +36,7 @@ export function emptyLine(no: number): RepairLineRow {
 type Props = {
   lines: () => RepairLineRow[];
   onChange: (lines: RepairLineRow[]) => void;
+  onSerialLotBlur?: (index: number, serialNo: string) => void | Promise<void>;
 };
 
 const REPAIR_LINE_COLUMNS = [
@@ -155,7 +156,12 @@ export function EditableLineGrid(props: Props) {
                     <input class={`${inputClass} w-full`} value={row.mop} onInput={(e) => updateRow(index(), { mop: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("serial_lot_no")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={row.serial_lot_no} onInput={(e) => updateRow(index(), { serial_lot_no: e.currentTarget.value })} />
+                    <input
+                      class={`${inputClass} w-full`}
+                      value={row.serial_lot_no}
+                      onInput={(e) => updateRow(index(), { serial_lot_no: e.currentTarget.value })}
+                      onBlur={(e) => void props.onSerialLotBlur?.(index(), e.currentTarget.value)}
+                    />
                   </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">
                     <input class={`${inputClass} w-full`} value={row.remark} onInput={(e) => updateRow(index(), { remark: e.currentTarget.value })} />

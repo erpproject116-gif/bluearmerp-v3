@@ -1,0 +1,838 @@
+package goodsreceipt
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+)
+
+type GoodsReceiptSerial struct {
+	ID        int64  `json:"id"`
+	SerialNo  string `json:"serial_no"`
+	CreatedAt string `json:"created_at"`
+}
+
+type GoodsReceiptLine struct {
+	ID                  int64                `json:"id"`
+	LineNo              int                  `json:"line_no"`
+	PurchaseOrderLineID int64                `json:"purchase_order_line_id"`
+	ItemID              *int64               `json:"item_id,omitempty"`
+	ItemCode            string               `json:"item_code"`
+	ItemName            string               `json:"item_name"`
+	TrackSerial         bool                 `json:"track_serial"`
+	ExpectedQty         float64              `json:"expected_qty"`
+	ReceivedQty         float64              `json:"received_qty"`
+	Serials             []GoodsReceiptSerial `json:"serials,omitempty"`
+}
+
+type GoodsReceipt struct {
+	ID                int64              `json:"id"`
+	PurchaseOrderID   int64              `json:"purchase_order_id"`
+	PurchaseOrderNo   string             `json:"purchase_order_no,omitempty"`
+	ReceiptDate       string             `json:"receipt_date"`
+	LocationID        int64              `json:"location_id"`
+	LocationName      string             `json:"location_name,omitempty"`
+	Status            string             `json:"status"`
+	Reference         *string            `json:"reference,omitempty"`
+	Notes             *string            `json:"notes,omitempty"`
+	CreatedByUserID   *int64             `json:"created_by_user_id,omitempty"`
+	CreatedByName     string             `json:"created_by_name,omitempty"`
+	CreatedAt         string             `json:"created_at"`
+	UpdatedAt         string             `json:"updated_at"`
+	Lines             []GoodsReceiptLine `json:"lines,omitempty"`
+}
+
+type createGoodsReceiptBody struct {
+	PurchaseOrderID int64   `json:"purchase_order_id"`
+	ReceiptDate     string  `json:"receipt_date"`
+	LocationID      int64   `json:"location_id"`
+	Reference       *string `json:"reference"`
+	Notes           *string `json:"notes"`
+}
+
+type addSerialBody struct {
+	GoodsReceiptLineID int64  `json:"goods_receipt_line_id"`
+	SerialNo           string `json:"serial_no"`
+}
+
+func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
+	allowed := map[string]string{
+		"receipt_date":      "gr.receipt_date",
+		"purchase_order_no": "po.purchase_order_no",
+		"status":            "gr.status",
+		"created_at":        "gr.created_at",
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "receipt_date", allowed)
+		offset := httputil.Offset(p)
+
+		where := "gr.tenant_id = $1"
+		args := []any{tu.TenantID}
+		argN := 2
+
+		if p.Q != "" {
+			where += fmt.Sprintf(` and (
+				po.purchase_order_no ilike $%d or
+				coalesce(gr.reference, '') ilike $%d or
+				exists (
+					select 1 from public.gr_goods_receipt_lines grl
+					join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+					where grl.goods_receipt_id = gr.id and pol.item_name ilike $%d
+				))`, argN, argN, argN)
+			args = append(args, "%"+p.Q+"%")
+			argN++
+		}
+		if st := strings.TrimSpace(r.URL.Query().Get("status")); st != "" {
+			where += fmt.Sprintf(" and gr.status = $%d", argN)
+			args = append(args, st)
+			argN++
+		}
+		if id, ok := optionalInt64Query(r, "purchase_order_id"); ok {
+			where += fmt.Sprintf(" and gr.purchase_order_id = $%d", argN)
+			args = append(args, *id)
+			argN++
+		}
+		if id, ok := optionalInt64Query(r, "location_id"); ok {
+			where += fmt.Sprintf(" and gr.location_id = $%d", argN)
+			args = append(args, *id)
+			argN++
+		}
+		if fromStr := strings.TrimSpace(r.URL.Query().Get("date_from")); fromStr != "" {
+			if from, err := parseDate(fromStr); err == nil {
+				where += fmt.Sprintf(" and gr.receipt_date >= $%d::date", argN)
+				args = append(args, from)
+				argN++
+			}
+		}
+		if toStr := strings.TrimSpace(r.URL.Query().Get("date_to")); toStr != "" {
+			if to, err := parseDate(toStr); err == nil {
+				where += fmt.Sprintf(" and gr.receipt_date <= $%d::date", argN)
+				args = append(args, to)
+				argN++
+			}
+		}
+
+		sortCol := allowed[p.Sort]
+		if sortCol == "" {
+			sortCol = "gr.receipt_date"
+		}
+
+		q := fmt.Sprintf(`
+			select gr.id, gr.purchase_order_id, po.purchase_order_no,
+			  gr.receipt_date, gr.location_id, loc.location_name,
+			  gr.status, gr.reference, gr.notes,
+			  gr.created_by_user_id, coalesce(u.full_name, ''),
+			  gr.created_at, gr.updated_at, count(*) over()
+			from public.gr_goods_receipts gr
+			join public.po_purchase_orders po on po.id = gr.purchase_order_id
+			join public.inv_locations loc on loc.id = gr.location_id
+			left join public.users u on u.id = gr.created_by_user_id
+			where %s
+			order by %s %s
+			limit $%d offset $%d`, where, sortCol, orderSQL(p.Order), argN, argN+1)
+		args = append(args, p.PageSize, offset)
+
+		rows, err := pool.Query(r.Context(), q, args...)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list goods receipts.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		var out []GoodsReceipt
+		var total int64
+		for rows.Next() {
+			var row GoodsReceipt
+			var receiptDate time.Time
+			var createdAt, updatedAt time.Time
+			if err := rows.Scan(
+				&row.ID, &row.PurchaseOrderID, &row.PurchaseOrderNo,
+				&receiptDate, &row.LocationID, &row.LocationName,
+				&row.Status, &row.Reference, &row.Notes,
+				&row.CreatedByUserID, &row.CreatedByName,
+				&createdAt, &updatedAt, &total,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read goods receipts.", "ERR_INTERNAL")
+				return
+			}
+			row.ReceiptDate = dateToStr(receiptDate)
+			row.CreatedAt = createdAt.Format(time.RFC3339)
+			row.UpdatedAt = updatedAt.Format(time.RFC3339)
+			out = append(out, row)
+		}
+		if out == nil {
+			out = []GoodsReceipt{}
+		}
+		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}
+
+func getGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		gr, err := loadGoodsReceipt(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.OK(w, gr, "OK")
+	}
+}
+
+func loadGoodsReceipt(ctx context.Context, conn pgxpoolConn, tenantID, id int64) (GoodsReceipt, error) {
+	var gr GoodsReceipt
+	var receiptDate time.Time
+	var createdAt, updatedAt time.Time
+
+	err := conn.QueryRow(ctx, `
+		select gr.id, gr.purchase_order_id, po.purchase_order_no,
+		  gr.receipt_date, gr.location_id, loc.location_name,
+		  gr.status, gr.reference, gr.notes,
+		  gr.created_by_user_id, coalesce(u.full_name, ''),
+		  gr.created_at, gr.updated_at
+		from public.gr_goods_receipts gr
+		join public.po_purchase_orders po on po.id = gr.purchase_order_id
+		join public.inv_locations loc on loc.id = gr.location_id
+		left join public.users u on u.id = gr.created_by_user_id
+		where gr.id = $1 and gr.tenant_id = $2`,
+		id, tenantID).Scan(
+		&gr.ID, &gr.PurchaseOrderID, &gr.PurchaseOrderNo,
+		&receiptDate, &gr.LocationID, &gr.LocationName,
+		&gr.Status, &gr.Reference, &gr.Notes,
+		&gr.CreatedByUserID, &gr.CreatedByName,
+		&createdAt, &updatedAt,
+	)
+	if err != nil {
+		return GoodsReceipt{}, err
+	}
+	gr.ReceiptDate = dateToStr(receiptDate)
+	gr.CreatedAt = createdAt.Format(time.RFC3339)
+	gr.UpdatedAt = updatedAt.Format(time.RFC3339)
+
+	lines, err := loadGoodsReceiptLines(ctx, conn, id)
+	if err != nil {
+		return GoodsReceipt{}, err
+	}
+	gr.Lines = lines
+	return gr, nil
+}
+
+func loadGoodsReceiptLines(ctx context.Context, conn pgxpoolConn, goodsReceiptID int64) ([]GoodsReceiptLine, error) {
+	rows, err := conn.Query(ctx, `
+		select grl.id, grl.line_no, grl.purchase_order_line_id,
+		  pol.item_id, pol.item_code, pol.item_name,
+		  coalesce(i.track_serial, false),
+		  grl.expected_qty::float8, grl.received_qty::float8
+		from public.gr_goods_receipt_lines grl
+		join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+		left join public.inv_items i on i.id = pol.item_id
+		where grl.goods_receipt_id = $1
+		order by grl.line_no`, goodsReceiptID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var lines []GoodsReceiptLine
+	var lineIDs []int64
+	for rows.Next() {
+		var ln GoodsReceiptLine
+		if err := rows.Scan(
+			&ln.ID, &ln.LineNo, &ln.PurchaseOrderLineID,
+			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.TrackSerial,
+			&ln.ExpectedQty, &ln.ReceivedQty,
+		); err != nil {
+			return nil, err
+		}
+		lineIDs = append(lineIDs, ln.ID)
+		lines = append(lines, ln)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if lines == nil {
+		return []GoodsReceiptLine{}, nil
+	}
+
+	serialsByLine, err := loadGoodsReceiptSerials(ctx, conn, lineIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range lines {
+		if s := serialsByLine[lines[i].ID]; s != nil {
+			lines[i].Serials = s
+		} else {
+			lines[i].Serials = []GoodsReceiptSerial{}
+		}
+	}
+	return lines, nil
+}
+
+func loadGoodsReceiptSerials(ctx context.Context, conn pgxpoolConn, lineIDs []int64) (map[int64][]GoodsReceiptSerial, error) {
+	out := make(map[int64][]GoodsReceiptSerial)
+	if len(lineIDs) == 0 {
+		return out, nil
+	}
+	rows, err := conn.Query(ctx, `
+		select id, goods_receipt_line_id, serial_no, created_at
+		from public.gr_goods_receipt_serials
+		where goods_receipt_line_id = any($1)
+		order by goods_receipt_line_id, serial_no`, lineIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s GoodsReceiptSerial
+		var lineID int64
+		var createdAt time.Time
+		if err := rows.Scan(&s.ID, &lineID, &s.SerialNo, &createdAt); err != nil {
+			return nil, err
+		}
+		s.CreatedAt = createdAt.Format(time.RFC3339)
+		out[lineID] = append(out[lineID], s)
+	}
+	return out, rows.Err()
+}
+
+func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		var body createGoodsReceiptBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		errs := map[string]string{}
+		if body.PurchaseOrderID <= 0 {
+			errs["purchase_order_id"] = "Purchase order is required."
+		}
+		if strings.TrimSpace(body.ReceiptDate) == "" {
+			errs["receipt_date"] = "Receipt date is required."
+		}
+		if body.LocationID <= 0 {
+			errs["location_id"] = "Location is required."
+		}
+		if len(errs) > 0 {
+			response.Validation(w, errs)
+			return
+		}
+		receiptDate, err := parseDate(body.ReceiptDate)
+		if err != nil {
+			response.Validation(w, map[string]string{"receipt_date": "Invalid date. Use YYYY-MM-DD."})
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create goods receipt.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var poStatus string
+		err = tx.QueryRow(r.Context(), `
+			select status from public.po_purchase_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			for update`, body.PurchaseOrderID, tu.TenantID).Scan(&poStatus)
+		if err != nil {
+			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order not found."})
+			return
+		}
+		if poStatus != "confirmed" && poStatus != "partially_received" {
+			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order must be confirmed or partially received."})
+			return
+		}
+
+		var locTenant int64
+		if err := tx.QueryRow(r.Context(), `select tenant_id from public.inv_locations where id = $1 and deleted_at is null`, body.LocationID).Scan(&locTenant); err != nil || locTenant != tu.TenantID {
+			response.Validation(w, map[string]string{"location_id": "Invalid location."})
+			return
+		}
+
+		var grID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.gr_goods_receipts (
+			  tenant_id, purchase_order_id, receipt_date, location_id, status,
+			  reference, notes, created_by_user_id
+			) values ($1, $2, $3::date, $4, 'draft', $5, $6, $7)
+			returning id`,
+			tu.TenantID, body.PurchaseOrderID, receiptDate, body.LocationID,
+			body.Reference, body.Notes, tu.AppUserID).Scan(&grID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create goods receipt.", "ERR_INTERNAL")
+			return
+		}
+
+		poLineRows, err := tx.Query(r.Context(), `
+			select pol.id, pol.line_no, (pol.qty - pol.received_qty)::float8,
+			  coalesce(i.track_serial, false)
+			from public.po_purchase_order_lines pol
+			left join public.inv_items i on i.id = pol.item_id
+			where pol.purchase_order_id = $1
+			  and (pol.qty - pol.received_qty) > 0.0001
+			order by pol.line_no`, body.PurchaseOrderID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load purchase order lines.", "ERR_INTERNAL")
+			return
+		}
+		defer poLineRows.Close()
+
+		lineCount := 0
+		for poLineRows.Next() {
+			var poLineID int64
+			var lineNo int
+			var openQty float64
+			var trackSerial bool
+			if err := poLineRows.Scan(&poLineID, &lineNo, &openQty, &trackSerial); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read purchase order lines.", "ERR_INTERNAL")
+				return
+			}
+			receivedQty := openQty
+			if trackSerial {
+				receivedQty = 0
+			}
+			_, err = tx.Exec(r.Context(), `
+				insert into public.gr_goods_receipt_lines (
+				  goods_receipt_id, purchase_order_line_id, line_no, expected_qty, received_qty
+				) values ($1, $2, $3, $4, $5)`,
+				grID, poLineID, lineNo, openQty, receivedQty)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to create goods receipt lines.", "ERR_INTERNAL")
+				return
+			}
+			lineCount++
+		}
+		if lineCount == 0 {
+			response.Validation(w, map[string]string{"purchase_order_id": "No open lines on purchase order."})
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create goods receipt.", "ERR_INTERNAL")
+			return
+		}
+
+		gr, err := loadGoodsReceipt(r.Context(), pool, tu.TenantID, grID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Created but failed to load goods receipt.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.create", "gr_goods_receipt", &grID, nil, body)
+		response.OK(w, gr, "Goods receipt created.")
+	}
+}
+
+func addGoodsReceiptSerial(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		grID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body addSerialBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		serialNo := strings.TrimSpace(body.SerialNo)
+		errs := map[string]string{}
+		if body.GoodsReceiptLineID <= 0 {
+			errs["goods_receipt_line_id"] = "Line is required."
+		}
+		if serialNo == "" {
+			errs["serial_no"] = "Serial number is required."
+		}
+		if len(errs) > 0 {
+			response.Validation(w, errs)
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add serial.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var status string
+		err = tx.QueryRow(r.Context(), `
+			select status from public.gr_goods_receipts
+			where id = $1 and tenant_id = $2
+			for update`, grID, tu.TenantID).Scan(&status)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if status != "draft" {
+			response.Validation(w, map[string]string{"status": "Only draft goods receipts accept serials."})
+			return
+		}
+
+		var lineGRID int64
+		var expectedQty, receivedQty float64
+		var trackSerial bool
+		err = tx.QueryRow(r.Context(), `
+			select grl.goods_receipt_id, grl.expected_qty::float8, grl.received_qty::float8,
+			  coalesce(i.track_serial, false)
+			from public.gr_goods_receipt_lines grl
+			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+			left join public.inv_items i on i.id = pol.item_id
+			where grl.id = $1`, body.GoodsReceiptLineID).Scan(&lineGRID, &expectedQty, &receivedQty, &trackSerial)
+		if err != nil || lineGRID != grID {
+			response.Validation(w, map[string]string{"goods_receipt_line_id": "Line not found on this goods receipt."})
+			return
+		}
+		if !trackSerial {
+			response.Validation(w, map[string]string{"goods_receipt_line_id": "Item does not track serial numbers."})
+			return
+		}
+		if receivedQty+0.0001 >= expectedQty {
+			response.Validation(w, map[string]string{"serial_no": "Line already has the expected quantity of serials."})
+			return
+		}
+
+		if err := assertSerialNotDuplicate(r.Context(), tx, tu.TenantID, serialNo); err != nil {
+			response.Validation(w, map[string]string{"serial_no": err.Error()})
+			return
+		}
+
+		var serialID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.gr_goods_receipt_serials (goods_receipt_line_id, serial_no)
+			values ($1, $2)
+			returning id`, body.GoodsReceiptLineID, serialNo).Scan(&serialID)
+		if err != nil {
+			response.Validation(w, map[string]string{"serial_no": "Serial already scanned for this line."})
+			return
+		}
+
+		_, err = tx.Exec(r.Context(), `
+			update public.gr_goods_receipt_lines
+			set received_qty = received_qty + 1
+			where id = $1`, body.GoodsReceiptLineID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update line quantity.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add serial.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.add_serial", "gr_goods_receipt", &grID, nil, body)
+		response.OK(w, map[string]any{
+			"id":        serialID,
+			"serial_no": serialNo,
+		}, "Serial added.")
+	}
+}
+
+func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		grID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to post goods receipt.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var purchaseOrderID, locationID int64
+		var receiptDate time.Time
+		var status string
+		err = tx.QueryRow(r.Context(), `
+			select purchase_order_id, location_id, receipt_date, status
+			from public.gr_goods_receipts
+			where id = $1 and tenant_id = $2
+			for update`, grID, tu.TenantID).Scan(&purchaseOrderID, &locationID, &receiptDate, &status)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if status != "draft" {
+			response.Validation(w, map[string]string{"status": "Only draft goods receipts can be posted."})
+			return
+		}
+
+		var poStatus string
+		err = tx.QueryRow(r.Context(), `
+			select status from public.po_purchase_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			for update`, purchaseOrderID, tu.TenantID).Scan(&poStatus)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Purchase order not found.", "ERR_INTERNAL")
+			return
+		}
+		if poStatus != "confirmed" && poStatus != "partially_received" {
+			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order is not open for receiving."})
+			return
+		}
+
+		lineRows, err := tx.Query(r.Context(), `
+			select grl.id, grl.purchase_order_line_id, grl.received_qty::float8,
+			  pol.qty::float8, pol.received_qty::float8,
+			  pol.item_id, pol.partner_id,
+			  coalesce(i.track_serial, false),
+			  coalesce(i.track_inventory_qty, false),
+			  coalesce(i.warranty_duration_months, 0)
+			from public.gr_goods_receipt_lines grl
+			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+			left join public.inv_items i on i.id = pol.item_id
+			where grl.goods_receipt_id = $1
+			order by grl.line_no`, grID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load lines.", "ERR_INTERNAL")
+			return
+		}
+		defer lineRows.Close()
+
+		type linePost struct {
+			ID                  int64
+			PurchaseOrderLineID int64
+			ReceivedQty         float64
+			POQty               float64
+			POReceivedQty       float64
+			ItemID              *int64
+			PartnerID           *int64
+			TrackSerial         bool
+			TrackInventory      bool
+			WarrantyMonths      int
+		}
+		var lines []linePost
+		hasReceiptQty := false
+		for lineRows.Next() {
+			var ln linePost
+			if err := lineRows.Scan(
+				&ln.ID, &ln.PurchaseOrderLineID, &ln.ReceivedQty,
+				&ln.POQty, &ln.POReceivedQty,
+				&ln.ItemID, &ln.PartnerID,
+				&ln.TrackSerial, &ln.TrackInventory, &ln.WarrantyMonths,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
+				return
+			}
+			if ln.ReceivedQty <= 0 {
+				continue
+			}
+			hasReceiptQty = true
+			openQty := ln.POQty - ln.POReceivedQty
+			if ln.ReceivedQty > openQty+0.0001 {
+				response.Validation(w, map[string]string{
+					"received_qty": fmt.Sprintf("Line %d exceeds open PO quantity (%.4f available).", ln.ID, openQty),
+				})
+				return
+			}
+			if ln.TrackSerial {
+				var serialCount int
+				if err := tx.QueryRow(r.Context(), `
+					select count(*) from public.gr_goods_receipt_serials
+					where goods_receipt_line_id = $1`, ln.ID).Scan(&serialCount); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to count serials.", "ERR_INTERNAL")
+					return
+				}
+				if float64(serialCount)+0.0001 < ln.ReceivedQty {
+					response.Validation(w, map[string]string{
+						"serials": fmt.Sprintf("Line %d requires %d serial(s); only %d scanned.", ln.ID, int(ln.ReceivedQty+0.5), serialCount),
+					})
+					return
+				}
+			}
+			lines = append(lines, ln)
+		}
+		if !hasReceiptQty {
+			response.Validation(w, map[string]string{"lines": "At least one line must have a received quantity."})
+			return
+		}
+
+		userID := tu.AppUserID
+
+		for _, ln := range lines {
+			if ln.TrackSerial {
+				serialRows, err := tx.Query(r.Context(), `
+					select serial_no from public.gr_goods_receipt_serials
+					where goods_receipt_line_id = $1
+					order by serial_no`, ln.ID)
+				if err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to load serials.", "ERR_INTERNAL")
+					return
+				}
+				wEnd := warrantyEndDate(receiptDate, ln.WarrantyMonths)
+				for serialRows.Next() {
+					var serialNo string
+					if err := serialRows.Scan(&serialNo); err != nil {
+						serialRows.Close()
+						response.Err(w, http.StatusInternalServerError, "Failed to read serial.", "ERR_INTERNAL")
+						return
+					}
+					if err := assertSerialNotDuplicate(r.Context(), tx, tu.TenantID, serialNo); err != nil {
+						serialRows.Close()
+						response.Validation(w, map[string]string{"serial_no": fmt.Sprintf("%s: %s", serialNo, err.Error())})
+						return
+					}
+					if ln.ItemID == nil {
+						serialRows.Close()
+						response.Validation(w, map[string]string{"item_id": "Serial line missing item."})
+						return
+					}
+					var unitID int64
+					err = tx.QueryRow(r.Context(), `
+						insert into public.inv_serial_units (
+						  tenant_id, item_id, serial_no, status, location_id, partner_id,
+						  warranty_start, warranty_end, purchase_order_line_id, goods_receipt_line_id,
+						  received_at
+						) values (
+						  $1, $2, $3, 'in_stock', $4, $5,
+						  $6::date, $7::date, $8, $9,
+						  $6::timestamptz
+						)
+						returning id`,
+						tu.TenantID, *ln.ItemID, serialNo, locationID, ln.PartnerID,
+						receiptDate, wEnd, ln.PurchaseOrderLineID, ln.ID,
+					).Scan(&unitID)
+					if err != nil {
+						serialRows.Close()
+						response.Validation(w, map[string]string{"serial_no": fmt.Sprintf("%s already exists.", serialNo)})
+						return
+					}
+					locID := locationID
+					if err := inventory.InsertSerialEvent(r.Context(), tx, tu.TenantID, unitID, "received", nil, &locID, "goods_receipt", grID, &userID); err != nil {
+						serialRows.Close()
+						response.Err(w, http.StatusInternalServerError, "Failed to record serial event.", "ERR_INTERNAL")
+						return
+					}
+				}
+				if err := serialRows.Err(); err != nil {
+					serialRows.Close()
+					response.Err(w, http.StatusInternalServerError, "Failed to process serials.", "ERR_INTERNAL")
+					return
+				}
+				serialRows.Close()
+			}
+
+			if ln.TrackInventory && ln.ItemID != nil && ln.ReceivedQty > 0 {
+				_, err = tx.Exec(r.Context(), `
+					insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
+					values ($1, $2, $3, $4)
+					on conflict (tenant_id, item_id, location_id)
+					do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
+					tu.TenantID, *ln.ItemID, locationID, ln.ReceivedQty)
+				if err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to update stock balance.", "ERR_INTERNAL")
+					return
+				}
+				_, err = tx.Exec(r.Context(), `
+					insert into public.inv_stock_movements (
+					  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
+					) values ($1, $2, $3, $4, 'goods_receipt', 'goods_receipt', $5, $6)`,
+					tu.TenantID, *ln.ItemID, locationID, ln.ReceivedQty, grID, tu.AppUserID)
+				if err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
+					return
+				}
+			}
+
+			tag, err := tx.Exec(r.Context(), `
+				update public.po_purchase_order_lines
+				set received_qty = received_qty + $1
+				where id = $2 and (qty - received_qty) >= $1 - 0.0001`,
+				ln.ReceivedQty, ln.PurchaseOrderLineID)
+			if err != nil || tag.RowsAffected() == 0 {
+				response.Validation(w, map[string]string{"received_qty": "Failed to update purchase order line quantity."})
+				return
+			}
+		}
+
+		var openLines int
+		if err := tx.QueryRow(r.Context(), `
+			select count(*) from public.po_purchase_order_lines
+			where purchase_order_id = $1 and (qty - received_qty) > 0.0001`, purchaseOrderID).Scan(&openLines); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to evaluate purchase order.", "ERR_INTERNAL")
+			return
+		}
+		newPOStatus := "received"
+		if openLines > 0 {
+			newPOStatus = "partially_received"
+		}
+		_, err = tx.Exec(r.Context(), `
+			update public.po_purchase_orders
+			set status = $1, updated_at = now()
+			where id = $2`, newPOStatus, purchaseOrderID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update purchase order status.", "ERR_INTERNAL")
+			return
+		}
+
+		_, err = tx.Exec(r.Context(), `
+			update public.gr_goods_receipts
+			set status = 'posted', updated_at = now()
+			where id = $1`, grID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to post goods receipt.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to post goods receipt.", "ERR_INTERNAL")
+			return
+		}
+
+		gr, err := loadGoodsReceipt(r.Context(), pool, tu.TenantID, grID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Posted but failed to load goods receipt.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.post", "gr_goods_receipt", &grID, nil, nil)
+		response.OK(w, gr, "Goods receipt posted.")
+	}
+}
+
+func assertSerialNotDuplicate(ctx context.Context, tx pgx.Tx, tenantID int64, serialNo string) error {
+	var exists bool
+	err := tx.QueryRow(ctx, `
+		select exists(
+		  select 1 from public.inv_serial_units
+		  where tenant_id = $1 and serial_no = $2 and status <> 'void'
+		)`, tenantID, serialNo).Scan(&exists)
+	if err != nil {
+		return errors.New("failed to validate serial number.")
+	}
+	if exists {
+		return errors.New("serial number already exists.")
+	}
+	return nil
+}
+
+type pgxpoolConn interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
