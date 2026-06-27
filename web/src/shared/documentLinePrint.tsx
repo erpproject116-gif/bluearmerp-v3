@@ -1,6 +1,6 @@
 import { createMemo } from "solid-js";
 import { PrintPreviewTable, type PrintPreviewColumn } from "./PrintPreviewTable";
-import { filterPrintRows, usePrintLayout, type PrintLayoutColumn } from "./usePrintLayout";
+import { usePrintLayout, type PrintLayoutColumn } from "./usePrintLayout";
 
 export type DocumentLineRow = {
   line_no: number;
@@ -74,15 +74,8 @@ export function documentLinePrintColumns(
   ];
 }
 
-export function useDocumentLinePrintLayout(lines: () => DocumentLineRow[]) {
-  return usePrintLayout(
-    () => DOCUMENT_LINE_COLUMN_META,
-    () =>
-      lines().map((ln) => ({
-        key: ln.line_no,
-        label: `${ln.line_no}. ${ln.item_code || "—"} — ${ln.item_name || "Line"}`,
-      })),
-  );
+export function useDocumentLinePrintLayout() {
+  return usePrintLayout(() => DOCUMENT_LINE_COLUMN_META);
 }
 
 type TableProps = {
@@ -97,16 +90,13 @@ export function DocumentLinePrintTable(props: TableProps) {
     const keys = new Set(props.layout.visibleColumns().map((c) => c.key));
     return allColumns().filter((c) => keys.has(c.key));
   });
-  const visibleLines = createMemo(() =>
-    filterPrintRows(props.lines(), props.layout.visibleRowKeys(), (ln) => ln.line_no),
-  );
 
   return (
     <PrintPreviewTable
-      class="mb-4"
+      class="mb-4 quotation-print__table-wrap"
       emptyMessage="No line items."
       columns={visibleColumns()}
-      rows={visibleLines()}
+      rows={props.lines()}
     />
   );
 }

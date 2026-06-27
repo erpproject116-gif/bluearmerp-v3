@@ -2,17 +2,51 @@ import { createEffect, createResource, createSignal, For, Show } from "solid-js"
 import { useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import { apiFetch } from "../../../shared/api";
+import { fetchAllPaginatedPages } from "../../../shared/fetchAllPaginated";
+import { StatusReportPrintDocument, type StatusPrintColumn } from "../../../shared/statusReportPrint";
+import type { StatusReportRow } from "../../../shared/useRepairOrderStatusReport";
 import {
   defaultStatusFilters,
   filtersToSearchParams,
   formatDisplayDate,
   type RepairOrderStatusFilters,
 } from "./repairOrderStatusFilters";
-import type { StatusReportRow } from "../../../shared/useRepairOrderStatusReport";
-import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
-import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import "../after-sales/repairOrderPrint.css";
 import "./statusReportPrint.css";
+
+const REPAIR_STATUS_PRINT_COLUMNS_META = [
+  { key: "date_no_display", label: "Date-No." },
+  { key: "repair_order_no", label: "Repair Order No" },
+  { key: "progress_status", label: "Progress" },
+  { key: "location_name", label: "Location" },
+  { key: "pic_name", label: "PIC" },
+  { key: "customer_name", label: "Customer" },
+  { key: "latest_update", label: "Latest Update" },
+  { key: "item_code", label: "Item Code" },
+  { key: "item_name_display", label: "Item Name [Spec]" },
+  { key: "qty", label: "Qty" },
+  { key: "remark", label: "Remark" },
+] as const;
+
+function repairOrderStatusPrintColumns(): StatusPrintColumn<StatusReportRow>[] {
+  return [
+    { key: "date_no_display", label: "Date-No.", render: (r) => r.date_no_display },
+    { key: "repair_order_no", label: "Repair Order No", render: (r) => r.repair_order_no },
+    {
+      key: "progress_status",
+      label: "Progress",
+      render: (r) => (r.progress_status === "finished" ? "Finished" : "Received"),
+    },
+    { key: "location_name", label: "Location", render: (r) => r.location_name },
+    { key: "pic_name", label: "PIC", render: (r) => r.pic_name },
+    { key: "customer_name", label: "Customer", render: (r) => r.customer_name },
+    { key: "latest_update", label: "Latest Update", render: (r) => r.latest_update ?? "" },
+    { key: "item_code", label: "Item Code", render: (r) => r.item_code },
+    { key: "item_name_display", label: "Item Name [Spec]", render: (r) => r.item_name_display },
+    { key: "qty", label: "Qty", align: "right", render: (r) => r.qty },
+    { key: "remark", label: "Remark", render: (r) => r.remark ?? "" },
+  ];
+}
 
 function parseFiltersFromSearch(params: Record<string, string | string[]>): RepairOrderStatusFilters {
   const get = (k: string) => {
@@ -38,115 +72,76 @@ function parseFiltersFromSearch(params: Record<string, string | string[]>): Repa
 }
 
 async function fetchAllStatusRows(filters: RepairOrderStatusFilters) {
-  const rows: StatusReportRow[] = [];
-  let totalQty = 0;
-  let page = 1;
-  const pageSize = 100;
-  while (page <= 50) {
-    const qs = filtersToSearchParams(filters, { page, pageSize, sort: "order_date", order: "desc" });
-    const res = await apiFetch<{ rows: StatusReportRow[]; summary: { total_qty: number } }>(
-      `/api/v1/inventory/repair-orders/status-report?${qs}`,
-    );
-    if (!res.success || !res.data) throw new Error(res.message ?? "Failed to load report");
-    rows.push(...(res.data.rows ?? []));
-    totalQty = res.data.summary?.total_qty ?? totalQty;
-    const total = res.meta?.total ?? 0;
-    if (rows.length >= total) break;
-    page++;
-  }
+  const rows = await fetchAllPaginatedPages({
+    pageSize: 200,
+    fetchPage: async (page, pageSize) => {
+      const qs = filtersToSearchParams(filters, { page, pageSize, sort: "order_date", order: "desc" });
+      const res = await apiFetch<{ rows: StatusReportRow[] }>(
+        `/api/v1/inventory/repair-orders/status-report?${qs}`,
+      );
+      if (!res.success || !res.data) throw new Error(res.message ?? "Failed to load report");
+      return { rows: res.data.rows ?? [], total: res.meta?.total ?? 0 };
+    },
+  });
+
+  const qs = filtersToSearchParams(filters, { page: 1, pageSize: 1, sort: "order_date", order: "desc" });
+  const summaryRes = await apiFetch<{ summary: { total_qty: number } }>(
+    `/api/v1/inventory/repair-orders/status-report?${qs}`,
+  );
+  const totalQty = summaryRes.data?.summary?.total_qty ?? rows.reduce((s, r) => s + r.qty, 0);
   return { rows, totalQty };
 }
 
 function StatusPrintView() {
   const [params] = useSearchParams();
   const [generatedAt] = createSignal(new Date());
-
   const filters = () => parseFiltersFromSearch(params as Record<string, string | string[]>);
-
   const [data] = createResource(filters, fetchAllStatusRows);
 
   createEffect(() => {
     if (!data()) return;
-    const timer = window.setTimeout(() => window.print(), 350);
+    const timer = window.setTimeout(() => window.print(), 500);
     return () => window.clearTimeout(timer);
   });
 
   return (
     <div class="repair-print">
       <Show when={data.loading}>
-        <p class="repair-print__loading">Loading…</p>
+        <p class="repair-print__loading">Loading all rows for print…</p>
       </Show>
       <Show when={data.error}>
         <p class="repair-print__error">{String(data.error)}</p>
       </Show>
       <Show when={data()}>
         {(payload) => (
-          <article class="repair-print__page status-report-print">
-            <PrintBrandingHeader
-              variant="repair"
-              docTitle="Repair Order Status"
-              docSubtitle={`${formatDisplayDate(filters().date_from)} ~ ${formatDisplayDate(filters().date_to)}`}
-            />
-            <table class="repair-print__table">
-              <thead>
-                <tr>
-                  <th>Date-No.</th>
-                  <th>Repair Order No</th>
-                  <th>Progress</th>
-                  <th>Location</th>
-                  <th>PIC</th>
-                  <th>Customer</th>
-                  <th>Latest Update</th>
-                  <th>Item Code</th>
-                  <th>Item Name [Spec]</th>
-                  <th class="num">Qty</th>
-                  <th>Remark</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={payload().rows}>
-                  {(row) => (
-                    <tr>
-                      <td>{row.date_no_display}</td>
-                      <td>{row.repair_order_no}</td>
-                      <td>{row.progress_status === "finished" ? "Finished" : "Received"}</td>
-                      <td>{row.location_name}</td>
-                      <td>{row.pic_name}</td>
-                      <td>{row.customer_name}</td>
-                      <td>{row.latest_update ?? ""}</td>
-                      <td>{row.item_code}</td>
-                      <td>{row.item_name_display}</td>
-                      <td class="num">{row.qty}</td>
-                      <td>{row.remark ?? ""}</td>
-                    </tr>
+          <StatusReportPrintDocument
+            docTitle="Repair Order Status"
+            docSubtitle={`${formatDisplayDate(filters().date_from)} ~ ${formatDisplayDate(filters().date_to)}`}
+            columnMeta={[...REPAIR_STATUS_PRINT_COLUMNS_META]}
+            columns={repairOrderStatusPrintColumns()}
+            rows={payload().rows}
+            generatedAt={generatedAt()}
+            brandingVariant="repair"
+            tableClass="repair-print__table"
+            pageClass="repair-print__page status-report-print"
+            summaryFooter={(visible) => (
+              <tr>
+                <For each={visible}>
+                  {(col, index) => (
+                    <td class={col.align === "right" ? "num repair-print__total" : index() === 0 ? "repair-print__total-label" : ""}>
+                      {col.key === "qty"
+                        ? payload().totalQty
+                        : index() === 0
+                          ? "Total"
+                          : ""}
+                    </td>
                   )}
                 </For>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={9} class="repair-print__total-label">
-                    Total
-                  </td>
-                  <td class="num repair-print__total">{payload().totalQty}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-            <PrintBrandingFooter
-              class="repair-print__footer"
-              defaultFooter={`[P.1] · ${generatedAt().toLocaleString()}`}
-            />
-          </article>
+              </tr>
+            )}
+          />
         )}
       </Show>
-      <div class="repair-print__toolbar no-print">
-        <button type="button" class="repair-print__btn" onClick={() => window.print()}>
-          Print
-        </button>
-        <button type="button" class="repair-print__btn repair-print__btn--muted" onClick={() => window.close()}>
-          Close
-        </button>
-      </div>
     </div>
   );
 }

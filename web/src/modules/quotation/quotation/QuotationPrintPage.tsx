@@ -49,7 +49,7 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
   const p = () => props.payload;
   const q = () => p().quotation;
   const lines = () => (q().lines ?? []) as DocumentLineRow[];
-  const layout = useDocumentLinePrintLayout(lines);
+  const layout = useDocumentLinePrintLayout();
 
   return (
     <>
@@ -149,14 +149,8 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
       <PrintToolbar
         layout={{
           columns: DOCUMENT_LINE_COLUMN_META,
-          rows: lines().map((ln) => ({
-            key: ln.line_no,
-            label: `${ln.line_no}. ${ln.item_code || "—"} — ${ln.item_name || "Line"}`,
-          })),
           hiddenColumns: layout.hiddenColumns,
-          hiddenRows: layout.hiddenRows,
           onToggleColumn: layout.toggleColumn,
-          onToggleRow: layout.toggleRow,
           onShowAll: layout.showAll,
         }}
         onPrint={() => window.print()}

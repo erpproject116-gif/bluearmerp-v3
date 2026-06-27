@@ -2,17 +2,51 @@ import { createEffect, createResource, createSignal, For, Show } from "solid-js"
 import { useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import { apiFetch } from "../../../shared/api";
+import { fetchAllPaginatedPages } from "../../../shared/fetchAllPaginated";
+import { StatusReportPrintDocument, type StatusPrintColumn } from "../../../shared/statusReportPrint";
+import type { SalesOrderStatusReportRow } from "../../../shared/useSalesOrderStatusReport";
 import {
   defaultStatusFilters,
   filtersToSearchParams,
   formatDisplayDate,
   type SalesOrderStatusFilters,
 } from "./salesOrderStatusFilters";
-import type { SalesOrderStatusReportRow } from "../../../shared/useSalesOrderStatusReport";
 import { progressStatusLabel } from "./progressStatus";
-import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
-import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import "../../quotation/quotation/quotationPrint.css";
+
+const SO_STATUS_PRINT_COLUMNS_META = [
+  { key: "date_no_display", label: "Date-No." },
+  { key: "sales_order_no", label: "Sales Order No." },
+  { key: "progress_status", label: "Progress" },
+  { key: "location_name", label: "Location" },
+  { key: "pic_name", label: "PIC" },
+  { key: "customer_name", label: "Customer" },
+  { key: "tax_type_name", label: "Tax Type" },
+  { key: "item_code", label: "Item Code" },
+  { key: "item_name", label: "Item Name" },
+  { key: "qty", label: "Qty" },
+  { key: "line_total", label: "Line Total" },
+] as const;
+
+function money(n: number) {
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function salesOrderStatusPrintColumns(): StatusPrintColumn<SalesOrderStatusReportRow>[] {
+  return [
+    { key: "date_no_display", label: "Date-No.", render: (r) => r.date_no_display },
+    { key: "sales_order_no", label: "Sales Order No.", render: (r) => r.sales_order_no },
+    { key: "progress_status", label: "Progress", render: (r) => progressStatusLabel(r.progress_status) },
+    { key: "location_name", label: "Location", render: (r) => r.location_name },
+    { key: "pic_name", label: "PIC", render: (r) => r.pic_name },
+    { key: "customer_name", label: "Customer", render: (r) => r.customer_name },
+    { key: "tax_type_name", label: "Tax Type", render: (r) => r.tax_type_name },
+    { key: "item_code", label: "Item Code", render: (r) => r.item_code },
+    { key: "item_name", label: "Item Name", render: (r) => r.item_name },
+    { key: "qty", label: "Qty", align: "right", render: (r) => r.qty },
+    { key: "line_total", label: "Line Total", align: "right", render: (r) => money(r.line_total) },
+  ];
+}
 
 function parseFiltersFromSearch(params: Record<string, string | string[]>): SalesOrderStatusFilters {
   const get = (k: string) => {
@@ -39,29 +73,25 @@ function parseFiltersFromSearch(params: Record<string, string | string[]>): Sale
 }
 
 async function fetchAllStatusRows(filters: SalesOrderStatusFilters) {
-  const rows: SalesOrderStatusReportRow[] = [];
-  let totalQty = 0;
-  let totalAmount = 0;
-  let page = 1;
-  const pageSize = 100;
-  while (page <= 50) {
-    const qs = filtersToSearchParams(filters, { page, pageSize, sort: "order_date", order: "desc" });
-    const res = await apiFetch<{ rows: SalesOrderStatusReportRow[]; summary: { total_qty: number; total_amount: number } }>(
-      `/api/v1/sales-order/sales-orders/status-report?${qs}`,
-    );
-    if (!res.success || !res.data) throw new Error(res.message ?? "Failed to load report");
-    rows.push(...(res.data.rows ?? []));
-    totalQty = res.data.summary?.total_qty ?? totalQty;
-    totalAmount = res.data.summary?.total_amount ?? totalAmount;
-    const total = res.meta?.total ?? 0;
-    if (rows.length >= total) break;
-    page++;
-  }
-  return { rows, totalQty, totalAmount };
-}
+  const rows = await fetchAllPaginatedPages({
+    pageSize: 200,
+    fetchPage: async (page, pageSize) => {
+      const qs = filtersToSearchParams(filters, { page, pageSize, sort: "order_date", order: "desc" });
+      const res = await apiFetch<{ rows: SalesOrderStatusReportRow[] }>(
+        `/api/v1/sales-order/sales-orders/status-report?${qs}`,
+      );
+      if (!res.success || !res.data) throw new Error(res.message ?? "Failed to load report");
+      return { rows: res.data.rows ?? [], total: res.meta?.total ?? 0 };
+    },
+  });
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const qs = filtersToSearchParams(filters, { page: 1, pageSize: 1, sort: "order_date", order: "desc" });
+  const summaryRes = await apiFetch<{ summary: { total_qty: number; total_amount: number } }>(
+    `/api/v1/sales-order/sales-orders/status-report?${qs}`,
+  );
+  const totalQty = summaryRes.data?.summary?.total_qty ?? rows.reduce((s, r) => s + r.qty, 0);
+  const totalAmount = summaryRes.data?.summary?.total_amount ?? rows.reduce((s, r) => s + r.line_total, 0);
+  return { rows, totalQty, totalAmount };
 }
 
 function StatusPrintView() {
@@ -72,85 +102,47 @@ function StatusPrintView() {
 
   createEffect(() => {
     if (!data()) return;
-    const timer = window.setTimeout(() => window.print(), 350);
+    const timer = window.setTimeout(() => window.print(), 500);
     return () => window.clearTimeout(timer);
   });
 
   return (
     <div class="quotation-print">
       <Show when={data.loading}>
-        <p class="quotation-print__loading">Loading…</p>
+        <p class="quotation-print__loading">Loading all rows for print…</p>
       </Show>
       <Show when={data.error}>
         <p class="quotation-print__error">{String(data.error)}</p>
       </Show>
       <Show when={data()}>
         {(payload) => (
-          <article class="quotation-print__page">
-            <PrintBrandingHeader
-              docTitle="Sales Order Status"
-              docSubtitle={`${formatDisplayDate(filters().date_from)} ~ ${formatDisplayDate(filters().date_to)}`}
-            />
-            <table class="quotation-print__table">
-              <thead>
-                <tr>
-                  <th>Date-No.</th>
-                  <th>Sales Order No.</th>
-                  <th>Progress</th>
-                  <th>Location</th>
-                  <th>PIC</th>
-                  <th>Customer</th>
-                  <th>Tax Type</th>
-                  <th>Item Code</th>
-                  <th>Item Name</th>
-                  <th class="num">Qty</th>
-                  <th class="num">Line Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={payload().rows}>
-                  {(row) => (
-                    <tr>
-                      <td>{row.date_no_display}</td>
-                      <td>{row.sales_order_no}</td>
-                      <td>{progressStatusLabel(row.progress_status)}</td>
-                      <td>{row.location_name}</td>
-                      <td>{row.pic_name}</td>
-                      <td>{row.customer_name}</td>
-                      <td>{row.tax_type_name}</td>
-                      <td>{row.item_code}</td>
-                      <td>{row.item_name}</td>
-                      <td class="num">{row.qty}</td>
-                      <td class="num">{money(row.line_total)}</td>
-                    </tr>
+          <StatusReportPrintDocument
+            docTitle="Sales Order Status"
+            docSubtitle={`${formatDisplayDate(filters().date_from)} ~ ${formatDisplayDate(filters().date_to)}`}
+            columnMeta={[...SO_STATUS_PRINT_COLUMNS_META]}
+            columns={salesOrderStatusPrintColumns()}
+            rows={payload().rows}
+            generatedAt={generatedAt()}
+            summaryFooter={(visible) => (
+              <tr>
+                <For each={visible}>
+                  {(col, index) => (
+                    <td class={col.align === "right" ? "num" : ""}>
+                      {col.key === "qty"
+                        ? payload().totalQty
+                        : col.key === "line_total"
+                          ? money(payload().totalAmount)
+                          : index() === 0
+                            ? "Total"
+                            : ""}
+                    </td>
                   )}
                 </For>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={9} class="quotation-print__totals-row">
-                    Total
-                  </td>
-                  <td class="num">{payload().totalQty}</td>
-                  <td class="num">{money(payload().totalAmount)}</td>
-                </tr>
-              </tfoot>
-            </table>
-            <PrintBrandingFooter
-              class="quotation-print__footer"
-              defaultFooter={`[P.1] · ${generatedAt().toLocaleString()}`}
-            />
-          </article>
+              </tr>
+            )}
+          />
         )}
       </Show>
-      <div class="quotation-print__toolbar no-print">
-        <button type="button" class="quotation-print__btn" onClick={() => window.print()}>
-          Print
-        </button>
-        <button type="button" class="quotation-print__btn quotation-print__btn--muted" onClick={() => window.close()}>
-          Close
-        </button>
-      </div>
     </div>
   );
 }

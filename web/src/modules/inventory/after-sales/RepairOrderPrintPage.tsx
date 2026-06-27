@@ -3,7 +3,7 @@ import { useParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import { PrintPreviewTable, type PrintPreviewColumn } from "../../../shared/PrintPreviewTable";
 import { PrintToolbar } from "../../../shared/PrintToolbar";
-import { filterPrintRows, usePrintLayout } from "../../../shared/usePrintLayout";
+import { usePrintLayout } from "../../../shared/usePrintLayout";
 import {
   fetchRepairOrderPrint,
   formatMoney,
@@ -90,22 +90,12 @@ function PrintDocument(props: { payload: RepairOrderPrintPayload }) {
   const lines = () => p().order.lines ?? [];
   const columnMeta = () =>
     REPAIR_COLUMN_META.filter((c) => p().doc_type === "receipt" || !["service_charge", "amount"].includes(c.key));
-  const layout = usePrintLayout(
-    columnMeta,
-    () =>
-      lines().map((ln) => ({
-        key: ln.line_no,
-        label: `${ln.line_no}. ${ln.item_code || "—"} — ${ln.item_name || "Line"}`,
-      })),
-  );
+  const layout = usePrintLayout(columnMeta);
   const visibleColumns = createMemo(() => {
     const keys = new Set(layout.visibleColumns().map((c) => c.key));
     return repairColumns(p().doc_type).filter((c) => keys.has(c.key));
   });
-  const visibleLines = createMemo(() =>
-    filterPrintRows(lines(), layout.visibleRowKeys(), (ln) => ln.line_no),
-  );
-  const total = () => orderLineTotal(visibleLines());
+  const total = () => orderLineTotal(lines());
 
   return (
     <>
@@ -157,9 +147,9 @@ function PrintDocument(props: { payload: RepairOrderPrintPayload }) {
           </div>
         </section>
 
-        <PrintPreviewTable class="mb-4" emptyMessage="No line items." columns={visibleColumns()} rows={visibleLines()} />
+        <PrintPreviewTable class="mb-4" emptyMessage="No line items." columns={visibleColumns()} rows={lines()} />
 
-        <Show when={p().doc_type === "receipt" && visibleLines().length > 0}>
+        <Show when={p().doc_type === "receipt" && lines().length > 0}>
           <div class="repair-print__totals">
             <div class="repair-print__totals-row">
               <span>Total Service Charge</span>
@@ -213,14 +203,8 @@ function PrintDocument(props: { payload: RepairOrderPrintPayload }) {
       <PrintToolbar
         layout={{
           columns: columnMeta(),
-          rows: lines().map((ln) => ({
-            key: ln.line_no,
-            label: `${ln.line_no}. ${ln.item_code || "—"} — ${ln.item_name || "Line"}`,
-          })),
           hiddenColumns: layout.hiddenColumns,
-          hiddenRows: layout.hiddenRows,
           onToggleColumn: layout.toggleColumn,
-          onToggleRow: layout.toggleRow,
           onShowAll: layout.showAll,
         }}
         onPrint={() => window.print()}

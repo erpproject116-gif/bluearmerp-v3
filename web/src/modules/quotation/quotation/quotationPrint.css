@@ -298,6 +298,14 @@
     display: none !important;
   }
 
+  .quotation-print__table thead {
+    display: table-header-group;
+  }
+
+  .quotation-print__table tr {
+    page-break-inside: avoid;
+  }
+
   .quotation-print {
     background: #fff;
     padding: 0;

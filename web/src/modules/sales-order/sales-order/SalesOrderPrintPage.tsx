@@ -49,7 +49,7 @@ function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
   const p = () => props.payload;
   const so = () => p().sales_order;
   const lines = () => (so().lines ?? []) as DocumentLineRow[];
-  const layout = useDocumentLinePrintLayout(lines);
+  const layout = useDocumentLinePrintLayout();
 
   return (
     <>
@@ -162,14 +162,8 @@ function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
     <PrintToolbar
       layout={{
         columns: DOCUMENT_LINE_COLUMN_META,
-        rows: lines().map((ln) => ({
-          key: ln.line_no,
-          label: `${ln.line_no}. ${ln.item_code || "—"} — ${ln.item_name || "Line"}`,
-        })),
         hiddenColumns: layout.hiddenColumns,
-        hiddenRows: layout.hiddenRows,
         onToggleColumn: layout.toggleColumn,
-        onToggleRow: layout.toggleRow,
         onShowAll: layout.showAll,
       }}
       onPrint={() => window.print()}

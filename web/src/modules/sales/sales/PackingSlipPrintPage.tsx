@@ -3,7 +3,7 @@ import { useParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import { PrintPreviewTable, type PrintPreviewColumn } from "../../../shared/PrintPreviewTable";
 import { PrintToolbar } from "../../../shared/PrintToolbar";
-import { filterPrintRows, usePrintLayout } from "../../../shared/usePrintLayout";
+import { usePrintLayout } from "../../../shared/usePrintLayout";
 import {
   fetchSalesPrint,
   formatMoney,
@@ -50,9 +50,6 @@ function packingColumns(): PrintPreviewColumn<LineRow>[] {
   ];
 }
 
-function lineKey(ln: LineRow, index: number) {
-  return ln.line_no ?? index + 1;
-}
 
 function PackingSlipPrintView() {
   const params = useParams<{ id: string }>();
@@ -84,22 +81,12 @@ function PrintDocument(props: { payload: SalesPrintPayload }) {
   const sale = () => p().sales;
   const lines = () => (sale().lines ?? []) as LineRow[];
   const receiptNo = () => sale().si_dr_no || sale().sales_no;
-  const layout = usePrintLayout(
-    () => PACKING_COLUMN_META,
-    () =>
-      lines().map((ln, index) => ({
-        key: lineKey(ln, index),
-        label: `${lineKey(ln, index)}. ${ln.item_name || "Line"}`,
-      })),
-  );
+  const layout = usePrintLayout(() => PACKING_COLUMN_META);
   const visibleColumns = createMemo(() => {
     const keys = new Set(layout.visibleColumns().map((c) => c.key));
     return packingColumns().filter((c) => keys.has(c.key));
   });
-  const visibleLines = createMemo(() =>
-    filterPrintRows(lines(), layout.visibleRowKeys(), (ln, index) => lineKey(ln, index)),
-  );
-  const totalQty = () => visibleLines().reduce((sum, ln) => sum + (ln.qty ?? 0), 0);
+  const totalQty = () => lines().reduce((sum, ln) => sum + (ln.qty ?? 0), 0);
   const grandTotal = () => sale().grand_total ?? 0;
 
   return (
@@ -143,7 +130,7 @@ function PrintDocument(props: { payload: SalesPrintPayload }) {
           </div>
         </section>
 
-        <PrintPreviewTable class="mb-4" emptyMessage="No line items." columns={visibleColumns()} rows={visibleLines()} />
+        <PrintPreviewTable class="mb-4" emptyMessage="No line items." columns={visibleColumns()} rows={lines()} />
 
         <div class="quotation-print__totals">
           <div class="quotation-print__totals-row">
@@ -176,14 +163,8 @@ function PrintDocument(props: { payload: SalesPrintPayload }) {
       <PrintToolbar
         layout={{
           columns: PACKING_COLUMN_META,
-          rows: lines().map((ln, index) => ({
-            key: lineKey(ln, index),
-            label: `${lineKey(ln, index)}. ${ln.item_name || "Line"}`,
-          })),
           hiddenColumns: layout.hiddenColumns,
-          hiddenRows: layout.hiddenRows,
           onToggleColumn: layout.toggleColumn,
-          onToggleRow: layout.toggleRow,
           onShowAll: layout.showAll,
         }}
         onPrint={() => window.print()}
