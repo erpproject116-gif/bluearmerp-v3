@@ -34,6 +34,8 @@ type FollowUpTask struct {
 	QuotationReference string  `json:"quotation_reference,omitempty"`
 	SalesID            *int64  `json:"sales_id,omitempty"`
 	SalesNo            string  `json:"sales_no,omitempty"`
+	PurchaseRequestID  *int64  `json:"purchase_request_id,omitempty"`
+	PurchaseRequestNo  string  `json:"purchase_request_no,omitempty"`
 	Title              string  `json:"title"`
 	Notes              *string `json:"notes,omitempty"`
 	CompletedAt        *string `json:"completed_at,omitempty"`
@@ -44,7 +46,8 @@ const followUpTaskFrom = `
   left join public.inv_partners p on p.id = t.partner_id
   left join public.crm_warranty_assets wa on wa.id = t.warranty_asset_id
   left join public.quo_quotations q on q.id = t.quotation_id
-  left join public.sa_sales s on s.id = t.sales_id`
+  left join public.sa_sales s on s.id = t.sales_id
+  left join public.pr_purchase_requests pr on pr.id = t.purchase_request_id`
 
 const followUpTaskSelect = `
   select t.id, t.task_type, t.stage, t.due_date,
@@ -53,6 +56,7 @@ const followUpTaskSelect = `
     t.warranty_asset_id, coalesce(wa.serial_no, ''),
     t.quotation_id, coalesce(q.reference_no, ''),
     t.sales_id, coalesce(s.sales_no, ''),
+    t.purchase_request_id, coalesce(pr.purchase_request_no, ''),
     t.title, t.notes, t.completed_at`
 
 type followUpTaskBody struct {
@@ -63,9 +67,10 @@ type followUpTaskBody struct {
 	PicUserID       *int64  `json:"pic_user_id"`
 	PicName         string  `json:"pic_name"`
 	WarrantyAssetID *int64  `json:"warranty_asset_id"`
-	QuotationID     *int64  `json:"quotation_id"`
-	SalesID         *int64  `json:"sales_id"`
-	Title           string  `json:"title"`
+	QuotationID       *int64  `json:"quotation_id"`
+	SalesID           *int64  `json:"sales_id"`
+	PurchaseRequestID *int64  `json:"purchase_request_id"`
+	Title             string  `json:"title"`
 	Notes           *string `json:"notes"`
 }
 
@@ -93,6 +98,7 @@ func scanFollowUpTask(scanner interface{ Scan(dest ...any) error }) (FollowUpTas
 		&row.WarrantyAssetID, &row.WarrantySerial,
 		&row.QuotationID, &row.QuotationReference,
 		&row.SalesID, &row.SalesNo,
+		&row.PurchaseRequestID, &row.PurchaseRequestNo,
 		&row.Title, &row.Notes, &completedAt,
 	)
 	if err != nil {
@@ -115,6 +121,7 @@ func scanFollowUpTaskList(scanner interface{ Scan(dest ...any) error }) (FollowU
 		&row.WarrantyAssetID, &row.WarrantySerial,
 		&row.QuotationID, &row.QuotationReference,
 		&row.SalesID, &row.SalesNo,
+		&row.PurchaseRequestID, &row.PurchaseRequestNo,
 		&row.Title, &row.Notes, &completedAt, &total,
 	)
 	if err != nil {
@@ -178,6 +185,16 @@ func listFollowUpTasks(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			where += fmt.Sprintf(" and t.sales_id = $%d", n)
+			args = append(args, id)
+			n++
+		}
+		if v := strings.TrimSpace(q.Get("purchase_request_id")); v != "" {
+			id, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || id <= 0 {
+				response.Validation(w, map[string]string{"purchase_request_id": "Invalid purchase request id."})
+				return
+			}
+			where += fmt.Sprintf(" and t.purchase_request_id = $%d", n)
 			args = append(args, id)
 			n++
 		}
@@ -300,7 +317,7 @@ func createFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusForbidden, picErr.Error(), "ERR_FORBIDDEN")
 			return
 		}
-		if existingID, err := findOpenLinkedTask(r.Context(), pool, tu.TenantID, body.QuotationID, body.SalesID, body.WarrantyAssetID); err == nil && existingID != nil {
+		if existingID, err := findOpenLinkedTask(r.Context(), pool, tu.TenantID, body.QuotationID, body.SalesID, body.WarrantyAssetID, body.PurchaseRequestID); err == nil && existingID != nil {
 			conflictWithExistingTask(r.Context(), w, pool, *existingID)
 			return
 		}
@@ -308,16 +325,16 @@ func createFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 		err = pool.QueryRow(r.Context(), `
 			insert into public.crm_follow_up_tasks (
 			  tenant_id, task_type, stage, due_date, partner_id, pic_user_id, pic_name,
-			  warranty_asset_id, quotation_id, sales_id, title, notes, created_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			  warranty_asset_id, quotation_id, sales_id, purchase_request_id, title, notes, created_by_user_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 			returning id`,
 			tu.TenantID, defaultTaskType(body.TaskType), defaultTaskStage(body.Stage), due,
 			body.PartnerID, picUserID, picName,
-			body.WarrantyAssetID, body.QuotationID, body.SalesID,
+			body.WarrantyAssetID, body.QuotationID, body.SalesID, body.PurchaseRequestID,
 			strings.TrimSpace(body.Title), body.Notes, tu.AppUserID).Scan(&id)
 		if err != nil {
 			if strings.Contains(err.Error(), "idx_crm_tasks_open_") || strings.Contains(err.Error(), "duplicate key") {
-				if existingID, findErr := findOpenLinkedTask(r.Context(), pool, tu.TenantID, body.QuotationID, body.SalesID, body.WarrantyAssetID); findErr == nil && existingID != nil {
+				if existingID, findErr := findOpenLinkedTask(r.Context(), pool, tu.TenantID, body.QuotationID, body.SalesID, body.WarrantyAssetID, body.PurchaseRequestID); findErr == nil && existingID != nil {
 					conflictWithExistingTask(r.Context(), w, pool, *existingID)
 					return
 				}
@@ -373,14 +390,14 @@ func patchFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 			update public.crm_follow_up_tasks set
 			  task_type = $1, stage = $2, due_date = $3,
 			  partner_id = $4, pic_user_id = $5, pic_name = $6,
-			  warranty_asset_id = $7, quotation_id = $8, sales_id = $9,
-			  title = $10, notes = $11,
+			  warranty_asset_id = $7, quotation_id = $8, sales_id = $9, purchase_request_id = $10,
+			  title = $11, notes = $12,
 			  completed_at = case when $2 in ('completed', 'closed') then coalesce(completed_at, now()) else null end,
 			  updated_at = now()
-			where id = $12 and tenant_id = $13`,
+			where id = $13 and tenant_id = $14`,
 			defaultTaskType(body.TaskType), stage, due,
 			body.PartnerID, picUserID, picName,
-			body.WarrantyAssetID, body.QuotationID, body.SalesID,
+			body.WarrantyAssetID, body.QuotationID, body.SalesID, body.PurchaseRequestID,
 			strings.TrimSpace(body.Title), body.Notes, id, tu.TenantID)
 		_ = completedAt
 		if err != nil || tag.RowsAffected() == 0 {

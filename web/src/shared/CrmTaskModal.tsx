@@ -23,6 +23,7 @@ export type CrmTaskContext = {
   notes?: string;
   quotation_id?: number | null;
   sales_id?: number | null;
+  purchase_request_id?: number | null;
   warranty_asset_id?: number | null;
 };
 
@@ -45,6 +46,7 @@ function defaultTitle(ctx: CrmTaskContext) {
   if (ctx.title?.trim()) return ctx.title.trim();
   if (ctx.quotation_id) return `Follow up on quotation`;
   if (ctx.sales_id) return `Follow up on sale`;
+  if (ctx.purchase_request_id) return `Follow up on purchase request`;
   if (ctx.warranty_asset_id) return `Warranty follow-up`;
   if (ctx.partner_name) return `Follow up — ${ctx.partner_name}`;
   return "";
@@ -117,6 +119,7 @@ export function CrmTaskModalProvider(props: ParentProps) {
       notes: notes().trim() || undefined,
       quotation_id: ctx.quotation_id ?? undefined,
       sales_id: ctx.sales_id ?? undefined,
+      purchase_request_id: ctx.purchase_request_id ?? undefined,
       warranty_asset_id: ctx.warranty_asset_id ?? undefined,
     }, { silent: true });
     setSaving(false);

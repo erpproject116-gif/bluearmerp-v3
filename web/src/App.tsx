@@ -50,6 +50,12 @@ import OutstandingSOStatusPage from "./modules/sales-order/sales-order/Outstandi
 import ReleaseSalesOrderPage from "./modules/sales-order/sales-order/ReleaseSalesOrderPage";
 import SalesOrderPrintPage from "./modules/sales-order/sales-order/SalesOrderPrintPage";
 import SalesOrderStatusPrintPage from "./modules/sales-order/sales-order/SalesOrderStatusPrintPage";
+import PurchaseRequestListPage from "./modules/purchase-request/purchase-request/PurchaseRequestListPage";
+import PurchaseRequestNewPage from "./modules/purchase-request/purchase-request/PurchaseRequestNewPage";
+import PurchaseRequestSettingsPage from "./modules/purchase-request/purchase-request/PurchaseRequestSettingsPage";
+import PurchaseRequestStatusPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPage";
+import PurchaseRequestPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestPrintPage";
+import PurchaseRequestStatusPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPrintPage";
 import SalesListPage from "./modules/sales/sales/SalesListPage";
 import SalesNewPage from "./modules/sales/sales/SalesNewPage";
 import SalesSettingsPage from "./modules/sales/sales/SalesSettingsPage";
@@ -142,6 +148,8 @@ export default function App() {
         <Route path="/app/quotation/quotations/status/print" component={QuotationStatusPrintPage} />
         <Route path="/app/sales-order/sales-orders/:salesOrderId/print" component={SalesOrderPrintPage} />
         <Route path="/app/sales-order/sales-orders/status/print" component={SalesOrderStatusPrintPage} />
+        <Route path="/app/purchase-request/purchase-requests/:purchaseRequestId/print" component={PurchaseRequestPrintPage} />
+        <Route path="/app/purchase-request/purchase-requests/status/print" component={PurchaseRequestStatusPrintPage} />
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
         <Route path="/app/sales/reports/discount-status/print" component={SalesDiscountStatusPrintPage} />
         <Route path="/app/sales/collective-invoicing/status/print" component={CollectiveInvoiceStatusPrintPage} />
@@ -183,6 +191,10 @@ export default function App() {
           <Route path="/sales-order/sales-orders/release" component={ReleaseSalesOrderPage} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
           <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
+          <Route path="/purchase-request/purchase-requests/new" component={PurchaseRequestNewPage} />
+          <Route path="/purchase-request/purchase-requests/status" component={PurchaseRequestStatusPage} />
+          <Route path="/purchase-request/purchase-requests/settings" component={PurchaseRequestSettingsPage} />
+          <Route path="/purchase-request/purchase-requests" component={PurchaseRequestListPage} />
           <Route path="/sales/sales/new" component={SalesNewPage} />
           <Route path="/sales/sales/status" component={SalesStatusPage} />
           <Route path="/sales/sales/pre-invoicing" component={PreInvoicingStatusPage} />

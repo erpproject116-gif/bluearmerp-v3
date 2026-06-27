@@ -204,6 +204,17 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "purchase_request",
+    label: "Purchase Request",
+    href: "/app/purchase-request/purchase-requests",
+    basePath: "/app/purchase-request",
+    features: [
+      { label: "New Purchase Request", href: "/app/purchase-request/purchase-requests/new", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Purchase Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+    ],
+  },
+  {
     id: "activity_logs",
     label: "Activity Logs",
     href: "/app/activity-logs",

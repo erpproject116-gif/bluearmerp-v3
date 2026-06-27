@@ -23,15 +23,17 @@ type FollowUpTaskSummary struct {
 }
 
 type followUpSummariesBody struct {
-	QuotationIDs     []int64 `json:"quotation_ids"`
-	SalesIDs         []int64 `json:"sales_ids"`
-	WarrantyAssetIDs []int64 `json:"warranty_asset_ids"`
+	QuotationIDs       []int64 `json:"quotation_ids"`
+	SalesIDs           []int64 `json:"sales_ids"`
+	WarrantyAssetIDs   []int64 `json:"warranty_asset_ids"`
+	PurchaseRequestIDs []int64 `json:"purchase_request_ids"`
 }
 
 type followUpSummariesResponse struct {
-	ByQuotation map[string]FollowUpTaskSummary `json:"by_quotation"`
-	BySales     map[string]FollowUpTaskSummary `json:"by_sales"`
-	ByWarranty  map[string]FollowUpTaskSummary `json:"by_warranty"`
+	ByQuotation       map[string]FollowUpTaskSummary `json:"by_quotation"`
+	BySales           map[string]FollowUpTaskSummary `json:"by_sales"`
+	ByWarranty        map[string]FollowUpTaskSummary `json:"by_warranty"`
+	ByPurchaseRequest map[string]FollowUpTaskSummary `json:"by_purchase_request"`
 }
 
 func batchFollowUpTaskSummaries(pool *pgxpool.Pool) http.HandlerFunc {
@@ -43,9 +45,10 @@ func batchFollowUpTaskSummaries(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		out := followUpSummariesResponse{
-			ByQuotation: map[string]FollowUpTaskSummary{},
-			BySales:     map[string]FollowUpTaskSummary{},
-			ByWarranty:  map[string]FollowUpTaskSummary{},
+			ByQuotation:       map[string]FollowUpTaskSummary{},
+			BySales:           map[string]FollowUpTaskSummary{},
+			ByWarranty:        map[string]FollowUpTaskSummary{},
+			ByPurchaseRequest: map[string]FollowUpTaskSummary{},
 		}
 		var err error
 		if len(body.QuotationIDs) > 0 {
@@ -69,6 +72,13 @@ func batchFollowUpTaskSummaries(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 		}
+		if len(body.PurchaseRequestIDs) > 0 {
+			out.ByPurchaseRequest, err = loadSummariesForColumn(r.Context(), pool, tu, "purchase_request_id", body.PurchaseRequestIDs)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load task summaries.", "ERR_INTERNAL")
+				return
+			}
+		}
 		response.OK(w, out, "OK")
 	}
 }
@@ -78,7 +88,7 @@ func loadSummariesForColumn(ctx context.Context, pool *pgxpool.Pool, tu auth.Ten
 		return map[string]FollowUpTaskSummary{}, nil
 	}
 	switch column {
-	case "quotation_id", "sales_id", "warranty_asset_id":
+	case "quotation_id", "sales_id", "warranty_asset_id", "purchase_request_id":
 	default:
 		return nil, fmt.Errorf("invalid column %q", column)
 	}
@@ -125,7 +135,7 @@ func isTerminalTaskStage(stage string) bool {
 	}
 }
 
-func findOpenLinkedTask(ctx context.Context, pool *pgxpool.Pool, tenantID int64, quotationID, salesID, warrantyAssetID *int64) (*int64, error) {
+func findOpenLinkedTask(ctx context.Context, pool *pgxpool.Pool, tenantID int64, quotationID, salesID, warrantyAssetID, purchaseRequestID *int64) (*int64, error) {
 	var id int64
 	var err error
 	switch {
@@ -147,6 +157,12 @@ func findOpenLinkedTask(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 			where tenant_id = $1 and warranty_asset_id = $2
 			  and stage not in ('completed', 'cancelled', 'closed')
 			limit 1`, tenantID, *warrantyAssetID).Scan(&id)
+	case purchaseRequestID != nil && *purchaseRequestID > 0:
+		err = pool.QueryRow(ctx, `
+			select id from public.crm_follow_up_tasks
+			where tenant_id = $1 and purchase_request_id = $2
+			  and stage not in ('completed', 'cancelled', 'closed')
+			limit 1`, tenantID, *purchaseRequestID).Scan(&id)
 	default:
 		return nil, nil
 	}

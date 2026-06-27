@@ -42,6 +42,16 @@ export const SALES_ORDER_SETTINGS_HREF = {
 
 export type SalesOrderFeature = keyof typeof SALES_ORDER_ENTITY;
 
+export const PURCHASE_REQUEST_ENTITY = {
+  purchaseRequest: "pr_purchase_request",
+} as const;
+
+export const PURCHASE_REQUEST_SETTINGS_HREF = {
+  purchaseRequest: "/app/purchase-request/purchase-requests/settings",
+} as const;
+
+export type PurchaseRequestFeature = keyof typeof PURCHASE_REQUEST_ENTITY;
+
 export const SALES_ENTITY = {
   sales: "sa_sales",
 } as const;

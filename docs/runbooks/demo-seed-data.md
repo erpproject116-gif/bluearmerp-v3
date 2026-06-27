@@ -64,6 +64,14 @@ This runbook covers the **DEMO000** demo tenant. For platform superadmins (`itsj
 
    Regenerate: `python scripts/generate-sales-order-seed-from-export.py path/to/sales-order-list.xlsx`
 
+   **Optional — demo purchase requests (2 per tenant):**
+
+   ```bash
+   psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
+   ```
+
+   Run after inventory seed; requires migrations `036`–`039`.
+
    Expected for DEMO000 after quotation seed:
 
    | Entity | Count |

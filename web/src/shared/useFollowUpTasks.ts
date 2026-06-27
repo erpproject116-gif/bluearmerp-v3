@@ -27,6 +27,8 @@ export type FollowUpTask = {
   quotation_reference?: string;
   sales_id?: number | null;
   sales_no?: string;
+  purchase_request_id?: number | null;
+  purchase_request_no?: string;
   title: string;
   notes?: string | null;
   completed_at?: string | null;
@@ -42,6 +44,7 @@ export type FollowUpTaskListParams = {
   board?: boolean;
   quotationId?: number;
   salesId?: number;
+  purchaseRequestId?: number;
   warrantyAssetId?: number;
 };
 
@@ -58,6 +61,7 @@ export function useFollowUpTasks(params: () => FollowUpTaskListParams) {
     if (p.board) qs.set("board", "true");
     if (p.quotationId) qs.set("quotation_id", String(p.quotationId));
     if (p.salesId) qs.set("sales_id", String(p.salesId));
+    if (p.purchaseRequestId) qs.set("purchase_request_id", String(p.purchaseRequestId));
     if (p.warrantyAssetId) qs.set("warranty_asset_id", String(p.warrantyAssetId));
     return {
       queryKey: ["crm-follow-up-tasks", p],
@@ -86,6 +90,7 @@ export async function createFollowUpTask(
     warranty_asset_id?: number | null;
     quotation_id?: number | null;
     sales_id?: number | null;
+    purchase_request_id?: number | null;
   },
   options?: { silent?: boolean },
 ) {
@@ -107,6 +112,7 @@ export async function patchFollowUpTask(id: number, payload: {
   warranty_asset_id?: number | null;
   quotation_id?: number | null;
   sales_id?: number | null;
+  purchase_request_id?: number | null;
 }) {
   return apiFetch<FollowUpTask>(`/api/v1/crm/follow-up-tasks/${id}`, {
     method: "PATCH",

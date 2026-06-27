@@ -9,6 +9,8 @@ import (
 
 var fieldLabels = map[string]string{
 	"progress_status":          "Progress status",
+	"send_status":              "Send status",
+	"domestic_foreign":         "Domestic / foreign",
 	"invoicing_status":         "Invoicing status",
 	"voucher_status":           "Voucher status",
 	"stage":                    "Stage",
@@ -53,6 +55,7 @@ var fieldLabels = map[string]string{
 var entityLabels = map[string]string{
 	"sa_sales":                  "Sales Invoice",
 	"so_sales_order":            "Sales Order",
+	"pr_purchase_request":       "Purchase Request",
 	"quo_quotation":             "Quotation",
 	"fin_official_receipt":      "Official Receipt",
 	"fin_bank_account":          "Bank account",
@@ -81,6 +84,7 @@ var entityLabels = map[string]string{
 var referenceLabels = map[string]string{
 	"sa_sales":                "Sales No.",
 	"so_sales_order":          "Sales Order No.",
+	"pr_purchase_request":     "Purchase Request No.",
 	"quo_quotation":           "Quote Ref.",
 	"fin_official_receipt":    "Receipt No.",
 	"crm_warranty_asset":      "Serial No.",
@@ -385,6 +389,8 @@ func describeCreatePayload(targetType string, newM map[string]any) []string {
 		pick("sales_no", "partner_id", "grand_total")
 	case "so_sales_order":
 		pick("sales_order_no", "partner_id", "grand_total")
+	case "pr_purchase_request":
+		pick("purchase_request_no", "partner_id", "grand_total")
 	case "fin_official_receipt":
 		pick("receipt_no", "amount_total", "payment_method")
 	case "inv_partner":
