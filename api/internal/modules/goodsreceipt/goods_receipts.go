@@ -79,6 +79,17 @@ type createGoodsReceiptBody struct {
 type addSerialBody struct {
 	GoodsReceiptLineID int64  `json:"goods_receipt_line_id"`
 	SerialNo           string `json:"serial_no"`
+	ClientScanID       string `json:"client_scan_id,omitempty"`
+}
+
+type batchSerialScanItem struct {
+	ClientScanID       string `json:"client_scan_id"`
+	GoodsReceiptLineID int64  `json:"goods_receipt_line_id"`
+	SerialNo           string `json:"serial_no"`
+}
+
+type batchSerialBody struct {
+	Scans []batchSerialScanItem `json:"scans"`
 }
 
 type addLotBody struct {
@@ -464,6 +475,7 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		defer poLineRows.Close()
 
 		lineCount := 0
+		grLineNo := 0
 		for poLineRows.Next() {
 			var poLineID int64
 			var lineNo int
@@ -473,6 +485,7 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to read purchase order lines.", "ERR_INTERNAL")
 				return
 			}
+			grLineNo++
 			receivedQty := openQty
 			if trackSerial || trackLot {
 				receivedQty = 0
@@ -481,7 +494,7 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				insert into public.gr_goods_receipt_lines (
 				  goods_receipt_id, purchase_order_line_id, line_no, expected_qty, received_qty
 				) values ($1, $2, $3, $4, $5)`,
-				grID, poLineID, lineNo, openQty, receivedQty)
+				grID, poLineID, grLineNo, openQty, receivedQty)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to create goods receipt lines.", "ERR_INTERNAL")
 				return
@@ -521,22 +534,143 @@ func addGoodsReceiptSerial(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		serialNo := strings.TrimSpace(body.SerialNo)
-		errs := map[string]string{}
-		if body.GoodsReceiptLineID <= 0 {
-			errs["goods_receipt_line_id"] = "Line is required."
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add serial.", "ERR_INTERNAL")
+			return
 		}
-		if serialNo == "" {
-			errs["serial_no"] = "Serial number is required."
+		defer tx.Rollback(r.Context())
+
+		results, err := processSerialScans(r.Context(), tx, tu.TenantID, grID, []serialScanInput{{
+			ClientScanID:       body.ClientScanID,
+			GoodsReceiptLineID: body.GoodsReceiptLineID,
+			SerialNo:           body.SerialNo,
+		}})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) || strings.Contains(err.Error(), "not found") {
+				response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if err.Error() == "only draft goods receipts accept serials" {
+				response.Validation(w, map[string]string{"status": "Only draft goods receipts accept serials."})
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to add serial.", "ERR_INTERNAL")
+			return
 		}
-		if len(errs) > 0 {
-			response.Validation(w, errs)
+
+		if len(results) == 0 {
+			response.Validation(w, map[string]string{"body": "Invalid scan."})
+			return
+		}
+		res := results[0]
+		if res.Status != SerialScanAccepted && res.Status != SerialScanIdempotentReplay {
+			key := "serial_no"
+			if res.Status == SerialScanInvalidLine {
+				key = "goods_receipt_line_id"
+			}
+			response.Validation(w, map[string]string{key: res.Message})
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add serial.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.add_serial", "gr_goods_receipt", &grID, nil, body)
+		response.OK(w, map[string]any{
+			"id":        res.SerialID,
+			"serial_no": res.SerialNo,
+			"status":    res.Status,
+		}, "Serial added.")
+	}
+}
+
+func addGoodsReceiptSerialBatch(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		grID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body batchSerialBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if len(body.Scans) == 0 {
+			response.Validation(w, map[string]string{"scans": "At least one scan is required."})
+			return
+		}
+		if len(body.Scans) > maxSerialBatchSize {
+			response.Validation(w, map[string]string{"scans": fmt.Sprintf("Maximum %d scans per batch.", maxSerialBatchSize)})
+			return
+		}
+
+		inputs := make([]serialScanInput, len(body.Scans))
+		for i, sc := range body.Scans {
+			inputs[i] = serialScanInput{
+				ClientScanID:       sc.ClientScanID,
+				GoodsReceiptLineID: sc.GoodsReceiptLineID,
+				SerialNo:           sc.SerialNo,
+			}
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add serials.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		results, err := processSerialScans(r.Context(), tx, tu.TenantID, grID, inputs)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if err.Error() == "only draft goods receipts accept serials" {
+				response.Validation(w, map[string]string{"status": "Only draft goods receipts accept serials."})
+				return
+			}
+			if strings.HasPrefix(err.Error(), "maximum ") {
+				response.Validation(w, map[string]string{"scans": err.Error()})
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to add serials.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add serials.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.add_serial_batch", "gr_goods_receipt", &grID, nil, map[string]any{"count": len(body.Scans)})
+		response.OK(w, map[string]any{"results": results}, "Batch processed.")
+	}
+}
+
+func removeGoodsReceiptSerial(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		grID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid goods receipt id."})
+			return
+		}
+		serialID, err := strconv.ParseInt(chi.URLParam(r, "serialId"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"serialId": "Invalid serial id."})
 			return
 		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to add serial.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to remove serial.", "ERR_INTERNAL")
 			return
 		}
 		defer tx.Rollback(r.Context())
@@ -551,67 +685,47 @@ func addGoodsReceiptSerial(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if status != "draft" {
-			response.Validation(w, map[string]string{"status": "Only draft goods receipts accept serials."})
+			response.Validation(w, map[string]string{"status": "Only draft goods receipts allow serial removal."})
 			return
 		}
 
-		var lineGRID int64
-		var expectedQty, receivedQty float64
-		var trackSerial bool
+		var lineID int64
+		var serialNo string
 		err = tx.QueryRow(r.Context(), `
-			select grl.goods_receipt_id, grl.expected_qty::float8, grl.received_qty::float8,
-			  coalesce(i.track_serial, false)
-			from public.gr_goods_receipt_lines grl
-			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
-			left join public.inv_items i on i.id = pol.item_id
-			where grl.id = $1`, body.GoodsReceiptLineID).Scan(&lineGRID, &expectedQty, &receivedQty, &trackSerial)
-		if err != nil || lineGRID != grID {
-			response.Validation(w, map[string]string{"goods_receipt_line_id": "Line not found on this goods receipt."})
-			return
-		}
-		if !trackSerial {
-			response.Validation(w, map[string]string{"goods_receipt_line_id": "Item does not track serial numbers."})
-			return
-		}
-		if receivedQty+0.0001 >= expectedQty {
-			response.Validation(w, map[string]string{"serial_no": "Line already has the expected quantity of serials."})
-			return
-		}
-
-		if err := assertSerialNotDuplicate(r.Context(), tx, tu.TenantID, serialNo); err != nil {
-			response.Validation(w, map[string]string{"serial_no": err.Error()})
-			return
-		}
-
-		var serialID int64
-		err = tx.QueryRow(r.Context(), `
-			insert into public.gr_goods_receipt_serials (goods_receipt_line_id, serial_no)
-			values ($1, $2)
-			returning id`, body.GoodsReceiptLineID, serialNo).Scan(&serialID)
+			select gs.goods_receipt_line_id, gs.serial_no
+			from public.gr_goods_receipt_serials gs
+			join public.gr_goods_receipt_lines grl on grl.id = gs.goods_receipt_line_id
+			where gs.id = $1 and grl.goods_receipt_id = $2`, serialID, grID).Scan(&lineID, &serialNo)
 		if err != nil {
-			response.Validation(w, map[string]string{"serial_no": "Serial already scanned for this line."})
+			response.Err(w, http.StatusNotFound, "Serial not found on this goods receipt.", "ERR_NOT_FOUND")
+			return
+		}
+
+		tag, err := tx.Exec(r.Context(), `delete from public.gr_goods_receipt_serials where id = $1`, serialID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Serial not found.", "ERR_NOT_FOUND")
 			return
 		}
 
 		_, err = tx.Exec(r.Context(), `
 			update public.gr_goods_receipt_lines
-			set received_qty = received_qty + 1
-			where id = $1`, body.GoodsReceiptLineID)
+			set received_qty = greatest(received_qty - 1, 0)
+			where id = $1`, lineID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update line quantity.", "ERR_INTERNAL")
 			return
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to add serial.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to remove serial.", "ERR_INTERNAL")
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.add_serial", "gr_goods_receipt", &grID, nil, body)
-		response.OK(w, map[string]any{
-			"id":        serialID,
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.remove_serial", "gr_goods_receipt", &grID, nil, map[string]any{
+			"serial_id": serialID,
 			"serial_no": serialNo,
-		}, "Serial added.")
+		})
+		response.OK(w, map[string]any{"id": serialID, "serial_no": serialNo}, "Serial removed.")
 	}
 }
 
@@ -882,65 +996,68 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 
 		for _, ln := range lines {
 			if ln.TrackSerial {
-				serialRows, err := tx.Query(r.Context(), `
-					select serial_no from public.gr_goods_receipt_serials
-					where goods_receipt_line_id = $1
-					order by serial_no`, ln.ID)
-				if err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to load serials.", "ERR_INTERNAL")
+				wEnd := warrantyEndDate(receiptDate, ln.WarrantyMonths)
+				if ln.ItemID == nil {
+					response.Validation(w, map[string]string{"item_id": "Serial line missing item."})
 					return
 				}
-				wEnd := warrantyEndDate(receiptDate, ln.WarrantyMonths)
-				for serialRows.Next() {
-					var serialNo string
-					if err := serialRows.Scan(&serialNo); err != nil {
-						serialRows.Close()
-						response.Err(w, http.StatusInternalServerError, "Failed to read serial.", "ERR_INTERNAL")
-						return
-					}
-					if err := assertSerialNotDuplicate(r.Context(), tx, tu.TenantID, serialNo); err != nil {
-						serialRows.Close()
-						response.Validation(w, map[string]string{"serial_no": fmt.Sprintf("%s: %s", serialNo, err.Error())})
-						return
-					}
-					if ln.ItemID == nil {
-						serialRows.Close()
-						response.Validation(w, map[string]string{"item_id": "Serial line missing item."})
-						return
-					}
+				var ledgerDup int
+				if err := tx.QueryRow(r.Context(), `
+					select count(*) from public.inv_serial_units su
+					where su.tenant_id = $1 and su.status <> 'void'
+					  and su.serial_no in (
+					    select gs.serial_no from public.gr_goods_receipt_serials gs
+					    where gs.goods_receipt_line_id = $2
+					  )`, tu.TenantID, ln.ID).Scan(&ledgerDup); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to validate serials.", "ERR_INTERNAL")
+					return
+				}
+				if ledgerDup > 0 {
+					response.Validation(w, map[string]string{"serial_no": "One or more serials already exist in inventory."})
+					return
+				}
+				unitRows, err := tx.Query(r.Context(), `
+					insert into public.inv_serial_units (
+					  tenant_id, item_id, serial_no, status, location_id, partner_id,
+					  warranty_start, warranty_end, purchase_order_line_id, goods_receipt_line_id,
+					  received_at
+					)
+					select $1, $2, gs.serial_no, 'in_stock', $3, $4,
+					  $5::date, $6::date, $7, $8,
+					  $5::timestamptz
+					from public.gr_goods_receipt_serials gs
+					where gs.goods_receipt_line_id = $8
+					order by gs.serial_no
+					returning id, serial_no`,
+					tu.TenantID, *ln.ItemID, locationID, ln.PartnerID,
+					receiptDate, wEnd, ln.PurchaseOrderLineID, ln.ID,
+				)
+				if err != nil {
+					response.Validation(w, map[string]string{"serial_no": "One or more serials already exist."})
+					return
+				}
+				locID := locationID
+				for unitRows.Next() {
 					var unitID int64
-					err = tx.QueryRow(r.Context(), `
-						insert into public.inv_serial_units (
-						  tenant_id, item_id, serial_no, status, location_id, partner_id,
-						  warranty_start, warranty_end, purchase_order_line_id, goods_receipt_line_id,
-						  received_at
-						) values (
-						  $1, $2, $3, 'in_stock', $4, $5,
-						  $6::date, $7::date, $8, $9,
-						  $6::timestamptz
-						)
-						returning id`,
-						tu.TenantID, *ln.ItemID, serialNo, locationID, ln.PartnerID,
-						receiptDate, wEnd, ln.PurchaseOrderLineID, ln.ID,
-					).Scan(&unitID)
-					if err != nil {
-						serialRows.Close()
-						response.Validation(w, map[string]string{"serial_no": fmt.Sprintf("%s already exists.", serialNo)})
+					var serialNo string
+					if err := unitRows.Scan(&unitID, &serialNo); err != nil {
+						unitRows.Close()
+						response.Err(w, http.StatusInternalServerError, "Failed to read serial unit.", "ERR_INTERNAL")
 						return
 					}
-					locID := locationID
 					if err := inventory.InsertSerialEvent(r.Context(), tx, tu.TenantID, unitID, "received", nil, &locID, "goods_receipt", grID, &userID); err != nil {
-						serialRows.Close()
+						unitRows.Close()
 						response.Err(w, http.StatusInternalServerError, "Failed to record serial event.", "ERR_INTERNAL")
 						return
 					}
+					_ = serialNo
 				}
-				if err := serialRows.Err(); err != nil {
-					serialRows.Close()
+				if err := unitRows.Err(); err != nil {
+					unitRows.Close()
 					response.Err(w, http.StatusInternalServerError, "Failed to process serials.", "ERR_INTERNAL")
 					return
 				}
-				serialRows.Close()
+				unitRows.Close()
 			}
 
 			if ln.TrackLot && ln.ItemID != nil {
@@ -1285,22 +1402,6 @@ func reverseGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.reverse", "gr_goods_receipt", &grID, nil, nil)
 		response.OK(w, gr, "Goods receipt reversed.")
 	}
-}
-
-func assertSerialNotDuplicate(ctx context.Context, tx pgx.Tx, tenantID int64, serialNo string) error {
-	var exists bool
-	err := tx.QueryRow(ctx, `
-		select exists(
-		  select 1 from public.inv_serial_units
-		  where tenant_id = $1 and serial_no = $2 and status <> 'void'
-		)`, tenantID, serialNo).Scan(&exists)
-	if err != nil {
-		return errors.New("failed to validate serial number.")
-	}
-	if exists {
-		return errors.New("serial number already exists.")
-	}
-	return nil
 }
 
 type pgxpoolConn interface {

@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -51,10 +52,23 @@ type soReleaseGapRow struct {
 	GapQty           float64 `json:"gap_qty"`
 }
 
+type grSerialGapRow struct {
+	GoodsReceiptID     int64   `json:"goods_receipt_id"`
+	GoodsReceiptLineID int64   `json:"goods_receipt_line_id"`
+	LineNo             int     `json:"line_no"`
+	ItemCode           string  `json:"item_code"`
+	ItemName           string  `json:"item_name"`
+	ExpectedQty        float64 `json:"expected_qty"`
+	ReceivedQty        float64 `json:"received_qty"`
+	SerialCount        float64 `json:"serial_count"`
+	GapQty             float64 `json:"gap_qty"`
+}
+
 func registerReconciliationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/reconciliation/serial-qty", listSerialQtyMismatch(pool))
 	r.Get("/reconciliation/reserved-stale", listReservedStale(pool))
 	r.Get("/reconciliation/so-release-gap", listSOReleaseGap(pool))
+	r.Get("/reconciliation/gr-serial-gap", listGRSerialGap(pool))
 }
 
 func listSerialQtyMismatch(pool *pgxpool.Pool) http.HandlerFunc {
@@ -245,5 +259,64 @@ func listSOReleaseGap(pool *pgxpool.Pool) http.HandlerFunc {
 			out = []soReleaseGapRow{}
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}
+
+func listGRSerialGap(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		where := `gr.tenant_id = $1 and gr.status = 'draft' and coalesce(i.track_serial, false) = true`
+		args := []any{tu.TenantID}
+		argN := 2
+		if grIDStr := strings.TrimSpace(r.URL.Query().Get("goods_receipt_id")); grIDStr != "" {
+			grID, err := strconv.ParseInt(grIDStr, 10, 64)
+			if err != nil || grID <= 0 {
+				response.Validation(w, map[string]string{"goods_receipt_id": "Invalid goods receipt id."})
+				return
+			}
+			where += fmt.Sprintf(" and gr.id = $%d", argN)
+			args = append(args, grID)
+		}
+
+		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
+			select gr.id, grl.id, grl.line_no, pol.item_code, pol.item_name,
+			  grl.expected_qty::float8, grl.received_qty::float8,
+			  coalesce(sc.cnt, 0)::float8,
+			  (grl.received_qty - coalesce(sc.cnt, 0))::float8
+			from public.gr_goods_receipt_lines grl
+			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
+			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+			left join public.inv_items i on i.id = pol.item_id
+			left join (
+			  select goods_receipt_line_id, count(*)::numeric as cnt
+			  from public.gr_goods_receipt_serials
+			  group by goods_receipt_line_id
+			) sc on sc.goods_receipt_line_id = grl.id
+			where %s
+			  and abs(grl.received_qty - coalesce(sc.cnt, 0)) > 0.0001
+			order by gr.id desc, grl.line_no asc`, where), args...)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load goods receipt serial gaps.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		var out []grSerialGapRow
+		for rows.Next() {
+			var row grSerialGapRow
+			if err := rows.Scan(
+				&row.GoodsReceiptID, &row.GoodsReceiptLineID, &row.LineNo,
+				&row.ItemCode, &row.ItemName,
+				&row.ExpectedQty, &row.ReceivedQty, &row.SerialCount, &row.GapQty,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read goods receipt serial gaps.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, row)
+		}
+		if out == nil {
+			out = []grSerialGapRow{}
+		}
+		response.OK(w, out, "OK")
 	}
 }

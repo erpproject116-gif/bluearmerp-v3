@@ -72,6 +72,14 @@ This runbook covers the **DEMO000** demo tenant. For platform superadmins (`itsj
 
    Run after inventory seed; requires migrations `036`–`039`.
 
+   **Optional — open purchase orders and goods receipts (serial receive testing):**
+
+   ```bash
+   psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
+   ```
+
+   Creates stable PO numbers `DEMOGR902` (confirmed, 5 open), `DEMOGR903` (confirmed, 3 open), `DEMOGR904` (partial), `DEMOGR905` (draft). Verify with `scripts/verify-demo-po-gr-open.sql`. Use **Serial & Lot → Receive / Scan** and pick **DEMOGR902**.
+
    Expected for DEMO000 after quotation seed:
 
    | Entity | Count |

@@ -20,8 +20,13 @@ const (
 	itemImportMaxBytes = 5 << 20
 )
 
-var itemImportHeaders = []string{"item_name", "purchase_price", "sales_price", "vip_price", "status"}
-var itemImportExample = []string{"Widget A", "100.00", "150.00", "140.00", "active"}
+var itemImportRequiredHeaders = []string{"item_name"}
+var itemImportOptionalHeaders = []string{
+	"purchase_price", "sales_price", "vip_price", "status",
+	"track_serial", "track_lot", "track_inventory_qty", "warranty_duration_months",
+}
+var itemImportAllHeaders = append(append([]string{}, itemImportRequiredHeaders...), itemImportOptionalHeaders...)
+var itemImportExample = []string{"Widget A", "100.00", "150.00", "140.00", "active", "true", "false", "true", "24"}
 
 type importRowError struct {
 	Row     int    `json:"row"`
@@ -44,7 +49,7 @@ func itemImportTemplateHandler() http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 		w.Header().Set("Content-Disposition", `attachment; filename="items-import-template.csv"`)
 		cw := csv.NewWriter(w)
-		_ = cw.Write(itemImportHeaders)
+		_ = cw.Write(itemImportAllHeaders)
 		_ = cw.Write(itemImportExample)
 		cw.Flush()
 	}
@@ -73,7 +78,7 @@ func itemImportCSVHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"file": "CSV must include a header row and at least one data row."})
 			return
 		}
-		colIdx, err := mapCSVHeaders(records[0], itemImportHeaders)
+		colIdx, err := mapCSVHeaders(records[0], itemImportRequiredHeaders)
 		if err != nil {
 			response.Validation(w, map[string]string{"file": err.Error()})
 			return
@@ -92,7 +97,7 @@ func itemImportCSVHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			if isEmptyCSVRow(raw) {
 				continue
 			}
-			row := extractCSVRow(raw, colIdx, itemImportHeaders)
+			row := extractCSVRow(raw, colIdx, itemImportAllHeaders)
 			body, err := parseImportItemBody(row)
 			if err != nil {
 				result.Failed++
@@ -155,6 +160,34 @@ func parseImportItemBody(row map[string]string) (itemBody, error) {
 	}
 	body.ItemName = strings.TrimSpace(body.ItemName)
 	body.Status = defaultStatus(body.Status)
+	if v := strings.TrimSpace(row["track_serial"]); v != "" {
+		b, err := parseCSVBool(v, "track_serial")
+		if err != nil {
+			return itemBody{}, err
+		}
+		body.TrackSerial = &b
+	}
+	if v := strings.TrimSpace(row["track_lot"]); v != "" {
+		b, err := parseCSVBool(v, "track_lot")
+		if err != nil {
+			return itemBody{}, err
+		}
+		body.TrackLot = &b
+	}
+	if v := strings.TrimSpace(row["track_inventory_qty"]); v != "" {
+		b, err := parseCSVBool(v, "track_inventory_qty")
+		if err != nil {
+			return itemBody{}, err
+		}
+		body.TrackInventoryQty = &b
+	}
+	if v := strings.TrimSpace(row["warranty_duration_months"]); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return itemBody{}, fmt.Errorf("warranty_duration_months must be a non-negative integer")
+		}
+		body.WarrantyDurationMonths = &n
+	}
 	return body, nil
 }
 
@@ -173,10 +206,11 @@ func bulkImportItems(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 		}
 		var id int64
 		err := tx.QueryRow(ctx, `
-			insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, status)
-			values ($1,$2,$3,$4,$5,$6,$7)
+			insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, warranty_duration_months, track_serial, track_lot, track_inventory_qty, status)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 			returning id`,
-			tu.TenantID, code, row.body.ItemName, row.body.PurchasePrice, row.body.SalesPrice, row.body.VipPrice, row.body.Status).
+			tu.TenantID, code, row.body.ItemName, row.body.PurchasePrice, row.body.SalesPrice, row.body.VipPrice,
+			row.body.WarrantyDurationMonths, boolOrFalse(row.body.TrackSerial), boolOrFalse(row.body.TrackLot), boolOrFalse(row.body.TrackInventoryQty), row.body.Status).
 			Scan(&id)
 		if err != nil {
 			return nil, err
@@ -236,4 +270,15 @@ func parseCSVFloat(raw, field string) (float64, error) {
 		return 0, fmt.Errorf("%s must be a number", field)
 	}
 	return v, nil
+}
+
+func parseCSVBool(raw, field string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "y":
+		return true, nil
+	case "0", "false", "no", "n":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be true/false, 1/0, or yes/no", field)
+	}
 }

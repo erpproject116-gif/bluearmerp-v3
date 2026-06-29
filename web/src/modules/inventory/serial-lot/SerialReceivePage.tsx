@@ -1,10 +1,17 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useInvalidateSerialLotLists } from "../../../shared/useSerialLotList";
+import {
+  patchGoodsReceiptLines,
+  removeSerialFromLine,
+  useSerialScanQueue,
+  type BatchScanResult,
+  type QueuedScan,
+} from "../../../shared/useSerialScanQueue";
 import { SerialLotLayout } from "./SerialLotLayout";
 
 type PurchaseOrderRow = {
@@ -46,6 +53,18 @@ type GoodsReceipt = {
   location_name?: string;
   status: string;
   lines?: GoodsReceiptLine[];
+};
+
+type GrSerialGapRow = {
+  goods_receipt_id: number;
+  goods_receipt_line_id: number;
+  line_no: number;
+  item_code: string;
+  item_name: string;
+  expected_qty: number;
+  received_qty: number;
+  serial_count: number;
+  gap_qty: number;
 };
 
 function todayISO(): string {
@@ -97,12 +116,90 @@ export default function SerialReceivePage() {
   const [lotQty, setLotQty] = createSignal("1");
   const [lotExpiry, setLotExpiry] = createSignal("");
   const [creating, setCreating] = createSignal(false);
-  const [scanning, setScanning] = createSignal(false);
   const [addingLot, setAddingLot] = createSignal(false);
   const [posting, setPosting] = createSignal(false);
+  const [grGaps, setGrGaps] = createSignal<GrSerialGapRow[]>([]);
+  const [pasteOpen, setPasteOpen] = createSignal(false);
+  const [pasteText, setPasteText] = createSignal("");
+  const [pasteBusy, setPasteBusy] = createSignal(false);
+
+  const appliedScanIds = new Set<string>();
+  const scanQueue = useSerialScanQueue(() => goodsReceipt()?.id ?? null);
 
   const serialLines = () => (goodsReceipt()?.lines ?? []).filter((l) => l.track_serial);
   const lotLines = () => (goodsReceipt()?.lines ?? []).filter((l) => l.track_lot);
+  const singleSerialLine = () => serialLines().length === 1;
+
+  const serialPostBlocked = createMemo(() => {
+    const lines = serialLines();
+    if (lines.length === 0) return false;
+    return lines.some((l) => {
+      const serialCount = l.serials?.length ?? 0;
+      const gap = Math.abs(l.received_qty - serialCount);
+      return gap > 0.0001 || l.received_qty + 0.0001 < l.expected_qty;
+    });
+  });
+
+  const loadGrGaps = async (grId: number) => {
+    const qs = new URLSearchParams({ goods_receipt_id: String(grId) });
+    const res = await apiFetch<GrSerialGapRow[]>(`/api/v1/inventory/reconciliation/gr-serial-gap?${qs}`, undefined, {
+      silent: true,
+    });
+    setGrGaps(res.success && res.data ? res.data : []);
+  };
+
+  const applyFlushToReceipt = (queueSlice: QueuedScan[], results: BatchScanResult[]) => {
+    const fresh = queueSlice.filter((q) => !appliedScanIds.has(q.client_scan_id));
+    if (fresh.length === 0) return;
+    for (const q of fresh) {
+      const r = results.find((x) => x.client_scan_id === q.client_scan_id);
+      if (r && (r.status === "accepted" || r.status === "idempotent_replay")) {
+        appliedScanIds.add(q.client_scan_id);
+      }
+    }
+    const rejected = queueSlice.filter((q) => {
+      const r = results.find((x) => x.client_scan_id === q.client_scan_id);
+      return r && r.status !== "accepted" && r.status !== "idempotent_replay";
+    });
+    for (const q of rejected) {
+      toast.warning(`${q.serial_no}: ${results.find((r) => r.client_scan_id === q.client_scan_id)?.message ?? "Rejected"}`);
+    }
+
+    setGoodsReceipt((gr) => {
+      if (!gr?.lines) return gr;
+      return {
+        ...gr,
+        lines: patchGoodsReceiptLines(gr.lines, fresh, results),
+      };
+    });
+
+    const activeLine = scanLineId();
+    if (activeLine) {
+      const line = goodsReceipt()?.lines?.find((l) => l.id === activeLine);
+      if (line && line.received_qty + 0.0001 >= line.expected_qty) {
+        toast.success(`Line complete (${line.item_code}).`);
+      }
+    }
+    void loadGrGaps(goodsReceipt()!.id);
+  };
+
+  createEffect(() => {
+    const q = scanQueue.queue();
+    const gr = goodsReceipt();
+    if (!gr) return;
+    const done = q.filter(
+      (item) =>
+        (item.status === "accepted" || item.status === "replay") && !appliedScanIds.has(item.client_scan_id),
+    );
+    if (done.length === 0) return;
+    const results: BatchScanResult[] = done.map((item) => ({
+      client_scan_id: item.client_scan_id,
+      serial_no: item.serial_no,
+      status: item.status === "replay" ? "idempotent_replay" : "accepted",
+      serial_id: item.serial_id,
+    }));
+    applyFlushToReceipt(done, results);
+  });
 
   const loadPoDetails = async (poId: number) => {
     const res = await apiFetch<PurchaseOrderRow>(`/api/v1/purchase-order/purchase-orders/${poId}`);
@@ -133,45 +230,85 @@ export default function SerialReceivePage() {
       toast.warning(res.message ?? "Failed to create goods receipt.");
       return;
     }
+    appliedScanIds.clear();
+    scanQueue.resetQueue();
     setGoodsReceipt(res.data);
+    scanQueue.initFromStorage(res.data.id);
     const firstSerialLine = res.data.lines?.find((l) => l.track_serial);
     if (firstSerialLine) setScanLineId(firstSerialLine.id);
     const firstLotLine = res.data.lines?.find((l) => l.track_lot);
     if (firstLotLine) setLotLineId(firstLotLine.id);
+    void loadGrGaps(res.data.id);
     toast.success("Goods receipt created. Scan serial numbers or enter lots.");
   };
 
-  const refreshReceipt = async (grId: number) => {
-    const res = await apiFetch<GoodsReceipt>(`/api/v1/goods-receipt/goods-receipts/${grId}`);
-    if (res.success && res.data) setGoodsReceipt(res.data);
-  };
-
-  const scanSerial = async () => {
+  const scanSerial = () => {
     const gr = goodsReceipt();
     const lineId = scanLineId();
     const serialNo = scanInput().trim();
     if (!gr || !lineId || !serialNo) return;
 
-    setScanning(true);
-    const res = await apiFetch(
-      `/api/v1/goods-receipt/goods-receipts/${gr.id}/serials`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          goods_receipt_line_id: lineId,
-          serial_no: serialNo,
-        }),
-      },
-      { silent: true },
-    );
-    setScanning(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to scan serial.");
+    if (serialNo.length > 0) {
+      scanQueue.enqueue(lineId, serialNo);
+      setScanInput("");
+    }
+  };
+
+  const undoLastSerial = async () => {
+    const gr = goodsReceipt();
+    const lineId = scanLineId();
+    if (!gr || !lineId) return;
+    const line = gr.lines?.find((l) => l.id === lineId);
+    const serials = line?.serials ?? [];
+    if (serials.length === 0) {
+      toast.warning("No serials to undo on this line.");
       return;
     }
-    setScanInput("");
-    await refreshReceipt(gr.id);
-    toast.success(`Scanned ${serialNo}`);
+    const last = serials[serials.length - 1];
+    const res = await apiFetch(
+      `/api/v1/goods-receipt/goods-receipts/${gr.id}/serials/${last.id}`,
+      { method: "DELETE" },
+      { silent: true },
+    );
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to remove serial.");
+      return;
+    }
+    setGoodsReceipt((g) => {
+      if (!g?.lines) return g;
+      return {
+        ...g,
+        lines: g.lines.map((l) => (l.id === lineId ? removeSerialFromLine(l, last.id) : l)),
+      };
+    });
+    void loadGrGaps(gr.id);
+    toast.success(`Removed ${last.serial_no}`);
+  };
+
+  const importPastedSerials = async () => {
+    const gr = goodsReceipt();
+    const lineId = scanLineId();
+    if (!gr || !lineId) {
+      toast.warning("Select a scan line first.");
+      return;
+    }
+    const lines = pasteText()
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (lines.length === 0) {
+      toast.warning("Paste at least one serial number.");
+      return;
+    }
+    setPasteBusy(true);
+    for (const sn of lines) {
+      scanQueue.enqueue(lineId, sn);
+    }
+    await scanQueue.flushNow();
+    setPasteBusy(false);
+    setPasteText("");
+    setPasteOpen(false);
+    toast.success(`Queued ${lines.length} serial(s).`);
   };
 
   const addLot = async () => {
@@ -203,17 +340,23 @@ export default function SerialReceivePage() {
       toast.warning(res.message ?? "Failed to add lot.");
       return;
     }
+    const refresh = await apiFetch<GoodsReceipt>(`/api/v1/goods-receipt/goods-receipts/${gr.id}`);
+    if (refresh.success && refresh.data) setGoodsReceipt(refresh.data);
     setLotNo("");
     setLotQty("1");
     setLotExpiry("");
-    await refreshReceipt(gr.id);
     toast.success(`Added lot ${lot}`);
   };
 
   const postReceipt = async () => {
     const gr = goodsReceipt();
     if (!gr) return;
+    if (serialPostBlocked()) {
+      toast.warning("Complete all serial lines before posting.");
+      return;
+    }
 
+    await scanQueue.flushNow();
     setPosting(true);
     const res = await apiFetch(
       `/api/v1/goods-receipt/goods-receipts/${gr.id}/post`,
@@ -227,6 +370,8 @@ export default function SerialReceivePage() {
     }
     toast.success("Goods receipt posted.");
     invalidate();
+    appliedScanIds.clear();
+    scanQueue.resetQueue();
     setGoodsReceipt(null);
     setSelectedPoId(null);
     setSelectedPo(null);
@@ -236,9 +381,12 @@ export default function SerialReceivePage() {
     setLotNo("");
     setLotQty("1");
     setLotExpiry("");
+    setGrGaps([]);
   };
 
   const reset = () => {
+    appliedScanIds.clear();
+    scanQueue.resetQueue();
     setGoodsReceipt(null);
     setSelectedPoId(null);
     setSelectedPo(null);
@@ -250,7 +398,15 @@ export default function SerialReceivePage() {
     setLotQty("1");
     setLotExpiry("");
     setReceiptDate(todayISO());
+    setGrGaps([]);
+    setPasteOpen(false);
+    setPasteText("");
   };
+
+  onMount(() => {
+    const gr = goodsReceipt();
+    if (gr) scanQueue.initFromStorage(gr.id);
+  });
 
   return (
     <SerialLotLayout>
@@ -276,8 +432,70 @@ export default function SerialReceivePage() {
                   {" · "}
                   <span class="text-text-secondary">Status:</span>{" "}
                   <span class="font-medium">{goodsReceipt()!.status}</span>
+                  {scanQueue.pendingCount() > 0 && (
+                    <>
+                      {" · "}
+                      <span class="font-medium text-amber-700">{scanQueue.pendingCount()} pending</span>
+                    </>
+                  )}
                 </p>
               </div>
+
+              <Show when={grGaps().length > 0}>
+                <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <p class="font-medium">Serial count mismatch on draft receipt</p>
+                  <ul class="mt-1 list-inside list-disc">
+                    <For each={grGaps()}>
+                      {(g) => (
+                        <li>
+                          Line {g.line_no} {g.item_code}: received {g.received_qty}, serials {g.serial_count} (gap{" "}
+                          {g.gap_qty})
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </div>
+              </Show>
+
+              <Show when={serialLines().length > 0}>
+                <div class="rounded-lg border border-stroke bg-slate-50 p-4">
+                  <h3 class="mb-2 text-sm font-semibold text-text-primary">Pre-post review (serials)</h3>
+                  <table class="min-w-full text-sm">
+                    <thead class="text-left text-text-secondary">
+                      <tr>
+                        <th class="py-1 pr-3">Line</th>
+                        <th class="py-1 pr-3">Item</th>
+                        <th class="py-1 pr-3">Expected</th>
+                        <th class="py-1 pr-3">Received</th>
+                        <th class="py-1 pr-3">Serials</th>
+                        <th class="py-1">Gap</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={serialLines()}>
+                        {(line) => {
+                          const serialCount = () => line.serials?.length ?? 0;
+                          const gap = () => line.expected_qty - serialCount();
+                          return (
+                            <tr class="border-t border-stroke/60">
+                              <td class="py-1 pr-3">{line.line_no}</td>
+                              <td class="py-1 pr-3">
+                                {line.item_code} — {line.item_name}
+                              </td>
+                              <td class="py-1 pr-3">{line.expected_qty}</td>
+                              <td class="py-1 pr-3">{line.received_qty}</td>
+                              <td class="py-1 pr-3">{serialCount()}</td>
+                              <td class={`py-1 ${gap() > 0.0001 ? "font-medium text-red-600" : "text-green-700"}`}>
+                                {gap() > 0.0001 ? gap().toFixed(0) : "OK"}
+                              </td>
+                            </tr>
+                          );
+                        }}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+              </Show>
 
               <Show when={lotLines().length > 0}>
                 <div class="rounded-lg border border-stroke bg-slate-50 p-4">
@@ -368,80 +586,123 @@ export default function SerialReceivePage() {
               </Show>
 
               <Show when={serialLines().length > 0}>
-              <div class="grid gap-4 md:grid-cols-2">
-                <Field label="Scan into line">
-                  <select
-                    class={inputClass}
-                    value={scanLineId() ?? ""}
-                    onChange={(e) => setScanLineId(Number(e.currentTarget.value) || null)}
-                  >
-                    <option value="">Select line…</option>
-                    <For each={serialLines()}>
-                      {(line) => (
-                        <option value={line.id}>
-                          {line.item_code} — {line.item_name} ({line.received_qty}/{line.expected_qty})
-                        </option>
-                      )}
-                    </For>
-                  </select>
-                </Field>
-                <Field label="Serial no.">
-                  <div class="flex gap-2">
-                    <input
+                <div class="grid gap-4 md:grid-cols-2">
+                  <Field label={singleSerialLine() ? "Serial line (auto)" : "Scan into line"}>
+                    <select
                       class={inputClass}
-                      value={scanInput()}
-                      onInput={(e) => setScanInput(e.currentTarget.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void scanSerial();
-                        }
-                      }}
-                      placeholder="Scan or type serial…"
-                      disabled={!scanLineId() || scanning()}
-                    />
+                      value={scanLineId() ?? ""}
+                      disabled={singleSerialLine()}
+                      onChange={(e) => setScanLineId(Number(e.currentTarget.value) || null)}
+                    >
+                      <option value="">Select line…</option>
+                      <For each={serialLines()}>
+                        {(line) => (
+                          <option value={line.id}>
+                            {line.item_code} — {line.item_name} ({line.received_qty}/{line.expected_qty})
+                          </option>
+                        )}
+                      </For>
+                    </select>
+                  </Field>
+                  <Field label="Serial no.">
+                    <div class="flex gap-2">
+                      <input
+                        class={inputClass}
+                        value={scanInput()}
+                        onInput={(e) => setScanInput(e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            scanSerial();
+                          }
+                        }}
+                        placeholder="Scan or type serial…"
+                        autofocus
+                      />
+                      <button
+                        type="button"
+                        class="shrink-0 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+                        disabled={!scanLineId() || !scanInput().trim()}
+                        onClick={() => scanSerial()}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </Field>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+                    disabled={!scanLineId()}
+                    onClick={() => void undoLastSerial()}
+                  >
+                    Undo last
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:bg-slate-50"
+                    onClick={() => setPasteOpen((v) => !v)}
+                  >
+                    {pasteOpen() ? "Hide paste" : "Paste serials"}
+                  </button>
+                  {scanQueue.flushing() && (
+                    <span class="self-center text-xs text-text-secondary">Syncing…</span>
+                  )}
+                </div>
+
+                <Show when={pasteOpen()}>
+                  <div class="rounded-lg border border-stroke bg-slate-50 p-4">
+                    <Field label="One serial per line">
+                      <textarea
+                        class={`${inputClass} min-h-[120px] font-mono text-sm`}
+                        value={pasteText()}
+                        onInput={(e) => setPasteText(e.currentTarget.value)}
+                        placeholder="SN001&#10;SN002&#10;SN003"
+                      />
+                    </Field>
                     <button
                       type="button"
-                      class="shrink-0 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-                      disabled={!scanLineId() || !scanInput().trim() || scanning()}
-                      onClick={() => void scanSerial()}
+                      class="mt-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                      disabled={pasteBusy() || !scanLineId()}
+                      onClick={() => void importPastedSerials()}
                     >
-                      Add
+                      {pasteBusy() ? "Importing…" : "Import pasted serials"}
                     </button>
                   </div>
-                </Field>
-              </div>
+                </Show>
 
-              <div class="overflow-x-auto rounded-lg border border-stroke">
-                <table class="min-w-full text-sm">
-                  <thead class="bg-slate-50 text-left text-text-secondary">
-                    <tr>
-                      <th class="px-3 py-2">Line</th>
-                      <th class="px-3 py-2">Item</th>
-                      <th class="px-3 py-2">Expected</th>
-                      <th class="px-3 py-2">Received</th>
-                      <th class="px-3 py-2">Serials</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={serialLines()}>
-                      {(line) => (
-                        <tr class="border-t border-stroke">
-                          <td class="px-3 py-2">{line.line_no}</td>
-                          <td class="px-3 py-2">
-                            {line.item_code} — {line.item_name}
-                          </td>
-                          <td class="px-3 py-2">{line.expected_qty}</td>
-                          <td class="px-3 py-2">{line.received_qty}</td>
-                          <td class="px-3 py-2">
-                            {(line.serials ?? []).map((s) => s.serial_no).join(", ") || "—"}
-                          </td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
+                <div class="overflow-x-auto rounded-lg border border-stroke">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-left text-text-secondary">
+                      <tr>
+                        <th class="px-3 py-2">Line</th>
+                        <th class="px-3 py-2">Item</th>
+                        <th class="px-3 py-2">Expected</th>
+                        <th class="px-3 py-2">Received</th>
+                        <th class="px-3 py-2">Serials</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={serialLines()}>
+                        {(line) => (
+                          <tr class="border-t border-stroke">
+                            <td class="px-3 py-2">{line.line_no}</td>
+                            <td class="px-3 py-2">
+                              {line.item_code} — {line.item_name}
+                            </td>
+                            <td class="px-3 py-2">{line.expected_qty}</td>
+                            <td class="px-3 py-2">{line.received_qty}</td>
+                            <td class="px-3 py-2">
+                              {(line.serials ?? []).map((s) => s.serial_no).join(", ") || "—"}
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
               </Show>
 
               <Show when={serialLines().length === 0 && lotLines().length === 0}>
@@ -452,7 +713,7 @@ export default function SerialReceivePage() {
                 <button
                   type="button"
                   class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-                  disabled={posting() || goodsReceipt()!.status !== "draft"}
+                  disabled={posting() || goodsReceipt()!.status !== "draft" || serialPostBlocked()}
                   onClick={() => void postReceipt()}
                 >
                   {posting() ? "Posting…" : "Post goods receipt"}

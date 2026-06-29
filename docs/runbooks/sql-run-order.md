@@ -120,6 +120,7 @@ See [docs/modules/inventory/serial-lot/README.md](../modules/inventory/serial-lo
 | 5b (optional) | `scripts/seed-demo-sales-orders-export.sql` | **Sales order list export** for **BLUEARM**; run after step 5 |
 | 5c (optional) | `scripts/seed-demo-purchase-requests.sql` | Demo purchase requests for **DEMO000** + **BLUEARM**; run after step 3 (inventory) |
 | 5d (optional) | `scripts/seed-demo-serial-lot.sql` | Serial-tracked items, PO, GRN, demo serial units; run after 5c and migrations 040-044 |
+| 5f (optional) | `scripts/seed-demo-po-gr-open.sql` | Stable open POs `DEMOGR902`–`905` + GR samples for receive/scan testing; run after inventory seed |
 | 5e (optional) | `scripts/seed-demo-dashboard.sql` | Intentional serial-vs-qty mismatch for dashboard red flags; run after 5d and migrations 047-049 |
 | 6 | `scripts/seed-demo-sales.sql` | Demo sales (SI) from released SO lines for **DEMO000** + **BLUEARM** |
 | 7 | `scripts/seed-demo-finance.sql` | Demo official receipt applied to demo sale for **DEMO000** + **BLUEARM** |
@@ -140,6 +141,7 @@ psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders-export.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-serial-lot.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-dashboard.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-finance.sql

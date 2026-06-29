@@ -47,11 +47,14 @@ Sales update/delete reverses direct-sale stock and serial state. SO-linked lines
 | `GET /api/v1/inventory/reconciliation/serial-qty` | Qty vs serial count mismatches |
 | `GET /api/v1/inventory/reconciliation/reserved-stale?days=30` | Stale reserved serials |
 | `GET /api/v1/inventory/reconciliation/so-release-gap` | Sold qty exceeds released |
+| `GET /api/v1/inventory/reconciliation/gr-serial-gap?goods_receipt_id=` | Draft GR lines where received qty ≠ serial count |
 | `GET /api/v1/purchase-order/purchase-orders` | PO list |
 | `POST /api/v1/purchase-order/purchase-orders/from-purchase-request/{id}` | Create PO from PR |
 | `PATCH /api/v1/purchase-order/purchase-orders/{id}/confirm` | Confirm PO + PR slip lines |
 | `POST /api/v1/goods-receipt/goods-receipts` | Draft receipt from PO |
-| `POST /api/v1/goods-receipt/goods-receipts/{id}/serials` | Scan serial |
+| `POST /api/v1/goods-receipt/goods-receipts/{id}/serials` | Scan one serial (draft) |
+| `POST /api/v1/goods-receipt/goods-receipts/{id}/serials/batch` | Batch scan (max 100 per request; idempotent via `client_scan_id`) |
+| `DELETE /api/v1/goods-receipt/goods-receipts/{id}/serials/{serialId}` | Remove draft serial (undo) |
 | `POST /api/v1/goods-receipt/goods-receipts/{id}/lots` | Lot batch entry (track_lot) |
 | `POST /api/v1/goods-receipt/goods-receipts/{id}/post` | Post receipt (+ CRM warranty at receipt) |
 | `POST /api/v1/goods-receipt/goods-receipts/{id}/reverse` | Reverse posted GR (permission gated) |
@@ -68,6 +71,14 @@ Item master update blocks disabling `track_serial` / `track_lot` when open units
 
 Red flags from reconciliation appear on [Business Dashboard](../../dashboard/README.md).
 
+## Receive / Scan UI
+
+- Client scan queue with `sessionStorage` backup (debounced batch flush to `/serials/batch`)
+- Pre-post review table: expected vs received vs serial count per line
+- Single-line mode when PO has one serial-tracked line
+- Undo last serial; paste serial list (one per line)
+- Post blocked until all serial lines are complete
+
 ## Migrations
 
 - `040_serial_lot.sql` — tables + item flags
@@ -78,14 +89,18 @@ Red flags from reconciliation appear on [Business Dashboard](../../dashboard/REA
 - `047_sales_stock_hybrid.sql` — `reserved_at`, reversal permissions
 - `048_gr_lots_sales_lot_batch.sql` — GR line lots, `sa_sales_lines.lot_batch_id`
 - `049_dashboard.sql` — Business Dashboard module (see dashboard README)
+- `050_gr_serial_scan_batch.sql` — `client_scan_id` on draft serials
 
 ## Demo data
 
 ```bash
 psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-serial-lot.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-dashboard.sql
 ```
+
+For serial receive testing, pick purchase order **DEMOGR902** (5 units open) on Receive / Scan after running `seed-demo-po-gr-open.sql`.
 
 ## Legacy backfill (optional)
 

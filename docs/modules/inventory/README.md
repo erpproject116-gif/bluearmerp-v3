@@ -31,7 +31,7 @@ Items only (`/app/inventory/items`):
 
 On the Items list: **Download template** → fill rows → **Import CSV**.
 
-Template columns: `item_name`, `purchase_price`, `sales_price`, `vip_price`, `status`.
+Template columns: `item_name` (required), `purchase_price`, `sales_price`, `vip_price`, `status`, `track_serial`, `track_lot`, `track_inventory_qty`, `warranty_duration_months` (optional).
 
 Codes are assigned on insert (same as **+ New row**). Partial success: valid rows are created; failures return `row_errors` with row numbers.
 

@@ -22,6 +22,7 @@ type Item = {
   reorder_level?: number | null;
   track_serial?: boolean;
   track_lot?: boolean;
+  track_inventory_qty?: boolean;
   status: string;
   custom_values?: Record<string, unknown>;
 };
@@ -43,6 +44,7 @@ export default function ItemsPage() {
     reorder_level: null as number | null,
     track_serial: false,
     track_lot: false,
+    track_inventory_qty: false,
     status: "active",
   });
   const [saving, setSaving] = createSignal(false);
@@ -73,6 +75,7 @@ export default function ItemsPage() {
       reorder_level: null,
       track_serial: false,
       track_lot: false,
+      track_inventory_qty: false,
       status: "active",
     });
     loadCustom({});
@@ -91,6 +94,7 @@ export default function ItemsPage() {
       reorder_level: row.reorder_level ?? null,
       track_serial: row.track_serial ?? false,
       track_lot: row.track_lot ?? false,
+      track_inventory_qty: row.track_inventory_qty ?? false,
       status: row.status,
     });
     loadCustom(row.custom_values ?? {});
@@ -281,6 +285,14 @@ export default function ItemsPage() {
                 }}
               />
               Track lot numbers
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form().track_inventory_qty}
+                onChange={(e) => setForm((f) => ({ ...f, track_inventory_qty: e.currentTarget.checked }))}
+              />
+              Track inventory quantity
             </label>
           </div>
         </Field>
