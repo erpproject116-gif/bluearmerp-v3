@@ -253,6 +253,15 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "documentation",
+    label: "Help & guides",
+    href: "/app/documentation",
+    basePath: "/app/documentation",
+    features: [
+      { label: "Help & guides", href: "/app/documentation", settingsHref: "/app/documentation" },
+    ],
+  },
+  {
     id: "user_management",
     label: "User Management",
     href: "/app/user-management/users",

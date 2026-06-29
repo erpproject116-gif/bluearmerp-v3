@@ -1,14 +1,12 @@
 import type { ParentComponent } from "solid-js";
-import { A, useLocation, useNavigate } from "@solidjs/router";
+import { A, useLocation } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { useAuth, canManageUsers, canViewActivityLogs, canViewCrm, canViewCrmAnalytics, canManageCrmRules, canManageBranding, hasModuleAccess, hasPermission } from "../shared/auth-context";
-import { AvatarUploadButton } from "../shared/AvatarUploadButton";
+import { useAuth, canManageUsers, canViewActivityLogs, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasModuleAccess, hasPermission } from "../shared/auth-context";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
 import { CrmNotificationPoller } from "../shared/CrmNotificationPoller";
 import { PresenceAvatars } from "../shared/PresenceAvatars";
-import { PresenceHeartbeat, signOutWithPresenceClear } from "../shared/PresenceHeartbeat";
-import { UserAvatar } from "../shared/UserAvatar";
+import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
 import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ModuleIcon } from "./ModuleIcon";
 import { ShellProvider, useShell } from "./shell-context";
@@ -24,6 +22,7 @@ import { useBranding } from "../shared/branding/BrandingProvider";
 import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
 import { isAnySubBranchPath } from "./sub-branch-nav";
+import { UserAccountMenu } from "./UserAccountMenu";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -34,7 +33,6 @@ function subBranchHeaderTitle(pathname: string, prefix?: string): string {
 
 function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const loc = useLocation();
-  const navigate = useNavigate();
   const auth = useAuth();
   const shell = useShell();
   const crmTask = useCrmTaskModal();
@@ -63,22 +61,17 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     return mod;
   };
 
-  const signOut = async () => {
-    await signOutWithPresenceClear();
-    navigate("/signin", { replace: true });
-  };
-
   return (
     <div class="flex min-h-screen bg-body">
       <aside
-        class="erp-surface fixed inset-y-0 left-0 z-40 flex flex-col border-r border-stroke py-6 transition-[width,padding] duration-200 ease-in-out"
+        class="erp-surface fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-stroke py-6 transition-[width,padding] duration-200 ease-in-out"
         classList={{
           "w-[4.5rem] px-2": shell.collapsed(),
           "w-[18.125rem] px-5": !shell.collapsed(),
         }}
       >
         <div
-          class="mb-6 flex items-center gap-3"
+          class="mb-6 shrink-0 flex items-center gap-3"
           classList={{ "justify-center px-0": shell.collapsed(), "px-2": !shell.collapsed() }}
         >
           <Show
@@ -92,14 +85,17 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           </Show>
         </div>
 
-        <Show when={!shell.collapsed()}>
-          <p class="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">
-            {brandingLabel("app.modules_heading", "Modules")}
-          </p>
-        </Show>
+        <div class="shrink-0">
+          <Show when={!shell.collapsed()}>
+            <p class="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">
+              {brandingLabel("app.modules_heading", "Modules")}
+            </p>
+          </Show>
+        </div>
 
-        <nav class="flex-1 space-y-1">
+        <nav class="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
           <For each={appModules.filter((m) => {
+            if (m.id === "documentation") return true;
             const codes = auth.me?.enabled_module_codes;
             if (m.id === "user_management" && !canManageUsers(auth.me)) return false;
             if (m.id === "activity_logs" && !canViewActivityLogs(auth.me)) return false;
@@ -174,81 +170,11 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           </For>
         </nav>
 
-        <Show when={auth.me}>
-          <div
-            class="mt-4 rounded-xl border border-stroke erp-panel"
-            classList={{
-              "flex flex-col items-center gap-2 p-2": shell.collapsed(),
-              "px-3 py-3": !shell.collapsed(),
-            }}
-            title={shell.collapsed() ? auth.me!.user.full_name : undefined}
-          >
-            <Show
-              when={!shell.collapsed()}
-              fallback={
-                <>
-                  <UserAvatar
-                    name={auth.me!.user.full_name}
-                    avatarUrl={auth.me!.user.avatar_url}
-                    size="sm"
-                    class="ring-2 ring-brand-50"
-                  />
-                  <Show when={canManageBranding(auth.me)}>
-                    <A
-                      href="/app/settings/branding"
-                      title={brandingLabel("app.branding_link", "Branding")}
-                      class="flex h-8 w-8 items-center justify-center rounded-lg border border-stroke text-text-secondary transition hover:erp-panel hover:text-text-primary"
-                    >
-                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                      </svg>
-                    </A>
-                  </Show>
-                  <button
-                    type="button"
-                    title={brandingLabel("app.sign_out", "Sign out")}
-                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-stroke text-text-secondary transition hover:erp-panel hover:text-text-primary"
-                    onClick={() => void signOut()}
-                  >
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                  </button>
-                </>
-              }
-            >
-              <div class="flex items-center gap-3">
-                <UserAvatar name={auth.me!.user.full_name} avatarUrl={auth.me!.user.avatar_url} size="sm" />
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-medium text-text-primary">{auth.me!.user.full_name}</p>
-                  <p class="truncate text-xs text-text-secondary">{auth.me!.tenant.company_name}</p>
-                  <AvatarUploadButton class="mt-0.5" />
-                </div>
-              </div>
-              <div class="mt-3 flex flex-col gap-1 border-t border-stroke pt-3">
-                <Show when={canManageBranding(auth.me)}>
-                  <A
-                    href="/app/settings/branding"
-                    class="rounded-lg border border-stroke px-3 py-2 text-center text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
-                  >
-                    {brandingLabel("app.branding_link", "Branding")}
-                  </A>
-                </Show>
-                <button
-                  type="button"
-                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
-                  onClick={() => void signOut()}
-                >
-                  {brandingLabel("app.sign_out", "Sign out")}
-                </button>
-              </div>
-            </Show>
-          </div>
-        </Show>
-
-        <button
+        <div class="mt-4 shrink-0 space-y-2 border-t border-stroke pt-3">
+          <UserAccountMenu />
+          <button
           type="button"
-          class="mt-4 flex items-center rounded-lg border border-stroke text-sm text-text-secondary transition hover:erp-panel hover:text-text-primary"
+          class="flex items-center rounded-lg border border-stroke text-sm text-text-secondary transition hover:erp-panel hover:text-text-primary"
           classList={{
             "mx-auto h-9 w-9 justify-center": shell.collapsed(),
             "w-full justify-center gap-2 px-3 py-2": !shell.collapsed(),
@@ -271,6 +197,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             <span>{brandingLabel("app.collapse_sidebar", "Collapse")}</span>
           </Show>
         </button>
+        </div>
       </aside>
 
       <div

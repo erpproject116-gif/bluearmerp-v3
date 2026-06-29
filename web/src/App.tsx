@@ -113,6 +113,7 @@ import BrandingSettingsPage from "./modules/settings/BrandingSettingsPage";
 import { BrandingProvider } from "./shared/branding/BrandingProvider";
 import LowStockReportPage from "./modules/crm/reports/LowStockReportPage";
 import DashboardPage from "./modules/dashboard/DashboardPage";
+import DocumentationPage from "./modules/documentation/DocumentationPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -167,6 +168,8 @@ export default function App() {
         <Route path="/app/sales/reports/print-slips/print" component={SalesSlipsPrintPage} />
         <Route path="/app" component={AppLayout}>
           <Route path="/dashboard" component={DashboardPage} />
+          <Route path="/documentation" component={DocumentationPage} />
+          <Route path="/documentation/:sectionId" component={DocumentationPage} />
           <Route path="/inventory/partners" component={PartnersPage} />
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
           <Route path="/inventory/locations" component={LocationsPage} />
