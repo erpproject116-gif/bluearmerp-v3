@@ -25,6 +25,17 @@ Purchase Request → Purchase Order → Goods Receipt (scan) → Serial Registry
 
 On **Inventory → Items**, enable **Track serial** or **Track lot** (mutually exclusive). Serial-tracked items require scan-on-receive and serial pick on sales.
 
+## Hybrid stock policy
+
+| Path | Qty movement | Serial |
+|------|--------------|--------|
+| GR post | `qty_on_hand` + | `in_stock` |
+| SO Release | `qty_on_hand` − | `reserved` (+ `reserved_at`) |
+| Sales from SO line | None (release already deducted) | `sold`; sold qty ≤ released |
+| Direct sales | `qty_on_hand` − at invoice | `sold` when picked |
+
+Sales update/delete reverses direct-sale stock and serial state. SO-linked lines validate against `so_sales_order_release_lines` totals.
+
 ## APIs
 
 | Endpoint | Purpose |
@@ -33,12 +44,29 @@ On **Inventory → Items**, enable **Track serial** or **Track lot** (mutually e
 | `GET /api/v1/inventory/serial-units/trace?serial_no=` | Trace lookup |
 | `GET /api/v1/inventory/serial-units/available?item_id=` | Pick list for sales/release |
 | `POST /api/v1/inventory/serial-units/transfer` | Internal location transfer |
+| `GET /api/v1/inventory/reconciliation/serial-qty` | Qty vs serial count mismatches |
+| `GET /api/v1/inventory/reconciliation/reserved-stale?days=30` | Stale reserved serials |
+| `GET /api/v1/inventory/reconciliation/so-release-gap` | Sold qty exceeds released |
 | `GET /api/v1/purchase-order/purchase-orders` | PO list |
 | `POST /api/v1/purchase-order/purchase-orders/from-purchase-request/{id}` | Create PO from PR |
 | `PATCH /api/v1/purchase-order/purchase-orders/{id}/confirm` | Confirm PO + PR slip lines |
 | `POST /api/v1/goods-receipt/goods-receipts` | Draft receipt from PO |
 | `POST /api/v1/goods-receipt/goods-receipts/{id}/serials` | Scan serial |
-| `POST /api/v1/goods-receipt/goods-receipts/{id}/post` | Post receipt |
+| `POST /api/v1/goods-receipt/goods-receipts/{id}/lots` | Lot batch entry (track_lot) |
+| `POST /api/v1/goods-receipt/goods-receipts/{id}/post` | Post receipt (+ CRM warranty at receipt) |
+| `POST /api/v1/goods-receipt/goods-receipts/{id}/reverse` | Reverse posted GR (permission gated) |
+| `POST /api/v1/sales-order/releases/{releaseLineId}/undo` | Undo release, restore qty/serials |
+| `POST /api/v1/sales/{id}/return-lines` | Return direct-sale lines |
+
+Item master update blocks disabling `track_serial` / `track_lot` when open units or lot batches exist.
+
+## UI
+
+- **SerialPickModal** — explicit serial selection on SO Release and Sales (replaces auto-first-N pick)
+- **Receive / Scan** — serial scan + lot entry for `track_lot` lines
+- **Purchase Request → PO** — `PurchaseOrderModal`, goods receipt list, deep link to receive
+
+Red flags from reconciliation appear on [Business Dashboard](../../dashboard/README.md).
 
 ## Migrations
 
@@ -47,12 +75,16 @@ On **Inventory → Items**, enable **Track serial** or **Track lot** (mutually e
 - `042_purchase_order.sql` / `043_purchase_order_permissions.sql`
 - `044_goods_receipt.sql`
 - `046_crm_serial_warranty.sql`
+- `047_sales_stock_hybrid.sql` — `reserved_at`, reversal permissions
+- `048_gr_lots_sales_lot_batch.sql` — GR line lots, `sa_sales_lines.lot_batch_id`
+- `049_dashboard.sql` — Business Dashboard module (see dashboard README)
 
 ## Demo data
 
 ```bash
 psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-serial-lot.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-dashboard.sql
 ```
 
 ## Legacy backfill (optional)
@@ -66,7 +98,12 @@ psql "$DATABASE_URL" -f scripts/backfill-serial-units-from-sales.sql
 1. `go build ./...` and `npm run build`
 2. PR → PO → confirm → Receive scan → registry `in_stock`
 3. Duplicate serial rejected on post
-4. SO release requires serial pick for tracked items
+4. SO release requires serial pick for tracked items (`SerialPickModal`)
 5. Sales marks serial `sold`; CRM warranty asset has `serial_unit_id`
 6. Trace shows PR → PO → GRN chain
 7. Warranty alert job creates notifications at 90/30/7/0 day rules
+8. **Hybrid:** direct sale deducts balance; SO-linked sale blocked when qty > released
+9. **Reconciliation:** `GET /inventory/reconciliation/serial-qty` flags demo mismatch after `seed-demo-dashboard.sql`
+10. **Reversals:** release undo restores qty; GR reverse blocked when serials sold
+11. **Lot:** GR lot entry + sales `lot_batch_id` decrements batch qty
+12. **Dashboard:** red flags panel shows serial mismatch and open PO categories

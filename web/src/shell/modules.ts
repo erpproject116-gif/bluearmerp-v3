@@ -30,6 +30,15 @@ export type AppModule = {
 /** Sidebar shows modules + sub-branches; header shows module label + feature nav for the active branch. */
 export const appModules: AppModule[] = [
   {
+    id: "dashboard",
+    label: "Business Dashboard",
+    href: "/app/dashboard",
+    basePath: "/app/dashboard",
+    features: [
+      { label: "Dashboard", href: "/app/dashboard", settingsHref: "/app/dashboard" },
+    ],
+  },
+  {
     id: "inventory",
     label: "Inventory",
     href: "/app/inventory/partners",
@@ -222,6 +231,7 @@ export const appModules: AppModule[] = [
       { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       { label: "Purchase Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       { label: "Purchase Order List", href: "/app/purchase-request/purchase-orders", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Goods Receipt List", href: "/app/purchase-request/goods-receipt", settingsHref: "/app/purchase-request/purchase-requests/settings" },
     ],
   },
   {

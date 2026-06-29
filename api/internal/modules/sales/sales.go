@@ -92,6 +92,7 @@ type saleLineBody struct {
 	Remark                 *string `json:"remark"`
 	SerialLotNo            *string `json:"serial_lot_no"`
 	SerialUnitIDs          []int64 `json:"serial_unit_ids,omitempty"`
+	LotBatchID             *int64  `json:"lot_batch_id"`
 	SourceSalesOrderLineID *int64  `json:"source_sales_order_line_id"`
 }
 
@@ -130,6 +131,7 @@ type computedLine struct {
 	DiscountedUnitVatInc   float64
 	Remark                 *string
 	SerialLotNo            *string
+	LotBatchID             *int64
 	SourceSalesOrderLineID *int64
 }
 
@@ -155,6 +157,7 @@ func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/{id}", getSale(pool))
 	r.Patch("/{id}", updateSale(pool))
 	r.Delete("/{id}", deleteSale(pool))
+	r.With(auth.RequirePermission("sales.sales_return", "write")).Post("/{id}/return-lines", postReturnSaleLines(pool))
 }
 
 func previewSalesSequences(pool *pgxpool.Pool) http.HandlerFunc {
@@ -498,6 +501,15 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+		if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+
 		if _, err := crm.SyncWarrantyAssetsFromSale(r.Context(), tx, tu.TenantID, id); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to sync warranty assets.", "ERR_INTERNAL")
 			return
@@ -562,6 +574,11 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		subtotal, taxTotal, grandTotal := sumSaleTotals(computed)
 
+		if convErrs := validateSalesOrderConversion(r.Context(), pool, tu.TenantID, computed); convErrs != nil {
+			response.Validation(w, convErrs)
+			return
+		}
+
 		before, _ := loadSale(r.Context(), pool, tu.TenantID, id)
 
 		tx, err := pool.Begin(r.Context())
@@ -591,8 +608,38 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if err := reverseSaleStock(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reverse stock.", "ERR_INTERNAL")
+			return
+		}
+		if err := reverseSaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reverse lot stock.", "ERR_INTERNAL")
+			return
+		}
+		if err := reverseSaleSerials(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reverse serials.", "ERR_INTERNAL")
+			return
+		}
+
 		if err := replaceSaleLines(r.Context(), tx, id, computed); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := applySaleSerialUnits(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.Lines); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+		if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+		if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+		if _, err := crm.SyncWarrantyAssetsFromSale(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to sync warranty assets.", "ERR_INTERNAL")
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
@@ -608,7 +655,41 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 
 func deleteSale(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		softDelete(pool, w, r, "sa_sales", "sales.delete", "sa_sales")
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to delete.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		if err := reverseSaleStock(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reverse stock.", "ERR_INTERNAL")
+			return
+		}
+		if err := reverseSaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reverse lot stock.", "ERR_INTERNAL")
+			return
+		}
+		if err := reverseSaleSerials(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reverse serials.", "ERR_INTERNAL")
+			return
+		}
+		tag, err := tx.Exec(r.Context(), `update public.sa_sales set deleted_at = now(), updated_at = now() where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to delete.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.delete", "sa_sales", &id, nil, nil)
+		response.OK(w, nil, "Deleted.")
 	}
 }
 
@@ -623,13 +704,13 @@ func insertSaleLines(ctx context.Context, tx pgx.Tx, salesID int64, lines []comp
 			  sales_id, line_no, item_id, item_code, item_name, description,
 			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total,
 			  discount_amount, discounted_unit_non_vat, discounted_unit_vat_inc,
-			  remark, serial_lot_no, source_sales_order_line_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+			  remark, serial_lot_no, lot_batch_id, source_sales_order_line_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
 			salesID, lineNo, ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.Description,
 			ln.Qty, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
 			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal,
 			ln.DiscountAmount, ln.DiscountedUnitNonVat, ln.DiscountedUnitVatInc,
-			ln.Remark, ln.SerialLotNo, ln.SourceSalesOrderLineID)
+			ln.Remark, ln.SerialLotNo, ln.LotBatchID, ln.SourceSalesOrderLineID)
 		if err != nil {
 			return err
 		}
@@ -689,6 +770,7 @@ func computeSaleLines(tt taxcalc.TaxType, templateCode string, lines []saleLineB
 			DiscountedUnitVatInc:   discountedUnitVatInc,
 			Remark:                 ln.Remark,
 			SerialLotNo:            ln.SerialLotNo,
+			LotBatchID:             ln.LotBatchID,
 			SourceSalesOrderLineID: ln.SourceSalesOrderLineID,
 		})
 	}

@@ -1,9 +1,9 @@
 import { createSignal, For, Show } from "solid-js";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_SETTINGS_HREF } from "../../../shared/entityTypes";
+import { SerialPickModal } from "../../../shared/SerialPickModal";
 import { useListState } from "../../../shared/useListState";
 import {
-  fetchAvailableSerials,
   postSalesOrderReleases,
   useInvalidateReleaseQueue,
   useReleaseQueue,
@@ -19,6 +19,8 @@ export default function ReleaseSalesOrderPage() {
   const { page, setPage, q, setQ, sort, order, pageSize } = useListState("order_date", 25, { defaultOrder: "desc" });
   const [releaseQty, setReleaseQty] = createSignal<Record<number, string>>({});
   const [serialIds, setSerialIds] = createSignal<Record<number, number[]>>({});
+  const [serialPickOpen, setSerialPickOpen] = createSignal(false);
+  const [serialPickRow, setSerialPickRow] = createSignal<ReleaseQueueRow | null>(null);
   const [submitting, setSubmitting] = createSignal(false);
 
   const queue = useReleaseQueue(() => ({
@@ -68,17 +70,16 @@ export default function ReleaseSalesOrderPage() {
     invalidate();
   };
 
-  const pickSerials = async (row: ReleaseQueueRow) => {
-    if (!row.item_id) return;
-    const avail = await fetchAvailableSerials(row.item_id, row.location_id);
-    if (avail.length === 0) {
-      toast.warning("No serials available at this location.");
-      return;
-    }
+  const openSerialPick = (row: ReleaseQueueRow) => {
+    setSerialPickRow(row);
+    setSerialPickOpen(true);
+  };
+
+  const serialPickQty = () => {
+    const row = serialPickRow();
+    if (!row) return 1;
     const qty = Number(releaseQty()[row.sales_order_line_id] ?? row.balance_qty);
-    const picked = avail.slice(0, Math.max(1, Math.floor(qty))).map((s) => s.id);
-    setSerialIds((prev) => ({ ...prev, [row.sales_order_line_id]: picked }));
-    toast.success(`Selected ${picked.length} serial(s).`);
+    return Math.max(1, Math.floor(qty));
   };
 
   const fillBalance = (row: ReleaseQueueRow) => {
@@ -179,7 +180,7 @@ export default function ReleaseSalesOrderPage() {
                         <button
                           type="button"
                           class="text-xs text-brand-600 hover:underline"
-                          onClick={() => void pickSerials(row)}
+                          onClick={() => openSerialPick(row)}
                         >
                           Pick ({(serialIds()[row.sales_order_line_id] ?? []).length})
                         </button>
@@ -214,6 +215,26 @@ export default function ReleaseSalesOrderPage() {
           </button>
         </div>
       </section>
+
+      <SerialPickModal
+        open={serialPickOpen()}
+        itemId={serialPickRow()?.item_id ?? null}
+        locationId={serialPickRow()?.location_id}
+        maxQty={serialPickQty()}
+        selectedIds={serialIds()[serialPickRow()?.sales_order_line_id ?? 0] ?? []}
+        itemLabel={
+          serialPickRow()
+            ? `${serialPickRow()!.item_code} — ${serialPickRow()!.item_name}`
+            : undefined
+        }
+        onClose={() => setSerialPickOpen(false)}
+        onConfirm={(ids) => {
+          const row = serialPickRow();
+          if (!row) return;
+          setSerialIds((prev) => ({ ...prev, [row.sales_order_line_id]: ids }));
+          toast.success(`Selected ${ids.length} serial(s).`);
+        }}
+      />
     </SalesOrderLayout>
   );
 }

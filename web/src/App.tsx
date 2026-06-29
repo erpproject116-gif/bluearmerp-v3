@@ -63,6 +63,7 @@ import PurchaseRequestStatusPage from "./modules/purchase-request/purchase-reque
 import PurchaseRequestPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestPrintPage";
 import PurchaseRequestStatusPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPrintPage";
 import PurchaseOrderListPage from "./modules/purchase-request/purchase-order/PurchaseOrderListPage";
+import GoodsReceiptListPage from "./modules/purchase-request/goods-receipt/GoodsReceiptListPage";
 import SalesListPage from "./modules/sales/sales/SalesListPage";
 import SalesNewPage from "./modules/sales/sales/SalesNewPage";
 import SalesSettingsPage from "./modules/sales/sales/SalesSettingsPage";
@@ -111,6 +112,7 @@ import ConversionFunnelReportPage from "./modules/crm/reports/ConversionFunnelRe
 import BrandingSettingsPage from "./modules/settings/BrandingSettingsPage";
 import { BrandingProvider } from "./shared/branding/BrandingProvider";
 import LowStockReportPage from "./modules/crm/reports/LowStockReportPage";
+import DashboardPage from "./modules/dashboard/DashboardPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -164,6 +166,7 @@ export default function App() {
         <Route path="/app/sales/collective-invoicing/:id/invoice/print" component={CollectiveInvoicePrintPage} />
         <Route path="/app/sales/reports/print-slips/print" component={SalesSlipsPrintPage} />
         <Route path="/app" component={AppLayout}>
+          <Route path="/dashboard" component={DashboardPage} />
           <Route path="/inventory/partners" component={PartnersPage} />
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
           <Route path="/inventory/locations" component={LocationsPage} />
@@ -209,6 +212,7 @@ export default function App() {
           <Route path="/purchase-request/purchase-requests/settings" component={PurchaseRequestSettingsPage} />
           <Route path="/purchase-request/purchase-requests" component={PurchaseRequestListPage} />
           <Route path="/purchase-request/purchase-orders" component={PurchaseOrderListPage} />
+          <Route path="/purchase-request/goods-receipt" component={GoodsReceiptListPage} />
           <Route path="/sales/sales/new" component={SalesNewPage} />
           <Route path="/sales/sales/status" component={SalesStatusPage} />
           <Route path="/sales/sales/pre-invoicing" component={PreInvoicingStatusPage} />

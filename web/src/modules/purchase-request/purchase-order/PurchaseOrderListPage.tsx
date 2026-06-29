@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -12,6 +13,7 @@ import {
   type PurchaseOrderRow,
 } from "../../../shared/usePurchaseOrderList";
 import { useToast } from "../../../shared/toast";
+import { PurchaseOrderModal } from "./PurchaseOrderModal";
 import { PurchaseRequestLayout } from "../PurchaseRequestLayout";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 
@@ -160,6 +162,8 @@ export default function PurchaseOrderListPage() {
 
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [fromPrOpen, setFromPrOpen] = createSignal(false);
+  const [poModalOpen, setPoModalOpen] = createSignal(false);
+  const [editingPoId, setEditingPoId] = createSignal<number | null>(null);
 
   const list = usePurchaseOrderList(() => ({
     page: page(),
@@ -180,8 +184,28 @@ export default function PurchaseOrderListPage() {
     invalidate();
   };
 
+  const openPo = (row: PurchaseOrderRow) => {
+    setEditingPoId(row.id);
+    setPoModalOpen(true);
+  };
+
   return (
     <PurchaseRequestLayout>
+      <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <A
+          href="/app/inventory/serial-lot/receive"
+          class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+        >
+          Receive goods
+        </A>
+        <A
+          href="/app/purchase-request/goods-receipt"
+          class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+        >
+          Goods receipts
+        </A>
+      </div>
+
       <SpreadsheetGrid
         columns={[
           { key: "date_no_display", header: "Date-No", clickable: true },
@@ -224,7 +248,7 @@ export default function PurchaseOrderListPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onEdit={() => {}}
+        onEdit={openPo}
         onNew={() => setFromPrOpen(true)}
         codeKey="purchase_order_no"
         nameKey="date_no_display"
@@ -249,6 +273,16 @@ export default function PurchaseOrderListPage() {
         open={fromPrOpen()}
         onClose={() => setFromPrOpen(false)}
         onCreated={invalidate}
+      />
+
+      <PurchaseOrderModal
+        open={poModalOpen()}
+        purchaseOrderId={editingPoId()}
+        onClose={() => {
+          setPoModalOpen(false);
+          setEditingPoId(null);
+        }}
+        onSaved={invalidate}
       />
     </PurchaseRequestLayout>
   );

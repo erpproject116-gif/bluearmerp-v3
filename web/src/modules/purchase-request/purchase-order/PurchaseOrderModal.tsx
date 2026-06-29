@@ -1,0 +1,466 @@
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { apiFetch } from "../../../shared/api";
+import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { DateInput } from "../../../shared/DateInput";
+import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { submitEntity } from "../../../shared/handleSaveResult";
+import { useToast } from "../../../shared/toast";
+import { formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
+import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
+import { WideEntityModal } from "../../../shared/WideEntityModal";
+import {
+  PurchaseRequestLineGrid,
+  emptyPurchaseRequestLine,
+  recalculatePurchaseRequestLines,
+  type PurchaseRequestLineRow,
+} from "../purchase-request/PurchaseRequestLineGrid";
+import { formatMoney } from "../purchase-request/purchaseRequestPrint";
+
+export type PurchaseOrderDetail = {
+  id: number;
+  order_date: string;
+  date_seq: number;
+  date_no_display: string;
+  purchase_order_no: string;
+  purchase_request_id?: number | null;
+  tax_type_id: number;
+  tax_type_name?: string;
+  currency_id: number;
+  currency_code?: string;
+  partner_id?: number | null;
+  partner_name: string;
+  pic_user_id?: number | null;
+  pic_name: string;
+  location_id: number;
+  location_name?: string;
+  project_id?: number | null;
+  project_name?: string | null;
+  status: string;
+  reference?: string | null;
+  notes?: string | null;
+  subtotal: number;
+  tax_total: number;
+  grand_total: number;
+  created_by_name?: string;
+  lines?: Array<{
+    line_no: number;
+    partner_id?: number | null;
+    partner_code: string;
+    partner_name: string;
+    item_id?: number | null;
+    item_code: string;
+    item_name: string;
+    spec_name?: string | null;
+    description?: string | null;
+    qty: number;
+    received_qty?: number;
+    unit_non_vat: number;
+    non_vat_total: number;
+    tax_amount: number;
+    unit_vat_inc: number;
+    line_total: number;
+    remark?: string | null;
+  }>;
+};
+
+type Props = {
+  open: boolean;
+  purchaseOrderId: number | null;
+  onClose: () => void;
+  onSaved: () => void;
+};
+
+async function fetchLocations(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
+  return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
+}
+
+async function fetchProjects(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; project_name: string }[]>(`/api/v1/inventory/projects?${qs}`);
+  return (res.data ?? []).map((p) => ({ id: p.id, label: p.project_name }));
+}
+
+async function fetchUsers(q: string): Promise<LookupOption[]> {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+  const res = await apiFetch<{ id: number; full_name: string; email: string }[]>(`/api/v1/inventory/after-sales/users${qs}`);
+  return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
+}
+
+async function fetchTaxTypes(): Promise<TaxTypeRow[]> {
+  const res = await apiFetch<TaxTypeRow[]>(
+    "/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc",
+  );
+  return res.data ?? [];
+}
+
+async function fetchCurrencies(): Promise<{ id: number; currency_code: string; name: string; is_default: boolean }[]> {
+  const res = await apiFetch<{ id: number; currency_code: string; name: string; is_default: boolean; status: string }[]>(
+    "/api/v1/quotation/currencies?page=1&pageSize=100&status=active&sort=name&order=asc",
+  );
+  return res.data ?? [];
+}
+
+function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestLineRow[] {
+  if (!lines?.length) return [emptyPurchaseRequestLine(1)];
+  return lines.map((ln) => ({
+    line_no: ln.line_no,
+    partner_id: ln.partner_id,
+    partner_code: ln.partner_code ?? "",
+    partner_name: ln.partner_name ?? "",
+    item_id: ln.item_id,
+    item_code: ln.item_code ?? "",
+    item_name: ln.item_name ?? "",
+    spec_name: ln.spec_name ?? "",
+    description: ln.description ?? "",
+    qty: ln.qty != null ? String(ln.qty) : "1",
+    unit_price: String(ln.unit_vat_inc ?? 0),
+    input_basis: "vat_inc_unit" as const,
+    unit_non_vat: String(ln.unit_non_vat ?? 0),
+    non_vat_total: String(ln.non_vat_total ?? 0),
+    tax_amount: String(ln.tax_amount ?? 0),
+    unit_vat_inc: String(ln.unit_vat_inc ?? 0),
+    line_total: String(ln.line_total ?? 0),
+    remark: ln.remark ?? "",
+  }));
+}
+
+function statusLabel(status: string): string {
+  return status.replace(/_/g, " ");
+}
+
+export function PurchaseOrderModal(props: Props) {
+  const toast = useToast();
+  const [loading, setLoading] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
+  const [detail, setDetail] = createSignal<PurchaseOrderDetail | null>(null);
+  const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
+  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
+
+  const [orderDate, setOrderDate] = createSignal("");
+  const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
+  const [currencyId, setCurrencyId] = createSignal<number | null>(null);
+  const [picUserId, setPicUserId] = createSignal<number | null>(null);
+  const [picName, setPicName] = createSignal("");
+  const [locationId, setLocationId] = createSignal<number | null>(null);
+  const [locationLabel, setLocationLabel] = createSignal("");
+  const [projectId, setProjectId] = createSignal<number | null>(null);
+  const [projectLabel, setProjectLabel] = createSignal("");
+  const [projectName, setProjectName] = createSignal("");
+  const [reference, setReference] = createSignal("");
+  const [notes, setNotes] = createSignal("");
+  const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
+
+  const isDraft = () => detail()?.status === "draft";
+  const readOnly = () => !isDraft();
+  const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
+
+  const applyDetail = (po: PurchaseOrderDetail) => {
+    setDetail(po);
+    setOrderDate(po.order_date);
+    setTaxTypeId(po.tax_type_id);
+    setCurrencyId(po.currency_id);
+    setPicUserId(po.pic_user_id ?? null);
+    setPicName(po.pic_name);
+    setLocationId(po.location_id);
+    setLocationLabel(po.location_name ?? "");
+    setProjectId(po.project_id ?? null);
+    setProjectLabel(po.project_name ?? "");
+    setProjectName(po.project_name ?? "");
+    setReference(po.reference ?? "");
+    setNotes(po.notes ?? "");
+    setLines(linesFromDetail(po.lines));
+  };
+
+  const loadDetail = async (id: number) => {
+    setLoading(true);
+    const [poRes, tt, cc] = await Promise.all([
+      apiFetch<PurchaseOrderDetail>(`/api/v1/purchase-order/purchase-orders/${id}`),
+      fetchTaxTypes(),
+      fetchCurrencies(),
+    ]);
+    setTaxTypes(tt);
+    setCurrencies(cc);
+    setLoading(false);
+    if (!poRes.success || !poRes.data) {
+      toast.warning(poRes.message ?? "Failed to load purchase order.");
+      props.onClose();
+      return;
+    }
+    applyDetail(poRes.data);
+  };
+
+  createEffect(() => {
+    if (!props.open || !props.purchaseOrderId) return;
+    void loadDetail(props.purchaseOrderId);
+  });
+
+  const onTaxTypeChange = async (newId: number | null) => {
+    if (readOnly()) return;
+    setTaxTypeId(newId);
+    const meta = taxTypes().find((t) => t.id === newId);
+    if (!newId || !meta) return;
+    const recalc = await recalculatePurchaseRequestLines(lines(), newId, meta);
+    setLines(recalc);
+  };
+
+  const save = async () => {
+    const po = detail();
+    if (!po || !isDraft()) return;
+    if (!taxTypeId() || !currencyId() || !locationId()) {
+      toast.warning("Transaction type, currency, and location are required.");
+      return;
+    }
+
+    const body = {
+      order_date: orderDate(),
+      tax_type_id: taxTypeId(),
+      currency_id: currencyId(),
+      pic_user_id: picUserId(),
+      pic_name: picName(),
+      location_id: locationId(),
+      project_id: projectId(),
+      project_name: projectName() || null,
+      reference: reference() || null,
+      notes: notes() || null,
+      lines: lines().map((ln, i) => ({
+        line_no: i + 1,
+        partner_id: ln.partner_id || null,
+        partner_code: ln.partner_code,
+        partner_name: ln.partner_name,
+        item_id: ln.item_id || null,
+        item_code: ln.item_code,
+        item_name: ln.item_name,
+        spec_name: ln.spec_name || null,
+        description: ln.description || null,
+        qty: ln.qty === "" ? 0 : Number(ln.qty),
+        unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
+        input_basis: ln.input_basis,
+        remark: ln.remark || null,
+      })),
+    };
+
+    setSaving(true);
+    const ok = await submitEntity(
+      () =>
+        apiFetch(`/api/v1/purchase-order/purchase-orders/${po.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        }, { silent: true }),
+      toast,
+      "Purchase order updated.",
+    );
+    setSaving(false);
+    if (!ok) return;
+    props.onSaved();
+    props.onClose();
+  };
+
+  const po = () => detail();
+
+  return (
+    <WideEntityModal
+      open={props.open}
+      title={po() ? `Purchase Order — ${po()!.purchase_order_no}` : "Purchase Order"}
+      onClose={props.onClose}
+      onSave={() => void save()}
+      readOnly={readOnly()}
+      saving={saving()}
+    >
+      <Show when={loading()}>
+        <p class="text-sm text-text-secondary">Loading…</p>
+      </Show>
+      <Show when={!loading() && po()}>
+        {(d) => (
+          <div class="space-y-4">
+            <div class="flex flex-wrap gap-4 rounded-lg border border-stroke bg-slate-50 p-3 text-sm">
+              <span>
+                <span class="text-text-secondary">Status:</span>{" "}
+                <span class="font-medium capitalize">{statusLabel(d().status)}</span>
+              </span>
+              <span>
+                <span class="text-text-secondary">Date-no:</span>{" "}
+                <span class="font-medium">{d().date_no_display}</span>
+              </span>
+              <span>
+                <span class="text-text-secondary">Vendor:</span>{" "}
+                <span class="font-medium">{d().partner_name}</span>
+              </span>
+              <span>
+                <span class="text-text-secondary">Total:</span>{" "}
+                <span class="font-medium">{formatMoney(d().grand_total, d().currency_code ?? "")}</span>
+              </span>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <Field label="Order date">
+                <DateInput
+                  value={orderDate()}
+                  onInput={(e) => setOrderDate(e.currentTarget.value)}
+                  disabled={readOnly()}
+                />
+              </Field>
+              <Field label="Transaction type">
+                <select
+                  class={inputClass}
+                  value={taxTypeId() ?? ""}
+                  disabled={readOnly()}
+                  onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
+                >
+                  <option value="">Select…</option>
+                  <For each={taxTypes()}>
+                    {(t) => (
+                      <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
+                    )}
+                  </For>
+                </select>
+                <Show when={selectedTaxType()}>
+                  {(t) => (
+                    <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
+                  )}
+                </Show>
+              </Field>
+              <Field label="Currency">
+                <select
+                  class={inputClass}
+                  value={currencyId() ?? ""}
+                  disabled={readOnly()}
+                  onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
+                >
+                  <option value="">Select…</option>
+                  <For each={currencies()}>
+                    {(c) => (
+                      <option value={c.id}>
+                        {c.currency_code} — {c.name}
+                      </option>
+                    )}
+                  </For>
+                </select>
+              </Field>
+              <Field label="Location">
+                <Show
+                  when={isDraft()}
+                  fallback={<input class={inputClass} value={locationLabel()} readOnly />}
+                >
+                  <LookupCombo
+                    label=""
+                    value={locationLabel}
+                    selectedId={locationId}
+                    onInput={setLocationLabel}
+                    onSelect={(o) => {
+                      setLocationId(o.id);
+                      setLocationLabel(o.label);
+                    }}
+                    onClear={() => {
+                      setLocationId(null);
+                      setLocationLabel("");
+                    }}
+                    fetchOptions={fetchLocations}
+                  />
+                </Show>
+              </Field>
+              <Field label="PIC">
+                <Show when={isDraft()} fallback={<input class={inputClass} value={picName()} readOnly />}>
+                  <LookupCombo
+                    label=""
+                    value={picName}
+                    selectedId={picUserId}
+                    onInput={setPicName}
+                    onSelect={(o) => {
+                      setPicUserId(o.id);
+                      setPicName(o.label);
+                    }}
+                    onClear={() => {
+                      setPicUserId(null);
+                      setPicName("");
+                    }}
+                    fetchOptions={fetchUsers}
+                  />
+                </Show>
+              </Field>
+              <Field label="Project">
+                <Show when={isDraft()} fallback={<input class={inputClass} value={projectLabel()} readOnly />}>
+                  <LookupCombo
+                    label=""
+                    value={projectLabel}
+                    selectedId={projectId}
+                    onInput={setProjectLabel}
+                    onSelect={(o) => {
+                      setProjectId(o.id);
+                      setProjectLabel(o.label);
+                      setProjectName(o.label);
+                    }}
+                    onClear={() => {
+                      setProjectId(null);
+                      setProjectLabel("");
+                      setProjectName("");
+                    }}
+                    fetchOptions={fetchProjects}
+                  />
+                </Show>
+              </Field>
+              <Field label="Reference">
+                <input
+                  class={inputClass}
+                  value={reference()}
+                  readOnly={readOnly()}
+                  onInput={(e) => setReference(e.currentTarget.value)}
+                />
+              </Field>
+              <Field label="Notes">
+                <input
+                  class={inputClass}
+                  value={notes()}
+                  readOnly={readOnly()}
+                  onInput={(e) => setNotes(e.currentTarget.value)}
+                />
+              </Field>
+            </div>
+
+            <Show when={isDraft()} fallback={
+              <div class="overflow-x-auto rounded-lg border border-stroke">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-50 text-left text-xs uppercase text-text-secondary">
+                    <tr>
+                      <th class="px-2 py-2">#</th>
+                      <th class="px-2 py-2">Item</th>
+                      <th class="px-2 py-2 text-right">Qty</th>
+                      <th class="px-2 py-2 text-right">Received</th>
+                      <th class="px-2 py-2 text-right">Line total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={d().lines ?? []}>
+                      {(ln) => (
+                        <tr class="border-t border-stroke">
+                          <td class="px-2 py-2">{ln.line_no}</td>
+                          <td class="px-2 py-2">
+                            {ln.item_code} — {ln.item_name}
+                          </td>
+                          <td class="px-2 py-2 text-right">{ln.qty}</td>
+                          <td class="px-2 py-2 text-right">{ln.received_qty ?? 0}</td>
+                          <td class="px-2 py-2 text-right">{formatMoney(ln.line_total, d().currency_code ?? "")}</td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            }>
+              <PurchaseRequestLineGrid
+                lines={lines}
+                onChange={setLines}
+                taxTypeId={taxTypeId}
+                taxTypeMeta={selectedTaxType}
+                locationId={locationId}
+              />
+            </Show>
+          </div>
+        )}
+      </Show>
+    </WideEntityModal>
+  );
+}

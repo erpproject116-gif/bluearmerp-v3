@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../../shared/api";
-import { fetchAvailableSerials } from "../../../shared/useReleaseQueue";
+import { SerialPickModal } from "../../../shared/SerialPickModal";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
@@ -189,6 +189,8 @@ type Props = {
 export function SalesLineGrid(props: Props) {
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchLineIdx, setSearchLineIdx] = createSignal<number | null>(null);
+  const [serialPickOpen, setSerialPickOpen] = createSignal(false);
+  const [serialPickIdx, setSerialPickIdx] = createSignal<number | null>(null);
 
   const columns = createMemo(() => {
     const cols = [...BASE_COLUMNS];
@@ -235,18 +237,9 @@ export function SalesLineGrid(props: Props) {
     props.onChange(next.length ? next : [emptySalesLine(1, "", basis)]);
   };
 
-  const pickSerialsForLine = async (idx: number) => {
-    const line = props.lines()[idx];
-    if (!line.item_id) return;
-    const loc = props.locationId();
-    const avail = await fetchAvailableSerials(line.item_id, loc ?? undefined);
-    if (avail.length === 0) return;
-    const qty = Math.max(1, Math.floor(parseNum(line.qty)));
-    const picked = avail.slice(0, qty);
-    await updateLine(idx, {
-      serial_unit_ids: picked.map((s) => s.id),
-      serial_lot_no: picked.map((s) => s.serial_no).join(", "),
-    });
+  const openSerialPick = (idx: number) => {
+    setSerialPickIdx(idx);
+    setSerialPickOpen(true);
   };
 
   const openSearch = (idx: number) => {
@@ -391,7 +384,7 @@ export function SalesLineGrid(props: Props) {
                       <div class="flex items-center gap-1">
                         <input class={`${inputClass} min-w-0 flex-1`} value={line.serial_lot_no} readOnly={Boolean(line.serial_unit_ids?.length)} onInput={(e) => void updateLine(idx(), { serial_lot_no: e.currentTarget.value })} />
                         <Show when={line.item_id}>
-                          <button type="button" class="shrink-0 text-xs text-brand-600 hover:underline" onClick={() => void pickSerialsForLine(idx())}>
+                          <button type="button" class="shrink-0 text-xs text-brand-600 hover:underline" onClick={() => openSerialPick(idx())}>
                             Pick
                           </button>
                         </Show>
@@ -432,6 +425,34 @@ export function SalesLineGrid(props: Props) {
         contextLocationId={props.locationId()}
         onClose={() => setSearchOpen(false)}
         onConfirm={applyItems}
+      />
+
+      <SerialPickModal
+        open={serialPickOpen()}
+        itemId={serialPickIdx() != null ? props.lines()[serialPickIdx()!]?.item_id ?? null : null}
+        locationId={props.locationId()}
+        maxQty={
+          serialPickIdx() != null
+            ? Math.max(1, Math.floor(parseNum(props.lines()[serialPickIdx()!]?.qty ?? "1")))
+            : 1
+        }
+        selectedIds={
+          serialPickIdx() != null ? props.lines()[serialPickIdx()!]?.serial_unit_ids ?? [] : []
+        }
+        itemLabel={
+          serialPickIdx() != null
+            ? `${props.lines()[serialPickIdx()!]?.item_code} — ${props.lines()[serialPickIdx()!]?.item_name}`
+            : undefined
+        }
+        onClose={() => setSerialPickOpen(false)}
+        onConfirm={(ids, serials) => {
+          const idx = serialPickIdx();
+          if (idx == null) return;
+          void updateLine(idx, {
+            serial_unit_ids: ids,
+            serial_lot_no: serials.map((s) => s.serial_no).join(", "),
+          });
+        }}
       />
     </div>
   );

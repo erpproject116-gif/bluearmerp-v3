@@ -17,15 +17,24 @@ type PurchaseOrderRow = {
   item_name_summary?: string;
 };
 
+type GoodsReceiptLot = {
+  id: number;
+  lot_no: string;
+  qty: number;
+  expiry_date?: string | null;
+};
+
 type GoodsReceiptLine = {
   id: number;
   line_no: number;
   item_code: string;
   item_name: string;
   track_serial: boolean;
+  track_lot: boolean;
   expected_qty: number;
   received_qty: number;
   serials?: { id: number; serial_no: string }[];
+  lots?: GoodsReceiptLot[];
 };
 
 type GoodsReceipt = {
@@ -83,11 +92,17 @@ export default function SerialReceivePage() {
   const [goodsReceipt, setGoodsReceipt] = createSignal<GoodsReceipt | null>(null);
   const [scanLineId, setScanLineId] = createSignal<number | null>(null);
   const [scanInput, setScanInput] = createSignal("");
+  const [lotLineId, setLotLineId] = createSignal<number | null>(null);
+  const [lotNo, setLotNo] = createSignal("");
+  const [lotQty, setLotQty] = createSignal("1");
+  const [lotExpiry, setLotExpiry] = createSignal("");
   const [creating, setCreating] = createSignal(false);
   const [scanning, setScanning] = createSignal(false);
+  const [addingLot, setAddingLot] = createSignal(false);
   const [posting, setPosting] = createSignal(false);
 
   const serialLines = () => (goodsReceipt()?.lines ?? []).filter((l) => l.track_serial);
+  const lotLines = () => (goodsReceipt()?.lines ?? []).filter((l) => l.track_lot);
 
   const loadPoDetails = async (poId: number) => {
     const res = await apiFetch<PurchaseOrderRow>(`/api/v1/purchase-order/purchase-orders/${poId}`);
@@ -121,7 +136,9 @@ export default function SerialReceivePage() {
     setGoodsReceipt(res.data);
     const firstSerialLine = res.data.lines?.find((l) => l.track_serial);
     if (firstSerialLine) setScanLineId(firstSerialLine.id);
-    toast.success("Goods receipt created. Scan serial numbers.");
+    const firstLotLine = res.data.lines?.find((l) => l.track_lot);
+    if (firstLotLine) setLotLineId(firstLotLine.id);
+    toast.success("Goods receipt created. Scan serial numbers or enter lots.");
   };
 
   const refreshReceipt = async (grId: number) => {
@@ -157,6 +174,42 @@ export default function SerialReceivePage() {
     toast.success(`Scanned ${serialNo}`);
   };
 
+  const addLot = async () => {
+    const gr = goodsReceipt();
+    const lineId = lotLineId();
+    const lot = lotNo().trim();
+    const qty = Number(lotQty());
+    if (!gr || !lineId || !lot || !Number.isFinite(qty) || qty <= 0) {
+      toast.warning("Select a line, enter lot no., and a positive quantity.");
+      return;
+    }
+
+    setAddingLot(true);
+    const res = await apiFetch(
+      `/api/v1/goods-receipt/goods-receipts/${gr.id}/lots`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          goods_receipt_line_id: lineId,
+          lot_no: lot,
+          qty,
+          expiry_date: lotExpiry().trim() || null,
+        }),
+      },
+      { silent: true },
+    );
+    setAddingLot(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to add lot.");
+      return;
+    }
+    setLotNo("");
+    setLotQty("1");
+    setLotExpiry("");
+    await refreshReceipt(gr.id);
+    toast.success(`Added lot ${lot}`);
+  };
+
   const postReceipt = async () => {
     const gr = goodsReceipt();
     if (!gr) return;
@@ -179,6 +232,10 @@ export default function SerialReceivePage() {
     setSelectedPo(null);
     setPoLabel("");
     setScanLineId(null);
+    setLotLineId(null);
+    setLotNo("");
+    setLotQty("1");
+    setLotExpiry("");
   };
 
   const reset = () => {
@@ -188,6 +245,10 @@ export default function SerialReceivePage() {
     setPoLabel("");
     setScanLineId(null);
     setScanInput("");
+    setLotLineId(null);
+    setLotNo("");
+    setLotQty("1");
+    setLotExpiry("");
     setReceiptDate(todayISO());
   };
 
@@ -197,7 +258,7 @@ export default function SerialReceivePage() {
         <div class="mb-4">
           <h2 class="text-lg font-semibold text-text-primary">Receive / Scan Serials</h2>
           <p class="text-sm text-text-secondary">
-            Select a confirmed purchase order, create a goods receipt, scan serial numbers, then post.
+            Select a confirmed purchase order, create a goods receipt, scan serial numbers or enter lots, then post.
           </p>
         </div>
 
@@ -218,6 +279,95 @@ export default function SerialReceivePage() {
                 </p>
               </div>
 
+              <Show when={lotLines().length > 0}>
+                <div class="rounded-lg border border-stroke bg-slate-50 p-4">
+                  <h3 class="mb-3 text-sm font-semibold text-text-primary">Lot entry</h3>
+                  <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <Field label="Lot line">
+                      <select
+                        class={inputClass}
+                        value={lotLineId() ?? ""}
+                        onChange={(e) => setLotLineId(Number(e.currentTarget.value) || null)}
+                      >
+                        <option value="">Select line…</option>
+                        <For each={lotLines()}>
+                          {(line) => (
+                            <option value={line.id}>
+                              {line.item_code} — {line.item_name} ({line.received_qty}/{line.expected_qty})
+                            </option>
+                          )}
+                        </For>
+                      </select>
+                    </Field>
+                    <Field label="Lot no.">
+                      <input
+                        class={inputClass}
+                        value={lotNo()}
+                        onInput={(e) => setLotNo(e.currentTarget.value)}
+                        placeholder="Lot / batch no."
+                      />
+                    </Field>
+                    <Field label="Qty">
+                      <input
+                        type="number"
+                        class={inputClass}
+                        min="0.0001"
+                        step="any"
+                        value={lotQty()}
+                        onInput={(e) => setLotQty(e.currentTarget.value)}
+                      />
+                    </Field>
+                    <Field label="Expiry date">
+                      <DateInput value={lotExpiry()} onInput={(e) => setLotExpiry(e.currentTarget.value)} />
+                    </Field>
+                  </div>
+                  <div class="mt-3">
+                    <button
+                      type="button"
+                      class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                      disabled={!lotLineId() || !lotNo().trim() || addingLot()}
+                      onClick={() => void addLot()}
+                    >
+                      {addingLot() ? "Adding…" : "Add lot"}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-stroke">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-left text-text-secondary">
+                      <tr>
+                        <th class="px-3 py-2">Line</th>
+                        <th class="px-3 py-2">Item</th>
+                        <th class="px-3 py-2">Expected</th>
+                        <th class="px-3 py-2">Received</th>
+                        <th class="px-3 py-2">Lots</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={lotLines()}>
+                        {(line) => (
+                          <tr class="border-t border-stroke">
+                            <td class="px-3 py-2">{line.line_no}</td>
+                            <td class="px-3 py-2">
+                              {line.item_code} — {line.item_name}
+                            </td>
+                            <td class="px-3 py-2">{line.expected_qty}</td>
+                            <td class="px-3 py-2">{line.received_qty}</td>
+                            <td class="px-3 py-2">
+                              {(line.lots ?? [])
+                                .map((l) => `${l.lot_no} (${l.qty}${l.expiry_date ? `, exp ${l.expiry_date}` : ""})`)
+                                .join("; ") || "—"}
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+              </Show>
+
+              <Show when={serialLines().length > 0}>
               <div class="grid gap-4 md:grid-cols-2">
                 <Field label="Scan into line">
                   <select
@@ -292,6 +442,11 @@ export default function SerialReceivePage() {
                   </tbody>
                 </table>
               </div>
+              </Show>
+
+              <Show when={serialLines().length === 0 && lotLines().length === 0}>
+                <p class="text-sm text-text-secondary">No serial or lot-tracked lines on this goods receipt.</p>
+              </Show>
 
               <div class="flex flex-wrap gap-2 border-t border-stroke pt-4">
                 <button

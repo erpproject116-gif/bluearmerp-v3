@@ -146,3 +146,65 @@ func SyncWarrantyAssetsFromSale(ctx context.Context, tx pgx.Tx, tenantID, salesI
 	}
 	return synced, rows.Err()
 }
+
+// SyncWarrantyAssetsFromGoodsReceipt upserts crm_warranty_assets for GR serial units with warranty months.
+func SyncWarrantyAssetsFromGoodsReceipt(ctx context.Context, tx pgx.Tx, tenantID, grID int64) error {
+	rows, err := tx.Query(ctx, `
+		select
+		  su.id, su.serial_no, su.item_id, i.item_code, i.item_name,
+		  su.warranty_start, su.warranty_end, su.partner_id, su.goods_receipt_line_id,
+		  coalesce(i.warranty_duration_months, 0)
+		from public.inv_serial_units su
+		join public.gr_goods_receipt_lines grl on grl.id = su.goods_receipt_line_id
+		join public.inv_items i on i.id = su.item_id
+		where grl.goods_receipt_id = $1 and su.tenant_id = $2
+		  and coalesce(i.warranty_duration_months, 0) > 0`, grID, tenantID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var unitID, itemID int64
+		var grLineID *int64
+		var partnerID *int64
+		var serialNo, itemCode, itemName string
+		var wStart, wEnd *time.Time
+		var warrantyMonths int
+		if err := rows.Scan(&unitID, &serialNo, &itemID, &itemCode, &itemName, &wStart, &wEnd,
+			&partnerID, &grLineID, &warrantyMonths); err != nil {
+			return err
+		}
+		if partnerID == nil || wStart == nil || wEnd == nil {
+			continue
+		}
+		status := "active"
+		if wEnd.Before(time.Now().Truncate(24 * time.Hour)) {
+			status = "expired"
+		}
+		_, err := tx.Exec(ctx, `
+			insert into public.crm_warranty_assets (
+			  tenant_id, partner_id, item_id, item_code, item_name, serial_no,
+			  serial_unit_id, warranty_origin, goods_receipt_line_id,
+			  warranty_start, warranty_end, status
+			) values ($1,$2,$3,$4,$5,$6,$7,'receipt',$8,$9,$10,$11)
+			on conflict (tenant_id, serial_no) do update set
+			  partner_id = excluded.partner_id,
+			  item_id = excluded.item_id,
+			  item_code = excluded.item_code,
+			  item_name = excluded.item_name,
+			  serial_unit_id = excluded.serial_unit_id,
+			  warranty_origin = excluded.warranty_origin,
+			  goods_receipt_line_id = excluded.goods_receipt_line_id,
+			  warranty_start = excluded.warranty_start,
+			  warranty_end = excluded.warranty_end,
+			  status = excluded.status,
+			  updated_at = now()`,
+			tenantID, *partnerID, itemID, strings.TrimSpace(itemCode), strings.TrimSpace(itemName), serialNo,
+			unitID, grLineID, *wStart, *wEnd, status)
+		if err != nil {
+			return fmt.Errorf("sync warranty asset %s: %w", serialNo, err)
+		}
+	}
+	return rows.Err()
+}

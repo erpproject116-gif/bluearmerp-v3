@@ -146,6 +146,7 @@ func registerSalesOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/sales-orders/quotation-lines/open", listOpenQuotationLines(pool))
 	r.Get("/sales-orders/release-queue", listReleaseQueue(pool))
 	r.Post("/sales-orders/releases", postReleases(pool))
+	r.With(auth.RequirePermission("sales_order.release_undo", "write")).Post("/sales-orders/releases/{releaseLineId}/undo", undoRelease(pool))
 	r.Get("/sales-orders/status-report/export", exportSalesOrderStatusReport(pool))
 	r.Get("/sales-orders/status-report", listSalesOrderStatusReport(pool))
 	r.Get("/sales-orders/outstanding-report/export", exportSalesOrderOutstandingReport(pool))

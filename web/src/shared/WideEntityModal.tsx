@@ -5,8 +5,9 @@ export function WideEntityModal(props: {
   open: boolean;
   title: string;
   onClose: () => void;
-  onSave: () => void;
+  onSave?: () => void;
   saving?: boolean;
+  readOnly?: boolean;
   children: JSX.Element;
 }) {
   return (
@@ -17,11 +18,13 @@ export function WideEntityModal(props: {
           <div class="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">{props.children}</div>
           <div class="mt-6 flex justify-end gap-3 border-t border-stroke pt-4">
             <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => props.onClose()}>
-              Cancel
+              {props.readOnly ? "Close" : "Cancel"}
             </button>
-            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" disabled={props.saving} onClick={() => props.onSave()}>
-              Save changes
-            </button>
+            <Show when={!props.readOnly && props.onSave}>
+              <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" disabled={props.saving} onClick={() => props.onSave!()}>
+                Save changes
+              </button>
+            </Show>
           </div>
         </div>
       </div>

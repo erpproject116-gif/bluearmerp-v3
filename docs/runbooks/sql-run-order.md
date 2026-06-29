@@ -90,6 +90,18 @@ psql "$DATABASE_URL" -f api/migrations/018_crm.sql
 
 **Do not skip migrations.** Seeds depend on tables created here.
 
+### Traceability hardening + Business Dashboard (047–049)
+
+Applied automatically by `supabase db reset` in filename order after earlier migrations:
+
+| File | Purpose |
+|------|---------|
+| `047_sales_stock_hybrid.sql` | `inv_serial_units.reserved_at`; reversal permissions (`release_undo`, `sales_return`, `goods_receipts_reverse`) |
+| `048_gr_lots_sales_lot_batch.sql` | `gr_goods_receipt_line_lots`; `sa_sales_lines.lot_batch_id` |
+| `049_dashboard.sql` | Business Dashboard module, permissions, tenant enablement |
+
+See [docs/modules/inventory/serial-lot/README.md](../modules/inventory/serial-lot/README.md) and [docs/modules/dashboard/README.md](../modules/dashboard/README.md).
+
 ---
 
 ## Phase 2 — Seed data (automatic with `db reset`)
@@ -108,6 +120,7 @@ psql "$DATABASE_URL" -f api/migrations/018_crm.sql
 | 5b (optional) | `scripts/seed-demo-sales-orders-export.sql` | **Sales order list export** for **BLUEARM**; run after step 5 |
 | 5c (optional) | `scripts/seed-demo-purchase-requests.sql` | Demo purchase requests for **DEMO000** + **BLUEARM**; run after step 3 (inventory) |
 | 5d (optional) | `scripts/seed-demo-serial-lot.sql` | Serial-tracked items, PO, GRN, demo serial units; run after 5c and migrations 040-044 |
+| 5e (optional) | `scripts/seed-demo-dashboard.sql` | Intentional serial-vs-qty mismatch for dashboard red flags; run after 5d and migrations 047-049 |
 | 6 | `scripts/seed-demo-sales.sql` | Demo sales (SI) from released SO lines for **DEMO000** + **BLUEARM** |
 | 7 | `scripts/seed-demo-finance.sql` | Demo official receipt applied to demo sale for **DEMO000** + **BLUEARM** |
 | 8 | `scripts/seed-demo-crm.sql` | CRM alert rules, warranty assets, follow-up tasks, notifications, low-stock demo for **DEMO000** + **BLUEARM** |
@@ -127,6 +140,7 @@ psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders-export.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-serial-lot.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-dashboard.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-finance.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-crm.sql

@@ -2,10 +2,12 @@ package crm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -99,11 +101,12 @@ func runAlertEvaluator(ctx context.Context, pool *pgxpool.Pool, tenantID int64) 
 }
 
 type alertRule struct {
-	ID        int64
-	RuleType  string
-	Name      string
-	LeadValue int
-	LeadUnit  string
+	ID            int64
+	RuleType      string
+	Name          string
+	LeadValue     int
+	LeadUnit      string
+	ThresholdJSON json.RawMessage
 }
 
 func evaluateTenantAlerts(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (notifCount, taskCount int, err error) {
@@ -146,7 +149,7 @@ func evaluateTenantAlerts(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 
 func loadEnabledRules(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]alertRule, error) {
 	rows, err := pool.Query(ctx, `
-		select id, rule_type, name, lead_value, lead_unit
+		select id, rule_type, name, lead_value, lead_unit, threshold_json
 		from public.crm_alert_rules
 		where tenant_id = $1 and is_enabled = true
 		order by sort_order`, tenantID)
@@ -157,7 +160,7 @@ func loadEnabledRules(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (
 	var out []alertRule
 	for rows.Next() {
 		var r alertRule
-		if err := rows.Scan(&r.ID, &r.RuleType, &r.Name, &r.LeadValue, &r.LeadUnit); err != nil {
+		if err := rows.Scan(&r.ID, &r.RuleType, &r.Name, &r.LeadValue, &r.LeadUnit, &r.ThresholdJSON); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -181,8 +184,55 @@ func insertNotification(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 
 func evalWarrantyFollowUp(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rule alertRule, today time.Time) (int, int, error) {
 	notifCount, taskCount := 0, 0
-	endExpr := "($2::date + make_interval(days => $3))::date"
+	for _, leadDays := range warrantyLeadDays(rule) {
+		n, t, err := evalWarrantyFollowUpForLead(ctx, pool, tenantID, rule, today, leadDays, "days")
+		if err != nil {
+			return notifCount, taskCount, err
+		}
+		notifCount += n
+		taskCount += t
+	}
 	if rule.LeadUnit == "months" {
+		n, t, err := evalWarrantyFollowUpForLead(ctx, pool, tenantID, rule, today, rule.LeadValue, "months")
+		if err != nil {
+			return notifCount, taskCount, err
+		}
+		notifCount += n
+		taskCount += t
+	}
+	return notifCount, taskCount, nil
+}
+
+func warrantyLeadDays(rule alertRule) []int {
+	seen := map[int]bool{}
+	if rule.LeadUnit == "days" {
+		seen[rule.LeadValue] = true
+	}
+	if len(rule.ThresholdJSON) > 0 {
+		var th struct {
+			DaysBeforeEnd []int `json:"days_before_end"`
+		}
+		if json.Unmarshal(rule.ThresholdJSON, &th) == nil {
+			for _, d := range th.DaysBeforeEnd {
+				seen[d] = true
+			}
+		}
+	}
+	if len(seen) == 0 {
+		seen[rule.LeadValue] = true
+	}
+	out := make([]int, 0, len(seen))
+	for d := range seen {
+		out = append(out, d)
+	}
+	sort.Ints(out)
+	return out
+}
+
+func evalWarrantyFollowUpForLead(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rule alertRule, today time.Time, leadValue int, leadUnit string) (int, int, error) {
+	notifCount, taskCount := 0, 0
+	endExpr := "($2::date + make_interval(days => $3))::date"
+	if leadUnit == "months" {
 		endExpr = "($2::date + make_interval(months => $3))::date"
 	}
 	q := fmt.Sprintf(`
@@ -190,7 +240,7 @@ func evalWarrantyFollowUp(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 		from public.crm_warranty_assets wa
 		where wa.tenant_id = $1 and wa.status = 'active'
 		  and wa.warranty_end = %s`, endExpr)
-	rows, err := pool.Query(ctx, q, tenantID, today, rule.LeadValue)
+	rows, err := pool.Query(ctx, q, tenantID, today, leadValue)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -204,7 +254,7 @@ func evalWarrantyFollowUp(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 			return notifCount, taskCount, err
 		}
 		key := dedupeKey(rule.RuleType, rule.ID, "crm_warranty_asset", assetID, today)
-		key = fmt.Sprintf("%s:lead%d", key, rule.LeadValue)
+		key = fmt.Sprintf("%s:lead%d", key, leadValue)
 		title := fmt.Sprintf("Warranty follow-up: %s", serial)
 		body := fmt.Sprintf("%s warranty ends on %s.", itemName, warrantyEnd.Format("2006-01-02"))
 		ok, err := insertNotification(ctx, pool, tenantID, picUserID, rule.ID, "warning", title, body, "crm_warranty_asset", assetID, key)
@@ -214,7 +264,7 @@ func evalWarrantyFollowUp(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 		if ok {
 			notifCount++
 		}
-		dueDate := subtractLead(warrantyEnd, rule.LeadValue, rule.LeadUnit)
+		dueDate := subtractLead(warrantyEnd, leadValue, leadUnit)
 		var exists bool
 		_ = pool.QueryRow(ctx, `
 			select exists(

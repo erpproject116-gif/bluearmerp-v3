@@ -1,5 +1,6 @@
 /** Maps app routes to permission_registry codes (must match migration 020). */
 export const hrefPermissionCode: Record<string, string> = {
+  "/app/dashboard": "dashboard.view",
   "/app/inventory/partners": "inventory.partners",
   "/app/inventory/locations": "inventory.locations",
   "/app/inventory/projects": "inventory.projects",
@@ -35,6 +36,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/purchase-request/purchase-requests/status": "purchase_request.purchase_requests_status",
   "/app/purchase-request/purchase-requests/settings": "purchase_request.purchase_requests",
   "/app/purchase-request/purchase-orders": "purchase_order.purchase_orders",
+  "/app/purchase-request/goods-receipt": "purchase_order.goods_receipts",
   "/app/sales/sales/new": "sales.sales_new",
   "/app/sales/sales": "sales.sales",
   "/app/sales/sales/status": "sales.sales_status",

@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
@@ -268,7 +270,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 					}
 					_, err = tx.Exec(r.Context(), `
 						update public.inv_serial_units
-						set status = 'reserved', sales_order_release_line_id = $1, updated_at = now()
+						set status = 'reserved', sales_order_release_line_id = $1, reserved_at = now(), updated_at = now()
 						where id = $2`, releaseLineID, unitID)
 					if err != nil {
 						response.Err(w, http.StatusInternalServerError, "Failed to reserve serial.", "ERR_INTERNAL")
@@ -292,5 +294,165 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.release", "so_sales_order", nil, nil, body)
 		response.OK(w, map[string]any{"released_count": releasedCount}, "Released.")
+	}
+}
+
+func undoRelease(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		releaseLineID, err := strconv.ParseInt(chi.URLParam(r, "releaseLineId"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"releaseLineId": "Invalid release line id."})
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to undo release.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var tenantID, locationID, salesOrderLineID int64
+		var releaseQty float64
+		var itemID *int64
+		var trackInventory, trackSerial bool
+
+		err = tx.QueryRow(r.Context(), `
+			select so.tenant_id, rl.location_id, rl.sales_order_line_id, rl.release_qty::float8,
+			  ln.item_id,
+			  coalesce(i.track_inventory_qty, false),
+			  coalesce(i.track_serial, false)
+			from public.so_sales_order_release_lines rl
+			join public.so_sales_order_lines ln on ln.id = rl.sales_order_line_id
+			join public.so_sales_orders so on so.id = ln.sales_order_id
+			left join public.inv_items i on i.id = ln.item_id
+			where rl.id = $1 and so.deleted_at is null
+			for update of rl`, releaseLineID).Scan(
+			&tenantID, &locationID, &salesOrderLineID, &releaseQty,
+			&itemID, &trackInventory, &trackSerial)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Release line not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if tenantID != tu.TenantID {
+			response.Err(w, http.StatusForbidden, "Forbidden.", "ERR_FORBIDDEN")
+			return
+		}
+
+		var totalReleased, sold float64
+		err = tx.QueryRow(r.Context(), `
+			select coalesce(rel.released, 0)::float8, coalesce(slip.sold, 0)::float8
+			from public.so_sales_order_lines ln
+			left join (
+			  select sales_order_line_id, sum(release_qty) as released
+			  from public.so_sales_order_release_lines
+			  group by sales_order_line_id
+			) rel on rel.sales_order_line_id = ln.id
+			left join (
+			  select sales_order_line_id, sum(qty) as sold
+			  from public.so_sales_order_slip_lines
+			  group by sales_order_line_id
+			) slip on slip.sales_order_line_id = ln.id
+			where ln.id = $1`, salesOrderLineID).Scan(&totalReleased, &sold)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to evaluate release.", "ERR_INTERNAL")
+			return
+		}
+		if sold > totalReleased-releaseQty+0.0001 {
+			response.Validation(w, map[string]string{
+				"releaseLineId": "Cannot undo: invoiced quantity exceeds remaining released balance.",
+			})
+			return
+		}
+
+		if trackSerial {
+			var soldSerials int
+			if err := tx.QueryRow(r.Context(), `
+				select count(*) from public.inv_serial_units
+				where sales_order_release_line_id = $1 and status = 'sold'`, releaseLineID).Scan(&soldSerials); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to check serials.", "ERR_INTERNAL")
+				return
+			}
+			if soldSerials > 0 {
+				response.Validation(w, map[string]string{
+					"releaseLineId": "Cannot undo: serial units from this release have been sold.",
+				})
+				return
+			}
+		}
+
+		if trackInventory && itemID != nil && releaseQty > 0 {
+			_, err = tx.Exec(r.Context(), `
+				insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
+				values ($1, $2, $3, $4)
+				on conflict (tenant_id, item_id, location_id)
+				do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
+				tenantID, *itemID, locationID, releaseQty)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to restore stock.", "ERR_INTERNAL")
+				return
+			}
+			_, err = tx.Exec(r.Context(), `
+				insert into public.inv_stock_movements
+				  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
+				values ($1, $2, $3, $4, 'so_release_undo', 'so_release_line', $5, $6)`,
+				tenantID, *itemID, locationID, releaseQty, releaseLineID, tu.AppUserID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
+				return
+			}
+		}
+
+		if trackSerial {
+			serialRows, err := tx.Query(r.Context(), `
+				select id from public.inv_serial_units
+				where sales_order_release_line_id = $1 and tenant_id = $2
+				for update`, releaseLineID, tenantID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load serials.", "ERR_INTERNAL")
+				return
+			}
+			defer serialRows.Close()
+			loc := locationID
+			for serialRows.Next() {
+				var unitID int64
+				if err := serialRows.Scan(&unitID); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to read serial.", "ERR_INTERNAL")
+					return
+				}
+				_, err = tx.Exec(r.Context(), `
+					update public.inv_serial_units
+					set status = 'in_stock', sales_order_release_line_id = null, reserved_at = null, updated_at = now()
+					where id = $1`, unitID)
+				if err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to restore serial.", "ERR_INTERNAL")
+					return
+				}
+				if err := inventory.InsertSerialEvent(r.Context(), tx, tenantID, unitID, "released", &loc, &loc, "so_release_line", releaseLineID, &tu.AppUserID); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to record serial event.", "ERR_INTERNAL")
+					return
+				}
+			}
+			if err := serialRows.Err(); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to process serials.", "ERR_INTERNAL")
+				return
+			}
+		}
+
+		tag, err := tx.Exec(r.Context(), `
+			delete from public.so_sales_order_release_lines where id = $1`, releaseLineID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove release line.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to undo release.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.release_undo", "so_release_line", &releaseLineID, nil, nil)
+		response.OK(w, map[string]any{"release_line_id": releaseLineID}, "Release undone.")
 	}
 }

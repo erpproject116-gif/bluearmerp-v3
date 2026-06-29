@@ -146,6 +146,49 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
+
+		var curTrackSerial, curTrackLot bool
+		err = tx.QueryRow(r.Context(), `
+			select track_serial, track_lot from public.inv_items
+			where id = $1 and tenant_id = $2 and deleted_at is null`,
+			id, tu.TenantID).Scan(&curTrackSerial, &curTrackLot)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if body.TrackSerial != nil && !*body.TrackSerial && curTrackSerial {
+			var openSerials int
+			if err := tx.QueryRow(r.Context(), `
+				select count(*) from public.inv_serial_units
+				where tenant_id = $1 and item_id = $2 and status not in ('void', 'scrapped')`,
+				tu.TenantID, id).Scan(&openSerials); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to validate serial units.", "ERR_INTERNAL")
+				return
+			}
+			if openSerials > 0 {
+				response.Validation(w, map[string]string{
+					"track_serial": "Cannot disable serial tracking while open serial units exist.",
+				})
+				return
+			}
+		}
+		if body.TrackLot != nil && !*body.TrackLot && curTrackLot {
+			var openLots int
+			if err := tx.QueryRow(r.Context(), `
+				select count(*) from public.inv_lot_batches
+				where tenant_id = $1 and item_id = $2 and qty_on_hand > 0`,
+				tu.TenantID, id).Scan(&openLots); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to validate lot batches.", "ERR_INTERNAL")
+				return
+			}
+			if openLots > 0 {
+				response.Validation(w, map[string]string{
+					"track_lot": "Cannot disable lot tracking while open lot batches exist.",
+				})
+				return
+			}
+		}
+
 		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, purchase_price=$2, sales_price=$3, vip_price=$4, warranty_duration_months=$5, reorder_level=$6, track_serial=$7, track_lot=$8, status=$9, updated_at=now()
 			where id=$10 and tenant_id=$11 and deleted_at is null`,
 			strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), defaultStatus(body.Status), id, tu.TenantID)
