@@ -162,6 +162,40 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "sales_order",
+    label: "Sales Order",
+    href: "/app/sales-order/sales-orders",
+    basePath: "/app/sales-order",
+    features: [
+      { label: "New Sales Order", href: "/app/sales-order/sales-orders/new", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Sales Order List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Sales Order Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
+      {
+        label: "Outstanding SO Status",
+        href: "/app/sales-order/sales-orders/outstanding",
+        settingsHref: "/app/sales-order/sales-orders/settings",
+      },
+      {
+        label: "Release Sales Order",
+        href: "/app/sales-order/sales-orders/release",
+        settingsHref: "/app/sales-order/sales-orders/settings",
+      },
+    ],
+  },
+  {
+    id: "purchase_request",
+    label: "Purchase Request",
+    href: "/app/purchase-request/purchase-requests",
+    basePath: "/app/purchase-request",
+    features: [
+      { label: "New Purchase Request", href: "/app/purchase-request/purchase-requests/new", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Purchase Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Purchase Order List", href: "/app/purchase-request/purchase-orders", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Goods Receipt List", href: "/app/purchase-request/goods-receipt", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+    ],
+  },
+  {
     id: "crm",
     label: "CRM",
     href: "/app/crm/dashboard",
@@ -198,40 +232,6 @@ export const appModules: AppModule[] = [
       { label: "Official Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "SI Receipt Status", href: "/app/finance/reports/receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
-    ],
-  },
-  {
-    id: "sales_order",
-    label: "Sales Order",
-    href: "/app/sales-order/sales-orders",
-    basePath: "/app/sales-order",
-    features: [
-      { label: "New Sales Order", href: "/app/sales-order/sales-orders/new", settingsHref: "/app/sales-order/sales-orders/settings" },
-      { label: "Sales Order List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings" },
-      { label: "Sales Order Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
-      {
-        label: "Outstanding SO Status",
-        href: "/app/sales-order/sales-orders/outstanding",
-        settingsHref: "/app/sales-order/sales-orders/settings",
-      },
-      {
-        label: "Release Sales Order",
-        href: "/app/sales-order/sales-orders/release",
-        settingsHref: "/app/sales-order/sales-orders/settings",
-      },
-    ],
-  },
-  {
-    id: "purchase_request",
-    label: "Purchase Request",
-    href: "/app/purchase-request/purchase-requests",
-    basePath: "/app/purchase-request",
-    features: [
-      { label: "New Purchase Request", href: "/app/purchase-request/purchase-requests/new", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Purchase Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Purchase Order List", href: "/app/purchase-request/purchase-orders", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Goods Receipt List", href: "/app/purchase-request/goods-receipt", settingsHref: "/app/purchase-request/purchase-requests/settings" },
     ],
   },
   {
