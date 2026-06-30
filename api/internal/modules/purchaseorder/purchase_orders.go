@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
 )
@@ -473,6 +474,16 @@ func createPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if vErrs := processpolicy.ValidatePurchaseOrderCreate(policy, body.PurchaseRequestID); vErrs != nil {
+			response.Validation(w, vErrs)
+			return
+		}
+
 		orderDate, err := parseDate(body.OrderDate)
 		if err != nil {
 			response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
@@ -565,19 +576,30 @@ func createFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var prTaxTypeID, prCurrencyID, prLocationID int64
 		var prPartnerID, prPicUserID, prProjectID *int64
-		var prPicName string
+		var prPicName, prProgressStatus string
 		var prProjectName, prReference, prNotes *string
+		var prApprovedAt *time.Time
 		err = pool.QueryRow(r.Context(), `
 			select tax_type_id, currency_id, partner_id, pic_user_id, pic_name,
-			  location_id, project_id, project_name, reference, notes
+			  location_id, project_id, project_name, reference, notes, progress_status, approved_at
 			from public.pr_purchase_requests
 			where id = $1 and tenant_id = $2 and deleted_at is null`,
 			prID, tu.TenantID).Scan(
 			&prTaxTypeID, &prCurrencyID, &prPartnerID, &prPicUserID, &prPicName,
-			&prLocationID, &prProjectID, &prProjectName, &prReference, &prNotes,
+			&prLocationID, &prProjectID, &prProjectName, &prReference, &prNotes, &prProgressStatus, &prApprovedAt,
 		)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Purchase request not found.", "ERR_NOT_FOUND")
+			return
+		}
+
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if vErrs := processpolicy.ValidatePurchaseRequestForPO(policy, prProgressStatus, prApprovedAt); vErrs != nil {
+			response.Validation(w, vErrs)
 			return
 		}
 

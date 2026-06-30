@@ -372,6 +372,10 @@ func redFlagsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			{Code: "reserved_stale", Label: "Stale reserved serials"},
 			{Code: "open_po", Label: "Open purchase order lines"},
 			{Code: "so_release_gap", Label: "Sales order release gap"},
+			{Code: "reserve_without_dr", Label: "Released, not delivered"},
+			{Code: "dr_without_invoice", Label: "Delivered, not invoiced"},
+			{Code: "gr_without_supplier_invoice", Label: "GR not fully billed"},
+			{Code: "ap_over_application", Label: "AP over-applied payments"},
 		}
 
 		_ = pool.QueryRow(ctx, `
@@ -450,6 +454,73 @@ func redFlagsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			  and so.progress_status in ('unconfirmed', 'in_progress')
 			  and (ln.qty - coalesce(rel.released, 0)) > 0.0001`,
 			tu.TenantID).Scan(&categories[5].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(distinct ln.id)
+			from public.so_sales_order_lines ln
+			join public.so_sales_orders so on so.id = ln.sales_order_id
+			left join (
+			  select sales_order_line_id, sum(release_qty) as released
+			  from public.so_sales_order_release_lines
+			  group by sales_order_line_id
+			) rel on rel.sales_order_line_id = ln.id
+			left join (
+			  select sales_order_line_id, sum(qty) as delivered
+			  from public.so_sales_order_slip_lines
+			  where slip_type = 'delivery_receipt'
+			  group by sales_order_line_id
+			) dr on dr.sales_order_line_id = ln.id
+			where so.tenant_id = $1 and so.deleted_at is null
+			  and coalesce(rel.released, 0) > 0.0001
+			  and (coalesce(rel.released, 0) - coalesce(dr.delivered, 0)) > 0.0001`,
+			tu.TenantID).Scan(&categories[6].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(distinct ln.id)
+			from public.so_sales_order_lines ln
+			join public.so_sales_orders so on so.id = ln.sales_order_id
+			left join (
+			  select sales_order_line_id, sum(qty) as delivered
+			  from public.so_sales_order_slip_lines
+			  where slip_type = 'delivery_receipt'
+			  group by sales_order_line_id
+			) dr on dr.sales_order_line_id = ln.id
+			left join (
+			  select sales_order_line_id, sum(qty) as sold
+			  from public.so_sales_order_slip_lines
+			  where slip_type = 'sales'
+			  group by sales_order_line_id
+			) slip on slip.sales_order_line_id = ln.id
+			where so.tenant_id = $1 and so.deleted_at is null
+			  and coalesce(dr.delivered, 0) > 0.0001
+			  and (coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)) > 0.0001`,
+			tu.TenantID).Scan(&categories[7].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(*)
+			from public.gr_goods_receipt_lines grl
+			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
+			left join (
+			  select goods_receipt_line_id, sum(qty) as billed
+			  from public.gr_goods_receipt_slip_lines
+			  where slip_type = 'supplier_invoice'
+			  group by goods_receipt_line_id
+			) sl on sl.goods_receipt_line_id = grl.id
+			where gr.tenant_id = $1 and gr.status = 'posted'
+			  and (grl.received_qty - coalesce(sl.billed, 0)) > 0.0001`,
+			tu.TenantID).Scan(&categories[8].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(*)
+			from public.fin_supplier_invoices si
+			left join (
+			  select supplier_invoice_id, sum(applied_amount) as applied
+			  from public.fin_payment_applications
+			  group by supplier_invoice_id
+			) paid on paid.supplier_invoice_id = si.id
+			where si.tenant_id = $1 and si.deleted_at is null
+			  and coalesce(paid.applied, 0) > si.grand_total + 0.0001`,
+			tu.TenantID).Scan(&categories[9].Count)
 
 		var total int64
 		for _, c := range categories {

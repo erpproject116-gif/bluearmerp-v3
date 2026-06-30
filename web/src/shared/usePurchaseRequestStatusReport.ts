@@ -9,6 +9,8 @@ export type PurchaseRequestStatusReportRow = {
   date_no_display: string;
   purchase_request_no: string;
   progress_status: string;
+  approved_at?: string | null;
+  approved_by_name?: string;
   send_status: string;
   domestic_foreign: string;
   location_name: string;

@@ -47,6 +47,10 @@ const redFlagLinks: Record<string, string> = {
   reserved_stale: "/app/inventory/serial-lot/registry",
   open_po: "/app/purchase-request/purchase-orders",
   so_release_gap: "/app/sales-order/sales-orders/release",
+  reserve_without_dr: "/app/sales-order/delivery-receipts/new",
+  dr_without_invoice: "/app/sales/sales/new",
+  gr_without_supplier_invoice: "/app/finance/supplier-invoices/new",
+  ap_over_application: "/app/finance/payment-vouchers",
 };
 
 function CssBarChart(props: { title: string; points: DashboardTrendPoint[]; valueFormat?: "money" | "int" }) {

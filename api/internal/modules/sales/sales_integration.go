@@ -12,6 +12,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -32,6 +33,7 @@ type openSalesOrderLineRow struct {
 	ItemName             string  `json:"item_name"`
 	Description          *string `json:"description,omitempty"`
 	ReleasedQty          float64 `json:"released_qty"`
+	DeliveredQty         float64 `json:"delivered_qty"`
 	BalanceQty           float64 `json:"balance_qty"`
 	UnitVatInc           float64 `json:"unit_vat_inc"`
 	Remark               *string `json:"remark,omitempty"`
@@ -40,6 +42,13 @@ type openSalesOrderLineRow struct {
 func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		useDelivery := !policy.LegacyCombinedSORelease
+
 		p := httputil.ParseListParams(r, "order_date", map[string]string{
 			"order_date":     "so.order_date",
 			"sales_order_no": "so.sales_order_no",
@@ -48,9 +57,14 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		})
 		offset := httputil.Offset(p)
 
-		where := `so.tenant_id = $1 and so.deleted_at is null
-			and coalesce(rel.released, 0) > 0.0001
-			and (coalesce(rel.released, 0) - coalesce(slip.sold, 0)) > 0.0001`
+		where := `so.tenant_id = $1 and so.deleted_at is null`
+		if useDelivery {
+			where += ` and coalesce(dr.delivered, 0) > 0.0001
+				and (coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)) > 0.0001`
+		} else {
+			where += ` and coalesce(rel.released, 0) > 0.0001
+				and (coalesce(rel.released, 0) - coalesce(slip.sold, 0)) > 0.0001`
+		}
 		args := []any{tu.TenantID}
 		argN := 2
 
@@ -68,7 +82,8 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  so.tax_type_id, so.currency_id, so.pic_name,
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  coalesce(rel.released, 0)::float8,
-			  (coalesce(rel.released, 0) - coalesce(slip.sold, 0))::float8,
+			  coalesce(dr.delivered, 0)::float8,
+			  (%s)::float8,
 			  ln.unit_vat_inc::float8, ln.remark,
 			  count(*) over()
 			from public.so_sales_orders so
@@ -81,13 +96,20 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  group by sales_order_line_id
 			) rel on rel.sales_order_line_id = ln.id
 			left join (
+			  select sales_order_line_id, sum(qty) as delivered
+			  from public.so_sales_order_slip_lines
+			  where slip_type = 'delivery_receipt'
+			  group by sales_order_line_id
+			) dr on dr.sales_order_line_id = ln.id
+			left join (
 			  select sales_order_line_id, sum(qty) as sold
 			  from public.so_sales_order_slip_lines
+			  where slip_type = 'sales'
 			  group by sales_order_line_id
 			) slip on slip.sales_order_line_id = ln.id
 			where %s
 			order by so.order_date desc, ln.line_no asc
-			limit $%d offset $%d`, where, argN, argN+1)
+			limit $%d offset $%d`, balanceExpr(useDelivery), where, argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
@@ -108,7 +130,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
-				&row.ReleasedQty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &total,
+				&row.ReleasedQty, &row.DeliveredQty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
 				return
@@ -123,10 +145,17 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func salesOrderLineBalance(ctx context.Context, tx pgx.Tx, tenantID, salesOrderLineID int64) (float64, error) {
+func balanceExpr(useDelivery bool) string {
+	if useDelivery {
+		return "coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)"
+	}
+	return "coalesce(rel.released, 0) - coalesce(slip.sold, 0)"
+}
+
+func salesOrderLineBalance(ctx context.Context, tx pgx.Tx, tenantID, salesOrderLineID int64, useDelivery bool) (float64, error) {
 	var balance float64
-	err := tx.QueryRow(ctx, `
-		select (coalesce(rel.released, 0) - coalesce(slip.sold, 0))::float8
+	err := tx.QueryRow(ctx, fmt.Sprintf(`
+		select (%s)::float8
 		from public.so_sales_order_lines ln
 		join public.so_sales_orders so on so.id = ln.sales_order_id
 		left join (
@@ -135,24 +164,36 @@ func salesOrderLineBalance(ctx context.Context, tx pgx.Tx, tenantID, salesOrderL
 		  group by sales_order_line_id
 		) rel on rel.sales_order_line_id = ln.id
 		left join (
+		  select sales_order_line_id, sum(qty) as delivered
+		  from public.so_sales_order_slip_lines
+		  where slip_type = 'delivery_receipt'
+		  group by sales_order_line_id
+		) dr on dr.sales_order_line_id = ln.id
+		left join (
 		  select sales_order_line_id, sum(qty) as sold
 		  from public.so_sales_order_slip_lines
+		  where slip_type = 'sales'
 		  group by sales_order_line_id
 		) slip on slip.sales_order_line_id = ln.id
 		where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null`,
-		salesOrderLineID, tenantID).Scan(&balance)
+		balanceExpr(useDelivery)), salesOrderLineID, tenantID).Scan(&balance)
 	return balance, err
 }
 
 func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenantID int64, lines []computedLine) map[string]string {
+	policy, err := processpolicy.Load(ctx, pool, tenantID)
+	if err != nil {
+		return map[string]string{"body": "Failed to load process policies."}
+	}
+	useDelivery := !policy.LegacyCombinedSORelease
 	errs := map[string]string{}
 	for i, ln := range lines {
 		if ln.SourceSalesOrderLineID == nil {
 			continue
 		}
 		var balance float64
-		err := pool.QueryRow(ctx, `
-			select (coalesce(rel.released, 0) - coalesce(slip.sold, 0))::float8
+		err := pool.QueryRow(ctx, fmt.Sprintf(`
+			select (%s)::float8
 			from public.so_sales_order_lines ln
 			join public.so_sales_orders so on so.id = ln.sales_order_id
 			left join (
@@ -161,22 +202,33 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 			  group by sales_order_line_id
 			) rel on rel.sales_order_line_id = ln.id
 			left join (
+			  select sales_order_line_id, sum(qty) as delivered
+			  from public.so_sales_order_slip_lines
+			  where slip_type = 'delivery_receipt'
+			  group by sales_order_line_id
+			) dr on dr.sales_order_line_id = ln.id
+			left join (
 			  select sales_order_line_id, sum(qty) as sold
 			  from public.so_sales_order_slip_lines
+			  where slip_type = 'sales'
 			  group by sales_order_line_id
 			) slip on slip.sales_order_line_id = ln.id
 			where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null`,
-			*ln.SourceSalesOrderLineID, tenantID).Scan(&balance)
+			balanceExpr(useDelivery)), *ln.SourceSalesOrderLineID, tenantID).Scan(&balance)
 		if err != nil {
 			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = "Sales order line not found."
 			continue
 		}
 		if balance <= 0.0001 {
-			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = "No released balance available."
+			msg := "No released balance available."
+			if useDelivery {
+				msg = "No delivered balance available."
+			}
+			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = msg
 			continue
 		}
 		if ln.Qty > balance+0.0001 {
-			errs[fmt.Sprintf("lines[%d].qty", i)] = fmt.Sprintf("Exceeds release balance (%.4f available).", balance)
+			errs[fmt.Sprintf("lines[%d].qty", i)] = fmt.Sprintf("Exceeds available balance (%.4f).", balance)
 		}
 	}
 	if len(errs) > 0 {
@@ -185,13 +237,13 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 	return nil
 }
 
-func writeSalesOrderSlipsForSales(ctx context.Context, tx pgx.Tx, tenantID, salesID int64, salesNo, dateNoDisplay string, lines []computedLine) error {
+func writeSalesOrderSlipsForSales(ctx context.Context, tx pgx.Tx, tenantID, salesID int64, salesNo, dateNoDisplay string, lines []computedLine, useDelivery bool) error {
 	salesOrderIDs := map[int64]struct{}{}
 	for i, ln := range lines {
 		if ln.SourceSalesOrderLineID == nil {
 			continue
 		}
-		balance, err := salesOrderLineBalance(ctx, tx, tenantID, *ln.SourceSalesOrderLineID)
+		balance, err := salesOrderLineBalance(ctx, tx, tenantID, *ln.SourceSalesOrderLineID, useDelivery)
 		if err != nil {
 			return errors.New("Sales order line not found for conversion.")
 		}

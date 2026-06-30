@@ -14,6 +14,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -45,6 +46,12 @@ type releaseLineBody struct {
 func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		splitRelease := !policy.LegacyCombinedSORelease
 		p := httputil.ParseListParams(r, "order_date", map[string]string{
 			"order_date":     "so.order_date",
 			"sales_order_no": "so.sales_order_no",
@@ -75,6 +82,7 @@ func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
 			  ln.qty::float8,
 			  (ln.qty - coalesce(rel.released, 0))::float8,
 			  coalesce(bal.qty_on_hand, 0)::float8,
+			  coalesce(bal.qty_reserved, 0)::float8,
 			  coalesce(i.track_inventory_qty, false),
 			  coalesce(i.track_serial, false),
 			  count(*) over()
@@ -108,14 +116,20 @@ func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
 			var row releaseQueueRow
 			var orderDate time.Time
 			var dateSeq int
+			var qtyOnHand, qtyReserved float64
 			if err := rows.Scan(
 				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.SalesOrderNo,
 				&row.ProgressStatus, &row.CustomerName, &row.LocationID, &row.LocationName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
-				&row.OrderQty, &row.BalanceQty, &row.LocationStock, &row.TrackInventory, &row.TrackSerial, &total,
+				&row.OrderQty, &row.BalanceQty, &qtyOnHand, &qtyReserved, &row.TrackInventory, &row.TrackSerial, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read release queue.", "ERR_INTERNAL")
 				return
+			}
+			if splitRelease {
+				row.LocationStock = qtyOnHand - qtyReserved
+			} else {
+				row.LocationStock = qtyOnHand
 			}
 			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
 			out = append(out, row)
@@ -130,6 +144,13 @@ func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
 func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		legacyCombined := policy.LegacyCombinedSORelease
+
 		var body struct {
 			Lines []releaseLineBody `json:"lines"`
 		}
@@ -221,35 +242,27 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 
 			if trackInventory && itemID != nil {
-				var qtyOnHand float64
-				err := tx.QueryRow(r.Context(), `
-					select qty_on_hand::float8
-					from public.inv_item_location_balances
-					where tenant_id = $1 and item_id = $2 and location_id = $3
-					for update`,
-					tenantID, *itemID, locationID).Scan(&qtyOnHand)
-				if err != nil {
-					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): "Insufficient stock at location (no balance record)."})
-					return
+				if legacyCombined {
+					if err := inventory.DeductOnHandStock(r.Context(), tx, tenantID, *itemID, locationID, item.ReleaseQty); err != nil {
+						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): err.Error()})
+						return
+					}
+					_, err = tx.Exec(r.Context(), `
+						insert into public.inv_stock_movements
+						  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
+						values ($1, $2, $3, $4, 'so_release', 'so_release_line', $5, $6)`,
+						tenantID, *itemID, locationID, -item.ReleaseQty, releaseLineID, tu.AppUserID)
+				} else {
+					if err := inventory.ReserveStock(r.Context(), tx, tenantID, *itemID, locationID, item.ReleaseQty); err != nil {
+						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): err.Error()})
+						return
+					}
+					_, err = tx.Exec(r.Context(), `
+						insert into public.inv_stock_movements
+						  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
+						values ($1, $2, $3, 0, 'so_reserve', 'so_release_line', $4, $5)`,
+						tenantID, *itemID, locationID, releaseLineID, tu.AppUserID)
 				}
-				if qtyOnHand+0.0001 < item.ReleaseQty {
-					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): fmt.Sprintf("Insufficient stock (%.4f on hand).", qtyOnHand)})
-					return
-				}
-				tag, err := tx.Exec(r.Context(), `
-					update public.inv_item_location_balances
-					set qty_on_hand = qty_on_hand - $1, updated_at = now()
-					where tenant_id = $2 and item_id = $3 and location_id = $4`,
-					item.ReleaseQty, tenantID, *itemID, locationID)
-				if err != nil || tag.RowsAffected() == 0 {
-					response.Err(w, http.StatusInternalServerError, "Failed to update stock.", "ERR_INTERNAL")
-					return
-				}
-				_, err = tx.Exec(r.Context(), `
-					insert into public.inv_stock_movements
-					  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
-					values ($1, $2, $3, $4, 'so_release', 'so_release_line', $5, $6)`,
-					tenantID, *itemID, locationID, -item.ReleaseQty, releaseLineID, tu.AppUserID)
 				if err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
 					return
@@ -300,6 +313,13 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 func undoRelease(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		legacyCombined := policy.LegacyCombinedSORelease
+
 		releaseLineID, err := strconv.ParseInt(chi.URLParam(r, "releaseLineId"), 10, 64)
 		if err != nil {
 			response.Validation(w, map[string]string{"releaseLineId": "Invalid release line id."})
@@ -383,21 +403,27 @@ func undoRelease(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if trackInventory && itemID != nil && releaseQty > 0 {
-			_, err = tx.Exec(r.Context(), `
-				insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
-				values ($1, $2, $3, $4)
-				on conflict (tenant_id, item_id, location_id)
-				do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
-				tenantID, *itemID, locationID, releaseQty)
-			if err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to restore stock.", "ERR_INTERNAL")
-				return
+			if legacyCombined {
+				if err := inventory.RestoreOnHandStock(r.Context(), tx, tenantID, *itemID, locationID, releaseQty); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to restore stock.", "ERR_INTERNAL")
+					return
+				}
+				_, err = tx.Exec(r.Context(), `
+					insert into public.inv_stock_movements
+					  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
+					values ($1, $2, $3, $4, 'so_release_undo', 'so_release_line', $5, $6)`,
+					tenantID, *itemID, locationID, releaseQty, releaseLineID, tu.AppUserID)
+			} else {
+				if err := inventory.UnreserveStock(r.Context(), tx, tenantID, *itemID, locationID, releaseQty); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to unreserve stock.", "ERR_INTERNAL")
+					return
+				}
+				_, err = tx.Exec(r.Context(), `
+					insert into public.inv_stock_movements
+					  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
+					values ($1, $2, $3, 0, 'so_reserve_undo', 'so_release_line', $4, $5)`,
+					tenantID, *itemID, locationID, releaseLineID, tu.AppUserID)
 			}
-			_, err = tx.Exec(r.Context(), `
-				insert into public.inv_stock_movements
-				  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
-				values ($1, $2, $3, $4, 'so_release_undo', 'so_release_line', $5, $6)`,
-				tenantID, *itemID, locationID, releaseQty, releaseLineID, tu.AppUserID)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
 				return

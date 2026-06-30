@@ -62,6 +62,9 @@ type PurchaseRequest struct {
 	DomesticForeign    string                `json:"domestic_foreign"`
 	SendStatus         string                `json:"send_status"`
 	ProgressStatus     string                `json:"progress_status"`
+	ApprovedAt         *string               `json:"approved_at,omitempty"`
+	ApprovedByUserID   *int64                `json:"approved_by_user_id,omitempty"`
+	ApprovedByName     string                `json:"approved_by_name,omitempty"`
 	TotalQty           float64               `json:"total_qty"`
 	Reference          *string               `json:"reference,omitempty"`
 	Notes              *string               `json:"notes,omitempty"`
@@ -166,6 +169,7 @@ func registerPurchaseRequestRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Patch("/purchase-requests/{id}/progress-status", patchPurchaseRequestProgressStatus(pool))
 	r.Patch("/purchase-requests/{id}/send-status", patchPurchaseRequestSendStatus(pool))
 	r.Get("/purchase-requests/{id}", getPurchaseRequest(pool))
+	registerPurchaseRequestApprovalRoutes(r, pool)
 	r.Patch("/purchase-requests/{id}", updatePurchaseRequest(pool))
 	r.Delete("/purchase-requests/{id}", deletePurchaseRequest(pool))
 }
@@ -400,6 +404,9 @@ func loadPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 	var requestDate time.Time
 	var partnerID *int64
 	var createdByName *string
+	var approvedAt *time.Time
+	var approvedByUserID *int64
+	var approvedByName *string
 
 	err := pool.QueryRow(ctx, `
 		select pr.id, pr.request_date, pr.date_seq, pr.purchase_request_no,
@@ -409,6 +416,7 @@ func loadPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		  pr.pic_user_id, pr.pic_name,
 		  pr.location_id, l.location_name, pr.project_id, pr.project_name,
 		  pr.cc, pr.domestic_foreign, pr.send_status, pr.progress_status,
+		  pr.approved_at, pr.approved_by_user_id, approver.full_name,
 		  pr.total_qty::float8, pr.reference, pr.notes,
 		  pr.subtotal::float8, pr.tax_total::float8, pr.grand_total::float8,
 		  pr.created_by_user_id, u.full_name
@@ -418,6 +426,7 @@ func loadPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		join public.quo_currencies c on c.id = pr.currency_id
 		join public.inv_locations l on l.id = pr.location_id
 		left join public.users u on u.id = pr.created_by_user_id
+		left join public.users approver on approver.id = pr.approved_by_user_id
 		where pr.id = $1 and pr.tenant_id = $2 and pr.deleted_at is null`,
 		id, tenantID).Scan(
 		&pr.ID, &requestDate, &pr.DateSeq, &pr.PurchaseRequestNo,
@@ -426,6 +435,7 @@ func loadPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		&pr.PicUserID, &pr.PicName,
 		&pr.LocationID, &pr.LocationName, &pr.ProjectID, &pr.ProjectName,
 		&pr.CC, &pr.DomesticForeign, &pr.SendStatus, &pr.ProgressStatus,
+		&approvedAt, &approvedByUserID, &approvedByName,
 		&pr.TotalQty, &pr.Reference, &pr.Notes,
 		&pr.Subtotal, &pr.TaxTotal, &pr.GrandTotal,
 		&pr.CreatedByUserID, &createdByName,
@@ -438,6 +448,11 @@ func loadPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 	pr.DateNoDisplay = formatDateNoDisplay(requestDate, pr.DateSeq)
 	if createdByName != nil {
 		pr.CreatedByName = *createdByName
+	}
+	pr.ApprovedAt = datePtrToStr(approvedAt)
+	pr.ApprovedByUserID = approvedByUserID
+	if approvedByName != nil {
+		pr.ApprovedByName = *approvedByName
 	}
 
 	lines, err := loadPurchaseRequestLines(ctx, pool, id)
@@ -610,6 +625,16 @@ func updatePurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		headerPartnerID := resolveHeaderPartnerID(body.PartnerID, computed)
 		subtotal, taxTotal, grandTotal := sumPurchaseRequestTotals(computed)
 		totalQty := sumLineQty(computed)
+		progress := defaultProgress(body.ProgressStatus)
+		blocked, err := manualConfirmBlocked(r.Context(), pool, tu.TenantID, progress)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if blocked {
+			response.Validation(w, map[string]string{"progress_status": "Use Approve when purchase request approval is required."})
+			return
+		}
 		before, _ := loadPurchaseRequest(r.Context(), pool, tu.TenantID, id)
 
 		tx, err := pool.Begin(r.Context())
@@ -648,7 +673,7 @@ func updatePurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			body.PicUserID, strings.TrimSpace(body.PicName), body.LocationID,
 			body.ProjectID, body.ProjectName, body.CC,
 			defaultDomesticForeign(body.DomesticForeign), defaultSendStatus(body.SendStatus),
-			defaultProgress(body.ProgressStatus), totalQty,
+			progress, totalQty,
 			body.Reference, body.Notes,
 			subtotal, taxTotal, grandTotal, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {

@@ -46,7 +46,11 @@ Sales update/delete reverses direct-sale stock and serial state. SO-linked lines
 | `POST /api/v1/inventory/serial-units/transfer` | Internal location transfer |
 | `GET /api/v1/inventory/reconciliation/serial-qty` | Qty vs serial count mismatches |
 | `GET /api/v1/inventory/reconciliation/reserved-stale?days=30` | Stale reserved serials |
-| `GET /api/v1/inventory/reconciliation/so-release-gap` | Sold qty exceeds released |
+| `GET /api/v1/inventory/reconciliation/so-release-gap` | SO lines with unreleased order qty |
+| `GET /api/v1/inventory/reconciliation/reserve-without-dr` | Released qty not yet delivered |
+| `GET /api/v1/inventory/reconciliation/dr-without-invoice` | Delivered qty not yet invoiced |
+| `GET /api/v1/inventory/reconciliation/gr-without-supplier-invoice` | Posted GR not fully billed |
+| `GET /api/v1/inventory/reconciliation/ap-over-application` | Payments exceed supplier invoice |
 | `GET /api/v1/inventory/reconciliation/gr-serial-gap?goods_receipt_id=` | Draft GR lines where received qty ≠ serial count |
 | `GET /api/v1/purchase-order/purchase-orders` | PO list |
 | `POST /api/v1/purchase-order/purchase-orders/from-purchase-request/{id}` | Create PO from PR |

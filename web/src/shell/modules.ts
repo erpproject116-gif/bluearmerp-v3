@@ -180,6 +180,16 @@ export const appModules: AppModule[] = [
         href: "/app/sales-order/sales-orders/release",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
+      {
+        label: "Delivery Receipt List",
+        href: "/app/sales-order/delivery-receipts",
+        settingsHref: "/app/sales-order/sales-orders/settings",
+      },
+      {
+        label: "New Delivery Receipt",
+        href: "/app/sales-order/delivery-receipts/new",
+        settingsHref: "/app/sales-order/sales-orders/settings",
+      },
     ],
   },
   {
@@ -230,8 +240,14 @@ export const appModules: AppModule[] = [
     features: [
       { label: "New Official Receipt", href: "/app/finance/official-receipts/new", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Official Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "New Supplier Invoice", href: "/app/finance/supplier-invoices/new", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Supplier Invoice List", href: "/app/finance/supplier-invoices", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "New Payment Voucher", href: "/app/finance/payment-vouchers/new", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Payment Voucher List", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "SI Receipt Status", href: "/app/finance/reports/receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Supplier Payment Status", href: "/app/finance/reports/supplier-payment-status", settingsHref: "/app/finance/official-receipts/settings" },
     ],
   },
   {
@@ -281,6 +297,11 @@ export const appModules: AppModule[] = [
         label: "User Groups",
         href: "/app/user-management/groups",
         settingsHref: "/app/user-management/groups",
+      },
+      {
+        label: "Process Policies",
+        href: "/app/user-management/process-policies",
+        settingsHref: "/app/user-management/process-policies",
       },
     ],
   },

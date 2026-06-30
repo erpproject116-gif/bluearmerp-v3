@@ -99,6 +99,12 @@ Applied automatically by `supabase db reset` in filename order after earlier mig
 | `047_sales_stock_hybrid.sql` | `inv_serial_units.reserved_at`; reversal permissions (`release_undo`, `sales_return`, `goods_receipts_reverse`) |
 | `048_gr_lots_sales_lot_batch.sql` | `gr_goods_receipt_line_lots`; `sa_sales_lines.lot_batch_id` |
 | `049_dashboard.sql` | Business Dashboard module, permissions, tenant enablement |
+| `050_gr_serial_scan_batch.sql` | Batch serial scan idempotency on goods receipt |
+| `051_tenant_process_policies.sql` | Tenant process flow policies + `settings.process_policies` permission |
+| `052_finance_ap.sql` | Supplier invoices, payment vouchers, GR slip lines, AP reports permissions |
+| `053_pr_approvals.sql` | PR approval audit trail, approve permission, approved_at columns |
+| `054_stock_reservation.sql` | `qty_reserved` on location balances for split SO release |
+| `055_delivery_receipt.sql` | Delivery receipt module, DR slip lines, permissions |
 
 See [docs/modules/inventory/serial-lot/README.md](../modules/inventory/serial-lot/README.md) and [docs/modules/dashboard/README.md](../modules/dashboard/README.md).
 
@@ -112,19 +118,20 @@ See [docs/modules/inventory/serial-lot/README.md](../modules/inventory/serial-lo
 |-------|------|-----------------|
 | 1 | `supabase/seed.sql` | `module_registry` (`core`, `inventory`), **DEMO000** tenant, demo user row |
 | 2 | `scripts/seed-platform-owners.sql` | **BLUEARM** tenant, superadmins `itsjohnranel@gmail.com` + `bluearmph@gmail.com`, app owner `bluearmph@gmail.com`, all modules enabled |
-| 3 | `scripts/seed-demo-inventory.sql` | Inventory dummy rows for **DEMO000** only |
+| 3 | `scripts/seed-demo-inventory.sql` | Inventory dummy rows for **DEMO000** + **BLUEARM** |
 | 4 | `scripts/seed-demo-quotations.sql` | Demo quotations for **DEMO000** + **BLUEARM** |
-| 4b (optional) | `scripts/seed-demo-quotations-export.sql` | **~250 real quotations** from BLUEARM list export (**BLUEARM** only); run after step 4 |
-| 4c (optional) | `scripts/seed-demo-items-export.sql` | **Item list export** for **BLUEARM** (upserts `inv_items`); run after step 3 |
-| 5 | `scripts/seed-demo-sales-orders.sql` | Demo sales orders for **DEMO000** + **BLUEARM** |
-| 5b (optional) | `scripts/seed-demo-sales-orders-export.sql` | **Sales order list export** for **BLUEARM**; run after step 5 |
-| 5c (optional) | `scripts/seed-demo-purchase-requests.sql` | Demo purchase requests for **DEMO000** + **BLUEARM**; run after step 3 (inventory) |
-| 5d (optional) | `scripts/seed-demo-serial-lot.sql` | Serial-tracked items, PO, GRN, demo serial units; run after 5c and migrations 040-044 |
-| 5f (optional) | `scripts/seed-demo-po-gr-open.sql` | Stable open POs `DEMOGR902`–`905` + GR samples for receive/scan testing; run after inventory seed |
-| 5e (optional) | `scripts/seed-demo-dashboard.sql` | Intentional serial-vs-qty mismatch for dashboard red flags; run after 5d and migrations 047-049 |
-| 6 | `scripts/seed-demo-sales.sql` | Demo sales (SI) from released SO lines for **DEMO000** + **BLUEARM** |
-| 7 | `scripts/seed-demo-finance.sql` | Demo official receipt applied to demo sale for **DEMO000** + **BLUEARM** |
-| 8 | `scripts/seed-demo-crm.sql` | CRM alert rules, warranty assets, follow-up tasks, notifications, low-stock demo for **DEMO000** + **BLUEARM** |
+| 5 | `scripts/seed-demo-purchase-requests.sql` | Demo purchase requests |
+| 6 | `scripts/seed-demo-sales-orders.sql` | Demo sales orders |
+| 7 | `scripts/seed-demo-golden-scenarios.sql` | Wired S2 serial, S3 lot, S4 direct sale chains |
+| 8 | `scripts/seed-demo-po-gr-open.sql` | Open POs `DEMOGR902`–`905` for receive/scan |
+| 9 | `scripts/seed-demo-sales.sql` | Demo sales (SI) |
+| 10 | `scripts/seed-demo-finance.sql` | Demo official receipt (AR) |
+| 11 | `scripts/seed-demo-finance-ap.sql` | S8 supplier invoice + partial payment (AP) |
+| 11 | `scripts/seed-demo-crm.sql` | CRM warranty, tasks, alerts |
+| 12 | `scripts/seed-demo-dashboard.sql` | Dashboard red-flag mismatch |
+| 13 | `scripts/verify-demo-full-chain.sql` | Post-seed gate: S2/S3/S8/S9/S10 chains |
+
+**`supabase db reset`** runs step 13 automatically via `supabase/config.toml`.
 
 **Manual equivalent:**
 
@@ -140,12 +147,14 @@ psql "$DATABASE_URL" -f scripts/seed-demo-items-export.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders-export.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
-psql "$DATABASE_URL" -f scripts/seed-demo-serial-lot.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-golden-scenarios.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
-psql "$DATABASE_URL" -f scripts/seed-demo-dashboard.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-finance.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-crm.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-dashboard.sql
+psql "$DATABASE_URL" -f scripts/verify-demo-full-chain.sql
 ```
 
 **Re-run safety:** All seed files use `ON CONFLICT` / idempotent patterns where possible.

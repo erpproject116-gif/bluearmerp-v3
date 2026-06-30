@@ -40,6 +40,8 @@ type purchaseRequestStatusRow struct {
 	DateNoDisplay     string  `json:"date_no_display"`
 	PurchaseRequestNo string  `json:"purchase_request_no"`
 	ProgressStatus    string  `json:"progress_status"`
+	ApprovedAt        *string `json:"approved_at,omitempty"`
+	ApprovedByName    string  `json:"approved_by_name,omitempty"`
 	SendStatus        string  `json:"send_status"`
 	DomesticForeign   string  `json:"domestic_foreign"`
 	LocationName      string  `json:"location_name"`
@@ -189,7 +191,8 @@ func purchaseRequestStatusFromClause() string {
 		join public.inv_locations l on l.id = pr.location_id
 		join public.pr_purchase_request_lines ln on ln.purchase_request_id = pr.id
 		left join public.inv_partners hp on hp.id = pr.partner_id
-		left join public.inv_partners lp on lp.id = ln.partner_id`
+		left join public.inv_partners lp on lp.id = ln.partner_id
+		left join public.users approver on approver.id = pr.approved_by_user_id`
 }
 
 func purchaseRequestStatusOrderBy(sort, order string) string {
@@ -217,6 +220,7 @@ func queryPurchaseRequestStatusRows(ctx context.Context, pool *pgxpool.Pool, ten
 	orderClause := purchaseRequestStatusOrderBy(sort, order)
 	q := fmt.Sprintf(`
 		select pr.id, ln.id, pr.request_date, pr.date_seq, pr.purchase_request_no, pr.progress_status,
+		  pr.approved_at, coalesce(approver.full_name, ''),
 		  pr.send_status, pr.domestic_foreign,
 		  l.location_name, pr.pic_name,
 		  coalesce(hp.company_name, lp.company_name, ln.partner_name, ''),
@@ -241,8 +245,10 @@ func queryPurchaseRequestStatusRows(ctx context.Context, pool *pgxpool.Pool, ten
 		var row purchaseRequestStatusRow
 		var requestDate time.Time
 		var dateSeq int
+		var approvedAt *time.Time
 		if err := rows.Scan(
 			&row.PurchaseRequestID, &row.LineID, &requestDate, &dateSeq, &row.PurchaseRequestNo, &row.ProgressStatus,
+			&approvedAt, &row.ApprovedByName,
 			&row.SendStatus, &row.DomesticForeign,
 			&row.LocationName, &row.PicName, &row.PartnerName,
 			&row.ItemCode, &row.ItemName, &row.SpecName, &row.Qty, &row.LineTotal, &row.Remark, &total,
@@ -250,6 +256,10 @@ func queryPurchaseRequestStatusRows(ctx context.Context, pool *pgxpool.Pool, ten
 			return nil, 0, err
 		}
 		row.DateNoDisplay = formatDateNoDisplay(requestDate, dateSeq)
+		if approvedAt != nil {
+			s := approvedAt.Format(time.RFC3339)
+			row.ApprovedAt = &s
+		}
 		out = append(out, row)
 	}
 	if out == nil {

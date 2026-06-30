@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
 )
@@ -410,6 +411,16 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if errs := validateSalesOrderBody(body, true); errs != nil {
 			response.Validation(w, errs)
+			return
+		}
+
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if vErrs := processpolicy.ValidateSalesOrderCreate(policy, body.SourceQuotationID); vErrs != nil {
+			response.Validation(w, vErrs)
 			return
 		}
 

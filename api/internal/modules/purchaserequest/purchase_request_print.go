@@ -95,6 +95,15 @@ func patchPurchaseRequestProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		status := defaultProgress(body.ProgressStatus)
+		blocked, err := manualConfirmBlocked(r.Context(), pool, tu.TenantID, status)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if blocked {
+			response.Validation(w, map[string]string{"progress_status": "Use Approve when purchase request approval is required."})
+			return
+		}
 
 		tag, err := pool.Exec(r.Context(), `
 			update public.pr_purchase_requests

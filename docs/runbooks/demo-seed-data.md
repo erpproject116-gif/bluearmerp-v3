@@ -72,6 +72,15 @@ This runbook covers the **DEMO000** demo tenant. For platform superadmins (`itsj
 
    Run after inventory seed; requires migrations `036`–`039`.
 
+   **Optional — golden wired scenarios (S2 serial, S3 lot, S4 direct):**
+
+   ```bash
+   psql "$DATABASE_URL" -f scripts/seed-demo-golden-scenarios.sql
+   psql "$DATABASE_URL" -f scripts/verify-demo-full-chain.sql
+   ```
+
+   Stable doc numbers: `DEMO-S2-SO`, `DEMO-S2-SI`, serials `{TENANT}-S2-001`…; lot `LOT-S3-A`; open receive PO `DEMOGR902`.
+
    **Optional — open purchase orders and goods receipts (serial receive testing):**
 
    ```bash

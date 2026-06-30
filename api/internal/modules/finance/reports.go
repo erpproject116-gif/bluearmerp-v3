@@ -60,6 +60,7 @@ func registerReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/receipt-status", listReceiptStatus(pool))
 	r.Get("/official-receipt-status/export", exportOfficialReceiptStatus(pool))
 	r.Get("/official-receipt-status", listOfficialReceiptStatus(pool))
+	registerAPReportRoutes(r, pool)
 }
 
 func parseOptionalDateRange(r *http.Request) (*time.Time, *time.Time, map[string]string) {

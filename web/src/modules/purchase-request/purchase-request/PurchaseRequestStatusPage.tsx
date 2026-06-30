@@ -83,6 +83,7 @@ export default function PurchaseRequestStatusPage() {
           onPageChange={setPage}
           onDateNoClick={(id) => void openPurchaseRequest(id)}
           onProgressChange={(id, status) => void onProgressChange(id, status)}
+          onApprovalChanged={() => invalidate()}
         />
       </Show>
 

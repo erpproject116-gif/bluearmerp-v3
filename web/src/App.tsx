@@ -54,6 +54,8 @@ import SalesOrderSettingsPage from "./modules/sales-order/sales-order/SalesOrder
 import SalesOrderStatusPage from "./modules/sales-order/sales-order/SalesOrderStatusPage";
 import OutstandingSOStatusPage from "./modules/sales-order/sales-order/OutstandingSOStatusPage";
 import ReleaseSalesOrderPage from "./modules/sales-order/sales-order/ReleaseSalesOrderPage";
+import DeliveryReceiptListPage from "./modules/sales-order/delivery-receipt/DeliveryReceiptListPage";
+import DeliveryReceiptNewPage from "./modules/sales-order/delivery-receipt/DeliveryReceiptNewPage";
 import SalesOrderPrintPage from "./modules/sales-order/sales-order/SalesOrderPrintPage";
 import SalesOrderStatusPrintPage from "./modules/sales-order/sales-order/SalesOrderStatusPrintPage";
 import PurchaseRequestListPage from "./modules/purchase-request/purchase-request/PurchaseRequestListPage";
@@ -75,8 +77,14 @@ import OfficialReceiptListPage from "./modules/finance/official-receipts/Officia
 import OfficialReceiptNewPage from "./modules/finance/official-receipts/OfficialReceiptNewPage";
 import OfficialReceiptSettingsPage from "./modules/finance/official-receipts/OfficialReceiptSettingsPage";
 import ArByCustomerPage from "./modules/finance/reports/ArByCustomerPage";
+import ApByVendorPage from "./modules/finance/reports/ApByVendorPage";
+import SupplierPaymentStatusPage from "./modules/finance/reports/SupplierPaymentStatusPage";
 import ReceiptStatusPage from "./modules/finance/reports/ReceiptStatusPage";
 import OfficialReceiptStatusPage from "./modules/finance/reports/OfficialReceiptStatusPage";
+import SupplierInvoiceListPage from "./modules/finance/supplier-invoices/SupplierInvoiceListPage";
+import SupplierInvoiceNewPage from "./modules/finance/supplier-invoices/SupplierInvoiceNewPage";
+import PaymentVoucherListPage from "./modules/finance/payment-vouchers/PaymentVoucherListPage";
+import PaymentVoucherNewPage from "./modules/finance/payment-vouchers/PaymentVoucherNewPage";
 import SalesOfficialReceiptStatusPage from "./modules/sales/reports/SalesOfficialReceiptStatusPage";
 import SalesSiReceiptStatusPage from "./modules/sales/reports/SalesSiReceiptStatusPage";
 import SalesArByCustomerPage from "./modules/sales/reports/SalesArByCustomerPage";
@@ -92,6 +100,7 @@ import CollectiveInvoiceStatusPrintPage from "./modules/sales/collective-invoici
 import UsersPage from "./modules/user-management/users/UsersPage";
 import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
+import ProcessPoliciesPage from "./modules/user-management/process-policies/ProcessPoliciesPage";
 import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
 import ChangeLogListPage from "./modules/activity-logs/ChangeLogListPage";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
@@ -208,6 +217,8 @@ export default function App() {
           <Route path="/sales-order/sales-orders/status" component={SalesOrderStatusPage} />
           <Route path="/sales-order/sales-orders/outstanding" component={OutstandingSOStatusPage} />
           <Route path="/sales-order/sales-orders/release" component={ReleaseSalesOrderPage} />
+          <Route path="/sales-order/delivery-receipts/new" component={DeliveryReceiptNewPage} />
+          <Route path="/sales-order/delivery-receipts" component={DeliveryReceiptListPage} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
           <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
           <Route path="/purchase-request/purchase-requests/new" component={PurchaseRequestNewPage} />
@@ -229,9 +240,15 @@ export default function App() {
           <Route path="/sales/collective-invoicing/list" component={CollectiveInvoiceListPage} />
           <Route path="/sales/collective-invoicing/status" component={CollectiveInvoiceStatusPage} />
           <Route path="/sales/reports/print-slips" component={SalesPrintSlipsLauncherPage} />
+          <Route path="/finance/supplier-invoices/new" component={SupplierInvoiceNewPage} />
+          <Route path="/finance/supplier-invoices" component={SupplierInvoiceListPage} />
+          <Route path="/finance/payment-vouchers/new" component={PaymentVoucherNewPage} />
+          <Route path="/finance/payment-vouchers" component={PaymentVoucherListPage} />
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />
+          <Route path="/finance/reports/ap-by-vendor" component={ApByVendorPage} />
+          <Route path="/finance/reports/supplier-payment-status" component={SupplierPaymentStatusPage} />
           <Route path="/finance/reports/ar-by-customer" component={ArByCustomerPage} />
           <Route path="/finance/reports/receipt-status" component={ReceiptStatusPage} />
           <Route path="/finance/reports/official-receipt-status" component={OfficialReceiptStatusPage} />
@@ -289,6 +306,11 @@ export default function App() {
           <Route path="/user-management/groups" component={() => (
             <AdminModuleRoute>
               <UserGroupsPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/process-policies" component={() => (
+            <AdminModuleRoute>
+              <ProcessPoliciesPage />
             </AdminModuleRoute>
           )} />
         </Route>

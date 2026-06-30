@@ -17,6 +17,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
 )
@@ -444,6 +445,23 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		hasSOLinkedLine := false
+		for _, ln := range body.Lines {
+			if ln.SourceSalesOrderLineID != nil && *ln.SourceSalesOrderLineID > 0 {
+				hasSOLinkedLine = true
+				break
+			}
+		}
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if vErrs := processpolicy.ValidateDirectSale(policy, hasSOLinkedLine); vErrs != nil {
+			response.Validation(w, vErrs)
+			return
+		}
+
 		if convErrs := validateSalesOrderConversion(r.Context(), pool, tu.TenantID, computed); convErrs != nil {
 			response.Validation(w, convErrs)
 			return
@@ -515,7 +533,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := writeSalesOrderSlipsForSales(r.Context(), tx, tu.TenantID, id, salesNo, dateNoDisplay, computed); err != nil {
+		if err := writeSalesOrderSlipsForSales(r.Context(), tx, tu.TenantID, id, salesNo, dateNoDisplay, computed, !policy.LegacyCombinedSORelease); err != nil {
 			response.Validation(w, map[string]string{"conversion": err.Error()})
 			return
 		}

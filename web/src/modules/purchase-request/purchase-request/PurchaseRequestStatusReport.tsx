@@ -4,6 +4,7 @@ import { getAccessToken } from "../../../shared/api";
 import { formatDisplayDate, statusExportUrl, statusPrintPath, type PurchaseRequestStatusFilters } from "./purchaseRequestStatusFilters";
 import type { PurchaseRequestStatusReportRow } from "../../../shared/usePurchaseRequestStatusReport";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
+import { PurchaseRequestApprovalPanel } from "./PurchaseRequestApprovalPanel";
 
 type Props = {
   filters: PurchaseRequestStatusFilters;
@@ -18,6 +19,7 @@ type Props = {
   onPageChange: (page: number) => void;
   onDateNoClick: (purchaseRequestId: number) => void;
   onProgressChange: (purchaseRequestId: number, status: string) => void;
+  onApprovalChanged: () => void;
 };
 
 function money(n: number) {
@@ -63,6 +65,7 @@ export function PurchaseRequestStatusReport(props: Props) {
               <th class="px-3 py-2">Date-No.</th>
               <th class="px-3 py-2">PR No.</th>
               <th class="px-3 py-2">Progress</th>
+              <th class="px-3 py-2">Approval</th>
               <th class="px-3 py-2">Send</th>
               <th class="px-3 py-2">D/F</th>
               <th class="px-3 py-2">Location</th>
@@ -79,14 +82,14 @@ export function PurchaseRequestStatusReport(props: Props) {
           <tbody>
             <Show when={props.loading}>
               <tr>
-                <td colSpan={14} class="px-3 py-8 text-center text-text-secondary">
+                <td colSpan={15} class="px-3 py-8 text-center text-text-secondary">
                   Loading…
                 </td>
               </tr>
             </Show>
             <Show when={!props.loading && props.rows.length === 0}>
               <tr>
-                <td colSpan={14} class="px-3 py-8 text-center text-text-secondary">
+                <td colSpan={15} class="px-3 py-8 text-center text-text-secondary">
                   No rows match your filters.
                 </td>
               </tr>
@@ -107,6 +110,16 @@ export function PurchaseRequestStatusReport(props: Props) {
                       onChange={(status) => props.onProgressChange(row.purchase_request_id, status)}
                     />
                   </td>
+                  <td class="px-3 py-2">
+                    <PurchaseRequestApprovalPanel
+                      compact
+                      purchaseRequestId={row.purchase_request_id}
+                      progressStatus={row.progress_status}
+                      approvedAt={row.approved_at}
+                      approvedByName={row.approved_by_name}
+                      onChanged={props.onApprovalChanged}
+                    />
+                  </td>
                   <td class="px-3 py-2 capitalize">{row.send_status}</td>
                   <td class="px-3 py-2 capitalize">{row.domestic_foreign}</td>
                   <td class="px-3 py-2">{row.location_name}</td>
@@ -124,7 +137,7 @@ export function PurchaseRequestStatusReport(props: Props) {
           </tbody>
           <tfoot class="border-t-2 border-stroke bg-slate-50 font-semibold">
             <tr>
-              <td colSpan={11} class="px-3 py-2 text-right">
+              <td colSpan={12} class="px-3 py-2 text-right">
                 Total
               </td>
               <td class="px-3 py-2 text-right">{props.totalQty}</td>

@@ -1,0 +1,144 @@
+Workstream 3 — Sales: reservation split + Delivery Receipt
+
+**Closes:** no DR document; reservation and deduction merged at SO Release\.
+
+**Highest regression risk in the program.** Ship behind `legacy_combined_so_release`.
+
+### Phase 3A — Ledger split (migration + release refactor)
+
+| # | Artifact | Details |
+|---|----------|---------|
+| 3A.1 | Migration `053_stock_reservation.sql` | `qty_reserved` on `inv_item_location_balances`; movement types `so_reserve`, `dr_issue` |
+| 3A.2 | Refactor `releases.go` | When `legacy_combined_so_release = false`: reserve only (serials → `reserved`, `qty_reserved += qty`, **no** `qty_on_hand` change) |
+| 3A.3 | Backfill script `scripts/backfill-legacy-releases.sql` | Existing tenants: keep balances; optional auto-posted DR rows |
+| 3A.4 | Update reconciliation | `reserve-without-dr`, adjust `so-release-gap` |
+| 3A.5 | Tests | Extend pattern from `goods_receipt_serial_test.go` |
+
+### Phase 3B — Delivery Receipt module
+
+| # | Artifact | Details |
+|---|----------|---------|
+| 3B.1 | Migration `054_delivery_receipt.sql` | `dr_*` tables + slip lines to SO |
+| 3B.2 | Go module `internal/modules/deliveryreceipt` | CRUD, post, reverse, print |
+| 3B.3 | Web module under Sales or Sales Order branch | List, new, post queue, print |
+| 3B.4 | Sales picker change | Balance = `delivered_qty − invoiced_qty` (legacy: `released_qty − invoiced_qty`) |
+| 3B.5 | Serial pick on DR post | Reuse `SerialPickModal` / available-serial API |
+| 3B.6 | Golden **S9** | SO→Reserve→DR→SI full stakeholder path |
+
+### Skip behavior (WS0)
+
+| Policy | Behavior |
+|--------|----------|
+| `sales_require_delivery_receipt = false` | Auto-post DR on reserve **or** allow SI from reservation (document in ADR; recommend auto-post for audit) |
+| `legacy_combined_so_release = true` | Current behavior unchanged |
+
+### Acceptance criteria
+
+- [ ] New tenant with split policy: reserve does **not** change `qty_on_hand`
+- [ ] DR post deducts `qty_on_hand` and reduces `qty_reserved`
+- [ ] SI from SO validates against DR qty (or legacy release qty)
+- [ ] Undo release / sales return / serial trace still coherent
+- [ ] `go build ./...`, `npm run build`, existing serial tests green
+
+---
+
+## Workstream 4 — PR approval (lightweight)
+
+**Closes:** approval status without workflow engine; internal department use case.
+
+### Deliverables
+
+| # | Artifact | Details |
+|---|----------|---------|
+| 4.1 | Migration `055_pr_approvals.sql` | `pr_approvals` audit table |
+| 4.2 | API | `POST .../purchase-requests/{id}/approve`, `.../reject` |
+| 4.3 | UI | Approve/Reject on PR detail; status report column |
+| 4.4 | Gate | When `purchase_require_pr_approval`: block `from-purchase-request` until approved |
+| 4.5 | Golden **S10** | PR in `e_approval` → approved → PO |
+
+### Acceptance criteria
+
+- [ ] Approval optional when policy off (today’s behavior)
+- [ ] Audit log entries on approve/reject
+- [ ] CRM task on PR still works (`038`)
+
+---
+
+## Workstream 5 — Reconciliation, docs, and quality gates
+
+**Closes:** stale READMEs, missing verifiers, dashboard blind spots.
+
+### Deliverables
+
+| # | Artifact |
+|---|----------|
+| 5.1 | New reconciliation endpoints (inventory module) |
+| 5.2 | Dashboard red flags for DR gap, GR-unbilled, AP over-application |
+| 5.3 | ADR `0004-process-flows-and-policies.md` |
+| 5.4 | Fix `purchase-request/README.md` out-of-scope section |
+| 5.5 | CI step: run `verify-demo-full-chain.sql` after seed in dev runbook |
+| 5.6 | Module README checklists for DR, AP, golden scenarios |
+
+### New reconciliation checks
+
+| Endpoint | Detects |
+|----------|---------|
+| `reserve-without-dr` | Reserved qty, no DR |
+| `dr-without-invoice` | Delivered, not invoiced |
+| `gr-without-supplier-invoice` | Posted GR, no bill |
+| `ap-over-application` | Payments exceed invoice |
+
+---
+
+## 4. Recommended delivery sequence
+
+Order minimizes rework and keeps production tenants safe.
+
+| Sprint | Workstream | Migration(s) | Why this order |
+|--------|------------|--------------|----------------|
+| **1** | WS0 Process policy | `051` | Foundation for all gates |
+| **2** | WS1 Demo orchestrator + fix S2 serial wiring | scripts only | Immediate demo value; no schema risk |
+| **3** | WS2 AP (supplier invoice + payments) | `052` | Additive; copies proven AR |
+| **4** | WS4 PR approval light | `055` | Small; unblocks internal PR story |
+| **5** | WS3A Stock reservation split | `053` | High risk; behind legacy flag |
+| **6** | WS3B Delivery Receipt | `054` | Depends on 3A |
+| **7** | WS1 final golden pass (S3 lot, S8 AP, S9 DR) | scripts | Full wired demo |
+| **8** | WS5 Reconciliation + docs + CI verify | — | Hardening |
+
+**Do not** start WS3B before WS3A. **Do not** rewrite all demo data before AP and DR schemas exist (would require double migration of seeds).
+
+---
+
+## 5. Verification matrix (every gap → proof)
+
+| Gap | Proof of closure |
+|-----|------------------|
+| No DR | Create/post DR `S9`; print; SI picker uses DR balance |
+| Reservation ≠ deduction | `qty_reserved` changes on reserve; `qty_on_hand` on DR post only (non-legacy) |
+| No supplier invoice / AP | S8: GR → bill → payment; AP report |
+| PR approval cosmetic | S10: reject PO until approved when policy on |
+| Skip paths informal | WS0 policies + S4/S5 seeds + validation errors documented |
+| Serial demo broken | S2 serial trace GR→SI in UI after reset |
+| No lot demo | S3 lot batch on GR + SI line |
+| Reset incomplete | `config.toml` runs full orchestrator |
+| Stale PR README | Updated out-of-scope list |
+| Dashboard payables deferred | AP KPI live after WS2 |
+
+### Standard gate per sprint
+
+```bash
+go build ./...
+go test ./internal/modules/...   # targeted packages touched
+npm run build
+psql "$DATABASE_URL" -f scripts/seed-demo-full-chain.sql
+psql "$DATABASE_URL" -f scripts/verify-demo-full-chain.sql
+```
+
+Manual: follow each module README checklist for touched domains.
+
+---
+
+## 6. Risk register and mitigations
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------

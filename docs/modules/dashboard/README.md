@@ -17,7 +17,7 @@ Requires module `dashboard` enabled and permission `dashboard.view`.
 | `dashboard.kpis` | KPI tiles (sales MTD/YTD, low stock, AR, open PO, warranty due, quotes) |
 | `dashboard.charts` | MoM sales/inventory trends + top customers/vendors/items |
 | `dashboard.red_flags` | Discrepancy and operational alert panel |
-| `dashboard.financial_summary` | AR summary only in Phase A (P&L / payables deferred) |
+| `dashboard.financial_summary` | AR summary; AP reports live via Finance module |
 
 Default: `store_admin` has write on all dashboard permissions; `member` has none (configurable in User Management).
 
@@ -47,20 +47,23 @@ All routes under `/api/v1/dashboard/`:
 | `serial_qty_mismatch` | Reconciliation: qty vs serial count |
 | `reserved_stale` | Serials `reserved` past threshold days |
 | `open_po_not_received` | PO lines where `qty > received_qty` |
-| `so_release_gap` | Sold qty exceeds released qty on SO lines |
+| `so_release_gap` | SO lines with unreleased order qty |
+| `reserve_without_dr` | Released qty not yet on delivery receipt |
+| `dr_without_invoice` | Delivered qty not yet invoiced |
+| `gr_without_supplier_invoice` | Posted GR lines not fully billed |
+| `ap_over_application` | Payment applications exceed invoice total |
 
-Drill-down links in the UI route to existing list pages (quotations, serial trace, purchase orders, etc.).
+Drill-down links in the UI route to existing list pages (quotations, serial trace, purchase orders, delivery receipts, supplier invoices, etc.).
 
 ## Hybrid stock semantics (for owners)
 
-Stock movement policy used by dashboard reconciliation:
+Stock movement policy depends on **Process Policies** (`legacy_combined_so_release`). See [ADR 0005](../../adr/0005-process-flows-and-policies.md).
 
-| Path | When qty moves | Serial behavior |
-|------|----------------|-----------------|
-| **Goods Receipt post** | `qty_on_hand` increases | Serial units → `in_stock` |
-| **SO Release** | `qty_on_hand` decreases | Serials → `reserved` |
-| **Sales from SO line** | No extra qty move (release already deducted) | Serials → `sold`; qty validated ≤ released |
-| **Direct sales** (no SO line) | `qty_on_hand` decreases at invoice | Serial pick required when `track_serial` |
+| Path | Legacy combined (`true`) | Split mode (`false`) |
+|------|--------------------------|----------------------|
+| **SO Release** | `qty_on_hand` decreases | `qty_reserved` increases |
+| **DR post** | Slip only | Deducts on-hand + reserved |
+| **Sales from SO** | Validates released − invoiced | Validates delivered − invoiced |
 
 See [serial-lot README](../inventory/serial-lot/README.md) for traceability APIs and reversal flows.
 
@@ -72,12 +75,15 @@ Used by dashboard red flags and available directly:
 |----------|---------|
 | `GET /api/v1/inventory/reconciliation/serial-qty` | Per item+location: balance vs serial count |
 | `GET /api/v1/inventory/reconciliation/reserved-stale?days=30` | Stale reserved serials |
-| `GET /api/v1/inventory/reconciliation/so-release-gap` | SO lines sold beyond release |
+| `GET /api/v1/inventory/reconciliation/so-release-gap` | SO lines with unreleased qty |
+| `GET /api/v1/inventory/reconciliation/reserve-without-dr` | Released, not delivered |
+| `GET /api/v1/inventory/reconciliation/dr-without-invoice` | Delivered, not invoiced |
+| `GET /api/v1/inventory/reconciliation/gr-without-supplier-invoice` | GR not fully billed |
+| `GET /api/v1/inventory/reconciliation/ap-over-application` | AP over-applied payments |
 
 ## Deferred (not in Phase A)
 
-- P&L, cashflow, full payables/AP
-- Vendor bills and payment runs
+- P&L, cashflow charts
 - COGS / cost layers on receipt
 - Email/SMS dashboard alerts (in-app + CRM notifications only)
 

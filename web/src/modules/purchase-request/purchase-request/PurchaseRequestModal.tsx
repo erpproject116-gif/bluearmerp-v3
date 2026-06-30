@@ -12,6 +12,7 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
+import { PurchaseRequestApprovalPanel } from "./PurchaseRequestApprovalPanel";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -41,6 +42,8 @@ export type PurchaseRequestDetail = {
   domestic_foreign: string;
   send_status: string;
   progress_status: string;
+  approved_at?: string | null;
+  approved_by_name?: string;
   total_qty: number;
   reference?: string | null;
   notes?: string | null;
@@ -168,6 +171,8 @@ export function PurchaseRequestModal(props: Props) {
   const [reference, setReference] = createSignal("");
   const [notes, setNotes] = createSignal("");
   const [progressStatus, setProgressStatus] = createSignal("unconfirmed");
+  const [approvedAt, setApprovedAt] = createSignal<string | null>(null);
+  const [approvedByName, setApprovedByName] = createSignal("");
   const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
@@ -283,6 +288,8 @@ export function PurchaseRequestModal(props: Props) {
       setReference(ed.reference ?? "");
       setNotes(ed.notes ?? "");
       setProgressStatus(ed.progress_status);
+      setApprovedAt(ed.approved_at ?? null);
+      setApprovedByName(ed.approved_by_name ?? "");
       setLines(linesFromDetail(ed.lines));
     } else {
       setRequestDate(todayISO());
@@ -517,6 +524,23 @@ export function PurchaseRequestModal(props: Props) {
       <Field label="Progress status">
         <ProgressStatusMenu value={progressStatus()} onChange={setProgressStatus} />
       </Field>
+      <Show when={props.editing}>
+        <PurchaseRequestApprovalPanel
+          purchaseRequestId={props.editing!.id}
+          progressStatus={progressStatus()}
+          approvedAt={approvedAt()}
+          approvedByName={approvedByName()}
+          onChanged={async () => {
+            const res = await apiFetch<PurchaseRequestDetail>(`/api/v1/purchase-request/purchase-requests/${props.editing!.id}`);
+            if (res.success && res.data) {
+              setProgressStatus(res.data.progress_status);
+              setApprovedAt(res.data.approved_at ?? null);
+              setApprovedByName(res.data.approved_by_name ?? "");
+            }
+            props.onSaved();
+          }}
+        />
+      </Show>
       <Field label="Reference">
         <input class={inputClass} value={reference()} onInput={(e) => setReference(e.currentTarget.value)} />
       </Field>

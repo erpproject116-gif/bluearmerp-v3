@@ -1,0 +1,59 @@
+# Golden demo scenario catalog (stable document numbers for QA and training)
+# SQL implementation: scripts/seed-demo-golden-scenarios.sql
+
+scenarios:
+  S2_serial_chain:
+    description: PR → PO → GR → SO release → SI with ledger serials
+    documents:
+      purchase_request: DEMO-S2-PR
+      purchase_order: DEMO-S2-PO
+      sales_order: DEMO-S2-SO
+      sales_invoice: DEMO-S2-SI
+    item_code: "00002"
+    partner_customer: "00001"
+    partner_vendor: "00004"
+    serial_prefix: "{tenant}-S2-"
+    serial_count: 5
+    sold_count: 2
+
+  S3_lot_chain:
+    description: PR → PO → GR lot batch → direct SI with lot_batch_id
+    documents:
+      purchase_request: DEMO-S3-PR
+      purchase_order: DEMO-S3-PO
+      sales_invoice: DEMO-S3-SI
+    item_code: "00004"
+    lot_no: LOT-S3-A
+    lot_qty_received: 50
+    lot_qty_sold: 10
+
+  S4_direct_sale:
+    description: Direct SI without sales order (skip SO path)
+    sales_invoice: DEMO-S4-SI
+    item_code: "00003"
+
+  S9_delivery_receipt_chain:
+    description: SO → reserve → posted DR → SI (split-mode ledger demo)
+    documents:
+      sales_order: DEMO-S9-SO
+      delivery_receipt: DEMO-S9-DR
+      sales_invoice: DEMO-S9-SI
+    item_code: "00003"
+    release_qty: 2
+    delivered_qty: 2
+    invoiced_qty: 2
+
+  S5_open_receive:
+    description: Open PO for Receive/Scan UI (from seed-demo-po-gr-open.sql)
+    purchase_order: DEMOGR902
+    open_qty: 5
+
+  S10_pr_approval:
+    description: Pending PR in e_approval + approved PR linked to PO
+    documents:
+      purchase_request_pending: DEMO-S10-PR
+      purchase_request_approved: DEMO-S10-PR-OK
+      purchase_order: DEMO-S10-PO
+    item_code: "00003"
+
+verify_script: scripts/verify-demo-full-chain.sql

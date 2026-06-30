@@ -1,0 +1,243 @@
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { apiFetch } from "../../../shared/api";
+import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { DateInput } from "../../../shared/DateInput";
+import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { submitEntity } from "../../../shared/handleSaveResult";
+import { useToast } from "../../../shared/toast";
+import { WideEntityModal } from "../../../shared/WideEntityModal";
+import type { OpenGRLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
+
+type LineRow = {
+  goods_receipt_line_id: number | null;
+  label: string;
+  qty: string;
+  unit_vat_inc: number;
+  line_total: string;
+};
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+};
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function fetchVendors(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; company_name: string; partner_kind: string }[]>(`/api/v1/inventory/partners?${qs}`);
+  return (res.data ?? [])
+    .filter((p) => p.partner_kind === "vendor" || p.partner_kind === "both")
+    .map((p) => ({ id: p.id, label: p.company_name }));
+}
+
+export function SupplierInvoiceModal(props: Props) {
+  const toast = useToast();
+  const [saving, setSaving] = createSignal(false);
+  const [invoiceDate, setInvoiceDate] = createSignal(todayISO());
+  const [dateNoDisplay, setDateNoDisplay] = createSignal("");
+  const [invoiceNo, setInvoiceNo] = createSignal("");
+  const [partnerId, setPartnerId] = createSignal<number | null>(null);
+  const [vendorLabel, setVendorLabel] = createSignal("");
+  const [currencyId, setCurrencyId] = createSignal<number | null>(null);
+  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; is_default: boolean }[]>([]);
+  const [vendorInvoiceNo, setVendorInvoiceNo] = createSignal("");
+  const [notes, setNotes] = createSignal("");
+  const [openLines, setOpenLines] = createSignal<OpenGRLine[]>([]);
+  const [lines, setLines] = createSignal<LineRow[]>([]);
+
+  const loadPreview = async (date: string) => {
+    const res = await apiFetch<{ date_no_display: string; invoice_no: string }>(
+      `/api/v1/finance/supplier-invoices/preview-sequences?invoice_date=${encodeURIComponent(date)}`,
+    );
+    if (res.success && res.data) {
+      setDateNoDisplay(res.data.date_no_display);
+      setInvoiceNo(res.data.invoice_no);
+    }
+  };
+
+  const loadOpenLines = async (pid: number) => {
+    const res = await apiFetch<OpenGRLine[]>(`/api/v1/finance/supplier-invoices/open-gr-lines?partner_id=${pid}`);
+    setOpenLines(res.data ?? []);
+  };
+
+  const reset = () => {
+    setInvoiceDate(todayISO());
+    setPartnerId(null);
+    setVendorLabel("");
+    setVendorInvoiceNo("");
+    setNotes("");
+    setLines([]);
+    setOpenLines([]);
+    void loadPreview(todayISO());
+    void apiFetch<{ id: number; currency_code: string; is_default: boolean }[]>(
+      "/api/v1/quotation/currencies?page=1&pageSize=100&status=active",
+    ).then((res) => {
+      const rows = res.data ?? [];
+      setCurrencies(rows);
+      const def = rows.find((c) => c.is_default) ?? rows[0];
+      if (def) setCurrencyId(def.id);
+    });
+  };
+
+  createEffect(() => {
+    if (!props.open) return;
+    reset();
+  });
+
+  createEffect(() => {
+    if (!props.open) return;
+    void loadPreview(invoiceDate());
+  });
+
+  createEffect(() => {
+    const pid = partnerId();
+    if (pid) void loadOpenLines(pid);
+  });
+
+  const addLineFromGR = (gr: OpenGRLine) => {
+    const qty = gr.balance_qty;
+    const total = qty * gr.unit_vat_inc;
+    setLines((rows) => [
+      ...rows,
+      {
+        goods_receipt_line_id: gr.goods_receipt_line_id,
+        label: `${gr.purchase_order_no} — ${gr.item_code} ${gr.item_name}`,
+        qty: String(qty),
+        unit_vat_inc: gr.unit_vat_inc,
+        line_total: total.toFixed(4),
+      },
+    ]);
+  };
+
+  const save = async () => {
+    if (!partnerId() || !currencyId()) {
+      toast.warning("Select a vendor and currency.");
+      return;
+    }
+    const bodyLines = lines()
+      .filter((l) => l.goods_receipt_line_id && Number(l.qty) > 0)
+      .map((l) => {
+        const qty = Number(l.qty);
+        const lineTotal = Number(l.line_total);
+        const nonVat = lineTotal / 1.12;
+        const tax = lineTotal - nonVat;
+        return {
+          goods_receipt_line_id: l.goods_receipt_line_id,
+          qty,
+          unit_non_vat: nonVat / qty,
+          non_vat_total: nonVat,
+          tax_amount: tax,
+          unit_vat_inc: l.unit_vat_inc,
+          line_total: lineTotal,
+        };
+      });
+    if (bodyLines.length === 0) {
+      toast.warning("Add at least one goods receipt line.");
+      return;
+    }
+
+    setSaving(true);
+    const ok = await submitEntity(
+      () =>
+        apiFetch<SupplierInvoiceDetail>(
+          "/api/v1/finance/supplier-invoices",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              invoice_date: invoiceDate(),
+              partner_id: partnerId(),
+              currency_id: currencyId(),
+              vendor_invoice_no: vendorInvoiceNo().trim() || null,
+              notes: notes().trim() || null,
+              lines: bodyLines,
+            }),
+          },
+          { silent: true },
+        ),
+      toast,
+      "Supplier invoice created.",
+    );
+    setSaving(false);
+    if (ok) props.onSaved();
+  };
+
+  return (
+    <WideEntityModal open={props.open} title="New Supplier Invoice" onClose={props.onClose} onSave={() => void save()} saving={saving()}>
+      <Field label="Invoice date">
+        <DateInput value={invoiceDate()} onInput={(e) => setInvoiceDate(e.currentTarget.value)} />
+      </Field>
+      <Field label="Date-no / Invoice no">
+        <input class={inputClass} readOnly value={`${dateNoDisplay()} / ${invoiceNo()}`} />
+      </Field>
+      <Field label="Vendor">
+        <LookupCombo
+          label=""
+          value={vendorLabel}
+          selectedId={() => partnerId()}
+          onInput={setVendorLabel}
+          onSelect={(o) => {
+            setPartnerId(o.id);
+            setVendorLabel(o.label);
+            setLines([]);
+          }}
+          onClear={() => {
+            setPartnerId(null);
+            setVendorLabel("");
+            setLines([]);
+          }}
+          fetchOptions={fetchVendors}
+        />
+      </Field>
+      <Field label="Currency">
+        <select class={inputClass} value={currencyId() ?? ""} onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}>
+          <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code}</option>}</For>
+        </select>
+      </Field>
+      <Field label="Vendor invoice no">
+        <input class={inputClass} value={vendorInvoiceNo()} onInput={(e) => setVendorInvoiceNo(e.currentTarget.value)} />
+      </Field>
+      <div class="col-span-full">
+        <Show when={partnerId()}>
+          <p class="mb-2 text-sm font-medium text-slate-700">Open goods receipt lines (click to add)</p>
+          <div class="max-h-32 space-y-1 overflow-y-auto rounded border border-slate-200 p-2">
+            <For each={openLines()}>
+              {(gr) => (
+                <button type="button" class="block w-full rounded px-2 py-1 text-left text-sm hover:bg-slate-100" onClick={() => addLineFromGR(gr)}>
+                  {gr.purchase_order_no} — {gr.item_code} (balance {gr.balance_qty})
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+      <div class="col-span-full">
+        <For each={lines()}>
+          {(ln, i) => (
+            <div class="mb-2 grid grid-cols-3 gap-2 text-sm">
+              <span class="col-span-2 truncate">{ln.label}</span>
+              <input
+                class={inputClass}
+                type="number"
+                step="any"
+                value={ln.qty}
+                onInput={(e) => {
+                  const qty = e.currentTarget.value;
+                  const total = (Number(qty) * ln.unit_vat_inc).toFixed(4);
+                  setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, qty, line_total: total } : r)));
+                }}
+              />
+            </div>
+          )}
+        </For>
+      </div>
+      <Field label="Notes">
+        <textarea class={`${inputClass} min-h-[60px]`} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
+      </Field>
+    </WideEntityModal>
+  );
+}

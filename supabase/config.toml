@@ -20,7 +20,22 @@ schema_paths = ["../api/migrations/*.sql"]
 
 [db.seed]
 enabled = true
-sql_paths = ["./seed.sql", "../scripts/seed-platform-owners.sql", "../scripts/seed-demo-inventory.sql"]
+sql_paths = [
+  "./seed.sql",
+  "../scripts/seed-platform-owners.sql",
+  "../scripts/seed-demo-inventory.sql",
+  "../scripts/seed-demo-quotations.sql",
+  "../scripts/seed-demo-purchase-requests.sql",
+  "../scripts/seed-demo-sales-orders.sql",
+  "../scripts/seed-demo-golden-scenarios.sql",
+  "../scripts/seed-demo-po-gr-open.sql",
+  "../scripts/seed-demo-sales.sql",
+  "../scripts/seed-demo-finance.sql",
+  "../scripts/seed-demo-finance-ap.sql",
+  "../scripts/seed-demo-crm.sql",
+  "../scripts/seed-demo-dashboard.sql",
+  "../scripts/verify-demo-full-chain.sql",
+]
 
 [auth]
 enabled = true

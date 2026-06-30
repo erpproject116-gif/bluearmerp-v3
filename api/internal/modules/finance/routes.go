@@ -16,6 +16,8 @@ import (
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/finance", func(fr chi.Router) {
 		registerOfficialReceiptRoutes(fr, pool)
+		registerSupplierInvoiceRoutes(fr, pool)
+		registerPaymentVoucherRoutes(fr, pool)
 		registerReportRoutes(fr, pool)
 	})
 }
