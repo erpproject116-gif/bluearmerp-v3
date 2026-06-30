@@ -192,17 +192,24 @@ export default function PurchaseOrderListPage() {
   return (
     <PurchaseRequestLayout>
       <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
-        <A
-          href="/app/inventory/serial-lot/receive"
-          class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+          onClick={() => setFromPrOpen(true)}
         >
-          Receive goods
-        </A>
+          From purchase request
+        </button>
         <A
-          href="/app/purchase-request/goods-receipt"
+          href="/app/purchase-order/goods-receipt"
           class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
         >
           Goods receipts
+        </A>
+        <A
+          href="/app/inventory/serial-lot/receive"
+          class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+        >
+          Receive goods
         </A>
       </div>
 
@@ -249,7 +256,10 @@ export default function PurchaseOrderListPage() {
         selectedId={selectedId()}
         onSelect={setSelectedId}
         onEdit={openPo}
-        onNew={() => setFromPrOpen(true)}
+        onNew={() => {
+          setEditingPoId(null);
+          setPoModalOpen(true);
+        }}
         codeKey="purchase_order_no"
         nameKey="date_no_display"
         sortKey={sort()}

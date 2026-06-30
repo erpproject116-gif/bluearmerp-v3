@@ -48,6 +48,9 @@ function groupFor(row: TenantModuleRow): string {
   ) {
     return "Misc";
   }
+  if (row.module_code === "crm" || row.module_code === "finance") {
+    return "CRM & Finance";
+  }
   return "Other";
 }
 
@@ -62,11 +65,11 @@ export default function ModuleFeaturesPage() {
   const load = async () => {
     setLoading(true);
     const res = await apiFetch<{ modules: TenantModuleRow[]; can_manage: boolean }>(
-      "/user-management/tenant-modules",
+      "/api/v1/user-management/tenant-modules",
     );
     setLoading(false);
     if (res.success && res.data) {
-      setRows(res.data.modules);
+      setRows(res.data.modules ?? []);
       setCanManage(!!res.data.can_manage);
     } else {
       toast.error(res.message || "Failed to load modules.");
@@ -84,9 +87,11 @@ export default function ModuleFeaturesPage() {
       if (!map.has(g)) map.set(g, []);
       map.get(g)!.push(r);
     }
-    const order = ["Stocks Management", "Sales Process", "Procurement Process", "Other", "Misc"];
+    const order = ["Stocks Management", "Sales Process", "Procurement Process", "CRM & Finance", "Other", "Misc"];
     return order.filter((g) => map.has(g)).map((g) => ({ label: g, items: map.get(g)! }));
   };
+
+  const isEmpty = () => !loading() && rows().length === 0;
 
   const toggle = (code: string) => {
     if (!canManage()) return;
@@ -98,7 +103,7 @@ export default function ModuleFeaturesPage() {
   const save = async () => {
     if (!canManage()) return;
     setSaving(true);
-    const res = await apiFetch<{ modules: TenantModuleRow[] }>("/user-management/tenant-modules", {
+    const res = await apiFetch<{ modules: TenantModuleRow[] }>("/api/v1/user-management/tenant-modules", {
       method: "PATCH",
       body: JSON.stringify({
         modules: rows().map((r) => ({ module_code: r.module_code, is_enabled: r.is_enabled })),
@@ -125,6 +130,12 @@ export default function ModuleFeaturesPage() {
       </div>
 
       <Show when={!loading()} fallback={<p class="text-sm text-slate-500">Loading…</p>}>
+        <Show when={!isEmpty()} fallback={
+          <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            No modules loaded. Confirm migration <code class="font-mono text-xs">057_tenant_modules_features.sql</code> has
+            been applied, then refresh.
+          </p>
+        }>
         <For each={grouped()}>
           {(group) => (
             <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -168,6 +179,7 @@ export default function ModuleFeaturesPage() {
         </Show>
         <Show when={!canManage()}>
           <p class="text-xs text-amber-700">Only store admins and owners can change module settings.</p>
+        </Show>
         </Show>
       </Show>
     </div>

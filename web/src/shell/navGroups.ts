@@ -71,8 +71,11 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
-/** Modules shown outside collapsible groups. */
-export const ungroupedModuleIds = ["dashboard", "crm", "finance"] as const;
+/** Shown after collapsible groups (below Misc). */
+export const belowGroupModuleIds = ["crm", "finance"] as const;
+
+/** Modules shown above collapsible groups. */
+export const ungroupedModuleIds = ["dashboard"] as const;
 
 export function moduleById(id: string): AppModule | undefined {
   return appModules.find((m) => m.id === id);

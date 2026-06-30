@@ -13,6 +13,7 @@ import {
   navGroups,
   navGroupStorageKey,
   subBranchByFeature,
+  belowGroupModuleIds,
   ungroupedModuleIds,
   type NavGroupEntry,
 } from "./navGroups";
@@ -197,6 +198,11 @@ export function SidebarNav() {
       .map((id) => appModules.find((m) => m.id === id))
       .filter((m): m is AppModule => !!m && isTenantModuleEnabled(auth.me, m.id));
 
+  const belowGroup = () =>
+    belowGroupModuleIds
+      .map((id) => appModules.find((m) => m.id === id))
+      .filter((m): m is AppModule => !!m && isTenantModuleEnabled(auth.me, m.id));
+
   return (
     <nav class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
       <For each={ungrouped()}>{(module) => <NavModuleLink module={module} />}</For>
@@ -211,6 +217,8 @@ export function SidebarNav() {
           />
         )}
       </For>
+
+      <For each={belowGroup()}>{(module) => <NavModuleLink module={module} />}</For>
     </nav>
   );
 }

@@ -48,9 +48,11 @@ func getTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load modules.", "ERR_INTERNAL")
 			return
 		}
+		canManage := tu.HasPermission("settings.tenant_modules", auth.AccessWrite) ||
+			tu.IsStoreAdmin || tu.IsTenantOwner || tu.IsPlatformSuperadmin
 		response.OK(w, map[string]any{
 			"modules":    rows,
-			"can_manage": tu.HasPermission("settings.tenant_modules", auth.AccessWrite),
+			"can_manage": canManage,
 		}, "OK")
 	}
 }
@@ -62,7 +64,8 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 			return
 		}
-		if !tu.HasPermission("settings.tenant_modules", auth.AccessWrite) {
+		if !tu.HasPermission("settings.tenant_modules", auth.AccessWrite) &&
+			!tu.IsStoreAdmin && !tu.IsTenantOwner && !tu.IsPlatformSuperadmin {
 			response.Err(w, http.StatusForbidden, "Not allowed.", "ERR_FORBIDDEN")
 			return
 		}

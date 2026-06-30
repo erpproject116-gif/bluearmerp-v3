@@ -5,7 +5,7 @@ import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
-import { formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
+import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import {
@@ -128,6 +128,10 @@ function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestL
   }));
 }
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function statusLabel(status: string): string {
   return status.replace(/_/g, " ");
 }
@@ -154,7 +158,8 @@ export function PurchaseOrderModal(props: Props) {
   const [notes, setNotes] = createSignal("");
   const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
 
-  const isDraft = () => detail()?.status === "draft";
+  const isCreate = () => props.open && props.purchaseOrderId == null;
+  const isDraft = () => isCreate() || detail()?.status === "draft";
   const readOnly = () => !isDraft();
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
 
@@ -193,9 +198,39 @@ export function PurchaseOrderModal(props: Props) {
     applyDetail(poRes.data);
   };
 
+  const initNew = async () => {
+    setLoading(true);
+    setDetail(null);
+    const [tt, cc] = await Promise.all([fetchTaxTypes(), fetchCurrencies()]);
+    setTaxTypes(tt);
+    setCurrencies(cc);
+    setOrderDate(todayISO());
+    setPicUserId(null);
+    setPicName("");
+    setLocationId(null);
+    setLocationLabel("");
+    setProjectId(null);
+    setProjectLabel("");
+    setProjectName("");
+    setReference("");
+    setNotes("");
+    if (tt.length) {
+      const first = tt[0];
+      setTaxTypeId(first.id);
+      setLines([emptyPurchaseRequestLine(1, "", defaultInputBasis(first.tax_mode))]);
+    } else {
+      setTaxTypeId(null);
+      setLines([emptyPurchaseRequestLine(1)]);
+    }
+    const def = cc.find((c) => c.is_default) ?? cc[0];
+    setCurrencyId(def?.id ?? null);
+    setLoading(false);
+  };
+
   createEffect(() => {
-    if (!props.open || !props.purchaseOrderId) return;
-    void loadDetail(props.purchaseOrderId);
+    if (!props.open) return;
+    if (props.purchaseOrderId) void loadDetail(props.purchaseOrderId);
+    else void initNew();
   });
 
   const onTaxTypeChange = async (newId: number | null) => {
@@ -208,15 +243,14 @@ export function PurchaseOrderModal(props: Props) {
   };
 
   const save = async () => {
-    const po = detail();
-    if (!po || !isDraft()) return;
+    if (!isDraft()) return;
     if (!taxTypeId() || !currencyId() || !locationId()) {
       toast.warning("Transaction type, currency, and location are required.");
       return;
     }
 
     const body = {
-      order_date: orderDate(),
+      order_date: orderDate() || todayISO(),
       tax_type_id: taxTypeId(),
       currency_id: currencyId(),
       pic_user_id: picUserId(),
@@ -244,14 +278,20 @@ export function PurchaseOrderModal(props: Props) {
     };
 
     setSaving(true);
+    const po = detail();
     const ok = await submitEntity(
       () =>
-        apiFetch(`/api/v1/purchase-order/purchase-orders/${po.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        }, { silent: true }),
+        isCreate()
+          ? apiFetch<PurchaseOrderDetail>("/api/v1/purchase-order/purchase-orders", {
+              method: "POST",
+              body: JSON.stringify(body),
+            }, { silent: true })
+          : apiFetch(`/api/v1/purchase-order/purchase-orders/${po!.id}`, {
+              method: "PATCH",
+              body: JSON.stringify(body),
+            }, { silent: true }),
       toast,
-      "Purchase order updated.",
+      isCreate() ? "Purchase order created." : "Purchase order updated.",
     );
     setSaving(false);
     if (!ok) return;
@@ -264,7 +304,7 @@ export function PurchaseOrderModal(props: Props) {
   return (
     <WideEntityModal
       open={props.open}
-      title={po() ? `Purchase Order — ${po()!.purchase_order_no}` : "Purchase Order"}
+      title={isCreate() ? "New Purchase Order" : po() ? `Purchase Order — ${po()!.purchase_order_no}` : "Purchase Order"}
       onClose={props.onClose}
       onSave={() => void save()}
       readOnly={readOnly()}
@@ -273,28 +313,31 @@ export function PurchaseOrderModal(props: Props) {
       <Show when={loading()}>
         <p class="text-sm text-text-secondary">Loading…</p>
       </Show>
-      <Show when={!loading() && po()}>
+      <Show when={!loading() && (isCreate() || po())}>
+        <Show when={po()} keyed>
         {(d) => (
-          <div class="space-y-4">
-            <div class="flex flex-wrap gap-4 rounded-lg border border-stroke bg-slate-50 p-3 text-sm">
-              <span>
-                <span class="text-text-secondary">Status:</span>{" "}
-                <span class="font-medium capitalize">{statusLabel(d().status)}</span>
-              </span>
-              <span>
-                <span class="text-text-secondary">Date-no:</span>{" "}
-                <span class="font-medium">{d().date_no_display}</span>
-              </span>
-              <span>
-                <span class="text-text-secondary">Vendor:</span>{" "}
-                <span class="font-medium">{d().partner_name}</span>
-              </span>
-              <span>
-                <span class="text-text-secondary">Total:</span>{" "}
-                <span class="font-medium">{formatMoney(d().grand_total, d().currency_code ?? "")}</span>
-              </span>
-            </div>
+          <div class="mb-4 flex flex-wrap gap-4 rounded-lg border border-stroke bg-slate-50 p-3 text-sm">
+            <span>
+              <span class="text-text-secondary">Status:</span>{" "}
+              <span class="font-medium capitalize">{statusLabel(d.status)}</span>
+            </span>
+            <span>
+              <span class="text-text-secondary">Date-no:</span>{" "}
+              <span class="font-medium">{d.date_no_display}</span>
+            </span>
+            <span>
+              <span class="text-text-secondary">Vendor:</span>{" "}
+              <span class="font-medium">{d.partner_name}</span>
+            </span>
+            <span>
+              <span class="text-text-secondary">Total:</span>{" "}
+              <span class="font-medium">{formatMoney(d.grand_total, d.currency_code ?? "")}</span>
+            </span>
+          </div>
+        )}
+        </Show>
 
+        <div class="space-y-4">
             <div class="grid gap-4 md:grid-cols-2">
               <Field label="Order date">
                 <DateInput
@@ -420,36 +463,45 @@ export function PurchaseOrderModal(props: Props) {
               </Field>
             </div>
 
-            <Show when={isDraft()} fallback={
-              <div class="overflow-x-auto rounded-lg border border-stroke">
-                <table class="min-w-full text-sm">
-                  <thead class="bg-slate-50 text-left text-xs uppercase text-text-secondary">
-                    <tr>
-                      <th class="px-2 py-2">#</th>
-                      <th class="px-2 py-2">Item</th>
-                      <th class="px-2 py-2 text-right">Qty</th>
-                      <th class="px-2 py-2 text-right">Received</th>
-                      <th class="px-2 py-2 text-right">Line total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={d().lines ?? []}>
-                      {(ln) => (
-                        <tr class="border-t border-stroke">
-                          <td class="px-2 py-2">{ln.line_no}</td>
-                          <td class="px-2 py-2">
-                            {ln.item_code} — {ln.item_name}
-                          </td>
-                          <td class="px-2 py-2 text-right">{ln.qty}</td>
-                          <td class="px-2 py-2 text-right">{ln.received_qty ?? 0}</td>
-                          <td class="px-2 py-2 text-right">{formatMoney(ln.line_total, d().currency_code ?? "")}</td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
-            }>
+            <Show
+              when={isDraft()}
+              fallback={
+                <Show when={po()}>
+                  {(d) => (
+                    <div class="overflow-x-auto rounded-lg border border-stroke">
+                      <table class="min-w-full text-sm">
+                        <thead class="bg-slate-50 text-left text-xs uppercase text-text-secondary">
+                          <tr>
+                            <th class="px-2 py-2">#</th>
+                            <th class="px-2 py-2">Item</th>
+                            <th class="px-2 py-2 text-right">Qty</th>
+                            <th class="px-2 py-2 text-right">Received</th>
+                            <th class="px-2 py-2 text-right">Line total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <For each={d().lines ?? []}>
+                            {(ln) => (
+                              <tr class="border-t border-stroke">
+                                <td class="px-2 py-2">{ln.line_no}</td>
+                                <td class="px-2 py-2">
+                                  {ln.item_code} — {ln.item_name}
+                                </td>
+                                <td class="px-2 py-2 text-right">{ln.qty}</td>
+                                <td class="px-2 py-2 text-right">{ln.received_qty ?? 0}</td>
+                                <td class="px-2 py-2 text-right">
+                                  {formatMoney(ln.line_total, d().currency_code ?? "")}
+                                </td>
+                              </tr>
+                            )}
+                          </For>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Show>
+              }
+            >
               <PurchaseRequestLineGrid
                 lines={lines}
                 onChange={setLines}
@@ -459,7 +511,6 @@ export function PurchaseOrderModal(props: Props) {
               />
             </Show>
           </div>
-        )}
       </Show>
     </WideEntityModal>
   );
