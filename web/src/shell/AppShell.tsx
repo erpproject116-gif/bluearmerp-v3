@@ -1,16 +1,15 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { For, Show } from "solid-js";
-import { useAuth, canManageUsers, canViewActivityLogs, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasModuleAccess, hasPermission } from "../shared/auth-context";
+import { Show } from "solid-js";
+import { useAuth, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
 import { CrmNotificationPoller } from "../shared/CrmNotificationPoller";
 import { PresenceAvatars } from "../shared/PresenceAvatars";
 import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
 import { useCrmTaskModal } from "../shared/CrmTaskModal";
-import { ModuleIcon } from "./ModuleIcon";
 import { ShellProvider, useShell } from "./shell-context";
-import { appModules, featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
+import { featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
 import { CollectiveInvoicingHeaderNav } from "./CollectiveInvoicingHeaderNav";
 import { SerialLotHeaderNav } from "./SerialLotHeaderNav";
@@ -21,8 +20,8 @@ import { serialLotHeaderTitle, SERIAL_LOT_PREFIX } from "./serial-lot-nav";
 import { useBranding } from "../shared/branding/BrandingProvider";
 import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
-import { isAnySubBranchPath } from "./sub-branch-nav";
 import { UserAccountMenu } from "./UserAccountMenu";
+import { SidebarNav } from "./SidebarNav";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -93,82 +92,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           </Show>
         </div>
 
-        <nav class="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
-          <For each={appModules.filter((m) => {
-            if (m.id === "documentation") return true;
-            const codes = auth.me?.enabled_module_codes;
-            if (m.id === "user_management" && !canManageUsers(auth.me)) return false;
-            if (m.id === "activity_logs" && !canViewActivityLogs(auth.me)) return false;
-            if (m.id === "crm" && !canViewCrm(auth.me)) return false;
-            if (m.id === "activity_logs" || m.id === "user_management") return true;
-            if (!codes?.length) return hasModuleAccess(auth.me, m.id);
-            if (!codes.includes(m.id)) return false;
-            return hasModuleAccess(auth.me, m.id);
-          })}>
-            {(module) => {
-              const inModule = () => loc.pathname.startsWith(module.basePath);
-              const inSubBranch = () => isAnySubBranchPath(loc.pathname, module.subBranches);
-              const moduleActive = () => inModule() && !inSubBranch();
-              const moduleExpanded = () => inModule() && inSubBranch();
-              return (
-                <div class="space-y-0.5">
-                  <A
-                    href={module.href}
-                    title={shell.collapsed() ? module.label : undefined}
-                    class="flex items-center rounded-lg text-sm font-medium transition-colors"
-                    classList={{
-                      "justify-center px-2 py-2.5": shell.collapsed(),
-                      "gap-3 px-3 py-2.5": !shell.collapsed(),
-                      "bg-brand-50 text-brand-600": moduleActive(),
-                      "erp-panel text-text-primary": moduleExpanded(),
-                      "text-text-secondary hover:erp-panel hover:text-text-primary": !inModule(),
-                    }}
-                  >
-                    <span
-                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
-                      classList={{
-                        "bg-brand-100 text-brand-600": moduleActive(),
-                        "erp-panel-strong text-text-primary": moduleExpanded(),
-                        "erp-panel text-text-secondary": !inModule(),
-                      }}
-                    >
-                      <ModuleIcon id={module.id} />
-                    </span>
-                    <Show when={!shell.collapsed()}>
-                      <span class="truncate">{module.label}</span>
-                    </Show>
-                  </A>
-                  <Show when={!shell.collapsed() && module.subBranches?.length}>
-                    <div class="ml-9 space-y-0.5 border-l border-stroke pl-2">
-                      <For each={module.subBranches}>
-                        {(branch) => {
-                          const branchActive = () =>
-                            branch.prefix != null
-                              ? loc.pathname === branch.href ||
-                                loc.pathname === branch.settingsHref ||
-                                loc.pathname.startsWith(`${branch.prefix}/`)
-                              : loc.pathname === branch.href || loc.pathname === branch.settingsHref;
-                          return (
-                            <A
-                              href={branch.href}
-                              class="flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors"
-                              classList={{
-                                "bg-brand-50 text-brand-600": branchActive(),
-                                "text-text-secondary hover:erp-panel hover:text-text-primary": !branchActive(),
-                              }}
-                            >
-                              <span class="truncate">{branch.label}</span>
-                            </A>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </Show>
-                </div>
-              );
-            }}
-          </For>
-        </nav>
+        <SidebarNav />
 
         <div class="mt-4 shrink-0 space-y-2 border-t border-stroke pt-3">
           <UserAccountMenu />

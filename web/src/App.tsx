@@ -103,6 +103,7 @@ import UsersPage from "./modules/user-management/users/UsersPage";
 import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
 import ProcessPoliciesPage from "./modules/user-management/process-policies/ProcessPoliciesPage";
+import ModuleFeaturesPage from "./modules/user-management/tenant-modules/ModuleFeaturesPage";
 import DemoDataPage from "./modules/user-management/demo-data/DemoDataPage";
 import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
 import ChangeLogListPage from "./modules/activity-logs/ChangeLogListPage";
@@ -229,12 +230,19 @@ export default function App() {
           <Route path="/sales-order/delivery-receipts" component={DeliveryReceiptListPage} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
           <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
+          <Route path="/purchase-order/purchase-orders" component={PurchaseOrderListPage} />
+          <Route path="/purchase-order/goods-receipt" component={GoodsReceiptListPage} />
+          <Route path="/purchase-request/purchase-orders" component={() => <Navigate href="/app/purchase-order/purchase-orders" />} />
+          <Route path="/purchase-request/goods-receipt" component={() => <Navigate href="/app/purchase-order/goods-receipt" />} />
           <Route path="/purchase-request/purchase-requests/new" component={PurchaseRequestNewPage} />
           <Route path="/purchase-request/purchase-requests/status" component={PurchaseRequestStatusPage} />
           <Route path="/purchase-request/purchase-requests/settings" component={PurchaseRequestSettingsPage} />
           <Route path="/purchase-request/purchase-requests" component={PurchaseRequestListPage} />
-          <Route path="/purchase-request/purchase-orders" component={PurchaseOrderListPage} />
-          <Route path="/purchase-request/goods-receipt" component={GoodsReceiptListPage} />
+          <Route path="/user-management/tenant-modules" component={() => (
+            <AdminModuleRoute>
+              <ModuleFeaturesPage />
+            </AdminModuleRoute>
+          )} />
           <Route path="/sales/sales/new" component={SalesNewPage} />
           <Route path="/sales/sales/status" component={SalesStatusPage} />
           <Route path="/sales/sales/pre-invoicing" component={PreInvoicingStatusPage} />

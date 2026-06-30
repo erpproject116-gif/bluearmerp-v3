@@ -7,6 +7,7 @@ import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
 import { useResizableColumns } from "../../../shared/useResizableColumns";
+import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
 import { SalesItemSearchModal } from "./SalesItemSearchModal";
 
 export type SalesTemplateCode = "default" | "non_vat" | "vat_included";
@@ -193,7 +194,8 @@ export function SalesLineGrid(props: Props) {
   const [serialPickIdx, setSerialPickIdx] = createSignal<number | null>(null);
 
   const columns = createMemo(() => {
-    const cols = [...BASE_COLUMNS];
+    const taxCols = filterTaxLineColumns(BASE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+    const cols = [...taxCols];
     if (hasDiscountTemplate(props.templateCode())) cols.push(...DISCOUNT_COLUMNS);
     cols.push(...TAIL_COLUMNS);
     return cols;

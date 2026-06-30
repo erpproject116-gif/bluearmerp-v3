@@ -77,7 +77,10 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/user-management/users": "user_management.users",
   "/app/user-management/roles": "user_management.roles",
   "/app/user-management/process-policies": "settings.process_policies",
+  "/app/user-management/tenant-modules": "settings.tenant_modules",
   "/app/user-management/demo-data": "settings.demo_data",
+  "/app/purchase-order/purchase-orders": "purchase_order.purchase_orders",
+  "/app/purchase-order/goods-receipt": "purchase_order.goods_receipts",
 };
 
 export function permissionCodeForHref(href: string): string | undefined {

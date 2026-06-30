@@ -201,8 +201,16 @@ export const appModules: AppModule[] = [
       { label: "New Purchase Request", href: "/app/purchase-request/purchase-requests/new", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       { label: "Purchase Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Purchase Order List", href: "/app/purchase-request/purchase-orders", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Goods Receipt List", href: "/app/purchase-request/goods-receipt", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+    ],
+  },
+  {
+    id: "purchase_order",
+    label: "Purchase Order",
+    href: "/app/purchase-order/purchase-orders",
+    basePath: "/app/purchase-order",
+    features: [
+      { label: "Purchase Order List", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "Goods Receipt List", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/purchase-orders/settings" },
     ],
   },
   {
@@ -297,6 +305,11 @@ export const appModules: AppModule[] = [
         label: "User Groups",
         href: "/app/user-management/groups",
         settingsHref: "/app/user-management/groups",
+      },
+      {
+        label: "Module & Features",
+        href: "/app/user-management/tenant-modules",
+        settingsHref: "/app/user-management/tenant-modules",
       },
       {
         label: "Process Policies",

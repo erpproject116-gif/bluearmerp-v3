@@ -252,21 +252,12 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 						  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
 						values ($1, $2, $3, $4, 'so_release', 'so_release_line', $5, $6)`,
 						tenantID, *itemID, locationID, -item.ReleaseQty, releaseLineID, tu.AppUserID)
-				} else {
-					if err := inventory.ReserveStock(r.Context(), tx, tenantID, *itemID, locationID, item.ReleaseQty); err != nil {
-						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): err.Error()})
+					if err != nil {
+						response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
 						return
 					}
-					_, err = tx.Exec(r.Context(), `
-						insert into public.inv_stock_movements
-						  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
-						values ($1, $2, $3, 0, 'so_reserve', 'so_release_line', $4, $5)`,
-						tenantID, *itemID, locationID, releaseLineID, tu.AppUserID)
 				}
-				if err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
-					return
-				}
+				// Split mode: stock reserved on SO save; release line records fulfillment intent only.
 			}
 
 			if trackSerial && itemID != nil {
@@ -402,28 +393,16 @@ func undoRelease(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		if trackInventory && itemID != nil && releaseQty > 0 {
-			if legacyCombined {
-				if err := inventory.RestoreOnHandStock(r.Context(), tx, tenantID, *itemID, locationID, releaseQty); err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to restore stock.", "ERR_INTERNAL")
-					return
-				}
-				_, err = tx.Exec(r.Context(), `
-					insert into public.inv_stock_movements
-					  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
-					values ($1, $2, $3, $4, 'so_release_undo', 'so_release_line', $5, $6)`,
-					tenantID, *itemID, locationID, releaseQty, releaseLineID, tu.AppUserID)
-			} else {
-				if err := inventory.UnreserveStock(r.Context(), tx, tenantID, *itemID, locationID, releaseQty); err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to unreserve stock.", "ERR_INTERNAL")
-					return
-				}
-				_, err = tx.Exec(r.Context(), `
-					insert into public.inv_stock_movements
-					  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
-					values ($1, $2, $3, 0, 'so_reserve_undo', 'so_release_line', $4, $5)`,
-					tenantID, *itemID, locationID, releaseLineID, tu.AppUserID)
+		if trackInventory && itemID != nil && releaseQty > 0 && legacyCombined {
+			if err := inventory.RestoreOnHandStock(r.Context(), tx, tenantID, *itemID, locationID, releaseQty); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to restore stock.", "ERR_INTERNAL")
+				return
 			}
+			_, err = tx.Exec(r.Context(), `
+				insert into public.inv_stock_movements
+				  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
+				values ($1, $2, $3, $4, 'so_release_undo', 'so_release_line', $5, $6)`,
+				tenantID, *itemID, locationID, releaseQty, releaseLineID, tu.AppUserID)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
 				return

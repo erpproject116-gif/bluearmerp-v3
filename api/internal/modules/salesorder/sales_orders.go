@@ -514,6 +514,19 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if !policy.LegacyCombinedSORelease {
+			reserveInputs := make([]soLineReserveInput, 0, len(computed))
+			for i, ln := range computed {
+				reserveInputs = append(reserveInputs, soLineReserveInput{
+					LineID: lineIDs[i], ItemID: ln.ItemID, Qty: ln.Qty, Reserved: 0,
+				})
+			}
+			if err := syncSalesOrderReservations(r.Context(), tx, tu.TenantID, body.LocationID, tu.AppUserID, reserveInputs, policy.LegacyCombinedSORelease); err != nil {
+				response.Validation(w, map[string]string{"lines": err.Error()})
+				return
+			}
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
@@ -574,6 +587,12 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 
 		before, _ := loadSalesOrder(r.Context(), pool, tu.TenantID, id)
 
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
@@ -603,10 +622,48 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if !policy.LegacyCombinedSORelease {
+			oldLoc := body.LocationID
+			if before.ID > 0 {
+				oldLoc = before.LocationID
+			}
+			if err := unreserveAllSalesOrderLines(r.Context(), tx, tu.TenantID, oldLoc, tu.AppUserID, id); err != nil {
+				response.Validation(w, map[string]string{"lines": err.Error()})
+				return
+			}
+		}
+
 		if err := replaceSalesOrderLines(r.Context(), tx, id, computed); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
 			return
 		}
+
+		if !policy.LegacyCombinedSORelease {
+			rows, err := tx.Query(r.Context(), `
+				select id, item_id, qty::float8, qty_reserved::float8
+				from public.so_sales_order_lines where sales_order_id = $1 order by line_no`, id)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load lines.", "ERR_INTERNAL")
+				return
+			}
+			var reserveInputs []soLineReserveInput
+			for rows.Next() {
+				var inp soLineReserveInput
+				if err := rows.Scan(&inp.LineID, &inp.ItemID, &inp.Qty, &inp.Reserved); err != nil {
+					rows.Close()
+					response.Err(w, http.StatusInternalServerError, "Failed to read line.", "ERR_INTERNAL")
+					return
+				}
+				inp.Reserved = 0
+				reserveInputs = append(reserveInputs, inp)
+			}
+			rows.Close()
+			if err := syncSalesOrderReservations(r.Context(), tx, tu.TenantID, body.LocationID, tu.AppUserID, reserveInputs, policy.LegacyCombinedSORelease); err != nil {
+				response.Validation(w, map[string]string{"lines": err.Error()})
+				return
+			}
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return

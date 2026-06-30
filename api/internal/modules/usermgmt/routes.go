@@ -14,5 +14,6 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerRoleRoutes(ur, pool)
 		registerPermissionRoutes(ur, pool)
 		registerGroupRoutes(ur, pool)
+		registerTenantModuleRoutes(ur, pool)
 	})
 }

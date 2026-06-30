@@ -32,6 +32,7 @@ export type MeData = {
     auto_enable_all_modules?: boolean;
   };
   enabled_module_codes: string[];
+  modules?: { module_code: string; is_enabled: boolean }[];
 };
 
 export function canManageFormSettings(me: MeData | null | undefined): boolean {
