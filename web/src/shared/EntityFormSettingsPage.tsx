@@ -195,7 +195,7 @@ export function EntityFormSettingsPage(props: Props) {
         </Show>
       </div>
 
-      <Show when={!auth.loading && !canEdit()}>
+      <Show when={!auth.bootstrapping && !canEdit()}>
         <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Only store admins, owners, and superadmins can change form settings.
         </p>

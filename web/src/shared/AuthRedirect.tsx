@@ -3,11 +3,11 @@ import { Navigate } from "@solidjs/router";
 import { useAuth } from "./auth-context";
 
 export function needsSignInRedirect(auth: {
-  loading: boolean;
+  bootstrapping: boolean;
   me: unknown;
   bootstrapError: string | null;
 }): boolean {
-  if (auth.loading || auth.me) return false;
+  if (auth.bootstrapping || auth.me) return false;
   if (auth.bootstrapError === "forbidden" || auth.bootstrapError === "network") return false;
   return true;
 }
@@ -25,7 +25,7 @@ export const SessionLoading: ParentComponent = () => (
 export function AuthEntryRedirect() {
   const auth = useAuth();
   return (
-    <Show when={!auth.loading} fallback={<SessionLoading />}>
+    <Show when={!auth.bootstrapping} fallback={<SessionLoading />}>
       <Navigate href={auth.me ? "/app/inventory/partners" : "/signin"} />
     </Show>
   );

@@ -255,8 +255,17 @@ export function QuotationModal(props: Props) {
     }
   };
 
+  let initializedKey: string | null = null;
+
   createEffect(() => {
-    if (!props.open) return;
+    if (!props.open) {
+      initializedKey = null;
+      return;
+    }
+    const key = props.editing ? `edit-${props.editing.id}` : "new";
+    if (initializedKey === key) return;
+    initializedKey = key;
+
     void loadLookups();
     const ed = props.editing;
     if (ed) {
@@ -393,6 +402,7 @@ export function QuotationModal(props: Props) {
       saving={saving()}
     >
       <draft.DraftBanner />
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <Field label="Date-no">
         <input class={inputClass} value={dateNoDisplay()} readOnly />
       </Field>
@@ -518,6 +528,7 @@ export function QuotationModal(props: Props) {
         values={customValues}
         onChange={setCustom}
       />
+      </div>
       <QuotationLineGrid
         lines={lines}
         onChange={setLines}

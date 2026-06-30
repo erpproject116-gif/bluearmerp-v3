@@ -7,7 +7,7 @@ import { SessionLoading } from "./AuthRedirect";
 export const CrmAnalyticsRoute: ParentComponent = (props) => {
   const auth = useAuth();
   return (
-    <Show when={!auth.loading} fallback={<SessionLoading />}>
+    <Show when={!auth.bootstrapping} fallback={<SessionLoading />}>
       <Show when={canViewCrmAnalytics(auth.me)} fallback={<Navigate href="/app/crm/dashboard" />}>
         {props.children}
       </Show>

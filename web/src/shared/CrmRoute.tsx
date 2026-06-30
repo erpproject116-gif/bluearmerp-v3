@@ -7,7 +7,7 @@ import { SessionLoading } from "./AuthRedirect";
 export const CrmRoute: ParentComponent = (props) => {
   const auth = useAuth();
   return (
-    <Show when={!auth.loading} fallback={<SessionLoading />}>
+    <Show when={!auth.bootstrapping} fallback={<SessionLoading />}>
       <Show when={canViewCrm(auth.me)} fallback={<Navigate href="/app/inventory/partners" />}>
         {props.children}
       </Show>

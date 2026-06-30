@@ -201,9 +201,11 @@ export type BootstrapError = "network" | "unauthorized" | "forbidden" | null;
 type AuthState = {
   me: MeData | null;
   loading: boolean;
+  /** True only during the initial session bootstrap (no user profile yet). */
+  bootstrapping: boolean;
   bootstrapError: BootstrapError;
   bootstrapMessage: string | null;
-  refresh: () => Promise<void>;
+  refresh: (options?: { background?: boolean }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState>();
@@ -226,7 +228,7 @@ export const AuthProvider: ParentComponent = (props) => {
       return;
     }
 
-    if (!background) {
+    if (!background && !state.me) {
       setState("loading", true);
     }
 
@@ -274,7 +276,7 @@ export const AuthProvider: ParentComponent = (props) => {
         return;
       }
       if (event === "SIGNED_IN") {
-        void refresh();
+        void refresh({ background: state.me != null });
         return;
       }
       if (event === "SIGNED_OUT" || (event === "INITIAL_SESSION" && !session)) {
@@ -293,6 +295,9 @@ export const AuthProvider: ParentComponent = (props) => {
         },
         get loading() {
           return state.loading;
+        },
+        get bootstrapping() {
+          return state.loading && state.me == null;
         },
         get bootstrapError() {
           return state.bootstrapError;

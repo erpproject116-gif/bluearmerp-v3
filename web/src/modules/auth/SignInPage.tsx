@@ -18,7 +18,7 @@ export default function SignInPage() {
   });
 
   createEffect(() => {
-    if (!auth.loading && auth.me) {
+    if (!auth.bootstrapping && auth.me) {
       navigate("/app/inventory/partners", { replace: true });
     }
   });
@@ -62,7 +62,7 @@ export default function SignInPage() {
   };
 
   return (
-    <Show when={!auth.loading} fallback={<SessionLoading />}>
+    <Show when={!auth.bootstrapping} fallback={<SessionLoading />}>
       <Show when={!auth.me} fallback={<SessionLoading />}>
         <div class="flex min-h-screen bg-body">
       <div class="hidden w-1/2 flex-col justify-between bg-brand-600 p-12 text-white lg:flex">

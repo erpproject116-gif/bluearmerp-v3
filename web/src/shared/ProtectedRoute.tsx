@@ -24,7 +24,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
   };
 
   return (
-    <Show when={auth.loading} fallback={
+    <Show when={auth.bootstrapping} fallback={
       <Show
         when={auth.me}
         fallback={

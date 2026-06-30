@@ -1,4 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
+import { focusManager } from "@tanstack/query-core";
+import { onMount } from "solid-js";
 import { Route, Router, type RouteSectionProps, Navigate, useLocation } from "@solidjs/router";
 import { AppShell } from "./shell/AppShell";
 import { AuthProvider } from "./shared/auth-context";
@@ -131,6 +133,7 @@ const queryClient = new QueryClient({
       staleTime: 30_000,
       gcTime: 300_000,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   },
 });
@@ -150,6 +153,10 @@ function AppLayout(props: RouteSectionProps) {
 }
 
 export default function App() {
+  onMount(() => {
+    focusManager.setEventListener(() => () => {});
+  });
+
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
