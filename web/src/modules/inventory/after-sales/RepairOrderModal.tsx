@@ -305,78 +305,81 @@ export function RepairOrderModal(props: Props) {
       onSave={() => void save()}
       saving={saving()}
     >
-      <Field label="Date-no">
-        <input class={inputClass} value={dateNoDisplay()} readOnly />
-      </Field>
-      <Field label="Repair Order No.">
-        <input class={inputClass} value={repairOrderNo()} readOnly />
-      </Field>
-      <Field label="Date *">
-        <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
-      </Field>
-      <LookupCombo
-        label="Customer"
-        required
-        value={customerLabel}
-        selectedId={partnerId}
-        onInput={setCustomerLabel}
-        onSelect={(o) => {
-          setPartnerId(o.id);
-          setCustomerLabel(o.label);
-        }}
-        onClear={() => {
-          setPartnerId(null);
-          setCustomerLabel("");
-        }}
-        fetchOptions={fetchPartners}
-      />
-      <LookupCombo
-        label="PIC (Person-In-Charge)"
-        value={picName}
-        selectedId={picUserId}
-        onInput={setPicName}
-        onSelect={(o) => {
-          setPicUserId(o.id);
-          setPicName(o.label);
-        }}
-        onClear={() => {
-          setPicUserId(null);
-          setPicName("");
-        }}
-        fetchOptions={fetchUsers}
-      />
-      <LookupCombo
-        label="Location"
-        required
-        value={locationLabel}
-        selectedId={locationId}
-        onInput={setLocationLabel}
-        onSelect={(o) => {
-          setLocationId(o.id);
-          setLocationLabel(o.label);
-        }}
-        onClear={() => {
-          setLocationId(null);
-          setLocationLabel("");
-        }}
-        fetchOptions={fetchLocations}
-      />
-      <Field label="Progress status">
-        <select class={inputClass} value={progressStatus()} onChange={(e) => setProgressStatus(e.currentTarget.value)}>
-          <option value="received">Received</option>
-          <option value="finished">Finished</option>
-        </select>
-      </Field>
-      <Field label="Scheduled completion date">
-        <DateInput value={scheduledDate()} onInput={(e) => setScheduledDate(e.currentTarget.value)} />
-      </Field>
-      <Field label="Latest update" span="full">
-        <textarea class={inputClass} rows={2} value={latestUpdate()} onInput={(e) => setLatestUpdate(e.currentTarget.value)} />
-      </Field>
-      <Field label="Repair details" span="full">
-        <textarea class={inputClass} rows={2} value={repairDetails()} onInput={(e) => setRepairDetails(e.currentTarget.value)} />
-      </Field>
-      <div class="col-span-full rounded-lg border border-stroke bg-slate-50 px-4 py-3">
+      <div class="space-y-4">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="Date-no">
+          <input class={inputClass} value={dateNoDisplay()} readOnly />
+        </Field>
+        <Field label="Repair Order No.">
+          <input class={inputClass} value={repairOrderNo()} readOnly />
+        </Field>
+        <Field label="Date *">
+          <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
+        </Field>
+        <LookupCombo
+          label="Customer"
+          required
+          value={customerLabel}
+          selectedId={partnerId}
+          onInput={setCustomerLabel}
+          onSelect={(o) => {
+            setPartnerId(o.id);
+            setCustomerLabel(o.label);
+          }}
+          onClear={() => {
+            setPartnerId(null);
+            setCustomerLabel("");
+          }}
+          fetchOptions={fetchPartners}
+        />
+        <LookupCombo
+          label="PIC (Person-In-Charge)"
+          value={picName}
+          selectedId={picUserId}
+          onInput={setPicName}
+          onSelect={(o) => {
+            setPicUserId(o.id);
+            setPicName(o.label);
+          }}
+          onClear={() => {
+            setPicUserId(null);
+            setPicName("");
+          }}
+          fetchOptions={fetchUsers}
+        />
+        <LookupCombo
+          label="Location"
+          required
+          value={locationLabel}
+          selectedId={locationId}
+          onInput={setLocationLabel}
+          onSelect={(o) => {
+            setLocationId(o.id);
+            setLocationLabel(o.label);
+          }}
+          onClear={() => {
+            setLocationId(null);
+            setLocationLabel("");
+          }}
+          fetchOptions={fetchLocations}
+        />
+        <Field label="Progress status">
+          <select class={inputClass} value={progressStatus()} onChange={(e) => setProgressStatus(e.currentTarget.value)}>
+            <option value="received">Received</option>
+            <option value="finished">Finished</option>
+          </select>
+        </Field>
+        <Field label="Scheduled completion date">
+          <DateInput value={scheduledDate()} onInput={(e) => setScheduledDate(e.currentTarget.value)} />
+        </Field>
+        <Field label="Latest update" span="full">
+          <textarea class={inputClass} rows={2} value={latestUpdate()} onInput={(e) => setLatestUpdate(e.currentTarget.value)} />
+        </Field>
+        <Field label="Repair details" span="full">
+          <textarea class={inputClass} rows={2} value={repairDetails()} onInput={(e) => setRepairDetails(e.currentTarget.value)} />
+        </Field>
+      </div>
+      <div class="rounded-lg border border-stroke bg-slate-50 px-4 py-3">
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm font-medium text-text-primary">Attachments</span>
           <Show when={props.editing}>
@@ -424,30 +427,33 @@ export function RepairOrderModal(props: Props) {
           </Show>
         </Show>
       </div>
-      <LookupCombo
-        label="Project"
-        value={projectLabel}
-        selectedId={projectId}
-        onInput={setProjectLabel}
-        onSelect={(o) => {
-          setProjectId(o.id);
-          setProjectLabel(o.label);
-          setProjectName(o.label);
-        }}
-        onClear={() => {
-          setProjectId(null);
-          setProjectLabel("");
-        }}
-        fetchOptions={fetchProjects}
-      />
-      <Field label="Project name">
-        <input class={inputClass} value={projectName()} onInput={(e) => setProjectName(e.currentTarget.value)} />
-      </Field>
-      <Field label="Technician">
-        <input class={inputClass} value={technicianName()} onInput={(e) => setTechnicianName(e.currentTarget.value)} />
-      </Field>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <LookupCombo
+          label="Project"
+          value={projectLabel}
+          selectedId={projectId}
+          onInput={setProjectLabel}
+          onSelect={(o) => {
+            setProjectId(o.id);
+            setProjectLabel(o.label);
+            setProjectName(o.label);
+          }}
+          onClear={() => {
+            setProjectId(null);
+            setProjectLabel("");
+          }}
+          fetchOptions={fetchProjects}
+        />
+        <Field label="Project name">
+          <input class={inputClass} value={projectName()} onInput={(e) => setProjectName(e.currentTarget.value)} />
+        </Field>
+        <Field label="Technician">
+          <input class={inputClass} value={technicianName()} onInput={(e) => setTechnicianName(e.currentTarget.value)} />
+        </Field>
+      </div>
       <EditableLineGrid lines={lines} onChange={setLines} onSerialLotBlur={onSerialLotBlur} />
       <CustomFieldsSection entityType={INVENTORY_ENTITY.repairOrder} values={customValues} onChange={setCustom} />
+      </div>
     </WideEntityModal>
   );
 }

@@ -216,7 +216,8 @@ export const AuthProvider: ParentComponent = (props) => {
     bootstrapMessage: null as string | null,
   });
 
-  const refresh = async () => {
+  const refresh = async (options?: { background?: boolean }) => {
+    const background = options?.background ?? false;
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -225,11 +226,17 @@ export const AuthProvider: ParentComponent = (props) => {
       return;
     }
 
-    setState("loading", true);
+    if (!background) {
+      setState("loading", true);
+    }
+
     try {
       const res = await apiFetch<MeData>("/api/v1/auth/me");
       if (res.success && res.data) {
         setState({ me: res.data, loading: false, bootstrapError: null, bootstrapMessage: null });
+        return;
+      }
+      if (background && state.me) {
         return;
       }
       const bootstrapError: BootstrapError =
@@ -245,6 +252,10 @@ export const AuthProvider: ParentComponent = (props) => {
         bootstrapMessage: res.message ?? null,
       });
     } catch {
+      if (background && state.me) {
+        setState("loading", false);
+        return;
+      }
       setState({
         me: null,
         loading: false,
@@ -258,7 +269,11 @@ export const AuthProvider: ParentComponent = (props) => {
     void refresh();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      if (event === "TOKEN_REFRESHED") {
+        void refresh({ background: true });
+        return;
+      }
+      if (event === "SIGNED_IN") {
         void refresh();
         return;
       }
