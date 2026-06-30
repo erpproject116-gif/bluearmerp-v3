@@ -233,6 +233,8 @@ psql "$DATABASE_URL" -f scripts/verify-demo-inventory.sql
 | Add BLUEARM owners after reset | `scripts/seed-platform-owners.sql` |
 | Link my Google account | `scripts/link-platform-owners.sql` |
 | Load demo inventory data | `scripts/seed-demo-inventory.sql` |
+| Load full demo document chain | User Management → **Demo Data** in app, or `scripts/seed-demo-full-chain.sql` (psql only) |
+| Purge demo documents only | User Management → **Demo Data** → Purge, or `scripts/purge-demo-data.sql` |
 | Link demo password user | `scripts/link-demo-auth-user.sql` |
 | Check superadmin setup | `scripts/verify-platform-owners.sql` |
 | Fix linked Gmail missing superadmin | `scripts/repair-platform-owners.sql` |

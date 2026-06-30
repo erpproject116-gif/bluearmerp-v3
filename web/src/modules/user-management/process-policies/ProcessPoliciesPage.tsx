@@ -33,13 +33,13 @@ const FIELDS: PolicyField[] = [
   },
   {
     key: "sales_require_reservation",
-    label: "Require stock reservation (future)",
-    help: "Reserved for delivery-receipt flow; not enforced until DR module ships.",
+    label: "Require stock reservation",
+    help: "When on, SO release must reserve stock before delivery (split release mode).",
   },
   {
     key: "sales_require_delivery_receipt",
-    label: "Require delivery receipt (future)",
-    help: "Reserved for delivery-receipt module; not enforced yet.",
+    label: "Require delivery receipt before invoice",
+    help: "When on, posting a delivery receipt is required before invoicing from SO lines (split release mode).",
   },
   {
     key: "purchase_require_pr",
@@ -53,8 +53,8 @@ const FIELDS: PolicyField[] = [
   },
   {
     key: "purchase_require_gr_before_supplier_invoice",
-    label: "Require goods receipt before supplier invoice (future)",
-    help: "Reserved for accounts-payable module.",
+    label: "Require goods receipt before supplier invoice",
+    help: "When on, supplier invoices must link to posted goods receipt lines.",
   },
   {
     key: "legacy_combined_so_release",

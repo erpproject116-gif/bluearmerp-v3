@@ -76,6 +76,8 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/activity-logs/changes": "activity_logs.changes",
   "/app/user-management/users": "user_management.users",
   "/app/user-management/roles": "user_management.roles",
+  "/app/user-management/process-policies": "settings.process_policies",
+  "/app/user-management/demo-data": "settings.demo_data",
 };
 
 export function permissionCodeForHref(href: string): string | undefined {

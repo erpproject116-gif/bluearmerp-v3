@@ -303,6 +303,11 @@ export const appModules: AppModule[] = [
         href: "/app/user-management/process-policies",
         settingsHref: "/app/user-management/process-policies",
       },
+      {
+        label: "Demo Data",
+        href: "/app/user-management/demo-data",
+        settingsHref: "/app/user-management/demo-data",
+      },
     ],
   },
 ];

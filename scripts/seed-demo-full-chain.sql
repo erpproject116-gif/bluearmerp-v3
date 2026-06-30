@@ -1,5 +1,6 @@
 -- Full demo seed orchestrator (psql ONLY — not Supabase SQL Editor)
--- Supabase SQL Editor does not support \echo or \ir. Run each script below manually, in order.
+-- Supabase SQL Editor does not support \echo or \ir. Run each script below manually, in order,
+-- or use User Management → Demo Data in the app (after migration 056).
 -- See docs/runbooks/sql-run-order.md Phase 2 for the file list.
 --
 -- Prerequisites: migrations through 055 applied (especially 052 finance AP, 054 qty_reserved, 055 DR).

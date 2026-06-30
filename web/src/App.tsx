@@ -101,6 +101,7 @@ import UsersPage from "./modules/user-management/users/UsersPage";
 import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
 import ProcessPoliciesPage from "./modules/user-management/process-policies/ProcessPoliciesPage";
+import DemoDataPage from "./modules/user-management/demo-data/DemoDataPage";
 import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
 import ChangeLogListPage from "./modules/activity-logs/ChangeLogListPage";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
@@ -311,6 +312,11 @@ export default function App() {
           <Route path="/user-management/process-policies" component={() => (
             <AdminModuleRoute>
               <ProcessPoliciesPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/demo-data" component={() => (
+            <AdminModuleRoute>
+              <DemoDataPage />
             </AdminModuleRoute>
           )} />
         </Route>

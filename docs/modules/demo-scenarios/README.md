@@ -31,6 +31,17 @@ psql "$DATABASE_URL" -f scripts/seed-demo-full-chain.sql
 psql "$DATABASE_URL" -f scripts/verify-demo-full-chain.sql
 ```
 
+In-app (DEMO000 / BLUEARM, migration 056):
+
+1. **User Management → Demo Data → Populate demo data** (optionally purge first).
+2. Status panel shows golden scenario checks when seeds succeed.
+
+Purge only:
+
+```bash
+psql "$DATABASE_URL" -f scripts/purge-demo-data.sql
+```
+
 ## Verification checklist
 
 After `db reset`:

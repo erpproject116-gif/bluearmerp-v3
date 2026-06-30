@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/dashboard"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demodata"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/deliveryreceipt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/goodsreceipt"
@@ -91,6 +92,7 @@ func main() {
 			reporttemplates.RegisterRoutes(protected, pool)
 			branding.RegisterRoutes(protected, pool)
 			processpolicy.RegisterRoutes(protected, pool)
+			demodata.RegisterRoutes(protected, pool)
 			activitylog.RegisterRoutes(protected, pool)
 			inventory.RegisterRoutes(protected, pool)
 			quotation.RegisterRoutes(protected, pool)

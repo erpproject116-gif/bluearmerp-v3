@@ -48,7 +48,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "Charts show how sales and stock movement changed month by month. The red flags section lists items that need attention—such as stock counts that do not match serial numbers, purchase orders not fully received, or sales that exceed what was released from a sales order.",
+        text: "Charts show how sales and stock movement changed month by month. The red flags section lists items that need attention—such as stock counts that do not match serial numbers, purchase orders not fully received, sales that exceed what was released from a sales order, reservations without delivery receipts, delivery receipts without invoices, goods receipts without supplier invoices, or supplier payments over-applied.",
       },
       {
         type: "tip",
@@ -103,12 +103,13 @@ export const documentationSections: DocSection[] = [
           "Receive goods",
           "Sales Order",
           "Release",
+          "Delivery receipt (optional)",
           "Sales invoice",
         ],
       },
       {
         type: "paragraph",
-        text: "When an item uses serial numbers, you scan or enter each unit when goods arrive. That unit appears in the Serial Registry as in stock. When you release a sales order, you pick which serial numbers go to the customer. When you invoice the sale, those units are marked as sold.",
+        text: "When an item uses serial numbers, you scan or enter each unit when goods arrive. That unit appears in the Serial Registry as in stock. When you release a sales order, you pick which serial numbers go to the customer. With delivery receipts enabled, posting a DR issues stock; with legacy combined release, release deducts stock immediately and DR is documentary. When you invoice the sale, those units are marked as sold.",
       },
       {
         type: "paragraph",
@@ -120,7 +121,8 @@ export const documentationSections: DocSection[] = [
           "Create a Purchase Request, then convert it to a Purchase Order.",
           "Open Serial & Lot → Receive / Scan to receive against the purchase order.",
           "Create a Sales Order, then use Release Sales Order to allocate stock (and pick serials if needed).",
-          "Create a Sales invoice from the released lines.",
+          "Post a Delivery Receipt when goods leave the warehouse (split release mode).",
+          "Create a Sales invoice from released or delivered lines.",
           "Use Serial Trace to look up the full history of one serial number.",
         ],
       },
@@ -206,11 +208,15 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "Release Sales Order is the step where you confirm what will ship. You enter release quantities (and pick serial numbers for tracked items). Stock is reduced when you release, so make sure quantities are correct before releasing.",
+        text: "Release Sales Order is the step where you confirm what will ship. You enter release quantities (and pick serial numbers for tracked items). In legacy combined mode, stock is reduced when you release. In split mode, release reserves quantity and a posted Delivery Receipt deducts stock.",
       },
       {
         type: "paragraph",
-        text: "Outstanding S/O Status shows orders that still have balance quantity not yet released or invoiced.",
+        text: "Delivery Receipt List and New Delivery Receipt record what left the warehouse against a sales order. Use them when your process policy turns off legacy combined release.",
+      },
+      {
+        type: "paragraph",
+        text: "Outstanding S/O Status shows orders that still have balance quantity not yet released, delivered, or invoiced.",
       },
     ],
   },
@@ -284,6 +290,7 @@ export const documentationSections: DocSection[] = [
         type: "steps",
         items: [
           "Create a Purchase Request with supplier and line items.",
+          "Submit for approval when your store requires it; approvers confirm the request before PO creation.",
           "From the request, create a Purchase Order when you are ready to order.",
           "Confirm the purchase order.",
           "When shipment arrives, open Goods Receipt List or Serial & Lot → Receive / Scan to receive against the order.",
@@ -305,7 +312,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "When a customer pays you, create an Official Receipt and apply it to their open sales invoices. This reduces what they still owe.",
+        text: "When a customer pays you, create an Official Receipt and apply it to their open sales invoices. This reduces what they still owe. For supplier bills, use Supplier Invoice List and Payment Voucher List to record accounts payable and partial payments against goods receipts.",
       },
       {
         type: "steps",
@@ -314,11 +321,12 @@ export const documentationSections: DocSection[] = [
           "Enter the customer, payment amount, and payment date.",
           "Apply the receipt to one or more open invoices.",
           "Save and print the receipt if needed.",
+          "For vendors: post a Supplier Invoice against received PO lines, then create a Payment Voucher and apply it to open supplier invoices.",
         ],
       },
       {
         type: "paragraph",
-        text: "A/R by Customer and SI Receipt Status reports show outstanding balances and which invoices are fully paid.",
+        text: "A/R by Customer, SI Receipt Status, A/P by Vendor, and Supplier Payment Status reports show outstanding balances and which documents are fully paid.",
       },
     ],
   },
@@ -389,9 +397,56 @@ export const documentationSections: DocSection[] = [
         items: [
           "User Management → Users: invite staff and link their email sign-in.",
           "User Management → Roles: control which areas each role can view or edit.",
+          "User Management → Process Policies: require quotations, SO, PR approval, GR before supplier invoice, and legacy vs split SO release.",
+          "User Management → Demo Data: populate or purge sample documents on DEMO000 / BLUEARM tenants.",
           "Activity Logs: see who changed important records.",
           "Branding (from your account menu): upload your logo and set the company name on printed documents.",
         ],
+      },
+    ],
+  },
+  {
+    id: "demo-data",
+    title: "Demo data (training & QA)",
+    iconId: "user_management",
+    intro: "Load or reset sample documents on demo tenants without running SQL manually.",
+    primaryHref: "/app/user-management/demo-data",
+    primaryLabel: "Open Demo Data",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "The Demo Data screen is for store administrators on DEMO000 or BLUEARM. It runs the same idempotent seed scripts used in development: quotations, purchase and sales chains, golden scenarios (serial GR→SI, lot sales, delivery receipt flow, PR approval, accounts payable), CRM fixtures, and dashboard red-flag samples.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open User Management → Demo Data.",
+          "Choose Purge demo data to remove transactional documents and reset stock balances (partners, items, and locations stay).",
+          "Choose Populate demo data with “Purge before populate” checked for a clean start.",
+          "Review the status panel for golden scenario checks (S2, S8, S9, open PO receive).",
+        ],
+      },
+      {
+        type: "tip",
+        text: "On hosted Supabase you can also run scripts from docs/runbooks/sql-run-order.md in the SQL Editor. The in-app tool embeds those scripts in the API—apply migration 056 first so permissions exist.",
+      },
+    ],
+  },
+  {
+    id: "process-policies",
+    title: "Process policies",
+    iconId: "user_management",
+    intro: "Configure which steps are required before the next document can be created.",
+    primaryHref: "/app/user-management/process-policies",
+    primaryLabel: "Open Process Policies",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Process policies let administrators enforce commercial flow gates: quotation before sales order, sales order before invoice, PR approval before PO, goods receipt before supplier invoice, and whether SO release combines reservation with stock deduction (legacy) or uses delivery receipts to issue stock.",
+      },
+      {
+        type: "paragraph",
+        text: "Defaults are skip-friendly with legacy combined SO release on. Turn policies on one at a time when rolling out stricter controls. The Business Dashboard red flags help find gaps—for example released but not delivered lines when DR is expected.",
       },
     ],
   },
