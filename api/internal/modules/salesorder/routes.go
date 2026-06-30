@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/deliveryreceipt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -16,6 +17,7 @@ import (
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/sales-order", func(sr chi.Router) {
 		registerSalesOrderRoutes(sr, pool)
+		deliveryreceipt.RegisterSalesOrderRoutes(sr, pool)
 	})
 }
 
