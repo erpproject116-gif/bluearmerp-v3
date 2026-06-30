@@ -217,9 +217,10 @@ export function SalesOrderLineGrid(props: Props) {
     };
   };
 
-  const columns = createMemo(() =>
-    filterTaxLineColumns(SALES_ORDER_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode),
-  );
+  const columns = createMemo(() => {
+    props.taxTypeId();
+    return filterTaxLineColumns(SALES_ORDER_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+  });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
 
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(() =>
@@ -323,10 +324,19 @@ export function SalesOrderLineGrid(props: Props) {
                 Totals
               </td>
               <td class="px-2 py-2 text-right">{totals().qty.toLocaleString("en-PH", { maximumFractionDigits: 4 })}</td>
-              <td colSpan={3} />
-              <td class="px-2 py-2 text-right">{money(totals().nonVat)}</td>
-              <td class="px-2 py-2 text-right">{money(totals().tax)}</td>
+              <Show when={hasCol("basis")}>
+                <td />
+              </Show>
               <td />
+              <Show when={hasCol("non_vat_total")}>
+                <td class="px-2 py-2 text-right">{money(totals().nonVat)}</td>
+              </Show>
+              <Show when={hasCol("tax")}>
+                <td class="px-2 py-2 text-right">{money(totals().tax)}</td>
+              </Show>
+              <Show when={hasCol("unit_vat_inc")}>
+                <td />
+              </Show>
               <td class="px-2 py-2 text-right">{money(totals().grand)}</td>
               <td colSpan={2} />
             </tr>

@@ -506,7 +506,10 @@ export function PurchaseOrderModal(props: Props) {
                 lines={lines}
                 onChange={setLines}
                 taxTypeId={taxTypeId}
-                taxTypeMeta={selectedTaxType}
+                taxTypeMeta={() => {
+                  const t = selectedTaxType();
+                  return t ? { tax_mode: t.tax_mode, rate_percent: t.rate_percent } : null;
+                }}
                 locationId={locationId}
               />
             </Show>

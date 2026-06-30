@@ -73,7 +73,7 @@ export default function ProcessPoliciesPage() {
   const load = async () => {
     setLoading(true);
     const res = await apiFetch<{ policy: ProcessPolicy; can_manage: boolean }>(
-      "/settings/process-policies",
+      "/api/v1/settings/process-policies",
     );
     setLoading(false);
     if (res.success && res.data) {
@@ -102,7 +102,7 @@ export default function ProcessPoliciesPage() {
     for (const f of FIELDS) {
       body[f.key] = !!p[f.key];
     }
-    const res = await apiFetch<ProcessPolicy>("/settings/process-policies", {
+    const res = await apiFetch<ProcessPolicy>("/api/v1/settings/process-policies", {
       method: "PATCH",
       body: JSON.stringify(body),
     });
@@ -126,7 +126,17 @@ export default function ProcessPoliciesPage() {
       </div>
 
       <Show when={!loading()} fallback={<p class="text-sm text-slate-500">Loading…</p>}>
-        <Show when={policy()} keyed>
+        <Show
+          when={policy()}
+          keyed
+          fallback={
+            <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Could not load process policies. Confirm migration{" "}
+              <code class="font-mono text-xs">051_tenant_process_policies.sql</code> has been applied,
+              then refresh.
+            </p>
+          }
+        >
           {(p) => (
             <div class="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <For each={FIELDS}>

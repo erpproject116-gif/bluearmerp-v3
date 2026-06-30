@@ -32,12 +32,12 @@ export type TaxLineGridVisibility = {
 /** Which tax amount columns to show based on transaction type tax_mode. */
 export function taxLineGridVisibility(taxMode: string | undefined): TaxLineGridVisibility {
   switch (taxMode as TaxMode) {
-    case "none":
-      return { showBasis: false, showNonVat: false, showTax: false, showVatInc: false };
-    case "excluded":
     case "included":
-    default:
+    case "excluded":
       return { showBasis: true, showNonVat: true, showTax: true, showVatInc: true };
+    case "none":
+    default:
+      return { showBasis: false, showNonVat: false, showTax: false, showVatInc: false };
   }
 }
 

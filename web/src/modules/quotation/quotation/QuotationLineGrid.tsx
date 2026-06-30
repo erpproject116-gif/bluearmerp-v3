@@ -213,9 +213,10 @@ export function QuotationLineGrid(props: Props) {
     };
   };
 
-  const columns = createMemo(() =>
-    filterTaxLineColumns(QUOTATION_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode),
-  );
+  const columns = createMemo(() => {
+    props.taxTypeId();
+    return filterTaxLineColumns(QUOTATION_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+  });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
 
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(() =>

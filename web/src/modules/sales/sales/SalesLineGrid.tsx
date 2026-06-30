@@ -194,12 +194,14 @@ export function SalesLineGrid(props: Props) {
   const [serialPickIdx, setSerialPickIdx] = createSignal<number | null>(null);
 
   const columns = createMemo(() => {
+    props.taxTypeId();
     const taxCols = filterTaxLineColumns(BASE_COLUMNS, props.taxTypeMeta()?.tax_mode);
     const cols = [...taxCols];
     if (hasDiscountTemplate(props.templateCode())) cols.push(...DISCOUNT_COLUMNS);
     cols.push(...TAIL_COLUMNS);
     return cols;
   });
+  const hasCol = (key: string) => columns().some((c) => c.key === key);
 
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(() =>
     columns().map((c) => ({ key: c.key, width: c.width })),
@@ -301,11 +303,6 @@ export function SalesLineGrid(props: Props) {
     key.includes("unit") || key === "qty" || key === "tax" || key === "line_total" || key === "non_vat_total" || key === "discount_amount";
 
   const footerColSpanBeforeQty = () => 4;
-  const footerColSpanAfterQty = () => {
-    let n = 3;
-    if (hasDiscountTemplate(props.templateCode())) n += 2;
-    return n;
-  };
 
   return (
     <div class="col-span-full">
@@ -360,23 +357,33 @@ export function SalesLineGrid(props: Props) {
                   <ResizableTd width={widthFor("qty")} class="px-2 py-1">
                     <input type="number" class={`${inputClass} w-full text-right`} value={line.qty} onInput={(e) => void updateLine(idx(), { qty: e.currentTarget.value })} />
                   </ResizableTd>
-                  <ResizableTd width={widthFor("basis")} class="px-2 py-1">
-                    <select
-                      class={inputClass}
-                      value={line.input_basis}
-                      onChange={(e) => void updateLine(idx(), { input_basis: e.currentTarget.value as SalesLineRow["input_basis"] })}
-                    >
-                      <option value="vat_inc_unit">VAT inc.</option>
-                      <option value="non_vat_unit">Non-VAT</option>
-                    </select>
-                  </ResizableTd>
+                  <Show when={hasCol("basis")}>
+                    <ResizableTd width={widthFor("basis")} class="px-2 py-1">
+                      <select
+                        class={inputClass}
+                        value={line.input_basis}
+                        onChange={(e) => void updateLine(idx(), { input_basis: e.currentTarget.value as SalesLineRow["input_basis"] })}
+                      >
+                        <option value="vat_inc_unit">VAT inc.</option>
+                        <option value="non_vat_unit">Non-VAT</option>
+                      </select>
+                    </ResizableTd>
+                  </Show>
                   <ResizableTd width={widthFor("unit_price")} class="px-2 py-1">
                     <input type="number" class={`${inputClass} w-full text-right`} value={line.unit_price} onInput={(e) => void updateLine(idx(), { unit_price: e.currentTarget.value })} />
                   </ResizableTd>
-                  <ResizableTd width={widthFor("unit_non_vat")} class="px-2 py-1 text-right">{money(parseNum(line.unit_non_vat))}</ResizableTd>
-                  <ResizableTd width={widthFor("non_vat_total")} class="px-2 py-1 text-right">{money(parseNum(line.non_vat_total))}</ResizableTd>
-                  <ResizableTd width={widthFor("tax")} class="px-2 py-1 text-right">{money(parseNum(line.tax_amount))}</ResizableTd>
-                  <ResizableTd width={widthFor("unit_vat_inc")} class="px-2 py-1 text-right">{money(parseNum(line.unit_vat_inc))}</ResizableTd>
+                  <Show when={hasCol("unit_non_vat")}>
+                    <ResizableTd width={widthFor("unit_non_vat")} class="px-2 py-1 text-right">{money(parseNum(line.unit_non_vat))}</ResizableTd>
+                  </Show>
+                  <Show when={hasCol("non_vat_total")}>
+                    <ResizableTd width={widthFor("non_vat_total")} class="px-2 py-1 text-right">{money(parseNum(line.non_vat_total))}</ResizableTd>
+                  </Show>
+                  <Show when={hasCol("tax")}>
+                    <ResizableTd width={widthFor("tax")} class="px-2 py-1 text-right">{money(parseNum(line.tax_amount))}</ResizableTd>
+                  </Show>
+                  <Show when={hasCol("unit_vat_inc")}>
+                    <ResizableTd width={widthFor("unit_vat_inc")} class="px-2 py-1 text-right">{money(parseNum(line.unit_vat_inc))}</ResizableTd>
+                  </Show>
                   <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{money(parseNum(line.line_total))}</ResizableTd>
                   <Show when={hasDiscountTemplate(props.templateCode())}>
                     <ResizableTd width={widthFor("discount_amount")} class="px-2 py-1">
@@ -411,12 +418,24 @@ export function SalesLineGrid(props: Props) {
                 Totals
               </td>
               <td class="px-2 py-2 text-right">{totals().qty.toLocaleString("en-PH", { maximumFractionDigits: 4 })}</td>
-              <td colSpan={footerColSpanAfterQty()} />
-              <td class="px-2 py-2 text-right">{money(totals().nonVat)}</td>
-              <td class="px-2 py-2 text-right">{money(totals().tax)}</td>
+              <Show when={hasCol("basis")}>
+                <td />
+              </Show>
               <td />
+              <Show when={hasCol("non_vat_total")}>
+                <td class="px-2 py-2 text-right">{money(totals().nonVat)}</td>
+              </Show>
+              <Show when={hasCol("tax")}>
+                <td class="px-2 py-2 text-right">{money(totals().tax)}</td>
+              </Show>
+              <Show when={hasCol("unit_vat_inc")}>
+                <td />
+              </Show>
               <td class="px-2 py-2 text-right">{money(totals().grand)}</td>
-              <td colSpan={hasDiscountTemplate(props.templateCode()) ? 4 : 2} />
+              <Show when={hasDiscountTemplate(props.templateCode())}>
+                <td colSpan={2} />
+              </Show>
+              <td colSpan={2} />
             </tr>
           </tfoot>
         </table>

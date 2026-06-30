@@ -33,9 +33,11 @@ func getPolicy(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		tu2, _ := auth.FromContext(r.Context())
+		canManage := tu2.HasPermission("settings.process_policies", auth.AccessWrite) ||
+			tu2.IsStoreAdmin || tu2.IsTenantOwner || tu2.IsPlatformSuperadmin
 		response.OK(w, map[string]any{
 			"policy":     p,
-			"can_manage": tu2.HasPermission("settings.process_policies", auth.AccessWrite),
+			"can_manage": canManage,
 		}, "OK")
 	}
 }
