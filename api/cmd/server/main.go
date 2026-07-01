@@ -93,8 +93,7 @@ func main() {
 	r.Route("/api/v1", func(api chi.Router) {
 		crm.RegisterJobRoutes(api, pool)
 		platformreports.RegisterJobRoutes(api, pool)
-		portal.RegisterPublicRoutes(api, pool)
-		portal.RegisterPortalRoutes(api, pool)
+		portal.RegisterRoutes(api, pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret)
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Use(audit.Middleware(pool))
@@ -122,7 +121,6 @@ func main() {
 			usermgmt.RegisterRoutes(protected, pool)
 			crm.RegisterRoutes(protected, pool)
 			support.RegisterRoutes(protected, pool)
-			portal.RegisterAdminRoutes(protected, pool)
 			bi.RegisterRoutes(protected, pool, api)
 			fixedassets.RegisterRoutes(protected, pool)
 			jobcosting.RegisterRoutes(protected, pool)
