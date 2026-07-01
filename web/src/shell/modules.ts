@@ -36,6 +36,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/dashboard",
     features: [
       { label: "Dashboard", href: "/app/dashboard", settingsHref: "/app/dashboard" },
+      { label: "Report Catalogue", href: "/app/reports", settingsHref: "/app/reports" },
     ],
   },
   {
