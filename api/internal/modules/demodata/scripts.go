@@ -28,6 +28,7 @@ var PopulateScripts = []string{
 }
 
 const verifyScript = "verify-demo-full-chain.sql"
+const verifyReconciliationScript = "verify-demo-reconciliation.sql"
 const purgeScript = "purge-demo-data.sql"
 
 // DemoTenantCodes are the only tenants that may use populate/purge from the app.

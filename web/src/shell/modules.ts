@@ -31,7 +31,7 @@ export type AppModule = {
 export const appModules: AppModule[] = [
   {
     id: "dashboard",
-    label: "Business Dashboard",
+    label: "Dashboard",
     href: "/app/dashboard",
     basePath: "/app/dashboard",
     features: [
@@ -40,7 +40,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "inventory",
-    label: "Inventory",
+    label: "Stock",
     href: "/app/inventory/partners",
     basePath: "/app/inventory",
     features: [
@@ -50,6 +50,8 @@ export const appModules: AppModule[] = [
       { label: "Departments", href: "/app/inventory/departments", settingsHref: "/app/inventory/departments/settings" },
       { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings" },
       { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements" },
+      { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation" },
+      { label: "Price List", href: "/app/inventory/price-lists", settingsHref: "/app/inventory/price-lists" },
     ],
     subBranches: [
       {
@@ -113,14 +115,14 @@ export const appModules: AppModule[] = [
       { label: "Quotation List", href: "/app/quotation/quotations", settingsHref: "/app/quotation/quotations/settings" },
       { label: "Quotation Status", href: "/app/quotation/quotations/status", settingsHref: "/app/quotation/quotations/settings" },
       {
-        label: "Outstanding Quote Status",
+        label: "Open Quotations",
         href: "/app/quotation/quotations/outstanding",
         settingsHref: "/app/quotation/quotations/settings",
       },
     ],
     subBranches: [
       {
-        label: "Tax Management",
+        label: "Taxes",
         prefix: TAX_MNGT_PREFIX,
         href: "/app/quotation/tax-mngt/tax-types",
         settingsHref: "/app/quotation/tax-mngt/tax-types/settings",
@@ -129,15 +131,15 @@ export const appModules: AppModule[] = [
   },
   {
     id: "sales",
-    label: "Sales",
+    label: "Sales Invoice",
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
-      { label: "New Sales", href: "/app/sales/sales/new", settingsHref: "/app/sales/sales/settings" },
-      { label: "Sales List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings" },
-      { label: "Sales Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
+      { label: "New Sales Invoice", href: "/app/sales/sales/new", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Invoice List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Invoice Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
       {
-        label: "Pre-invoicing Status",
+        label: "Billing Status",
         href: "/app/sales/sales/pre-invoicing",
         settingsHref: "/app/sales/sales/settings",
       },
@@ -151,10 +153,11 @@ export const appModules: AppModule[] = [
       { label: "A/R by Customer", href: "/app/sales/reports/ar-by-customer", settingsHref: "/app/sales/sales/settings" },
       { label: "Sales Discount Status", href: "/app/sales/reports/discount-status", settingsHref: "/app/sales/sales/settings" },
       { label: "Print Sales Slips", href: "/app/sales/reports/print-slips", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Returns", href: "/app/sales/sales-returns", settingsHref: "/app/sales/sales/settings" },
     ],
     subBranches: [
       {
-        label: "Collective Invoicing (Sales)",
+        label: "Group Invoicing",
         prefix: COLLECTIVE_INVOICING_PREFIX,
         href: "/app/sales/collective-invoicing/list",
         settingsHref: "/app/sales/sales/settings",
@@ -171,22 +174,22 @@ export const appModules: AppModule[] = [
       { label: "Sales Order List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings" },
       { label: "Sales Order Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
       {
-        label: "Outstanding SO Status",
+        label: "Open Sales Orders",
         href: "/app/sales-order/sales-orders/outstanding",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       {
-        label: "Release Sales Order",
+        label: "Pick List",
         href: "/app/sales-order/sales-orders/release",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       {
-        label: "Delivery Receipt List",
+        label: "Delivery Note List",
         href: "/app/sales-order/delivery-receipts",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       {
-        label: "New Delivery Receipt",
+        label: "New Delivery Note",
         href: "/app/sales-order/delivery-receipts/new",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
@@ -194,13 +197,13 @@ export const appModules: AppModule[] = [
   },
   {
     id: "purchase_request",
-    label: "Purchase Request",
+    label: "Material Request",
     href: "/app/purchase-request/purchase-requests",
     basePath: "/app/purchase-request",
     features: [
-      { label: "New Purchase Request", href: "/app/purchase-request/purchase-requests/new", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Purchase Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "New Material Request", href: "/app/purchase-request/purchase-requests/new", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Material Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Material Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
     ],
   },
   {
@@ -210,7 +213,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/purchase-order",
     features: [
       { label: "Purchase Order List", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "Goods Receipt List", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "Purchase Receipt List", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/purchase-orders/settings" },
     ],
   },
   {
@@ -242,12 +245,12 @@ export const appModules: AppModule[] = [
   },
   {
     id: "finance",
-    label: "Finance",
+    label: "Accounts",
     href: "/app/finance/official-receipts",
     basePath: "/app/finance",
     features: [
-      { label: "New Official Receipt", href: "/app/finance/official-receipts/new", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Official Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "New Payment Receipt", href: "/app/finance/official-receipts/new", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Payment Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "New Supplier Invoice", href: "/app/finance/supplier-invoices/new", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Supplier Invoice List", href: "/app/finance/supplier-invoices", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "New Payment Voucher", href: "/app/finance/payment-vouchers/new", settingsHref: "/app/finance/official-receipts/settings" },
@@ -256,6 +259,7 @@ export const appModules: AppModule[] = [
       { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "SI Receipt Status", href: "/app/finance/reports/receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Supplier Payment Status", href: "/app/finance/reports/supplier-payment-status", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Journal Entry", href: "/app/finance/journal-entries", settingsHref: "/app/finance/official-receipts/settings" },
     ],
   },
   {

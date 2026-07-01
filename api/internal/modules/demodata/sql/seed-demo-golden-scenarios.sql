@@ -678,7 +678,36 @@ begin
       end if;
     end if;
 
-    raise notice 'seed-demo-golden-scenarios: ensured S2/S3/S4/S9/S10 for %', v_code;
+    -- === S11: standalone PO (no purchase request) ===
+    if not exists (select 1 from public.po_purchase_orders where tenant_id = v_tenant and purchase_order_no = 'DEMO-S11-PO') then
+      insert into public.po_purchase_orders (
+        tenant_id, order_date, date_seq, purchase_order_no, purchase_request_id,
+        tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
+        status, notes, subtotal, tax_total, grand_total, created_by_user_id
+      )
+      values (
+        v_tenant, v_d, 11, 'DEMO-S11-PO', null,
+        v_tax_vat, v_currency_id, v_partner_vendor, v_user_id,
+        coalesce((select full_name from public.users where id = v_user_id), 'Procurement'),
+        v_loc_hq, 'confirmed', 'GOLDEN-S11 standalone PO without PR.',
+        982.1429, 117.8571, 1100.0000, v_user_id
+      ) returning id into v_poid;
+
+      insert into public.po_purchase_order_lines (
+        purchase_order_id, purchase_request_line_id, line_no,
+        partner_id, partner_code, partner_name,
+        item_id, item_code, item_name, qty, received_qty,
+        unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, input_basis
+      )
+      select v_poid, null, 1, v_partner_vendor, p.partner_code, p.company_name,
+        coalesce(v_item_foam, v_item_oak), i.item_code, i.item_name, 1, 0,
+        982.1429, 982.1429, 117.8571, 1100, 1100, 'vat_inc_unit'
+      from public.inv_partners p
+      join public.inv_items i on i.id = coalesce(v_item_foam, v_item_oak)
+      where p.id = v_partner_vendor;
+    end if;
+
+    raise notice 'seed-demo-golden-scenarios: ensured S2/S3/S4/S9/S10/S11 for %', v_code;
   end loop;
 end $$;
 

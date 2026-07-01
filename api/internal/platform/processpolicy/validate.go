@@ -56,3 +56,42 @@ func ValidatePurchaseRequestForPO(p Policy, progressStatus string, approvedAt *t
 		"purchase_request_id": "Purchase request must be approved before creating a purchase order.",
 	}
 }
+
+// ValidateSalesInvoiceQtyAgainstDelivery blocks SI qty above delivered when DR policy is on.
+func ValidateSalesInvoiceQtyAgainstDelivery(p Policy, qty, deliveredQty float64) map[string]string {
+	if !p.SalesRequireDeliveryReceipt {
+		return nil
+	}
+	if qty <= deliveredQty+0.0001 {
+		return nil
+	}
+	return map[string]string{
+		"qty": "Quantity exceeds delivered quantity for this sales order line.",
+	}
+}
+
+// ValidateSupplierInvoiceQtyAgainstReceived blocks invoice qty above received when GR policy is on.
+func ValidateSupplierInvoiceQtyAgainstReceived(p Policy, qty, receivedQty float64) map[string]string {
+	if !p.PurchaseRequireGRBeforeSupplierInv {
+		return nil
+	}
+	if qty <= receivedQty+0.0001 {
+		return nil
+	}
+	return map[string]string{
+		"qty": "Quantity exceeds received quantity on the purchase receipt line.",
+	}
+}
+
+// ValidateReleaseQty blocks release above order qty minus already released.
+func ValidateReleaseQty(orderQty, alreadyReleased, releaseQty float64) map[string]string {
+	if releaseQty <= 0.0001 {
+		return map[string]string{"release_qty": "Release quantity must be positive."}
+	}
+	if alreadyReleased+releaseQty <= orderQty+0.0001 {
+		return nil
+	}
+	return map[string]string{
+		"release_qty": "Release quantity exceeds remaining order quantity.",
+	}
+}

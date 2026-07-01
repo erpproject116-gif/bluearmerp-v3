@@ -29,7 +29,7 @@ export default function DemoDataPage() {
 
   const load = async () => {
     setLoading(true);
-    const res = await apiFetch<DemoStatus>("/settings/demo-data");
+    const res = await apiFetch<DemoStatus>("/api/v1/settings/demo-data");
     setLoading(false);
     if (res.success && res.data) {
       setStatus(res.data);
@@ -48,7 +48,7 @@ export default function DemoDataPage() {
     }
     setBusy("purge");
     setSteps([]);
-    const res = await apiFetch<{ steps: StepResult[]; status: DemoStatus }>("/settings/demo-data/purge", {
+    const res = await apiFetch<{ steps: StepResult[]; status: DemoStatus }>("/api/v1/settings/demo-data/purge", {
       method: "POST",
     });
     setBusy(null);
@@ -69,7 +69,7 @@ export default function DemoDataPage() {
 
     setBusy("populate");
     setSteps([]);
-    const res = await apiFetch<{ steps: StepResult[]; status: DemoStatus }>("/settings/demo-data/populate", {
+    const res = await apiFetch<{ steps: StepResult[]; status: DemoStatus }>("/api/v1/settings/demo-data/populate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ purge_first: purgeFirst(), include_verify: true }),
@@ -92,6 +92,8 @@ export default function DemoDataPage() {
     golden_s9_dr: "Golden S9 (SO→DR→SI)",
     golden_s8_ap: "Golden S8 (supplier invoice + payment)",
     open_po_demogr902: "Open PO receive demo (DEMOGR902)",
+    golden_s11_standalone_po: "Golden S11 (standalone PO, no PR)",
+    reconciliation_clean: "Reconciliation gaps (should be 0)",
   };
 
   return (

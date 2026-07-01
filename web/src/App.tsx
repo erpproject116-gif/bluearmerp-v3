@@ -28,6 +28,8 @@ import RegisterRepairNewPage from "./modules/inventory/after-sales/RegisterRepai
 import RegisterRepairStatusPage from "./modules/inventory/after-sales/RegisterRepairStatusPage";
 import RegisterRepairConsumptionPage from "./modules/inventory/after-sales/RegisterRepairConsumptionPage";
 import StockMovementsPage from "./modules/inventory/StockMovementsPage";
+import StockReconciliationPage from "./modules/inventory/StockReconciliationPage";
+import PriceListsPage from "./modules/inventory/PriceListsPage";
 import SerialRegistryListPage from "./modules/inventory/serial-lot/SerialRegistryListPage";
 import LotBatchesListPage from "./modules/inventory/serial-lot/LotBatchesListPage";
 import SerialMovementsListPage from "./modules/inventory/serial-lot/SerialMovementsListPage";
@@ -74,7 +76,9 @@ import SalesSettingsPage from "./modules/sales/sales/SalesSettingsPage";
 import SalesStatusPage from "./modules/sales/sales/SalesStatusPage";
 import PreInvoicingStatusPage from "./modules/sales/sales/PreInvoicingStatusPage";
 import ChangeSalesPriceBatchPage from "./modules/sales/sales/ChangeSalesPriceBatchPage";
+import SalesReturnsPage from "./modules/sales/SalesReturnsPage";
 import PackingSlipPrintPage from "./modules/sales/sales/PackingSlipPrintPage";
+import JournalEntriesPage from "./modules/finance/JournalEntriesPage";
 import OfficialReceiptListPage from "./modules/finance/official-receipts/OfficialReceiptListPage";
 import OfficialReceiptNewPage from "./modules/finance/official-receipts/OfficialReceiptNewPage";
 import OfficialReceiptSettingsPage from "./modules/finance/official-receipts/OfficialReceiptSettingsPage";
@@ -199,6 +203,8 @@ export default function App() {
           <Route path="/inventory/items" component={ItemsPage} />
           <Route path="/inventory/items/settings" component={ItemsSettingsPage} />
           <Route path="/inventory/stock-movements" component={StockMovementsPage} />
+          <Route path="/inventory/stock-reconciliation" component={StockReconciliationPage} />
+          <Route path="/inventory/price-lists" component={PriceListsPage} />
           <Route path="/inventory/serial-lot/registry" component={SerialRegistryListPage} />
           <Route path="/inventory/serial-lot/lots" component={LotBatchesListPage} />
           <Route path="/inventory/serial-lot/movements" component={SerialMovementsListPage} />
@@ -256,10 +262,12 @@ export default function App() {
           <Route path="/sales/collective-invoicing/list" component={CollectiveInvoiceListPage} />
           <Route path="/sales/collective-invoicing/status" component={CollectiveInvoiceStatusPage} />
           <Route path="/sales/reports/print-slips" component={SalesPrintSlipsLauncherPage} />
+          <Route path="/sales/sales-returns" component={SalesReturnsPage} />
           <Route path="/finance/supplier-invoices/new" component={SupplierInvoiceNewPage} />
           <Route path="/finance/supplier-invoices" component={SupplierInvoiceListPage} />
           <Route path="/finance/payment-vouchers/new" component={PaymentVoucherNewPage} />
           <Route path="/finance/payment-vouchers" component={PaymentVoucherListPage} />
+          <Route path="/finance/journal-entries" component={JournalEntriesPage} />
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />

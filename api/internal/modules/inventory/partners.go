@@ -57,6 +57,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerStockMovementRoutes(ir, pool)
 		registerSerialRoutes(ir, pool)
 		registerReconciliationRoutes(ir, pool)
+		registerPriceListRoutes(ir, pool)
 	})
 }
 

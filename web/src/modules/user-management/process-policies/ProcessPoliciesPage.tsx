@@ -12,6 +12,9 @@ type ProcessPolicy = {
   purchase_require_pr_approval: boolean;
   purchase_require_gr_before_supplier_invoice: boolean;
   legacy_combined_so_release: boolean;
+  sales_enforce_credit_limit: boolean;
+  accounts_auto_post_or: boolean;
+  accounts_auto_post_pv: boolean;
 };
 
 type PolicyField = {
@@ -60,6 +63,21 @@ const FIELDS: PolicyField[] = [
     key: "legacy_combined_so_release",
     label: "Legacy combined SO release (reserve + deduct together)",
     help: "Keep on for existing tenants until delivery receipt is enabled.",
+  },
+  {
+    key: "sales_enforce_credit_limit",
+    label: "Enforce customer credit limit",
+    help: "When on, new sales invoices are blocked if open A/R plus the invoice exceeds the partner credit limit.",
+  },
+  {
+    key: "accounts_auto_post_or",
+    label: "Auto-post official receipts to journal",
+    help: "When on, payment receipts create posted journal entries (requires chart of accounts).",
+  },
+  {
+    key: "accounts_auto_post_pv",
+    label: "Auto-post payment vouchers to journal",
+    help: "When on, supplier payment vouchers create posted journal entries.",
   },
 ];
 

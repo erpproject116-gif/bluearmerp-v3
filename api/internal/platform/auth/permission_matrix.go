@@ -73,9 +73,10 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 		return nil
 	}
 	perms := map[string]string{}
+	submit := map[string]bool{}
 
 	roleRows, err := pool.Query(ctx, `
-		select rp.permission_code, rp.access_level
+		select rp.permission_code, rp.access_level, rp.can_submit
 		from public.tenant_role_permissions rp
 		where rp.tenant_id = $1 and rp.role_code = $2`,
 		tu.TenantID, tu.TenantRole)
@@ -84,11 +85,15 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 	}
 	for roleRows.Next() {
 		var code, lvl string
-		if err := roleRows.Scan(&code, &lvl); err != nil {
+		var canSubmit bool
+		if err := roleRows.Scan(&code, &lvl, &canSubmit); err != nil {
 			roleRows.Close()
 			return err
 		}
 		perms[code] = lvl
+		if canSubmit {
+			submit[code] = true
+		}
 	}
 	roleRows.Close()
 	if err := roleRows.Err(); err != nil {
@@ -141,6 +146,9 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 	}
 	if len(perms) > 0 {
 		tu.permissions = perms
+	}
+	if len(submit) > 0 {
+		tu.submitPerms = submit
 	}
 	return nil
 }
@@ -216,6 +224,39 @@ func (tu TenantUser) PermissionsMap() map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// RequireSubmit blocks unless role has can_submit for the permission code.
+func RequireSubmit(code string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tu, ok := FromContext(r.Context())
+			if !ok {
+				response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+				return
+			}
+			if tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.HasSubmit(code) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if tu.HasPermission(code, AccessWrite) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			response.Err(w, http.StatusForbidden, "Submit permission required.", "ERR_FORBIDDEN")
+		})
+	}
+}
+
+// HasSubmit reports submit action on a permission code.
+func (tu TenantUser) HasSubmit(code string) bool {
+	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+		return true
+	}
+	if tu.submitPerms == nil {
+		return false
+	}
+	return tu.submitPerms[code]
 }
 
 // RequirePermission blocks handlers unless the caller has the required access.

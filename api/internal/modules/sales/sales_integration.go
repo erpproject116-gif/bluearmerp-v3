@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -229,6 +230,18 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 		}
 		if ln.Qty > balance+0.0001 {
 			errs[fmt.Sprintf("lines[%d].qty", i)] = fmt.Sprintf("Exceeds available balance (%.4f).", balance)
+			continue
+		}
+		if policy.SalesRequireDeliveryReceipt && useDelivery {
+			var delivered float64
+			_ = pool.QueryRow(ctx, `
+				select coalesce(delivered_qty, 0)::float8 from public.so_sales_order_lines where id = $1`,
+				*ln.SourceSalesOrderLineID).Scan(&delivered)
+			if vErr := processpolicy.ValidateSalesInvoiceQtyAgainstDelivery(policy, ln.Qty, delivered); vErr != nil {
+				for k, msg := range vErr {
+					errs[fmt.Sprintf("lines[%d].%s", i, k)] = msg
+				}
+			}
 		}
 	}
 	if len(errs) > 0 {
@@ -257,6 +270,10 @@ func writeSalesOrderSlipsForSales(ctx context.Context, tx pgx.Tx, tenantID, sale
 			values ($1, 'sales', $2, $3, $4, $5)`,
 			*ln.SourceSalesOrderLineID, slipRef, dateNoDisplay, ln.Qty, salesID)
 		if err != nil {
+			return err
+		}
+
+		if err := fulfillment.SyncSOLineQty(ctx, tx, *ln.SourceSalesOrderLineID); err != nil {
 			return err
 		}
 

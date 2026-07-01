@@ -25,7 +25,7 @@ export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
 export const navGroups: NavGroup[] = [
   {
     id: "stocks_management",
-    label: "Stocks Management",
+    label: "Stock",
     defaultExpanded: true,
     entries: [
       { kind: "module", moduleId: "inventory" },
@@ -35,24 +35,24 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "sales_process",
-    label: "Sales Process",
+    label: "Selling",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "quotation" },
-      { kind: "subBranch", moduleId: "quotation", featureCode: "quotation.tax_mngt", branchLabel: "Tax Management" },
+      { kind: "subBranch", moduleId: "quotation", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
       { kind: "module", moduleId: "sales" },
       {
         kind: "subBranch",
         moduleId: "sales",
         featureCode: "sales.collective_invoicing",
-        branchLabel: "Collective Invoicing (Sales)",
+        branchLabel: "Group Invoicing",
       },
       { kind: "module", moduleId: "sales_order" },
     ],
   },
   {
     id: "procurement_process",
-    label: "Procurement Process",
+    label: "Buying",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "purchase_request" },
@@ -61,7 +61,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "misc",
-    label: "Misc",
+    label: "Setup",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "activity_logs" },

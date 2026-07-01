@@ -65,6 +65,7 @@ type grSerialGapRow struct {
 }
 
 func registerReconciliationRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.Get("/reconciliation/summary", reconciliationSummary(pool))
 	r.Get("/reconciliation/serial-qty", listSerialQtyMismatch(pool))
 	r.Get("/reconciliation/reserved-stale", listReservedStale(pool))
 	r.Get("/reconciliation/so-release-gap", listSOReleaseGap(pool))
@@ -73,6 +74,124 @@ func registerReconciliationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/reconciliation/dr-without-invoice", listDRWithoutInvoice(pool))
 	r.Get("/reconciliation/gr-without-supplier-invoice", listGRWithoutSupplierInvoice(pool))
 	r.Get("/reconciliation/ap-over-application", listAPOverApplication(pool))
+}
+
+type reconciliationCategory struct {
+	Code  string `json:"code"`
+	Label string `json:"label"`
+	Count int64  `json:"count"`
+	API   string `json:"api"`
+}
+
+type reconciliationSummaryResponse struct {
+	TotalCount int64                    `json:"total_count"`
+	Categories []reconciliationCategory `json:"categories"`
+}
+
+func reconciliationSummary(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		ctx := r.Context()
+		categories := []reconciliationCategory{
+			{Code: "serial_qty_mismatch", Label: "Serial quantity mismatch", API: "serial-qty"},
+			{Code: "reserved_stale", Label: "Stale reserved serials", API: "reserved-stale"},
+			{Code: "so_release_gap", Label: "Sales order release gap", API: "so-release-gap"},
+			{Code: "gr_serial_gap", Label: "Goods receipt serial gap", API: "gr-serial-gap"},
+			{Code: "reserve_without_dr", Label: "Released, not delivered", API: "reserve-without-dr"},
+			{Code: "dr_without_invoice", Label: "Delivered, not invoiced", API: "dr-without-invoice"},
+			{Code: "gr_without_supplier_invoice", Label: "GR not fully billed", API: "gr-without-supplier-invoice"},
+			{Code: "ap_over_application", Label: "AP over-applied payments", API: "ap-over-application"},
+		}
+
+		staleDays := 7
+		if v := r.URL.Query().Get("stale_days"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				staleDays = n
+			}
+		}
+
+		_ = pool.QueryRow(ctx, `
+			select count(*) from (
+			  select ln.id from public.sa_sales_lines ln
+			  join public.sa_sales s on s.id = ln.sales_id
+			  join public.inv_items i on i.id = ln.item_id
+			  left join (select sales_line_id, count(*)::float8 as serial_cnt from public.inv_serial_unit_sales_lines group by sales_line_id) j on j.sales_line_id = ln.id
+			  where s.tenant_id = $1 and s.deleted_at is null and i.track_serial = true and ln.qty > 0 and coalesce(j.serial_cnt, 0) <> ln.qty
+			  union
+			  select rl.id from public.so_sales_order_release_lines rl
+			  join public.so_sales_order_lines ln on ln.id = rl.sales_order_line_id
+			  join public.so_sales_orders so on so.id = ln.sales_order_id
+			  join public.inv_items i on i.id = ln.item_id
+			  left join (select sales_order_release_line_id, count(*)::float8 as serial_cnt from public.inv_serial_units where sales_order_release_line_id is not null group by sales_order_release_line_id) su on su.sales_order_release_line_id = rl.id
+			  where so.tenant_id = $1 and so.deleted_at is null and i.track_serial = true and rl.release_qty > 0 and coalesce(su.serial_cnt, 0) <> rl.release_qty
+			) mismatches`, tu.TenantID).Scan(&categories[0].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(*) from public.inv_serial_units su
+			where su.tenant_id = $1 and su.status = 'reserved'
+			  and su.reserved_at is not null
+			  and su.reserved_at < (now() - make_interval(days => $2))`,
+			tu.TenantID, staleDays).Scan(&categories[1].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(distinct ln.id)
+			from public.so_sales_order_lines ln
+			join public.so_sales_orders so on so.id = ln.sales_order_id
+			left join (select sales_order_line_id, sum(release_qty) as released from public.so_sales_order_release_lines group by sales_order_line_id) rel on rel.sales_order_line_id = ln.id
+			where so.tenant_id = $1 and so.deleted_at is null
+			  and so.progress_status in ('unconfirmed', 'in_progress')
+			  and (ln.qty - coalesce(rel.released, 0)) > 0.0001`, tu.TenantID).Scan(&categories[2].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(distinct grl.id)
+			from public.gr_goods_receipt_lines grl
+			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
+			join public.inv_items i on i.id = grl.item_id
+			left join (select goods_receipt_line_id, count(*)::float8 as cnt from public.gr_goods_receipt_serials group by goods_receipt_line_id) sc on sc.goods_receipt_line_id = grl.id
+			where gr.tenant_id = $1 and gr.status = 'posted' and i.track_serial = true
+			  and abs(grl.received_qty - coalesce(sc.cnt, 0)) > 0.0001`, tu.TenantID).Scan(&categories[3].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(distinct ln.id)
+			from public.so_sales_order_lines ln
+			join public.so_sales_orders so on so.id = ln.sales_order_id
+			left join (select sales_order_line_id, sum(release_qty) as released from public.so_sales_order_release_lines group by sales_order_line_id) rel on rel.sales_order_line_id = ln.id
+			left join (select sales_order_line_id, sum(qty) as delivered from public.so_sales_order_slip_lines where slip_type = 'delivery_receipt' group by sales_order_line_id) dr on dr.sales_order_line_id = ln.id
+			where so.tenant_id = $1 and so.deleted_at is null
+			  and coalesce(rel.released, 0) > 0.0001
+			  and (coalesce(rel.released, 0) - coalesce(dr.delivered, 0)) > 0.0001`, tu.TenantID).Scan(&categories[4].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(distinct ln.id)
+			from public.so_sales_order_lines ln
+			join public.so_sales_orders so on so.id = ln.sales_order_id
+			left join (select sales_order_line_id, sum(qty) as delivered from public.so_sales_order_slip_lines where slip_type = 'delivery_receipt' group by sales_order_line_id) dr on dr.sales_order_line_id = ln.id
+			left join (select sales_order_line_id, sum(qty) as sold from public.so_sales_order_slip_lines where slip_type = 'sales' group by sales_order_line_id) slip on slip.sales_order_line_id = ln.id
+			where so.tenant_id = $1 and so.deleted_at is null
+			  and coalesce(dr.delivered, 0) > 0.0001
+			  and (coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)) > 0.0001`, tu.TenantID).Scan(&categories[5].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(*)
+			from public.gr_goods_receipt_lines grl
+			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
+			left join (select goods_receipt_line_id, sum(qty) as billed from public.gr_goods_receipt_slip_lines where slip_type = 'supplier_invoice' group by goods_receipt_line_id) sl on sl.goods_receipt_line_id = grl.id
+			where gr.tenant_id = $1 and gr.status = 'posted'
+			  and (grl.received_qty - coalesce(sl.billed, 0)) > 0.0001`, tu.TenantID).Scan(&categories[6].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(*)
+			from public.fin_supplier_invoices si
+			left join (select supplier_invoice_id, sum(applied_amount) as applied from public.fin_payment_applications group by supplier_invoice_id) paid on paid.supplier_invoice_id = si.id
+			where si.tenant_id = $1 and si.deleted_at is null
+			  and coalesce(paid.applied, 0) > si.grand_total + 0.0001`, tu.TenantID).Scan(&categories[7].Count)
+
+		var total int64
+		for i := range categories {
+			total += categories[i].Count
+		}
+		response.OK(w, reconciliationSummaryResponse{TotalCount: total, Categories: categories}, "OK")
+	}
 }
 
 func listSerialQtyMismatch(pool *pgxpool.Pool) http.HandlerFunc {

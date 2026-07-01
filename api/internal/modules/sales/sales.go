@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -139,6 +140,7 @@ type computedLine struct {
 func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerAttachmentRoutes(r, pool)
 	registerCollectiveInvoiceRoutes(r, pool)
+	registerSalesReturnRoutes(r, pool)
 	r.Get("/preview-sequences", previewSalesSequences(pool))
 	r.Get("/sales-order-lines/open", listOpenSalesOrderLines(pool))
 	r.Get("/status-report/export", exportSalesStatusReport(pool))
@@ -468,6 +470,14 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		subtotal, taxTotal, grandTotal := sumSaleTotals(computed)
+
+		if clErrs, err := creditlimit.ValidateFromPolicy(r.Context(), pool, tu.TenantID, body.PartnerID, grandTotal); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to check credit limit.", "ERR_INTERNAL")
+			return
+		} else if clErrs != nil {
+			response.Validation(w, clErrs)
+			return
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {

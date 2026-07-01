@@ -39,6 +39,7 @@ type TenantUser struct {
 	AutoEnableAllModules      bool
 	AuthRevision              int64
 	permissions               map[string]string
+	submitPerms               map[string]bool
 }
 
 type Claims struct {

@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -465,6 +466,10 @@ func postDeliveryReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				ln.SalesOrderLineID, deliveryNo, dateNoDisplay, ln.Qty)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to write slip line.", "ERR_INTERNAL")
+				return
+			}
+			if err := fulfillment.SyncSOLineQty(r.Context(), tx, ln.SalesOrderLineID); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to sync fulfillment qty.", "ERR_INTERNAL")
 				return
 			}
 		}

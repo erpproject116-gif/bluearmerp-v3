@@ -56,14 +56,16 @@ func runPopulate(ctx context.Context, pool *pgxpool.Pool, includeVerify bool) ([
 		}
 	}
 	if includeVerify {
-		sql, err := readSQL(verifyScript)
-		if err != nil {
-			return results, fmt.Errorf("load %s: %w", verifyScript, err)
-		}
-		step := execScript(ctx, pool, verifyScript, sql)
-		results = append(results, step)
-		if !step.OK {
-			return results, fmt.Errorf("%s failed: %s", verifyScript, step.Message)
+		for _, vName := range []string{verifyScript, verifyReconciliationScript} {
+			sql, err := readSQL(vName)
+			if err != nil {
+				return results, fmt.Errorf("load %s: %w", vName, err)
+			}
+			step := execScript(ctx, pool, vName, sql)
+			results = append(results, step)
+			if !step.OK {
+				return results, fmt.Errorf("%s failed: %s", vName, step.Message)
+			}
 		}
 	}
 	return results, nil

@@ -20,6 +20,9 @@ type Policy struct {
 	PurchaseRequirePRApproval           bool  `json:"purchase_require_pr_approval"`
 	PurchaseRequireGRBeforeSupplierInv  bool  `json:"purchase_require_gr_before_supplier_invoice"`
 	LegacyCombinedSORelease             bool  `json:"legacy_combined_so_release"`
+	SalesEnforceCreditLimit             bool  `json:"sales_enforce_credit_limit"`
+	AccountsAutoPostOR                  bool  `json:"accounts_auto_post_or"`
+	AccountsAutoPostPV                  bool  `json:"accounts_auto_post_pv"`
 }
 
 // Patch is the writable subset for PATCH/PUT requests.
@@ -32,6 +35,9 @@ type Patch struct {
 	PurchaseRequirePRApproval          *bool `json:"purchase_require_pr_approval,omitempty"`
 	PurchaseRequireGRBeforeSupplierInv *bool `json:"purchase_require_gr_before_supplier_invoice,omitempty"`
 	LegacyCombinedSORelease            *bool `json:"legacy_combined_so_release,omitempty"`
+	SalesEnforceCreditLimit            *bool `json:"sales_enforce_credit_limit,omitempty"`
+	AccountsAutoPostOR                 *bool `json:"accounts_auto_post_or,omitempty"`
+	AccountsAutoPostPV                 *bool `json:"accounts_auto_post_pv,omitempty"`
 }
 
 var ErrNotFound = errors.New("process policy not found")
@@ -45,7 +51,10 @@ const selectCols = `
   purchase_require_pr,
   purchase_require_pr_approval,
   purchase_require_gr_before_supplier_invoice,
-  legacy_combined_so_release
+  legacy_combined_so_release,
+  sales_enforce_credit_limit,
+  accounts_auto_post_or,
+  accounts_auto_post_pv
 `
 
 // Load returns the tenant policy, inserting skip-friendly defaults when missing.
@@ -72,6 +81,9 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, erro
 		&p.PurchaseRequirePRApproval,
 		&p.PurchaseRequireGRBeforeSupplierInv,
 		&p.LegacyCombinedSORelease,
+		&p.SalesEnforceCreditLimit,
+		&p.AccountsAutoPostOR,
+		&p.AccountsAutoPostPV,
 	)
 	return p, err
 }
@@ -108,6 +120,15 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 	if patch.LegacyCombinedSORelease != nil {
 		next.LegacyCombinedSORelease = *patch.LegacyCombinedSORelease
 	}
+	if patch.SalesEnforceCreditLimit != nil {
+		next.SalesEnforceCreditLimit = *patch.SalesEnforceCreditLimit
+	}
+	if patch.AccountsAutoPostOR != nil {
+		next.AccountsAutoPostOR = *patch.AccountsAutoPostOR
+	}
+	if patch.AccountsAutoPostPV != nil {
+		next.AccountsAutoPostPV = *patch.AccountsAutoPostPV
+	}
 
 	_, err = pool.Exec(ctx, `
 		update public.tenant_process_policies set
@@ -119,7 +140,10 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		  purchase_require_pr_approval = $7,
 		  purchase_require_gr_before_supplier_invoice = $8,
 		  legacy_combined_so_release = $9,
-		  updated_by_user_id = $10,
+		  sales_enforce_credit_limit = $10,
+		  accounts_auto_post_or = $11,
+		  accounts_auto_post_pv = $12,
+		  updated_by_user_id = $13,
 		  updated_at = now()
 		where tenant_id = $1`,
 		tenantID,
@@ -131,6 +155,9 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		next.PurchaseRequirePRApproval,
 		next.PurchaseRequireGRBeforeSupplierInv,
 		next.LegacyCombinedSORelease,
+		next.SalesEnforceCreditLimit,
+		next.AccountsAutoPostOR,
+		next.AccountsAutoPostPV,
 		userID,
 	)
 	if err != nil {
@@ -173,6 +200,9 @@ func LoadTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error) {
 		&p.PurchaseRequirePRApproval,
 		&p.PurchaseRequireGRBeforeSupplierInv,
 		&p.LegacyCombinedSORelease,
+		&p.SalesEnforceCreditLimit,
+		&p.AccountsAutoPostOR,
+		&p.AccountsAutoPostPV,
 	)
 	return p, err
 }
