@@ -26,6 +26,8 @@ export type SalesOrderRow = {
   pic_name: string;
   location_id: number;
   progress_status: string;
+  pct_delivered?: number;
+  pct_billed?: number;
   delivery_date?: string | null;
   delivery_date_display?: string | null;
   grand_total: number;

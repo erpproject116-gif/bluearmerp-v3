@@ -92,6 +92,18 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
           { key: "item_name_summary", header: "Item Name" },
           { key: "delivery_date_display", header: "Delivery Date" },
           {
+            key: "pct_delivered",
+            header: "% Delivered",
+            sortable: false,
+            render: (r) => <span>{r.pct_delivered ?? 0}%</span>,
+          },
+          {
+            key: "pct_billed",
+            header: "% Billed",
+            sortable: false,
+            render: (r) => <span>{r.pct_billed ?? 0}%</span>,
+          },
+          {
             key: "grand_total",
             header: "Grand Total",
             render: (r) => formatMoney(r.grand_total, r.currency_code),

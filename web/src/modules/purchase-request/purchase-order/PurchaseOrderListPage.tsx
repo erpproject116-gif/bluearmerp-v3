@@ -8,6 +8,7 @@ import { useListState } from "../../../shared/useListState";
 import {
   confirmPurchaseOrder,
   createPurchaseOrderFromRequest,
+  createPurchaseOrderFromSupplierQuotation,
   useInvalidatePurchaseOrders,
   usePurchaseOrderList,
   type PurchaseOrderRow,
@@ -37,6 +38,15 @@ type PurchaseRequestLookupRow = {
   item_name_summary?: string;
 };
 
+type SupplierQuotationLookupRow = {
+  id: number;
+  quote_no: string;
+  status: string;
+  line_count: number;
+  partner_id: number;
+  grand_total: number;
+};
+
 async function fetchPurchaseRequests(q: string): Promise<LookupOption[]> {
   const today = new Date().toISOString().slice(0, 10);
   const yearAgo = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
@@ -54,6 +64,17 @@ async function fetchPurchaseRequests(q: string): Promise<LookupOption[]> {
     id: pr.id,
     label: `${pr.purchase_request_no} — ${pr.partner_name}`,
     sublabel: pr.item_name_summary,
+  }));
+}
+
+async function fetchSupplierQuotations(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ status: "received" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<SupplierQuotationLookupRow[]>(`/api/v1/purchase-order/supplier-quotations?${qs}`);
+  return (res.data ?? []).map((sq) => ({
+    id: sq.id,
+    label: sq.quote_no,
+    sublabel: `status: ${sq.status}`,
   }));
 }
 
@@ -150,6 +171,99 @@ function CreateFromPrModal(props: {
   );
 }
 
+function CreateFromSupplierQuotationModal(props: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const toast = useToast();
+  const [sqLabel, setSqLabel] = createSignal("");
+  const [sqId, setSqId] = createSignal<number | null>(null);
+  const [creating, setCreating] = createSignal(false);
+
+  const reset = () => {
+    setSqLabel("");
+    setSqId(null);
+  };
+
+  const create = async () => {
+    const id = sqId();
+    if (!id) {
+      toast.warning("Select a supplier quotation.");
+      return;
+    }
+    setCreating(true);
+    const res = await createPurchaseOrderFromSupplierQuotation(id);
+    setCreating(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to create purchase order.");
+      return;
+    }
+    toast.success(`Purchase order ${res.data?.purchase_order_no ?? "created"}.`);
+    reset();
+    props.onCreated();
+    props.onClose();
+  };
+
+  return (
+    <Show when={props.open}>
+      <div class="fixed inset-0 z-[55] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center">
+        <div class="w-full max-w-lg rounded-2xl border border-stroke bg-white p-6 shadow-xl">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-text-primary">Create from Supplier Quotation</h2>
+            <button
+              type="button"
+              class={modalDismissClass}
+              onClick={() => {
+                reset();
+                props.onClose();
+              }}
+            >
+              Close
+            </button>
+          </div>
+          <LookupCombo
+            label="Supplier Quotation"
+            required
+            value={sqLabel}
+            selectedId={sqId}
+            onInput={setSqLabel}
+            onSelect={(o) => {
+              setSqId(o.id);
+              setSqLabel(o.label);
+            }}
+            onClear={() => {
+              setSqId(null);
+              setSqLabel("");
+            }}
+            fetchOptions={fetchSupplierQuotations}
+          />
+          <div class="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+              onClick={() => {
+                reset();
+                props.onClose();
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              disabled={creating()}
+              onClick={() => void create()}
+            >
+              {creating() ? "Creating…" : "Create purchase order"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+
 export default function PurchaseOrderListPage() {
   const toast = useToast();
   const invalidate = useInvalidatePurchaseOrders();
@@ -162,6 +276,7 @@ export default function PurchaseOrderListPage() {
 
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [fromPrOpen, setFromPrOpen] = createSignal(false);
+  const [fromSqOpen, setFromSqOpen] = createSignal(false);
   const [poModalOpen, setPoModalOpen] = createSignal(false);
   const [editingPoId, setEditingPoId] = createSignal<number | null>(null);
 
@@ -199,6 +314,13 @@ export default function PurchaseOrderListPage() {
         >
           From purchase request
         </button>
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+          onClick={() => setFromSqOpen(true)}
+        >
+          From supplier quotation
+        </button>
         <A
           href="/app/purchase-order/goods-receipt"
           class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
@@ -220,6 +342,18 @@ export default function PurchaseOrderListPage() {
           { key: "partner_name", header: "Vendor" },
           { key: "pic_name", header: "PIC" },
           { key: "item_name_summary", header: "Item" },
+          {
+            key: "pct_received",
+            header: "% Received",
+            sortable: false,
+            render: (r) => <span>{r.pct_received ?? 0}%</span>,
+          },
+          {
+            key: "pct_billed",
+            header: "% Billed",
+            sortable: false,
+            render: (r) => <span>{r.pct_billed ?? 0}%</span>,
+          },
           {
             key: "grand_total",
             header: "Total Amount",
@@ -282,6 +416,11 @@ export default function PurchaseOrderListPage() {
       <CreateFromPrModal
         open={fromPrOpen()}
         onClose={() => setFromPrOpen(false)}
+        onCreated={invalidate}
+      />
+      <CreateFromSupplierQuotationModal
+        open={fromSqOpen()}
+        onClose={() => setFromSqOpen(false)}
         onCreated={invalidate}
       />
 

@@ -36,6 +36,8 @@ export type SalesOrderDetail = {
   customer_name: string;
   pic_user_id?: number | null;
   pic_name: string;
+  sales_person_id?: number | null;
+  sales_person_name?: string;
   location_id: number;
   location_name?: string;
   project_id?: number | null;
@@ -162,6 +164,8 @@ export function SalesOrderModal(props: Props) {
   const [customerLabel, setCustomerLabel] = createSignal("");
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
   const [picName, setPicName] = createSignal("");
+  const [salesPersonId, setSalesPersonId] = createSignal<number | null>(null);
+  const [salesPersonName, setSalesPersonName] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
   const [projectId, setProjectId] = createSignal<number | null>(null);
@@ -188,6 +192,8 @@ export function SalesOrderModal(props: Props) {
     customer_label: customerLabel(),
     pic_user_id: picUserId(),
     pic_name: picName(),
+    sales_person_id: salesPersonId(),
+    sales_person_name: salesPersonName(),
     location_id: locationId(),
     location_label: locationLabel(),
     project_id: projectId(),
@@ -213,6 +219,8 @@ export function SalesOrderModal(props: Props) {
     setCustomerLabel(payload.customer_label);
     setPicUserId(payload.pic_user_id);
     setPicName(payload.pic_name);
+    setSalesPersonId(payload.sales_person_id);
+    setSalesPersonName(payload.sales_person_name);
     setLocationId(payload.location_id);
     setLocationLabel(payload.location_label);
     setProjectId(payload.project_id);
@@ -286,6 +294,8 @@ export function SalesOrderModal(props: Props) {
       setCustomerLabel(ed.customer_name);
       setPicUserId(ed.pic_user_id ?? null);
       setPicName(ed.pic_name);
+      setSalesPersonId(ed.sales_person_id ?? null);
+      setSalesPersonName(ed.sales_person_name ?? "");
       setLocationId(ed.location_id);
       setLocationLabel(ed.location_name ?? "");
       setProjectId(ed.project_id ?? null);
@@ -307,6 +317,8 @@ export function SalesOrderModal(props: Props) {
       setCustomerLabel("");
       setPicUserId(null);
       setPicName("");
+      setSalesPersonId(null);
+      setSalesPersonName("");
       setLocationId(null);
       setLocationLabel("");
       setProjectId(null);
@@ -399,6 +411,7 @@ export function SalesOrderModal(props: Props) {
       partner_id: partnerId(),
       pic_user_id: picUserId(),
       pic_name: picName(),
+      sales_person_id: salesPersonId(),
       location_id: locationId(),
       project_id: projectId(),
       project_name: projectName() || null,
@@ -524,6 +537,21 @@ export function SalesOrderModal(props: Props) {
           fetchOptions={fetchUsers}
         />
         <LookupCombo
+          label="Sales person"
+          value={salesPersonName}
+          selectedId={salesPersonId}
+          onInput={setSalesPersonName}
+          onSelect={(o) => {
+            setSalesPersonId(o.id);
+            setSalesPersonName(o.label);
+          }}
+          onClear={() => {
+            setSalesPersonId(null);
+            setSalesPersonName("");
+          }}
+          fetchOptions={fetchUsers}
+        />
+        <LookupCombo
           label="Location *"
           required
           value={locationLabel}
@@ -599,6 +627,7 @@ export function SalesOrderModal(props: Props) {
             return t ? { tax_mode: t.tax_mode, rate_percent: t.rate_percent } : null;
           }}
           locationId={locationId}
+          partnerId={partnerId}
         />
       </WideEntityModal>
 

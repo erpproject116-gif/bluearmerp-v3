@@ -72,7 +72,7 @@ export const navGroups: NavGroup[] = [
 ];
 
 /** Shown after collapsible groups (below Misc). */
-export const belowGroupModuleIds = ["crm", "finance"] as const;
+export const belowGroupModuleIds = ["crm", "support", "pos", "hr", "fixed_assets", "job_costing", "finance"] as const;
 
 /** Modules shown above collapsible groups. */
 export const ungroupedModuleIds = ["dashboard"] as const;

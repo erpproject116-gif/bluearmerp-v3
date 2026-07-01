@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
@@ -22,6 +23,9 @@ export type Partner = {
   email: string | null;
   address: string | null;
   status: string;
+  credit_limit?: number | null;
+  credit_limit_on_hold?: boolean;
+  default_price_list_id?: number | null;
   custom_values?: Record<string, unknown>;
 };
 
@@ -40,12 +44,24 @@ export default function PartnersPage() {
     email: "",
     address: "",
     status: "active",
+    credit_limit: "",
+    credit_limit_on_hold: false,
+    default_price_list_id: "",
   });
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.partners);
+
+  const priceLists = createQuery(() => ({
+    queryKey: ["price-lists"],
+    queryFn: async () => {
+      const res = await apiFetch<{ id: number; name: string; is_selling: boolean }[]>("/api/v1/inventory/price-lists");
+      if (!res.success) return [];
+      return (res.data ?? []).filter((pl) => pl.is_selling);
+    },
+  }));
 
   const list = useInventoryList<Partner>("partners", () => ({
     page: page(),
@@ -69,6 +85,9 @@ export default function PartnersPage() {
       email: "",
       address: "",
       status: "active",
+      credit_limit: "",
+      credit_limit_on_hold: false,
+      default_price_list_id: "",
     });
     loadCustom({});
     setModalOpen(true);
@@ -86,6 +105,9 @@ export default function PartnersPage() {
       email: row.email ?? "",
       address: row.address ?? "",
       status: row.status,
+      credit_limit: row.credit_limit != null ? String(row.credit_limit) : "",
+      credit_limit_on_hold: row.credit_limit_on_hold ?? false,
+      default_price_list_id: row.default_price_list_id != null ? String(row.default_price_list_id) : "",
     });
     loadCustom(row.custom_values ?? {});
     setModalOpen(true);
@@ -102,6 +124,10 @@ export default function PartnersPage() {
     }
 
     setSaving(true);
+    const creditLimitRaw = form().credit_limit.trim();
+    const creditLimit = creditLimitRaw === "" ? null : Number(creditLimitRaw);
+    const plRaw = form().default_price_list_id.trim();
+    const defaultPriceListId = plRaw === "" ? null : Number(plRaw);
     const body = {
       ...form(),
       ceo_name: form().ceo_name || null,
@@ -109,6 +135,9 @@ export default function PartnersPage() {
       mobile: form().mobile || null,
       email: form().email || null,
       address: form().address || null,
+      credit_limit: creditLimit != null && Number.isFinite(creditLimit) ? creditLimit : null,
+      credit_limit_on_hold: form().credit_limit_on_hold,
+      default_price_list_id: defaultPriceListId != null && Number.isFinite(defaultPriceListId) ? defaultPriceListId : null,
       custom_values: customValues(),
     };
     const ok = await submitEntity(
@@ -136,6 +165,16 @@ export default function PartnersPage() {
           { key: "phone", header: "Phone" },
           { key: "mobile", header: "Mobile" },
           { key: "email", header: "Email" },
+          {
+            key: "credit_limit",
+            header: "Credit limit",
+            render: (r) => <span>{r.credit_limit != null ? r.credit_limit : "—"}</span>,
+          },
+          {
+            key: "credit_limit_on_hold",
+            header: "On hold",
+            render: (r) => <span>{r.credit_limit_on_hold ? "Yes" : "No"}</span>,
+          },
           { key: "status", header: "Status" },
         ]}
         rows={list.data?.rows ?? []}
@@ -259,6 +298,39 @@ export default function PartnersPage() {
             </select>
           )}
         </ModalField>
+        <Field label="Default price list">
+          <select
+            class={inputClass}
+            value={form().default_price_list_id}
+            onChange={(e) => setForm((f) => ({ ...f, default_price_list_id: e.currentTarget.value }))}
+          >
+            <option value="">— None —</option>
+            {(priceLists.data ?? []).map((pl) => (
+              <option value={String(pl.id)}>{pl.name}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Credit limit">
+          <input
+            class={inputClass}
+            type="number"
+            min="0"
+            step="0.01"
+            value={form().credit_limit}
+            onInput={(e) => setForm((f) => ({ ...f, credit_limit: e.currentTarget.value }))}
+            placeholder="Leave blank for no limit"
+          />
+        </Field>
+        <Field label="Credit on hold">
+          <label class="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form().credit_limit_on_hold}
+              onChange={(e) => setForm((f) => ({ ...f, credit_limit_on_hold: e.currentTarget.checked }))}
+            />
+            Block new sales when credit limit is enforced
+          </label>
+        </Field>
         <CustomFieldsSection
           entityType={INVENTORY_ENTITY.partners}
           values={customValues}

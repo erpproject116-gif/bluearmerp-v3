@@ -1,0 +1,596 @@
+import { createQuery } from "@tanstack/solid-query";
+import { apiFetch } from "../api";
+
+export type DateRangeFilters = {
+  date_from?: string;
+  date_to?: string;
+};
+
+export type ReportParams<F> = {
+  filters: F;
+  page: number;
+  pageSize: number;
+  sort: string;
+  order: "asc" | "desc";
+  enabled: boolean;
+};
+
+function reportQs(
+  filters: Record<string, string | number | null | undefined>,
+  extra?: { page?: number; pageSize?: number; sort?: string; order?: string },
+): URLSearchParams {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) {
+    if (v != null && v !== "") qs.set(k, String(v));
+  }
+  if (extra?.page) qs.set("page", String(extra.page));
+  if (extra?.pageSize) qs.set("pageSize", String(extra.pageSize));
+  if (extra?.sort) qs.set("sort", extra.sort);
+  if (extra?.order) qs.set("order", extra.order);
+  return qs;
+}
+
+export function exportUrl(path: string, filters: Record<string, string | number | null | undefined>): string {
+  return `${path}?${reportQs(filters)}`;
+}
+
+// --- SO Analysis ---
+
+export type SOAnalysisRow = {
+  partner_id: number;
+  customer_name: string;
+  order_count: number;
+  unconfirmed_count: number;
+  in_progress_count: number;
+  completed_count: number;
+  total_amount: number;
+};
+
+export function soAnalysisExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/sales-order/reports/so-analysis/export", filters);
+}
+
+export function useSOAnalysisReport(params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-so-analysis", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<SOAnalysisRow[]>(`/api/v1/sales-order/reports/so-analysis?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- PO Analysis ---
+
+export type POAnalysisRow = {
+  partner_id: number;
+  vendor_name: string;
+  order_count: number;
+  confirmed_count: number;
+  partial_count: number;
+  received_count: number;
+  total_amount: number;
+};
+
+export function poAnalysisExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/purchase-order/reports/po-analysis/export", filters);
+}
+
+export function usePOAnalysisReport(params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-po-analysis", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<POAnalysisRow[]>(`/api/v1/purchase-order/reports/po-analysis?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- Items to Receive ---
+
+export type ItemsToReceiveRow = {
+  purchase_order_id: number;
+  purchase_order_no: string;
+  order_date: string;
+  vendor_name: string;
+  line_id: number;
+  item_code: string;
+  item_name: string;
+  order_qty: number;
+  received_qty: number;
+  pending_qty: number;
+};
+
+export function itemsToReceiveExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/purchase-order/reports/items-to-receive/export", filters);
+}
+
+export function useItemsToReceiveReport(params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-items-to-receive", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<ItemsToReceiveRow[]>(`/api/v1/purchase-order/reports/items-to-receive?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- Stock Balance ---
+
+export type StockBalanceRow = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  location_id: number;
+  location_name: string;
+  qty_on_hand: number;
+  qty_reserved: number;
+  available_qty: number;
+};
+
+export function stockBalanceExportUrl(): string {
+  return "/api/v1/inventory/reports/stock-balance/export";
+}
+
+export function useStockBalanceReport(params: () => Omit<ReportParams<Record<string, never>>, "filters">) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs({}, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-stock-balance", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<StockBalanceRow[]>(`/api/v1/inventory/reports/stock-balance?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- Stock Ledger ---
+
+export type StockLedgerRow = {
+  id: number;
+  created_at: string;
+  item_code: string;
+  item_name: string;
+  location_name: string;
+  qty_delta: number;
+  movement_type: string;
+  ref_type: string;
+  reason?: string;
+};
+
+export function stockLedgerExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/inventory/reports/stock-ledger/export", filters);
+}
+
+export function useStockLedgerReport(params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-stock-ledger", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<StockLedgerRow[]>(`/api/v1/inventory/reports/stock-ledger?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- Stock Ageing ---
+
+export type StockAgeingRow = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  location_id: number;
+  location_name: string;
+  qty_on_hand: number;
+  last_movement_at: string;
+  age_days: number;
+  age_bucket: string;
+};
+
+export function stockAgeingExportUrl(): string {
+  return "/api/v1/inventory/reports/stock-ageing/export";
+}
+
+export function useStockAgeingReport(params: () => Omit<ReportParams<Record<string, never>>, "filters">) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs({}, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-stock-ageing", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<StockAgeingRow[]>(`/api/v1/inventory/reports/stock-ageing?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- Trial Balance ---
+
+export type TrialBalanceRow = {
+  account_id: number;
+  account_code: string;
+  account_name: string;
+  account_type: string;
+  total_debit: number;
+  total_credit: number;
+  balance: number;
+};
+
+type TrialBalancePayload = { rows: TrialBalanceRow[]; has_journal_data: boolean };
+
+export function trialBalanceExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/finance/reports/trial-balance/export", filters);
+}
+
+export function useTrialBalanceReport(params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-trial-balance", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<TrialBalancePayload | TrialBalanceRow[]>(`/api/v1/finance/reports/trial-balance?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        const data = res.data;
+        if (Array.isArray(data)) {
+          return { rows: data, total: res.meta?.total ?? 0, hasJournalData: true };
+        }
+        return {
+          rows: data?.rows ?? [],
+          total: res.meta?.total ?? 0,
+          hasJournalData: data?.has_journal_data ?? false,
+        };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- General Ledger ---
+
+export type GeneralLedgerRow = {
+  entry_date: string;
+  entry_no: string;
+  account_code: string;
+  account_name: string;
+  debit: number;
+  credit: number;
+  party_name?: string;
+  remarks?: string;
+};
+
+type GeneralLedgerPayload = { rows: GeneralLedgerRow[]; has_journal_data: boolean };
+
+export function generalLedgerExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/finance/reports/general-ledger/export", filters);
+}
+
+export function useGeneralLedgerReport(params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-general-ledger", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<GeneralLedgerPayload | GeneralLedgerRow[]>(`/api/v1/finance/reports/general-ledger?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        const data = res.data;
+        if (Array.isArray(data)) {
+          return { rows: data, total: res.meta?.total ?? 0, hasJournalData: true };
+        }
+        return {
+          rows: data?.rows ?? [],
+          total: res.meta?.total ?? 0,
+          hasJournalData: data?.has_journal_data ?? false,
+        };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- Profit & Loss / Balance Sheet ---
+
+export type FinancialStatementRow = {
+  account_id: number;
+  account_code: string;
+  account_name: string;
+  account_type: string;
+  amount: number;
+};
+
+type FinancialStatementPayload = {
+  rows: FinancialStatementRow[];
+  total_amount: number;
+  has_journal_data: boolean;
+};
+
+function useFinancialStatementReport(endpoint: string, queryKey: string, params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: [queryKey, p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<FinancialStatementPayload | FinancialStatementRow[]>(
+          `/api/v1/finance/reports/${endpoint}?${qs}`,
+        );
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        const data = res.data;
+        if (Array.isArray(data)) {
+          return { rows: data, total: res.meta?.total ?? 0, totalAmount: 0, hasJournalData: true };
+        }
+        return {
+          rows: data?.rows ?? [],
+          total: res.meta?.total ?? 0,
+          totalAmount: data?.total_amount ?? 0,
+          hasJournalData: data?.has_journal_data ?? false,
+        };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+export function useProfitAndLossReport(params: () => ReportParams<DateRangeFilters>) {
+  return useFinancialStatementReport("profit-and-loss", "report-profit-and-loss", params);
+}
+
+export function useBalanceSheetReport(params: () => ReportParams<DateRangeFilters>) {
+  return useFinancialStatementReport("balance-sheet", "report-balance-sheet", params);
+}
+
+export function profitAndLossExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/finance/reports/profit-and-loss/export", filters);
+}
+
+export function balanceSheetExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/finance/reports/balance-sheet/export", filters);
+}
+
+// --- A/R & A/P Aging ---
+
+export type AgingFilters = {
+  as_of?: string;
+};
+
+export type AgingSummary = {
+  current: number;
+  days_1_30: number;
+  days_31_60: number;
+  days_61_90: number;
+  over_90: number;
+  total: number;
+};
+
+export type ArAgingRow = {
+  sales_id: number;
+  sales_no: string;
+  customer_name: string;
+  due_date: string;
+  balance: number;
+  age_days: number;
+  age_bucket: string;
+};
+
+export type ApAgingRow = {
+  supplier_invoice_id: number;
+  invoice_no: string;
+  vendor_name: string;
+  due_date: string;
+  balance: number;
+  age_days: number;
+  age_bucket: string;
+};
+
+type AgingPayload<T> = {
+  rows: T[];
+  summary: AgingSummary;
+};
+
+function useAgingReport<T>(endpoint: string, key: string, params: () => ReportParams<AgingFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: [key, p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<AgingPayload<T>>(`/api/v1/finance/${endpoint}?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return {
+          rows: res.data?.rows ?? [],
+          summary: res.data?.summary ?? { current: 0, days_1_30: 0, days_31_60: 0, days_61_90: 0, over_90: 0, total: 0 },
+          total: res.meta?.total ?? 0,
+        };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+export function arAgingExportUrl(filters: AgingFilters): string {
+  return exportUrl("/api/v1/finance/ar-aging/export", filters);
+}
+
+export function apAgingExportUrl(filters: AgingFilters): string {
+  return exportUrl("/api/v1/finance/ap-aging/export", filters);
+}
+
+export function useArAgingReport(params: () => ReportParams<AgingFilters>) {
+  return useAgingReport<ArAgingRow>("ar-aging", "report-ar-aging", params);
+}
+
+export function useApAgingReport(params: () => ReportParams<AgingFilters>) {
+  return useAgingReport<ApAgingRow>("ap-aging", "report-ap-aging", params);
+}
+
+// --- Workspaces ---
+
+export type InventoryWorkspaceSummary = {
+  active_items: number;
+  active_locations: number;
+  low_stock_skus: number;
+  negative_stock_skus: number;
+  open_stock_entries: number;
+};
+
+export function useInventoryWorkspace() {
+  return createQuery(() => ({
+    queryKey: ["inventory-workspace"],
+    queryFn: async () => {
+      const res = await apiFetch<InventoryWorkspaceSummary>("/api/v1/inventory/workspace");
+      if (!res.success) throw new Error(res.message ?? "Failed to load workspace");
+      return res.data!;
+    },
+    staleTime: 30_000,
+  }));
+}
+
+export type BuyingWorkspaceSummary = {
+  open_purchase_orders: number;
+  open_rfq: number;
+  pending_receipt_rows: number;
+  unpaid_invoices: number;
+};
+
+export function useBuyingWorkspace() {
+  return createQuery(() => ({
+    queryKey: ["buying-workspace"],
+    queryFn: async () => {
+      const res = await apiFetch<BuyingWorkspaceSummary>("/api/v1/buying/workspace");
+      if (!res.success) throw new Error(res.message ?? "Failed to load workspace");
+      return res.data!;
+    },
+    staleTime: 30_000,
+  }));
+}
+
+export type SellingWorkspaceSummary = {
+  open_sales_orders: number;
+  open_quotations: number;
+  expired_quotations: number;
+  pending_delivery_lines: number;
+  low_stock_skus: number;
+};
+
+export function useSellingWorkspace() {
+  return createQuery(() => ({
+    queryKey: ["selling-workspace"],
+    queryFn: async () => {
+      const res = await apiFetch<SellingWorkspaceSummary>("/api/v1/selling/workspace");
+      if (!res.success) throw new Error(res.message ?? "Failed to load workspace");
+      return res.data!;
+    },
+    staleTime: 30_000,
+  }));
+}
+
+export type FinanceWorkspaceSummary = {
+  ar_customers: number;
+  unpaid_supplier_invoices: number;
+  draft_journal_entries: number;
+  unmatched_bank_lines: number;
+  ap_over_application: number;
+};
+
+export function useFinanceWorkspace() {
+  return createQuery(() => ({
+    queryKey: ["finance-workspace"],
+    queryFn: async () => {
+      const res = await apiFetch<FinanceWorkspaceSummary>("/api/v1/finance/workspace");
+      if (!res.success) throw new Error(res.message ?? "Failed to load workspace");
+      return res.data!;
+    },
+    staleTime: 30_000,
+  }));
+}

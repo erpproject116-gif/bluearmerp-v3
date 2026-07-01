@@ -138,6 +138,8 @@ type Props = {
   taxTypeId: () => number | null;
   taxTypeMeta: () => TaxTypeMeta | null;
   locationId: () => number | null;
+  /** Hide per-line partner columns (e.g. purchase order uses header vendor). */
+  hidePartnerColumns?: boolean;
 };
 
 export function PurchaseRequestLineGrid(props: Props) {
@@ -238,9 +240,15 @@ export function PurchaseRequestLineGrid(props: Props) {
 
   const columns = createMemo(() => {
     props.taxTypeId();
-    return filterTaxLineColumns(LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+    const base = filterTaxLineColumns(LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+    if (!props.hidePartnerColumns) return base;
+    return base.filter((c) => c.key !== "partner_code" && c.key !== "partner_name");
   });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
+  const footerColSpanBeforeQty = () => {
+    const qtyIdx = columns().findIndex((c) => c.key === "qty");
+    return qtyIdx > 0 ? qtyIdx : 1;
+  };
 
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(() =>
     columns().map((c) => ({ key: c.key, width: c.width })),
@@ -279,24 +287,26 @@ export function PurchaseRequestLineGrid(props: Props) {
               {(line, idx) => (
                 <tr>
                   <ResizableTd width={widthFor("line_no")} class="px-2 py-1">{line.line_no}</ResizableTd>
-                  <ResizableTd width={widthFor("partner_code")} class="px-2 py-1">
-                    <input
-                      class={`${inputClass} w-full cursor-pointer`}
-                      value={line.partner_code}
-                      readOnly
-                      onDblClick={() => openPartnerSearch(idx())}
-                      title="Double-click to search partner"
-                    />
-                  </ResizableTd>
-                  <ResizableTd width={widthFor("partner_name")} class="px-2 py-1">
-                    <input
-                      class={`${inputClass} w-full cursor-pointer`}
-                      value={line.partner_name}
-                      readOnly
-                      onDblClick={() => openPartnerSearch(idx())}
-                      title="Double-click to search partner"
-                    />
-                  </ResizableTd>
+                  <Show when={!props.hidePartnerColumns}>
+                    <ResizableTd width={widthFor("partner_code")} class="px-2 py-1">
+                      <input
+                        class={`${inputClass} w-full cursor-pointer`}
+                        value={line.partner_code}
+                        readOnly
+                        onDblClick={() => openPartnerSearch(idx())}
+                        title="Double-click to search partner"
+                      />
+                    </ResizableTd>
+                    <ResizableTd width={widthFor("partner_name")} class="px-2 py-1">
+                      <input
+                        class={`${inputClass} w-full cursor-pointer`}
+                        value={line.partner_name}
+                        readOnly
+                        onDblClick={() => openPartnerSearch(idx())}
+                        title="Double-click to search partner"
+                      />
+                    </ResizableTd>
+                  </Show>
                   <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
                       class={`${inputClass} w-full cursor-pointer`}
@@ -360,7 +370,7 @@ export function PurchaseRequestLineGrid(props: Props) {
           </tbody>
           <tfoot class="bg-slate-50 font-semibold">
             <tr>
-              <td colSpan={7} class="px-2 py-2 text-right">
+              <td colSpan={footerColSpanBeforeQty()} class="px-2 py-2 text-right">
                 Totals
               </td>
               <td class="px-2 py-2 text-right">{totals().qty.toLocaleString("en-PH", { maximumFractionDigits: 4 })}</td>
@@ -393,7 +403,9 @@ export function PurchaseRequestLineGrid(props: Props) {
         onClose={() => setItemSearchOpen(false)}
         onSelect={applyItem}
       />
-      <PartnerSearchModal open={partnerSearchOpen()} onClose={() => setPartnerSearchOpen(false)} onSelect={applyPartner} />
+      <Show when={!props.hidePartnerColumns}>
+        <PartnerSearchModal open={partnerSearchOpen()} onClose={() => setPartnerSearchOpen(false)} onSelect={applyPartner} />
+      </Show>
     </div>
   );
 }

@@ -36,6 +36,7 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
   );
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [prefilterSOId, setPrefilterSOId] = createSignal<number | null>(null);
   const [posting, setPosting] = createSignal(false);
 
   const list = useDeliveryReceiptList(() => ({
@@ -56,6 +57,11 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
   };
 
   onMount(() => {
+    const params = new URLSearchParams(loc.search);
+    const soId = Number(params.get("sales_order_id"));
+    if (Number.isFinite(soId) && soId > 0) {
+      setPrefilterSOId(soId);
+    }
     if (props.openNewOnMount || loc.pathname.endsWith("/new")) openNew();
   });
 
@@ -146,6 +152,7 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
 
       <DeliveryReceiptModal
         open={modalOpen()}
+        prefilterSalesOrderId={prefilterSOId()}
         onClose={closeModal}
         onSaved={() => {
           invalidate();

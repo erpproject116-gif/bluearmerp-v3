@@ -22,6 +22,9 @@ export type ReleaseQueueRow = {
   item_code: string;
   item_name: string;
   order_qty: number;
+  released_qty: number;
+  delivered_qty: number;
+  remaining_qty: number;
   balance_qty: number;
   location_stock: number;
   track_inventory_qty: boolean;
@@ -64,7 +67,7 @@ export function useInvalidateReleaseQueue() {
 export async function postSalesOrderReleases(
   lines: Array<{ sales_order_line_id: number; release_qty: number; serial_unit_ids?: number[] }>,
 ) {
-  return apiFetch<{ released_count: number }>("/api/v1/sales-order/sales-orders/releases", {
+  return apiFetch<{ released_count: number; sales_order_ids?: number[] }>("/api/v1/sales-order/sales-orders/releases", {
     method: "POST",
     body: JSON.stringify({ lines }),
   }, { silent: true });

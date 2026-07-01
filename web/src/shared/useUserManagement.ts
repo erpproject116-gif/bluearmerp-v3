@@ -22,6 +22,7 @@ export type TenantRoleRow = {
   is_system: boolean;
   can_manage_users: boolean;
   can_manage_form_settings: boolean;
+  apply_user_scopes: boolean;
   is_active: boolean;
   sort_order: number;
   user_count?: number;

@@ -28,8 +28,11 @@ import RegisterRepairNewPage from "./modules/inventory/after-sales/RegisterRepai
 import RegisterRepairStatusPage from "./modules/inventory/after-sales/RegisterRepairStatusPage";
 import RegisterRepairConsumptionPage from "./modules/inventory/after-sales/RegisterRepairConsumptionPage";
 import StockMovementsPage from "./modules/inventory/StockMovementsPage";
+import StockEntriesPage from "./modules/inventory/StockEntriesPage";
 import StockReconciliationPage from "./modules/inventory/StockReconciliationPage";
 import PriceListsPage from "./modules/inventory/PriceListsPage";
+import StockWorkspacePage from "./modules/inventory/StockWorkspacePage";
+import ProductBundlesPage from "./modules/inventory/ProductBundlesPage";
 import SerialRegistryListPage from "./modules/inventory/serial-lot/SerialRegistryListPage";
 import LotBatchesListPage from "./modules/inventory/serial-lot/LotBatchesListPage";
 import SerialMovementsListPage from "./modules/inventory/serial-lot/SerialMovementsListPage";
@@ -69,6 +72,9 @@ import PurchaseRequestStatusPage from "./modules/purchase-request/purchase-reque
 import PurchaseRequestPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestPrintPage";
 import PurchaseRequestStatusPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPrintPage";
 import PurchaseOrderListPage from "./modules/purchase-request/purchase-order/PurchaseOrderListPage";
+import PurchaseReturnsPage from "./modules/purchase-request/purchase-order/PurchaseReturnsPage";
+import RfqListPage from "./modules/purchase-request/purchase-order/RfqListPage";
+import RfqDetailPage from "./modules/purchase-request/purchase-order/RfqDetailPage";
 import GoodsReceiptListPage from "./modules/purchase-request/goods-receipt/GoodsReceiptListPage";
 import SalesListPage from "./modules/sales/sales/SalesListPage";
 import SalesNewPage from "./modules/sales/sales/SalesNewPage";
@@ -94,6 +100,7 @@ import PaymentVoucherNewPage from "./modules/finance/payment-vouchers/PaymentVou
 import SalesOfficialReceiptStatusPage from "./modules/sales/reports/SalesOfficialReceiptStatusPage";
 import SalesSiReceiptStatusPage from "./modules/sales/reports/SalesSiReceiptStatusPage";
 import SalesArByCustomerPage from "./modules/sales/reports/SalesArByCustomerPage";
+import CustomerCreditBalancePage from "./modules/sales/reports/CustomerCreditBalancePage";
 import SalesDiscountStatusPage from "./modules/sales/reports/SalesDiscountStatusPage";
 import SalesDiscountStatusPrintPage from "./modules/sales/reports/SalesDiscountStatusPrintPage";
 import SalesPrintSlipsLauncherPage from "./modules/sales/reports/SalesPrintSlipsLauncherPage";
@@ -106,6 +113,7 @@ import CollectiveInvoiceStatusPrintPage from "./modules/sales/collective-invoici
 import UsersPage from "./modules/user-management/users/UsersPage";
 import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
+import UserPermissionsPage from "./modules/user-management/user-permissions/UserPermissionsPage";
 import ProcessPoliciesPage from "./modules/user-management/process-policies/ProcessPoliciesPage";
 import ModuleFeaturesPage from "./modules/user-management/tenant-modules/ModuleFeaturesPage";
 import DemoDataPage from "./modules/user-management/demo-data/DemoDataPage";
@@ -115,6 +123,13 @@ import { AdminModuleRoute } from "./shared/AdminModuleRoute";
 import { ActivityLogRoute } from "./shared/ActivityLogRoute";
 import { ChangeLogRoute } from "./shared/ChangeLogRoute";
 import { CrmRoute } from "./shared/CrmRoute";
+import { SupportRoute } from "./shared/SupportRoute";
+import { PosRoute } from "./shared/PosRoute";
+import { HrRoute } from "./shared/HrRoute";
+import { FixedAssetsRoute } from "./shared/FixedAssetsRoute";
+import { JobCostingRoute } from "./shared/JobCostingRoute";
+import { ManufacturingRoute } from "./shared/ManufacturingRoute";
+import { QualityRoute } from "./shared/QualityRoute";
 import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
 import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
 import CrmDashboardPage from "./modules/crm/CrmDashboardPage";
@@ -129,6 +144,42 @@ import ConversionFunnelReportPage from "./modules/crm/reports/ConversionFunnelRe
 import BrandingSettingsPage from "./modules/settings/BrandingSettingsPage";
 import { BrandingProvider } from "./shared/branding/BrandingProvider";
 import LowStockReportPage from "./modules/crm/reports/LowStockReportPage";
+import ExpiredQuotationsReportPage from "./modules/crm/reports/ExpiredQuotationsReportPage";
+import LeadsPage from "./modules/crm/LeadsPage";
+import OpportunitiesPage from "./modules/crm/OpportunitiesPage";
+import TicketsPage from "./modules/support/TicketsPage";
+import TicketDetailPage from "./modules/support/TicketDetailPage";
+import PosPage from "./modules/pos/PosPage";
+import HrEmployeesPage from "./modules/hr/HrEmployeesPage";
+import PayrollRunsPage from "./modules/hr/PayrollRunsPage";
+import FixedAssetsPage from "./modules/fixedassets/FixedAssetsPage";
+import JobCostingPage from "./modules/jobcosting/JobCostingPage";
+import BomsPage from "./modules/manufacturing/BomsPage";
+import WorkOrdersPage from "./modules/manufacturing/WorkOrdersPage";
+import NcrsPage from "./modules/quality/NcrsPage";
+import SOAnalysisReportPage from "./modules/sales-order/reports/SOAnalysisReportPage";
+import POAnalysisReportPage from "./modules/purchase-order/reports/POAnalysisReportPage";
+import ItemsToReceiveReportPage from "./modules/purchase-order/reports/ItemsToReceiveReportPage";
+import StockBalanceReportPage from "./modules/inventory/reports/StockBalanceReportPage";
+import StockLedgerReportPage from "./modules/inventory/reports/StockLedgerReportPage";
+import StockAgeingReportPage from "./modules/inventory/reports/StockAgeingReportPage";
+import TrialBalanceReportPage from "./modules/finance/reports/TrialBalanceReportPage";
+import GeneralLedgerReportPage from "./modules/finance/reports/GeneralLedgerReportPage";
+import ProfitAndLossReportPage from "./modules/finance/reports/ProfitAndLossReportPage";
+import BalanceSheetReportPage from "./modules/finance/reports/BalanceSheetReportPage";
+import ArAgingReportPage from "./modules/finance/reports/ArAgingReportPage";
+import ApAgingReportPage from "./modules/finance/reports/ApAgingReportPage";
+import PaymentEntriesPage from "./modules/finance/PaymentEntriesPage";
+import ChartOfAccountsPage from "./modules/finance/ChartOfAccountsPage";
+import BankReconciliationPage from "./modules/finance/BankReconciliationPage";
+import FiscalYearsPage from "./modules/finance/FiscalYearsPage";
+import SellingWorkspacePage from "./modules/selling/SellingWorkspacePage";
+import BuyingWorkspacePage from "./modules/buying/BuyingWorkspacePage";
+import FinanceWorkspacePage from "./modules/finance/FinanceWorkspacePage";
+import PortalLoginPage from "./modules/portal/PortalLoginPage";
+import PortalDashboardPage from "./modules/portal/PortalDashboardPage";
+import ReportsIndexPage from "./modules/reports/ReportsIndexPage";
+import SavedViewsPage from "./modules/reports/SavedViewsPage";
 import DashboardPage from "./modules/dashboard/DashboardPage";
 import DocumentationPage from "./modules/documentation/DocumentationPage";
 
@@ -171,6 +222,8 @@ export default function App() {
         <Router>
         <Route path="/signin" component={SignInPage} />
         <Route path="/auth/callback" component={AuthCallbackPage} />
+        <Route path="/portal/login" component={PortalLoginPage} />
+        <Route path="/portal/dashboard" component={PortalDashboardPage} />
         <Route path="/" component={AuthEntryRedirect} />
         <Route path="/app/after-sales/repair-orders/:orderId/receipt" component={RepairOrderReceiptPrintPage} />
         <Route path="/app/after-sales/repair-orders/:orderId/warranty" component={RepairOrderWarrantyPrintPage} />
@@ -188,10 +241,18 @@ export default function App() {
         <Route path="/app/sales/collective-invoicing/:id/slip/print" component={CollectiveInvoiceSlipPrintPage} />
         <Route path="/app/sales/collective-invoicing/:id/invoice/print" component={CollectiveInvoicePrintPage} />
         <Route path="/app/sales/reports/print-slips/print" component={SalesSlipsPrintPage} />
+        <Route path="/app/pos" component={() => (
+          <ProtectedRoute>
+            <PosRoute><PosPage /></PosRoute>
+          </ProtectedRoute>
+        )} />
         <Route path="/app" component={AppLayout}>
           <Route path="/dashboard" component={DashboardPage} />
+          <Route path="/reports/saved-views" component={SavedViewsPage} />
+          <Route path="/reports" component={ReportsIndexPage} />
           <Route path="/documentation" component={DocumentationPage} />
           <Route path="/documentation/:sectionId" component={DocumentationPage} />
+          <Route path="/inventory" component={StockWorkspacePage} />
           <Route path="/inventory/partners" component={PartnersPage} />
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
           <Route path="/inventory/locations" component={LocationsPage} />
@@ -202,9 +263,14 @@ export default function App() {
           <Route path="/inventory/departments/settings" component={DepartmentsSettingsPage} />
           <Route path="/inventory/items" component={ItemsPage} />
           <Route path="/inventory/items/settings" component={ItemsSettingsPage} />
+          <Route path="/inventory/reports/stock-balance" component={StockBalanceReportPage} />
+          <Route path="/inventory/reports/stock-ledger" component={StockLedgerReportPage} />
+          <Route path="/inventory/reports/stock-ageing" component={StockAgeingReportPage} />
           <Route path="/inventory/stock-movements" component={StockMovementsPage} />
+          <Route path="/inventory/stock-entries" component={StockEntriesPage} />
           <Route path="/inventory/stock-reconciliation" component={StockReconciliationPage} />
           <Route path="/inventory/price-lists" component={PriceListsPage} />
+          <Route path="/inventory/product-bundles" component={ProductBundlesPage} />
           <Route path="/inventory/serial-lot/registry" component={SerialRegistryListPage} />
           <Route path="/inventory/serial-lot/lots" component={LotBatchesListPage} />
           <Route path="/inventory/serial-lot/movements" component={SerialMovementsListPage} />
@@ -228,6 +294,9 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
+          <Route path="/selling" component={SellingWorkspacePage} />
+          <Route path="/buying" component={BuyingWorkspacePage} />
+          <Route path="/sales-order/reports/so-analysis" component={SOAnalysisReportPage} />
           <Route path="/sales-order/sales-orders/new" component={SalesOrderNewPage} />
           <Route path="/sales-order/sales-orders/status" component={SalesOrderStatusPage} />
           <Route path="/sales-order/sales-orders/outstanding" component={OutstandingSOStatusPage} />
@@ -236,7 +305,12 @@ export default function App() {
           <Route path="/sales-order/delivery-receipts" component={DeliveryReceiptListPage} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
           <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
+          <Route path="/purchase-order/reports/po-analysis" component={POAnalysisReportPage} />
+          <Route path="/purchase-order/reports/items-to-receive" component={ItemsToReceiveReportPage} />
           <Route path="/purchase-order/purchase-orders" component={PurchaseOrderListPage} />
+          <Route path="/purchase-order/rfq" component={RfqListPage} />
+          <Route path="/purchase-order/rfq/:id" component={RfqDetailPage} />
+          <Route path="/purchase-order/purchase-returns" component={PurchaseReturnsPage} />
           <Route path="/purchase-order/goods-receipt" component={GoodsReceiptListPage} />
           <Route path="/purchase-request/purchase-orders" component={() => <Navigate href="/app/purchase-order/purchase-orders" />} />
           <Route path="/purchase-request/goods-receipt" component={() => <Navigate href="/app/purchase-order/goods-receipt" />} />
@@ -258,6 +332,7 @@ export default function App() {
           <Route path="/sales/reports/official-receipt-status" component={SalesOfficialReceiptStatusPage} />
           <Route path="/sales/reports/si-receipt-status" component={SalesSiReceiptStatusPage} />
           <Route path="/sales/reports/ar-by-customer" component={SalesArByCustomerPage} />
+          <Route path="/sales/reports/customer-credit-balance" component={CustomerCreditBalancePage} />
           <Route path="/sales/reports/discount-status" component={SalesDiscountStatusPage} />
           <Route path="/sales/collective-invoicing/list" component={CollectiveInvoiceListPage} />
           <Route path="/sales/collective-invoicing/status" component={CollectiveInvoiceStatusPage} />
@@ -267,15 +342,26 @@ export default function App() {
           <Route path="/finance/supplier-invoices" component={SupplierInvoiceListPage} />
           <Route path="/finance/payment-vouchers/new" component={PaymentVoucherNewPage} />
           <Route path="/finance/payment-vouchers" component={PaymentVoucherListPage} />
+          <Route path="/finance/chart-of-accounts" component={ChartOfAccountsPage} />
+          <Route path="/finance/bank-reconciliation" component={BankReconciliationPage} />
+          <Route path="/finance/fiscal-years" component={FiscalYearsPage} />
+          <Route path="/finance/payment-entries" component={PaymentEntriesPage} />
           <Route path="/finance/journal-entries" component={JournalEntriesPage} />
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />
+          <Route path="/finance/reports/trial-balance" component={TrialBalanceReportPage} />
+          <Route path="/finance/reports/general-ledger" component={GeneralLedgerReportPage} />
+          <Route path="/finance/reports/profit-and-loss" component={ProfitAndLossReportPage} />
+          <Route path="/finance/reports/balance-sheet" component={BalanceSheetReportPage} />
+          <Route path="/finance/reports/ar-aging" component={ArAgingReportPage} />
+          <Route path="/finance/reports/ap-aging" component={ApAgingReportPage} />
           <Route path="/finance/reports/ap-by-vendor" component={ApByVendorPage} />
           <Route path="/finance/reports/supplier-payment-status" component={SupplierPaymentStatusPage} />
           <Route path="/finance/reports/ar-by-customer" component={ArByCustomerPage} />
           <Route path="/finance/reports/receipt-status" component={ReceiptStatusPage} />
           <Route path="/finance/reports/official-receipt-status" component={OfficialReceiptStatusPage} />
+          <Route path="/finance" component={FinanceWorkspacePage} />
           <Route path="/crm/dashboard" component={() => (
             <CrmRoute><CrmDashboardPage /></CrmRoute>
           )} />
@@ -284,6 +370,12 @@ export default function App() {
           )} />
           <Route path="/crm/follow-up-tasks" component={() => (
             <CrmRoute><FollowUpTasksPage /></CrmRoute>
+          )} />
+          <Route path="/crm/leads" component={() => (
+            <CrmRoute><LeadsPage /></CrmRoute>
+          )} />
+          <Route path="/crm/opportunities" component={() => (
+            <CrmRoute><OpportunitiesPage /></CrmRoute>
           )} />
           <Route path="/crm/pipelines/quotations" component={() => (
             <CrmRoute><QuotationPipelinePage /></CrmRoute>
@@ -303,8 +395,38 @@ export default function App() {
           <Route path="/crm/reports/conversion" component={() => (
             <CrmRoute><CrmAnalyticsRoute><ConversionFunnelReportPage /></CrmAnalyticsRoute></CrmRoute>
           )} />
+          <Route path="/crm/reports/expired-quotations" component={() => (
+            <CrmRoute><CrmAnalyticsRoute><ExpiredQuotationsReportPage /></CrmAnalyticsRoute></CrmRoute>
+          )} />
           <Route path="/crm/reports/low-stock" component={() => (
             <CrmRoute><CrmAnalyticsRoute><LowStockReportPage /></CrmAnalyticsRoute></CrmRoute>
+          )} />
+          <Route path="/support/tickets" component={() => (
+            <SupportRoute><TicketsPage /></SupportRoute>
+          )} />
+          <Route path="/support/tickets/:id" component={() => (
+            <SupportRoute><TicketDetailPage /></SupportRoute>
+          )} />
+          <Route path="/hr/employees" component={() => (
+            <HrRoute><HrEmployeesPage /></HrRoute>
+          )} />
+          <Route path="/hr/payroll-runs" component={() => (
+            <HrRoute><PayrollRunsPage /></HrRoute>
+          )} />
+          <Route path="/fixed-assets" component={() => (
+            <FixedAssetsRoute><FixedAssetsPage /></FixedAssetsRoute>
+          )} />
+          <Route path="/job-costing" component={() => (
+            <JobCostingRoute><JobCostingPage /></JobCostingRoute>
+          )} />
+          <Route path="/manufacturing/boms" component={() => (
+            <ManufacturingRoute><BomsPage /></ManufacturingRoute>
+          )} />
+          <Route path="/manufacturing/work-orders" component={() => (
+            <ManufacturingRoute><WorkOrdersPage /></ManufacturingRoute>
+          )} />
+          <Route path="/quality/ncrs" component={() => (
+            <QualityRoute><NcrsPage /></QualityRoute>
           )} />
           <Route path="/activity-logs/changes" component={() => (
             <ChangeLogRoute>
@@ -330,6 +452,11 @@ export default function App() {
           <Route path="/user-management/groups" component={() => (
             <AdminModuleRoute>
               <UserGroupsPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/user-permissions" component={() => (
+            <AdminModuleRoute>
+              <UserPermissionsPage />
             </AdminModuleRoute>
           )} />
           <Route path="/user-management/process-policies" component={() => (

@@ -13,5 +13,5 @@ func RegisterSalesOrderRoutes(sr chi.Router, pool *pgxpool.Pool) {
 	sr.With(auth.RequirePermission("sales_order.delivery_receipts", "read")).Get("/delivery-receipts", listDeliveryReceipts(pool))
 	sr.With(auth.RequirePermission("sales_order.delivery_receipts", "read")).Get("/delivery-receipts/{id}", getDeliveryReceipt(pool))
 	sr.With(auth.RequirePermission("sales_order.delivery_receipts_new", "write")).Post("/delivery-receipts", createDeliveryReceipt(pool))
-	sr.With(auth.RequirePermission("sales_order.delivery_receipts_post", "write")).Post("/delivery-receipts/{id}/post", postDeliveryReceipt(pool))
+	sr.With(auth.RequireSubmit("sales_order.delivery_receipts_post")).Post("/delivery-receipts/{id}/post", postDeliveryReceipt(pool))
 }

@@ -2,12 +2,32 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
+import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
 import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
 import { SalesOrderItemSearchModal } from "./SalesOrderItemSearchModal";
+
+type ProductBundleListRow = { id: number };
+type ExplodedBundleLine = { item_id: number; item_code: string; item_name: string; qty: number };
+
+async function findBundleForItem(itemId: number): Promise<ProductBundleListRow | null> {
+  const qs = new URLSearchParams({
+    page: "1",
+    pageSize: "1",
+    status: "active",
+    parent_item_id: String(itemId),
+  });
+  const res = await apiFetch<ProductBundleListRow[]>(`/api/v1/inventory/product-bundles?${qs}`);
+  return res.data?.[0] ?? null;
+}
+
+async function fetchExplodedBundleLines(bundleId: number): Promise<ExplodedBundleLine[]> {
+  const res = await apiFetch<ExplodedBundleLine[]>(`/api/v1/inventory/product-bundles/${bundleId}/explode`);
+  return res.data ?? [];
+}
 
 export type SalesOrderLineRow = {
   line_no: number;
@@ -129,6 +149,7 @@ type Props = {
   taxTypeId: () => number | null;
   taxTypeMeta: () => TaxTypeMeta | null;
   locationId: () => number | null;
+  partnerId?: () => number | null;
 };
 
 export function SalesOrderLineGrid(props: Props) {
@@ -169,24 +190,78 @@ export function SalesOrderLineGrid(props: Props) {
     setSearchOpen(true);
   };
 
-  const applyItems = (items: ItemSearchRow[]) => {
+  const applyItems = async (items: ItemSearchRow[]) => {
     const idx = searchLineIdx();
     if (idx == null) return;
     const meta = props.taxTypeMeta();
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const pid = props.partnerId?.() ?? null;
     const current = [...props.lines()];
     const first = items[0];
+    const parentQty = parseNum(current[idx]?.qty ?? "1");
+
+    const bundle = await findBundleForItem(first.id);
+    if (
+      bundle &&
+      window.confirm(
+        `"${first.item_name}" is a product bundle. Explode into component lines with price-list rates?`,
+      )
+    ) {
+      const exploded = await fetchExplodedBundleLines(bundle.id);
+      if (exploded.length > 0) {
+        const componentLines: SalesOrderLineRow[] = [];
+        for (const comp of exploded) {
+          const rate = (await resolveItemRate(pid, comp.item_id)) ?? 0;
+          componentLines.push({
+            ...emptySalesOrderLine(componentLines.length + 1, String(rate), basis),
+            item_id: comp.item_id,
+            item_code: comp.item_code,
+            item_name: comp.item_name,
+            qty: String(comp.qty * parentQty),
+          });
+        }
+        const before = current.slice(0, idx);
+        const after = current.slice(idx + 1);
+        let next = [...before, ...componentLines, ...after];
+        for (let i = 1; i < items.length; i++) {
+          const it = items[i];
+          const rate = (await resolveItemRate(pid, it.id)) ?? it.sales_price ?? 0;
+          next.push(emptySalesOrderLine(next.length + 1, String(rate), basis));
+          const last = next.length - 1;
+          next[last] = {
+            ...next[last],
+            item_id: it.id,
+            item_code: it.item_code,
+            item_name: it.item_name,
+          };
+        }
+        const numbered = next.map((ln, i) => ({ ...ln, line_no: i + 1 }));
+        props.onChange(numbered);
+        void Promise.all(numbered.map((ln, i) => previewLine(ln).then((amounts) => ({ i, amounts })))).then((results) => {
+          props.onChange((prev) =>
+            prev.map((ln, i) => {
+              const hit = results.find((r) => r.i === i);
+              return hit ? { ...ln, ...hit.amounts } : ln;
+            }),
+          );
+        });
+        return;
+      }
+    }
+
+    const rate0 = (await resolveItemRate(pid, first.id)) ?? first.sales_price ?? 0;
     current[idx] = {
       ...current[idx],
       item_id: first.id,
       item_code: first.item_code,
       item_name: first.item_name,
-      unit_price: String(first.sales_price ?? 0),
+      unit_price: String(rate0),
       input_basis: basis,
     };
     for (let i = 1; i < items.length; i++) {
       const it = items[i];
-      current.push(emptySalesOrderLine(current.length + 1, String(it.sales_price ?? 0), basis));
+      const rate = (await resolveItemRate(pid, it.id)) ?? it.sales_price ?? 0;
+      current.push(emptySalesOrderLine(current.length + 1, String(rate), basis));
       const last = current.length - 1;
       current[last] = {
         ...current[last],

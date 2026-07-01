@@ -41,7 +41,7 @@ type SalesReturnLine struct {
 func registerSalesReturnRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("sales.sales_returns", auth.AccessRead)).Get("/sales-returns", listSalesReturns(pool))
 	r.With(auth.RequirePermission("sales.sales_returns_new", auth.AccessWrite)).Post("/sales-returns", createSalesReturn(pool))
-	r.With(auth.RequirePermission("sales.sales_returns_submit", auth.AccessWrite)).Post("/sales-returns/{id}/submit", submitSalesReturn(pool))
+	r.With(auth.RequireSubmit("sales.sales_returns_submit")).Post("/sales-returns/{id}/submit", submitSalesReturn(pool))
 }
 
 func listSalesReturns(pool *pgxpool.Pool) http.HandlerFunc {
@@ -173,32 +173,68 @@ func submitSalesReturn(pool *pgxpool.Pool) http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 
 		var status string
+		var salesID int64
+		var locationID int64
 		err = tx.QueryRow(r.Context(), `
-			select status from public.sr_sales_returns where id = $1 and tenant_id = $2 for update`,
-			id, tu.TenantID).Scan(&status)
-		if err != nil || status != "draft" {
+			select sr.status, sr.sales_id, s.location_id
+			from public.sr_sales_returns sr
+			join public.sa_sales s on s.id = sr.sales_id
+			where sr.id = $1 and sr.tenant_id = $2 for update of sr`,
+			id, tu.TenantID).Scan(&status, &salesID, &locationID)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Return not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if status != "draft" {
 			response.Validation(w, map[string]string{"status": "Only draft returns can be submitted."})
 			return
 		}
 
 		rows, err := tx.Query(r.Context(), `
-			select sales_line_id, qty::float8 from public.sr_sales_return_lines where sales_return_id = $1 order by line_no`, id)
+			select id, sales_line_id, qty::float8 from public.sr_sales_return_lines where sales_return_id = $1 order by line_no`, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
+		var lineIDs []int64
 		for rows.Next() {
-			var salesLineID int64
+			var returnLineID, salesLineID int64
 			var qty float64
-			if err := rows.Scan(&salesLineID, &qty); err != nil {
+			if err := rows.Scan(&returnLineID, &salesLineID, &qty); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read line.", "ERR_INTERNAL")
 				return
 			}
+			var lineQty, returnedQty float64
+			err = tx.QueryRow(r.Context(), `
+				select qty::float8, coalesce(returned_qty, 0)::float8
+				from public.sa_sales_lines where id = $1 and sales_id = $2`,
+				salesLineID, salesID).Scan(&lineQty, &returnedQty)
+			if err != nil {
+				response.Validation(w, map[string]string{"lines": "Invalid sales line on return."})
+				return
+			}
+			if qty+returnedQty > lineQty+0.0001 {
+				response.Validation(w, map[string]string{"lines": "Return qty exceeds remaining billable qty on a line."})
+				return
+			}
+			if err := applySalesReturnStock(r.Context(), tx, tu.TenantID, salesID, locationID, returnLineID, salesLineID, tu.AppUserID, qty); err != nil {
+				response.Err(w, http.StatusInternalServerError, err.Error(), "ERR_INTERNAL")
+				return
+			}
+			lineIDs = append(lineIDs, salesLineID)
 			if err := fulfillment.SyncSalesLineReturnedQty(r.Context(), tx, salesLineID, qty); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to update returned qty.", "ERR_INTERNAL")
 				return
 			}
+		}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
+			return
+		}
+		if err := reverseSaleSerialsForLines(r.Context(), tx, tu.TenantID, salesID, lineIDs); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to restore serial units.", "ERR_INTERNAL")
+			return
 		}
 
 		_, err = tx.Exec(r.Context(), `

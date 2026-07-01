@@ -613,6 +613,7 @@ export function SalesModal(props: Props) {
           }}
           locationId={locationId}
           templateCode={templateCode}
+          partnerId={partnerId}
         />
       </WideEntityModal>
 

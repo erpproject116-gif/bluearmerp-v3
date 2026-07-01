@@ -17,6 +17,7 @@ import (
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/sales-order", func(sr chi.Router) {
 		registerSalesOrderRoutes(sr, pool)
+		registerReportRoutes(sr, pool)
 		deliveryreceipt.RegisterSalesOrderRoutes(sr, pool)
 	})
 }

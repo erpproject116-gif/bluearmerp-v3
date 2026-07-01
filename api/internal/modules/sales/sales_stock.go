@@ -353,6 +353,79 @@ func reverseSaleSerialsForLines(ctx context.Context, tx pgx.Tx, tenantID, salesI
 	return rows.Err()
 }
 
+// applySalesReturnStock restores inventory for a returned sales line quantity.
+func applySalesReturnStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationID, returnLineID, salesLineID, userID int64, returnQty float64) error {
+	if returnQty <= 0 {
+		return nil
+	}
+	var itemID *int64
+	var lineQty float64
+	var soLineID *int64
+	err := tx.QueryRow(ctx, `
+		select item_id, qty::float8, source_sales_order_line_id
+		from public.sa_sales_lines where id = $1 and sales_id = $2`,
+		salesLineID, salesID).Scan(&itemID, &lineQty, &soLineID)
+	if err != nil {
+		return fmt.Errorf("sales line not found")
+	}
+	if itemID == nil || lineQty <= 0 {
+		return nil
+	}
+	var trackInventory bool
+	if err := tx.QueryRow(ctx, `select track_inventory_qty from public.inv_items where id = $1`, *itemID).Scan(&trackInventory); err != nil || !trackInventory {
+		return nil
+	}
+
+	restoreQty := returnQty
+	if soLineID == nil {
+		// Direct sale: prefer reversing proportional stock from original movement.
+		var movQty float64
+		err := tx.QueryRow(ctx, `
+			select -qty_delta::float8 from public.inv_stock_movements
+			where tenant_id = $1 and ref_type = 'sa_sales_line' and ref_id = $2 and movement_type = 'sales'
+			limit 1`, tenantID, salesLineID).Scan(&movQty)
+		if err == nil && movQty > 0 {
+			restoreQty = movQty * (returnQty / lineQty)
+		}
+	}
+
+	_, err = tx.Exec(ctx, `
+		insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
+		values ($1, $2, $3, $4)
+		on conflict (tenant_id, item_id, location_id)
+		do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
+		tenantID, *itemID, locationID, restoreQty)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		insert into public.inv_stock_movements (
+		  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
+		) values ($1, $2, $3, $4, 'sales_return', 'sr_sales_return_line', $5, $6)`,
+		tenantID, *itemID, locationID, restoreQty, returnLineID, userID)
+	if err != nil {
+		return err
+	}
+
+	// Lot batch: restore proportional qty when lot tracked on line.
+	var lotBatchID *int64
+	_ = tx.QueryRow(ctx, `select lot_batch_id from public.sa_sales_lines where id = $1`, salesLineID).Scan(&lotBatchID)
+	if lotBatchID != nil {
+		lotRestore := lineQty
+		if lineQty > 0.0001 {
+			lotRestore = returnQty
+		}
+		_, err = tx.Exec(ctx, `
+			update public.inv_lot_batches
+			set qty_on_hand = qty_on_hand + $1, updated_at = now()
+			where id = $2 and tenant_id = $3`, lotRestore, *lotBatchID, tenantID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // voidWarrantyForSaleLines marks CRM warranty assets void for selected sales lines.
 func voidWarrantyForSaleLines(ctx context.Context, tx pgx.Tx, tenantID int64, lineIDs []int64) error {
 	if len(lineIDs) == 0 {

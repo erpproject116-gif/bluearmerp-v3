@@ -10,6 +10,10 @@ type Props = {
   onChange: (code: string, level: MatrixValue) => void;
   allowInherit?: boolean;
   roleDefaults?: Record<string, AccessLevel>;
+  submitFlags?: Record<string, boolean>;
+  cancelFlags?: Record<string, boolean>;
+  onSubmitChange?: (code: string, enabled: boolean) => void;
+  onCancelChange?: (code: string, enabled: boolean) => void;
   loading?: boolean;
   title?: string;
 };
@@ -37,6 +41,8 @@ export function PermissionMatrix(props: Props) {
     }
   };
 
+  const showActions = () => props.onSubmitChange != null || props.onCancelChange != null;
+
   return (
     <Show when={!props.loading} fallback={<p class="text-sm text-text-secondary">Loading permissions…</p>}>
       <p class="mb-3 text-sm text-text-secondary">
@@ -51,6 +57,10 @@ export function PermissionMatrix(props: Props) {
               <For each={columns()}>
                 {(col) => <th class="px-2 py-2 text-center font-semibold">{col.label}</th>}
               </For>
+              <Show when={showActions()}>
+                <th class="px-2 py-2 text-center font-semibold">Submit</th>
+                <th class="px-2 py-2 text-center font-semibold">Cancel</th>
+              </Show>
             </tr>
           </thead>
           <tbody>
@@ -119,6 +129,28 @@ export function PermissionMatrix(props: Props) {
                             </td>
                           )}
                         </For>
+                        <Show when={showActions()}>
+                          <td class="px-2 py-2 text-center">
+                            <Show when={props.onSubmitChange}>
+                              <input
+                                type="checkbox"
+                                checked={props.submitFlags?.[perm.permission_code] ?? false}
+                                title="Allow submit/post actions"
+                                onChange={(e) => props.onSubmitChange?.(perm.permission_code, e.currentTarget.checked)}
+                              />
+                            </Show>
+                          </td>
+                          <td class="px-2 py-2 text-center">
+                            <Show when={props.onCancelChange}>
+                              <input
+                                type="checkbox"
+                                checked={props.cancelFlags?.[perm.permission_code] ?? false}
+                                title="Allow cancel/undo actions"
+                                onChange={(e) => props.onCancelChange?.(perm.permission_code, e.currentTarget.checked)}
+                              />
+                            </Show>
+                          </td>
+                        </Show>
                       </tr>
                     );
                   }}
@@ -131,6 +163,7 @@ export function PermissionMatrix(props: Props) {
       <p class="mt-2 text-xs text-text-secondary">
         <strong>Read-only</strong> — view lists and details. <strong>Read & Write</strong> — create and edit.{" "}
         <strong>D/A</strong> — do not allow.
+        {showActions() ? " **Submit** — post/confirm/submit actions. **Cancel** — cancel or undo actions." : null}
         {props.allowInherit ? " **Role** — inherit from the user’s assigned role (groups and overrides can raise access)." : null}
       </p>
     </Show>

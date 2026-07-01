@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -65,7 +66,7 @@ type paymentVoucherBody struct {
 func registerPaymentVoucherRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/payment-vouchers/preview-sequences", previewPaymentVoucherSequences(pool))
 	r.Get("/payment-vouchers", listPaymentVouchers(pool))
-	r.Post("/payment-vouchers", createPaymentVoucher(pool))
+	r.With(auth.RequirePermission("finance.payment_vouchers_new", auth.AccessWrite)).Post("/payment-vouchers", createPaymentVoucher(pool))
 	r.Get("/payment-vouchers/{id}", getPaymentVoucher(pool))
 	r.Delete("/payment-vouchers/{id}", deletePaymentVoucher(pool))
 }
@@ -126,6 +127,15 @@ func listPaymentVouchers(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, pm)
 			argN++
 		}
+
+		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			CustomerColumn: "pv.partner_id",
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
 
 		q := fmt.Sprintf(`
 			select pv.id, pv.payment_date, pv.date_seq, pv.payment_no,
@@ -406,6 +416,12 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if err := insertPaymentApplications(r.Context(), tx, id, body.Applications); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save applications.", "ERR_INTERNAL")
+			return
+		}
+
+		ev := buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, body.PaymentMethod)
+		if err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
 			return
 		}
 

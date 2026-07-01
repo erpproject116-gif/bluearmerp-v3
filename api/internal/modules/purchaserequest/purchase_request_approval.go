@@ -30,7 +30,7 @@ type PRApprovalRecord struct {
 }
 
 func registerPurchaseRequestApprovalRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.Post("/purchase-requests/{id}/submit-for-approval", submitPurchaseRequestForApproval(pool))
+	r.With(auth.RequirePermission("purchase_request", auth.AccessWrite)).Post("/purchase-requests/{id}/submit-for-approval", submitPurchaseRequestForApproval(pool))
 	r.Post("/purchase-requests/{id}/approve", approvePurchaseRequest(pool))
 	r.Post("/purchase-requests/{id}/reject", rejectPurchaseRequest(pool))
 	r.Get("/purchase-requests/{id}/approvals", listPurchaseRequestApprovals(pool))

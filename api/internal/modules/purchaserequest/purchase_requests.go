@@ -15,9 +15,11 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 )
 
 type PurchaseRequestLine struct {
@@ -314,6 +316,16 @@ func listPurchaseRequests(pool *pgxpool.Pool) http.HandlerFunc {
 		scope, argN := tu.PicOrCreatedScopeSQL("pr", argN, &args)
 		where += scope
 
+		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			CustomerColumn: "coalesce(pr.partner_id, line_partner.partner_id)",
+			LocationColumn: "pr.location_id",
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
+
 		sortCol := allowed[p.Sort]
 		if sortCol == "" {
 			sortCol = allowed[defaultSort]
@@ -519,7 +531,7 @@ func createPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		computed, errs := computePurchaseRequestLines(tt, body.Lines)
+		computed, errs := computePurchaseRequestLines(tt, applyBuyingRatesToPRLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -612,7 +624,7 @@ func updatePurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		computed, errs := computePurchaseRequestLines(tt, body.Lines)
+		computed, errs := computePurchaseRequestLines(tt, applyBuyingRatesToPRLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -801,6 +813,23 @@ func replacePurchaseRequestLines(ctx context.Context, tx pgx.Tx, purchaseRequest
 	}
 	_, err := insertPurchaseRequestLines(ctx, tx, purchaseRequestID, lines)
 	return err
+}
+
+func applyBuyingRatesToPRLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, headerPartnerID *int64, lines []purchaseRequestLineBody) []purchaseRequestLineBody {
+	out := make([]purchaseRequestLineBody, len(lines))
+	copy(out, lines)
+	for i := range out {
+		partnerID := int64(0)
+		if out[i].PartnerID != nil && *out[i].PartnerID > 0 {
+			partnerID = *out[i].PartnerID
+		} else if headerPartnerID != nil && *headerPartnerID > 0 {
+			partnerID = *headerPartnerID
+		}
+		if out[i].ItemID != nil && *out[i].ItemID > 0 && partnerID > 0 {
+			out[i].UnitPrice = inventory.ResolveBuyingUnitPrice(ctx, pool, tenantID, *out[i].ItemID, partnerID, out[i].UnitPrice)
+		}
+	}
+	return out
 }
 
 func computePurchaseRequestLines(tt taxcalc.TaxType, lines []purchaseRequestLineBody) ([]computedLine, map[string]string) {

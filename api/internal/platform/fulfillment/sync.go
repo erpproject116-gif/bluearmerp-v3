@@ -37,11 +37,11 @@ func SyncPOLineBilledQty(ctx context.Context, tx pgx.Tx, purchaseOrderLineID int
 	return err
 }
 
-// SyncSalesLineReturnedQty sets returned_qty on a sales line.
+// SyncSalesLineReturnedQty increments returned_qty on a sales line.
 func SyncSalesLineReturnedQty(ctx context.Context, tx pgx.Tx, salesLineID int64, qty float64) error {
 	_, err := tx.Exec(ctx, `
 		update public.sa_sales_lines
-		set returned_qty = $2
+		set returned_qty = coalesce(returned_qty, 0) + $2
 		where id = $1`, salesLineID, qty)
 	return err
 }

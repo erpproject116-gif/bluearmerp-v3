@@ -32,6 +32,8 @@ type rolePermissionsPayload struct {
 	RoleCode    string            `json:"role_code"`
 	RoleName    string            `json:"role_name"`
 	Permissions map[string]string `json:"permissions"`
+	CanSubmit   map[string]bool   `json:"can_submit"`
+	CanCancel   map[string]bool   `json:"can_cancel"`
 }
 
 type userPermissionsPayload struct {
@@ -46,6 +48,8 @@ type userPermissionsPayload struct {
 
 type permissionsBody struct {
 	Permissions map[string]string `json:"permissions"`
+	CanSubmit   map[string]bool   `json:"can_submit"`
+	CanCancel   map[string]bool   `json:"can_cancel"`
 }
 
 type userOverridesBody struct {
@@ -132,13 +136,14 @@ func getRolePermissions(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load role.", "ERR_INTERNAL")
 			return
 		}
-		perms, err := loadRolePermissions(r.Context(), pool, tu.TenantID, roleCode)
+		perms, submit, cancel, err := loadRolePermissionsFull(r.Context(), pool, tu.TenantID, roleCode)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load permissions.", "ERR_INTERNAL")
 			return
 		}
 		response.OK(w, rolePermissionsPayload{
 			RoleCode: roleCode, RoleName: roleName, Permissions: perms,
+			CanSubmit: submit, CanCancel: cancel,
 		}, "OK")
 	}
 }
@@ -168,7 +173,7 @@ func putRolePermissions(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to update permissions.", "ERR_INTERNAL")
 			return
 		}
-		if err := saveRolePermissions(r.Context(), pool, tu.TenantID, roleCode, body.Permissions); err != nil {
+		if err := saveRolePermissions(r.Context(), pool, tu.TenantID, roleCode, body.Permissions, body.CanSubmit, body.CanCancel); err != nil {
 			if err == errInvalidAccessLevel {
 				response.Validation(w, map[string]string{"permissions": "Each level must be read, write, or deny."})
 				return
@@ -180,8 +185,10 @@ func putRolePermissions(pool *pgxpool.Pool) http.HandlerFunc {
 			"role_code": roleCode,
 		})
 		_ = auth.InvalidateUsersByTenantRole(r.Context(), pool, tu.TenantID, roleCode)
-		perms, _ := loadRolePermissions(r.Context(), pool, tu.TenantID, roleCode)
-		response.OK(w, rolePermissionsPayload{RoleCode: roleCode, Permissions: perms}, "Permissions saved.")
+		perms, submit, cancel, _ := loadRolePermissionsFull(r.Context(), pool, tu.TenantID, roleCode)
+		response.OK(w, rolePermissionsPayload{
+			RoleCode: roleCode, Permissions: perms, CanSubmit: submit, CanCancel: cancel,
+		}, "Permissions saved.")
 	}
 }
 

@@ -9,6 +9,7 @@ export type PurchaseOrderListParams = {
   q?: string;
   status?: string;
   purchase_request_id?: number;
+  supplier_quotation_id?: number;
 };
 
 export type PurchaseOrderRow = {
@@ -18,6 +19,8 @@ export type PurchaseOrderRow = {
   date_no_display: string;
   purchase_order_no: string;
   purchase_request_id?: number | null;
+  rfq_id?: number | null;
+  supplier_quotation_id?: number | null;
   tax_type_id: number;
   tax_type_name: string;
   currency_id: number;
@@ -28,6 +31,8 @@ export type PurchaseOrderRow = {
   pic_name: string;
   location_id: number;
   status: string;
+  pct_received?: number;
+  pct_billed?: number;
   grand_total: number;
   created_by_name?: string;
   item_name_summary?: string;
@@ -45,6 +50,7 @@ export function usePurchaseOrderList(params: () => PurchaseOrderListParams) {
     if (p.q) qs.set("q", p.q);
     if (p.status) qs.set("status", p.status);
     if (p.purchase_request_id) qs.set("purchase_request_id", String(p.purchase_request_id));
+    if (p.supplier_quotation_id) qs.set("supplier_quotation_id", String(p.supplier_quotation_id));
 
     return {
       queryKey: ["purchase-orders", p],
@@ -79,4 +85,14 @@ export async function createPurchaseOrderFromRequest(purchaseRequestId: number) 
     method: "POST",
     body: JSON.stringify({}),
   });
+}
+
+export async function createPurchaseOrderFromSupplierQuotation(supplierQuotationId: number) {
+  return apiFetch<PurchaseOrderRow>(
+    `/api/v1/purchase-order/purchase-orders/from-supplier-quotation/${supplierQuotationId}`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
 }

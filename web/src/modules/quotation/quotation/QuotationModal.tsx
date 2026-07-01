@@ -538,6 +538,7 @@ export function QuotationModal(props: Props) {
           return t ? { tax_mode: t.tax_mode, rate_percent: t.rate_percent } : null;
         }}
         locationId={locationId}
+        partnerId={partnerId}
       />
     </WideEntityModal>
   );

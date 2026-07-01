@@ -82,8 +82,12 @@ export const documentationSections: DocSection[] = [
         text: "Each item can be set to track quantity on hand. Some items can also track serial numbers (one unique number per unit) or lot batches (groups received together). Turn those options on in the item record when you need that level of detail.",
       },
       {
+        type: "paragraph",
+        text: "Product Bundles let you sell a kit as one line on a sales order; when you pick a bundle item, you can explode it into component lines with prices from your price list. Price Lists support selling lists (customers) and buying lists (suppliers)—use the Selling / Buying filter when maintaining rates.",
+      },
+      {
         type: "tip",
-        text: "Use the settings link on each list screen to choose which columns and fields appear on your forms.",
+        text: "Open Stock → Workspace for a quick view of stock KPIs. Use settings on each list screen to choose which columns appear on forms.",
       },
     ],
   },
@@ -208,7 +212,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "Release Sales Order is the step where you confirm what will ship. You enter release quantities (and pick serial numbers for tracked items). In legacy combined mode, stock is reduced when you release. In split mode, release reserves quantity and a posted Delivery Receipt deducts stock.",
+        text: "Release Sales Order is the step where you confirm what will ship. You enter release quantities (and pick serial numbers for tracked items). When a line item is a product bundle, you can explode it into component lines before saving. In legacy combined mode, stock is reduced when you release. In split mode, release reserves quantity and a posted Delivery Receipt deducts stock.",
       },
       {
         type: "paragraph",
@@ -294,7 +298,12 @@ export const documentationSections: DocSection[] = [
           "From the request, create a Purchase Order when you are ready to order.",
           "Confirm the purchase order.",
           "When shipment arrives, open Goods Receipt List or Serial & Lot → Receive / Scan to receive against the order.",
+          "If Quality is enabled, set inspection to Released on draft receipts before posting; Held receipts block stock posting until released.",
         ],
+      },
+      {
+        type: "paragraph",
+        text: "Buying workspace and RFQ help you request quotes from suppliers and convert accepted supplier quotations into purchase orders. Vendor rates can resolve from buying price lists when PO lines have no unit price.",
       },
       {
         type: "tip",
@@ -304,29 +313,55 @@ export const documentationSections: DocSection[] = [
   },
   {
     id: "finance",
-    title: "Finance and receipts",
+    title: "Finance and accounts",
     iconId: "finance",
-    intro: "Record payments received from customers and view accounts receivable.",
-    primaryHref: "/app/finance/official-receipts",
-    primaryLabel: "Open Official Receipt List",
+    intro: "Receipts, payables, general ledger, and the accounts workspace.",
+    primaryHref: "/app/finance",
+    primaryLabel: "Open Accounts Workspace",
     blocks: [
       {
         type: "paragraph",
-        text: "When a customer pays you, create an Official Receipt and apply it to their open sales invoices. This reduces what they still owe. For supplier bills, use Supplier Invoice List and Payment Voucher List to record accounts payable and partial payments against goods receipts.",
+        text: "The Accounts workspace summarizes open receivables, payables, draft journal entries, and bank reconciliation items. From there, jump to payment receipts, supplier invoices, chart of accounts, bank reconciliation, fiscal years, and financial reports.",
       },
       {
         type: "steps",
         items: [
-          "Click New Official Receipt.",
-          "Enter the customer, payment amount, and payment date.",
-          "Apply the receipt to one or more open invoices.",
-          "Save and print the receipt if needed.",
-          "For vendors: post a Supplier Invoice against received PO lines, then create a Payment Voucher and apply it to open supplier invoices.",
+          "Open Accounts → Workspace for KPIs and shortcuts.",
+          "Record customer payments with New Payment Receipt; apply to open sales invoices.",
+          "Post supplier invoices against received PO lines, then pay vendors with Payment Vouchers.",
+          "Use Chart of Accounts, Journal Entries, Trial Balance, P&L, and Balance Sheet for GL work.",
+          "Match bank statement lines on Bank Reconciliation.",
         ],
       },
       {
         type: "paragraph",
-        text: "A/R by Customer, SI Receipt Status, A/P by Vendor, and Supplier Payment Status reports show outstanding balances and which documents are fully paid.",
+        text: "A/R and A/P aging reports, SI Receipt Status, and Supplier Payment Status show outstanding balances. Fixed Assets (separate module) posts monthly depreciation journal entries when you run depreciation.",
+      },
+    ],
+  },
+  {
+    id: "reports",
+    title: "Reports catalog",
+    iconId: "reports",
+    intro: "Find module reports and saved filter views in one place.",
+    primaryHref: "/app/reports",
+    primaryLabel: "Open Reports Catalog",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "The Reports catalog lists analytics and status reports across selling, stock, buying, finance, and CRM. Each entry links to the live report screen and supports CSV export where available.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open Reports → Catalog to browse by module.",
+          "Open a report, set filters, and export if needed.",
+          "Open Saved Views to store named filter sets on catalog reports (Ad-hoc BI).",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Scheduled report email is a stub in this release—exports run on demand from each report or saved view.",
       },
     ],
   },
@@ -354,6 +389,223 @@ export const documentationSections: DocSection[] = [
       {
         type: "tip",
         text: "The bell icon at the top of the screen shows CRM alerts when you have new notifications.",
+      },
+    ],
+  },
+  {
+    id: "support",
+    title: "Support tickets",
+    iconId: "crm",
+    intro: "Log customer issues, link warranty assets, and track resolution.",
+    primaryHref: "/app/support/tickets",
+    primaryLabel: "Open Support Tickets",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Support helps your team track customer issues after the sale. Each ticket links to a customer and can reference a warranty asset from the CRM registry.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Create a ticket from Support → Tickets with subject, customer, and optional warranty asset.",
+          "Update status as you work (open, in progress, waiting, resolved, closed).",
+          "Add comments to keep an internal thread on the ticket.",
+          "Assign an agent and optionally link a repair order from After-Sales.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "fixed-assets",
+    title: "Fixed assets",
+    iconId: "fixed_assets",
+    intro: "Register capital assets and run monthly straight-line depreciation.",
+    primaryHref: "/app/fixed-assets",
+    primaryLabel: "Open Asset Register",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Fixed Assets tracks capital equipment and other depreciable property. Each asset has cost, salvage value, useful life, and GL accounts for asset, accumulated depreciation, and expense.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Add assets in the Asset Register with acquisition date and accounts.",
+          "Run monthly depreciation for the period; the system posts a journal entry per asset line.",
+          "Review posted runs before closing the month.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "job-costing",
+    title: "Job costing",
+    iconId: "job_costing",
+    intro: "Project budgets, timesheets, and budget vs actual—separate from inventory Projects dimension.",
+    primaryHref: "/app/job-costing",
+    primaryLabel: "Open Job Costing",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Job Costing is for job or project P&L tracking. It is not the same as Inventory → Projects (which tags stock and documents). Here you define a job, budget lines, and timesheet hours, then compare budget to actual costs.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Create a job cost project with budget lines.",
+          "Enter timesheets against the job.",
+          "Open budget vs actual to see variance.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "manufacturing",
+    title: "Manufacturing",
+    iconId: "manufacturing",
+    intro: "Single-level bills of material and work orders with backflush on completion.",
+    primaryHref: "/app/manufacturing/boms",
+    primaryLabel: "Open Bills of Material",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Manufacturing covers in-house production. Define a BOM (finished item plus component quantities), create a work order, release it, then complete it to backflush components and receive finished goods into stock.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Create a BOM with one finished item and component lines.",
+          "Create a work order from the BOM and set quantity to produce.",
+          "Release the work order when ready to start.",
+          "Complete the work order to issue components and receipt finished goods.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Multi-level BOMs, routings, and WIP lot trace are not in this MVP—use single-level BOMs only.",
+      },
+    ],
+  },
+  {
+    id: "quality",
+    title: "Quality (QMS)",
+    iconId: "quality",
+    intro: "Goods receipt inspection and non-conformance records.",
+    primaryHref: "/app/quality/ncrs",
+    primaryLabel: "Open NCR List",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Quality adds inspection status on draft goods receipts. Receipts on hold cannot be posted until inspection is released. Log non-conformance reports (NCRs) for failed or suspect material.",
+      },
+      {
+        type: "steps",
+        items: [
+          "On Goods Receipt List, set inspection to Held or Released while the receipt is still draft.",
+          "Post only after inspection is Released.",
+          "Create NCRs from Quality → NCRs to document issues and follow-up.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "pos",
+    title: "Point of sale",
+    iconId: "pos",
+    intro: "Walk-in checkout with shift open, cart, and cash tender.",
+    primaryHref: "/app/pos",
+    primaryLabel: "Open POS Terminal",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "POS is a full-screen terminal for retail walk-in sales. Open a shift, scan or search items into the cart, take cash payment, and close the shift when done. Checkout creates a sales invoice and reduces stock.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open POS from the sidebar (or go to /app/pos).",
+          "Open shift with opening cash if prompted.",
+          "Add items to the cart and complete checkout.",
+          "Close shift at end of day for a summary.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Offline mode and receipt printers are not supported in the web POS MVP.",
+      },
+    ],
+  },
+  {
+    id: "hr",
+    title: "HR and payroll",
+    iconId: "hr",
+    intro: "Employee master and monthly payroll runs with payslip stub.",
+    primaryHref: "/app/hr/employees",
+    primaryLabel: "Open Employees",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "HR maintains employees separately from app login users. Payroll runs generate payslips for a pay period and post a payroll accrual journal entry stub to finance.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Add employees with base salary and department.",
+          "Open Payroll Runs and run payroll for the period.",
+          "Review payslips; accrual posts to configured GL accounts.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Statutory tax tables vary by country—configure rates with your accountant; this MVP uses simple withholding stubs.",
+      },
+    ],
+  },
+  {
+    id: "portal",
+    title: "Customer portal",
+    iconId: "crm",
+    intro: "External read-only access for invited customers.",
+    primaryHref: "/portal/login",
+    primaryLabel: "Open Portal Login",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "The customer portal is separate from the main ERP sign-in. Administrators invite portal users linked to a customer; users request a magic link to view their orders, invoices, and support tickets read-only.",
+      },
+      {
+        type: "steps",
+        items: [
+          "An administrator creates a portal user for the customer partner.",
+          "The customer opens the portal login page and requests a magic link.",
+          "After signing in, they browse orders, invoices, and tickets scoped to their account only.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Portal users cannot access internal modules or other customers’ data.",
+      },
+    ],
+  },
+  {
+    id: "bi",
+    title: "Saved report views",
+    iconId: "reports",
+    intro: "Save filter sets on catalog reports for quick reuse.",
+    primaryHref: "/app/reports/saved-views",
+    primaryLabel: "Open Saved Views",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Saved Views (Ad-hoc BI) let each user store named filter combinations on reports from the catalog. Exports use the same secure report APIs—no custom SQL.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open a report from the catalog and set your filters.",
+          "Save the view with a name from Reports → Saved Views or the report screen.",
+          "Reload the view later or export CSV through the BI export proxy.",
+        ],
       },
     ],
   },
@@ -447,6 +699,22 @@ export const documentationSections: DocSection[] = [
       {
         type: "paragraph",
         text: "Defaults are skip-friendly with legacy combined SO release on. Turn policies on one at a time when rolling out stricter controls. The Business Dashboard red flags help find gaps—for example released but not delivered lines when DR is expected.",
+      },
+    ],
+  },
+  {
+    id: "roadmap",
+    title: "Still on the roadmap",
+    iconId: "documentation",
+    intro: "Capabilities not yet in the product or only partially covered.",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "The following are documented for future work: shipping rules, delivery trip logistics, sales commission, full Support SLA and email delivery, multi-book depreciation, offline POS, portal vendor write access, CAPA workflows, and in-process manufacturing QC. See docs/TIER_C_BACKLOG.md in the repository for briefs.",
+      },
+      {
+        type: "tip",
+        text: "Tier C MVPs now in the sidebar (when enabled for your tenant) include Support, Fixed Assets, Job Costing, Manufacturing, Quality, POS, HR, Reports/Saved Views, and Customer Portal. Enable modules under User Management → Module & Features.",
       },
     ],
   },

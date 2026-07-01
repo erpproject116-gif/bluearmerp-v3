@@ -142,6 +142,12 @@ func evaluateTenantAlerts(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 				return notifCount, taskCount, e
 			}
 			notifCount += n
+		case "reconciliation_gap":
+			n, e := evalReconciliationGap(ctx, pool, tenantID, rule, today)
+			if e != nil {
+				return notifCount, taskCount, e
+			}
+			notifCount += n
 		}
 	}
 	return notifCount, taskCount, nil
@@ -390,6 +396,64 @@ func evalQuoteUnconverted(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 		}
 	}
 	return count, rows.Err()
+}
+
+func evalReconciliationGap(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rule alertRule, today time.Time) (int, error) {
+	minCount := 1
+	if len(rule.ThresholdJSON) > 0 {
+		var th struct {
+			MinCount int `json:"min_count"`
+		}
+		if err := json.Unmarshal(rule.ThresholdJSON, &th); err == nil && th.MinCount > 0 {
+			minCount = th.MinCount
+		}
+	}
+
+	var gapCount int64
+	err := pool.QueryRow(ctx, `
+		select
+		  (select count(*) from (
+		    select ln.id from public.sa_sales_lines ln
+		    join public.sa_sales s on s.id = ln.sales_id
+		    join public.inv_items i on i.id = ln.item_id
+		    left join (select sales_line_id, count(*)::float8 as serial_cnt from public.inv_serial_unit_sales_lines group by sales_line_id) j on j.sales_line_id = ln.id
+		    where s.tenant_id = $1 and s.deleted_at is null and i.track_serial = true and ln.qty > 0 and coalesce(j.serial_cnt, 0) <> ln.qty
+		    union all
+		    select rl.id from public.so_sales_order_release_lines rl
+		    join public.so_sales_order_lines ln on ln.id = rl.sales_order_line_id
+		    join public.so_sales_orders so on so.id = ln.sales_order_id
+		    join public.inv_items i on i.id = ln.item_id
+		    left join (select sales_order_release_line_id, count(*)::float8 as serial_cnt from public.inv_serial_units where sales_order_release_line_id is not null group by sales_order_release_line_id) su on su.sales_order_release_line_id = rl.id
+		    where so.tenant_id = $1 and so.deleted_at is null and i.track_serial = true and rl.release_qty > 0 and coalesce(su.serial_cnt, 0) <> rl.release_qty
+		  ) serial_mismatch)
+		+ (select count(*) from public.so_sales_order_lines ln
+		    join public.so_sales_orders so on so.id = ln.sales_order_id
+		    left join (select sales_order_line_id, sum(release_qty) as released from public.so_sales_order_release_lines group by sales_order_line_id) rel on rel.sales_order_line_id = ln.id
+		    where so.tenant_id = $1 and so.deleted_at is null
+		      and so.progress_status in ('unconfirmed', 'in_progress')
+		      and (ln.qty - coalesce(rel.released, 0)) > 0.0001)
+		+ (select count(*) from public.so_sales_order_lines ln
+		    join public.so_sales_orders so on so.id = ln.sales_order_id
+		    where so.tenant_id = $1 and so.deleted_at is null
+		      and so.progress_status in ('in_progress', 'completed')
+		      and (ln.delivered_qty - ln.billed_qty) > 0.0001)`, tenantID).Scan(&gapCount)
+	if err != nil {
+		return 0, err
+	}
+	if gapCount < int64(minCount) {
+		return 0, nil
+	}
+	key := dedupeKey(rule.RuleType, rule.ID, "reconciliation", 0, today)
+	title := "Reconciliation gaps detected"
+	body := fmt.Sprintf("%d inventory or fulfillment reconciliation gaps need review.", gapCount)
+	ok, err := insertNotification(ctx, pool, tenantID, nil, rule.ID, "warning", title, body, "reconciliation", 0, key)
+	if err != nil {
+		return 0, err
+	}
+	if ok {
+		return 1, nil
+	}
+	return 0, nil
 }
 
 func handleCRMOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event) error {

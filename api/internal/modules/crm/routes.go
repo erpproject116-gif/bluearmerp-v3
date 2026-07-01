@@ -20,6 +20,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerFollowUpTaskRoutes(cr, pool)
 		registerNotificationRoutes(cr, pool)
 		registerPipelineRoutes(cr, pool)
+		registerLeadRoutes(cr, pool)
 
 		cr.Route("/reports", func(rr chi.Router) {
 			rr.Use(auth.RequireCrmAnalytics)

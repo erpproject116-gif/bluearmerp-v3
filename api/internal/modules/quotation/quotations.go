@@ -15,9 +15,11 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 )
 
 type QuotationLine struct {
@@ -222,6 +224,16 @@ func listQuotations(pool *pgxpool.Pool) http.HandlerFunc {
 		scope, argN := tu.PicOrCreatedScopeSQL("q", argN, &args)
 		where += scope
 
+		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			CustomerColumn: "q.partner_id",
+			LocationColumn: "q.location_id",
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
+
 		q := fmt.Sprintf(`
 			select q.id, q.order_date, q.date_seq, q.reference_no,
 			  q.tax_type_id, tt.name, q.currency_id, c.currency_code,
@@ -416,6 +428,7 @@ func createQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		body.Lines = applyPartnerRatesToQuotationLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeQuotationLines(tt, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
@@ -512,6 +525,7 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		body.Lines = applyPartnerRatesToQuotationLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeQuotationLines(tt, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
@@ -636,6 +650,17 @@ func computeQuotationLines(tt taxcalc.TaxType, lines []quotationLineBody) ([]com
 		out = []computedLine{}
 	}
 	return out, nil
+}
+
+func applyPartnerRatesToQuotationLines(ctx context.Context, pool *pgxpool.Pool, tenantID, partnerID int64, lines []quotationLineBody) []quotationLineBody {
+	out := make([]quotationLineBody, len(lines))
+	copy(out, lines)
+	for i := range out {
+		if out[i].ItemID != nil && *out[i].ItemID > 0 {
+			out[i].UnitPrice = inventory.ResolveSellingUnitPrice(ctx, pool, tenantID, *out[i].ItemID, partnerID, out[i].UnitPrice)
+		}
+	}
+	return out
 }
 
 func sumQuotationTotals(lines []computedLine) (subtotal, taxTotal, grandTotal float64) {

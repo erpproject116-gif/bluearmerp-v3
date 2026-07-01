@@ -14,17 +14,28 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/buying"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/dashboard"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demodata"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/fixedassets"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/goodsreceipt"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/hr"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/manufacturing"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quality"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/jobcosting"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaseorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaserequest"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/bi"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/portal"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/pos"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quotation"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/salesorder"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/selling"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/support"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/usermgmt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -37,6 +48,7 @@ import (
 	platformmw "github.com/bluearm/bluearm-erp-v3/api/internal/platform/middleware"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/presence"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
+	platformreports "github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reporttemplates"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -69,7 +81,7 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORSOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CRM-Job-Secret"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CRM-Job-Secret", "X-Portal-Token"},
 		AllowCredentials: true,
 	}))
 
@@ -80,6 +92,9 @@ func main() {
 
 	r.Route("/api/v1", func(api chi.Router) {
 		crm.RegisterJobRoutes(api, pool)
+		platformreports.RegisterJobRoutes(api, pool)
+		portal.RegisterPublicRoutes(api, pool)
+		portal.RegisterPortalRoutes(api, pool)
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Use(audit.Middleware(pool))
@@ -89,6 +104,7 @@ func main() {
 			drafts.RegisterRoutes(protected, pool)
 			formfields.RegisterRoutes(protected, pool)
 			reporttemplates.RegisterRoutes(protected, pool)
+			platformreports.RegisterRoutes(protected)
 			branding.RegisterRoutes(protected, pool)
 			processpolicy.RegisterRoutes(protected, pool)
 			demodata.RegisterRoutes(protected, pool)
@@ -98,11 +114,22 @@ func main() {
 			sales.RegisterRoutes(protected, pool)
 			finance.RegisterRoutes(protected, pool)
 			salesorder.RegisterRoutes(protected, pool)
+			selling.RegisterRoutes(protected, pool)
+			buying.RegisterRoutes(protected, pool)
 			purchaserequest.RegisterRoutes(protected, pool)
 			purchaseorder.RegisterRoutes(protected, pool)
 			goodsreceipt.RegisterRoutes(protected, pool)
 			usermgmt.RegisterRoutes(protected, pool)
 			crm.RegisterRoutes(protected, pool)
+			support.RegisterRoutes(protected, pool)
+			portal.RegisterAdminRoutes(protected, pool)
+			bi.RegisterRoutes(protected, pool, api)
+			fixedassets.RegisterRoutes(protected, pool)
+			jobcosting.RegisterRoutes(protected, pool)
+			manufacturing.RegisterRoutes(protected, pool)
+			quality.RegisterRoutes(protected, pool)
+			pos.RegisterRoutes(protected, pool)
+			hr.RegisterRoutes(protected, pool)
 			dashboard.RegisterRoutes(protected, pool)
 		})
 	})

@@ -6,7 +6,10 @@ import { OfficialReceiptStatusFilter } from "./OfficialReceiptStatusFilter";
 import { OfficialReceiptStatusReport } from "./OfficialReceiptStatusReport";
 import { defaultOfficialReceiptStatusFilters, type OfficialReceiptStatusFilters } from "./officialReceiptStatusFilters";
 
+import { useOfficialReceiptStatusReportTemplates } from "./officialReceiptStatusTemplate";
+
 export default function OfficialReceiptStatusPage() {
+  useOfficialReceiptStatusReportTemplates();
   const [draftFilters, setDraftFilters] = createSignal<OfficialReceiptStatusFilters>(defaultOfficialReceiptStatusFilters());
   const [submittedFilters, setSubmittedFilters] = createSignal<OfficialReceiptStatusFilters | null>(null);
   const [page, setPage] = createSignal(1);

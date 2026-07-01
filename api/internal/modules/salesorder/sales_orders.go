@@ -13,8 +13,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -29,6 +32,8 @@ type SalesOrderLine struct {
 	ItemName               string  `json:"item_name"`
 	Description            *string `json:"description,omitempty"`
 	Qty                    float64 `json:"qty"`
+	DeliveredQty           float64 `json:"delivered_qty"`
+	BilledQty              float64 `json:"billed_qty"`
 	UnitNonVat             float64 `json:"unit_non_vat"`
 	NonVatTotal            float64 `json:"non_vat_total"`
 	TaxAmount              float64 `json:"tax_amount"`
@@ -52,6 +57,8 @@ type SalesOrder struct {
 	CustomerName      string           `json:"customer_name"`
 	PicUserID         *int64           `json:"pic_user_id,omitempty"`
 	PicName           string           `json:"pic_name"`
+	SalesPersonID     *int64           `json:"sales_person_id,omitempty"`
+	SalesPersonName   string           `json:"sales_person_name,omitempty"`
 	LocationID        int64            `json:"location_id"`
 	LocationName      string           `json:"location_name,omitempty"`
 	ProjectID         *int64           `json:"project_id,omitempty"`
@@ -65,6 +72,8 @@ type SalesOrder struct {
 	PaymentTerms      *string          `json:"payment_terms,omitempty"`
 	Mop               *string          `json:"mop,omitempty"`
 	ProgressStatus    string           `json:"progress_status"`
+	PctDelivered      float64          `json:"pct_delivered"`
+	PctBilled         float64          `json:"pct_billed"`
 	Subtotal          float64          `json:"subtotal"`
 	TaxTotal          float64          `json:"tax_total"`
 	GrandTotal        float64          `json:"grand_total"`
@@ -95,6 +104,7 @@ type salesOrderBody struct {
 	PartnerID         int64                `json:"partner_id"`
 	PicUserID         *int64               `json:"pic_user_id"`
 	PicName           string               `json:"pic_name"`
+	SalesPersonID     *int64               `json:"sales_person_id"`
 	LocationID        int64                `json:"location_id"`
 	ProjectID         *int64               `json:"project_id"`
 	ProjectName       *string              `json:"project_name"`
@@ -236,6 +246,16 @@ func listSalesOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		scope, argN := tu.PicOrCreatedScopeSQL("so", argN, &args)
 		where += scope
 
+		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			CustomerColumn: "so.partner_id",
+			LocationColumn: "so.location_id",
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
+
 		q := fmt.Sprintf(`
 			select so.id, so.order_date, so.date_seq, so.sales_order_no,
 			  so.tax_type_id, tt.name, so.currency_id, c.currency_code,
@@ -245,6 +265,16 @@ func listSalesOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			  (select ln.item_name from public.so_sales_order_lines ln
 			   where ln.sales_order_id = so.id order by ln.line_no limit 1),
 			  (select count(*)::int from public.so_sales_order_lines ln where ln.sales_order_id = so.id),
+			  coalesce((
+			    select case when sum(ln.qty) > 0.0001
+			      then round(100.0 * sum(coalesce(ln.delivered_qty, 0)) / sum(ln.qty), 1) else 0 end
+			    from public.so_sales_order_lines ln where ln.sales_order_id = so.id
+			  ), 0)::float8,
+			  coalesce((
+			    select case when sum(ln.qty) > 0.0001
+			      then round(100.0 * sum(coalesce(ln.billed_qty, 0)) / sum(ln.qty), 1) else 0 end
+			    from public.so_sales_order_lines ln where ln.sales_order_id = so.id
+			  ), 0)::float8,
 			  count(*) over()
 			from public.so_sales_orders so
 			join public.inv_partners p on p.id = so.partner_id
@@ -278,7 +308,7 @@ func listSalesOrders(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.PartnerID, &row.CustomerName, &row.PicUserID, &row.PicName,
 				&row.LocationID, &deliveryDate, &row.ProgressStatus, &row.GrandTotal,
 				&row.CreatedByName, &row.DeliveryRemarks, &row.PaymentTerms,
-				&firstItemName, &lineCount, &total,
+				&firstItemName, &lineCount, &row.PctDelivered, &row.PctBilled, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read sales orders.", "ERR_INTERNAL")
 				return
@@ -326,6 +356,7 @@ func loadSalesOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 		select so.id, so.order_date, so.date_seq, so.sales_order_no,
 		  so.tax_type_id, tt.name, so.currency_id, c.currency_code,
 		  so.partner_id, p.company_name, so.pic_user_id, so.pic_name,
+		  so.sales_person_id, coalesce(sp.full_name, ''),
 		  so.location_id, l.location_name, so.project_id, so.project_name,
 		  so.due_date, so.delivery_date, so.reference, so.notes,
 		  so.delivery_remarks, so.payment_terms, so.mop,
@@ -338,11 +369,13 @@ func loadSalesOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 		join public.quo_currencies c on c.id = so.currency_id
 		join public.inv_locations l on l.id = so.location_id
 		left join public.users u on u.id = so.created_by_user_id
+		left join public.users sp on sp.id = so.sales_person_id
 		where so.id = $1 and so.tenant_id = $2 and so.deleted_at is null`,
 		id, tenantID).Scan(
 		&so.ID, &orderDate, &so.DateSeq, &so.SalesOrderNo,
 		&so.TaxTypeID, &so.TaxTypeName, &so.CurrencyID, &so.CurrencyCode,
 		&so.PartnerID, &so.CustomerName, &so.PicUserID, &so.PicName,
+		&so.SalesPersonID, &so.SalesPersonName,
 		&so.LocationID, &so.LocationName, &so.ProjectID, &so.ProjectName,
 		&dueDate, &deliveryDate, &so.Reference, &so.Notes,
 		&so.DeliveryRemarks, &so.PaymentTerms, &so.Mop,
@@ -375,7 +408,8 @@ func loadSalesOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID int64) ([]SalesOrderLine, error) {
 	rows, err := pool.Query(ctx, `
 		select id, line_no, item_id, item_code, item_name, description,
-		  qty::float8, unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
+		  qty::float8, coalesce(delivered_qty, 0)::float8, coalesce(billed_qty, 0)::float8,
+		  unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
 		  unit_vat_inc::float8, line_total::float8, remark, source_quotation_line_id
 		from public.so_sales_order_lines
 		where sales_order_id = $1
@@ -389,7 +423,7 @@ func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID i
 	for rows.Next() {
 		var ln SalesOrderLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
-			&ln.Qty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
+			&ln.Qty, &ln.DeliveredQty, &ln.BilledQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.SourceQuotationLineID); err != nil {
 			return nil, err
 		}
@@ -446,6 +480,7 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		body.Lines = applyPartnerRatesToSOLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeSalesOrderLines(tt, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
@@ -462,6 +497,16 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		subtotal, taxTotal, grandTotal := sumSalesOrderTotals(computed)
+
+		if defaultProgress(body.ProgressStatus) == "in_progress" {
+			if clErrs, err := creditlimit.ValidateFromPolicy(r.Context(), pool, tu.TenantID, body.PartnerID, grandTotal); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to validate credit limit.", "ERR_INTERNAL")
+				return
+			} else if clErrs != nil {
+				response.Validation(w, clErrs)
+				return
+			}
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -485,15 +530,15 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		err = tx.QueryRow(r.Context(), `
 			insert into public.so_sales_orders (
 			  tenant_id, order_date, date_seq, sales_order_no,
-			  tax_type_id, currency_id, partner_id, pic_user_id, pic_name,
+			  tax_type_id, currency_id, partner_id, pic_user_id, pic_name, sales_person_id,
 			  location_id, project_id, project_name,
 			  due_date, delivery_date, reference, notes, delivery_remarks,
 			  payment_terms, mop, progress_status,
 			  subtotal, tax_total, grand_total, source_quotation_id, created_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
 			returning id`,
 			tu.TenantID, orderDate, dateSeq, salesOrderNo,
-			body.TaxTypeID, body.CurrencyID, body.PartnerID, body.PicUserID, strings.TrimSpace(body.PicName),
+			body.TaxTypeID, body.CurrencyID, body.PartnerID, body.PicUserID, strings.TrimSpace(body.PicName), body.SalesPersonID,
 			body.LocationID, body.ProjectID, body.ProjectName,
 			dueDate, deliveryDate, body.Reference, body.Notes, body.DeliveryRemarks,
 			body.PaymentTerms, body.Mop, defaultProgress(body.ProgressStatus),
@@ -578,6 +623,7 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		body.Lines = applyPartnerRatesToSOLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeSalesOrderLines(tt, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
@@ -593,6 +639,17 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		newProgress := defaultProgress(body.ProgressStatus)
+		if newProgress == "in_progress" && before.ProgressStatus != "in_progress" {
+			if clErrs, err := creditlimit.ValidateFromPolicy(r.Context(), pool, tu.TenantID, body.PartnerID, grandTotal); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to validate credit limit.", "ERR_INTERNAL")
+				return
+			} else if clErrs != nil {
+				response.Validation(w, clErrs)
+				return
+			}
+		}
+
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
@@ -603,15 +660,15 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		tag, err := tx.Exec(r.Context(), `
 			update public.so_sales_orders set
 			  order_date = $1, tax_type_id = $2, currency_id = $3, partner_id = $4,
-			  pic_user_id = $5, pic_name = $6, location_id = $7,
-			  project_id = $8, project_name = $9,
-			  due_date = $10, delivery_date = $11, reference = $12, notes = $13,
-			  delivery_remarks = $14, payment_terms = $15, mop = $16,
-			  progress_status = $17, subtotal = $18, tax_total = $19, grand_total = $20,
-			  source_quotation_id = $21, updated_at = now()
-			where id = $22 and tenant_id = $23 and deleted_at is null`,
+			  pic_user_id = $5, pic_name = $6, sales_person_id = $7, location_id = $8,
+			  project_id = $9, project_name = $10,
+			  due_date = $11, delivery_date = $12, reference = $13, notes = $14,
+			  delivery_remarks = $15, payment_terms = $16, mop = $17,
+			  progress_status = $18, subtotal = $19, tax_total = $20, grand_total = $21,
+			  source_quotation_id = $22, updated_at = now()
+			where id = $23 and tenant_id = $24 and deleted_at is null`,
 			orderDate, body.TaxTypeID, body.CurrencyID, body.PartnerID,
-			body.PicUserID, strings.TrimSpace(body.PicName), body.LocationID,
+			body.PicUserID, strings.TrimSpace(body.PicName), body.SalesPersonID, body.LocationID,
 			body.ProjectID, body.ProjectName,
 			dueDate, deliveryDate, body.Reference, body.Notes,
 			body.DeliveryRemarks, body.PaymentTerms, body.Mop,
@@ -747,6 +804,17 @@ func computeSalesOrderLines(tt taxcalc.TaxType, lines []salesOrderLineBody) ([]c
 		return nil, errs
 	}
 	return out, nil
+}
+
+func applyPartnerRatesToSOLines(ctx context.Context, pool *pgxpool.Pool, tenantID, partnerID int64, lines []salesOrderLineBody) []salesOrderLineBody {
+	out := make([]salesOrderLineBody, len(lines))
+	copy(out, lines)
+	for i := range out {
+		if out[i].ItemID != nil && *out[i].ItemID > 0 {
+			out[i].UnitPrice = inventory.ResolveSellingUnitPrice(ctx, pool, tenantID, *out[i].ItemID, partnerID, out[i].UnitPrice)
+		}
+	}
+	return out
 }
 
 func sumSalesOrderTotals(lines []computedLine) (subtotal, taxTotal, grandTotal float64) {

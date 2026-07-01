@@ -211,6 +211,54 @@ export function useLowStockReport(params: () => CrmReportParams<LowStockFilters>
   });
 }
 
+// --- Expired quotations ---
+
+export type ExpiredQuotationsFilters = {
+  date_from?: string;
+  date_to?: string;
+};
+
+export type ExpiredQuotationRow = {
+  quotation_id: number;
+  line_id: number;
+  reference_no: string;
+  customer_name: string;
+  valid_until?: string;
+  item_code: string;
+  item_name: string;
+  qty: number;
+  line_total: number;
+};
+
+export function expiredQuotationsExportUrl(filters: ExpiredQuotationsFilters): string {
+  return `/api/v1/crm/reports/expired-quotations/export?${reportQs(filters as Record<string, string | number | null | undefined>).toString()}`;
+}
+
+export function useExpiredQuotationsReport(params: () => CrmReportParams<ExpiredQuotationsFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string | number | null | undefined>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["crm-report-expired-quotations", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<ExpiredQuotationRow[]>(`/api/v1/crm/reports/expired-quotations?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return {
+          rows: res.data ?? [],
+          total: res.meta?.total ?? 0,
+        };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
 // --- Alert rules ---
 
 export type CrmAlertRule = {
@@ -256,6 +304,7 @@ export function useInvalidateCrmReports() {
     void client.invalidateQueries({ queryKey: ["crm-report-item-demand"] });
     void client.invalidateQueries({ queryKey: ["crm-report-conversion-funnel"] });
     void client.invalidateQueries({ queryKey: ["crm-report-low-stock"] });
+    void client.invalidateQueries({ queryKey: ["crm-report-expired-quotations"] });
     void client.invalidateQueries({ queryKey: ["crm-alert-rules"] });
   };
 }

@@ -22,11 +22,14 @@ export default function RolesPage() {
   const [permModalOpen, setPermModalOpen] = createSignal(false);
   const [permRoleId, setPermRoleId] = createSignal<number | null>(null);
   const [permValues, setPermValues] = createSignal<Record<string, MatrixValue>>({});
+  const [submitFlags, setSubmitFlags] = createSignal<Record<string, boolean>>({});
+  const [cancelFlags, setCancelFlags] = createSignal<Record<string, boolean>>({});
   const [editing, setEditing] = createSignal<TenantRoleRow | null>(null);
   const [roleCode, setRoleCode] = createSignal("");
   const [roleName, setRoleName] = createSignal("");
   const [description, setDescription] = createSignal("");
   const [isActive, setIsActive] = createSignal(true);
+  const [applyUserScopes, setApplyUserScopes] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateUserManagement();
@@ -41,6 +44,7 @@ export default function RolesPage() {
     setRoleName("");
     setDescription("");
     setIsActive(true);
+    setApplyUserScopes(false);
     setModalOpen(true);
   };
 
@@ -50,6 +54,7 @@ export default function RolesPage() {
     setRoleName(row.role_name);
     setDescription(row.description ?? "");
     setIsActive(row.is_active);
+    setApplyUserScopes(row.apply_user_scopes ?? false);
     setModalOpen(true);
   };
 
@@ -66,6 +71,8 @@ export default function RolesPage() {
       next[k] = v as MatrixValue;
     }
     setPermValues(next);
+    setSubmitFlags(rolePerms.data?.can_submit ?? {});
+    setCancelFlags(rolePerms.data?.can_cancel ?? {});
   });
 
   const save = async () => {
@@ -85,6 +92,7 @@ export default function RolesPage() {
                 role_name: name,
                 description: description(),
                 is_active: isActive(),
+                apply_user_scopes: applyUserScopes(),
               }),
             }, { silent: true })
           : apiFetch("/api/v1/user-management/roles", {
@@ -93,6 +101,7 @@ export default function RolesPage() {
                 role_code: roleCode().trim() || undefined,
                 role_name: name,
                 description: description(),
+                apply_user_scopes: applyUserScopes(),
               }),
             }, { silent: true }),
       toast,
@@ -113,7 +122,7 @@ export default function RolesPage() {
       if (v === "inherit") continue;
       payload[k] = v;
     }
-    const res = await saveRolePermissions(id, payload);
+    const res = await saveRolePermissions(id, payload, submitFlags(), cancelFlags());
     setSaving(false);
     if (!res.success) {
       toast.warning(res.message ?? "Could not save permissions.");
@@ -214,6 +223,16 @@ export default function RolesPage() {
         <Field label="Description">
           <input class={inputClass} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} />
         </Field>
+        <Field label="Apply user data scopes">
+          <label class="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={applyUserScopes()}
+              onChange={(e) => setApplyUserScopes(e.currentTarget.checked)}
+            />
+            Restrict lists to customers/locations assigned per user
+          </label>
+        </Field>
         <Show when={editing()}>
           <Field label="Active">
             <label class="flex items-center gap-2 text-sm">
@@ -242,6 +261,10 @@ export default function RolesPage() {
           loading={registry.isLoading || rolePerms.isLoading}
           title="App-wide defaults for this role. Users also inherit permissions from any groups they belong to."
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
+          submitFlags={submitFlags()}
+          cancelFlags={cancelFlags()}
+          onSubmitChange={(code, enabled) => setSubmitFlags((prev) => ({ ...prev, [code]: enabled }))}
+          onCancelChange={(code, enabled) => setCancelFlags((prev) => ({ ...prev, [code]: enabled }))}
         />
       </EntityModal>
     </>

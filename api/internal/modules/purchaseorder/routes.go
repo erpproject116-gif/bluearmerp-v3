@@ -16,7 +16,10 @@ import (
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/purchase-order", func(po chi.Router) {
 		registerPurchaseOrderRoutes(po, pool)
+		registerReportRoutes(po, pool)
 		registerPurchaseReturnRoutes(po, pool)
+		registerRFQRoutes(po, pool)
+		registerSupplierQuotationRoutes(po, pool)
 	})
 }
 

@@ -27,20 +27,20 @@ type arByCustomerRow struct {
 }
 
 type receiptStatusRow struct {
-	SalesID         int64   `json:"sales_id"`
-	LineID          int64   `json:"line_id"`
-	DateNoDisplay   string  `json:"date_no_display"`
-	SalesNo         string  `json:"sales_no"`
-	CustomerName    string  `json:"customer_name"`
-	PartnerID       int64   `json:"partner_id"`
-	GrandTotal      float64 `json:"grand_total"`
-	ReceivedAmount  float64 `json:"received_amount"`
-	Balance         float64 `json:"balance"`
-	ReceiptStatus   string  `json:"receipt_status"`
-	ItemCode        string  `json:"item_code"`
-	ItemName        string  `json:"item_name"`
-	Qty             float64 `json:"qty"`
-	LineTotal       float64 `json:"line_total"`
+	SalesID        int64   `json:"sales_id"`
+	LineID         int64   `json:"line_id"`
+	DateNoDisplay  string  `json:"date_no_display"`
+	SalesNo        string  `json:"sales_no"`
+	CustomerName   string  `json:"customer_name"`
+	PartnerID      int64   `json:"partner_id"`
+	GrandTotal     float64 `json:"grand_total"`
+	ReceivedAmount float64 `json:"received_amount"`
+	Balance        float64 `json:"balance"`
+	ReceiptStatus  string  `json:"receipt_status"`
+	ItemCode       string  `json:"item_code"`
+	ItemName       string  `json:"item_name"`
+	Qty            float64 `json:"qty"`
+	LineTotal      float64 `json:"line_total"`
 }
 
 type receiptStatusSummary struct {
@@ -61,6 +61,7 @@ func registerReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/official-receipt-status/export", exportOfficialReceiptStatus(pool))
 	r.Get("/official-receipt-status", listOfficialReceiptStatus(pool))
 	registerAPReportRoutes(r, pool)
+	registerAgingReportRoutes(r, pool)
 }
 
 func parseOptionalDateRange(r *http.Request) (*time.Time, *time.Time, map[string]string) {
@@ -254,10 +255,10 @@ func exportArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 type receiptStatusFilters struct {
-	DateFrom       *time.Time
-	DateTo         *time.Time
-	PartnerID      *int64
-	ReceiptStatus  string
+	DateFrom      *time.Time
+	DateTo        *time.Time
+	PartnerID     *int64
+	ReceiptStatus string
 }
 
 func parseReceiptStatusFilters(r *http.Request) (receiptStatusFilters, map[string]string) {
@@ -329,15 +330,15 @@ func receiptStatusLabel(received, grandTotal float64) string {
 func queryReceiptStatusRows(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f receiptStatusFilters, sort, order string, limit, offset int) ([]receiptStatusRow, int64, error) {
 	where, args := buildReceiptStatusWhere(f, tenantID)
 	allowed := map[string]string{
-		"order_date":     "s.order_date",
-		"sales_no":       "s.sales_no",
-		"customer_name":  "p.company_name",
-		"grand_total":    "s.grand_total",
+		"order_date":      "s.order_date",
+		"sales_no":        "s.sales_no",
+		"customer_name":   "p.company_name",
+		"grand_total":     "s.grand_total",
 		"received_amount": "recv.received",
-		"balance":        "(s.grand_total - coalesce(recv.received, 0))",
-		"item_code":      "ln.item_code",
-		"qty":            "ln.qty",
-		"line_total":     "ln.line_total",
+		"balance":         "(s.grand_total - coalesce(recv.received, 0))",
+		"item_code":       "ln.item_code",
+		"qty":             "ln.qty",
+		"line_total":      "ln.line_total",
 	}
 	col := allowed["order_date"]
 	if c, ok := allowed[sort]; ok {

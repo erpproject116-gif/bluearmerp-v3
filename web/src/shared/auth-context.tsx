@@ -177,6 +177,10 @@ function legacyPermissionLevel(me: MeData, code: string): AccessLevel {
     }
     return "read";
   }
+  if (code.startsWith("support")) {
+    if (!canViewCrm(me)) return "deny";
+    return "write";
+  }
   if (
     code.startsWith("inventory") ||
     code.startsWith("after_sales") ||
@@ -193,6 +197,7 @@ function legacyModuleAccess(me: MeData, moduleId: string): boolean {
   if (moduleId === "user_management") return canManageUsers(me);
   if (moduleId === "activity_logs") return canViewActivityLogs(me);
   if (moduleId === "crm") return canViewCrm(me);
+  if (moduleId === "support") return canViewCrm(me);
   if (moduleId === "finance") return false;
   return legacyPermissionLevel(me, moduleId) !== "deny";
 }

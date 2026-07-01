@@ -10,6 +10,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -93,6 +94,30 @@ func patchSalesOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		status := defaultProgress(body.ProgressStatus)
+
+		if status == "in_progress" {
+			var partnerID int64
+			var grandTotal float64
+			var prevStatus string
+			err = pool.QueryRow(r.Context(), `
+				select partner_id, grand_total::float8, progress_status
+				from public.so_sales_orders
+				where id = $1 and tenant_id = $2 and deleted_at is null`,
+				id, tu.TenantID).Scan(&partnerID, &grandTotal, &prevStatus)
+			if err != nil {
+				response.Err(w, http.StatusNotFound, "Sales order not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if prevStatus != "in_progress" {
+				if clErrs, err := creditlimit.ValidateFromPolicy(r.Context(), pool, tu.TenantID, partnerID, grandTotal); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to validate credit limit.", "ERR_INTERNAL")
+					return
+				} else if clErrs != nil {
+					response.Validation(w, clErrs)
+					return
+				}
+			}
+		}
 
 		tag, err := pool.Exec(r.Context(), `
 			update public.so_sales_orders

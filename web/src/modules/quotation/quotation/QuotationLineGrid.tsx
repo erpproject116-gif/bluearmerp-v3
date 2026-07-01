@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
@@ -125,6 +126,7 @@ type Props = {
   taxTypeId: () => number | null;
   taxTypeMeta: () => TaxTypeMeta | null;
   locationId: () => number | null;
+  partnerId?: () => number | null;
 };
 
 export function QuotationLineGrid(props: Props) {
@@ -165,24 +167,27 @@ export function QuotationLineGrid(props: Props) {
     setSearchOpen(true);
   };
 
-  const applyItems = (items: ItemSearchRow[]) => {
+  const applyItems = async (items: ItemSearchRow[]) => {
     const idx = searchLineIdx();
     if (idx == null) return;
     const meta = props.taxTypeMeta();
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const pid = props.partnerId?.() ?? null;
     const current = [...props.lines()];
     const first = items[0];
+    const rate0 = (await resolveItemRate(pid, first.id)) ?? first.sales_price ?? 0;
     current[idx] = {
       ...current[idx],
       item_id: first.id,
       item_code: first.item_code,
       item_name: first.item_name,
-      unit_price: String(first.sales_price ?? 0),
+      unit_price: String(rate0),
       input_basis: basis,
     };
     for (let i = 1; i < items.length; i++) {
       const it = items[i];
-      current.push(emptyQuotationLine(current.length + 1, String(it.sales_price ?? 0), basis));
+      const rate = (await resolveItemRate(pid, it.id)) ?? it.sales_price ?? 0;
+      current.push(emptyQuotationLine(current.length + 1, String(rate), basis));
       const last = current.length - 1;
       current[last] = {
         ...current[last],

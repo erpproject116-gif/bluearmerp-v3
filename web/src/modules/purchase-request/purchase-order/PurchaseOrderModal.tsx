@@ -104,6 +104,21 @@ async function fetchCurrencies(): Promise<{ id: number; currency_code: string; n
   return res.data ?? [];
 }
 
+async function fetchPartners(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; company_name: string; partner_code: string; partner_kind: string }[]>(
+    `/api/v1/inventory/partners?${qs}`,
+  );
+  return (res.data ?? [])
+    .filter((p) => p.partner_kind === "vendor" || p.partner_kind === "both")
+    .map((p) => ({
+      id: p.id,
+      label: p.company_name,
+      sublabel: p.partner_code,
+    }));
+}
+
 function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestLineRow[] {
   if (!lines?.length) return [emptyPurchaseRequestLine(1)];
   return lines.map((ln) => ({
@@ -156,6 +171,9 @@ export function PurchaseOrderModal(props: Props) {
   const [projectName, setProjectName] = createSignal("");
   const [reference, setReference] = createSignal("");
   const [notes, setNotes] = createSignal("");
+  const [partnerId, setPartnerId] = createSignal<number | null>(null);
+  const [partnerLabel, setPartnerLabel] = createSignal("");
+  const [partnerCode, setPartnerCode] = createSignal("");
   const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
 
   const isCreate = () => props.open && props.purchaseOrderId == null;
@@ -177,6 +195,9 @@ export function PurchaseOrderModal(props: Props) {
     setProjectName(po.project_name ?? "");
     setReference(po.reference ?? "");
     setNotes(po.notes ?? "");
+    setPartnerId(po.partner_id ?? null);
+    setPartnerLabel(po.partner_name ?? "");
+    setPartnerCode(po.lines?.[0]?.partner_code ?? "");
     setLines(linesFromDetail(po.lines));
   };
 
@@ -214,6 +235,9 @@ export function PurchaseOrderModal(props: Props) {
     setProjectName("");
     setReference("");
     setNotes("");
+    setPartnerId(null);
+    setPartnerLabel("");
+    setPartnerCode("");
     if (tt.length) {
       const first = tt[0];
       setTaxTypeId(first.id);
@@ -248,9 +272,17 @@ export function PurchaseOrderModal(props: Props) {
       toast.warning("Transaction type, currency, and location are required.");
       return;
     }
+    const vendorId = partnerId();
+    if (!vendorId) {
+      toast.warning("Vendor is required.");
+      return;
+    }
 
+    const vendorCode = partnerCode();
+    const vendorName = partnerLabel();
     const body = {
       order_date: orderDate() || todayISO(),
+      partner_id: vendorId,
       tax_type_id: taxTypeId(),
       currency_id: currencyId(),
       pic_user_id: picUserId(),
@@ -262,9 +294,9 @@ export function PurchaseOrderModal(props: Props) {
       notes: notes() || null,
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
-        partner_id: ln.partner_id || null,
-        partner_code: ln.partner_code,
-        partner_name: ln.partner_name,
+        partner_id: vendorId,
+        partner_code: vendorCode,
+        partner_name: vendorName,
         item_id: ln.item_id || null,
         item_code: ln.item_code,
         item_name: ln.item_name,
@@ -382,6 +414,31 @@ export function PurchaseOrderModal(props: Props) {
                     )}
                   </For>
                 </select>
+              </Field>
+              <Field label="Vendor *">
+                <Show
+                  when={isDraft()}
+                  fallback={<input class={inputClass} value={partnerLabel()} readOnly />}
+                >
+                  <LookupCombo
+                    label=""
+                    required
+                    value={partnerLabel}
+                    selectedId={partnerId}
+                    onInput={setPartnerLabel}
+                    onSelect={(o) => {
+                      setPartnerId(o.id);
+                      setPartnerLabel(o.label);
+                      setPartnerCode(o.sublabel ?? "");
+                    }}
+                    onClear={() => {
+                      setPartnerId(null);
+                      setPartnerLabel("");
+                      setPartnerCode("");
+                    }}
+                    fetchOptions={fetchPartners}
+                  />
+                </Show>
               </Field>
               <Field label="Location">
                 <Show
@@ -511,6 +568,7 @@ export function PurchaseOrderModal(props: Props) {
                   return t ? { tax_mode: t.tax_mode, rate_percent: t.rate_percent } : null;
                 }}
                 locationId={locationId}
+                hidePartnerColumns
               />
             </Show>
           </div>

@@ -25,6 +25,8 @@ export type RolePermissionsPayload = {
   role_code: string;
   role_name: string;
   permissions: Record<string, string>;
+  can_submit?: Record<string, boolean>;
+  can_cancel?: Record<string, boolean>;
 };
 
 export type UserPermissionsPayload = {
@@ -79,10 +81,15 @@ export function useUserPermissions(userId: () => number | null) {
   });
 }
 
-export async function saveRolePermissions(roleId: number, permissions: Record<string, string>) {
+export async function saveRolePermissions(
+  roleId: number,
+  permissions: Record<string, string>,
+  canSubmit?: Record<string, boolean>,
+  canCancel?: Record<string, boolean>,
+) {
   return apiFetch<RolePermissionsPayload>(`/api/v1/user-management/roles/${roleId}/permissions`, {
     method: "PUT",
-    body: JSON.stringify({ permissions }),
+    body: JSON.stringify({ permissions, can_submit: canSubmit ?? {}, can_cancel: canCancel ?? {} }),
   });
 }
 
@@ -164,4 +171,17 @@ export async function saveUserGroups(userId: number, groupIds: number[]) {
 
 export async function fetchUserGroups(userId: number) {
   return apiFetch<{ group_ids: number[] }>(`/api/v1/user-management/users/${userId}/groups`);
+}
+
+export type UserDataScope = { scope_type: string; record_id: number };
+
+export async function fetchUserDataScopes(userId: number) {
+  return apiFetch<UserDataScope[]>(`/api/v1/user-management/users/${userId}/data-scopes`);
+}
+
+export async function saveUserDataScopes(userId: number, scopes: UserDataScope[]) {
+  return apiFetch<UserDataScope[]>(`/api/v1/user-management/users/${userId}/data-scopes`, {
+    method: "PUT",
+    body: JSON.stringify({ scopes }),
+  });
 }

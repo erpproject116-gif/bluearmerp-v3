@@ -19,21 +19,24 @@ import (
 )
 
 type releaseQueueRow struct {
-	SalesOrderID    int64   `json:"sales_order_id"`
-	SalesOrderLineID int64  `json:"sales_order_line_id"`
-	DateNoDisplay   string  `json:"date_no_display"`
-	SalesOrderNo    string  `json:"sales_order_no"`
-	ProgressStatus  string  `json:"progress_status"`
-	CustomerName    string  `json:"customer_name"`
-	LocationID      int64   `json:"location_id"`
-	LocationName    string  `json:"location_name"`
-	ItemID          *int64  `json:"item_id,omitempty"`
-	ItemCode        string  `json:"item_code"`
-	ItemName        string  `json:"item_name"`
-	OrderQty        float64 `json:"order_qty"`
-	BalanceQty      float64 `json:"balance_qty"`
-	LocationStock   float64 `json:"location_stock"`
-	TrackInventory  bool    `json:"track_inventory_qty"`
+	SalesOrderID     int64   `json:"sales_order_id"`
+	SalesOrderLineID int64   `json:"sales_order_line_id"`
+	DateNoDisplay    string  `json:"date_no_display"`
+	SalesOrderNo     string  `json:"sales_order_no"`
+	ProgressStatus   string  `json:"progress_status"`
+	CustomerName     string  `json:"customer_name"`
+	LocationID       int64   `json:"location_id"`
+	LocationName     string  `json:"location_name"`
+	ItemID           *int64  `json:"item_id,omitempty"`
+	ItemCode         string  `json:"item_code"`
+	ItemName         string  `json:"item_name"`
+	OrderQty         float64 `json:"order_qty"`
+	ReleasedQty      float64 `json:"released_qty"`
+	DeliveredQty     float64 `json:"delivered_qty"`
+	RemainingQty     float64 `json:"remaining_qty"`
+	BalanceQty       float64 `json:"balance_qty"`
+	LocationStock    float64 `json:"location_stock"`
+	TrackInventory   bool    `json:"track_inventory_qty"`
 	TrackSerial      bool    `json:"track_serial"`
 }
 
@@ -80,6 +83,9 @@ func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
 			  so.progress_status, p.company_name, so.location_id, l.location_name,
 			  ln.item_id, ln.item_code, ln.item_name,
 			  ln.qty::float8,
+			  coalesce(rel.released, 0)::float8,
+			  coalesce(ln.delivered_qty, 0)::float8,
+			  greatest(coalesce(rel.released, 0) - coalesce(ln.delivered_qty, 0), 0)::float8,
 			  (ln.qty - coalesce(rel.released, 0))::float8,
 			  coalesce(bal.qty_on_hand, 0)::float8,
 			  coalesce(bal.qty_reserved, 0)::float8,
@@ -121,7 +127,8 @@ func listReleaseQueue(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.SalesOrderNo,
 				&row.ProgressStatus, &row.CustomerName, &row.LocationID, &row.LocationName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
-				&row.OrderQty, &row.BalanceQty, &qtyOnHand, &qtyReserved, &row.TrackInventory, &row.TrackSerial, &total,
+				&row.OrderQty, &row.ReleasedQty, &row.DeliveredQty, &row.RemainingQty, &row.BalanceQty,
+				&qtyOnHand, &qtyReserved, &row.TrackInventory, &row.TrackSerial, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read release queue.", "ERR_INTERNAL")
 				return
@@ -172,6 +179,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 
 		releaseDate := time.Now()
 		var releasedCount int
+		soIDs := map[int64]struct{}{}
 
 		for i, item := range body.Lines {
 			if item.SalesOrderLineID <= 0 {
@@ -184,12 +192,13 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 
 			var tenantID, locationID int64
+			var salesOrderID int64
 			var itemID *int64
 			var lineQty, released float64
 			var trackInventory, trackSerial bool
 
 			err := tx.QueryRow(r.Context(), `
-				select so.tenant_id, so.location_id, ln.item_id, ln.qty::float8,
+				select so.tenant_id, so.location_id, so.id, ln.item_id, ln.qty::float8,
 				  coalesce(rel.released, 0)::float8,
 				  coalesce(i.track_inventory_qty, false),
 				  coalesce(i.track_serial, false)
@@ -202,7 +211,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 				  group by sales_order_line_id
 				) rel on rel.sales_order_line_id = ln.id
 				where ln.id = $1 and so.deleted_at is null`,
-				item.SalesOrderLineID).Scan(&tenantID, &locationID, &itemID, &lineQty, &released, &trackInventory, &trackSerial)
+				item.SalesOrderLineID).Scan(&tenantID, &locationID, &salesOrderID, &itemID, &lineQty, &released, &trackInventory, &trackSerial)
 			if err != nil {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].sales_order_line_id", i): "Line not found."})
 				return
@@ -289,6 +298,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 
 			releasedCount++
+			soIDs[salesOrderID] = struct{}{}
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
@@ -296,8 +306,13 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		var salesOrderIDs []int64
+		for id := range soIDs {
+			salesOrderIDs = append(salesOrderIDs, id)
+		}
+
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.release", "so_sales_order", nil, nil, body)
-		response.OK(w, map[string]any{"released_count": releasedCount}, "Released.")
+		response.OK(w, map[string]any{"released_count": releasedCount, "sales_order_ids": salesOrderIDs}, "Released.")
 	}
 }
 

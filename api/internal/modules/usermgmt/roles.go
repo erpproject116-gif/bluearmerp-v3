@@ -24,6 +24,7 @@ type RoleRow struct {
 	IsSystem               bool   `json:"is_system"`
 	CanManageUsers         bool   `json:"can_manage_users"`
 	CanManageFormSettings  bool   `json:"can_manage_form_settings"`
+	ApplyUserScopes        bool   `json:"apply_user_scopes"`
 	IsActive               bool   `json:"is_active"`
 	SortOrder              int    `json:"sort_order"`
 	UserCount              int64  `json:"user_count"`
@@ -35,6 +36,7 @@ type roleBody struct {
 	Description           string `json:"description"`
 	CanManageUsers        bool   `json:"can_manage_users"`
 	CanManageFormSettings bool   `json:"can_manage_form_settings"`
+	ApplyUserScopes       bool   `json:"apply_user_scopes"`
 	SortOrder             *int   `json:"sort_order"`
 }
 
@@ -43,6 +45,7 @@ type rolePatchBody struct {
 	Description           *string `json:"description"`
 	CanManageUsers        *bool   `json:"can_manage_users"`
 	CanManageFormSettings *bool   `json:"can_manage_form_settings"`
+	ApplyUserScopes       *bool   `json:"apply_user_scopes"`
 	IsActive              *bool   `json:"is_active"`
 	SortOrder             *int    `json:"sort_order"`
 }
@@ -54,6 +57,7 @@ func listRoles(pool *pgxpool.Pool) http.HandlerFunc {
 			select
 			  tr.id, tr.role_code, tr.role_name, coalesce(tr.description, ''),
 			  tr.is_system, tr.can_manage_users, tr.can_manage_form_settings,
+			  coalesce(tr.apply_user_scopes, false),
 			  tr.is_active, tr.sort_order,
 			  (select count(*) from public.users u where u.tenant_id = tr.tenant_id and u.tenant_role = tr.role_code)
 			from public.tenant_roles tr
@@ -71,6 +75,7 @@ func listRoles(pool *pgxpool.Pool) http.HandlerFunc {
 			if err := rows.Scan(
 				&row.ID, &row.RoleCode, &row.RoleName, &row.Description,
 				&row.IsSystem, &row.CanManageUsers, &row.CanManageFormSettings,
+				&row.ApplyUserScopes,
 				&row.IsActive, &row.SortOrder, &row.UserCount,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to list roles.", "ERR_INTERNAL")
@@ -116,15 +121,15 @@ func createRole(pool *pgxpool.Pool) http.HandlerFunc {
 		err := pool.QueryRow(r.Context(), `
 			insert into public.tenant_roles (
 			  tenant_id, role_code, role_name, description, is_system,
-			  can_manage_users, can_manage_form_settings, sort_order
-			) values ($1, $2, $3, $4, false, $5, $6, $7)
+			  can_manage_users, can_manage_form_settings, apply_user_scopes, sort_order
+			) values ($1, $2, $3, $4, false, $5, $6, $7, $8)
 			returning id, role_code, role_name, coalesce(description, ''), is_system,
-			  can_manage_users, can_manage_form_settings, is_active, sort_order`,
+			  can_manage_users, can_manage_form_settings, coalesce(apply_user_scopes, false), is_active, sort_order`,
 			tu.TenantID, code, name, stringsTrim(body.Description),
-			body.CanManageUsers, body.CanManageFormSettings, sortOrder,
+			body.CanManageUsers, body.CanManageFormSettings, body.ApplyUserScopes, sortOrder,
 		).Scan(
 			&row.ID, &row.RoleCode, &row.RoleName, &row.Description, &row.IsSystem,
-			&row.CanManageUsers, &row.CanManageFormSettings, &row.IsActive, &row.SortOrder,
+			&row.CanManageUsers, &row.CanManageFormSettings, &row.ApplyUserScopes, &row.IsActive, &row.SortOrder,
 		)
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -138,7 +143,7 @@ func createRole(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "role.create", "tenant_role", &row.ID, nil, map[string]any{
 			"role_code": row.RoleCode,
 		})
-		_ = saveRolePermissions(r.Context(), pool, tu.TenantID, row.RoleCode, map[string]string{})
+		_ = saveRolePermissions(r.Context(), pool, tu.TenantID, row.RoleCode, map[string]string{}, nil, nil)
 		response.OK(w, row, "Role created.")
 	}
 }
@@ -160,14 +165,14 @@ func patchRole(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var isSystem bool
 		var roleCode, roleName, description string
-		var canUsers, canForm, isActive bool
+		var canUsers, canForm, applyScopes, isActive bool
 		var sortOrder int
 		err = pool.QueryRow(r.Context(), `
 			select role_code, role_name, coalesce(description, ''), is_system,
-			  can_manage_users, can_manage_form_settings, is_active, sort_order
+			  can_manage_users, can_manage_form_settings, coalesce(apply_user_scopes, false), is_active, sort_order
 			from public.tenant_roles
 			where id = $1 and tenant_id = $2`, id, tu.TenantID).
-			Scan(&roleCode, &roleName, &description, &isSystem, &canUsers, &canForm, &isActive, &sortOrder)
+			Scan(&roleCode, &roleName, &description, &isSystem, &canUsers, &canForm, &applyScopes, &isActive, &sortOrder)
 		if err == pgx.ErrNoRows {
 			response.Err(w, http.StatusNotFound, "Role not found.", "ERR_NOT_FOUND")
 			return
@@ -201,6 +206,9 @@ func patchRole(pool *pgxpool.Pool) http.HandlerFunc {
 			if body.CanManageFormSettings != nil {
 				canForm = *body.CanManageFormSettings
 			}
+			if body.ApplyUserScopes != nil {
+				applyScopes = *body.ApplyUserScopes
+			}
 			if body.IsActive != nil {
 				isActive = *body.IsActive
 			}
@@ -219,14 +227,14 @@ func patchRole(pool *pgxpool.Pool) http.HandlerFunc {
 			update public.tenant_roles
 			set role_name = $1, description = $2,
 			    can_manage_users = $3, can_manage_form_settings = $4,
-			    is_active = $5, sort_order = $6, updated_at = now()
-			where id = $7 and tenant_id = $8
+			    apply_user_scopes = $5, is_active = $6, sort_order = $7, updated_at = now()
+			where id = $8 and tenant_id = $9
 			returning id, role_code, role_name, coalesce(description, ''), is_system,
-			  can_manage_users, can_manage_form_settings, is_active, sort_order`,
-			roleName, description, canUsers, canForm, isActive, sortOrder, id, tu.TenantID,
+			  can_manage_users, can_manage_form_settings, coalesce(apply_user_scopes, false), is_active, sort_order`,
+			roleName, description, canUsers, canForm, applyScopes, isActive, sortOrder, id, tu.TenantID,
 		).Scan(
 			&row.ID, &row.RoleCode, &row.RoleName, &row.Description, &row.IsSystem,
-			&row.CanManageUsers, &row.CanManageFormSettings, &row.IsActive, &row.SortOrder,
+			&row.CanManageUsers, &row.CanManageFormSettings, &row.ApplyUserScopes, &row.IsActive, &row.SortOrder,
 		)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update role.", "ERR_INTERNAL")

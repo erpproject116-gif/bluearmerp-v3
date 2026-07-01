@@ -29,6 +29,7 @@ type Props<T extends { id: number }> = {
   onSelect: (id: number) => void;
   onEdit: (row: T) => void;
   onNew: () => void;
+  showNew?: boolean;
   codeKey: keyof T & string;
   nameKey: keyof T & string;
   sortKey?: string;
@@ -254,6 +255,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                 </svg>
               </A>
             </Show>
+            <Show when={props.showNew !== false}>
             <button
               type="button"
               class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
@@ -261,6 +263,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             >
               + New row
             </button>
+            </Show>
           </div>
         </div>
       </div>

@@ -19,6 +19,8 @@ export type GoodsReceiptRow = {
   location_id: number;
   location_name?: string;
   status: string;
+  inspection_status?: string;
+  inspection_notes?: string | null;
   reference?: string | null;
   notes?: string | null;
   created_by_name?: string;

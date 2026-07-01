@@ -16,7 +16,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Post("/goods-receipts/{id}/serials/batch", addGoodsReceiptSerialBatch(pool))
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Delete("/goods-receipts/{id}/serials/{serialId}", removeGoodsReceiptSerial(pool))
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Post("/goods-receipts/{id}/lots", addGoodsReceiptLot(pool))
-		gr.With(auth.RequirePermission("purchase_order.goods_receipts_post", "write")).Post("/goods-receipts/{id}/post", postGoodsReceipt(pool))
+		gr.With(auth.RequireSubmit("purchase_order.goods_receipts_post")).Post("/goods-receipts/{id}/post", postGoodsReceipt(pool))
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts_reverse", "write")).Post("/goods-receipts/{id}/reverse", reverseGoodsReceipt(pool))
 	})
 }

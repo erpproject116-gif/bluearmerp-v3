@@ -13,7 +13,10 @@ import { SalesStatusReport } from "./SalesStatusReport";
 import { defaultStatusFilters, type SalesStatusFilters } from "./salesStatusFilters";
 import type { SalesTemplateCode } from "./SalesLineGrid";
 
+import { useSalesStatusReportTemplates } from "./salesStatusTemplate";
+
 export default function SalesStatusPage() {
+  useSalesStatusReportTemplates();
   const toast = useToast();
   const invalidate = useInvalidateSalesStatusReport();
 

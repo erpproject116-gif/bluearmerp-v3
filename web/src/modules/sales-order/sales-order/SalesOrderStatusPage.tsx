@@ -12,7 +12,10 @@ import { SalesOrderStatusFilter } from "./SalesOrderStatusFilter";
 import { SalesOrderStatusReport } from "./SalesOrderStatusReport";
 import { defaultStatusFilters, type SalesOrderStatusFilters } from "./salesOrderStatusFilters";
 
+import { useSalesOrderStatusReportTemplates } from "./salesOrderStatusTemplate";
+
 export default function SalesOrderStatusPage() {
+  useSalesOrderStatusReportTemplates();
   const toast = useToast();
   const invalidate = useInvalidateSalesOrderStatusReport();
 

@@ -1,4 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { SerialPickModal } from "../../../shared/SerialPickModal";
@@ -15,6 +16,7 @@ import { progressStatusLabel } from "./progressStatus";
 
 export default function ReleaseSalesOrderPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const invalidate = useInvalidateReleaseQueue();
   const { page, setPage, q, setQ, sort, order, pageSize } = useListState("order_date", 25, { defaultOrder: "desc" });
   const [releaseQty, setReleaseQty] = createSignal<Record<number, string>>({});
@@ -68,6 +70,11 @@ export default function ReleaseSalesOrderPage() {
     setReleaseQty({});
     setSerialIds({});
     invalidate();
+
+    const soId = res.data?.sales_order_ids?.[0];
+    if (soId) {
+      navigate(`/app/sales-order/delivery-receipts/new?sales_order_id=${soId}`);
+    }
   };
 
   const openSerialPick = (row: ReleaseQueueRow) => {
@@ -126,7 +133,10 @@ export default function ReleaseSalesOrderPage() {
                 <th class="px-3 py-2">Location</th>
                 <th class="px-3 py-2">Item</th>
                 <th class="px-3 py-2 text-right">Order Qty</th>
-                <th class="px-3 py-2 text-right">Balance</th>
+                <th class="px-3 py-2 text-right">Released</th>
+                <th class="px-3 py-2 text-right">Delivered</th>
+                <th class="px-3 py-2 text-right">Remaining</th>
+                <th class="px-3 py-2 text-right">Pick balance</th>
                 <th class="px-3 py-2 text-right">Loc. Stock</th>
                 <th class="px-3 py-2 text-right">Release Qty</th>
                 <th class="px-3 py-2">Serials</th>
@@ -135,14 +145,14 @@ export default function ReleaseSalesOrderPage() {
             <tbody>
               <Show when={queue.isFetching}>
                 <tr>
-                  <td colSpan={11} class="px-3 py-8 text-center text-text-secondary">
+                  <td colSpan={13} class="px-3 py-8 text-center text-text-secondary">
                     Loading…
                   </td>
                 </tr>
               </Show>
               <Show when={!queue.isFetching && (queue.data?.rows ?? []).length === 0}>
                 <tr>
-                  <td colSpan={11} class="px-3 py-8 text-center text-text-secondary">
+                  <td colSpan={13} class="px-3 py-8 text-center text-text-secondary">
                     No lines in the release queue.
                   </td>
                 </tr>
@@ -159,6 +169,9 @@ export default function ReleaseSalesOrderPage() {
                       {row.item_code} — {row.item_name}
                     </td>
                     <td class="px-3 py-2 text-right">{row.order_qty}</td>
+                    <td class="px-3 py-2 text-right">{row.released_qty}</td>
+                    <td class="px-3 py-2 text-right">{row.delivered_qty}</td>
+                    <td class="px-3 py-2 text-right">{row.remaining_qty}</td>
                     <td class="px-3 py-2 text-right">
                       <button type="button" class="text-brand-600 hover:underline" onClick={() => fillBalance(row)} title="Fill balance">
                         {row.balance_qty}

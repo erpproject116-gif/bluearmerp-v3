@@ -14,8 +14,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -31,6 +33,7 @@ type SaleLine struct {
 	ItemName               string  `json:"item_name"`
 	Description            *string `json:"description,omitempty"`
 	Qty                    float64 `json:"qty"`
+	ReturnedQty            float64 `json:"returned_qty"`
 	UnitNonVat             float64 `json:"unit_non_vat"`
 	NonVatTotal            float64 `json:"non_vat_total"`
 	TaxAmount              float64 `json:"tax_amount"`
@@ -141,6 +144,7 @@ func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerAttachmentRoutes(r, pool)
 	registerCollectiveInvoiceRoutes(r, pool)
 	registerSalesReturnRoutes(r, pool)
+	registerCustomerCreditBalanceRoutes(r, pool)
 	r.Get("/preview-sequences", previewSalesSequences(pool))
 	r.Get("/sales-order-lines/open", listOpenSalesOrderLines(pool))
 	r.Get("/status-report/export", exportSalesStatusReport(pool))
@@ -241,6 +245,16 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 
 		scope, argN := tu.PicOrCreatedScopeSQL("s", argN, &args)
 		where += scope
+
+		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			CustomerColumn: "s.partner_id",
+			LocationColumn: "s.location_id",
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
 
 		q := fmt.Sprintf(`
 			select s.id, s.order_date, s.date_seq, s.sales_no,
@@ -376,7 +390,8 @@ func loadSale(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Sale
 func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]SaleLine, error) {
 	rows, err := pool.Query(ctx, `
 		select id, line_no, item_id, item_code, item_name, description,
-		  qty::float8, unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
+		  qty::float8, coalesce(returned_qty, 0)::float8,
+		  unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
 		  unit_vat_inc::float8, line_total::float8,
 		  discount_amount::float8, discounted_unit_non_vat::float8, discounted_unit_vat_inc::float8,
 		  remark, serial_lot_no, source_sales_order_line_id
@@ -392,7 +407,7 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 	for rows.Next() {
 		var ln SaleLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
-			&ln.Qty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
+			&ln.Qty, &ln.ReturnedQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal,
 			&ln.DiscountAmount, &ln.DiscountedUnitNonVat, &ln.DiscountedUnitVatInc,
 			&ln.Remark, &ln.SerialLotNo, &ln.SourceSalesOrderLineID); err != nil {
@@ -437,6 +452,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		templateCode := defaultTemplateCode(body.TemplateCode)
+		body.Lines = applyPartnerRatesToSaleLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeSaleLines(tt, templateCode, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
@@ -595,6 +611,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		templateCode := defaultTemplateCode(body.TemplateCode)
+		body.Lines = applyPartnerRatesToSaleLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeSaleLines(tt, templateCode, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
@@ -806,6 +823,17 @@ func computeSaleLines(tt taxcalc.TaxType, templateCode string, lines []saleLineB
 		return nil, errs
 	}
 	return out, nil
+}
+
+func applyPartnerRatesToSaleLines(ctx context.Context, pool *pgxpool.Pool, tenantID, partnerID int64, lines []saleLineBody) []saleLineBody {
+	out := make([]saleLineBody, len(lines))
+	copy(out, lines)
+	for i := range out {
+		if out[i].ItemID != nil && *out[i].ItemID > 0 {
+			out[i].UnitPrice = inventory.ResolveSellingUnitPrice(ctx, pool, tenantID, *out[i].ItemID, partnerID, out[i].UnitPrice)
+		}
+	}
+	return out
 }
 
 func sumSaleTotals(lines []computedLine) (subtotal, taxTotal, grandTotal float64) {

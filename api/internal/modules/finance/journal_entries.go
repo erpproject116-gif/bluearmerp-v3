@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,7 +24,7 @@ type JournalEntry struct {
 func registerJournalEntryRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("finance.journal_entries", auth.AccessRead)).Get("/journal-entries", listJournalEntries(pool))
 	r.With(auth.RequirePermission("finance.journal_entries_new", auth.AccessWrite)).Post("/journal-entries", createJournalEntry(pool))
-	r.With(auth.RequirePermission("finance.journal_entries_post", auth.AccessWrite)).Post("/journal-entries/{id}/post", postJournalEntry(pool))
+	r.With(auth.RequireSubmit("finance.journal_entries_post")).Post("/journal-entries/{id}/post", postJournalEntry(pool))
 }
 
 func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
@@ -123,6 +124,17 @@ func postJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			where je.id = $1 and je.tenant_id = $2 and je.status = 'draft'`, id, tu.TenantID).Scan(&debit, &credit)
 		if err != nil || debit != credit {
 			response.Validation(w, map[string]string{"lines": "Journal entry must balance before posting."})
+			return
+		}
+		var entryDate time.Time
+		if err := pool.QueryRow(r.Context(), `
+			select entry_date from public.fin_journal_entries
+			where id = $1 and tenant_id = $2 and status = 'draft'`, id, tu.TenantID).Scan(&entryDate); err != nil {
+			response.Err(w, http.StatusNotFound, "Journal entry not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if errs := validatePostingDate(r.Context(), pool, tu.TenantID, entryDate); len(errs) > 0 {
+			response.Validation(w, errs)
 			return
 		}
 		tag, err := pool.Exec(r.Context(), `

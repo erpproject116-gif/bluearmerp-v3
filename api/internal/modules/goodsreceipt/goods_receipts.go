@@ -18,6 +18,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -59,6 +60,8 @@ type GoodsReceipt struct {
 	LocationID        int64              `json:"location_id"`
 	LocationName      string             `json:"location_name,omitempty"`
 	Status            string             `json:"status"`
+	InspectionStatus  string             `json:"inspection_status"`
+	InspectionNotes   *string            `json:"inspection_notes,omitempty"`
 	Reference         *string            `json:"reference,omitempty"`
 	Notes             *string            `json:"notes,omitempty"`
 	CreatedByUserID   *int64             `json:"created_by_user_id,omitempty"`
@@ -162,10 +165,21 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 			sortCol = "gr.receipt_date"
 		}
 
+		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			CustomerColumn: "po.partner_id",
+			LocationColumn: "gr.location_id",
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
+
 		q := fmt.Sprintf(`
 			select gr.id, gr.purchase_order_id, po.purchase_order_no,
 			  gr.receipt_date, gr.location_id, loc.location_name,
-			  gr.status, gr.reference, gr.notes,
+			  gr.status, gr.inspection_status, gr.inspection_notes,
+			  gr.reference, gr.notes,
 			  gr.created_by_user_id, coalesce(u.full_name, ''),
 			  gr.created_at, gr.updated_at, count(*) over()
 			from public.gr_goods_receipts gr
@@ -193,7 +207,8 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 			if err := rows.Scan(
 				&row.ID, &row.PurchaseOrderID, &row.PurchaseOrderNo,
 				&receiptDate, &row.LocationID, &row.LocationName,
-				&row.Status, &row.Reference, &row.Notes,
+				&row.Status, &row.InspectionStatus, &row.InspectionNotes,
+				&row.Reference, &row.Notes,
 				&row.CreatedByUserID, &row.CreatedByName,
 				&createdAt, &updatedAt, &total,
 			); err != nil {
@@ -237,7 +252,8 @@ func loadGoodsReceipt(ctx context.Context, conn pgxpoolConn, tenantID, id int64)
 	err := conn.QueryRow(ctx, `
 		select gr.id, gr.purchase_order_id, po.purchase_order_no,
 		  gr.receipt_date, gr.location_id, loc.location_name,
-		  gr.status, gr.reference, gr.notes,
+		  gr.status, gr.inspection_status, gr.inspection_notes,
+		  gr.reference, gr.notes,
 		  gr.created_by_user_id, coalesce(u.full_name, ''),
 		  gr.created_at, gr.updated_at
 		from public.gr_goods_receipts gr
@@ -248,7 +264,8 @@ func loadGoodsReceipt(ctx context.Context, conn pgxpoolConn, tenantID, id int64)
 		id, tenantID).Scan(
 		&gr.ID, &gr.PurchaseOrderID, &gr.PurchaseOrderNo,
 		&receiptDate, &gr.LocationID, &gr.LocationName,
-		&gr.Status, &gr.Reference, &gr.Notes,
+		&gr.Status, &gr.InspectionStatus, &gr.InspectionNotes,
+		&gr.Reference, &gr.Notes,
 		&gr.CreatedByUserID, &gr.CreatedByName,
 		&createdAt, &updatedAt,
 	)
@@ -868,18 +885,22 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var purchaseOrderID, locationID int64
 		var receiptDate time.Time
-		var status string
+		var status, inspectionStatus string
 		err = tx.QueryRow(r.Context(), `
-			select purchase_order_id, location_id, receipt_date, status
+			select purchase_order_id, location_id, receipt_date, status, inspection_status
 			from public.gr_goods_receipts
 			where id = $1 and tenant_id = $2
-			for update`, grID, tu.TenantID).Scan(&purchaseOrderID, &locationID, &receiptDate, &status)
+			for update`, grID, tu.TenantID).Scan(&purchaseOrderID, &locationID, &receiptDate, &status, &inspectionStatus)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
 			return
 		}
 		if status != "draft" {
 			response.Validation(w, map[string]string{"status": "Only draft goods receipts can be posted."})
+			return
+		}
+		if inspectionStatus != "released" {
+			response.Validation(w, map[string]string{"inspection_status": "Goods receipt must be inspection-released before posting."})
 			return
 		}
 

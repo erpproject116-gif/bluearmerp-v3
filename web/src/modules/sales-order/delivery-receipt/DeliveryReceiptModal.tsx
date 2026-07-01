@@ -19,6 +19,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  prefilterSalesOrderId?: number | null;
 };
 
 function todayISO() {
@@ -56,6 +57,24 @@ export function DeliveryReceiptModal(props: Props) {
   createEffect(() => {
     if (!props.open) return;
     reset();
+  });
+
+  createEffect(() => {
+    if (!props.open || !props.prefilterSalesOrderId) return;
+    const soId = props.prefilterSalesOrderId;
+    const rows = openLines.data ?? [];
+    if (rows.length === 0) return;
+    const matching = rows.filter((r) => r.sales_order_id === soId);
+    if (matching.length === 0) return;
+    setLines(
+      matching.map((row) => ({
+        sales_order_line_id: row.sales_order_line_id,
+        sales_order_release_line_id: row.sales_order_release_line_id,
+        label: `${row.sales_order_no} — ${row.item_code} ${row.item_name} (${row.customer_name})`,
+        qty: String(row.balance_qty),
+        balance_qty: row.balance_qty,
+      })),
+    );
   });
 
   createEffect(() => {

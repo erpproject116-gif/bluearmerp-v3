@@ -18,33 +18,40 @@ import (
 )
 
 type Partner struct {
-	ID          int64   `json:"id"`
-	PartnerCode string  `json:"partner_code"`
-	PartnerKind string  `json:"partner_kind"`
-	CompanyName string  `json:"company_name"`
-	CeoName     *string `json:"ceo_name"`
-	Phone       *string `json:"phone"`
-	Mobile      *string `json:"mobile"`
-	Email       *string `json:"email"`
-	Address      *string        `json:"address"`
-	Status       string         `json:"status"`
-	CustomValues map[string]any `json:"custom_values,omitempty"`
+	ID                 int64          `json:"id"`
+	PartnerCode        string         `json:"partner_code"`
+	PartnerKind        string         `json:"partner_kind"`
+	CompanyName        string         `json:"company_name"`
+	CeoName            *string        `json:"ceo_name"`
+	Phone              *string        `json:"phone"`
+	Mobile             *string        `json:"mobile"`
+	Email              *string        `json:"email"`
+	Address            *string        `json:"address"`
+	Status             string         `json:"status"`
+	CreditLimit        *float64       `json:"credit_limit,omitempty"`
+	CreditLimitOnHold  bool           `json:"credit_limit_on_hold"`
+	DefaultPriceListID *int64         `json:"default_price_list_id,omitempty"`
+	CustomValues       map[string]any `json:"custom_values,omitempty"`
 }
 
 type partnerBody struct {
-	PartnerKind  string         `json:"partner_kind"`
-	CompanyName  string         `json:"company_name"`
-	CeoName      *string        `json:"ceo_name"`
-	Phone        *string        `json:"phone"`
-	Mobile       *string        `json:"mobile"`
-	Email        *string        `json:"email"`
-	Address      *string        `json:"address"`
-	Status       string         `json:"status"`
-	CustomValues map[string]any `json:"custom_values"`
+	PartnerKind        string         `json:"partner_kind"`
+	CompanyName        string         `json:"company_name"`
+	CeoName            *string        `json:"ceo_name"`
+	Phone              *string        `json:"phone"`
+	Mobile             *string        `json:"mobile"`
+	Email              *string        `json:"email"`
+	Address            *string        `json:"address"`
+	Status             string         `json:"status"`
+	CreditLimit        *float64       `json:"credit_limit"`
+	CreditLimitOnHold  *bool          `json:"credit_limit_on_hold"`
+	DefaultPriceListID *int64         `json:"default_price_list_id"`
+	CustomValues       map[string]any `json:"custom_values"`
 }
 
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/inventory", func(ir chi.Router) {
+		registerInventoryWorkspaceRoutes(ir, pool)
 		registerPartnerRoutes(ir, pool)
 		registerLocationRoutes(ir, pool)
 		registerProjectRoutes(ir, pool)
@@ -55,9 +62,12 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerRepairOrderAttachmentRoutes(ir, pool)
 		registerRepairRegistrationRoutes(ir, pool)
 		registerStockMovementRoutes(ir, pool)
+		registerStockEntryRoutes(ir, pool)
 		registerSerialRoutes(ir, pool)
 		registerReconciliationRoutes(ir, pool)
+		registerInventoryReportRoutes(ir, pool)
 		registerPriceListRoutes(ir, pool)
+		registerProductBundleRoutes(ir, pool)
 	})
 }
 
@@ -106,6 +116,7 @@ func listPartners(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		q := fmt.Sprintf(`
 			select id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, address, status,
+			  credit_limit::float8, coalesce(credit_limit_on_hold, false), default_price_list_id,
 			       count(*) over() as total_count
 			from public.inv_partners
 			where %s
@@ -125,7 +136,8 @@ func listPartners(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row Partner
 			if err := rows.Scan(&row.ID, &row.PartnerCode, &row.PartnerKind, &row.CompanyName,
-				&row.CeoName, &row.Phone, &row.Mobile, &row.Email, &row.Address, &row.Status, &total); err != nil {
+				&row.CeoName, &row.Phone, &row.Mobile, &row.Email, &row.Address, &row.Status,
+				&row.CreditLimit, &row.CreditLimitOnHold, &row.DefaultPriceListID, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read partners.", "ERR_INTERNAL")
 				return
 			}
@@ -179,11 +191,13 @@ func createPartner(pool *pgxpool.Pool) http.HandlerFunc {
 		var id int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.inv_partners
-			  (tenant_id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, address, status)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			  (tenant_id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, address, status,
+			   credit_limit, credit_limit_on_hold, default_price_list_id)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 			returning id`,
 			tu.TenantID, code, body.PartnerKind, strings.TrimSpace(body.CompanyName),
-			body.CeoName, body.Phone, body.Mobile, body.Email, body.Address, defaultStatus(body.Status)).
+			body.CeoName, body.Phone, body.Mobile, body.Email, body.Address, defaultStatus(body.Status),
+			body.CreditLimit, body.CreditLimitOnHold != nil && *body.CreditLimitOnHold, body.DefaultPriceListID).
 			Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create partner.", "ERR_INTERNAL")
@@ -234,10 +248,12 @@ func updatePartner(pool *pgxpool.Pool) http.HandlerFunc {
 		tag, err := tx.Exec(r.Context(), `
 			update public.inv_partners set
 			  partner_kind = $1, company_name = $2, ceo_name = $3, phone = $4, mobile = $5,
-			  email = $6, address = $7, status = $8, updated_at = now()
-			where id = $9 and tenant_id = $10 and deleted_at is null`,
+			  email = $6, address = $7, status = $8,
+			  credit_limit = $9, credit_limit_on_hold = $10, default_price_list_id = $11, updated_at = now()
+			where id = $12 and tenant_id = $13 and deleted_at is null`,
 			body.PartnerKind, strings.TrimSpace(body.CompanyName), body.CeoName, body.Phone, body.Mobile,
-			body.Email, body.Address, defaultStatus(body.Status), id, tu.TenantID)
+			body.Email, body.Address, defaultStatus(body.Status),
+			body.CreditLimit, body.CreditLimitOnHold != nil && *body.CreditLimitOnHold, body.DefaultPriceListID, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Partner not found.", "ERR_NOT_FOUND")
 			return
@@ -279,11 +295,13 @@ func deletePartner(pool *pgxpool.Pool) http.HandlerFunc {
 func getPartner(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Partner, error) {
 	var row Partner
 	err := pool.QueryRow(ctx, `
-		select id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, address, status
+		select id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, address, status,
+		  credit_limit::float8, coalesce(credit_limit_on_hold, false), default_price_list_id
 		from public.inv_partners
 		where id = $1 and tenant_id = $2 and deleted_at is null`, id, tenantID).
 		Scan(&row.ID, &row.PartnerCode, &row.PartnerKind, &row.CompanyName,
-			&row.CeoName, &row.Phone, &row.Mobile, &row.Email, &row.Address, &row.Status)
+			&row.CeoName, &row.Phone, &row.Mobile, &row.Email, &row.Address, &row.Status,
+			&row.CreditLimit, &row.CreditLimitOnHold, &row.DefaultPriceListID)
 	if err != nil {
 		return row, err
 	}

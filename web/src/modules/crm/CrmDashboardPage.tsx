@@ -13,7 +13,7 @@ type KpiTile = {
 };
 
 const tiles: KpiTile[] = [
-  { label: "Expired quotations", value: (s) => s.expired_quotations_count ?? 0, href: "/app/crm/pipelines/quotations", accent: "text-red-600" },
+        { label: "Expired quotations", value: (s) => s.expired_quotations_count ?? 0, href: "/app/crm/reports/expired-quotations", accent: "text-red-600" },
   { label: "Quotes expiring (7d)", value: (s) => s.quotes_expiring_7d ?? 0, href: "/app/crm/pipelines/quotations", accent: "text-amber-600" },
   {
     label: "Not converted to SO",

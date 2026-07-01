@@ -106,6 +106,35 @@ Applied automatically by `supabase db reset` in filename order after earlier mig
 | `054_stock_reservation.sql` | `qty_reserved` on location balances for split SO release |
 | `055_delivery_receipt.sql` | Delivery receipt module, DR slip lines, permissions |
 
+### Gap closure — fulfillment, returns, GL, parity (058–072)
+
+Applied in filename order after `055` (or via `go run ./cmd/migrate -from 060` on hosted DB):
+
+| File | Purpose |
+|------|---------|
+| `058_line_fulfillment_qty.sql` | SO/PO line `delivered_qty`, `billed_qty`, `received_qty`, `returned_qty` |
+| `059_sales_returns.sql` | Sales return documents, lines, permissions |
+| `060_purchase_returns.sql` | Purchase return documents, lines, permissions |
+| `061_credit_limits.sql` | Partner `credit_limit`, `credit_limit_on_hold` |
+| `062_price_lists.sql` | `inv_price_lists`, `inv_price_list_items`, partner default list |
+| `063_chart_of_accounts.sql` | Chart of accounts, journal entries, GL posting |
+| `064_permission_actions.sql` | `submit` / `cancel` permission actions |
+| `065_user_data_scopes.sql` | Per-user location/team data scopes |
+| `067_rfq_supplier_quotations.sql` | RFQ, supplier quotations, lines |
+| `068_stock_entries.sql` | Stock entry transfer/issue/receipt |
+| `069_selling_depth.sql` | Product bundles, SO sales person, credit balance report |
+| `070_crm_reconciliation_gap.sql` | CRM `reconciliation_gap` alert rule |
+| `071_finance_operational.sql` | Fiscal years, bank statements, payment entries |
+| `072_crm_leads_opportunities.sql` | CRM leads and opportunities |
+
+**Hosted apply (no `psql` required):**
+
+```bash
+cd api
+go run ./cmd/migrate -check -from 060   # list pending
+go run ./cmd/migrate -from 060          # apply pending
+```
+
 See [docs/modules/inventory/serial-lot/README.md](../modules/inventory/serial-lot/README.md) and [docs/modules/dashboard/README.md](../modules/dashboard/README.md).
 
 ---

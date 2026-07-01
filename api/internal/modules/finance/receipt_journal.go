@@ -386,6 +386,14 @@ func saveReceiptJournal(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		if len(body.JournalLines) > 0 {
+			ev := buildORPostingEvent(tu.TenantID, id, body.JournalLines)
+			if err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
+				return
+			}
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return

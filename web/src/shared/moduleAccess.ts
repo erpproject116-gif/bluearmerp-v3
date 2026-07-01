@@ -6,6 +6,7 @@ export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: s
   if (moduleId === "user_management" && !canManageUsers(me)) return false;
   if (moduleId === "activity_logs" && !canViewActivityLogs(me)) return false;
   if (moduleId === "crm" && !canViewCrm(me)) return false;
+  if (moduleId === "support" && !canViewCrm(me)) return false;
   if (moduleId === "activity_logs" || moduleId === "user_management") return true;
 
   const codes = me?.enabled_module_codes;

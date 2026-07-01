@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -69,7 +70,7 @@ func registerOfficialReceiptRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerORAttachmentRoutes(r, pool)
 	r.Get("/official-receipts/preview-sequences", previewReceiptSequences(pool))
 	r.Get("/official-receipts", listOfficialReceipts(pool))
-	r.Post("/official-receipts", createOfficialReceipt(pool))
+	r.With(auth.RequirePermission("finance.official_receipts_new", auth.AccessWrite)).Post("/official-receipts", createOfficialReceipt(pool))
 	r.Get("/official-receipts/{id}", getOfficialReceipt(pool))
 	r.Patch("/official-receipts/{id}", updateOfficialReceipt(pool))
 	r.Delete("/official-receipts/{id}", deleteOfficialReceipt(pool))
@@ -139,6 +140,15 @@ func listOfficialReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *pid)
 			argN++
 		}
+
+		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			CustomerColumn: "r.partner_id",
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
 
 		q := fmt.Sprintf(`
 			select r.id, r.receipt_date, r.date_seq, r.receipt_no,

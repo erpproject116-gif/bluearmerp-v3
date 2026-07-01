@@ -14,25 +14,40 @@ func validAccessLevel(level string) bool {
 }
 
 func loadRolePermissions(ctx context.Context, pool *pgxpool.Pool, tenantID int64, roleCode string) (map[string]string, error) {
+	perms, _, _, err := loadRolePermissionsFull(ctx, pool, tenantID, roleCode)
+	return perms, err
+}
+
+func loadRolePermissionsFull(ctx context.Context, pool *pgxpool.Pool, tenantID int64, roleCode string) (map[string]string, map[string]bool, map[string]bool, error) {
 	rows, err := pool.Query(ctx, `
-		select pr.permission_code, coalesce(trp.access_level, 'deny')
+		select pr.permission_code, coalesce(trp.access_level, 'deny'),
+		  coalesce(trp.can_submit, false), coalesce(trp.can_cancel, false)
 		from public.permission_registry pr
 		left join public.tenant_role_permissions trp
 		  on trp.tenant_id = $1 and trp.role_code = $2 and trp.permission_code = pr.permission_code
 		order by pr.sort_order`, tenantID, roleCode)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	defer rows.Close()
 	out := map[string]string{}
+	submit := map[string]bool{}
+	cancel := map[string]bool{}
 	for rows.Next() {
 		var code, lvl string
-		if err := rows.Scan(&code, &lvl); err != nil {
-			return nil, err
+		var canSubmit, canCancel bool
+		if err := rows.Scan(&code, &lvl, &canSubmit, &canCancel); err != nil {
+			return nil, nil, nil, err
 		}
 		out[code] = lvl
+		if canSubmit {
+			submit[code] = true
+		}
+		if canCancel {
+			cancel[code] = true
+		}
 	}
-	return out, rows.Err()
+	return out, submit, cancel, rows.Err()
 }
 
 func loadUserOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64) (map[string]string, error) {
@@ -66,9 +81,15 @@ func mergePermissions(rolePerms, overrides map[string]string) map[string]string 
 	return out
 }
 
-func saveRolePermissions(ctx context.Context, pool *pgxpool.Pool, tenantID int64, roleCode string, perms map[string]string) error {
+func saveRolePermissions(ctx context.Context, pool *pgxpool.Pool, tenantID int64, roleCode string, perms map[string]string, canSubmit, canCancel map[string]bool) error {
 	if perms == nil {
 		perms = map[string]string{}
+	}
+	if canSubmit == nil {
+		canSubmit = map[string]bool{}
+	}
+	if canCancel == nil {
+		canCancel = map[string]bool{}
 	}
 	for _, lvl := range perms {
 		if !validAccessLevel(lvl) {
@@ -102,11 +123,13 @@ func saveRolePermissions(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 			lvl = "deny"
 		}
 		_, err := tx.Exec(ctx, `
-			insert into public.tenant_role_permissions (tenant_id, role_code, permission_code, access_level)
-			values ($1, $2, $3, $4)
+			insert into public.tenant_role_permissions (tenant_id, role_code, permission_code, access_level, can_submit, can_cancel)
+			values ($1, $2, $3, $4, $5, $6)
 			on conflict (tenant_id, role_code, permission_code)
-			do update set access_level = excluded.access_level`,
-			tenantID, roleCode, code, lvl)
+			do update set access_level = excluded.access_level,
+			  can_submit = excluded.can_submit,
+			  can_cancel = excluded.can_cancel`,
+			tenantID, roleCode, code, lvl, canSubmit[code], canCancel[code])
 		if err != nil {
 			return err
 		}
