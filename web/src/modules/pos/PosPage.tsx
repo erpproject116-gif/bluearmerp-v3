@@ -67,6 +67,18 @@ export default function PosPage() {
   const [locationLabel, setLocationLabel] = createSignal("");
   const [openingCash, setOpeningCash] = createSignal("0");
   const [opening, setOpening] = createSignal(false);
+  const [locationTouched, setLocationTouched] = createSignal(false);
+
+  // Prefill the register location from POS settings so cashiers open against the
+  // stock-holding location (POS sales deduct inventory from this location).
+  createEffect(() => {
+    if (session.data || locationTouched()) return;
+    const s = settings.data;
+    if (s?.default_location_id && locationId() === null) {
+      setLocationId(s.default_location_id);
+      setLocationLabel(s.default_location_name ?? "");
+    }
+  });
 
   const [activeCategory, setActiveCategory] = createSignal<number | null>(null);
   const [search, setSearch] = createSignal("");
@@ -370,22 +382,35 @@ export default function PosPage() {
               <h2 class="mb-1 text-lg font-semibold">Open shift</h2>
               <p class="mb-5 text-sm text-slate-500">Pick your register location and starting cash to begin selling.</p>
               <div class="space-y-4">
-                <LookupCombo
-                  label="Location"
-                  value={locationLabel}
-                  selectedId={locationId}
-                  onInput={setLocationLabel}
-                  onSelect={(o) => {
-                    setLocationId(o.id);
-                    setLocationLabel(o.label);
-                  }}
-                  onClear={() => {
-                    setLocationId(null);
-                    setLocationLabel("");
-                  }}
-                  fetchOptions={fetchLocations}
-                  placeholder="Select location…"
-                />
+                <div>
+                  <LookupCombo
+                    label="Location"
+                    value={locationLabel}
+                    selectedId={locationId}
+                    onInput={setLocationLabel}
+                    onSelect={(o) => {
+                      setLocationTouched(true);
+                      setLocationId(o.id);
+                      setLocationLabel(o.label);
+                    }}
+                    onClear={() => {
+                      setLocationTouched(true);
+                      setLocationId(null);
+                      setLocationLabel("");
+                    }}
+                    fetchOptions={fetchLocations}
+                    placeholder="Select location…"
+                  />
+                  <div class="mt-2 flex gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.48 14.7A1 1 0 002.67 20h18.66a1 1 0 00.86-1.44l-8.48-14.7a1 1 0 00-1.72 0z" />
+                    </svg>
+                    <span>
+                      Sales made in this shift deduct stock from this location. Choose the branch/warehouse that holds your sellable
+                      inventory{settings.data?.default_location_name ? "" : " (set a default in POS → Manage → Settings)"}.
+                    </span>
+                  </div>
+                </div>
                 <div>
                   <label class="mb-1 block text-sm font-medium text-slate-600">Opening cash</label>
                   <input

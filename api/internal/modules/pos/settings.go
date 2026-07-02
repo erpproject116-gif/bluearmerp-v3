@@ -13,14 +13,15 @@ import (
 )
 
 type PosSettings struct {
-	DefaultLocationID *int64   `json:"default_location_id,omitempty"`
-	DefaultTaxTypeID  *int64   `json:"default_tax_type_id,omitempty"`
-	TaxInclusive      bool     `json:"tax_inclusive"`
-	OrderTypes        []string `json:"order_types"`
-	AllowedTenders    []string `json:"allowed_tenders"`
-	RequireCustomer   bool     `json:"require_customer"`
-	EnableBarcode     bool     `json:"enable_barcode"`
-	ReceiptFooter     string   `json:"receipt_footer,omitempty"`
+	DefaultLocationID   *int64   `json:"default_location_id,omitempty"`
+	DefaultLocationName string   `json:"default_location_name,omitempty"`
+	DefaultTaxTypeID    *int64   `json:"default_tax_type_id,omitempty"`
+	TaxInclusive        bool     `json:"tax_inclusive"`
+	OrderTypes          []string `json:"order_types"`
+	AllowedTenders      []string `json:"allowed_tenders"`
+	RequireCustomer     bool     `json:"require_customer"`
+	EnableBarcode       bool     `json:"enable_barcode"`
+	ReceiptFooter       string   `json:"receipt_footer,omitempty"`
 	// Read-only resolved fields for client-side tax preview.
 	TaxMode        string  `json:"tax_mode,omitempty"`
 	TaxRatePercent float64 `json:"tax_rate_percent"`
@@ -38,7 +39,9 @@ type posSettingsBody struct {
 }
 
 func registerSettingsRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.With(auth.RequirePermission("pos.manage", auth.AccessRead)).Get("/settings", getPosSettings(pool))
+	// Register config is needed by the terminal (tax, tenders, default location), so allow
+	// either terminal or manage to read it; only managers can change it.
+	r.Get("/settings", getPosSettings(pool))
 	r.With(auth.RequirePermission("pos.manage", auth.AccessWrite)).Put("/settings", putPosSettings(pool))
 }
 
@@ -48,12 +51,13 @@ func loadPosSettings(pool *pgxpool.Pool, r *http.Request, tenantID int64) (PosSe
 	var footer, taxMode *string
 	var ratePercent *float64
 	err := pool.QueryRow(r.Context(), `
-		select ps.default_location_id, ps.default_tax_type_id, ps.tax_inclusive, ps.order_types, ps.allowed_tenders,
+		select ps.default_location_id, coalesce(loc.location_name, ''), ps.default_tax_type_id, ps.tax_inclusive, ps.order_types, ps.allowed_tenders,
 		  ps.require_customer, ps.enable_barcode, ps.receipt_footer, tt.tax_mode, tt.rate_percent::float8
 		from public.pos_settings ps
 		left join public.quo_tax_types tt on tt.id = ps.default_tax_type_id and tt.tenant_id = ps.tenant_id
+		left join public.inv_locations loc on loc.id = ps.default_location_id and loc.tenant_id = ps.tenant_id
 		where ps.tenant_id = $1`, tenantID).
-		Scan(&s.DefaultLocationID, &s.DefaultTaxTypeID, &s.TaxInclusive, &orderTypes, &allowedTenders,
+		Scan(&s.DefaultLocationID, &s.DefaultLocationName, &s.DefaultTaxTypeID, &s.TaxInclusive, &orderTypes, &allowedTenders,
 			&s.RequireCustomer, &s.EnableBarcode, &footer, &taxMode, &ratePercent)
 	if err != nil {
 		return s, err
@@ -80,7 +84,15 @@ func loadPosSettings(pool *pgxpool.Pool, r *http.Request, tenantID int64) (PosSe
 
 func getPosSettings(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tu, _ := auth.FromContext(r.Context())
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !tu.HasPermission("pos.terminal", auth.AccessRead) && !tu.HasPermission("pos.manage", auth.AccessRead) {
+			response.Err(w, http.StatusForbidden, "You do not have permission for this action.", "ERR_FORBIDDEN")
+			return
+		}
 		s, err := loadPosSettings(pool, r, tu.TenantID)
 		if err != nil {
 			// Lazily create a default row if none exists yet.

@@ -149,6 +149,7 @@ export type PosCatalogItem = {
 
 export type PosSettings = {
   default_location_id?: number | null;
+  default_location_name?: string;
   default_tax_type_id?: number | null;
   tax_inclusive: boolean;
   order_types: string[];
