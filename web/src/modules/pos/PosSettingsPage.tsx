@@ -4,6 +4,7 @@ import { apiFetch, apiAbsoluteUrl, getAccessToken } from "../../shared/api";
 import { AuthImage } from "../../shared/AuthImage";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { useToast } from "../../shared/toast";
+import { useAuth, hasPermission } from "../../shared/auth-context";
 import { usePosSettings, savePosSettings, fetchPosLogs, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
 
 type ItemRow = {
@@ -65,10 +66,26 @@ async function uploadImage(itemId: number, file: File): Promise<boolean> {
 }
 
 export default function PosSettingsPage() {
+  const auth = useAuth();
   const [searchParams, setSearchParams] = useSearchParams<{ tab?: string }>();
   const tab = () => searchParams.tab ?? "products";
+  const canManage = () => hasPermission(auth.me, "pos.manage", "read");
 
   return (
+    <Show
+      when={canManage()}
+      fallback={
+        <div class="mx-auto max-w-6xl p-6">
+          <div class="rounded-lg border border-stroke bg-slate-50 p-6 text-center">
+            <h1 class="text-lg font-semibold text-text-primary">POS management</h1>
+            <p class="mt-2 text-sm text-text-secondary">
+              You don't have permission to manage POS. Ask an administrator to grant the
+              <span class="font-medium"> POS Management</span> permission.
+            </p>
+          </div>
+        </div>
+      }
+    >
     <div class="mx-auto max-w-6xl p-6">
       <h1 class="text-xl font-semibold text-text-primary">POS management</h1>
       <p class="mt-1 text-sm text-text-secondary">Manage products, categories, and register behavior for this store.</p>
@@ -109,6 +126,7 @@ export default function PosSettingsPage() {
         </Show>
       </div>
     </div>
+    </Show>
   );
 }
 

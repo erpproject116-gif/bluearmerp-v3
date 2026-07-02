@@ -145,10 +145,12 @@ export const hrefPermissionCode: Record<string, string> = {
 };
 
 export function permissionCodeForHref(href: string): string | undefined {
-  if (hrefPermissionCode[href]) return hrefPermissionCode[href];
-  if (href.startsWith("/app/support/tickets/")) return "support.tickets";
-  if (href.startsWith("/app/finance/budgets/")) return "finance.budget_read";
-  const base = href.replace(/\/settings$/, "").replace(/\/new$/, "");
+  // Ignore query string / hash so tabbed routes (e.g. /app/pos/manage?tab=x) still resolve.
+  const path = href.split(/[?#]/)[0];
+  if (hrefPermissionCode[path]) return hrefPermissionCode[path];
+  if (path.startsWith("/app/support/tickets/")) return "support.tickets";
+  if (path.startsWith("/app/finance/budgets/")) return "finance.budget_read";
+  const base = path.replace(/\/settings$/, "").replace(/\/new$/, "");
   return hrefPermissionCode[base];
 }
 

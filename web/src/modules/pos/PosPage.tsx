@@ -4,7 +4,7 @@ import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
 import { AuthImage } from "../../shared/AuthImage";
 import { useToast } from "../../shared/toast";
-import { useAuth } from "../../shared/auth-context";
+import { useAuth, hasPermission } from "../../shared/auth-context";
 import {
   addPosCartLine,
   checkoutPos,
@@ -320,6 +320,14 @@ export default function PosPage() {
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <Show when={hasPermission(auth.me, "pos.manage", "read")}>
+            <A
+              href="/app/pos/manage"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Manage
+            </A>
+          </Show>
           <Show when={session.data}>
             <button
               type="button"
