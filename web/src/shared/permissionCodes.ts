@@ -93,6 +93,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/crm/settings/alert-rules": "crm.settings_alert_rules",
   "/app/support/tickets": "support.tickets",
   "/app/pos": "pos.terminal",
+  "/app/pos/manage": "pos.manage",
   "/app/hr/employees": "hr.employees",
   "/app/hr/payroll-runs": "hr.payroll_runs",
   "/app/manufacturing/boms": "manufacturing.boms",

@@ -39,14 +39,24 @@ type Session struct {
 }
 
 type CartLine struct {
-	ID        int64   `json:"id"`
-	LineNo    int     `json:"line_no"`
-	ItemID    int64   `json:"item_id"`
-	ItemCode  string  `json:"item_code"`
-	ItemName  string  `json:"item_name"`
-	Qty       float64 `json:"qty"`
-	UnitPrice float64 `json:"unit_price"`
-	LineTotal float64 `json:"line_total"`
+	ID        int64             `json:"id"`
+	LineNo    int               `json:"line_no"`
+	ItemID    int64             `json:"item_id"`
+	ItemCode  string            `json:"item_code"`
+	ItemName  string            `json:"item_name"`
+	Qty       float64           `json:"qty"`
+	UnitPrice float64           `json:"unit_price"`
+	LineTotal float64           `json:"line_total"`
+	Notes     *string           `json:"notes,omitempty"`
+	SizeLabel *string           `json:"size_label,omitempty"`
+	Modifiers []CartLineModifier `json:"modifiers,omitempty"`
+}
+
+type CartLineModifier struct {
+	ID         int64   `json:"id"`
+	ModifierID int64   `json:"modifier_id,omitempty"`
+	Name       string  `json:"name"`
+	PriceDelta float64 `json:"price_delta"`
 }
 
 type Tender struct {
@@ -70,9 +80,12 @@ type closeSessionBody struct {
 }
 
 type cartLineBody struct {
-	ItemID    int64   `json:"item_id"`
-	Qty       float64 `json:"qty"`
-	UnitPrice float64 `json:"unit_price"`
+	ItemID      int64   `json:"item_id"`
+	Qty         float64 `json:"qty"`
+	UnitPrice   float64 `json:"unit_price"`
+	ModifierIDs []int64 `json:"modifier_ids"`
+	Notes       *string `json:"notes"`
+	SizeLabel   *string `json:"size_label"`
 }
 
 type cartLinePatch struct {
@@ -81,8 +94,11 @@ type cartLinePatch struct {
 }
 
 type checkoutBody struct {
-	PartnerID *int64       `json:"partner_id"`
-	Tenders   []tenderBody `json:"tenders"`
+	PartnerID      *int64       `json:"partner_id"`
+	Tenders        []tenderBody `json:"tenders"`
+	DiscountAmount float64      `json:"discount_amount"`
+	VoucherCode    string       `json:"voucher_code"`
+	VoucherAmount  float64      `json:"voucher_amount"`
 }
 
 type tenderBody struct {
@@ -94,6 +110,7 @@ type checkoutResult struct {
 	SalesID    int64    `json:"sales_id"`
 	SalesNo    string   `json:"sales_no"`
 	GrandTotal float64  `json:"grand_total"`
+	Change     float64  `json:"change"`
 	Tenders    []Tender `json:"tenders"`
 }
 
@@ -329,18 +346,56 @@ func addCartLine(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"item_id": "Item not found."})
 			return
 		}
-		lineTotal := roundMoney(body.Qty * body.UnitPrice)
+		// Resolve any selected modifiers server-side (never trust client prices).
+		var mods []CartLineModifier
+		var modsDelta float64
+		if len(body.ModifierIDs) > 0 {
+			rows, err := pool.Query(r.Context(), `
+				select m.id, m.name, m.price_delta::float8
+				from public.pos_modifiers m
+				join public.pos_modifier_groups g on g.id = m.group_id
+				where m.id = any($1) and g.tenant_id = $2 and m.active = true`,
+				body.ModifierIDs, tu.TenantID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load modifiers.", "ERR_INTERNAL")
+				return
+			}
+			for rows.Next() {
+				var m CartLineModifier
+				if err := rows.Scan(&m.ModifierID, &m.Name, &m.PriceDelta); err != nil {
+					rows.Close()
+					response.Err(w, http.StatusInternalServerError, "Failed to read modifiers.", "ERR_INTERNAL")
+					return
+				}
+				modsDelta += m.PriceDelta
+				mods = append(mods, m)
+			}
+			rows.Close()
+		}
+		effUnit := roundMoney(body.UnitPrice + modsDelta)
+		lineTotal := roundMoney(body.Qty * effUnit)
 		var lineNo int
 		_ = pool.QueryRow(r.Context(), `select coalesce(max(line_no), 0) + 1 from public.pos_cart_lines where session_id = $1`, sessionID).Scan(&lineNo)
 		var lineID int64
 		if err := pool.QueryRow(r.Context(), `
-			insert into public.pos_cart_lines (session_id, line_no, item_id, item_code, item_name, qty, unit_price, line_total)
-			values ($1,$2,$3,$4,$5,$6,$7,$8) returning id`,
-			sessionID, lineNo, body.ItemID, itemCode, itemName, body.Qty, body.UnitPrice, lineTotal).Scan(&lineID); err != nil {
+			insert into public.pos_cart_lines (session_id, line_no, item_id, item_code, item_name, qty, unit_price, line_total, notes, size_label)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
+			sessionID, lineNo, body.ItemID, itemCode, itemName, body.Qty, effUnit, lineTotal, body.Notes, body.SizeLabel).Scan(&lineID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to add line.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, CartLine{ID: lineID, LineNo: lineNo, ItemID: body.ItemID, ItemCode: itemCode, ItemName: itemName, Qty: body.Qty, UnitPrice: body.UnitPrice, LineTotal: lineTotal}, "Added.")
+		for i := range mods {
+			var mid int64
+			if err := pool.QueryRow(r.Context(), `
+				insert into public.pos_cart_line_modifiers (line_id, modifier_id, name, price_delta)
+				values ($1,$2,$3,$4) returning id`,
+				lineID, mods[i].ModifierID, mods[i].Name, mods[i].PriceDelta).Scan(&mid); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to save modifiers.", "ERR_INTERNAL")
+				return
+			}
+			mods[i].ID = mid
+		}
+		response.OK(w, CartLine{ID: lineID, LineNo: lineNo, ItemID: body.ItemID, ItemCode: itemCode, ItemName: itemName, Qty: body.Qty, UnitPrice: effUnit, LineTotal: lineTotal, Notes: body.Notes, SizeLabel: body.SizeLabel, Modifiers: mods}, "Added.")
 	}
 }
 
@@ -436,19 +491,69 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"cart": "Cart is empty."})
 			return
 		}
-		var grandTotal float64
+		var subtotalLines float64
 		for _, ln := range lines {
-			grandTotal += ln.LineTotal
+			subtotalLines += ln.LineTotal
 		}
-		grandTotal = roundMoney(grandTotal)
+		subtotalLines = roundMoney(subtotalLines)
+
+		// Apply order-level discount and voucher to the taxable base (never below zero).
+		discountTotal := roundMoney(body.DiscountAmount + body.VoucherAmount)
+		if discountTotal < 0 {
+			discountTotal = 0
+		}
+		if discountTotal > subtotalLines {
+			discountTotal = subtotalLines
+		}
+		subtotalLines = roundMoney(subtotalLines - discountTotal)
+
+		// Resolve tax from POS settings (default tax type + inclusive flag).
+		var settingsTaxTypeID *int64
+		var settingsTaxInclusive bool = true
+		_ = tx.QueryRow(r.Context(), `select default_tax_type_id, tax_inclusive from public.pos_settings where tenant_id=$1`, tu.TenantID).Scan(&settingsTaxTypeID, &settingsTaxInclusive)
+		var resolvedTaxTypeID int64
+		if settingsTaxTypeID != nil {
+			resolvedTaxTypeID = *settingsTaxTypeID
+		}
+		taxMode := "none"
+		var ratePercent float64
+		if resolvedTaxTypeID > 0 {
+			_ = tx.QueryRow(r.Context(), `select tax_mode, rate_percent::float8 from public.quo_tax_types where id=$1 and tenant_id=$2`, resolvedTaxTypeID, tu.TenantID).Scan(&taxMode, &ratePercent)
+		}
+		// When the tenant configured tax-exclusive pricing, treat an "included" tax type as excluded.
+		if taxMode == "included" && !settingsTaxInclusive {
+			taxMode = "excluded"
+		}
+
+		var subtotal, taxTotal, grandTotal float64
+		templateCode := "non_vat"
+		switch taxMode {
+		case "included":
+			taxTotal = roundMoney(subtotalLines * ratePercent / (100 + ratePercent))
+			subtotal = roundMoney(subtotalLines - taxTotal)
+			grandTotal = subtotalLines
+			templateCode = "vat_included"
+		case "excluded":
+			taxTotal = roundMoney(subtotalLines * ratePercent / 100)
+			subtotal = subtotalLines
+			grandTotal = roundMoney(subtotalLines + taxTotal)
+			templateCode = "default"
+		default:
+			taxTotal = 0
+			subtotal = subtotalLines
+			grandTotal = subtotalLines
+		}
+
 		var tenderTotal float64
 		for _, t := range body.Tenders {
 			tenderTotal += t.Amount
 		}
-		if math.Abs(roundMoney(tenderTotal)-grandTotal) > 0.01 {
-			response.Validation(w, map[string]string{"tenders": "Tender total must match cart total."})
+		tenderTotal = roundMoney(tenderTotal)
+		if tenderTotal+0.01 < grandTotal {
+			response.Validation(w, map[string]string{"tenders": "Tender total is less than the amount due."})
 			return
 		}
+		change := roundMoney(tenderTotal - grandTotal)
 		partnerID := int64(0)
 		if body.PartnerID != nil {
 			partnerID = *body.PartnerID
@@ -461,7 +566,9 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var taxTypeID, currencyID int64
-		if err := tx.QueryRow(r.Context(), `select id from public.quo_tax_types where tenant_id=$1 and status='active' order by sort_order, id limit 1`, tu.TenantID).Scan(&taxTypeID); err != nil {
+		if resolvedTaxTypeID > 0 {
+			taxTypeID = resolvedTaxTypeID
+		} else if err := tx.QueryRow(r.Context(), `select id from public.quo_tax_types where tenant_id=$1 and status='active' order by sort_order, id limit 1`, tu.TenantID).Scan(&taxTypeID); err != nil {
 			response.Validation(w, map[string]string{"tax_type_id": "No active tax type."})
 			return
 		}
@@ -481,8 +588,8 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			insert into public.sa_sales (tenant_id, order_date, date_seq, sales_no, tax_type_id, currency_id, partner_id,
 			  pic_user_id, pic_name, location_id, terms_of_payment, progress_status, template_code,
 			  subtotal, tax_total, grand_total, created_by_user_id, invoicing_status)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,'cash','completed','non_vat',$10,0,$10,$11,true) returning id`,
-			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID, tu.AppUserID, locationID, grandTotal, tu.AppUserID).Scan(&salesID); err != nil {
+			values ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,'cash','completed',$10,$11,$12,$13,$14,true) returning id`,
+			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID, tu.AppUserID, locationID, templateCode, subtotal, taxTotal, grandTotal, tu.AppUserID).Scan(&salesID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create sale.", "ERR_INTERNAL")
 			return
 		}
@@ -527,7 +634,7 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "pos.checkout", "sa_sales", &salesID, nil, body)
-		response.OK(w, checkoutResult{SalesID: salesID, SalesNo: salesNo, GrandTotal: grandTotal, Tenders: outTenders}, "Checkout complete.")
+		response.OK(w, checkoutResult{SalesID: salesID, SalesNo: salesNo, GrandTotal: grandTotal, Change: change, Tenders: outTenders}, "Checkout complete.")
 	}
 }
 
@@ -568,23 +675,50 @@ func loadCartLinesTx(ctx context.Context, tx pgx.Tx, sessionID int64) ([]CartLin
 }
 
 func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64) ([]CartLine, error) {
-	rows, err := q.Query(ctx, `select id, line_no, item_id, item_code, item_name, qty::float8, unit_price::float8, line_total::float8 from public.pos_cart_lines where session_id=$1 order by line_no`, sessionID)
+	rows, err := q.Query(ctx, `select id, line_no, item_id, item_code, item_name, qty::float8, unit_price::float8, line_total::float8, notes, size_label from public.pos_cart_lines where session_id=$1 order by line_no`, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []CartLine
+	byID := map[int64]int{}
+	var lineIDs []int64
 	for rows.Next() {
 		var ln CartLine
-		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal); err != nil {
+		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel); err != nil {
 			return nil, err
 		}
+		byID[ln.ID] = len(out)
+		lineIDs = append(lineIDs, ln.ID)
 		out = append(out, ln)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(lineIDs) > 0 {
+		mrows, err := q.Query(ctx, `select line_id, id, coalesce(modifier_id, 0), name, price_delta::float8 from public.pos_cart_line_modifiers where line_id = any($1) order by id`, lineIDs)
+		if err != nil {
+			return nil, err
+		}
+		defer mrows.Close()
+		for mrows.Next() {
+			var lineID int64
+			var m CartLineModifier
+			if err := mrows.Scan(&lineID, &m.ID, &m.ModifierID, &m.Name, &m.PriceDelta); err != nil {
+				return nil, err
+			}
+			if idx, ok := byID[lineID]; ok {
+				out[idx].Modifiers = append(out[idx].Modifiers, m)
+			}
+		}
+		if err := mrows.Err(); err != nil {
+			return nil, err
+		}
 	}
 	if out == nil {
 		out = []CartLine{}
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func sessionBelongsToTenant(ctx context.Context, pool *pgxpool.Pool, tenantID, sessionID int64) bool {

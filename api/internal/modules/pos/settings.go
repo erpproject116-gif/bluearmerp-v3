@@ -1,0 +1,156 @@
+package pos
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+)
+
+type PosSettings struct {
+	DefaultLocationID *int64   `json:"default_location_id,omitempty"`
+	DefaultTaxTypeID  *int64   `json:"default_tax_type_id,omitempty"`
+	TaxInclusive      bool     `json:"tax_inclusive"`
+	OrderTypes        []string `json:"order_types"`
+	AllowedTenders    []string `json:"allowed_tenders"`
+	RequireCustomer   bool     `json:"require_customer"`
+	EnableBarcode     bool     `json:"enable_barcode"`
+	ReceiptFooter     string   `json:"receipt_footer,omitempty"`
+	// Read-only resolved fields for client-side tax preview.
+	TaxMode        string  `json:"tax_mode,omitempty"`
+	TaxRatePercent float64 `json:"tax_rate_percent"`
+}
+
+type posSettingsBody struct {
+	DefaultLocationID *int64   `json:"default_location_id"`
+	DefaultTaxTypeID  *int64   `json:"default_tax_type_id"`
+	TaxInclusive      *bool    `json:"tax_inclusive"`
+	OrderTypes        []string `json:"order_types"`
+	AllowedTenders    []string `json:"allowed_tenders"`
+	RequireCustomer   *bool    `json:"require_customer"`
+	EnableBarcode     *bool    `json:"enable_barcode"`
+	ReceiptFooter     *string  `json:"receipt_footer"`
+}
+
+func registerSettingsRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.With(auth.RequirePermission("pos.manage", auth.AccessRead)).Get("/settings", getPosSettings(pool))
+	r.With(auth.RequirePermission("pos.manage", auth.AccessWrite)).Put("/settings", putPosSettings(pool))
+}
+
+func loadPosSettings(pool *pgxpool.Pool, r *http.Request, tenantID int64) (PosSettings, error) {
+	var s PosSettings
+	var orderTypes, allowedTenders []byte
+	var footer, taxMode *string
+	var ratePercent *float64
+	err := pool.QueryRow(r.Context(), `
+		select ps.default_location_id, ps.default_tax_type_id, ps.tax_inclusive, ps.order_types, ps.allowed_tenders,
+		  ps.require_customer, ps.enable_barcode, ps.receipt_footer, tt.tax_mode, tt.rate_percent::float8
+		from public.pos_settings ps
+		left join public.quo_tax_types tt on tt.id = ps.default_tax_type_id and tt.tenant_id = ps.tenant_id
+		where ps.tenant_id = $1`, tenantID).
+		Scan(&s.DefaultLocationID, &s.DefaultTaxTypeID, &s.TaxInclusive, &orderTypes, &allowedTenders,
+			&s.RequireCustomer, &s.EnableBarcode, &footer, &taxMode, &ratePercent)
+	if err != nil {
+		return s, err
+	}
+	if taxMode != nil {
+		s.TaxMode = *taxMode
+	}
+	if ratePercent != nil {
+		s.TaxRatePercent = *ratePercent
+	}
+	_ = json.Unmarshal(orderTypes, &s.OrderTypes)
+	_ = json.Unmarshal(allowedTenders, &s.AllowedTenders)
+	if s.OrderTypes == nil {
+		s.OrderTypes = []string{}
+	}
+	if s.AllowedTenders == nil {
+		s.AllowedTenders = []string{}
+	}
+	if footer != nil {
+		s.ReceiptFooter = *footer
+	}
+	return s, nil
+}
+
+func getPosSettings(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		s, err := loadPosSettings(pool, r, tu.TenantID)
+		if err != nil {
+			// Lazily create a default row if none exists yet.
+			_, _ = pool.Exec(r.Context(), `insert into public.pos_settings (tenant_id) values ($1) on conflict (tenant_id) do nothing`, tu.TenantID)
+			s, err = loadPosSettings(pool, r, tu.TenantID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load settings.", "ERR_INTERNAL")
+				return
+			}
+		}
+		response.OK(w, s, "OK")
+	}
+}
+
+func putPosSettings(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		var body posSettingsBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		orderTypes := body.OrderTypes
+		if orderTypes == nil {
+			orderTypes = []string{}
+		}
+		allowedTenders := body.AllowedTenders
+		if allowedTenders == nil {
+			allowedTenders = []string{}
+		}
+		orderTypesJSON, _ := json.Marshal(orderTypes)
+		allowedTendersJSON, _ := json.Marshal(allowedTenders)
+		taxInclusive := true
+		if body.TaxInclusive != nil {
+			taxInclusive = *body.TaxInclusive
+		}
+		requireCustomer := false
+		if body.RequireCustomer != nil {
+			requireCustomer = *body.RequireCustomer
+		}
+		enableBarcode := false
+		if body.EnableBarcode != nil {
+			enableBarcode = *body.EnableBarcode
+		}
+		_, err := pool.Exec(r.Context(), `
+			insert into public.pos_settings (tenant_id, default_location_id, default_tax_type_id, tax_inclusive,
+			  order_types, allowed_tenders, require_customer, enable_barcode, receipt_footer, updated_at)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+			on conflict (tenant_id) do update set
+			  default_location_id = excluded.default_location_id,
+			  default_tax_type_id = excluded.default_tax_type_id,
+			  tax_inclusive = excluded.tax_inclusive,
+			  order_types = excluded.order_types,
+			  allowed_tenders = excluded.allowed_tenders,
+			  require_customer = excluded.require_customer,
+			  enable_barcode = excluded.enable_barcode,
+			  receipt_footer = excluded.receipt_footer,
+			  updated_at = now()`,
+			tu.TenantID, body.DefaultLocationID, body.DefaultTaxTypeID, taxInclusive,
+			orderTypesJSON, allowedTendersJSON, requireCustomer, enableBarcode, body.ReceiptFooter)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save settings.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "pos.settings.update", "pos_settings", &tu.TenantID, nil, body)
+		s, err := loadPosSettings(pool, r, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load settings.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, s, "Saved.")
+	}
+}

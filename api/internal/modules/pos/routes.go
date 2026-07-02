@@ -11,5 +11,9 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/pos", func(pr chi.Router) {
 		pr.Use(auth.RequirePermission("pos.terminal", auth.AccessRead))
 		registerSessionRoutes(pr, pool)
+		registerCatalogRoutes(pr, pool)
+		registerSettingsRoutes(pr, pool)
+		registerModifierRoutes(pr, pool)
+		registerOpsRoutes(pr, pool)
 	})
 }

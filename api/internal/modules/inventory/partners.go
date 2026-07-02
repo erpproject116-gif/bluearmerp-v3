@@ -60,6 +60,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerProjectRoutes(ir, pool)
 		registerDepartmentRoutes(ir, pool)
 		registerItemRoutes(ir, pool)
+		registerItemImageRoutes(ir, pool)
 		registerItemSearchRoutes(ir, pool)
 		registerRepairOrderRoutes(ir, pool)
 		registerRepairOrderAttachmentRoutes(ir, pool)

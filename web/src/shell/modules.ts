@@ -337,7 +337,12 @@ export const appModules: AppModule[] = [
     href: "/app/pos",
     basePath: "/app/pos",
     features: [
-      { label: "Terminal", href: "/app/pos", settingsHref: "/app/pos" },
+      { label: "Terminal", href: "/app/pos", settingsHref: "/app/pos/manage" },
+      { label: "Products", href: "/app/pos/manage?tab=products", settingsHref: "/app/pos/manage", managersOnly: true },
+      { label: "Categories", href: "/app/pos/manage?tab=categories", settingsHref: "/app/pos/manage", managersOnly: true },
+      { label: "Modifiers", href: "/app/pos/manage?tab=modifiers", settingsHref: "/app/pos/manage", managersOnly: true },
+      { label: "Settings", href: "/app/pos/manage?tab=settings", settingsHref: "/app/pos/manage", managersOnly: true },
+      { label: "Logs", href: "/app/pos/manage?tab=logs", settingsHref: "/app/pos/manage", managersOnly: true },
     ],
   },
   {

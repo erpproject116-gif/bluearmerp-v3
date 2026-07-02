@@ -1,18 +1,31 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
+import { AuthImage } from "../../shared/AuthImage";
 import { useToast } from "../../shared/toast";
 import { useAuth } from "../../shared/auth-context";
 import {
   addPosCartLine,
   checkoutPos,
   closePosSession,
+  deleteHeldOrder,
   deletePosCartLine,
+  fetchHeldOrders,
+  fetchItemModifiers,
+  holdCart,
   openPosSession,
+  patchPosCartLine,
+  resumeHeldOrder,
   useInvalidatePosSession,
+  usePosCatalogCategories,
+  usePosCatalogItems,
   usePosCurrentSession,
+  usePosSettings,
+  type HeldOrder,
   type PosCartLine,
+  type PosCatalogItem,
+  type PosModifierGroup,
 } from "../../shared/usePos";
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
@@ -22,42 +35,76 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((r) => ({ id: r.id, label: r.location_name }));
 }
 
-async function fetchItems(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "25" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; item_code: string; item_name: string; selling_price?: number }[]>(
-    `/api/v1/inventory/items?${qs}`,
-  );
-  return (res.data ?? []).map((r) => ({
-    id: r.id,
-    label: `${r.item_code} — ${r.item_name}`,
-    sublabel: r.selling_price != null ? String(r.selling_price) : undefined,
-  }));
+function money(n: number): string {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+const ORDER_TYPE_LABELS: Record<string, string> = {
+  dine_in: "Dine In",
+  take_away: "Take Away",
+  delivery: "Delivery",
+  pickup: "Pickup",
+};
 
 export default function PosPage() {
   const auth = useAuth();
   const toast = useToast();
   const invalidate = useInvalidatePosSession();
   const session = usePosCurrentSession();
+  const settings = usePosSettings();
+  const categories = usePosCatalogCategories();
 
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
   const [openingCash, setOpeningCash] = createSignal("0");
   const [opening, setOpening] = createSignal(false);
 
-  const [itemId, setItemId] = createSignal<number | null>(null);
-  const [itemLabel, setItemLabel] = createSignal("");
-  const [unitPrice, setUnitPrice] = createSignal("");
-  const [qty, setQty] = createSignal("1");
+  const [activeCategory, setActiveCategory] = createSignal<number | null>(null);
+  const [search, setSearch] = createSignal("");
+  const [orderType, setOrderType] = createSignal("dine_in");
   const [adding, setAdding] = createSignal(false);
-
-  const [closingCash, setClosingCash] = createSignal("");
   const [checkingOut, setCheckingOut] = createSignal(false);
+  const [closingCash, setClosingCash] = createSignal("");
+  const [showClose, setShowClose] = createSignal(false);
+  const [modalItem, setModalItem] = createSignal<PosCatalogItem | null>(null);
+  const [discount, setDiscount] = createSignal(0);
+  const [customerId, setCustomerId] = createSignal<number | null>(null);
+  const [customerLabel, setCustomerLabel] = createSignal("");
+  const [showPayment, setShowPayment] = createSignal(false);
+  const [showBills, setShowBills] = createSignal(false);
+  const [heldOrders, setHeldOrders] = createSignal<HeldOrder[]>([]);
+  const [showCustomer, setShowCustomer] = createSignal(false);
 
-  const cartTotal = createMemo(() =>
-    (session.data?.cart_lines ?? []).reduce((sum, ln) => sum + ln.line_total, 0),
-  );
+  const items = usePosCatalogItems(() => ({ categoryId: activeCategory(), q: search().trim() || undefined }));
+
+  const orderTypes = createMemo(() => settings.data?.order_types ?? ["dine_in", "take_away"]);
+
+  const cartLines = createMemo(() => session.data?.cart_lines ?? []);
+  const subtotalLines = createMemo(() => cartLines().reduce((sum, ln) => sum + ln.line_total, 0));
+
+  const taxPreview = createMemo(() => {
+    const s = settings.data;
+    const rawSub = subtotalLines();
+    const disc = Math.min(Math.max(discount(), 0), rawSub);
+    const sub = rawSub - disc;
+    const rate = s?.tax_rate_percent ?? 0;
+    let mode = s?.tax_mode ?? "none";
+    if (mode === "included" && s && !s.tax_inclusive) mode = "excluded";
+    if (mode === "included") {
+      const tax = (sub * rate) / (100 + rate);
+      return { discount: disc, subtotal: sub - tax, tax, total: sub };
+    }
+    if (mode === "excluded") {
+      const tax = (sub * rate) / 100;
+      return { discount: disc, subtotal: sub, tax, total: sub + tax };
+    }
+    return { discount: disc, subtotal: sub, tax: 0, total: sub };
+  });
 
   const openShift = async () => {
     if (!locationId()) {
@@ -65,10 +112,7 @@ export default function PosPage() {
       return;
     }
     setOpening(true);
-    const res = await openPosSession({
-      location_id: locationId()!,
-      opening_cash: Number(openingCash()) || 0,
-    });
+    const res = await openPosSession({ location_id: locationId()!, opening_cash: Number(openingCash()) || 0 });
     setOpening(false);
     if (!res.success) {
       toast.warning(res.message ?? "Could not open session.");
@@ -78,29 +122,58 @@ export default function PosPage() {
     toast.success("POS session opened.");
   };
 
-  const addLine = async () => {
+  const addItem = async (item: PosCatalogItem) => {
     const s = session.data;
-    if (!s?.id || !itemId()) {
-      toast.warning("Select an item.");
-      return;
-    }
-    const q = Number(qty());
-    const price = Number(unitPrice());
-    if (q <= 0 || price < 0) {
-      toast.warning("Enter valid quantity and price.");
+    if (!s?.id) return;
+    if (item.has_modifiers) {
+      setModalItem(item);
       return;
     }
     setAdding(true);
-    const res = await addPosCartLine(s.id, { item_id: itemId()!, qty: q, unit_price: price });
+    const res = await addPosCartLine(s.id, { item_id: item.id, qty: 1, unit_price: item.price });
     setAdding(false);
     if (!res.success) {
       toast.warning(res.message ?? "Could not add item.");
       return;
     }
-    setItemId(null);
-    setItemLabel("");
-    setUnitPrice("");
-    setQty("1");
+    invalidate();
+  };
+
+  const addFromModal = async (payload: { qty: number; modifier_ids: number[]; notes?: string; size_label?: string }) => {
+    const s = session.data;
+    const item = modalItem();
+    if (!s?.id || !item) return;
+    setAdding(true);
+    const res = await addPosCartLine(s.id, {
+      item_id: item.id,
+      qty: payload.qty,
+      unit_price: item.price,
+      modifier_ids: payload.modifier_ids,
+      notes: payload.notes || null,
+      size_label: payload.size_label || null,
+    });
+    setAdding(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not add item.");
+      return;
+    }
+    setModalItem(null);
+    invalidate();
+  };
+
+  const changeQty = async (ln: PosCartLine, delta: number) => {
+    const s = session.data;
+    if (!s?.id) return;
+    const next = ln.qty + delta;
+    if (next <= 0) {
+      await removeLine(ln);
+      return;
+    }
+    const res = await patchPosCartLine(s.id, ln.id, { qty: next });
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not update quantity.");
+      return;
+    }
     invalidate();
   };
 
@@ -115,23 +188,105 @@ export default function PosPage() {
     invalidate();
   };
 
-  const checkout = async () => {
+  const clearOrder = async () => {
     const s = session.data;
     if (!s?.id) return;
-    const total = cartTotal();
+    for (const ln of cartLines()) {
+      await deletePosCartLine(s.id, ln.id);
+    }
+    invalidate();
+  };
+
+  const openPayment = () => {
+    if (cartLines().length === 0) {
+      toast.warning("Cart is empty.");
+      return;
+    }
+    setShowPayment(true);
+  };
+
+  const checkout = async (tenderType: string, amountReceived: number) => {
+    const s = session.data;
+    if (!s?.id) return;
+    const total = Number(taxPreview().total.toFixed(2));
     if (total <= 0) {
       toast.warning("Cart is empty.");
       return;
     }
     setCheckingOut(true);
-    const res = await checkoutPos(s.id, { tenders: [{ tender_type: "cash", amount: total }] });
+    const res = await checkoutPos(s.id, {
+      tenders: [{ tender_type: tenderType, amount: Math.max(amountReceived, total) }],
+      partner_id: customerId(),
+      discount_amount: taxPreview().discount,
+    });
     setCheckingOut(false);
     if (!res.success) {
       toast.warning(res.message ?? "Checkout failed.");
       return;
     }
-    toast.success(`Sale ${res.data?.sales_no} — ${total.toFixed(2)}`);
+    const change = res.data?.change ?? 0;
+    toast.success(`Sale ${res.data?.sales_no} — ${money(total)}${change > 0 ? ` · Change ${money(change)}` : ""}`);
+    setShowPayment(false);
+    setDiscount(0);
+    setCustomerId(null);
+    setCustomerLabel("");
     invalidate();
+  };
+
+  const saveBill = async () => {
+    const s = session.data;
+    if (!s?.id || cartLines().length === 0) {
+      toast.warning("Cart is empty.");
+      return;
+    }
+    const label = window.prompt("Label for this bill (e.g. Table 5, John):", "");
+    if (label === null) return;
+    const res = await holdCart(s.id, { label, order_type: orderType() });
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not save bill.");
+      return;
+    }
+    toast.success("Bill saved.");
+    invalidate();
+  };
+
+  const openBills = async () => {
+    setHeldOrders(await fetchHeldOrders());
+    setShowBills(true);
+  };
+
+  const resumeBill = async (id: number) => {
+    const res = await resumeHeldOrder(id);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not resume bill.");
+      return;
+    }
+    setShowBills(false);
+    invalidate();
+  };
+
+  const removeBill = async (id: number) => {
+    await deleteHeldOrder(id);
+    setHeldOrders(await fetchHeldOrders());
+  };
+
+  const applyDiscount = () => {
+    const raw = window.prompt("Discount amount:", String(discount() || ""));
+    if (raw === null) return;
+    const val = Number(raw);
+    setDiscount(Number.isFinite(val) && val > 0 ? val : 0);
+  };
+
+  const handleSearchKey = async (e: KeyboardEvent) => {
+    if (e.key !== "Enter" || !settings.data?.enable_barcode) return;
+    const list = items.data ?? [];
+    const code = search().trim().toLowerCase();
+    if (!code) return;
+    const exact = list.find((i) => i.item_code.toLowerCase() === code) ?? (list.length === 1 ? list[0] : null);
+    if (exact) {
+      await addItem(exact);
+      setSearch("");
+    }
   };
 
   const closeShift = async () => {
@@ -143,36 +298,50 @@ export default function PosPage() {
       return;
     }
     toast.success("Session closed.");
+    setShowClose(false);
+    setClosingCash("");
     invalidate();
   };
 
   return (
-    <div class="flex min-h-screen flex-col bg-slate-950 text-slate-100">
-      <header class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-        <div>
-          <h1 class="text-xl font-semibold tracking-tight">Point of Sale</h1>
-          <p class="text-sm text-slate-400">{auth.me?.tenant.company_name}</p>
-        </div>
+    <div class="flex h-screen flex-col bg-slate-100 text-slate-900">
+      <header class="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
         <div class="flex items-center gap-3">
+          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </span>
+          <div>
+            <h1 class="text-base font-semibold leading-tight">{auth.me?.tenant.company_name ?? "Point of Sale"}</h1>
+            <Show when={session.data}>
+              {(s) => <p class="text-xs text-slate-500">{s().session_no} · {s().location_name}</p>}
+            </Show>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
           <Show when={session.data}>
-            {(s) => (
-              <span class="rounded-full bg-emerald-900/50 px-3 py-1 text-sm text-emerald-300">
-                {s().session_no} · {s().location_name}
-              </span>
-            )}
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              onClick={() => setShowClose(true)}
+            >
+              Close shift
+            </button>
           </Show>
-          <A href="/app/dashboard" class="text-sm text-slate-400 hover:text-white">
+          <A href="/app/dashboard" class="rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800">
             Exit POS
           </A>
         </div>
       </header>
 
-      <main class="flex flex-1 flex-col gap-4 p-6 lg:flex-row">
-        <Show
-          when={session.data}
-          fallback={
-            <section class="mx-auto w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6">
-              <h2 class="mb-4 text-lg font-medium">Open shift</h2>
+      <Show
+        when={session.data}
+        fallback={
+          <div class="flex flex-1 items-center justify-center p-6">
+            <section class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 class="mb-1 text-lg font-semibold">Open shift</h2>
+              <p class="mb-5 text-sm text-slate-500">Pick your register location and starting cash to begin selling.</p>
               <div class="space-y-4">
                 <LookupCombo
                   label="Location"
@@ -191,19 +360,19 @@ export default function PosPage() {
                   placeholder="Select location…"
                 />
                 <div>
-                  <label class="mb-1 block text-sm text-slate-400">Opening cash</label>
+                  <label class="mb-1 block text-sm font-medium text-slate-600">Opening cash</label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
+                    class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
                     value={openingCash()}
                     onInput={(e) => setOpeningCash(e.currentTarget.value)}
                   />
                 </div>
                 <button
                   type="button"
-                  class="w-full rounded-lg bg-emerald-600 py-2.5 font-medium hover:bg-emerald-500 disabled:opacity-50"
+                  class="w-full rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
                   disabled={opening()}
                   onClick={openShift}
                 >
@@ -211,136 +380,695 @@ export default function PosPage() {
                 </button>
               </div>
             </section>
-          }
-        >
-          {(s) => (
-            <>
-              <section class="flex flex-1 flex-col rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <h2 class="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">Add item</h2>
-                <div class="mb-4 grid gap-3 sm:grid-cols-4">
-                  <div class="sm:col-span-2">
-                    <LookupCombo
-                      label="Item"
-                      value={itemLabel}
-                      selectedId={itemId}
-                      onInput={setItemLabel}
-                      onSelect={(o) => {
-                        setItemId(o.id);
-                        setItemLabel(o.label);
-                        if (o.sublabel) setUnitPrice(o.sublabel);
-                      }}
-                      onClear={() => {
-                        setItemId(null);
-                        setItemLabel("");
-                      }}
-                      fetchOptions={fetchItems}
-                      placeholder="Search item…"
-                    />
+          </div>
+        }
+      >
+        <div class="flex flex-1 overflow-hidden">
+          <CategoryRail
+            categories={categories.data ?? []}
+            activeId={activeCategory()}
+            onSelect={setActiveCategory}
+          />
+
+          <section class="flex flex-1 flex-col overflow-hidden">
+            <div class="border-b border-slate-200 bg-white px-5 py-3">
+              <div class="relative">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                </svg>
+                <input
+                  type="search"
+                  class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm focus:border-emerald-500 focus:bg-white focus:outline-none"
+                  placeholder={settings.data?.enable_barcode ? "Search or scan barcode…" : "Search product…"}
+                  value={search()}
+                  onInput={(e) => setSearch(e.currentTarget.value)}
+                  onKeyDown={handleSearchKey}
+                />
+              </div>
+            </div>
+            <div class="flex-1 overflow-auto p-5">
+              <Show
+                when={(items.data ?? []).length > 0}
+                fallback={
+                  <div class="flex h-full items-center justify-center text-sm text-slate-400">
+                    {items.isLoading ? "Loading products…" : "No products found."}
                   </div>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="Qty"
-                    class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
-                    value={qty()}
-                    onInput={(e) => setQty(e.currentTarget.value)}
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Price"
-                    class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
-                    value={unitPrice()}
-                    onInput={(e) => setUnitPrice(e.currentTarget.value)}
-                  />
+                }
+              >
+                <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  <For each={items.data ?? []}>
+                    {(item) => (
+                      <button
+                        type="button"
+                        class="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-emerald-400 hover:shadow-md disabled:opacity-60"
+                        disabled={adding()}
+                        onClick={() => addItem(item)}
+                      >
+                        <div class="flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-100">
+                          <AuthImage
+                            src={item.image_url}
+                            alt={item.item_name}
+                            class="h-full w-full object-cover"
+                            fallback={() => (
+                              <span class="text-2xl font-semibold text-slate-300">{initials(item.item_name)}</span>
+                            )}
+                          />
+                        </div>
+                        <div class="flex flex-1 flex-col gap-0.5 p-3">
+                          <span class="line-clamp-2 text-sm font-medium leading-snug">{item.item_name}</span>
+                          <span class="mt-auto text-sm font-semibold text-emerald-600">{money(item.price)}</span>
+                        </div>
+                      </button>
+                    )}
+                  </For>
                 </div>
+              </Show>
+            </div>
+          </section>
+
+          <OrderPanel
+            orderType={orderType()}
+            orderTypes={orderTypes()}
+            onOrderType={setOrderType}
+            lines={cartLines()}
+            subtotal={taxPreview().subtotal}
+            tax={taxPreview().tax}
+            discount={taxPreview().discount}
+            total={taxPreview().total}
+            customerLabel={customerLabel()}
+            onCustomer={() => setShowCustomer(true)}
+            onDiscount={applyDiscount}
+            onSaveBill={saveBill}
+            onBills={openBills}
+            onQty={changeQty}
+            onRemove={removeLine}
+            onClear={clearOrder}
+            onCheckout={openPayment}
+            checkingOut={checkingOut()}
+          />
+        </div>
+      </Show>
+
+      <Show when={modalItem()}>
+        {(item) => <ProductModal item={item()} adding={adding()} onCancel={() => setModalItem(null)} onAdd={addFromModal} />}
+      </Show>
+
+      <Show when={showPayment()}>
+        <PaymentModal
+          total={taxPreview().total}
+          tenders={settings.data?.allowed_tenders ?? ["cash"]}
+          checkingOut={checkingOut()}
+          onCancel={() => setShowPayment(false)}
+          onConfirm={checkout}
+        />
+      </Show>
+
+      <Show when={showCustomer()}>
+        <CustomerModal
+          onCancel={() => setShowCustomer(false)}
+          onSelect={(id, label) => {
+            setCustomerId(id);
+            setCustomerLabel(label);
+            setShowCustomer(false);
+          }}
+        />
+      </Show>
+
+      <Show when={showBills()}>
+        <BillsModal orders={heldOrders()} onCancel={() => setShowBills(false)} onResume={resumeBill} onDelete={removeBill} />
+      </Show>
+
+      <Show when={showClose()}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowClose(false)}>
+          <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 class="mb-1 text-lg font-semibold">Close shift</h3>
+            <p class="mb-4 text-sm text-slate-500">Count the drawer and enter the closing cash. The cart must be empty.</p>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Closing cash count"
+              class="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
+              value={closingCash()}
+              onInput={(e) => setClosingCash(e.currentTarget.value)}
+            />
+            <div class="flex justify-end gap-2">
+              <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50" onClick={() => setShowClose(false)}>
+                Cancel
+              </button>
+              <button type="button" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" onClick={closeShift}>
+                Close session
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+function CategoryRail(props: {
+  categories: { id: number; name: string; icon?: string; color?: string }[];
+  activeId: number | null;
+  onSelect: (id: number | null) => void;
+}) {
+  const tile = (active: boolean) =>
+    `flex w-full flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center text-xs font-medium transition ${
+      active ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-transparent bg-white text-slate-600 hover:bg-slate-50"
+    }`;
+  return (
+    <nav class="w-24 shrink-0 space-y-2 overflow-auto border-r border-slate-200 bg-slate-50 p-2">
+      <button type="button" class={tile(props.activeId === null)} onClick={() => props.onSelect(null)}>
+        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-200 text-slate-600">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </span>
+        All Menu
+      </button>
+      <For each={props.categories}>
+        {(c) => (
+          <button type="button" class={tile(props.activeId === c.id)} onClick={() => props.onSelect(c.id)}>
+            <span
+              class="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-semibold text-white"
+              style={{ "background-color": c.color || "#94a3b8" }}
+            >
+              {c.icon || initials(c.name)}
+            </span>
+            <span class="line-clamp-2 leading-tight">{c.name}</span>
+          </button>
+        )}
+      </For>
+    </nav>
+  );
+}
+
+function PaymentModal(props: {
+  total: number;
+  tenders: string[];
+  checkingOut: boolean;
+  onCancel: () => void;
+  onConfirm: (tenderType: string, amountReceived: number) => void;
+}) {
+  const [tender, setTender] = createSignal(props.tenders[0] ?? "cash");
+  const [received, setReceived] = createSignal(props.total.toFixed(2));
+
+  const change = createMemo(() => {
+    const r = Number(received());
+    return Number.isFinite(r) ? Math.max(0, r - props.total) : 0;
+  });
+
+  const quickAmounts = createMemo(() => {
+    const t = props.total;
+    const set = new Set<number>([Math.ceil(t)]);
+    for (const step of [50, 100, 500, 1000]) {
+      set.add(Math.ceil(t / step) * step);
+    }
+    return [...set].filter((n) => n >= t).sort((a, b) => a - b).slice(0, 4);
+  });
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
+      <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 class="mb-1 text-lg font-semibold">Payment</h3>
+        <p class="mb-4 text-sm text-slate-500">Amount due <span class="font-semibold text-slate-900">{money(props.total)}</span></p>
+
+        <div class="mb-4">
+          <p class="mb-1.5 text-xs font-medium text-slate-500">Tender</p>
+          <div class="flex gap-2">
+            <For each={props.tenders}>
+              {(t) => (
                 <button
                   type="button"
-                  class="mb-6 w-full rounded-lg bg-blue-600 py-2 font-medium hover:bg-blue-500 disabled:opacity-50 sm:w-auto sm:px-8"
-                  disabled={adding()}
-                  onClick={addLine}
+                  class={`flex-1 rounded-lg border py-2 text-sm font-medium capitalize transition ${
+                    tender() === t ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                  onClick={() => {
+                    setTender(t);
+                    if (t !== "cash") setReceived(props.total.toFixed(2));
+                  }}
                 >
-                  Add to cart
+                  {t}
                 </button>
+              )}
+            </For>
+          </div>
+        </div>
 
-                <div class="flex-1 overflow-auto">
-                  <table class="w-full text-left text-sm">
-                    <thead class="border-b border-slate-800 text-slate-500">
-                      <tr>
-                        <th class="py-2">Item</th>
-                        <th class="py-2 text-right">Qty</th>
-                        <th class="py-2 text-right">Price</th>
-                        <th class="py-2 text-right">Total</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <For each={s().cart_lines ?? []}>
-                        {(ln) => (
-                          <tr class="border-b border-slate-800/60">
-                            <td class="py-2">
-                              <div class="font-medium">{ln.item_name}</div>
-                              <div class="text-xs text-slate-500">{ln.item_code}</div>
-                            </td>
-                            <td class="py-2 text-right">{ln.qty}</td>
-                            <td class="py-2 text-right">{ln.unit_price.toFixed(2)}</td>
-                            <td class="py-2 text-right font-medium">{ln.line_total.toFixed(2)}</td>
-                            <td class="py-2 text-right">
-                              <button type="button" class="text-red-400 hover:text-red-300" onClick={() => removeLine(ln)}>
-                                Remove
-                              </button>
-                            </td>
-                          </tr>
-                        )}
-                      </For>
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              <aside class="w-full shrink-0 space-y-4 lg:w-80">
-                <div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                  <div class="mb-1 text-sm text-slate-500">Cart total</div>
-                  <div class="text-3xl font-bold tabular-nums">{cartTotal().toFixed(2)}</div>
-                  <button
-                    type="button"
-                    class="mt-4 w-full rounded-lg bg-emerald-600 py-3 text-lg font-semibold hover:bg-emerald-500 disabled:opacity-50"
-                    disabled={checkingOut() || cartTotal() <= 0}
-                    onClick={checkout}
-                  >
-                    {checkingOut() ? "Processing…" : "Cash checkout"}
+        <Show when={tender() === "cash"}>
+          <div class="mb-4">
+            <label class="mb-1 block text-xs font-medium text-slate-500">Cash received</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
+              value={received()}
+              onInput={(e) => setReceived(e.currentTarget.value)}
+            />
+            <div class="mt-2 flex flex-wrap gap-2">
+              <For each={quickAmounts()}>
+                {(amt) => (
+                  <button type="button" class="rounded-lg border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:bg-slate-50" onClick={() => setReceived(amt.toFixed(2))}>
+                    {money(amt)}
                   </button>
-                </div>
-                <div class="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
-                  <div>Opening: {s().opening_cash.toFixed(2)}</div>
-                  <div>Sales: {s().sales_total.toFixed(2)}</div>
-                </div>
-                <div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                  <h3 class="mb-2 text-sm font-medium text-slate-400">Close shift</h3>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Closing cash count"
-                    class="mb-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
-                    value={closingCash()}
-                    onInput={(e) => setClosingCash(e.currentTarget.value)}
-                  />
-                  <button
-                    type="button"
-                    class="w-full rounded-lg border border-slate-600 py-2 hover:bg-slate-800"
-                    onClick={closeShift}
-                  >
-                    Close session
-                  </button>
-                </div>
-              </aside>
-            </>
-          )}
+                )}
+              </For>
+            </div>
+            <div class="mt-3 flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+              <span class="text-slate-500">Change</span>
+              <span class="font-semibold tabular-nums">{money(change())}</span>
+            </div>
+          </div>
         </Show>
-      </main>
+
+        <div class="flex gap-2">
+          <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            disabled={props.checkingOut || (tender() === "cash" && Number(received()) + 0.001 < props.total)}
+            onClick={() => props.onConfirm(tender(), Number(received()) || props.total)}
+          >
+            {props.checkingOut ? "Processing…" : "Confirm"}
+          </button>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function CustomerModal(props: { onCancel: () => void; onSelect: (id: number, label: string) => void }) {
+  const [label, setLabel] = createSignal("");
+  const [id, setId] = createSignal<number | null>(null);
+
+  const fetchCustomers = async (q: string): Promise<LookupOption[]> => {
+    const qs = new URLSearchParams({ page: "1", pageSize: "25" });
+    if (q) qs.set("q", q);
+    const res = await apiFetch<{ id: number; partner_code: string; partner_name: string }[]>(`/api/v1/inventory/partners?${qs}`);
+    return (res.data ?? []).map((r) => ({ id: r.id, label: r.partner_name || r.partner_code }));
+  };
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
+      <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 class="mb-3 text-lg font-semibold">Select customer</h3>
+        <LookupCombo
+          label="Customer"
+          value={label}
+          selectedId={id}
+          onInput={setLabel}
+          onSelect={(o) => {
+            setId(o.id);
+            setLabel(o.label);
+          }}
+          onClear={() => {
+            setId(null);
+            setLabel("");
+          }}
+          fetchOptions={fetchCustomers}
+          placeholder="Search customer…"
+        />
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+            disabled={!id()}
+            onClick={() => id() && props.onSelect(id()!, label())}
+          >
+            Select
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillsModal(props: {
+  orders: HeldOrder[];
+  onCancel: () => void;
+  onResume: (id: number) => void;
+  onDelete: (id: number) => void;
+}) {
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
+      <div class="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div class="flex items-center justify-between border-b border-slate-100 p-4">
+          <h3 class="text-lg font-semibold">Saved bills</h3>
+          <button type="button" class="text-sm text-slate-500 hover:text-slate-800" onClick={props.onCancel}>
+            Close
+          </button>
+        </div>
+        <div class="flex-1 overflow-auto p-4">
+          <Show when={props.orders.length > 0} fallback={<p class="py-8 text-center text-sm text-slate-400">No saved bills.</p>}>
+            <ul class="space-y-2">
+              <For each={props.orders}>
+                {(o) => (
+                  <li class="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-medium">{o.label || `Bill #${o.id}`}</p>
+                      <p class="text-xs text-slate-500">{o.line_count} items · {money(o.total)}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button type="button" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500" onClick={() => props.onResume(o.id)}>
+                        Resume
+                      </button>
+                      <button type="button" class="text-xs text-red-500 hover:text-red-600" onClick={() => props.onDelete(o.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductModal(props: {
+  item: PosCatalogItem;
+  adding: boolean;
+  onCancel: () => void;
+  onAdd: (payload: { qty: number; modifier_ids: number[]; notes?: string; size_label?: string }) => void;
+}) {
+  const [groups, setGroups] = createSignal<PosModifierGroup[]>([]);
+  const [loading, setLoading] = createSignal(true);
+  const [qty, setQty] = createSignal(1);
+  const [notes, setNotes] = createSignal("");
+  // Map of groupId -> Set of selected modifier ids.
+  const [selected, setSelected] = createSignal<Record<number, number[]>>({});
+
+  createEffect(() => {
+    const id = props.item.id;
+    setLoading(true);
+    fetchItemModifiers(id)
+      .then((g) => setGroups(g))
+      .catch(() => setGroups([]))
+      .finally(() => setLoading(false));
+  });
+
+  const toggle = (group: PosModifierGroup, modifierId: number) => {
+    setSelected((prev) => {
+      const cur = prev[group.id] ?? [];
+      let next: number[];
+      if (group.max_select === 1) {
+        next = cur.includes(modifierId) && !group.required ? [] : [modifierId];
+      } else if (cur.includes(modifierId)) {
+        next = cur.filter((x) => x !== modifierId);
+      } else if (group.max_select > 0 && cur.length >= group.max_select) {
+        next = cur;
+      } else {
+        next = [...cur, modifierId];
+      }
+      return { ...prev, [group.id]: next };
+    });
+  };
+
+  const allModifierIds = createMemo(() => Object.values(selected()).flat());
+
+  const modifiersDelta = createMemo(() => {
+    let delta = 0;
+    for (const g of groups()) {
+      const sel = selected()[g.id] ?? [];
+      for (const m of g.modifiers) {
+        if (sel.includes(m.id)) delta += m.price_delta;
+      }
+    }
+    return delta;
+  });
+
+  const total = createMemo(() => (props.item.price + modifiersDelta()) * qty());
+
+  const sizeLabel = createMemo(() => {
+    for (const g of groups()) {
+      if (g.name.trim().toLowerCase() === "size") {
+        const sel = selected()[g.id] ?? [];
+        const m = g.modifiers.find((x) => sel.includes(x.id));
+        if (m) return m.name;
+      }
+    }
+    return "";
+  });
+
+  const missingRequired = createMemo(() =>
+    groups().some((g) => g.required && (selected()[g.id]?.length ?? 0) < Math.max(1, g.min_select)),
+  );
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
+      <div class="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div class="flex items-start gap-3 border-b border-slate-100 p-4">
+          <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+            <AuthImage
+              src={props.item.image_url}
+              alt={props.item.item_name}
+              class="h-full w-full object-cover"
+              fallback={() => <span class="text-lg font-semibold text-slate-300">{initials(props.item.item_name)}</span>}
+            />
+          </div>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-base font-semibold leading-tight">{props.item.item_name}</h3>
+            <p class="mt-1 text-sm font-medium text-emerald-600">{money(props.item.price)}</p>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-auto p-4">
+          <div class="mb-4 flex items-center justify-between">
+            <span class="text-sm font-medium text-slate-700">Qty</span>
+            <div class="flex items-center gap-3">
+              <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => setQty((q) => Math.max(1, q - 1))}>
+                −
+              </button>
+              <span class="w-6 text-center text-sm tabular-nums">{qty()}</span>
+              <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => setQty((q) => q + 1)}>
+                +
+              </button>
+            </div>
+          </div>
+
+          <Show when={!loading()} fallback={<p class="text-sm text-slate-400">Loading options…</p>}>
+            <For each={groups()}>
+              {(group) => (
+                <div class="mb-4">
+                  <div class="mb-2 flex items-center gap-2">
+                    <span class="text-sm font-medium text-slate-700">{group.name}</span>
+                    <Show when={group.required}>
+                      <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Required</span>
+                    </Show>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <For each={group.modifiers}>
+                      {(m) => {
+                        const isSel = () => (selected()[group.id] ?? []).includes(m.id);
+                        return (
+                          <button
+                            type="button"
+                            class={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition ${
+                              isSel() ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                            }`}
+                            onClick={() => toggle(group, m.id)}
+                          >
+                            <span class="truncate">{m.name}</span>
+                            <Show when={m.price_delta !== 0}>
+                              <span class="ml-2 shrink-0 text-xs">+{money(m.price_delta)}</span>
+                            </Show>
+                          </button>
+                        );
+                      }}
+                    </For>
+                  </div>
+                </div>
+              )}
+            </For>
+          </Show>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700">Notes</label>
+            <input
+              type="text"
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+              placeholder="Add some notes"
+              value={notes()}
+              onInput={(e) => setNotes(e.currentTarget.value)}
+            />
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 p-4">
+          <div class="mb-3 flex items-center justify-between">
+            <span class="text-sm text-slate-500">Total</span>
+            <span class="text-lg font-semibold tabular-nums">{money(total())}</span>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              disabled={props.adding || missingRequired()}
+              onClick={() => props.onAdd({ qty: qty(), modifier_ids: allModifierIds(), notes: notes(), size_label: sizeLabel() })}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrderPanel(props: {
+  orderType: string;
+  orderTypes: string[];
+  onOrderType: (t: string) => void;
+  lines: PosCartLine[];
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  customerLabel: string;
+  onCustomer: () => void;
+  onDiscount: () => void;
+  onSaveBill: () => void;
+  onBills: () => void;
+  onQty: (ln: PosCartLine, delta: number) => void;
+  onRemove: (ln: PosCartLine) => void;
+  onClear: () => void;
+  onCheckout: () => void;
+  checkingOut: boolean;
+}) {
+  const actionBtn = "flex flex-col items-center gap-1 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50";
+  return (
+    <aside class="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
+      <div class="border-b border-slate-100 p-4">
+        <div class="mb-3 grid grid-cols-4 gap-2">
+          <button type="button" class={actionBtn} onClick={props.onCustomer}>
+            <span>Customer</span>
+          </button>
+          <button type="button" class={actionBtn} onClick={props.onDiscount}>
+            <span>Discount</span>
+          </button>
+          <button type="button" class={actionBtn} onClick={props.onSaveBill}>
+            <span>Save Bill</span>
+          </button>
+          <button type="button" class={actionBtn} onClick={props.onBills}>
+            <span>Bills</span>
+          </button>
+        </div>
+        <h2 class="mb-2 text-sm font-semibold text-slate-700">Order Details</h2>
+        <Show when={props.customerLabel}>
+          <p class="mb-2 text-xs text-slate-500">Customer: <span class="font-medium text-slate-700">{props.customerLabel}</span></p>
+        </Show>
+        <div class="flex rounded-lg bg-slate-100 p-1">
+          <For each={props.orderTypes}>
+            {(t) => (
+              <button
+                type="button"
+                class={`flex-1 rounded-md py-1.5 text-sm font-medium transition ${
+                  props.orderType === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+                onClick={() => props.onOrderType(t)}
+              >
+                {ORDER_TYPE_LABELS[t] ?? t}
+              </button>
+            )}
+          </For>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-auto p-4">
+        <Show
+          when={props.lines.length > 0}
+          fallback={
+            <div class="flex h-full flex-col items-center justify-center gap-2 text-center text-slate-400">
+              <span class="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+                <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </span>
+              <p class="text-sm font-medium">No Order</p>
+              <p class="text-xs">Tap a product to add it to the order</p>
+            </div>
+          }
+        >
+          <ul class="space-y-3">
+            <For each={props.lines}>
+              {(ln) => (
+                <li class="flex items-start gap-2">
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium">{ln.item_name}</p>
+                    <Show when={ln.size_label}>
+                      <p class="text-xs text-slate-500">{ln.size_label}</p>
+                    </Show>
+                    <Show when={ln.modifiers && ln.modifiers.length > 0}>
+                      <p class="truncate text-xs text-slate-400">{(ln.modifiers ?? []).map((m) => m.name).join(", ")}</p>
+                    </Show>
+                    <Show when={ln.notes}>
+                      <p class="truncate text-xs italic text-slate-400">“{ln.notes}”</p>
+                    </Show>
+                    <p class="text-xs text-slate-500">{money(ln.unit_price)}</p>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" class="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => props.onQty(ln, -1)}>
+                      −
+                    </button>
+                    <span class="w-6 text-center text-sm tabular-nums">{ln.qty}</span>
+                    <button type="button" class="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => props.onQty(ln, 1)}>
+                      +
+                    </button>
+                  </div>
+                  <span class="w-16 text-right text-sm font-semibold tabular-nums">{money(ln.line_total)}</span>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
+      </div>
+
+      <div class="border-t border-slate-100 p-4">
+        <Show when={props.lines.length > 0}>
+          <button type="button" class="mb-3 w-full rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={props.onClear}>
+            Clear All Order
+          </button>
+        </Show>
+        <div class="space-y-1.5 rounded-xl bg-slate-50 p-3 text-sm">
+          <div class="flex justify-between text-slate-500">
+            <span>Subtotal</span>
+            <span class="tabular-nums">{money(props.subtotal)}</span>
+          </div>
+          <Show when={props.discount > 0}>
+            <div class="flex justify-between text-emerald-600">
+              <span>Discount</span>
+              <span class="tabular-nums">-{money(props.discount)}</span>
+            </div>
+          </Show>
+          <div class="flex justify-between text-slate-500">
+            <span>Tax</span>
+            <span class="tabular-nums">{money(props.tax)}</span>
+          </div>
+          <div class="mt-1 flex justify-between border-t border-slate-200 pt-2 text-base font-semibold">
+            <span>Total</span>
+            <span class="tabular-nums">{money(props.total)}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="mt-3 w-full rounded-lg bg-emerald-600 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          disabled={props.checkingOut || props.lines.length === 0}
+          onClick={props.onCheckout}
+        >
+          {props.checkingOut ? "Processing…" : "Process Transaction"}
+        </button>
+      </div>
+    </aside>
   );
 }

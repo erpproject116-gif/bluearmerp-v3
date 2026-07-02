@@ -30,6 +30,7 @@ type Item struct {
 	TrackLot               bool     `json:"track_lot"`
 	TrackInventoryQty      bool     `json:"track_inventory_qty"`
 	Status                 string   `json:"status"`
+	ItemCategoryID         *int64         `json:"item_category_id,omitempty"`
 	CustomValues           map[string]any `json:"custom_values,omitempty"`
 }
 
@@ -44,6 +45,7 @@ type itemBody struct {
 	TrackLot               *bool          `json:"track_lot"`
 	TrackInventoryQty      *bool          `json:"track_inventory_qty"`
 	Status                 string         `json:"status"`
+	ItemCategoryID         *int64         `json:"item_category_id"`
 	CustomValues           map[string]any `json:"custom_values"`
 }
 
@@ -73,7 +75,7 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 		offset := httputil.Offset(p)
 		where, args := buildWhere(tu.TenantID, p, "item_name", "item_code")
 		q := fmt.Sprintf(`select id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8,
-			warranty_duration_months, reorder_level::float8, track_serial, track_lot, track_inventory_qty, status, count(*) over()
+			warranty_duration_months, reorder_level::float8, track_serial, track_lot, track_inventory_qty, status, item_category_id, count(*) over()
 			from public.inv_items where %s order by %s %s limit $%d offset $%d`,
 			where, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
 		args = append(args, p.PageSize, offset)
@@ -88,7 +90,7 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row Item
 			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice,
-				&row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.TrackInventoryQty, &row.Status, &total); err != nil {
+				&row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read.", "ERR_INTERNAL")
 				return
 			}
@@ -116,10 +118,10 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		id, row, err := createWithCode(r.Context(), pool, tu, "item", func(ctx context.Context, tx pgxpoolConn, code string) (int64, Item, error) {
 			var row Item
-			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, warranty_duration_months, reorder_level, track_serial, track_lot, track_inventory_qty, status) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-				returning id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8, warranty_duration_months, reorder_level::float8, track_serial, track_lot, track_inventory_qty, status`,
-				tu.TenantID, code, strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status)).
-				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.TrackInventoryQty, &row.Status)
+			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, warranty_duration_months, reorder_level, track_serial, track_lot, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+				returning id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8, warranty_duration_months, reorder_level::float8, track_serial, track_lot, track_inventory_qty, status, item_category_id`,
+				tu.TenantID, code, strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), body.ItemCategoryID).
+				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
 			return row.ID, row, err
 		})
 		if err != nil {
@@ -191,9 +193,9 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, purchase_price=$2, sales_price=$3, vip_price=$4, warranty_duration_months=$5, reorder_level=$6, track_serial=$7, track_lot=$8, track_inventory_qty=$9, status=$10, updated_at=now()
+		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, purchase_price=$2, sales_price=$3, vip_price=$4, warranty_duration_months=$5, reorder_level=$6, track_serial=$7, track_lot=$8, track_inventory_qty=$9, status=$10, item_category_id=$13, updated_at=now()
 			where id=$11 and tenant_id=$12 and deleted_at is null`,
-			strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID)
+			strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
 			return

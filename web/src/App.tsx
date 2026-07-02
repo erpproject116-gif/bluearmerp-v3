@@ -152,6 +152,7 @@ import OpportunitiesPage from "./modules/crm/OpportunitiesPage";
 import TicketsPage from "./modules/support/TicketsPage";
 import TicketDetailPage from "./modules/support/TicketDetailPage";
 import PosPage from "./modules/pos/PosPage";
+import PosSettingsPage from "./modules/pos/PosSettingsPage";
 import HrEmployeesPage from "./modules/hr/HrEmployeesPage";
 import PayrollRunsPage from "./modules/hr/PayrollRunsPage";
 import FixedAssetsPage from "./modules/fixedassets/FixedAssetsPage";
@@ -273,6 +274,7 @@ export default function App() {
           <Route path="/reports" component={ReportsIndexPage} />
           <Route path="/documentation" component={DocumentationPage} />
           <Route path="/documentation/:sectionId" component={DocumentationPage} />
+          <Route path="/pos/manage" component={PosSettingsPage} />
           <Route path="/inventory" component={StockWorkspacePage} />
           <Route path="/inventory/partners" component={PartnersPage} />
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
