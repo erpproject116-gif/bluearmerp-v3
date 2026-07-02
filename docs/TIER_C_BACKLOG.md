@@ -116,19 +116,9 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 ## Quality (QMS)
 
-**Status:** MVP shipped (migration 081) — GR inspection hold/release, NCR log.
+**Status:** MVP shipped (migration 081, 101) — GR inspection hold/release, NCR log, **CAPA web UI** (`/app/quality/capa`).
 
-**Purpose:** Inspection plans, non-conformance, and corrective actions.
-
-**Core entities:** Inspection template, QC result, NCR, CAPA.
-
-**Dependencies:** Purchase (GR inspection), Manufacturing (in-process QC), Inventory.
-
-**MVP slice:** GR hold/release on failed inspection; NCR log with photo attachment.
-
-**Risks:** Regulatory traceability; mobile shop-floor UX.
-
-**Still deferred:** CAPA, inspection templates, photo attachments, in-process MFG QC.
+**Still deferred:** Inspection templates, photo attachments, in-process MFG QC, CAPA ↔ NCR workflow.
 
 ---
 
@@ -174,15 +164,14 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 | Area | Status | Migration |
 |------|--------|-----------|
-| Mapping Center / doc generation | Shipped | 086 |
-| Universal approvals | Shipped | 087–088 |
-| Company budget | Shipped (opt-in module) | 089–090 |
+| Mapping Center / doc generation | Shipped (PR→PO, Quotation→SO, SO→Sales/DR, GR→Supplier Invoice) | 086 |
+| Universal approvals + pending email (SMTP outbox) | Shipped | 087–088 |
+| Company budget | Shipped (opt-in module, block mode on PR/PO) | 089–090 |
 | Data Center ingestion | Shipped (opt-in module) | 091 |
-| Shipping orders / delivery trips | Shipped | 092–093 |
+| Shipping orders / delivery trips / **freight rules** | Shipped (rules UI, auto flat freight) | 092–093, 095, 103 |
 | WMS scheduled receipt | Shipped (opt-in module) | 094 |
-| Shipping rules | Schema only | 095 |
-| Withholding / checks / notes / landed cost / contracts | Shipped (finance APIs) | 096–100 |
-| Sales commission / CAPA / vendor portal | Shipped | 101 |
+| Acct II: withholding / checks / notes / landed cost / contracts | Shipped (API + web UI; PV check/WHT on create; landed cost Post) | 096–100, 102 |
+| Sales commission / CAPA / vendor portal | Shipped (commission rules UI, CAPA UI) | 101 |
 
 ---
 

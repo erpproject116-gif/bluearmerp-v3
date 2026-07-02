@@ -26,16 +26,22 @@ type ShippingOrder struct {
 	PartnerName   string  `json:"partner_name,omitempty"`
 	LocationID    int64   `json:"location_id"`
 	Status        string  `json:"status"`
+	ShippingZone  *string `json:"shipping_zone,omitempty"`
+	Carrier       *string `json:"carrier,omitempty"`
+	FreightAmount *float64 `json:"freight_amount,omitempty"`
 	Notes         *string `json:"notes,omitempty"`
 }
 
 type shippingOrderBody struct {
-	ShippingDate string  `json:"shipping_date"`
-	SalesOrderID *int64  `json:"sales_order_id"`
-	PartnerID    int64   `json:"partner_id"`
-	LocationID   int64   `json:"location_id"`
-	Status       string  `json:"status"`
-	Notes        *string `json:"notes"`
+	ShippingDate  string   `json:"shipping_date"`
+	SalesOrderID  *int64   `json:"sales_order_id"`
+	PartnerID     int64    `json:"partner_id"`
+	LocationID    int64    `json:"location_id"`
+	Status        string   `json:"status"`
+	ShippingZone  *string  `json:"shipping_zone"`
+	Carrier       *string  `json:"carrier"`
+	FreightAmount *float64 `json:"freight_amount"`
+	Notes         *string  `json:"notes"`
 }
 
 func listShippingOrders(pool *pgxpool.Pool) http.HandlerFunc {
@@ -45,7 +51,8 @@ func listShippingOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		offset := httputil.Offset(p)
 		rows, err := pool.Query(r.Context(), `
 			select so.id, so.shipping_date::text, so.shipping_no, so.sales_order_id,
-			  so.partner_id, coalesce(p.company_name, ''), so.location_id, so.status, so.notes,
+			  so.partner_id, coalesce(p.company_name, ''), so.location_id, so.status,
+			  so.shipping_zone, so.carrier, so.freight_amount::float8, so.notes,
 			  count(*) over()
 			from public.sh_shipping_orders so
 			left join public.inv_partners p on p.id = so.partner_id
@@ -62,7 +69,8 @@ func listShippingOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row ShippingOrder
 			if err := rows.Scan(&row.ID, &row.ShippingDate, &row.ShippingNo, &row.SalesOrderID,
-				&row.PartnerID, &row.PartnerName, &row.LocationID, &row.Status, &row.Notes, &total); err != nil {
+				&row.PartnerID, &row.PartnerName, &row.LocationID, &row.Status,
+				&row.ShippingZone, &row.Carrier, &row.FreightAmount, &row.Notes, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read shipping orders.", "ERR_INTERNAL")
 				return
 			}
@@ -120,6 +128,10 @@ func createShippingOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		if status == "" {
 			status = "draft"
 		}
+		freight := body.FreightAmount
+		if freight == nil {
+			freight, _ = ResolveFlatFreight(r.Context(), pool, tu.TenantID, body.ShippingZone, body.Carrier)
+		}
 		var dateSeq int
 		_ = pool.QueryRow(r.Context(), `
 			select coalesce(max(date_seq), 0) + 1 from public.sh_shipping_orders
@@ -130,11 +142,11 @@ func createShippingOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		err := pool.QueryRow(r.Context(), `
 			insert into public.sh_shipping_orders (
 			  tenant_id, shipping_date, date_seq, shipping_no, sales_order_id,
-			  partner_id, location_id, status, notes, created_by_user_id
-			) values ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, $10)
+			  partner_id, location_id, status, shipping_zone, carrier, freight_amount, notes, created_by_user_id
+			) values ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			returning id`,
 			tu.TenantID, shippingDate, dateSeq, shippingNo, body.SalesOrderID,
-			body.PartnerID, body.LocationID, status, body.Notes, tu.AppUserID,
+			body.PartnerID, body.LocationID, status, body.ShippingZone, body.Carrier, freight, body.Notes, tu.AppUserID,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create shipping order.", "ERR_INTERNAL")

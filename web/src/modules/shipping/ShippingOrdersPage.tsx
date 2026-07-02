@@ -16,6 +16,9 @@ type ShippingOrder = {
   partner_name?: string;
   location_id: number;
   status: string;
+  shipping_zone?: string | null;
+  carrier?: string | null;
+  freight_amount?: number | null;
 };
 
 async function fetchPartners(q: string): Promise<LookupOption[]> {
@@ -44,6 +47,8 @@ export default function ShippingOrdersPage() {
   const [partnerLabel, setPartnerLabel] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
+  const [shippingZone, setShippingZone] = createSignal("");
+  const [carrier, setCarrier] = createSignal("");
   const [notes, setNotes] = createSignal("");
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
@@ -75,6 +80,8 @@ export default function ShippingOrdersPage() {
     setPartnerLabel("");
     setLocationId(null);
     setLocationLabel("");
+    setShippingZone("");
+    setCarrier("");
     setNotes("");
     setModalOpen(true);
   };
@@ -92,6 +99,8 @@ export default function ShippingOrdersPage() {
         sales_order_id: salesOrderId() ? Number(salesOrderId()) : undefined,
         partner_id: partnerId(),
         location_id: locationId(),
+        shipping_zone: shippingZone().trim() || undefined,
+        carrier: carrier().trim() || undefined,
         notes: notes().trim() || undefined,
       }),
     });
@@ -112,6 +121,16 @@ export default function ShippingOrdersPage() {
           { key: "shipping_no", header: "Shipping no.", clickable: true },
           { key: "shipping_date", header: "Date" },
           { key: "partner_name", header: "Customer" },
+          { key: "shipping_zone", header: "Zone" },
+          { key: "carrier", header: "Carrier" },
+          {
+            key: "freight_amount",
+            header: "Freight",
+            render: (r) =>
+              r.freight_amount != null
+                ? r.freight_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })
+                : "—",
+          },
           { key: "status", header: "Status" },
           { key: "sales_order_id", header: "Sales order" },
         ]}
@@ -192,6 +211,12 @@ export default function ShippingOrdersPage() {
           }}
           fetchOptions={fetchLocations}
         />
+        <Field label="Shipping zone">
+          <input class={inputClass} value={shippingZone()} onInput={(e) => setShippingZone(e.currentTarget.value)} placeholder="Matches freight rules" />
+        </Field>
+        <Field label="Carrier">
+          <input class={inputClass} value={carrier()} onInput={(e) => setCarrier(e.currentTarget.value)} />
+        </Field>
         <Field label="Notes">
           <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
         </Field>

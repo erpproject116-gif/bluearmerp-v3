@@ -34,6 +34,16 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     permissionCode: "inventory.serial_receive",
   },
   {
+    label: "Bills of Material",
+    href: "/app/inventory/serial-lot/manufacturing/boms",
+    permissionCode: "manufacturing.boms",
+  },
+  {
+    label: "Work Orders",
+    href: "/app/inventory/serial-lot/manufacturing/work-orders",
+    permissionCode: "manufacturing.work_orders",
+  },
+  {
     label: "Settings",
     href: "/app/inventory/serial-lot/settings",
     permissionCode: "inventory.serial_settings",

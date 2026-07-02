@@ -31,21 +31,22 @@ type PaymentApplication struct {
 }
 
 type PaymentVoucher struct {
-	ID              int64                `json:"id"`
-	PaymentDate     string               `json:"payment_date"`
-	DateSeq         int                  `json:"date_seq"`
-	DateNoDisplay   string               `json:"date_no_display"`
-	PaymentNo       string               `json:"payment_no"`
-	PartnerID       int64                `json:"partner_id"`
-	VendorName      string               `json:"vendor_name"`
-	CurrencyID      int64                `json:"currency_id"`
-	CurrencyCode    string               `json:"currency_code,omitempty"`
-	PaymentMethod   string               `json:"payment_method"`
-	ReferenceNo     *string              `json:"reference_no,omitempty"`
-	Notes           *string              `json:"notes,omitempty"`
-	AmountTotal     float64              `json:"amount_total"`
-	CreatedByName   string               `json:"created_by_name,omitempty"`
-	Applications    []PaymentApplication `json:"applications,omitempty"`
+	ID              int64                    `json:"id"`
+	PaymentDate     string                   `json:"payment_date"`
+	DateSeq         int                      `json:"date_seq"`
+	DateNoDisplay   string                   `json:"date_no_display"`
+	PaymentNo       string                   `json:"payment_no"`
+	PartnerID       int64                    `json:"partner_id"`
+	VendorName      string                   `json:"vendor_name"`
+	CurrencyID      int64                    `json:"currency_id"`
+	CurrencyCode    string                   `json:"currency_code,omitempty"`
+	PaymentMethod   string                   `json:"payment_method"`
+	ReferenceNo     *string                  `json:"reference_no,omitempty"`
+	Notes           *string                  `json:"notes,omitempty"`
+	AmountTotal     float64                  `json:"amount_total"`
+	CreatedByName   string                   `json:"created_by_name,omitempty"`
+	Applications    []PaymentApplication     `json:"applications,omitempty"`
+	WithholdingLines []WithholdingLineResponse `json:"withholding_lines,omitempty"`
 }
 
 type paymentApplicationBody struct {
@@ -54,13 +55,15 @@ type paymentApplicationBody struct {
 }
 
 type paymentVoucherBody struct {
-	PaymentDate   string                   `json:"payment_date"`
-	PartnerID     int64                    `json:"partner_id"`
-	CurrencyID    int64                    `json:"currency_id"`
-	PaymentMethod string                   `json:"payment_method"`
-	ReferenceNo   *string                  `json:"reference_no"`
-	Notes         *string                  `json:"notes"`
-	Applications  []paymentApplicationBody `json:"applications"`
+	PaymentDate      string                   `json:"payment_date"`
+	PartnerID        int64                    `json:"partner_id"`
+	CurrencyID       int64                    `json:"currency_id"`
+	PaymentMethod    string                   `json:"payment_method"`
+	ReferenceNo      *string                  `json:"reference_no"`
+	BankAccountID    *int64                   `json:"bank_account_id"`
+	Notes            *string                  `json:"notes"`
+	Applications     []paymentApplicationBody `json:"applications"`
+	WithholdingLines []withholdingLineBody    `json:"withholding_lines"`
 }
 
 func registerPaymentVoucherRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -231,6 +234,11 @@ func loadPaymentVoucher(ctx context.Context, pool *pgxpool.Pool, tenantID, id in
 		return PaymentVoucher{}, err
 	}
 	pv.Applications = apps
+	wht, err := listWithholdingLines(ctx, pool, tenantID, "payment_voucher", id)
+	if err != nil {
+		return PaymentVoucher{}, err
+	}
+	pv.WithholdingLines = wht
 	return pv, nil
 }
 
@@ -419,7 +427,28 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		ev := buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, body.PaymentMethod)
+		var payeeName string
+		_ = tx.QueryRow(r.Context(), `select company_name from public.inv_partners where id = $1 and tenant_id = $2`, body.PartnerID, tu.TenantID).Scan(&payeeName)
+		if err := insertWithholdingLines(r.Context(), tx, tu.TenantID, "payment_voucher", id, body.WithholdingLines); err != nil {
+			response.Validation(w, map[string]string{"withholding_lines": err.Error()})
+			return
+		}
+
+		whtTotal, err := sumWithholdingTax(r.Context(), tx, tu.TenantID, body.WithholdingLines)
+		if err != nil {
+			response.Validation(w, map[string]string{"withholding_lines": err.Error()})
+			return
+		}
+		netPay := amountTotal - whtTotal
+		if netPay < 0 {
+			netPay = 0
+		}
+		if err := syncPaymentVoucherCheck(r.Context(), tx, tu.TenantID, id, &tu.AppUserID, paymentDate, payeeName, body.PaymentMethod, body.ReferenceNo, body.BankAccountID, netPay); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to register check.", "ERR_INTERNAL")
+			return
+		}
+
+		ev := buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod)
 		if err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
 			return

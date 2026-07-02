@@ -1,4 +1,4 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { FINANCE_SETTINGS_HREF } from "../../../shared/entityTypes";
@@ -56,6 +56,18 @@ export function PaymentVoucherListPageInner(props: PageOptions = {}) {
 
   return (
     <FinanceLayout>
+      <Show when={selectedId()}>
+        <div class="mb-3 flex justify-end">
+          <a
+            href={`/app/finance/payment-vouchers/${selectedId()}/2307`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="rounded-lg border border-stroke bg-white px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50"
+          >
+            Print BIR 2307
+          </a>
+        </div>
+      </Show>
       <SpreadsheetGrid<PaymentVoucherRow>
         columns={[
           { key: "date_no_display", header: "Date-no", clickable: true },

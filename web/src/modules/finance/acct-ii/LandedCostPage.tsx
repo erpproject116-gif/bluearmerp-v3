@@ -48,6 +48,17 @@ export default function LandedCostPage() {
 
   const invalidate = () => void client.invalidateQueries({ queryKey: ["landed-costs"] });
 
+  const postAllocation = async (row: LandedCost) => {
+    if (row.status === "posted") return;
+    const res = await apiFetch(`/api/v1/finance/landed-costs/${row.id}/post`, { method: "POST" });
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to post landed cost.");
+      return;
+    }
+    toast.success("Landed cost posted.");
+    invalidate();
+  };
+
   const openNew = () => {
     setGoodsReceiptId("");
     setReference("");
@@ -107,6 +118,17 @@ export default function LandedCostPage() {
             key: "status",
             header: "Status",
             render: (r) => <span class="capitalize">{r.status}</span>,
+          },
+          {
+            key: "id",
+            header: "",
+            sortable: false,
+            render: (r) =>
+              r.status === "draft" ? (
+                <button type="button" class="text-sm font-medium text-brand-600 hover:underline" onClick={() => postAllocation(r)}>
+                  Post
+                </button>
+              ) : null,
           },
         ]}
         rows={list.data?.rows ?? []}

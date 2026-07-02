@@ -34,7 +34,7 @@ const RECEIPT_FIELDS: { key: keyof BrandingReceipt; label: string; multiline?: b
   { key: "address", label: "Address", multiline: true },
   { key: "phone", label: "Phone" },
   { key: "email", label: "Email" },
-  { key: "tax_id", label: "Tax ID" },
+  { key: "tax_id", label: "Tax ID (TIN) — used on BIR 2307 payor" },
   { key: "header_text", label: "Extra header text", multiline: true },
   { key: "footer_text", label: "Receipt footer", multiline: true },
 ];

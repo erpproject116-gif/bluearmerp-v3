@@ -90,6 +90,7 @@ func putBranding(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save branding.", "ERR_INTERNAL")
 			return
 		}
+		syncTenantTinFromBranding(r.Context(), pool, tu.TenantID, merged)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "branding.update", "tenant_branding", &tu.TenantID, nil, nil)
 		var out map[string]any
 		_ = json.Unmarshal(merged, &out)
@@ -193,4 +194,19 @@ func ResolveAvatarRef(ref string) string {
 func parseID(s string) int64 {
 	n, _ := strconv.ParseInt(s, 10, 64)
 	return n
+}
+
+func syncTenantTinFromBranding(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settingsJSON []byte) {
+	var settings map[string]any
+	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
+		return
+	}
+	receipt, _ := settings["receipt"].(map[string]any)
+	if receipt == nil {
+		return
+	}
+	taxID, _ := receipt["tax_id"].(string)
+	_, _ = pool.Exec(ctx, `
+		update public.tenants set tin = nullif(trim($1), ''), updated_at = now()
+		where id = $2`, taxID, tenantID)
 }

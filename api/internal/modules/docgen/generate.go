@@ -9,6 +9,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/deliveryreceipt"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaseorder"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/salesorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -116,6 +121,12 @@ func executeGenerate(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 		return generatePOFromPR(ctx, pool, tu, sourceIDs)
 	case "quotation->sales_order":
 		return generateSOFromQuotation(ctx, pool, tu, sourceIDs)
+	case "sales_order->sales":
+		return generateSalesFromSO(ctx, pool, tu, sourceIDs)
+	case "sales_order->delivery_receipt":
+		return generateDRFromSO(ctx, pool, tu, sourceIDs)
+	case "goods_receipt->supplier_invoice":
+		return generateSupplierInvoiceFromGR(ctx, pool, tu, sourceIDs)
 	default:
 		return nil, fmt.Errorf("generation for %s is not yet automated; use module create endpoints", pair)
 	}
@@ -124,16 +135,11 @@ func executeGenerate(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 func generatePOFromPR(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, prIDs []int64) ([]int64, error) {
 	var out []int64
 	for _, prID := range prIDs {
-		var poID int64
-		err := pool.QueryRow(ctx, `
-			select po.id from public.po_purchase_orders po
-			where po.tenant_id = $1 and po.purchase_request_id = $2 and po.deleted_at is null
-			order by po.id desc limit 1`, tu.TenantID, prID).Scan(&poID)
-		if err == nil {
-			out = append(out, poID)
-			continue
+		poID, err := purchaseorder.CreateFromPurchaseRequest(ctx, pool, tu, prID, purchaseorder.CreateFromPROptions{})
+		if err != nil {
+			return out, fmt.Errorf("PR %d: %w", prID, err)
 		}
-		return out, fmt.Errorf("create PO from PR %d via purchase order module (from-purchase-request endpoint)", prID)
+		out = append(out, poID)
 	}
 	return out, nil
 }
@@ -141,16 +147,47 @@ func generatePOFromPR(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUse
 func generateSOFromQuotation(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, quoIDs []int64) ([]int64, error) {
 	var out []int64
 	for _, qid := range quoIDs {
-		var soID int64
-		err := pool.QueryRow(ctx, `
-			select id from public.so_sales_orders
-			where tenant_id = $1 and source_quotation_id = $2 and deleted_at is null
-			order by id desc limit 1`, tu.TenantID, qid).Scan(&soID)
-		if err == nil {
-			out = append(out, soID)
-			continue
+		soID, err := salesorder.CreateFromQuotation(ctx, pool, tu, qid)
+		if err != nil {
+			return out, fmt.Errorf("quotation %d: %w", qid, err)
 		}
-		return out, fmt.Errorf("create SO from quotation %d via sales order module", qid)
+		out = append(out, soID)
+	}
+	return out, nil
+}
+
+func generateSalesFromSO(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, soIDs []int64) ([]int64, error) {
+	var out []int64
+	for _, soID := range soIDs {
+		saleID, err := sales.CreateFromSalesOrder(ctx, pool, tu, soID)
+		if err != nil {
+			return out, fmt.Errorf("sales order %d: %w", soID, err)
+		}
+		out = append(out, saleID)
+	}
+	return out, nil
+}
+
+func generateDRFromSO(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, soIDs []int64) ([]int64, error) {
+	var out []int64
+	for _, soID := range soIDs {
+		drID, err := deliveryreceipt.CreateFromSalesOrder(ctx, pool, tu, soID)
+		if err != nil {
+			return out, fmt.Errorf("sales order %d: %w", soID, err)
+		}
+		out = append(out, drID)
+	}
+	return out, nil
+}
+
+func generateSupplierInvoiceFromGR(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, grIDs []int64) ([]int64, error) {
+	var out []int64
+	for _, grID := range grIDs {
+		invID, err := finance.CreateSupplierInvoiceFromGoodsReceipt(ctx, pool, tu, grID)
+		if err != nil {
+			return out, fmt.Errorf("goods receipt %d: %w", grID, err)
+		}
+		out = append(out, invID)
 	}
 	return out, nil
 }

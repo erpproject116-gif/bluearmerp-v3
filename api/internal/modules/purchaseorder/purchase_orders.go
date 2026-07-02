@@ -3,6 +3,7 @@ package purchaseorder
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -618,177 +619,25 @@ func createFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		var prTaxTypeID, prCurrencyID, prLocationID int64
-		var prPartnerID, prPicUserID, prProjectID *int64
-		var prPicName, prProgressStatus string
-		var prProjectName, prReference, prNotes *string
-		var prApprovedAt *time.Time
-		err = pool.QueryRow(r.Context(), `
-			select tax_type_id, currency_id, partner_id, pic_user_id, pic_name,
-			  location_id, project_id, project_name, reference, notes, progress_status, approved_at
-			from public.pr_purchase_requests
-			where id = $1 and tenant_id = $2 and deleted_at is null`,
-			prID, tu.TenantID).Scan(
-			&prTaxTypeID, &prCurrencyID, &prPartnerID, &prPicUserID, &prPicName,
-			&prLocationID, &prProjectID, &prProjectName, &prReference, &prNotes, &prProgressStatus, &prApprovedAt,
-		)
+		id, err := CreateFromPurchaseRequest(r.Context(), pool, tu, prID, CreateFromPROptions{
+			OrderDate: body.OrderDate,
+			DateSeq:   body.DateSeq,
+			Reference: body.Reference,
+			Notes:     body.Notes,
+		})
 		if err != nil {
-			response.Err(w, http.StatusNotFound, "Purchase request not found.", "ERR_NOT_FOUND")
-			return
-		}
-
-		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
-			return
-		}
-		if vErrs := processpolicy.ValidatePurchaseRequestForPO(policy, prProgressStatus, prApprovedAt); vErrs != nil {
-			response.Validation(w, vErrs)
-			return
-		}
-
-		orderDate := time.Now()
-		if body.OrderDate != nil && strings.TrimSpace(*body.OrderDate) != "" {
-			orderDate, err = parseDate(*body.OrderDate)
-			if err != nil {
-				response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
+			if fields, ok := AsDocflowValidation(err); ok {
+				response.Validation(w, fields)
 				return
 			}
-		}
-
-		tt, err := loadTaxCalcType(r.Context(), pool, tu.TenantID, prTaxTypeID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load tax type.", "ERR_INTERNAL")
-			return
-		}
-
-		rows, err := pool.Query(r.Context(), `
-			select ln.id, ln.line_no, ln.partner_id, ln.partner_code, ln.partner_name,
-			  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
-			  ln.qty::float8, ln.input_basis, ln.unit_non_vat::float8, ln.unit_vat_inc::float8,
-			  ln.remark, coalesce(sl.slipped, 0)::float8
-			from public.pr_purchase_request_lines ln
-			left join (
-			  select purchase_request_line_id, sum(qty) as slipped
-			  from public.pr_purchase_request_slip_lines
-			  group by purchase_request_line_id
-			) sl on sl.purchase_request_line_id = ln.id
-			where ln.purchase_request_id = $1
-			order by ln.line_no`, prID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load purchase request lines.", "ERR_INTERNAL")
-			return
-		}
-		defer rows.Close()
-
-		var computed []computedLine
-		lineNo := 0
-		for rows.Next() {
-			var prLineID int64
-			var lnLineNo int
-			var partnerID, itemID *int64
-			var partnerCode, partnerName, itemCode, itemName string
-			var specName, description, remark *string
-			var qty, unitNonVat, unitVatInc, slipped float64
-			var inputBasis string
-			if err := rows.Scan(&prLineID, &lnLineNo, &partnerID, &partnerCode, &partnerName,
-				&itemID, &itemCode, &itemName, &specName, &description,
-				&qty, &inputBasis, &unitNonVat, &unitVatInc, &remark, &slipped); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
+			if errors.Is(err, ErrPurchaseRequestNotFound) {
+				response.Err(w, http.StatusNotFound, "Purchase request not found.", "ERR_NOT_FOUND")
 				return
 			}
-			openQty := qty - slipped
-			if openQty <= 0 {
-				continue
-			}
-			if inputBasis == "" {
-				inputBasis = taxcalc.InputVatIncUnit
-			}
-			unitPrice := unitVatInc
-			if inputBasis == taxcalc.InputNonVatUnit {
-				unitPrice = unitNonVat
-			}
-			lineNo++
-			amounts := taxcalc.ComputeLine(tt, unitPrice, openQty, inputBasis)
-			prLineIDCopy := prLineID
-			computed = append(computed, computedLine{
-				LineNo:                lineNo,
-				PurchaseRequestLineID: &prLineIDCopy,
-				PartnerID:             partnerID,
-				PartnerCode:           partnerCode,
-				PartnerName:           partnerName,
-				ItemID:                itemID,
-				ItemCode:              itemCode,
-				ItemName:              itemName,
-				SpecName:              specName,
-				Description:           description,
-				Qty:                   openQty,
-				InputBasis:            inputBasis,
-				Amounts:               amounts,
-				Remark:                remark,
-			})
-		}
-		if len(computed) == 0 {
-			response.Validation(w, map[string]string{"lines": "No open lines available on this purchase request."})
+			response.Err(w, http.StatusInternalServerError, "Failed to create purchase order.", "ERR_INTERNAL")
 			return
 		}
 
-		headerPartnerID := resolveHeaderPartnerID(prPartnerID, computed)
-		subtotal, taxTotal, grandTotal := sumPurchaseOrderTotals(computed)
-
-		reference := prReference
-		if body.Reference != nil {
-			reference = body.Reference
-		}
-		notes := prNotes
-		if body.Notes != nil {
-			notes = body.Notes
-		}
-
-		tx, err := pool.Begin(r.Context())
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
-			return
-		}
-		defer tx.Rollback(r.Context())
-
-		dateSeq, purchaseOrderNo, seqErrs := allocatePurchaseOrderSequences(r.Context(), tx, tu.TenantID, orderDate, body.DateSeq, 0)
-		if seqErrs != nil {
-			response.Validation(w, seqErrs)
-			return
-		}
-
-		prIDCopy := prID
-		var id int64
-		err = tx.QueryRow(r.Context(), `
-			insert into public.po_purchase_orders (
-			  tenant_id, order_date, date_seq, purchase_order_no,
-			  purchase_request_id, rfq_id, supplier_quotation_id, tax_type_id, currency_id, partner_id,
-			  pic_user_id, pic_name, location_id, project_id, project_name,
-			  status, reference, notes,
-			  subtotal, tax_total, grand_total, created_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'draft',$16,$17,$18,$19,$20,$21)
-			returning id`,
-			tu.TenantID, orderDate, dateSeq, purchaseOrderNo,
-			&prIDCopy, nil, nil, prTaxTypeID, prCurrencyID, headerPartnerID,
-			prPicUserID, strings.TrimSpace(prPicName), prLocationID, prProjectID, prProjectName,
-			reference, notes,
-			subtotal, taxTotal, grandTotal, tu.AppUserID).Scan(&id)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to insert purchase order.", "ERR_INTERNAL")
-			return
-		}
-
-		if _, err := insertPurchaseOrderLines(r.Context(), tx, id, computed); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
-			return
-		}
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
-			return
-		}
-
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.create_from_pr", "po_purchase_order", &id, nil, map[string]any{"purchase_request_id": prID})
 		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, po, "Created.")
 	}

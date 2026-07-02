@@ -189,7 +189,7 @@ export default function WorkOrdersPage() {
         onSelect={setSelectedId}
         onNew={openNew}
         onEdit={() => {}}
-        settingsHref="/app/manufacturing/work-orders"
+        settingsHref="/app/inventory/serial-lot/manufacturing/work-orders"
         codeKey="work_order_no"
         nameKey="bom_code"
         sortKey={sort()}

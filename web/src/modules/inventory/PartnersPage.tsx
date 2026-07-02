@@ -22,6 +22,7 @@ export type Partner = {
   mobile: string | null;
   email: string | null;
   address: string | null;
+  tin: string | null;
   status: string;
   credit_limit?: number | null;
   credit_limit_on_hold?: boolean;
@@ -43,6 +44,7 @@ export default function PartnersPage() {
     mobile: "",
     email: "",
     address: "",
+    tin: "",
     status: "active",
     credit_limit: "",
     credit_limit_on_hold: false,
@@ -84,6 +86,7 @@ export default function PartnersPage() {
       mobile: "",
       email: "",
       address: "",
+      tin: "",
       status: "active",
       credit_limit: "",
       credit_limit_on_hold: false,
@@ -104,6 +107,7 @@ export default function PartnersPage() {
       mobile: row.mobile ?? "",
       email: row.email ?? "",
       address: row.address ?? "",
+      tin: row.tin ?? "",
       status: row.status,
       credit_limit: row.credit_limit != null ? String(row.credit_limit) : "",
       credit_limit_on_hold: row.credit_limit_on_hold ?? false,
@@ -135,6 +139,7 @@ export default function PartnersPage() {
       mobile: form().mobile || null,
       email: form().email || null,
       address: form().address || null,
+      tin: form().tin.trim() || null,
       credit_limit: creditLimit != null && Number.isFinite(creditLimit) ? creditLimit : null,
       credit_limit_on_hold: form().credit_limit_on_hold,
       default_price_list_id: defaultPriceListId != null && Number.isFinite(defaultPriceListId) ? defaultPriceListId : null,
@@ -165,6 +170,7 @@ export default function PartnersPage() {
           { key: "phone", header: "Phone" },
           { key: "mobile", header: "Mobile" },
           { key: "email", header: "Email" },
+          { key: "tin", header: "TIN" },
           {
             key: "credit_limit",
             header: "Credit limit",
@@ -274,6 +280,9 @@ export default function PartnersPage() {
             />
           )}
         </ModalField>
+        <Field label="TIN (BIR 2307 payee)">
+          <input class={inputClass} value={form().tin} onInput={(e) => setForm((f) => ({ ...f, tin: e.currentTarget.value }))} placeholder="000-000-000-000" />
+        </Field>
         <ModalField settings={byKey} fieldKey="address" fallbackLabel="Address" span="full">
           {(m) => (
             <textarea

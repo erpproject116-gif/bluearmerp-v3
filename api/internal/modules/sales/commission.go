@@ -18,6 +18,7 @@ type CommissionRule struct {
 	Name              string  `json:"name"`
 	SalespersonUserID *int64  `json:"salesperson_user_id,omitempty"`
 	ItemCategoryID    *int64  `json:"item_category_id,omitempty"`
+	ItemCategoryName  *string `json:"item_category_name,omitempty"`
 	RatePct           float64 `json:"rate_pct"`
 	Active            bool    `json:"active"`
 }
@@ -50,10 +51,11 @@ func listCommissionRules(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		rows, err := pool.Query(r.Context(), `
-			select id, name, salesperson_user_id, item_category_id, rate_pct::float8, active
-			from public.sa_commission_rules
-			where tenant_id = $1
-			order by name`, tu.TenantID)
+			select r.id, r.name, r.salesperson_user_id, r.item_category_id, c.name, r.rate_pct::float8, r.active
+			from public.sa_commission_rules r
+			left join public.inv_item_categories c on c.id = r.item_category_id
+			where r.tenant_id = $1
+			order by r.name`, tu.TenantID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list commission rules.", "ERR_INTERNAL")
 			return
@@ -62,7 +64,7 @@ func listCommissionRules(pool *pgxpool.Pool) http.HandlerFunc {
 		var out []CommissionRule
 		for rows.Next() {
 			var row CommissionRule
-			if err := rows.Scan(&row.ID, &row.Name, &row.SalespersonUserID, &row.ItemCategoryID, &row.RatePct, &row.Active); err != nil {
+			if err := rows.Scan(&row.ID, &row.Name, &row.SalespersonUserID, &row.ItemCategoryID, &row.ItemCategoryName, &row.RatePct, &row.Active); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read commission rules.", "ERR_INTERNAL")
 				return
 			}

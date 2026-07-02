@@ -155,6 +155,11 @@ func patchSalesProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		status := defaultProgress(body.ProgressStatus)
 
+		var priorStatus string
+		_ = pool.QueryRow(r.Context(), `
+			select progress_status from public.sa_sales
+			where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID).Scan(&priorStatus)
+
 		tag, err := pool.Exec(r.Context(), `
 			update public.sa_sales
 			set progress_status = $1, updated_at = now()
@@ -163,6 +168,10 @@ func patchSalesProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Sales not found.", "ERR_NOT_FOUND")
 			return
+		}
+
+		if status == "completed" && priorStatus != "completed" {
+			_ = accrueCommissionForSalePool(r.Context(), pool, tu.TenantID, id)
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.progress_status", "sa_sales", &id, nil, body)

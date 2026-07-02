@@ -1,9 +1,12 @@
 package approval
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -59,11 +62,15 @@ func submitApproval(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to submit.", "ERR_INTERNAL")
 			return
 		}
+		label := entityLabel(r.Context(), pool, tu.TenantID, entityType, entityID)
+		submitter := submitterName(r.Context(), pool, tu.TenantID, tu.AppUserID)
+		_ = EnqueuePendingApprovalTx(r.Context(), tx, tu.TenantID, entityType, entityID, label, submitter)
 		_ = SyncEntityProgress(r.Context(), tx, tu.TenantID, entityType, entityID, "e_approval")
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
 		}
+		_ = DrainOutbox(r.Context(), pool)
 		response.OK(w, map[string]any{"entity_type": entityType, "entity_id": entityID, "status": "e_approval"}, "Submitted.")
 	}
 }
@@ -108,4 +115,25 @@ func decideApproval(pool *pgxpool.Pool, approve bool) http.HandlerFunc {
 		}
 		response.OK(w, map[string]any{"entity_type": entityType, "entity_id": entityID, "status": status}, "Updated.")
 	}
+}
+
+func entityLabel(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entityType string, entityID int64) string {
+	switch strings.TrimSpace(entityType) {
+	case "purchase_request", "pr_purchase_request":
+		var ref string
+		_ = pool.QueryRow(ctx, `
+			select coalesce(nullif(trim(reference), ''), purchase_request_no, '')
+			from public.pr_purchase_requests
+			where id = $1 and tenant_id = $2`, entityID, tenantID).Scan(&ref)
+		if ref != "" {
+			return ref
+		}
+	}
+	return fmt.Sprintf("%s #%d", entityType, entityID)
+}
+
+func submitterName(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64) string {
+	var name string
+	_ = pool.QueryRow(ctx, `select coalesce(full_name, email, '') from public.users where id = $1 and tenant_id = $2`, userID, tenantID).Scan(&name)
+	return name
 }

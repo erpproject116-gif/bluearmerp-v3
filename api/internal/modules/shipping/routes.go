@@ -11,6 +11,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/shipping", func(sr chi.Router) {
 		registerShippingOrderRoutes(sr, pool)
 		registerDeliveryTripRoutes(sr, pool)
+		registerShippingRuleRoutes(sr, pool)
 	})
 }
 

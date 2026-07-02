@@ -3,6 +3,7 @@ package purchaserequest
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -89,6 +91,7 @@ func submitPurchaseRequestForApproval(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
 			return
 		}
+		_ = approval.DrainOutbox(r.Context(), pool)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_request.submit_for_approval", "pr_purchase_request", &id, nil, body)
 		pr, _ := loadPurchaseRequest(r.Context(), pool, tu.TenantID, id)
@@ -266,6 +269,20 @@ func applyPRApprovalTransition(ctx context.Context, pool *pgxpool.Pool, tu auth.
 		id, action, tu.AppUserID, actorName, remarks, fromStatus, toStatus)
 	if err != nil {
 		return err
+	}
+	if action == "submit" {
+		var ref string
+		_ = tx.QueryRow(ctx, `
+			select coalesce(nullif(trim(reference), ''), purchase_request_no, '')
+			from public.pr_purchase_requests
+			where id = $1 and tenant_id = $2`, id, tu.TenantID).Scan(&ref)
+		label := ref
+		if label == "" {
+			label = fmt.Sprintf("Purchase Request #%d", id)
+		}
+		if err := approval.EnqueuePendingApprovalTx(ctx, tx, tu.TenantID, "purchase_request", id, label, actorName); err != nil {
+			return err
+		}
 	}
 	return tx.Commit(ctx)
 }

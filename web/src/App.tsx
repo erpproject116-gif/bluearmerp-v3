@@ -84,6 +84,7 @@ import PreInvoicingStatusPage from "./modules/sales/sales/PreInvoicingStatusPage
 import ChangeSalesPriceBatchPage from "./modules/sales/sales/ChangeSalesPriceBatchPage";
 import SalesReturnsPage from "./modules/sales/SalesReturnsPage";
 import PackingSlipPrintPage from "./modules/sales/sales/PackingSlipPrintPage";
+import Bir2307PrintPage from "./modules/finance/payment-vouchers/Bir2307PrintPage";
 import JournalEntriesPage from "./modules/finance/JournalEntriesPage";
 import OfficialReceiptListPage from "./modules/finance/official-receipts/OfficialReceiptListPage";
 import OfficialReceiptNewPage from "./modules/finance/official-receipts/OfficialReceiptNewPage";
@@ -158,6 +159,8 @@ import JobCostingPage from "./modules/jobcosting/JobCostingPage";
 import BomsPage from "./modules/manufacturing/BomsPage";
 import WorkOrdersPage from "./modules/manufacturing/WorkOrdersPage";
 import NcrsPage from "./modules/quality/NcrsPage";
+import CapaPage from "./modules/quality/CapaPage";
+import CommissionRulesPage from "./modules/sales/CommissionRulesPage";
 import SOAnalysisReportPage from "./modules/sales-order/reports/SOAnalysisReportPage";
 import POAnalysisReportPage from "./modules/purchase-order/reports/POAnalysisReportPage";
 import ItemsToReceiveReportPage from "./modules/purchase-order/reports/ItemsToReceiveReportPage";
@@ -191,6 +194,7 @@ import IngestionRulesPage from "./modules/data-center/IngestionRulesPage";
 import InboxPage from "./modules/data-center/InboxPage";
 import ScheduledReceiptsPage from "./modules/wms/ScheduledReceiptsPage";
 import ShippingOrdersPage from "./modules/shipping/ShippingOrdersPage";
+import ShippingRulesPage from "./modules/shipping/ShippingRulesPage";
 import DeliveryTripsPage from "./modules/shipping/DeliveryTripsPage";
 import WithholdingCodesPage from "./modules/finance/acct-ii/WithholdingCodesPage";
 import CheckRegisterPage from "./modules/finance/acct-ii/CheckRegisterPage";
@@ -251,6 +255,7 @@ export default function App() {
         <Route path="/app/purchase-request/purchase-requests/:purchaseRequestId/print" component={PurchaseRequestPrintPage} />
         <Route path="/app/purchase-request/purchase-requests/status/print" component={PurchaseRequestStatusPrintPage} />
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
+        <Route path="/app/finance/payment-vouchers/:id/2307" component={Bir2307PrintPage} />
         <Route path="/app/sales/reports/discount-status/print" component={SalesDiscountStatusPrintPage} />
         <Route path="/app/sales/collective-invoicing/status/print" component={CollectiveInvoiceStatusPrintPage} />
         <Route path="/app/sales/collective-invoicing/:id/slip/print" component={CollectiveInvoiceSlipPrintPage} />
@@ -294,6 +299,18 @@ export default function App() {
           <Route path="/inventory/serial-lot/trace" component={SerialTracePage} />
           <Route path="/inventory/serial-lot/receive" component={SerialReceivePage} />
           <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
+          <Route path="/inventory/serial-lot/manufacturing/work-orders" component={() => (
+            <ManufacturingRoute><WorkOrdersPage /></ManufacturingRoute>
+          )} />
+          <Route path="/inventory/serial-lot/manufacturing/boms" component={() => (
+            <ManufacturingRoute><BomsPage /></ManufacturingRoute>
+          )} />
+          <Route path="/manufacturing/work-orders" component={() => (
+            <Navigate href="/app/inventory/serial-lot/manufacturing/work-orders" />
+          )} />
+          <Route path="/manufacturing/boms" component={() => (
+            <Navigate href="/app/inventory/serial-lot/manufacturing/boms" />
+          )} />
           <Route path="/after-sales/repair-orders/new" component={RepairOrderNewPage} />
           <Route path="/after-sales/repair-orders/status" component={RepairOrderStatusPage} />
           <Route path="/after-sales/repair-orders/settings" component={RepairOrderSettingsPage} />
@@ -322,6 +339,7 @@ export default function App() {
           <Route path="/sales-order/delivery-receipts" component={DeliveryReceiptListPage} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
           <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
+          <Route path="/sales-order/shipping/rules" component={ShippingRulesPage} />
           <Route path="/sales-order/shipping/orders" component={ShippingOrdersPage} />
           <Route path="/sales-order/shipping/trips" component={DeliveryTripsPage} />
           <Route path="/purchase-order/reports/po-analysis" component={POAnalysisReportPage} />
@@ -455,11 +473,9 @@ export default function App() {
           <Route path="/job-costing" component={() => (
             <JobCostingRoute><JobCostingPage /></JobCostingRoute>
           )} />
-          <Route path="/manufacturing/boms" component={() => (
-            <ManufacturingRoute><BomsPage /></ManufacturingRoute>
-          )} />
-          <Route path="/manufacturing/work-orders" component={() => (
-            <ManufacturingRoute><WorkOrdersPage /></ManufacturingRoute>
+          <Route path="/sales/commission-rules" component={CommissionRulesPage} />
+          <Route path="/quality/capa" component={() => (
+            <QualityRoute><CapaPage /></QualityRoute>
           )} />
           <Route path="/quality/ncrs" component={() => (
             <QualityRoute><NcrsPage /></QualityRoute>

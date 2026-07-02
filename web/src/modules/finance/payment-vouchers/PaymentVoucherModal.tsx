@@ -1,4 +1,5 @@
-import { createEffect, createSignal, For } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
@@ -13,6 +14,20 @@ type AppRow = {
   label: string;
   grand_total: number;
   applied_amount: string;
+};
+
+type WhtRow = {
+  tax_code_id: number | null;
+  code: string;
+  rate_pct: number;
+  base_amount: string;
+};
+
+type WithholdingCode = {
+  id: number;
+  code: string;
+  description: string;
+  rate_pct: number;
 };
 
 type Props = {
@@ -54,7 +69,31 @@ export function PaymentVoucherModal(props: Props) {
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [paymentMethod, setPaymentMethod] = createSignal("bank_transfer");
   const [referenceNo, setReferenceNo] = createSignal("");
+  const [bankAccountId, setBankAccountId] = createSignal<number | null>(null);
   const [applications, setApplications] = createSignal<AppRow[]>([{ supplier_invoice_id: null, label: "", grand_total: 0, applied_amount: "" }]);
+  const [withholdingLines, setWithholdingLines] = createSignal<WhtRow[]>([]);
+
+  const whtCodes = createQuery(() => ({
+    queryKey: ["withholding-codes-pv"],
+    queryFn: async () => {
+      const res = await apiFetch<WithholdingCode[]>("/api/v1/finance/withholding-codes");
+      if (!res.success) throw new Error(res.message ?? "Failed to load withholding codes");
+      return res.data ?? [];
+    },
+    enabled: props.open,
+  }));
+
+  const bankAccounts = createQuery(() => ({
+    queryKey: ["bank-accounts-pv"],
+    queryFn: async () => {
+      const res = await apiFetch<{ id: number; bank_account_name: string }[]>(
+        "/api/v1/finance/bank-accounts?page=1&pageSize=200&sort=bank_account_name&order=asc",
+      );
+      if (!res.success) throw new Error(res.message ?? "Failed to load bank accounts");
+      return res.data ?? [];
+    },
+    enabled: props.open,
+  }));
 
   const loadPreview = async (date: string) => {
     const res = await apiFetch<{ date_no_display: string; payment_no: string }>(
@@ -72,6 +111,8 @@ export function PaymentVoucherModal(props: Props) {
     setPartnerId(null);
     setVendorLabel("");
     setReferenceNo("");
+    setBankAccountId(null);
+    setWithholdingLines([]);
     setApplications([{ supplier_invoice_id: null, label: "", grand_total: 0, applied_amount: "" }]);
     void loadPreview(todayISO());
     void apiFetch<{ id: number; is_default: boolean }[]>("/api/v1/quotation/currencies?page=1&pageSize=100&status=active").then((res) => {
@@ -85,6 +126,15 @@ export function PaymentVoucherModal(props: Props) {
     void loadPreview(paymentDate());
   });
 
+  const totalWithheld = () =>
+    withholdingLines().reduce((sum, row) => {
+      const base = Number(row.base_amount) || 0;
+      return sum + base * (row.rate_pct / 100);
+    }, 0);
+
+  const totalApplied = () =>
+    applications().reduce((sum, a) => sum + (Number(a.applied_amount) || 0), 0);
+
   const save = async () => {
     if (!partnerId() || !currencyId()) {
       toast.warning("Select vendor and currency.");
@@ -97,6 +147,9 @@ export function PaymentVoucherModal(props: Props) {
       toast.warning("Add at least one invoice application.");
       return;
     }
+    const wht = withholdingLines()
+      .filter((w) => w.tax_code_id && Number(w.base_amount) > 0)
+      .map((w) => ({ tax_code_id: w.tax_code_id!, base_amount: Number(w.base_amount) }));
     setSaving(true);
     const ok = await submitEntity(
       () =>
@@ -110,7 +163,9 @@ export function PaymentVoucherModal(props: Props) {
               currency_id: currencyId(),
               payment_method: paymentMethod(),
               reference_no: referenceNo().trim() || null,
+              bank_account_id: bankAccountId() || null,
               applications: apps,
+              withholding_lines: wht,
             }),
           },
           { silent: true },
@@ -120,6 +175,15 @@ export function PaymentVoucherModal(props: Props) {
     );
     setSaving(false);
     if (ok) props.onSaved();
+  };
+
+  const addWhtLine = () => {
+    const codes = whtCodes.data ?? [];
+    const first = codes[0];
+    setWithholdingLines((rows) => [
+      ...rows,
+      { tax_code_id: first?.id ?? null, code: first?.code ?? "", rate_pct: first?.rate_pct ?? 0, base_amount: "" },
+    ]);
   };
 
   return (
@@ -158,10 +222,21 @@ export function PaymentVoucherModal(props: Props) {
           <option value="bank_transfer">Bank Transfer</option>
         </select>
       </Field>
-      <Field label="Reference">
+      <Show when={paymentMethod() === "check"}>
+        <Field label="Bank account (check register)">
+          <select class={inputClass} value={bankAccountId() ?? ""} onChange={(e) => setBankAccountId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}>
+            <option value="">Select bank account…</option>
+            {(bankAccounts.data ?? []).map((b) => (
+              <option value={String(b.id)}>{b.bank_account_name}</option>
+            ))}
+          </select>
+        </Field>
+      </Show>
+      <Field label="Reference / check no.">
         <input class={inputClass} value={referenceNo()} onInput={(e) => setReferenceNo(e.currentTarget.value)} />
       </Field>
       <div class="col-span-full space-y-2">
+        <p class="text-sm font-medium text-text-primary">Invoice applications</p>
         <For each={applications()}>
           {(_, index) => (
             <div class="grid grid-cols-2 gap-2">
@@ -209,6 +284,76 @@ export function PaymentVoucherModal(props: Props) {
         <button type="button" class="text-sm text-brand-600" onClick={() => setApplications((rows) => [...rows, { supplier_invoice_id: null, label: "", grand_total: 0, applied_amount: "" }])}>
           + Add application
         </button>
+      </div>
+
+      <div class="col-span-full space-y-2 border-t border-stroke pt-4">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-medium text-text-primary">Withholding tax (2307)</p>
+          <button type="button" class="text-sm text-brand-600" onClick={addWhtLine}>
+            + Add withholding line
+          </button>
+        </div>
+        <For each={withholdingLines()}>
+          {(_, index) => (
+            <div class="grid grid-cols-3 gap-2">
+              <Field label="Tax code">
+                <select
+                  class={inputClass}
+                  value={withholdingLines()[index()]?.tax_code_id ?? ""}
+                  onChange={(e) => {
+                    const id = Number(e.currentTarget.value);
+                    const code = (whtCodes.data ?? []).find((c) => c.id === id);
+                    setWithholdingLines((rows) =>
+                      rows.map((r, idx) =>
+                        idx === index()
+                          ? { ...r, tax_code_id: id || null, code: code?.code ?? "", rate_pct: code?.rate_pct ?? 0 }
+                          : r,
+                      ),
+                    );
+                  }}
+                >
+                  <option value="">Select code…</option>
+                  {(whtCodes.data ?? []).map((c) => (
+                    <option value={String(c.id)}>
+                      {c.code} — {c.description} ({c.rate_pct}%)
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Income base amount">
+                <input
+                  class={inputClass}
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={withholdingLines()[index()]?.base_amount ?? ""}
+                  onInput={(e) =>
+                    setWithholdingLines((rows) => rows.map((r, idx) => (idx === index() ? { ...r, base_amount: e.currentTarget.value } : r)))
+                  }
+                />
+              </Field>
+              <Field label="Tax withheld">
+                <input
+                  class={inputClass}
+                  readOnly
+                  value={(() => {
+                    const row = withholdingLines()[index()];
+                    if (!row) return "";
+                    const base = Number(row.base_amount) || 0;
+                    return (base * (row.rate_pct / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                  })()}
+                />
+              </Field>
+            </div>
+          )}
+        </For>
+        <Show when={withholdingLines().length > 0}>
+          <p class="text-sm text-text-secondary">
+            Applied: {totalApplied().toLocaleString(undefined, { minimumFractionDigits: 2 })} · Withheld:{" "}
+            {totalWithheld().toLocaleString(undefined, { minimumFractionDigits: 2 })} · Net payment:{" "}
+            {(totalApplied() - totalWithheld()).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </p>
+        </Show>
       </div>
     </WideEntityModal>
   );

@@ -183,7 +183,7 @@ export default function BomsPage() {
         onSelect={setSelectedId}
         onNew={openNew}
         onEdit={openEdit}
-        settingsHref="/app/manufacturing/boms"
+        settingsHref="/app/inventory/serial-lot/manufacturing/boms"
         codeKey="bom_code"
         nameKey="bom_name"
         sortKey={sort()}

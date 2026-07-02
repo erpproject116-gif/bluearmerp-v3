@@ -1,4 +1,5 @@
 import type { DocSection } from "./documentationTypes";
+import { documentationGroups } from "./documentationGroups";
 
 export const documentationSections: DocSection[] = [
   {
@@ -225,6 +226,28 @@ export const documentationSections: DocSection[] = [
     ],
   },
   {
+    id: "shipping",
+    title: "Shipping & delivery",
+    iconId: "sales_order",
+    intro: "Shipping orders, freight rules, and delivery trips after sales orders.",
+    primaryHref: "/app/sales-order/shipping/orders",
+    primaryLabel: "Open Shipping Orders",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Under Sales Order → Shipping, create shipping orders linked to customers and locations. Enter zone and carrier to auto-resolve flat freight from shipping rules.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Maintain Shipping Rules with zone, carrier, and flat freight amount.",
+          "Create a Shipping Order — freight fills in when rules match.",
+          "Use Delivery Trips to group outbound deliveries for drivers or couriers.",
+        ],
+      },
+    ],
+  },
+  {
     id: "sales",
     title: "Sales invoices",
     iconId: "sales",
@@ -248,6 +271,11 @@ export const documentationSections: DocSection[] = [
       {
         type: "paragraph",
         text: "Sales Status and Pre-invoicing Status help you see which orders are ready to bill. Reports such as A/R by Customer show who still owes money on open invoices.",
+      },
+      { type: "heading", text: "Sales commission" },
+      {
+        type: "paragraph",
+        text: "Under Sales → Commission Rules, define rates by salesperson and/or item category. Commission accrues automatically when a sale is marked Completed.",
       },
     ],
   },
@@ -312,6 +340,30 @@ export const documentationSections: DocSection[] = [
     ],
   },
   {
+    id: "data-ops",
+    title: "Data Center & WMS",
+    iconId: "inventory",
+    intro: "Inbound file ingestion and warehouse scheduled receipts (opt-in modules).",
+    primaryHref: "/app/data-center/inbox",
+    primaryLabel: "Open Data Center Inbox",
+    blocks: [
+      { type: "heading", text: "Data Center" },
+      {
+        type: "paragraph",
+        text: "Data Center ingests external files using ingestion rules. Review the inbox, map columns, and load rows into staging before posting to inventory or finance lists.",
+      },
+      { type: "heading", text: "WMS scheduled receipt" },
+      {
+        type: "paragraph",
+        text: "WMS (when enabled) lets you schedule expected inbound receipts against PO lines. Use it to plan dock appointments and compare scheduled vs actual GR quantities.",
+      },
+      {
+        type: "tip",
+        text: "Enable Data Center and WMS under User Management → Module & Features if they do not appear in the sidebar.",
+      },
+    ],
+  },
+  {
     id: "finance",
     title: "Finance and accounts",
     iconId: "finance",
@@ -321,21 +373,36 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "The Accounts workspace summarizes open receivables, payables, draft journal entries, and bank reconciliation items. ECOUNT-style Acct. I covers journal entries, chart of accounts, fiscal years, bank reconciliation, payment entries, and financial statements. Acct. II adds check register, withholding tax codes, notes receivable/payable, landed import cost, company budgets, and contracts.",
+        text: "The Accounts workspace summarizes open receivables, payables, and shortcuts into Acct. I (core GL) and Acct. II (extended PH-style accounting).",
       },
+      { type: "heading", text: "Acct. I — core ledger" },
       {
         type: "steps",
         items: [
-          "Open Accounts → Workspace for KPIs and Acct. I / Acct. II shortcuts.",
-          "Acct. I: Journal Entries, Chart of Accounts, Trial Balance, P&L, Balance Sheet, Bank Reconciliation.",
-          "Record customer payments (Payment Receipts) and vendor payments (Payment Vouchers); post supplier invoices against PO receipts.",
-          "Acct. II: Check Register, Withholding Tax, Notes, Landed Cost, Company Budgets, Contracts.",
-          "Use Budget vs Actual and set Process Policies → budget control to warn or block PR/PO overruns.",
+          "Journal Entries, Chart of Accounts, Trial Balance, P&L, and Balance Sheet.",
+          "Payment Receipts (customer collections) and Payment Vouchers (vendor payments).",
+          "Supplier invoices matched to goods receipts; bank reconciliation.",
         ],
       },
+      { type: "heading", text: "Acct. II — checks, withholding, import cost" },
+      {
+        type: "steps",
+        items: [
+          "Check Register — checks auto-register when you pay by check on a payment voucher.",
+          "Withholding Tax — maintain BIR-style codes; add withholding lines on payment vouchers; print BIR 2307 from the voucher list.",
+          "Set payor TIN under Settings → Branding → Receipt Tax ID; set vendor TIN on the partner record.",
+          "Landed Cost — allocate import/freight to GR lines; Post updates unit cost on receipt lines.",
+          "Notes, Company Budgets, and Contracts for extended A/R and A/P tracking.",
+        ],
+      },
+      { type: "heading", text: "Budget control" },
       {
         type: "paragraph",
-        text: "A/R and A/P aging reports, SI Receipt Status, and Supplier Payment Status show outstanding balances. Default PH withholding codes (1–15%) seed on migration 102. Fixed Assets (separate module) posts monthly depreciation journal entries when you run depreciation.",
+        text: "Company budgets can warn or block purchase requests and POs when spend exceeds budget. Budget vs Actual report shows utilization; the dashboard flags overruns.",
+      },
+      {
+        type: "tip",
+        text: "Default PH withholding codes (1–15%) seed automatically. Fixed Assets (separate module) posts monthly depreciation when you run a depreciation period.",
       },
     ],
   },
@@ -463,13 +530,13 @@ export const documentationSections: DocSection[] = [
     id: "manufacturing",
     title: "Manufacturing",
     iconId: "manufacturing",
-    intro: "Single-level bills of material and work orders with backflush on completion.",
-    primaryHref: "/app/manufacturing/boms",
+    intro: "Single-level bills of material and work orders with backflush on completion (under Stock → Serial & Lot).",
+    primaryHref: "/app/inventory/serial-lot/manufacturing/boms",
     primaryLabel: "Open Bills of Material",
     blocks: [
       {
         type: "paragraph",
-        text: "Manufacturing covers in-house production. Define a BOM (finished item plus component quantities), create a work order, release it, then complete it to backflush components and receive finished goods into stock.",
+        text: "Manufacturing covers in-house production under Stock → Serial & Lot. Define a BOM (finished item plus component quantities), create a work order, release it, then complete it to backflush components and receive finished goods into stock.",
       },
       {
         type: "steps",
@@ -496,14 +563,15 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Quality adds inspection status on draft goods receipts. Receipts on hold cannot be posted until inspection is released. Log non-conformance reports (NCRs) for failed or suspect material.",
+        text: "Quality adds inspection status on draft goods receipts. Receipts on hold cannot be posted until inspection is released.",
       },
       {
         type: "steps",
         items: [
           "On Goods Receipt List, set inspection to Held or Released while the receipt is still draft.",
           "Post only after inspection is Released.",
-          "Create NCRs from Quality → NCRs to document issues and follow-up.",
+          "Log NCRs (non-conformance reports) for failed or suspect material.",
+          "Open CAPA under Quality to track corrective actions beyond the initial NCR.",
         ],
       },
     ],
@@ -738,11 +806,15 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "The following are documented for future work: full Groupware, offline POS, multi-book depreciation, portal vendor write access, and in-process manufacturing QC depth. ECOUNT gap closure items (Mapping Center, approvals, budget, Data Center, WMS, Acct II extensions) shipped in migrations 086–101—see docs/TIER_C_BACKLOG.md.",
+        text: "Most day-to-day ECOUNT-style features are live: document generation (Mapping Center), approvals with email, company budgets, Data Center, WMS, shipping rules, Acct II (withholding/2307, landed cost, checks), sales commission, and CAPA.",
+      },
+      {
+        type: "paragraph",
+        text: "Still planned or partial: full Groupware, offline POS, multi-book depreciation, vendor portal write access, category-level item master on forms, and in-process manufacturing QC.",
       },
       {
         type: "tip",
-        text: "Tier C MVPs now in the sidebar (when enabled for your tenant) include Support, Fixed Assets, Job Costing, Manufacturing, Quality, POS, HR, Reports/Saved Views, and Customer Portal. Enable modules under User Management → Module & Features.",
+        text: "Enable optional modules under User Management → Module & Features. Technical backlog notes live in docs/TIER_C_BACKLOG.md in the repository.",
       },
     ],
   },
@@ -752,4 +824,9 @@ export const defaultSectionId = "getting-started";
 
 export function getDocSection(id: string | undefined): DocSection {
   return documentationSections.find((s) => s.id === id) ?? documentationSections[0];
+}
+
+/** All section ids in group display order (for prev/next navigation). */
+export function orderedSectionIds(): string[] {
+  return documentationGroups.flatMap((g) => g.sectionIds);
 }

@@ -206,6 +206,7 @@ export const appModules: AppModule[] = [
       { label: "Sales Discount Status", href: "/app/sales/reports/discount-status", settingsHref: "/app/sales/sales/settings" },
       { label: "Print Sales Slips", href: "/app/sales/reports/print-slips", settingsHref: "/app/sales/sales/settings" },
       { label: "Sales Returns", href: "/app/sales/sales-returns", settingsHref: "/app/sales/sales/settings" },
+      { label: "Commission Rules", href: "/app/sales/commission-rules", settingsHref: "/app/sales/sales/settings" },
     ],
     subBranches: [
       {
@@ -247,6 +248,7 @@ export const appModules: AppModule[] = [
       },
       { label: "SO Analysis", href: "/app/sales-order/reports/so-analysis", settingsHref: "/app/sales-order/sales-orders/settings" },
       { label: "Shipping Orders", href: "/app/sales-order/shipping/orders", settingsHref: "/app/sales-order/shipping/orders" },
+      { label: "Shipping Rules", href: "/app/sales-order/shipping/rules", settingsHref: "/app/sales-order/shipping/rules" },
       { label: "Delivery Trips", href: "/app/sales-order/shipping/trips", settingsHref: "/app/sales-order/shipping/trips" },
     ],
   },
@@ -311,22 +313,13 @@ export const appModules: AppModule[] = [
     ],
   },
   {
-    id: "manufacturing",
-    label: "Manufacturing",
-    href: "/app/manufacturing/boms",
-    basePath: "/app/manufacturing",
-    features: [
-      { label: "Bills of Material", href: "/app/manufacturing/boms", settingsHref: "/app/manufacturing/boms" },
-      { label: "Work Orders", href: "/app/manufacturing/work-orders", settingsHref: "/app/manufacturing/work-orders" },
-    ],
-  },
-  {
     id: "quality",
     label: "Quality",
     href: "/app/quality/ncrs",
     basePath: "/app/quality",
     features: [
       { label: "NCRs", href: "/app/quality/ncrs", settingsHref: "/app/quality/ncrs" },
+      { label: "CAPA", href: "/app/quality/capa", settingsHref: "/app/quality/ncrs" },
     ],
   },
   {

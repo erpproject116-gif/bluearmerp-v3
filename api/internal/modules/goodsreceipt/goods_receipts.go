@@ -1013,6 +1013,19 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		for _, ln := range lines {
+			_, err = tx.Exec(r.Context(), `
+				update public.gr_goods_receipt_lines grl
+				set base_unit_cost = coalesce(pol.unit_non_vat, 0),
+				    unit_cost = coalesce(pol.unit_non_vat, 0)
+				from public.po_purchase_order_lines pol
+				where grl.id = $1 and pol.id = grl.purchase_order_line_id`, ln.ID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to set GR unit cost.", "ERR_INTERNAL")
+				return
+			}
+		}
+
 		userID := tu.AppUserID
 
 		for _, ln := range lines {

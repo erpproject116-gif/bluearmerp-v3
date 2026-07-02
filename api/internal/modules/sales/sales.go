@@ -566,6 +566,13 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if defaultProgress(body.ProgressStatus) == "completed" {
+			if err := accrueCommissionForSale(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to accrue commission.", "ERR_INTERNAL")
+				return
+			}
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
@@ -689,6 +696,15 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to sync warranty assets.", "ERR_INTERNAL")
 			return
 		}
+
+		newStatus := defaultProgress(body.ProgressStatus)
+		if newStatus == "completed" && before.ProgressStatus != "completed" {
+			if err := accrueCommissionForSale(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to accrue commission.", "ERR_INTERNAL")
+				return
+			}
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return

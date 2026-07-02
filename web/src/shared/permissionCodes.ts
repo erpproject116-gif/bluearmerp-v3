@@ -17,6 +17,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/inventory/reports/stock-ledger": "inventory.stock_movements",
   "/app/inventory/price-lists": "inventory.price_lists",
   "/app/sales/sales-returns": "sales.sales_returns",
+  "/app/sales/commission-rules": "sales.commission_read",
   "/app/finance/journal-entries": "finance.journal_entries",
   "/app/inventory/serial-lot/registry": "inventory.serial_registry",
   "/app/inventory/serial-lot/lots": "inventory.serial_registry",
@@ -24,6 +25,8 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/inventory/serial-lot/trace": "inventory.serial_trace",
   "/app/inventory/serial-lot/receive": "inventory.serial_receive",
   "/app/inventory/serial-lot/settings": "inventory.serial_settings",
+  "/app/inventory/serial-lot/manufacturing/boms": "manufacturing.boms",
+  "/app/inventory/serial-lot/manufacturing/work-orders": "manufacturing.work_orders",
   "/app/after-sales/repair-orders": "after_sales.repair_orders",
   "/app/after-sales/repair-orders/new": "after_sales.repair_orders_new",
   "/app/after-sales/repair-orders/status": "after_sales.repair_orders_status",
@@ -95,6 +98,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/manufacturing/boms": "manufacturing.boms",
   "/app/manufacturing/work-orders": "manufacturing.work_orders",
   "/app/quality/ncrs": "quality.ncrs",
+  "/app/quality/capa": "quality.capa_read",
   "/app/fixed-assets": "fixed_assets.assets",
   "/app/job-costing": "job_costing.projects",
   "/app/activity-logs": "activity_logs.logs",
@@ -135,6 +139,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/data-center/inbox": "data_center.read",
   "/app/inventory/wms/scheduled-receipts": "wms.read",
   "/app/sales-order/shipping/orders": "shipping_order.read",
+  "/app/sales-order/shipping/rules": "shipping_order.read",
   "/app/sales-order/shipping/trips": "delivery_trip.read",
 };
 
