@@ -468,6 +468,7 @@ export function SalesOrderModal(props: Props) {
         saving={saving()}
       >
         <draft.DraftBanner />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Date-no">
           <input class={inputClass} value={dateNoDisplay()} readOnly />
         </Field>
@@ -617,6 +618,7 @@ export function SalesOrderModal(props: Props) {
             <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
           </Field>
         </Show>
+        </div>
         <div class="col-span-full mb-2">
           <button
             type="button"
