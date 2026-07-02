@@ -5,7 +5,7 @@ import { AuthImage } from "../../shared/AuthImage";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { useToast } from "../../shared/toast";
 import { useAuth, hasPermission } from "../../shared/auth-context";
-import { usePosSettings, savePosSettings, fetchPosLogs, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
+import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
 
 type ItemRow = {
   id: number;
@@ -51,7 +51,7 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   delivery: "Delivery",
   pickup: "Pickup",
 };
-const ALL_TENDERS = ["cash", "card", "other"];
+const ALL_TENDERS = [...POS_TENDER_TYPES];
 
 async function uploadImage(itemId: number, file: File): Promise<boolean> {
   const token = await getAccessToken();
@@ -720,7 +720,7 @@ function SettingsTab() {
     settings.data ?? {
       tax_inclusive: true,
       order_types: ["dine_in", "take_away"],
-      allowed_tenders: ["cash", "card"],
+      allowed_tenders: ["cash", "gcash", "maya", "qrph", "card", "bank_transfer"],
       require_customer: false,
       enable_barcode: false,
     };
@@ -799,9 +799,9 @@ function SettingsTab() {
             <div class="flex flex-wrap gap-2">
               <For each={ALL_TENDERS}>
                 {(t) => (
-                  <label class={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm capitalize ${current().allowed_tenders.includes(t) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-stroke text-text-secondary"}`}>
+                  <label class={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${current().allowed_tenders.includes(t) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-stroke text-text-secondary"}`}>
                     <input type="checkbox" class="hidden" checked={current().allowed_tenders.includes(t)} onChange={() => update({ allowed_tenders: toggleIn(current().allowed_tenders, t) })} />
-                    {t}
+                    {posTenderLabel(t)}
                   </label>
                 )}
               </For>

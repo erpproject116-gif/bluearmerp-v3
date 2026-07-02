@@ -1,6 +1,35 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 
+/** Canonical POS tender/payment methods (codes must match the DB check constraint). */
+export const POS_TENDER_TYPES = ["cash", "gcash", "maya", "qrph", "card", "bank_transfer", "other"] as const;
+
+const POS_TENDER_LABELS: Record<string, string> = {
+  cash: "Cash",
+  gcash: "GCash",
+  maya: "Maya",
+  qrph: "QRPh",
+  card: "Card",
+  bank_transfer: "Bank Transfer",
+  other: "Other",
+};
+
+/** Human-friendly label for a tender code (falls back to a title-cased code). */
+export function posTenderLabel(code: string): string {
+  const key = (code ?? "").trim().toLowerCase();
+  if (POS_TENDER_LABELS[key]) return POS_TENDER_LABELS[key];
+  return key
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** Non-cash tenders don't affect the cash drawer and take the exact amount due. */
+export function isCashTender(code: string): boolean {
+  return (code ?? "").trim().toLowerCase() === "cash";
+}
+
 export type PosSession = {
   id: number;
   session_no: string;

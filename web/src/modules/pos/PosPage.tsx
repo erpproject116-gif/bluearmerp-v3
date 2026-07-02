@@ -13,9 +13,12 @@ import {
   deletePosCartLine,
   fetchHeldOrders,
   fetchItemModifiers,
+  fetchSessionReport,
   holdCart,
+  isCashTender,
   openPosSession,
   patchPosCartLine,
+  posTenderLabel,
   resumeHeldOrder,
   useInvalidatePosSession,
   usePosCatalogCategories,
@@ -26,6 +29,7 @@ import {
   type PosCartLine,
   type PosCatalogItem,
   type PosModifierGroup,
+  type SessionReport,
 } from "../../shared/usePos";
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
@@ -71,6 +75,7 @@ export default function PosPage() {
   const [checkingOut, setCheckingOut] = createSignal(false);
   const [closingCash, setClosingCash] = createSignal("");
   const [showClose, setShowClose] = createSignal(false);
+  const [shiftReport, setShiftReport] = createSignal<SessionReport | null>(null);
   const [modalItem, setModalItem] = createSignal<PosCatalogItem | null>(null);
   const [discount, setDiscount] = createSignal(0);
   const [customerId, setCustomerId] = createSignal<number | null>(null);
@@ -205,7 +210,7 @@ export default function PosPage() {
     setShowPayment(true);
   };
 
-  const checkout = async (tenderType: string, amountReceived: number) => {
+  const checkout = async (tenders: { tender_type: string; amount: number }[]) => {
     const s = session.data;
     if (!s?.id) return;
     const total = Number(taxPreview().total.toFixed(2));
@@ -215,7 +220,7 @@ export default function PosPage() {
     }
     setCheckingOut(true);
     const res = await checkoutPos(s.id, {
-      tenders: [{ tender_type: tenderType, amount: Math.max(amountReceived, total) }],
+      tenders,
       partner_id: customerId(),
       discount_amount: taxPreview().discount,
     });
@@ -225,7 +230,13 @@ export default function PosPage() {
       return;
     }
     const change = res.data?.change ?? 0;
-    toast.success(`Sale ${res.data?.sales_no} — ${money(total)}${change > 0 ? ` · Change ${money(change)}` : ""}`);
+    const label =
+      tenders.length === 1
+        ? posTenderLabel(tenders[0].tender_type)
+        : tenders.map((t) => posTenderLabel(t.tender_type)).join(" + ");
+    toast.success(
+      `Sale ${res.data?.sales_no} — ${money(total)} · ${label}${change > 0 ? ` · Change ${money(change)}` : ""}`,
+    );
     setShowPayment(false);
     setDiscount(0);
     setCustomerId(null);
@@ -289,6 +300,14 @@ export default function PosPage() {
     }
   };
 
+  const openClose = async () => {
+    const s = session.data;
+    if (!s?.id) return;
+    setShiftReport(null);
+    setShowClose(true);
+    setShiftReport(await fetchSessionReport(s.id));
+  };
+
   const closeShift = async () => {
     const s = session.data;
     if (!s?.id) return;
@@ -332,7 +351,7 @@ export default function PosPage() {
             <button
               type="button"
               class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              onClick={() => setShowClose(true)}
+              onClick={openClose}
             >
               Close shift
             </button>
@@ -508,18 +527,91 @@ export default function PosPage() {
 
       <Show when={showClose()}>
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowClose(false)}>
-          <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div class="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 class="mb-1 text-lg font-semibold">Close shift</h3>
-            <p class="mb-4 text-sm text-slate-500">Count the drawer and enter the closing cash. The cart must be empty.</p>
+            <p class="mb-4 text-sm text-slate-500">Shift summary (X/Z report). Count the drawer and enter the closing cash.</p>
+
+            <div class="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <Show when={shiftReport()} fallback={<p class="text-slate-400">Loading summary…</p>}>
+                {(rep) => (
+                  <>
+                    <div class="flex justify-between py-0.5">
+                      <span class="text-slate-500">Opening cash</span>
+                      <span class="tabular-nums">{money(rep().opening_cash)}</span>
+                    </div>
+                    <div class="flex justify-between py-0.5">
+                      <span class="text-slate-500">Sales total</span>
+                      <span class="tabular-nums">{money(rep().sales_total)}</span>
+                    </div>
+
+                    <div class="my-2 border-t border-slate-200" />
+                    <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Tenders</p>
+                    <Show when={Object.keys(rep().tenders_by_type).length > 0} fallback={<p class="text-slate-400">No payments yet.</p>}>
+                      <For each={Object.entries(rep().tenders_by_type)}>
+                        {([type, amount]) => (
+                          <div class="flex justify-between py-0.5">
+                            <span class="text-slate-500">{posTenderLabel(type)}</span>
+                            <span class="tabular-nums">{money(amount)}</span>
+                          </div>
+                        )}
+                      </For>
+                    </Show>
+
+                    <Show when={rep().cash_in > 0 || rep().cash_out > 0}>
+                      <div class="my-2 border-t border-slate-200" />
+                      <Show when={rep().cash_in > 0}>
+                        <div class="flex justify-between py-0.5">
+                          <span class="text-slate-500">Cash in</span>
+                          <span class="tabular-nums">{money(rep().cash_in)}</span>
+                        </div>
+                      </Show>
+                      <Show when={rep().cash_out > 0}>
+                        <div class="flex justify-between py-0.5">
+                          <span class="text-slate-500">Cash out</span>
+                          <span class="tabular-nums">-{money(rep().cash_out)}</span>
+                        </div>
+                      </Show>
+                    </Show>
+
+                    <div class="my-2 border-t border-slate-200" />
+                    <div class="flex justify-between py-0.5 font-semibold">
+                      <span>Expected cash in drawer</span>
+                      <span class="tabular-nums">{money(rep().expected_cash)}</span>
+                    </div>
+                  </>
+                )}
+              </Show>
+            </div>
+
+            <label class="mb-1 block text-xs font-medium text-slate-500">Counted closing cash</label>
             <input
               type="number"
               min="0"
               step="0.01"
               placeholder="Closing cash count"
-              class="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
+              class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
               value={closingCash()}
               onInput={(e) => setClosingCash(e.currentTarget.value)}
             />
+
+            <Show when={shiftReport() && closingCash() !== ""}>
+              {(() => {
+                const variance = () => Number(closingCash()) - (shiftReport()?.expected_cash ?? 0);
+                return (
+                  <div
+                    class="mb-4 flex justify-between rounded-lg px-3 py-2 text-sm font-medium"
+                    classList={{
+                      "bg-emerald-50 text-emerald-700": Math.abs(variance()) < 0.005,
+                      "bg-amber-50 text-amber-700": Math.abs(variance()) >= 0.005,
+                    }}
+                  >
+                    <span>{variance() < 0 ? "Short" : variance() > 0 ? "Over" : "Balanced"}</span>
+                    <span class="tabular-nums">{money(Math.abs(variance()))}</span>
+                  </div>
+                );
+              })()}
+            </Show>
+
             <div class="flex justify-end gap-2">
               <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50" onClick={() => setShowClose(false)}>
                 Cancel
@@ -571,94 +663,154 @@ function CategoryRail(props: {
   );
 }
 
+type PayLine = { type: string; amount: string };
+
 function PaymentModal(props: {
   total: number;
   tenders: string[];
   checkingOut: boolean;
   onCancel: () => void;
-  onConfirm: (tenderType: string, amountReceived: number) => void;
+  onConfirm: (tenders: { tender_type: string; amount: number }[]) => void;
 }) {
-  const [tender, setTender] = createSignal(props.tenders[0] ?? "cash");
-  const [received, setReceived] = createSignal(props.total.toFixed(2));
+  const first = () => props.tenders[0] ?? "cash";
+  const [lines, setLines] = createSignal<PayLine[]>([{ type: first(), amount: props.total.toFixed(2) }]);
 
-  const change = createMemo(() => {
-    const r = Number(received());
-    return Number.isFinite(r) ? Math.max(0, r - props.total) : 0;
-  });
+  const paid = createMemo(() =>
+    lines().reduce((sum, l) => {
+      const n = Number(l.amount);
+      return Number.isFinite(n) && n > 0 ? sum + n : sum;
+    }, 0),
+  );
+  const remaining = createMemo(() => Math.max(0, Number((props.total - paid()).toFixed(2))));
+  const change = createMemo(() => Math.max(0, Number((paid() - props.total).toFixed(2))));
+  const hasCash = createMemo(() => lines().some((l) => isCashTender(l.type)));
+  // Overpayment is only valid when a cash line can dispense change.
+  const canConfirm = createMemo(
+    () => paid() + 0.001 >= props.total && lines().some((l) => Number(l.amount) > 0) && (change() <= 0.005 || hasCash()),
+  );
+
+  const setLine = (i: number, patch: Partial<PayLine>) =>
+    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+
+  const addLine = () => {
+    const used = new Set(lines().map((l) => l.type));
+    const next = props.tenders.find((t) => !used.has(t)) ?? first();
+    const rem = remaining();
+    setLines((prev) => [...prev, { type: next, amount: rem > 0 ? rem.toFixed(2) : "" }]);
+  };
+
+  const removeLine = (i: number) => setLines((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
 
   const quickAmounts = createMemo(() => {
-    const t = props.total;
+    const t = remaining() > 0 ? remaining() : props.total;
     const set = new Set<number>([Math.ceil(t)]);
-    for (const step of [50, 100, 500, 1000]) {
-      set.add(Math.ceil(t / step) * step);
-    }
+    for (const step of [50, 100, 500, 1000]) set.add(Math.ceil(t / step) * step);
     return [...set].filter((n) => n >= t).sort((a, b) => a - b).slice(0, 4);
   });
 
+  const confirm = () => {
+    const payload = lines()
+      .map((l) => ({ tender_type: l.type, amount: Number(l.amount) }))
+      .filter((l) => Number.isFinite(l.amount) && l.amount > 0);
+    if (payload.length === 0) return;
+    props.onConfirm(payload);
+  };
+
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
-      <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div class="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h3 class="mb-1 text-lg font-semibold">Payment</h3>
         <p class="mb-4 text-sm text-slate-500">Amount due <span class="font-semibold text-slate-900">{money(props.total)}</span></p>
 
-        <div class="mb-4">
-          <p class="mb-1.5 text-xs font-medium text-slate-500">Tender</p>
-          <div class="flex gap-2">
-            <For each={props.tenders}>
-              {(t) => (
-                <button
-                  type="button"
-                  class={`flex-1 rounded-lg border py-2 text-sm font-medium capitalize transition ${
-                    tender() === t ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
-                  onClick={() => {
-                    setTender(t);
-                    if (t !== "cash") setReceived(props.total.toFixed(2));
-                  }}
-                >
-                  {t}
-                </button>
-              )}
-            </For>
-          </div>
+        <div class="space-y-3">
+          <For each={lines()}>
+            {(line, i) => (
+              <div class="rounded-xl border border-slate-200 p-3">
+                <div class="flex items-center gap-2">
+                  <select
+                    class="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                    value={line.type}
+                    onChange={(e) => setLine(i(), { type: e.currentTarget.value })}
+                  >
+                    <For each={props.tenders}>{(t) => <option value={t}>{posTenderLabel(t)}</option>}</For>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="w-28 rounded-lg border border-slate-300 px-2 py-2 text-right text-sm font-semibold focus:border-emerald-500 focus:outline-none"
+                    value={line.amount}
+                    onInput={(e) => setLine(i(), { amount: e.currentTarget.value })}
+                  />
+                  <Show when={lines().length > 1}>
+                    <button
+                      type="button"
+                      class="shrink-0 rounded-lg border border-slate-200 px-2 py-2 text-slate-400 hover:bg-slate-50 hover:text-red-500"
+                      aria-label="Remove payment"
+                      onClick={() => removeLine(i())}
+                    >
+                      ✕
+                    </button>
+                  </Show>
+                </div>
+                <Show when={isCashTender(line.type)}>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <For each={quickAmounts()}>
+                      {(amt) => (
+                        <button
+                          type="button"
+                          class="rounded-lg border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:bg-slate-50"
+                          onClick={() => setLine(i(), { amount: amt.toFixed(2) })}
+                        >
+                          {money(amt)}
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+            )}
+          </For>
         </div>
 
-        <Show when={tender() === "cash"}>
-          <div class="mb-4">
-            <label class="mb-1 block text-xs font-medium text-slate-500">Cash received</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
-              value={received()}
-              onInput={(e) => setReceived(e.currentTarget.value)}
-            />
-            <div class="mt-2 flex flex-wrap gap-2">
-              <For each={quickAmounts()}>
-                {(amt) => (
-                  <button type="button" class="rounded-lg border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:bg-slate-50" onClick={() => setReceived(amt.toFixed(2))}>
-                    {money(amt)}
-                  </button>
-                )}
-              </For>
+        <Show when={props.tenders.length > 1}>
+          <button
+            type="button"
+            class="mt-3 w-full rounded-lg border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50"
+            onClick={addLine}
+          >
+            + Split payment
+          </button>
+        </Show>
+
+        <div class="mt-4 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Paid</span>
+            <span class="font-semibold tabular-nums">{money(paid())}</span>
+          </div>
+          <Show when={remaining() > 0.005}>
+            <div class="flex justify-between text-amber-600">
+              <span>Remaining</span>
+              <span class="font-semibold tabular-nums">{money(remaining())}</span>
             </div>
-            <div class="mt-3 flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+          </Show>
+          <Show when={change() > 0.005}>
+            <div class="flex justify-between">
               <span class="text-slate-500">Change</span>
               <span class="font-semibold tabular-nums">{money(change())}</span>
             </div>
-          </div>
-        </Show>
+          </Show>
+        </div>
 
-        <div class="flex gap-2">
+        <div class="mt-4 flex gap-2">
           <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
             Cancel
           </button>
           <button
             type="button"
             class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-            disabled={props.checkingOut || (tender() === "cash" && Number(received()) + 0.001 < props.total)}
-            onClick={() => props.onConfirm(tender(), Number(received()) || props.total)}
+            disabled={props.checkingOut || !canConfirm()}
+            onClick={confirm}
           >
             {props.checkingOut ? "Processing…" : "Confirm"}
           </button>

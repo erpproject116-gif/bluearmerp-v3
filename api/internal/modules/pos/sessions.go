@@ -554,6 +554,8 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		change := roundMoney(tenderTotal - grandTotal)
+		// Record the primary payment mode on the sale so receipts/reports reflect it.
+		primaryTender := normalizeTenderType(body.Tenders[0].TenderType)
 		partnerID := int64(0)
 		if body.PartnerID != nil {
 			partnerID = *body.PartnerID
@@ -588,8 +590,8 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			insert into public.sa_sales (tenant_id, order_date, date_seq, sales_no, tax_type_id, currency_id, partner_id,
 			  pic_user_id, pic_name, location_id, terms_of_payment, progress_status, template_code,
 			  subtotal, tax_total, grand_total, created_by_user_id, invoicing_status)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,'cash','completed',$10,$11,$12,$13,$14,true) returning id`,
-			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID, tu.AppUserID, locationID, templateCode, subtotal, taxTotal, grandTotal, tu.AppUserID).Scan(&salesID); err != nil {
+			values ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,$15,'completed',$10,$11,$12,$13,$14,true) returning id`,
+			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID, tu.AppUserID, locationID, templateCode, subtotal, taxTotal, grandTotal, tu.AppUserID, primaryTender).Scan(&salesID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create sale.", "ERR_INTERNAL")
 			return
 		}
@@ -747,9 +749,12 @@ func roundMoney(v float64) float64 {
 
 func normalizeTenderType(s string) string {
 	switch strings.TrimSpace(strings.ToLower(s)) {
-	case "card", "other":
+	case "cash", "gcash", "maya", "qrph", "card", "bank_transfer", "other":
 		return strings.TrimSpace(strings.ToLower(s))
-	default:
+	case "":
 		return "cash"
+	default:
+		// Unknown modes are recorded as "other" so they never inflate the cash drawer.
+		return "other"
 	}
 }
