@@ -9,6 +9,7 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -157,6 +158,8 @@ export function SalesModal(props: Props) {
   const { fields } = useFormFieldSettings(SALES_ENTITY.sales);
   const [saving, setSaving] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [newCustomerName, setNewCustomerName] = createSignal("");
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [salesNo, setSalesNo] = createSignal("");
@@ -513,6 +516,11 @@ export function SalesModal(props: Props) {
             setCustomerLabel("");
           }}
           fetchOptions={fetchPartners}
+          createLabel="Add customer"
+          onCreate={(q) => {
+            setNewCustomerName(q);
+            setShowNewCustomer(true);
+          }}
         />
         <LookupCombo
           label="PIC"
@@ -623,6 +631,16 @@ export function SalesModal(props: Props) {
         open={soPickerOpen()}
         onClose={() => setSoPickerOpen(false)}
         onConfirm={(picked) => void applySalesOrderLines(picked)}
+      />
+
+      <QuickCustomerModal
+        open={showNewCustomer()}
+        initialName={newCustomerName()}
+        onClose={() => setShowNewCustomer(false)}
+        onCreated={(p) => {
+          setPartnerId(p.id);
+          setCustomerLabel(p.company_name);
+        }}
       />
     </>
   );

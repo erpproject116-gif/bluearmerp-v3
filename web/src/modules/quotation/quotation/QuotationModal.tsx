@@ -11,6 +11,7 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import {
   QuotationLineGrid,
@@ -155,6 +156,8 @@ export function QuotationModal(props: Props) {
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
   const [customerLabel, setCustomerLabel] = createSignal("");
+  const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [newCustomerName, setNewCustomerName] = createSignal("");
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
   const [picName, setPicName] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
@@ -394,6 +397,7 @@ export function QuotationModal(props: Props) {
   };
 
   return (
+    <>
     <WideEntityModal
       open={props.open}
       title={props.editing ? "Edit Quotation" : "New Quotation"}
@@ -452,6 +456,11 @@ export function QuotationModal(props: Props) {
           setCustomerLabel("");
         }}
         fetchOptions={fetchPartners}
+        createLabel="Add customer"
+        onCreate={(q) => {
+          setNewCustomerName(q);
+          setShowNewCustomer(true);
+        }}
       />
       <LookupCombo
         label="PIC"
@@ -541,5 +550,16 @@ export function QuotationModal(props: Props) {
         partnerId={partnerId}
       />
     </WideEntityModal>
+
+    <QuickCustomerModal
+      open={showNewCustomer()}
+      initialName={newCustomerName()}
+      onClose={() => setShowNewCustomer(false)}
+      onCreated={(p) => {
+        setPartnerId(p.id);
+        setCustomerLabel(p.company_name);
+      }}
+    />
+    </>
   );
 }

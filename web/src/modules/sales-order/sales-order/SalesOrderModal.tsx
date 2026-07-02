@@ -9,6 +9,7 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -153,6 +154,8 @@ export function SalesOrderModal(props: Props) {
   const { fields } = useFormFieldSettings(SALES_ORDER_ENTITY.salesOrder);
   const [saving, setSaving] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
+  const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [newCustomerName, setNewCustomerName] = createSignal("");
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [salesOrderNo, setSalesOrderNo] = createSignal("");
@@ -520,6 +523,11 @@ export function SalesOrderModal(props: Props) {
             setCustomerLabel("");
           }}
           fetchOptions={fetchPartners}
+          createLabel="Add customer"
+          onCreate={(q) => {
+            setNewCustomerName(q);
+            setShowNewCustomer(true);
+          }}
         />
         <LookupCombo
           label="PIC"
@@ -635,6 +643,16 @@ export function SalesOrderModal(props: Props) {
         open={quotationPickerOpen()}
         onClose={() => setQuotationPickerOpen(false)}
         onConfirm={(picked) => void applyQuotationLines(picked)}
+      />
+
+      <QuickCustomerModal
+        open={showNewCustomer()}
+        initialName={newCustomerName()}
+        onClose={() => setShowNewCustomer(false)}
+        onCreated={(p) => {
+          setPartnerId(p.id);
+          setCustomerLabel(p.company_name);
+        }}
       />
     </>
   );

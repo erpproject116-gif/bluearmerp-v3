@@ -13,6 +13,9 @@ type Props = {
   fetchOptions: (q: string) => Promise<LookupOption[]>;
   placeholder?: string;
   required?: boolean;
+  /** When provided, shows a create row in the dropdown with the current typed text. */
+  onCreate?: (query: string) => void;
+  createLabel?: string;
 };
 
 export function LookupCombo(props: Props) {
@@ -69,7 +72,7 @@ export function LookupCombo(props: Props) {
             Clear
           </button>
         </Show>
-        <Show when={open() && (options().length > 0 || loading())}>
+        <Show when={open() && (options().length > 0 || loading() || (!!props.onCreate && props.value().trim() !== ""))}>
           <ul class="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-stroke bg-white py-1 shadow-lg">
             <Show when={loading()}>
               <li class="px-3 py-2 text-sm text-text-secondary">Loading…</li>
@@ -94,6 +97,22 @@ export function LookupCombo(props: Props) {
                 </li>
               )}
             </For>
+            <Show when={props.onCreate && props.value().trim() !== ""}>
+              <li class="border-t border-stroke">
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-1 px-3 py-2 text-left text-sm text-brand-600 hover:bg-brand-50"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    props.onCreate!(props.value().trim());
+                    setOpen(false);
+                  }}
+                >
+                  <span class="text-base leading-none">+</span>
+                  <span>{props.createLabel ?? "Add new"} "{props.value().trim()}"</span>
+                </button>
+              </li>
+            </Show>
           </ul>
         </Show>
       </div>

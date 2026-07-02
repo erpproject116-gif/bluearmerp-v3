@@ -3,6 +3,7 @@ import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
 import { AuthImage } from "../../shared/AuthImage";
+import { QuickCustomerModal } from "../../shared/QuickCustomerModal";
 import { useToast } from "../../shared/toast";
 import { useAuth, hasPermission } from "../../shared/auth-context";
 import {
@@ -848,12 +849,14 @@ function PaymentModal(props: {
 function CustomerModal(props: { onCancel: () => void; onSelect: (id: number, label: string) => void }) {
   const [label, setLabel] = createSignal("");
   const [id, setId] = createSignal<number | null>(null);
+  const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [newCustomerName, setNewCustomerName] = createSignal("");
 
   const fetchCustomers = async (q: string): Promise<LookupOption[]> => {
     const qs = new URLSearchParams({ page: "1", pageSize: "25" });
     if (q) qs.set("q", q);
-    const res = await apiFetch<{ id: number; partner_code: string; partner_name: string }[]>(`/api/v1/inventory/partners?${qs}`);
-    return (res.data ?? []).map((r) => ({ id: r.id, label: r.partner_name || r.partner_code }));
+    const res = await apiFetch<{ id: number; partner_code: string; company_name: string }[]>(`/api/v1/inventory/partners?${qs}`);
+    return (res.data ?? []).map((r) => ({ id: r.id, label: r.company_name || r.partner_code }));
   };
 
   return (
@@ -875,6 +878,17 @@ function CustomerModal(props: { onCancel: () => void; onSelect: (id: number, lab
           }}
           fetchOptions={fetchCustomers}
           placeholder="Search customer…"
+          createLabel="Add customer"
+          onCreate={(q) => {
+            setNewCustomerName(q);
+            setShowNewCustomer(true);
+          }}
+        />
+        <QuickCustomerModal
+          open={showNewCustomer()}
+          initialName={newCustomerName()}
+          onClose={() => setShowNewCustomer(false)}
+          onCreated={(p) => props.onSelect(p.id, p.company_name)}
         />
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
