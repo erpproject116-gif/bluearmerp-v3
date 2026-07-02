@@ -164,5 +164,60 @@ func Catalog() []ReportDef {
 			WebPath:    "/app/crm/reports/expired-quotations", Tier: "R7",
 			Description: "Quotation lines past validity date.",
 		},
+		{
+			Key: "budget_vs_actual", Label: "Budget vs Actual", Module: "finance",
+			APIPath:    "/api/v1/company-budget/budgets/{id}/vs-actual",
+			ExportPath: "/api/v1/company-budget/budgets/{id}/vs-actual/export",
+			WebPath:    "/app/finance/reports/budget-vs-actual", Tier: "R5",
+			Description: "Budget lines compared to posted journal activity.",
+		},
+		{
+			Key: "withholding_codes", Label: "Withholding Tax Codes", Module: "finance",
+			APIPath: "/api/v1/finance/withholding-codes",
+			WebPath: "/app/finance/acct-ii/withholding-codes", Tier: "R5",
+			Description: "Acct. II BIR-style withholding rate master (2307 support).",
+		},
+		{
+			Key: "check_register", Label: "Check Register", Module: "finance",
+			APIPath: "/api/v1/finance/checks",
+			WebPath: "/app/finance/acct-ii/checks", Tier: "R5",
+			Description: "Acct. II issued checks and cleared status.",
+		},
+		{
+			Key: "notes_receivable_payable", Label: "Notes Receivable/Payable", Module: "finance",
+			APIPath: "/api/v1/finance/notes",
+			WebPath: "/app/finance/acct-ii/notes", Tier: "R5",
+			Description: "Acct. II promissory notes with due dates.",
+		},
+		{
+			Key: "landed_cost", Label: "Landed Cost", Module: "finance",
+			APIPath: "/api/v1/finance/landed-costs",
+			WebPath: "/app/finance/acct-ii/landed-costs", Tier: "R5",
+			Description: "Acct. II import cost allocation to goods receipts.",
+		},
+		{
+			Key: "contracts", Label: "Contracts", Module: "finance",
+			APIPath: "/api/v1/finance/contracts",
+			WebPath: "/app/finance/acct-ii/contracts", Tier: "R5",
+			Description: "Acct. II contract and milestone billing headers.",
+		},
+		{
+			Key: "wms_scheduled_receipts", Label: "Scheduled Receipts", Module: "inventory",
+			APIPath: "/api/v1/wms/scheduled-receipts",
+			WebPath: "/app/inventory/wms/scheduled-receipts", Tier: "R4",
+			Description: "Inbound PO lines scheduled for warehouse receipt.",
+		},
+		{
+			Key: "shipping_orders", Label: "Shipping Orders", Module: "sales-order",
+			APIPath: "/api/v1/shipping/orders",
+			WebPath: "/app/sales-order/shipping/orders", Tier: "R2",
+			Description: "Outbound shipping orders linked to sales orders.",
+		},
+		{
+			Key: "data_center_inbox", Label: "Data Center Inbox", Module: "data_center",
+			APIPath: "/api/v1/data-center/inbox",
+			WebPath: "/app/data-center/inbox", Tier: "R8",
+			Description: "Ingested documents awaiting generation.",
+		},
 	}
 }

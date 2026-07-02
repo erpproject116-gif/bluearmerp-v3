@@ -1,6 +1,7 @@
 /** Maps app routes to permission_registry codes (must match migration 020). */
 export const hrefPermissionCode: Record<string, string> = {
   "/app/dashboard": "dashboard.view",
+  "/app/dashboard/approvals": "dashboard.view",
   "/app/reports": "bi.saved_views",
   "/app/reports/saved-views": "bi.saved_views",
   "/app/selling": "dashboard.view",
@@ -101,6 +102,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/user-management/users": "user_management.users",
   "/app/user-management/roles": "user_management.roles",
   "/app/user-management/process-policies": "settings.process_policies",
+  "/app/user-management/mapping-center": "user_management.users",
   "/app/user-management/tenant-modules": "settings.tenant_modules",
   "/app/user-management/demo-data": "settings.demo_data",
   "/app/purchase-order/purchase-orders": "purchase_order.purchase_orders",
@@ -113,11 +115,33 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/finance/reports/profit-and-loss": "finance.journal_entries",
   "/app/finance/reports/balance-sheet": "finance.journal_entries",
   "/app/finance/payment-entries": "finance.official_receipts",
+  "/app/finance/budgets": "finance.budget_read",
+  "/app/finance/reports/budget-vs-actual": "finance.budget_read",
+  "/app/finance/acct-i/journal-entries": "finance.journal_entries",
+  "/app/finance/acct-i/chart-of-accounts": "finance.journal_entries",
+  "/app/finance/acct-i/fiscal-years": "finance.journal_entries",
+  "/app/finance/acct-i/bank-reconciliation": "finance.journal_entries",
+  "/app/finance/acct-i/payment-entries": "finance.official_receipts",
+  "/app/finance/acct-i/reports/trial-balance": "finance.journal_entries",
+  "/app/finance/acct-i/reports/general-ledger": "finance.journal_entries",
+  "/app/finance/acct-i/reports/profit-and-loss": "finance.journal_entries",
+  "/app/finance/acct-i/reports/balance-sheet": "finance.journal_entries",
+  "/app/finance/acct-ii/checks": "finance.check_read",
+  "/app/finance/acct-ii/withholding-codes": "finance.withholding_read",
+  "/app/finance/acct-ii/notes": "finance.note_read",
+  "/app/finance/acct-ii/landed-costs": "finance.landed_cost_read",
+  "/app/finance/acct-ii/contracts": "finance.contract_read",
+  "/app/data-center/ingestion-rules": "data_center.read",
+  "/app/data-center/inbox": "data_center.read",
+  "/app/inventory/wms/scheduled-receipts": "wms.read",
+  "/app/sales-order/shipping/orders": "shipping_order.read",
+  "/app/sales-order/shipping/trips": "delivery_trip.read",
 };
 
 export function permissionCodeForHref(href: string): string | undefined {
   if (hrefPermissionCode[href]) return hrefPermissionCode[href];
   if (href.startsWith("/app/support/tickets/")) return "support.tickets";
+  if (href.startsWith("/app/finance/budgets/")) return "finance.budget_read";
   const base = href.replace(/\/settings$/, "").replace(/\/new$/, "");
   return hrefPermissionCode[base];
 }

@@ -14,10 +14,14 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/bi"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/buying"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/companybudget"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/dashboard"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/datacenter"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demodata"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/docgen"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/fixedassets"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/goodsreceipt"
@@ -28,15 +32,17 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/jobcosting"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaseorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaserequest"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/bi"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/portal"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/pos"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quotation"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/salesorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/selling"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/shipping"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/support"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/usermgmt"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/wms"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
@@ -106,12 +112,18 @@ func main() {
 			platformreports.RegisterRoutes(protected)
 			branding.RegisterRoutes(protected, pool)
 			processpolicy.RegisterRoutes(protected, pool)
+			approval.RegisterRoutes(protected, pool)
+			docgen.RegisterRoutes(protected, pool)
 			demodata.RegisterRoutes(protected, pool)
 			activitylog.RegisterRoutes(protected, pool)
 			inventory.RegisterRoutes(protected, pool)
 			quotation.RegisterRoutes(protected, pool)
 			sales.RegisterRoutes(protected, pool)
 			finance.RegisterRoutes(protected, pool)
+			companybudget.RegisterRoutes(protected, pool)
+			datacenter.RegisterRoutes(protected, pool)
+			shipping.RegisterRoutes(protected, pool)
+			wms.RegisterRoutes(protected, pool)
 			salesorder.RegisterRoutes(protected, pool)
 			selling.RegisterRoutes(protected, pool)
 			buying.RegisterRoutes(protected, pool)

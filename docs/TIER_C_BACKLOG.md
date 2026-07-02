@@ -166,7 +166,23 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 **Note:** Report catalog and finance read APIs (Trial Balance, GL, P&L, BS) ship in Tier B/R. Scheduled email uses outbox stub (migration 077).
 
-**Still deferred:** Scheduled email delivery, interactive report builder UI, read replica.
+**Still deferred:** Interactive report builder UI, read replica. Scheduled email delivery uses SMTP when `SMTP_HOST` and `SMTP_FROM` are set.
+
+---
+
+## ECOUNT gap closure (migrations 086–101)
+
+| Area | Status | Migration |
+|------|--------|-----------|
+| Mapping Center / doc generation | Shipped | 086 |
+| Universal approvals | Shipped | 087–088 |
+| Company budget | Shipped (opt-in module) | 089–090 |
+| Data Center ingestion | Shipped (opt-in module) | 091 |
+| Shipping orders / delivery trips | Shipped | 092–093 |
+| WMS scheduled receipt | Shipped (opt-in module) | 094 |
+| Shipping rules | Schema only | 095 |
+| Withholding / checks / notes / landed cost / contracts | Shipped (finance APIs) | 096–100 |
+| Sales commission / CAPA / vendor portal | Shipped | 101 |
 
 ---
 
@@ -174,9 +190,8 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 | Area | Notes |
 |------|--------|
-| Shipping rules | No schema |
-| Delivery trip | No schema |
-| Sales commission | No schema |
+| Full ECOUNT menu parity | Out of scope |
+| Groupware suite | Use approvals queue + dashboard instead |
 
 ---
 

@@ -83,6 +83,51 @@ func ValidateSupplierInvoiceQtyAgainstReceived(p Policy, qty, receivedQty float6
 	}
 }
 
+// ValidateSalesReleaseRequiresReservation enforces stock reservation before SO release (split mode)
+// or available unreserved stock (legacy combined mode).
+func ValidateSalesReleaseRequiresReservation(
+	p Policy,
+	legacyCombined bool,
+	lineQtyReserved, alreadyReleased, releaseQty, qtyOnHand, qtyReservedAtLocation float64,
+) map[string]string {
+	if !p.SalesRequireReservation {
+		return nil
+	}
+	if releaseQty <= 0.0001 {
+		return nil
+	}
+	if legacyCombined {
+		available := qtyOnHand - qtyReservedAtLocation
+		if available+0.0001 < releaseQty {
+			return map[string]string{
+				"release_qty": "Insufficient available stock. Reservation is required before release.",
+			}
+		}
+		return nil
+	}
+	remainingReserved := lineQtyReserved - alreadyReleased
+	if remainingReserved+0.0001 < releaseQty {
+		return map[string]string{
+			"release_qty": "Line must be reserved before release. Confirm the sales order to reserve stock.",
+		}
+	}
+	return nil
+}
+
+// ValidateDeliveryRequiresRelease blocks DR qty above released minus delivered when reservation policy is on.
+func ValidateDeliveryRequiresRelease(p Policy, releasedQty, deliveredQty, drQty float64) map[string]string {
+	if !p.SalesRequireReservation {
+		return nil
+	}
+	releasable := releasedQty - deliveredQty
+	if drQty <= releasable+0.0001 {
+		return nil
+	}
+	return map[string]string{
+		"qty": "Delivery quantity exceeds released quantity. Release stock before posting delivery.",
+	}
+}
+
 // ValidateReleaseQty blocks release above order qty minus already released.
 func ValidateReleaseQty(orderQty, alreadyReleased, releaseQty float64) map[string]string {
 	if releaseQty <= 0.0001 {

@@ -1,6 +1,7 @@
-import { createSignal, onMount } from "solid-js";
+import { createMemo, createSignal, onMount } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
+import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
@@ -49,6 +50,11 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
     q: q() || undefined,
     progressStatus: statusFilter() || undefined,
   }));
+
+  const selectedIds = createMemo(() => {
+    const id = selectedId();
+    return id != null ? [id] : [];
+  });
 
   const openNew = () => {
     setEditing(null);
@@ -214,6 +220,17 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
         ]}
         onRefresh={invalidate}
         settingsHref={SALES_ORDER_SETTINGS_HREF.salesOrder}
+        toolbarExtra={
+          <GenerateOtherSlipsMenu
+            sourceEntity="sales_order"
+            targets={[
+              { label: "Sales Invoice", targetEntity: "sales" },
+              { label: "Delivery Receipt", targetEntity: "delivery_receipt" },
+            ]}
+            selectedIds={selectedIds}
+            onSuccess={() => invalidate()}
+          />
+        }
       />
 
       <SalesOrderModal open={modalOpen()} editing={editing()} onClose={closeModal} onSaved={invalidate} />

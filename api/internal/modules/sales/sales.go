@@ -141,8 +141,10 @@ type computedLine struct {
 }
 
 func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
+	registerCommissionRoutes(r, pool)
 	registerAttachmentRoutes(r, pool)
 	registerCollectiveInvoiceRoutes(r, pool)
+	registerCollectiveInvoiceLinkRoutes(r, pool)
 	registerSalesReturnRoutes(r, pool)
 	registerCustomerCreditBalanceRoutes(r, pool)
 	r.Get("/preview-sequences", previewSalesSequences(pool))

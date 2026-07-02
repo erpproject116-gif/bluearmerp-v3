@@ -13,10 +13,16 @@ import { featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } f
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
 import { CollectiveInvoicingHeaderNav } from "./CollectiveInvoicingHeaderNav";
 import { SerialLotHeaderNav } from "./SerialLotHeaderNav";
+import { WmsHeaderNav } from "./WmsHeaderNav";
+import { AcctIHeaderNav } from "./AcctIHeaderNav";
+import { AcctIIHeaderNav } from "./AcctIIHeaderNav";
 import { taxMngtHeaderTitle } from "./tax-mngt-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 import { collectiveInvoicingHeaderTitle, COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
 import { serialLotHeaderTitle, SERIAL_LOT_PREFIX } from "./serial-lot-nav";
+import { wmsHeaderTitle, WMS_PREFIX } from "./wms-nav";
+import { acctIHeaderTitle, ACCT_I_PREFIX } from "./acct-i-nav";
+import { acctIIHeaderTitle, ACCT_II_PREFIX } from "./acct-ii-nav";
 import { useBranding } from "../shared/branding/BrandingProvider";
 import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
@@ -27,6 +33,9 @@ function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
   if (prefix === COLLECTIVE_INVOICING_PREFIX) return collectiveInvoicingHeaderTitle(pathname);
   if (prefix === SERIAL_LOT_PREFIX) return serialLotHeaderTitle(pathname);
+  if (prefix === WMS_PREFIX) return wmsHeaderTitle(pathname);
+  if (prefix === ACCT_I_PREFIX) return acctIHeaderTitle(pathname);
+  if (prefix === ACCT_II_PREFIX) return acctIIHeaderTitle(pathname);
   return "Sub-module";
 }
 
@@ -220,6 +229,9 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <TaxMngtHeaderNav />
           <CollectiveInvoicingHeaderNav />
           <SerialLotHeaderNav />
+          <WmsHeaderNav />
+          <AcctIHeaderNav />
+          <AcctIIHeaderNav />
         </header>
         <main class="flex-1 p-6">{props.children}</main>
       </div>

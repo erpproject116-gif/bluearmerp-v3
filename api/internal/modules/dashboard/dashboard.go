@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -376,6 +377,7 @@ func redFlagsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			{Code: "dr_without_invoice", Label: "Delivered, not invoiced"},
 			{Code: "gr_without_supplier_invoice", Label: "GR not fully billed"},
 			{Code: "ap_over_application", Label: "AP over-applied payments"},
+			{Code: "budget_overrun", Label: "Budget overrun"},
 		}
 
 		_ = pool.QueryRow(ctx, `
@@ -521,6 +523,9 @@ func redFlagsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			where si.tenant_id = $1 and si.deleted_at is null
 			  and coalesce(paid.applied, 0) > si.grand_total + 0.0001`,
 			tu.TenantID).Scan(&categories[9].Count)
+
+		overruns, _ := processpolicy.CountBudgetOverruns(ctx, pool, tu.TenantID)
+		categories[10].Count = overruns
 
 		var total int64
 		for _, c := range categories {

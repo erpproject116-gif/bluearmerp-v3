@@ -194,24 +194,30 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			var tenantID, locationID int64
 			var salesOrderID int64
 			var itemID *int64
-			var lineQty, released float64
+			var lineQty, released, lineQtyReserved float64
 			var trackInventory, trackSerial bool
+			var qtyOnHand, qtyReservedAtLoc float64
 
 			err := tx.QueryRow(r.Context(), `
 				select so.tenant_id, so.location_id, so.id, ln.item_id, ln.qty::float8,
 				  coalesce(rel.released, 0)::float8,
+				  coalesce(ln.qty_reserved, 0)::float8,
 				  coalesce(i.track_inventory_qty, false),
-				  coalesce(i.track_serial, false)
+				  coalesce(i.track_serial, false),
+				  coalesce(bal.qty_on_hand, 0)::float8,
+				  coalesce(bal.qty_reserved, 0)::float8
 				from public.so_sales_order_lines ln
 				join public.so_sales_orders so on so.id = ln.sales_order_id
 				left join public.inv_items i on i.id = ln.item_id
+				left join public.inv_item_location_balances bal
+				  on bal.tenant_id = so.tenant_id and bal.item_id = ln.item_id and bal.location_id = so.location_id
 				left join (
 				  select sales_order_line_id, sum(release_qty) as released
 				  from public.so_sales_order_release_lines
 				  group by sales_order_line_id
 				) rel on rel.sales_order_line_id = ln.id
 				where ln.id = $1 and so.deleted_at is null`,
-				item.SalesOrderLineID).Scan(&tenantID, &locationID, &salesOrderID, &itemID, &lineQty, &released, &trackInventory, &trackSerial)
+				item.SalesOrderLineID).Scan(&tenantID, &locationID, &salesOrderID, &itemID, &lineQty, &released, &lineQtyReserved, &trackInventory, &trackSerial, &qtyOnHand, &qtyReservedAtLoc)
 			if err != nil {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].sales_order_line_id", i): "Line not found."})
 				return
@@ -225,6 +231,17 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			if item.ReleaseQty > balance+0.0001 {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): fmt.Sprintf("Exceeds balance (%.4f available).", balance)})
 				return
+			}
+
+			if trackInventory && itemID != nil {
+				if v := processpolicy.ValidateSalesReleaseRequiresReservation(
+					policy, legacyCombined, lineQtyReserved, released, item.ReleaseQty, qtyOnHand, qtyReservedAtLoc,
+				); v != nil {
+					for k, msg := range v {
+						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].%s", i, k): msg})
+						return
+					}
+				}
 			}
 
 			if trackSerial {

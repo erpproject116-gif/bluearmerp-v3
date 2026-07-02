@@ -156,6 +156,14 @@ begin
       raise exception 'verify-full-chain [%]: S9 SO→reserve→DR→SI chain missing', v_code;
     end if;
 
+    -- ECOUNT gap closure: default doc generation rules seeded
+    select count(*) into v_count
+    from public.doc_generation_rules
+    where tenant_id = v_tenant and active;
+    if v_count < 5 then
+      raise exception 'verify-full-chain [%]: expected >= 5 doc generation rules, got %', v_code, v_count;
+    end if;
+
     raise notice 'verify-full-chain: OK for %', v_code;
   end loop;
 end $$;

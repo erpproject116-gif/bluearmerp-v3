@@ -447,6 +447,22 @@ func postDeliveryReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 
+			var releasedQty, deliveredQty float64
+			_ = tx.QueryRow(r.Context(), `
+				select coalesce(rel.released, 0)::float8, coalesce(ln.delivered_qty, 0)::float8
+				from public.so_sales_order_lines ln
+				left join (
+				  select sales_order_line_id, sum(release_qty) as released
+				  from public.so_sales_order_release_lines group by sales_order_line_id
+				) rel on rel.sales_order_line_id = ln.id
+				where ln.id = $1`, ln.SalesOrderLineID).Scan(&releasedQty, &deliveredQty)
+			if v := processpolicy.ValidateDeliveryRequiresRelease(policy, releasedQty, deliveredQty, ln.Qty); v != nil {
+				for k, msg := range v {
+					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].%s", i, k): msg})
+					return
+				}
+			}
+
 			var trackInventory bool
 			if ln.ItemID != nil {
 				_ = tx.QueryRow(r.Context(), `

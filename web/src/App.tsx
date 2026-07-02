@@ -115,6 +115,7 @@ import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
 import UserPermissionsPage from "./modules/user-management/user-permissions/UserPermissionsPage";
 import ProcessPoliciesPage from "./modules/user-management/process-policies/ProcessPoliciesPage";
+import MappingCenterPage from "./modules/user-management/mapping-center/MappingCenterPage";
 import ModuleFeaturesPage from "./modules/user-management/tenant-modules/ModuleFeaturesPage";
 import DemoDataPage from "./modules/user-management/demo-data/DemoDataPage";
 import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
@@ -181,7 +182,21 @@ import PortalDashboardPage from "./modules/portal/PortalDashboardPage";
 import ReportsIndexPage from "./modules/reports/ReportsIndexPage";
 import SavedViewsPage from "./modules/reports/SavedViewsPage";
 import DashboardPage from "./modules/dashboard/DashboardPage";
+import ApprovalsQueuePage from "./modules/dashboard/ApprovalsQueuePage";
 import DocumentationPage from "./modules/documentation/DocumentationPage";
+import BudgetListPage from "./modules/company-budget/BudgetListPage";
+import BudgetDetailPage from "./modules/company-budget/BudgetDetailPage";
+import BudgetVsActualReportPage from "./modules/finance/reports/BudgetVsActualReportPage";
+import IngestionRulesPage from "./modules/data-center/IngestionRulesPage";
+import InboxPage from "./modules/data-center/InboxPage";
+import ScheduledReceiptsPage from "./modules/wms/ScheduledReceiptsPage";
+import ShippingOrdersPage from "./modules/shipping/ShippingOrdersPage";
+import DeliveryTripsPage from "./modules/shipping/DeliveryTripsPage";
+import WithholdingCodesPage from "./modules/finance/acct-ii/WithholdingCodesPage";
+import CheckRegisterPage from "./modules/finance/acct-ii/CheckRegisterPage";
+import NotesPage from "./modules/finance/acct-ii/NotesPage";
+import LandedCostPage from "./modules/finance/acct-ii/LandedCostPage";
+import ContractsPage from "./modules/finance/acct-ii/ContractsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -248,6 +263,7 @@ export default function App() {
         )} />
         <Route path="/app" component={AppLayout}>
           <Route path="/dashboard" component={DashboardPage} />
+          <Route path="/dashboard/approvals" component={ApprovalsQueuePage} />
           <Route path="/reports/saved-views" component={SavedViewsPage} />
           <Route path="/reports" component={ReportsIndexPage} />
           <Route path="/documentation" component={DocumentationPage} />
@@ -271,6 +287,7 @@ export default function App() {
           <Route path="/inventory/stock-reconciliation" component={StockReconciliationPage} />
           <Route path="/inventory/price-lists" component={PriceListsPage} />
           <Route path="/inventory/product-bundles" component={ProductBundlesPage} />
+          <Route path="/inventory/wms/scheduled-receipts" component={ScheduledReceiptsPage} />
           <Route path="/inventory/serial-lot/registry" component={SerialRegistryListPage} />
           <Route path="/inventory/serial-lot/lots" component={LotBatchesListPage} />
           <Route path="/inventory/serial-lot/movements" component={SerialMovementsListPage} />
@@ -305,6 +322,8 @@ export default function App() {
           <Route path="/sales-order/delivery-receipts" component={DeliveryReceiptListPage} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
           <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
+          <Route path="/sales-order/shipping/orders" component={ShippingOrdersPage} />
+          <Route path="/sales-order/shipping/trips" component={DeliveryTripsPage} />
           <Route path="/purchase-order/reports/po-analysis" component={POAnalysisReportPage} />
           <Route path="/purchase-order/reports/items-to-receive" component={ItemsToReceiveReportPage} />
           <Route path="/purchase-order/purchase-orders" component={PurchaseOrderListPage} />
@@ -338,6 +357,20 @@ export default function App() {
           <Route path="/sales/collective-invoicing/status" component={CollectiveInvoiceStatusPage} />
           <Route path="/sales/reports/print-slips" component={SalesPrintSlipsLauncherPage} />
           <Route path="/sales/sales-returns" component={SalesReturnsPage} />
+          <Route path="/finance/acct-ii/contracts" component={ContractsPage} />
+          <Route path="/finance/acct-ii/landed-costs" component={LandedCostPage} />
+          <Route path="/finance/acct-ii/notes" component={NotesPage} />
+          <Route path="/finance/acct-ii/withholding-codes" component={WithholdingCodesPage} />
+          <Route path="/finance/acct-ii/checks" component={CheckRegisterPage} />
+          <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
+          <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
+          <Route path="/finance/acct-i/reports/general-ledger" component={GeneralLedgerReportPage} />
+          <Route path="/finance/acct-i/reports/trial-balance" component={TrialBalanceReportPage} />
+          <Route path="/finance/acct-i/payment-entries" component={PaymentEntriesPage} />
+          <Route path="/finance/acct-i/bank-reconciliation" component={BankReconciliationPage} />
+          <Route path="/finance/acct-i/fiscal-years" component={FiscalYearsPage} />
+          <Route path="/finance/acct-i/chart-of-accounts" component={ChartOfAccountsPage} />
+          <Route path="/finance/acct-i/journal-entries" component={JournalEntriesPage} />
           <Route path="/finance/supplier-invoices/new" component={SupplierInvoiceNewPage} />
           <Route path="/finance/supplier-invoices" component={SupplierInvoiceListPage} />
           <Route path="/finance/payment-vouchers/new" component={PaymentVoucherNewPage} />
@@ -350,6 +383,9 @@ export default function App() {
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />
+          <Route path="/finance/reports/budget-vs-actual" component={BudgetVsActualReportPage} />
+          <Route path="/finance/budgets/:id" component={BudgetDetailPage} />
+          <Route path="/finance/budgets" component={BudgetListPage} />
           <Route path="/finance/reports/trial-balance" component={TrialBalanceReportPage} />
           <Route path="/finance/reports/general-ledger" component={GeneralLedgerReportPage} />
           <Route path="/finance/reports/profit-and-loss" component={ProfitAndLossReportPage} />
@@ -428,6 +464,8 @@ export default function App() {
           <Route path="/quality/ncrs" component={() => (
             <QualityRoute><NcrsPage /></QualityRoute>
           )} />
+          <Route path="/data-center/ingestion-rules" component={IngestionRulesPage} />
+          <Route path="/data-center/inbox" component={InboxPage} />
           <Route path="/activity-logs/changes" component={() => (
             <ChangeLogRoute>
               <ChangeLogListPage />
@@ -462,6 +500,11 @@ export default function App() {
           <Route path="/user-management/process-policies" component={() => (
             <AdminModuleRoute>
               <ProcessPoliciesPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/mapping-center" component={() => (
+            <AdminModuleRoute>
+              <MappingCenterPage />
             </AdminModuleRoute>
           )} />
           <Route path="/user-management/demo-data" component={() => (

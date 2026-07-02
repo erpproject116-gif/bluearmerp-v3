@@ -51,6 +51,7 @@ const redFlagLinks: Record<string, string> = {
   dr_without_invoice: "/app/sales/sales/new",
   gr_without_supplier_invoice: "/app/finance/supplier-invoices/new",
   ap_over_application: "/app/finance/payment-vouchers",
+  budget_overrun: "/app/finance/reports/budget-vs-actual",
 };
 
 function CssBarChart(props: { title: string; points: DashboardTrendPoint[]; valueFormat?: "money" | "int" }) {
@@ -195,10 +196,16 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <div class="mb-4">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-text-secondary">
           Business overview — sales, inventory, purchasing, and operational red flags.
         </p>
+        <A
+          href="/app/dashboard/approvals"
+          class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-brand-600 shadow-sm transition hover:shadow-md"
+        >
+          Approvals queue
+        </A>
       </div>
 
       <Show when={loading()}>

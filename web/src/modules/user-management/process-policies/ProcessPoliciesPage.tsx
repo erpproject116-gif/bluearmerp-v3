@@ -15,6 +15,10 @@ type ProcessPolicy = {
   sales_enforce_credit_limit: boolean;
   accounts_auto_post_or: boolean;
   accounts_auto_post_pv: boolean;
+  sales_require_so_approval: boolean;
+  purchase_require_po_approval: boolean;
+  finance_require_je_approval: boolean;
+  budget_control_mode: string;
 };
 
 type PolicyField = {
@@ -23,7 +27,9 @@ type PolicyField = {
   help: string;
 };
 
-const FIELDS: PolicyField[] = [
+type BudgetControlMode = "off" | "warn" | "block";
+
+const BOOLEAN_FIELDS: PolicyField[] = [
   {
     key: "sales_require_quotation",
     label: "Require quotation before sales order",
@@ -79,6 +85,27 @@ const FIELDS: PolicyField[] = [
     label: "Auto-post payment vouchers to journal",
     help: "When on, supplier payment vouchers create posted journal entries.",
   },
+  {
+    key: "sales_require_so_approval",
+    label: "Require sales order approval",
+    help: "When on, sales orders must be approved before release or invoicing.",
+  },
+  {
+    key: "purchase_require_po_approval",
+    label: "Require purchase order approval",
+    help: "When on, purchase orders must be approved before goods receipt or invoicing.",
+  },
+  {
+    key: "finance_require_je_approval",
+    label: "Require journal entry approval",
+    help: "When on, journal entries must be approved before posting.",
+  },
+];
+
+const BUDGET_CONTROL_OPTIONS: { value: BudgetControlMode; label: string }[] = [
+  { value: "off", label: "Off — no budget checks" },
+  { value: "warn", label: "Warn — allow but show warnings" },
+  { value: "block", label: "Block — prevent over-budget transactions" },
 ];
 
 export default function ProcessPoliciesPage() {
@@ -112,14 +139,21 @@ export default function ProcessPoliciesPage() {
     setPolicy({ ...p, [key]: !p[key] });
   };
 
+  const setBudgetMode = (mode: BudgetControlMode) => {
+    const p = policy();
+    if (!p || !canManage()) return;
+    setPolicy({ ...p, budget_control_mode: mode });
+  };
+
   const save = async () => {
     const p = policy();
     if (!p || !canManage()) return;
     setSaving(true);
-    const body: Record<string, boolean> = {};
-    for (const f of FIELDS) {
+    const body: Record<string, boolean | string> = {};
+    for (const f of BOOLEAN_FIELDS) {
       body[f.key] = !!p[f.key];
     }
+    body.budget_control_mode = p.budget_control_mode || "off";
     const res = await apiFetch<ProcessPolicy>("/api/v1/settings/process-policies", {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -157,7 +191,7 @@ export default function ProcessPoliciesPage() {
         >
           {(p) => (
             <div class="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <For each={FIELDS}>
+              <For each={BOOLEAN_FIELDS}>
                 {(field) => (
                   <label class="flex cursor-pointer gap-3 border-b border-slate-100 pb-4 last:border-0 last:pb-0">
                     <input
@@ -174,6 +208,23 @@ export default function ProcessPoliciesPage() {
                   </label>
                 )}
               </For>
+
+              <label class="block border-b border-slate-100 pb-4">
+                <span class="block text-sm font-medium text-slate-900">Budget control mode</span>
+                <span class="mb-2 block text-xs text-slate-500">
+                  How strictly to enforce budget limits on purchases and expenses.
+                </span>
+                <select
+                  class="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50"
+                  value={p.budget_control_mode || "off"}
+                  disabled={!canManage()}
+                  onChange={(e) => setBudgetMode(e.currentTarget.value as BudgetControlMode)}
+                >
+                  <For each={BUDGET_CONTROL_OPTIONS}>
+                    {(opt) => <option value={opt.value}>{opt.label}</option>}
+                  </For>
+                </select>
+              </label>
 
               <Show when={canManage()}>
                 <button

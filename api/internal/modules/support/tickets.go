@@ -236,7 +236,7 @@ func createTicket(pool *pgxpool.Pool) http.HandlerFunc {
 
 		payload := ticketCreatedPayload{
 			TicketID: id, TicketNo: ticketNo, Subject: strings.TrimSpace(body.Subject),
-			PartnerID: body.PartnerID, NotifyStub: true,
+			PartnerID: body.PartnerID, AssignedUserID: body.AssignedUserID, NotifyStub: true,
 		}
 		idemKey := fmt.Sprintf("support.ticket_created:%d:%d", tu.TenantID, id)
 		if err := outbox.EnqueueTx(r.Context(), tx, tu.TenantID, "support.ticket_created", idemKey, payload); err != nil {

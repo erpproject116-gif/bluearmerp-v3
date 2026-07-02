@@ -315,27 +315,27 @@ export const documentationSections: DocSection[] = [
     id: "finance",
     title: "Finance and accounts",
     iconId: "finance",
-    intro: "Receipts, payables, general ledger, and the accounts workspace.",
+    intro: "Receipts, payables, general ledger, Acct. I core GL, and Acct. II extended accounting.",
     primaryHref: "/app/finance",
     primaryLabel: "Open Accounts Workspace",
     blocks: [
       {
         type: "paragraph",
-        text: "The Accounts workspace summarizes open receivables, payables, draft journal entries, and bank reconciliation items. From there, jump to payment receipts, supplier invoices, chart of accounts, bank reconciliation, fiscal years, and financial reports.",
+        text: "The Accounts workspace summarizes open receivables, payables, draft journal entries, and bank reconciliation items. ECOUNT-style Acct. I covers journal entries, chart of accounts, fiscal years, bank reconciliation, payment entries, and financial statements. Acct. II adds check register, withholding tax codes, notes receivable/payable, landed import cost, company budgets, and contracts.",
       },
       {
         type: "steps",
         items: [
-          "Open Accounts → Workspace for KPIs and shortcuts.",
-          "Record customer payments with New Payment Receipt; apply to open sales invoices.",
-          "Post supplier invoices against received PO lines, then pay vendors with Payment Vouchers.",
-          "Use Chart of Accounts, Journal Entries, Trial Balance, P&L, and Balance Sheet for GL work.",
-          "Match bank statement lines on Bank Reconciliation.",
+          "Open Accounts → Workspace for KPIs and Acct. I / Acct. II shortcuts.",
+          "Acct. I: Journal Entries, Chart of Accounts, Trial Balance, P&L, Balance Sheet, Bank Reconciliation.",
+          "Record customer payments (Payment Receipts) and vendor payments (Payment Vouchers); post supplier invoices against PO receipts.",
+          "Acct. II: Check Register, Withholding Tax, Notes, Landed Cost, Company Budgets, Contracts.",
+          "Use Budget vs Actual and set Process Policies → budget control to warn or block PR/PO overruns.",
         ],
       },
       {
         type: "paragraph",
-        text: "A/R and A/P aging reports, SI Receipt Status, and Supplier Payment Status show outstanding balances. Fixed Assets (separate module) posts monthly depreciation journal entries when you run depreciation.",
+        text: "A/R and A/P aging reports, SI Receipt Status, and Supplier Payment Status show outstanding balances. Default PH withholding codes (1–15%) seed on migration 102. Fixed Assets (separate module) posts monthly depreciation journal entries when you run depreciation.",
       },
     ],
   },
@@ -685,6 +685,34 @@ export const documentationSections: DocSection[] = [
     ],
   },
   {
+    id: "mapping-center",
+    title: "Mapping Center",
+    iconId: "user_management",
+    intro: "Configure document generation rules (Generate Other Slips).",
+    primaryHref: "/app/user-management/mapping-center",
+    primaryLabel: "Open Mapping Center",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Mapping Center stores tenant rules for generating downstream documents from list selections—quotation to sales order, sales order to invoice or delivery receipt, purchase request to PO, and goods receipt to supplier invoice.",
+      },
+    ],
+  },
+  {
+    id: "approvals",
+    title: "Approvals queue",
+    iconId: "dashboard",
+    intro: "Review and approve pending documents.",
+    primaryHref: "/app/dashboard/approvals",
+    primaryLabel: "Open Approvals",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "When process policies require SO, PO, or collective invoice approval, documents enter e-Approval status until an authorized user approves or rejects from the dashboard queue.",
+      },
+    ],
+  },
+  {
     id: "process-policies",
     title: "Process policies",
     iconId: "user_management",
@@ -710,7 +738,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "The following are documented for future work: shipping rules, delivery trip logistics, sales commission, full Support SLA and email delivery, multi-book depreciation, offline POS, portal vendor write access, CAPA workflows, and in-process manufacturing QC. See docs/TIER_C_BACKLOG.md in the repository for briefs.",
+        text: "The following are documented for future work: full Groupware, offline POS, multi-book depreciation, portal vendor write access, and in-process manufacturing QC depth. ECOUNT gap closure items (Mapping Center, approvals, budget, Data Center, WMS, Acct II extensions) shipped in migrations 086–101—see docs/TIER_C_BACKLOG.md.",
       },
       {
         type: "tip",

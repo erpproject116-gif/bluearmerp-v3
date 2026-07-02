@@ -63,6 +63,27 @@ func submitPurchaseRequestForApproval(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		var grandTotal float64
+		var projectID *int64
+		var requestDate time.Time
+		if err := pool.QueryRow(r.Context(), `
+			select grand_total::float8, project_id, request_date
+			from public.pr_purchase_requests
+			where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID).Scan(&grandTotal, &projectID, &requestDate); err != nil {
+			response.Err(w, http.StatusNotFound, "Purchase request not found.", "ERR_NOT_FOUND")
+			return
+		}
+		budgetCheck, _ := processpolicy.CheckPurchaseBudget(r.Context(), pool, policy, tu.TenantID, projectID, requestDate, grandTotal)
+		if v := processpolicy.ValidateBudgetControl(policy, budgetCheck); v != nil {
+			response.Validation(w, v)
+			return
+		}
+
 		fromStatus := current.ProgressStatus
 		if err := applyPRApprovalTransition(r.Context(), pool, tu, id, "submit", fromStatus, "e_approval", body.Remarks, false); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")

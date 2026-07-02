@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,8 +22,12 @@ type Policy struct {
 	PurchaseRequireGRBeforeSupplierInv  bool  `json:"purchase_require_gr_before_supplier_invoice"`
 	LegacyCombinedSORelease             bool  `json:"legacy_combined_so_release"`
 	SalesEnforceCreditLimit             bool  `json:"sales_enforce_credit_limit"`
-	AccountsAutoPostOR                  bool  `json:"accounts_auto_post_or"`
-	AccountsAutoPostPV                  bool  `json:"accounts_auto_post_pv"`
+	AccountsAutoPostOR                  bool   `json:"accounts_auto_post_or"`
+	AccountsAutoPostPV                  bool   `json:"accounts_auto_post_pv"`
+	SalesRequireSOApproval              bool   `json:"sales_require_so_approval"`
+	PurchaseRequirePOApproval           bool   `json:"purchase_require_po_approval"`
+	FinanceRequireJEApproval            bool   `json:"finance_require_je_approval"`
+	BudgetControlMode                   string `json:"budget_control_mode"`
 }
 
 // Patch is the writable subset for PATCH/PUT requests.
@@ -36,8 +41,12 @@ type Patch struct {
 	PurchaseRequireGRBeforeSupplierInv *bool `json:"purchase_require_gr_before_supplier_invoice,omitempty"`
 	LegacyCombinedSORelease            *bool `json:"legacy_combined_so_release,omitempty"`
 	SalesEnforceCreditLimit            *bool `json:"sales_enforce_credit_limit,omitempty"`
-	AccountsAutoPostOR                 *bool `json:"accounts_auto_post_or,omitempty"`
-	AccountsAutoPostPV                 *bool `json:"accounts_auto_post_pv,omitempty"`
+	AccountsAutoPostOR                 *bool   `json:"accounts_auto_post_or,omitempty"`
+	AccountsAutoPostPV                 *bool   `json:"accounts_auto_post_pv,omitempty"`
+	SalesRequireSOApproval             *bool   `json:"sales_require_so_approval,omitempty"`
+	PurchaseRequirePOApproval          *bool   `json:"purchase_require_po_approval,omitempty"`
+	FinanceRequireJEApproval           *bool   `json:"finance_require_je_approval,omitempty"`
+	BudgetControlMode                  *string `json:"budget_control_mode,omitempty"`
 }
 
 var ErrNotFound = errors.New("process policy not found")
@@ -54,7 +63,11 @@ const selectCols = `
   legacy_combined_so_release,
   sales_enforce_credit_limit,
   accounts_auto_post_or,
-  accounts_auto_post_pv
+  accounts_auto_post_pv,
+  coalesce(sales_require_so_approval, false),
+  coalesce(purchase_require_po_approval, false),
+  coalesce(finance_require_je_approval, false),
+  coalesce(budget_control_mode, 'off')
 `
 
 // Load returns the tenant policy, inserting skip-friendly defaults when missing.
@@ -84,6 +97,10 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, erro
 		&p.SalesEnforceCreditLimit,
 		&p.AccountsAutoPostOR,
 		&p.AccountsAutoPostPV,
+		&p.SalesRequireSOApproval,
+		&p.PurchaseRequirePOApproval,
+		&p.FinanceRequireJEApproval,
+		&p.BudgetControlMode,
 	)
 	return p, err
 }
@@ -129,6 +146,23 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 	if patch.AccountsAutoPostPV != nil {
 		next.AccountsAutoPostPV = *patch.AccountsAutoPostPV
 	}
+	if patch.SalesRequireSOApproval != nil {
+		next.SalesRequireSOApproval = *patch.SalesRequireSOApproval
+	}
+	if patch.PurchaseRequirePOApproval != nil {
+		next.PurchaseRequirePOApproval = *patch.PurchaseRequirePOApproval
+	}
+	if patch.FinanceRequireJEApproval != nil {
+		next.FinanceRequireJEApproval = *patch.FinanceRequireJEApproval
+	}
+	if patch.BudgetControlMode != nil {
+		mode := strings.TrimSpace(*patch.BudgetControlMode)
+		if mode == "warn" || mode == "block" {
+			next.BudgetControlMode = mode
+		} else {
+			next.BudgetControlMode = "off"
+		}
+	}
 
 	_, err = pool.Exec(ctx, `
 		update public.tenant_process_policies set
@@ -143,7 +177,11 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		  sales_enforce_credit_limit = $10,
 		  accounts_auto_post_or = $11,
 		  accounts_auto_post_pv = $12,
-		  updated_by_user_id = $13,
+		  sales_require_so_approval = $13,
+		  purchase_require_po_approval = $14,
+		  finance_require_je_approval = $15,
+		  budget_control_mode = $16,
+		  updated_by_user_id = $17,
 		  updated_at = now()
 		where tenant_id = $1`,
 		tenantID,
@@ -158,6 +196,10 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		next.SalesEnforceCreditLimit,
 		next.AccountsAutoPostOR,
 		next.AccountsAutoPostPV,
+		next.SalesRequireSOApproval,
+		next.PurchaseRequirePOApproval,
+		next.FinanceRequireJEApproval,
+		next.BudgetControlMode,
 		userID,
 	)
 	if err != nil {
@@ -203,6 +245,10 @@ func LoadTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error) {
 		&p.SalesEnforceCreditLimit,
 		&p.AccountsAutoPostOR,
 		&p.AccountsAutoPostPV,
+		&p.SalesRequireSOApproval,
+		&p.PurchaseRequirePOApproval,
+		&p.FinanceRequireJEApproval,
+		&p.BudgetControlMode,
 	)
 	return p, err
 }

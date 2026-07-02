@@ -48,6 +48,7 @@ type Props<T extends { id: number }> = {
   statusOptions?: { value: string; label: string }[];
   onRefresh?: () => void;
   settingsHref?: string;
+  toolbarExtra?: JSX.Element;
   itemsCsvImport?: boolean;
   onImportComplete?: () => void;
 };
@@ -201,6 +202,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           </Show>
           <span class="hidden flex-1 pb-2 text-sm text-text-secondary lg:inline">F2 new · ↑↓ navigate · Enter edit · click headers to sort</span>
           <div class="ml-auto flex shrink-0 items-center gap-2 pb-0.5">
+            {props.toolbarExtra}
             <Show when={props.itemsCsvImport}>
               <button
                 type="button"

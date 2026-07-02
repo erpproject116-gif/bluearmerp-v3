@@ -1,9 +1,12 @@
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 import { COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
 import { SERIAL_LOT_PREFIX } from "./serial-lot-nav";
+import { WMS_PREFIX } from "./wms-nav";
+import { ACCT_I_PREFIX } from "./acct-i-nav";
+import { ACCT_II_PREFIX } from "./acct-ii-nav";
 import { isSubBranchPath } from "./sub-branch-nav";
 
-export { TAX_MNGT_PREFIX, COLLECTIVE_INVOICING_PREFIX, SERIAL_LOT_PREFIX, isSubBranchPath };
+export { TAX_MNGT_PREFIX, COLLECTIVE_INVOICING_PREFIX, SERIAL_LOT_PREFIX, WMS_PREFIX, ACCT_I_PREFIX, ACCT_II_PREFIX, isSubBranchPath };
 
 export type ModuleFeature = {
   label: string;
@@ -36,6 +39,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/dashboard",
     features: [
       { label: "Dashboard", href: "/app/dashboard", settingsHref: "/app/dashboard" },
+      { label: "Approvals", href: "/app/dashboard/approvals", settingsHref: "/app/dashboard/approvals" },
       { label: "Report Catalogue", href: "/app/reports", settingsHref: "/app/reports" },
     ],
   },
@@ -85,6 +89,12 @@ export const appModules: AppModule[] = [
         prefix: SERIAL_LOT_PREFIX,
         href: "/app/inventory/serial-lot/registry",
         settingsHref: "/app/inventory/serial-lot/settings",
+      },
+      {
+        label: "WMS",
+        prefix: WMS_PREFIX,
+        href: "/app/inventory/wms/scheduled-receipts",
+        settingsHref: "/app/inventory/wms/scheduled-receipts",
       },
     ],
   },
@@ -236,6 +246,8 @@ export const appModules: AppModule[] = [
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       { label: "SO Analysis", href: "/app/sales-order/reports/so-analysis", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Shipping Orders", href: "/app/sales-order/shipping/orders", settingsHref: "/app/sales-order/shipping/orders" },
+      { label: "Delivery Trips", href: "/app/sales-order/shipping/trips", settingsHref: "/app/sales-order/shipping/trips" },
     ],
   },
   {
@@ -391,6 +403,34 @@ export const appModules: AppModule[] = [
       { label: "Balance Sheet", href: "/app/finance/reports/balance-sheet", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "A/R Aging", href: "/app/finance/reports/ar-aging", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "A/P Aging", href: "/app/finance/reports/ap-aging", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Company Budgets", href: "/app/finance/budgets", settingsHref: "/app/finance/budgets" },
+      { label: "Budget vs Actual", href: "/app/finance/reports/budget-vs-actual", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Acct. I — Journal", href: "/app/finance/acct-i/journal-entries", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Acct. II — Checks", href: "/app/finance/acct-ii/checks", settingsHref: "/app/finance/acct-ii/checks" },
+    ],
+    subBranches: [
+      {
+        label: "Acct. I",
+        prefix: ACCT_I_PREFIX,
+        href: "/app/finance/acct-i/journal-entries",
+        settingsHref: "/app/finance/official-receipts/settings",
+      },
+      {
+        label: "Acct. II",
+        prefix: ACCT_II_PREFIX,
+        href: "/app/finance/acct-ii/checks",
+        settingsHref: "/app/finance/acct-ii/checks",
+      },
+    ],
+  },
+  {
+    id: "data_center",
+    label: "Data Center",
+    href: "/app/data-center/ingestion-rules",
+    basePath: "/app/data-center",
+    features: [
+      { label: "Ingestion Rules", href: "/app/data-center/ingestion-rules", settingsHref: "/app/data-center/ingestion-rules" },
+      { label: "Inbox", href: "/app/data-center/inbox", settingsHref: "/app/data-center/inbox" },
     ],
   },
   {
@@ -455,6 +495,11 @@ export const appModules: AppModule[] = [
         label: "Process Policies",
         href: "/app/user-management/process-policies",
         settingsHref: "/app/user-management/process-policies",
+      },
+      {
+        label: "Mapping Center",
+        href: "/app/user-management/mapping-center",
+        settingsHref: "/app/user-management/mapping-center",
       },
       {
         label: "Demo Data",

@@ -36,5 +36,5 @@ Migrations: `033_collective_invoicing.sql`, `034_collective_invoicing_permission
 ## Deferred
 
 - **Tax Entity** filter — UI checkbox only (no schema).
-- **XLSX** export — CSV only today.
-- **Link/Unlink Inv. Slips** — phase 2.
+- ~~**XLSX** export — CSV only today.~~ Shipped: add `?format=xlsx` to status export.
+- ~~**Link/Unlink Inv. Slips** — phase 2.~~ Shipped: `POST /collective-invoices/{id}/link-sales` and `/unlink-sales`.

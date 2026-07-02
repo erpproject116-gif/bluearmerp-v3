@@ -1,6 +1,7 @@
 import { createMemo, createSignal, onMount } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
+import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { QUOTATION_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
@@ -62,6 +63,11 @@ export function QuotationListPageInner(props: PageOptions = {}) {
 
   const quotationIds = createMemo(() => (list.data?.rows ?? []).map((r) => r.id));
   const taskSummaries = useCrmTaskSummaries(() => ({ quotationIds: quotationIds() }));
+
+  const selectedIds = createMemo(() => {
+    const id = selectedId();
+    return id != null ? [id] : [];
+  });
 
   const openNew = () => {
     setEditing(null);
@@ -225,6 +231,14 @@ export function QuotationListPageInner(props: PageOptions = {}) {
         ]}
         onRefresh={invalidate}
         settingsHref={QUOTATION_SETTINGS_HREF.quotation}
+        toolbarExtra={
+          <GenerateOtherSlipsMenu
+            sourceEntity="quotation"
+            targets={[{ label: "Sales Order", targetEntity: "sales_order" }]}
+            selectedIds={selectedIds}
+            onSuccess={() => invalidate()}
+          />
+        }
       />
 
       <QuotationModal open={modalOpen()} editing={editing()} onClose={closeModal} onSaved={invalidate} />

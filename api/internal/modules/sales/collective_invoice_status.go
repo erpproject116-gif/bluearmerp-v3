@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/export"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -248,16 +249,14 @@ func exportCollectiveInvoiceStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to export.", "ERR_INTERNAL")
 			return
 		}
-		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="sales-invoice-status.csv"`)
-		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"Date-No.", "Receivable No.", "Customer/Vendor Name", "Pretax Amount", "Sales Tax", "Total Sales", "Due Date", "Status"})
+		headers := []string{"Date-No.", "Receivable No.", "Customer/Vendor Name", "Pretax Amount", "Sales Tax", "Total Sales", "Due Date", "Status"}
+		var dataRows [][]string
 		for _, row := range rows {
 			due := ""
 			if row.DueDate != nil {
 				due = *row.DueDate
 			}
-			_ = cw.Write([]string{
+			dataRows = append(dataRows, []string{
 				row.DateNoDisplay,
 				row.ReceivableNo,
 				row.CustomerName,
@@ -267,6 +266,21 @@ func exportCollectiveInvoiceStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 				due,
 				row.Status,
 			})
+		}
+		if exportFormat(r) == "xlsx" {
+			w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+			w.Header().Set("Content-Disposition", `attachment; filename="sales-invoice-status.xlsx"`)
+			if err := export.WriteSimpleXLSX(w, "Invoice Status", headers, dataRows); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to export XLSX.", "ERR_INTERNAL")
+			}
+			return
+		}
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="sales-invoice-status.csv"`)
+		cw := csv.NewWriter(w)
+		_ = cw.Write(headers)
+		for _, dr := range dataRows {
+			_ = cw.Write(dr)
 		}
 		cw.Flush()
 	}

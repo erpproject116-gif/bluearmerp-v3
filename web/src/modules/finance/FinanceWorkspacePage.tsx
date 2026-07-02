@@ -2,6 +2,8 @@ import { A } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { useAuth } from "../../shared/auth-context";
 import { useFinanceWorkspace } from "../../shared/reports/useModuleReports";
+import { acctINavLinks } from "../../shell/acct-i-nav";
+import { acctIINavLinks } from "../../shell/acct-ii-nav";
 
 type KpiTile = {
   label: string;
@@ -18,15 +20,14 @@ const tiles: KpiTile[] = [
   { label: "AP over-applied", value: (s) => s.ap_over_application, href: "/app/finance/payment-vouchers", accent: "text-red-600" },
 ];
 
-const reportLinks = [
+const operationalLinks = [
+  { label: "Payment Receipts", href: "/app/finance/official-receipts" },
+  { label: "Payment Vouchers", href: "/app/finance/payment-vouchers" },
+  { label: "Supplier Invoices", href: "/app/finance/supplier-invoices" },
   { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer" },
   { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor" },
   { label: "A/R Aging", href: "/app/finance/reports/ar-aging" },
   { label: "A/P Aging", href: "/app/finance/reports/ap-aging" },
-  { label: "Trial Balance", href: "/app/finance/reports/trial-balance" },
-  { label: "General Ledger", href: "/app/finance/reports/general-ledger" },
-  { label: "Profit & Loss", href: "/app/finance/reports/profit-and-loss" },
-  { label: "Balance Sheet", href: "/app/finance/reports/balance-sheet" },
 ];
 
 export default function FinanceWorkspacePage() {
@@ -38,6 +39,10 @@ export default function FinanceWorkspacePage() {
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <h2 class="text-lg font-semibold text-text-primary">Finance workspace</h2>
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
+        <p class="mt-2 text-sm text-text-secondary">
+          ECOUNT-style accounting: <strong class="font-medium text-text-primary">Acct. I</strong> for core GL and vouchers;{" "}
+          <strong class="font-medium text-text-primary">Acct. II</strong> for checks, withholding, budgets, import cost, contracts, and notes.
+        </p>
       </section>
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -56,11 +61,45 @@ export default function FinanceWorkspacePage() {
         </For>
       </section>
 
+      <div class="grid gap-6 lg:grid-cols-2">
+        <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+          <h3 class="mb-1 text-sm font-semibold text-text-primary">Acct. I — Core accounting</h3>
+          <p class="mb-4 text-xs text-text-secondary">Journal, chart of accounts, bank recon, financial statements</p>
+          <ul class="grid gap-2 sm:grid-cols-2">
+            <For each={acctINavLinks}>
+              {(link) => (
+                <li>
+                  <A href={link.href} class="text-sm font-medium text-brand-600 hover:underline">
+                    {link.label}
+                  </A>
+                </li>
+              )}
+            </For>
+          </ul>
+        </section>
+
+        <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+          <h3 class="mb-1 text-sm font-semibold text-text-primary">Acct. II — Extended accounting</h3>
+          <p class="mb-4 text-xs text-text-secondary">Receivable/payable depth, checks, budget, withholding, import, contracts</p>
+          <ul class="grid gap-2 sm:grid-cols-2">
+            <For each={acctIINavLinks}>
+              {(link) => (
+                <li>
+                  <A href={link.href} class="text-sm font-medium text-brand-600 hover:underline">
+                    {link.label}
+                  </A>
+                </li>
+              )}
+            </For>
+          </ul>
+        </section>
+      </div>
+
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h3 class="mb-4 text-sm font-semibold text-text-primary">Reports</h3>
+        <h3 class="mb-4 text-sm font-semibold text-text-primary">AR / AP operations</h3>
         <Show when={!workspace.isLoading} fallback={<p class="text-sm text-text-secondary">Loading…</p>}>
           <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <For each={reportLinks}>
+            <For each={operationalLinks}>
               {(link) => (
                 <li>
                   <A href={link.href} class="text-sm font-medium text-brand-600 hover:underline">

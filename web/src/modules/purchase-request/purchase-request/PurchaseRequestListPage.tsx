@@ -1,6 +1,7 @@
 import { createMemo, createSignal, onMount, Show } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
+import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
 import {
@@ -85,6 +86,11 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
 
   const purchaseRequestIds = createMemo(() => (list.data?.rows ?? []).map((r) => r.id));
   const taskSummaries = useCrmTaskSummaries(() => ({ purchaseRequestIds: purchaseRequestIds() }));
+
+  const selectedIds = createMemo(() => {
+    const id = selectedId();
+    return id != null ? [id] : [];
+  });
 
   const search = () => {
     setSubmittedFilters({ ...draftFilters() });
@@ -260,6 +266,14 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
             statusOptions={PROGRESS_TABS}
             onRefresh={invalidate}
             settingsHref={PURCHASE_REQUEST_SETTINGS_HREF.purchaseRequest}
+            toolbarExtra={
+              <GenerateOtherSlipsMenu
+                sourceEntity="purchase_request"
+                targets={[{ label: "Purchase Order", targetEntity: "purchase_order" }]}
+                selectedIds={selectedIds}
+                onSuccess={() => invalidate()}
+              />
+            }
           />
         </div>
       </Show>

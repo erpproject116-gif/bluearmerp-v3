@@ -2,6 +2,7 @@ import type { AppModule } from "./modules";
 import { appModules } from "./modules";
 import { COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
 import { SERIAL_LOT_PREFIX } from "./serial-lot-nav";
+import { WMS_PREFIX } from "./wms-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 
 export type NavGroupEntry =
@@ -18,6 +19,7 @@ export type NavGroup = {
 /** Sidebar feature codes for sub-branches (see migration 057). */
 export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
   [SERIAL_LOT_PREFIX]: "inventory.serial_lot",
+  [WMS_PREFIX]: "inventory.wms",
   [TAX_MNGT_PREFIX]: "quotation.tax_mngt",
   [COLLECTIVE_INVOICING_PREFIX]: "sales.collective_invoicing",
 };
@@ -30,6 +32,7 @@ export const navGroups: NavGroup[] = [
     entries: [
       { kind: "module", moduleId: "inventory" },
       { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Serial & Lot" },
+      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "WMS" },
       { kind: "module", moduleId: "after_sales" },
     ],
   },
@@ -72,7 +75,19 @@ export const navGroups: NavGroup[] = [
 ];
 
 /** Shown after collapsible groups (below Misc). */
-export const belowGroupModuleIds = ["crm", "support", "pos", "hr", "fixed_assets", "job_costing", "finance"] as const;
+export const belowGroupModuleIds = [
+  "crm",
+  "manufacturing",
+  "quality",
+  "reports",
+  "support",
+  "pos",
+  "hr",
+  "fixed_assets",
+  "job_costing",
+  "data_center",
+  "finance",
+] as const;
 
 /** Modules shown above collapsible groups. */
 export const ungroupedModuleIds = ["dashboard"] as const;

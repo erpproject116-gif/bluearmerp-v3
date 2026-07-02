@@ -1174,6 +1174,21 @@ func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		orderDate, err := time.Parse("2006-01-02", before.OrderDate)
+		if err != nil {
+			orderDate = time.Now()
+		}
+		budgetCheck, _ := processpolicy.CheckPurchaseBudget(r.Context(), pool, policy, tu.TenantID, before.ProjectID, orderDate, before.GrandTotal)
+		if v := processpolicy.ValidateBudgetControl(policy, budgetCheck); v != nil {
+			response.Validation(w, v)
+			return
+		}
+
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to confirm.", "ERR_INTERNAL")
