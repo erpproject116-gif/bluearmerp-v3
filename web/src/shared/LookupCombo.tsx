@@ -98,10 +98,10 @@ export function LookupCombo(props: Props) {
               )}
             </For>
             <Show when={props.onCreate && props.value().trim() !== ""}>
-              <li class="border-t border-stroke">
+              <li class="sticky bottom-0 border-t border-stroke bg-white">
                 <button
                   type="button"
-                  class="flex w-full items-center gap-1 px-3 py-2 text-left text-sm text-brand-600 hover:bg-brand-50"
+                  class="flex w-full items-center gap-1 px-3 py-2 text-left text-sm font-medium text-brand-600 hover:bg-brand-50"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     props.onCreate!(props.value().trim());
