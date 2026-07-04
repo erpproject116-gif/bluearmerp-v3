@@ -27,6 +27,7 @@ import { useBranding } from "../shared/branding/BrandingProvider";
 import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
 import { UserAccountMenu } from "./UserAccountMenu";
+import { BranchSwitcher } from "./BranchSwitcher";
 import { SidebarNav } from "./SidebarNav";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
@@ -104,6 +105,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         <SidebarNav />
 
         <div class="mt-4 shrink-0 space-y-2 border-t border-stroke pt-3">
+          <BranchSwitcher />
           <UserAccountMenu />
           <button
           type="button"

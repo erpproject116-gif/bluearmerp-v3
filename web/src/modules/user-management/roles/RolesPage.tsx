@@ -232,6 +232,12 @@ export default function RolesPage() {
             />
             Restrict lists to customers/locations assigned per user
           </label>
+          <Show when={applyUserScopes()}>
+            <p class="mt-1 text-xs text-amber-700">
+              Fail-closed: a user with this role sees <strong>no records</strong> until you assign them
+              customers/locations under User permissions &rarr; Data scopes.
+            </p>
+          </Show>
         </Field>
         <Show when={editing()}>
           <Field label="Active">

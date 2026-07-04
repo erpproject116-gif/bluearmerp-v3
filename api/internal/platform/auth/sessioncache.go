@@ -2,11 +2,19 @@ package auth
 
 import (
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 )
+
+// cacheKey scopes a cached session to a specific business so multi-tenant users
+// keep a distinct entry per active tenant.
+func cacheKey(authUserID string, tenantID int64) string {
+	return authUserID + "|" + strconv.FormatInt(tenantID, 10)
+}
 
 type cacheEntry struct {
 	user         TenantUser
@@ -89,12 +97,18 @@ func evictOldestLocked() {
 	}
 }
 
-// InvalidateUser drops a cached session (call after permission mutations).
+// InvalidateUser drops every cached session for an auth identity across all of its
+// tenants (call after permission mutations). Keys are authUserID|tenantID.
 func InvalidateUser(authUserID string) {
 	if authUserID == "" {
 		return
 	}
+	prefix := authUserID + "|"
 	cacheMu.Lock()
-	delete(cacheData, authUserID)
+	for k := range cacheData {
+		if k == authUserID || strings.HasPrefix(k, prefix) {
+			delete(cacheData, k)
+		}
+	}
 	cacheMu.Unlock()
 }

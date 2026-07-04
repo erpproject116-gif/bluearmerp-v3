@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getGlobalToast } from "./toast";
+import { getActiveTenantId } from "./activeContext";
 
 const url = import.meta.env.VITE_SUPABASE_URL ?? "";
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
@@ -108,6 +109,11 @@ export async function apiFetch<T>(
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  // Tell the API which business this request targets (multi-tenant logins).
+  const activeTenantId = getActiveTenantId();
+  if (activeTenantId && !headers.has("X-Tenant-ID")) {
+    headers.set("X-Tenant-ID", String(activeTenantId));
+  }
   const base = apiBase || "";
   let res: Response;
   try {

@@ -104,6 +104,7 @@ func main() {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Use(audit.Middleware(pool))
 			protected.Get("/auth/me", auth.MeHandler(pool))
+			auth.RegisterAuthRoutes(protected, pool)
 			presence.RegisterRoutes(protected, pool)
 			customfields.RegisterRoutes(protected, pool)
 			drafts.RegisterRoutes(protected, pool)

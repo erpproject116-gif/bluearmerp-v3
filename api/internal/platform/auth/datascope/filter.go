@@ -58,6 +58,15 @@ func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 		return "", argIdx, err
 	}
 
+	// Fail closed: a user whose role enforces data scopes but who has NO scope rows at all
+	// sees nothing, instead of everything. (Zero scope rows almost always means an admin
+	// enabled scoping on the role but has not yet assigned the user any branches/customers.)
+	// Users with only customer scopes or only location scopes are unaffected: they keep the
+	// existing per-dimension filtering below.
+	if len(customers) == 0 && len(locations) == 0 {
+		return " and 1=0", argIdx, nil
+	}
+
 	var frag strings.Builder
 	if len(customers) > 0 && f.CustomerColumn != "" {
 		placeholders := make([]string, len(customers))

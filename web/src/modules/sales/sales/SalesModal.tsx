@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -316,8 +317,9 @@ export function SalesModal(props: Props) {
       setCustomerLabel("");
       setPicUserId(null);
       setPicName("");
-      setLocationId(null);
-      setLocationLabel("");
+      const branch = getActiveBranchCurrent();
+      setLocationId(branch?.id ?? null);
+      setLocationLabel(branch?.name ?? "");
       setProjectId(null);
       setProjectLabel("");
       setProjectName("");

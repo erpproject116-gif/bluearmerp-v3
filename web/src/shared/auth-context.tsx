@@ -1,6 +1,15 @@
 import { createContext, onCleanup, onMount, useContext, type ParentComponent } from "solid-js";
 import { createStore } from "solid-js/store";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "./api";
+import { getActiveTenantId, setActiveTenantId } from "./activeContext";
+
+export type TenantMembership = {
+  tenant_id: number;
+  company_name: string;
+  company_code: string;
+  tenant_role?: string;
+  status?: string;
+};
 
 export type MeData = {
   user: {
@@ -31,6 +40,8 @@ export type MeData = {
     status: string;
     auto_enable_all_modules?: boolean;
   };
+  active_tenant_id?: number;
+  memberships?: TenantMembership[];
   enabled_module_codes: string[];
   modules?: { module_code: string; is_enabled: boolean }[];
 };
@@ -212,6 +223,8 @@ type AuthState = {
   bootstrapError: BootstrapError;
   bootstrapMessage: string | null;
   refresh: (options?: { background?: boolean }) => Promise<void>;
+  /** Switch the active business, persist it, and reload the session. */
+  setActiveTenant: (tenantId: number) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState>();
@@ -241,6 +254,12 @@ export const AuthProvider: ParentComponent = (props) => {
     try {
       const res = await apiFetch<MeData>("/api/v1/auth/me");
       if (res.success && res.data) {
+        // Keep the persisted active tenant in sync with what the server resolved, so
+        // subsequent requests send a stable X-Tenant-ID header.
+        const resolved = res.data.active_tenant_id ?? res.data.tenant?.id;
+        if (resolved && getActiveTenantId() !== resolved) {
+          setActiveTenantId(resolved);
+        }
         setState({ me: res.data, loading: false, bootstrapError: null, bootstrapMessage: null });
         return;
       }
@@ -271,6 +290,17 @@ export const AuthProvider: ParentComponent = (props) => {
         bootstrapMessage: apiNetworkErrorMessage(),
       });
     }
+  };
+
+  const setActiveTenant = async (tenantId: number) => {
+    if (!tenantId || tenantId === state.me?.tenant?.id) return;
+    const res = await apiFetch<{ tenant_id: number }>("/api/v1/auth/switch-tenant", {
+      method: "POST",
+      body: JSON.stringify({ tenant_id: tenantId }),
+    });
+    if (!res.success) return;
+    setActiveTenantId(tenantId);
+    await refresh();
   };
 
   onMount(() => {
@@ -312,6 +342,7 @@ export const AuthProvider: ParentComponent = (props) => {
           return state.bootstrapMessage;
         },
         refresh,
+        setActiveTenant,
       }}
     >
       {props.children}

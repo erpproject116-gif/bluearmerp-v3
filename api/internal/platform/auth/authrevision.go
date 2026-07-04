@@ -7,11 +7,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func currentAuthRevision(ctx context.Context, pool *pgxpool.Pool, authUserID string) (int64, error) {
+func currentAuthRevision(ctx context.Context, pool *pgxpool.Pool, authUserID string, tenantID int64) (int64, error) {
 	var rev int64
 	err := pool.QueryRow(ctx, `
 		select auth_revision from public.users
-		where auth_user_id = $1::uuid and status = 'active'`, authUserID).Scan(&rev)
+		where auth_user_id = $1::uuid and tenant_id = $2 and status = 'active'`, authUserID, tenantID).Scan(&rev)
 	return rev, err
 }
 

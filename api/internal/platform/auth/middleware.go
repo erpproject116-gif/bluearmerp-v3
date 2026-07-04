@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,6 +18,9 @@ import (
 type contextKey string
 
 const UserContextKey contextKey = "tenantUser"
+
+// ActiveTenantHeader lets a multi-tenant user pick which business a request targets.
+const ActiveTenantHeader = "X-Tenant-ID"
 
 type TenantUser struct {
 	AuthUserID               string
@@ -68,17 +72,14 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 				return
 			}
 
-			user, err := resolveTenantUser(r.Context(), pool, claims.Sub)
+			activeTenantID := parseActiveTenantHeader(r)
+
+			user, err := resolveTenantUser(r.Context(), pool, claims.Sub, activeTenantID)
 			if err != nil {
 				if errorsIsNoProfile(err) && claims.Email != "" {
 					linkErr := tryAutoLinkProvisionedUser(r.Context(), pool, claims.Sub, claims.Email)
 					if linkErr == nil {
-						user, err = resolveTenantUser(r.Context(), pool, claims.Sub)
-					} else if linkErr == ErrAmbiguousInvite {
-						response.Err(w, http.StatusForbidden,
-							"This email is invited on multiple tenants. Contact your administrator.",
-							"ERR_FORBIDDEN")
-						return
+						user, err = resolveTenantUser(r.Context(), pool, claims.Sub, activeTenantID)
 					}
 				}
 			}
@@ -102,7 +103,7 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 			if needsBootstrapRepair {
 				if repairErr := repairBootstrapPlatformAccess(r.Context(), pool, user); repairErr == nil {
 					InvalidateUser(claims.Sub)
-					if repaired, reloadErr := resolveTenantUser(r.Context(), pool, claims.Sub); reloadErr == nil {
+					if repaired, reloadErr := resolveTenantUser(r.Context(), pool, claims.Sub, activeTenantID); reloadErr == nil {
 						user = repaired
 					}
 				}
@@ -123,19 +124,34 @@ func FromContext(ctx context.Context) (TenantUser, bool) {
 	return u, ok
 }
 
-func resolveTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) (TenantUser, error) {
-	if cached, rev, ok := cacheGet(authUserID); ok {
-		current, err := currentAuthRevision(ctx, pool, authUserID)
+// parseActiveTenantHeader reads the requested business from X-Tenant-ID. 0 means
+// "unspecified" — resolution then falls back to the saved default, else lowest tenant.
+func parseActiveTenantHeader(r *http.Request) int64 {
+	raw := strings.TrimSpace(r.Header.Get(ActiveTenantHeader))
+	if raw == "" {
+		return 0
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id < 0 {
+		return 0
+	}
+	return id
+}
+
+func resolveTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, tenantID int64) (TenantUser, error) {
+	key := cacheKey(authUserID, tenantID)
+	if cached, rev, ok := cacheGet(key); ok {
+		current, err := currentAuthRevision(ctx, pool, authUserID, cached.TenantID)
 		if err == nil && current == rev {
 			return cached, nil
 		}
 		InvalidateUser(authUserID)
 	}
-	user, err := loadTenantUser(ctx, pool, authUserID)
+	user, err := loadTenantUser(ctx, pool, authUserID, tenantID)
 	if err != nil {
 		return TenantUser{}, err
 	}
-	cacheSet(authUserID, user, user.AuthRevision)
+	cacheSet(key, user, user.AuthRevision)
 	return user, nil
 }
 
@@ -147,7 +163,12 @@ func bearerToken(r *http.Request) string {
 	return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
 }
 
-func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) (TenantUser, error) {
+func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, tenantID int64) (TenantUser, error) {
+	// A single query resolves the active business with a natural fallback order:
+	// (1) the requested tenant ($2) if it is a real membership, else
+	// (2) the user's saved default (user_active_tenant), else
+	// (3) the lowest tenant_id. This can only ever select a genuine membership row,
+	// so a stale/forged X-Tenant-ID degrades gracefully instead of locking the user out.
 	const q = `
 		select
 		  u.id,
@@ -172,15 +193,20 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string) 
 		left join public.tenant_roles tr
 		  on tr.tenant_id = u.tenant_id and tr.role_code = u.tenant_role and tr.is_active = true
 		left join public.platform_users pu on pu.auth_user_id = u.auth_user_id
+		left join public.user_active_tenant uat on uat.auth_user_id = u.auth_user_id
 		where u.auth_user_id = $1::uuid
 		  and u.status = 'active'
 		  and t.status not in ('suspended', 'cancelled')
+		order by
+		  (case when u.tenant_id = $2 then 0 else 1 end),
+		  (case when u.tenant_id = coalesce(uat.tenant_id, 0) then 0 else 1 end),
+		  u.tenant_id
 		limit 1`
 	var tu TenantUser
 	tu.AuthUserID = authUserID
 	var canFormSettings, canManageUsers, canViewActivityLogs, canViewCrm, canManageCrmRules bool
 	var canViewAllCrm, canManageSalesTeam, canViewCrmAnalytics bool
-	err := pool.QueryRow(ctx, q, authUserID).Scan(
+	err := pool.QueryRow(ctx, q, authUserID, tenantID).Scan(
 		&tu.AppUserID,
 		&tu.TenantID,
 		&tu.Email,

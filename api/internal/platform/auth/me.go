@@ -15,9 +15,19 @@ type ModuleRow struct {
 	IsEnabled  bool   `json:"is_enabled"`
 }
 
+type Membership struct {
+	TenantID    int64  `json:"tenant_id"`
+	CompanyName string `json:"company_name"`
+	CompanyCode string `json:"company_code"`
+	TenantRole  string `json:"tenant_role"`
+	Status      string `json:"status"`
+}
+
 type MePayload struct {
 	User               map[string]any `json:"user"`
 	Tenant             map[string]any `json:"tenant"`
+	ActiveTenantID     int64          `json:"active_tenant_id"`
+	Memberships        []Membership   `json:"memberships"`
 	EnabledModuleCodes []string       `json:"enabled_module_codes"`
 	Modules            []ModuleRow    `json:"modules"`
 }
@@ -83,6 +93,32 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 		}
 	}
 
+	// Every business this login belongs to, so the UI can offer a switcher.
+	var memberships []Membership
+	mrows, err := pool.Query(ctx, `
+		select u.tenant_id, t.company_name, t.company_code, u.tenant_role, t.status
+		from public.users u
+		join public.tenants t on t.id = u.tenant_id
+		where u.auth_user_id = (select auth_user_id from public.users where id = $1)
+		  and u.status = 'active'
+		  and t.status not in ('suspended', 'cancelled')
+		order by t.company_name`, tu.AppUserID)
+	if err != nil {
+		return MePayload{}, err
+	}
+	for mrows.Next() {
+		var m Membership
+		if err := mrows.Scan(&m.TenantID, &m.CompanyName, &m.CompanyCode, &m.TenantRole, &m.Status); err != nil {
+			mrows.Close()
+			return MePayload{}, err
+		}
+		memberships = append(memberships, m)
+	}
+	mrows.Close()
+	if err := mrows.Err(); err != nil {
+		return MePayload{}, err
+	}
+
 	var avatarURL *string
 	_ = pool.QueryRow(ctx, `select avatar_url from public.users where id = $1`, tu.AppUserID).Scan(&avatarURL)
 
@@ -119,6 +155,8 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 			"status":                   tenantStatus,
 			"auto_enable_all_modules":  autoEnableAll,
 		},
+		ActiveTenantID:     tu.TenantID,
+		Memberships:        memberships,
 		EnabledModuleCodes: enabled,
 		Modules:            modules,
 	}, nil

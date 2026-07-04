@@ -137,6 +137,12 @@ export default function UserPermissionsPage() {
         singleColumn
       >
         <Show when={!loadingScopes()} fallback={<p class="text-sm text-text-secondary">Loading scopes…</p>}>
+          <Show when={scopes().length === 0}>
+            <div class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              No scopes selected. If this user's role has <strong>Apply user scopes</strong> enabled, they will
+              see <strong>no records</strong> until you assign at least one customer or location below.
+            </div>
+          </Show>
           <Field label="Customers">
             <div class="max-h-40 overflow-y-auto rounded border border-stroke p-2 space-y-1">
               <For each={customers()}>

@@ -29,28 +29,14 @@ func isBootstrapSuperadminEmail(email string) bool {
 	return ok
 }
 
-// tryAutoLinkProvisionedUser links a Supabase auth user to a pre-provisioned row by email.
-// Matches invited users (invite flow) and active users without auth_user_id (platform owner seed).
+// tryAutoLinkProvisionedUser links a Supabase auth user to ALL pre-provisioned rows for
+// its email, across every tenant. Matches invited users (invite flow) and active users
+// without auth_user_id (platform owner seed). Supporting one login across many businesses
+// means the same email invited to multiple tenants is linked to each rather than rejected.
 func tryAutoLinkProvisionedUser(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) error {
 	email = normalizeEmail(email)
 	if email == "" || authUserID == "" {
 		return ErrNoTenantProfile
-	}
-
-	var matchCount int
-	if err := pool.QueryRow(ctx, `
-		select count(*)::int
-		from public.users u
-		where lower(u.email) = $1
-		  and u.auth_user_id is null
-		  and u.status in ('invited', 'active')`, email).Scan(&matchCount); err != nil {
-		return err
-	}
-	if matchCount == 0 {
-		return ErrNoTenantProfile
-	}
-	if matchCount > 1 {
-		return ErrAmbiguousInvite
 	}
 
 	tx, err := pool.Begin(ctx)
@@ -59,37 +45,50 @@ func tryAutoLinkProvisionedUser(ctx context.Context, pool *pgxpool.Pool, authUse
 	}
 	defer tx.Rollback(ctx)
 
-	var userID int64
-	var fullName string
-	err = tx.QueryRow(ctx, `
+	// Link every unclaimed row for this email whose tenant does not already have a row
+	// bound to this auth identity (the (auth_user_id, tenant_id) unique index guards this).
+	rows, err := tx.Query(ctx, `
 		update public.users u
 		set auth_user_id = $1::uuid, status = 'active', updated_at = now()
-		where u.id = (
-		  select u2.id
-		  from public.users u2
-		  where lower(u2.email) = $2
-		    and u2.auth_user_id is null
-		    and u2.status in ('invited', 'active')
-		  limit 1
-		)
-		and not exists (
-		  select 1 from public.users x
-		  where x.auth_user_id = $1::uuid and x.id <> u.id
-		)
-		returning u.id, u.full_name`, authUserID, email).Scan(&userID, &fullName)
+		where lower(u.email) = $2
+		  and u.auth_user_id is null
+		  and u.status in ('invited', 'active')
+		  and not exists (
+		    select 1 from public.users x
+		    where x.auth_user_id = $1::uuid and x.tenant_id = u.tenant_id
+		  )
+		returning u.id, u.full_name`, authUserID, email)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNoTenantProfile
-		}
 		return err
+	}
+	var userIDs []int64
+	var fullName string
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			rows.Close()
+			return err
+		}
+		userIDs = append(userIDs, id)
+		if fullName == "" {
+			fullName = name
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(userIDs) == 0 {
+		return ErrNoTenantProfile
 	}
 
 	_, err = tx.Exec(ctx, `
 		update public.user_invites ui
 		set accepted_at = now()
-		where ui.user_id = $1
+		where ui.user_id = any($1)
 		  and ui.revoked_at is null
-		  and ui.accepted_at is null`, userID)
+		  and ui.accepted_at is null`, userIDs)
 	if err != nil {
 		return err
 	}
