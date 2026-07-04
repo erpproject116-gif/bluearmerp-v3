@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
@@ -221,6 +222,24 @@ func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Po
 	}
 
 	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "finance.supplier_invoice.create_from_gr", "fin_supplier_invoice", &id, nil, map[string]any{"goods_receipt_id": grID})
+
+	// Carry the originating Purchase Order's attachments along to the Purchase (best-effort).
+	var poID int64
+	if err := pool.QueryRow(ctx,
+		`select purchase_order_id from public.gr_goods_receipts where id = $1 and tenant_id = $2`,
+		grID, tu.TenantID).Scan(&poID); err == nil && poID > 0 {
+		_ = attachmentx.Copy(ctx, pool, attachmentx.CopyParams{
+			SrcBaseDir: attachmentx.Dir("purchase_order"),
+			DstBaseDir: attachmentx.Dir("supplier_invoice"),
+			SrcTable:   "public.po_purchase_order_attachments",
+			SrcFKCol:   "purchase_order_id",
+			SrcID:      poID,
+			DstTable:   "public.fin_supplier_invoice_attachments",
+			DstFKCol:   "supplier_invoice_id",
+			DstID:      id,
+			TenantID:   tu.TenantID,
+		})
+	}
 	return id, nil
 }
 

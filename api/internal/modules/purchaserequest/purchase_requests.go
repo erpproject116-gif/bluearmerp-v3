@@ -3,6 +3,7 @@ package purchaserequest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -93,6 +94,8 @@ type purchaseRequestLineBody struct {
 	UnitPrice   float64 `json:"unit_price"`
 	InputBasis  string  `json:"input_basis"`
 	Remark      *string `json:"remark"`
+
+	SourceSalesOrderLineID *int64 `json:"source_sales_order_line_id"`
 }
 
 type purchaseRequestBody struct {
@@ -116,19 +119,20 @@ type purchaseRequestBody struct {
 }
 
 type computedLine struct {
-	LineNo      int
-	PartnerID   *int64
-	PartnerCode string
-	PartnerName string
-	ItemID      *int64
-	ItemCode    string
-	ItemName    string
-	SpecName    *string
-	Description *string
-	Qty         float64
-	InputBasis  string
-	Amounts     taxcalc.LineAmounts
-	Remark      *string
+	LineNo                 int
+	PartnerID              *int64
+	PartnerCode            string
+	PartnerName            string
+	ItemID                 *int64
+	ItemCode               string
+	ItemName               string
+	SpecName               *string
+	Description            *string
+	Qty                    float64
+	InputBasis             string
+	Amounts                taxcalc.LineAmounts
+	Remark                 *string
+	SourceSalesOrderLineID *int64
 }
 
 type createdSlipRow struct {
@@ -164,8 +168,11 @@ func registerPurchaseRequestRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/purchase-requests/preview-sequences", previewPurchaseRequestSequences(pool))
 	r.Get("/purchase-requests/status-report/export", exportPurchaseRequestStatusReport(pool))
 	r.Get("/purchase-requests/status-report", listPurchaseRequestStatusReport(pool))
+	r.Get("/purchase-requests/open-sales-order-lines", listOpenSalesOrderLinesForPR(pool))
+	r.Get("/purchase-requests/sales-order-lines/open", listOpenSalesOrderSlipLines(pool))
 	r.Get("/purchase-requests", listPurchaseRequests(pool))
 	r.Post("/purchase-requests", createPurchaseRequest(pool))
+	r.Post("/purchase-requests/from-sales-order/{soId}", createPurchaseRequestFromSalesOrder(pool))
 	r.Get("/purchase-requests/{id}/print", getPurchaseRequestPrint(pool))
 	r.Get("/purchase-requests/{id}/created-slips", getCreatedSlips(pool))
 	r.Patch("/purchase-requests/{id}/progress-status", patchPurchaseRequestProgressStatus(pool))
@@ -239,10 +246,12 @@ func listPurchaseRequests(pool *pgxpool.Pool) http.HandlerFunc {
 			where += fmt.Sprintf(` and (
 				pr.purchase_request_no ilike $%d or
 				coalesce(hp.company_name, line_partner.company_name, '') ilike $%d or
+				coalesce(pr.reference, '') ilike $%d or
+				(to_char(pr.request_date, 'MM/DD/YYYY') || '-' || pr.date_seq) ilike $%d or
 				exists (
 					select 1 from public.pr_purchase_request_lines ln
 					where ln.purchase_request_id = pr.id and ln.item_name ilike $%d
-				))`, argN, argN, argN)
+				))`, argN, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
@@ -792,13 +801,15 @@ func insertPurchaseRequestLines(ctx context.Context, tx pgx.Tx, purchaseRequestI
 			insert into public.pr_purchase_request_lines (
 			  purchase_request_id, line_no, partner_id, partner_code, partner_name,
 			  item_id, item_code, item_name, spec_name, description,
-			  qty, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+			  qty, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
+			  source_sales_order_line_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 			returning id`,
 			purchaseRequestID, lineNo, ln.PartnerID, strings.TrimSpace(ln.PartnerCode), strings.TrimSpace(ln.PartnerName),
 			ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.SpecName, ln.Description,
 			ln.Qty, ln.InputBasis, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
-			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark).Scan(&id)
+			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark,
+			ln.SourceSalesOrderLineID).Scan(&id)
 		if err != nil {
 			return nil, err
 		}
@@ -862,6 +873,8 @@ func computePurchaseRequestLines(tt taxcalc.TaxType, lines []purchaseRequestLine
 			InputBasis:  inputBasis,
 			Amounts:     amounts,
 			Remark:      ln.Remark,
+
+			SourceSalesOrderLineID: ln.SourceSalesOrderLineID,
 		})
 	}
 	if len(errs) > 0 {
@@ -909,6 +922,202 @@ func validatePurchaseRequestBody(b purchaseRequestBody, create bool) map[string]
 		return errs
 	}
 	return nil
+}
+
+func createPurchaseRequestFromSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		soID, err := strconv.ParseInt(chi.URLParam(r, "soId"), 10, 64)
+		if err != nil || soID <= 0 {
+			response.Validation(w, map[string]string{"soId": "Invalid sales order id."})
+			return
+		}
+		id, err := CreateFromSalesOrder(r.Context(), pool, tu, soID)
+		if err != nil {
+			if fields, ok := AsDocflowValidation(err); ok {
+				response.Validation(w, fields)
+				return
+			}
+			if errors.Is(err, ErrSalesOrderNotFound) {
+				response.Err(w, http.StatusNotFound, "Sales order not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to create purchase request.", "ERR_INTERNAL")
+			return
+		}
+		pr, _ := loadPurchaseRequest(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, pr, "Created.")
+	}
+}
+
+type openSalesOrderLineForPR struct {
+	SalesOrderLineID int64   `json:"sales_order_line_id"`
+	LineNo           int     `json:"line_no"`
+	ItemID           *int64  `json:"item_id,omitempty"`
+	ItemCode         string  `json:"item_code"`
+	ItemName         string  `json:"item_name"`
+	Description      *string `json:"description,omitempty"`
+	OpenQty          float64 `json:"open_qty"`
+	UnitVatInc       float64 `json:"unit_vat_inc"`
+	Remark           *string `json:"remark,omitempty"`
+}
+
+func listOpenSalesOrderLinesForPR(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		soID, ok := optionalInt64Query(r, "sales_order_id")
+		if !ok || *soID <= 0 {
+			response.Validation(w, map[string]string{"sales_order_id": "sales_order_id is required."})
+			return
+		}
+		var exists bool
+		if err := pool.QueryRow(r.Context(),
+			`select exists(select 1 from public.so_sales_orders where id = $1 and tenant_id = $2 and deleted_at is null)`,
+			*soID, tu.TenantID).Scan(&exists); err != nil || !exists {
+			response.Err(w, http.StatusNotFound, "Sales order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select ln.id, ln.line_no, ln.item_id, ln.item_code, ln.item_name, ln.description,
+			  (ln.qty - coalesce(req.requested, 0))::float8, ln.unit_vat_inc::float8, ln.remark
+			from public.so_sales_order_lines ln
+			left join (
+			  select source_sales_order_line_id, sum(qty) as requested
+			  from public.pr_purchase_request_lines
+			  where source_sales_order_line_id is not null
+			  group by source_sales_order_line_id
+			) req on req.source_sales_order_line_id = ln.id
+			where ln.sales_order_id = $1
+			order by ln.line_no`, *soID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load lines.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		out := []openSalesOrderLineForPR{}
+		for rows.Next() {
+			var ln openSalesOrderLineForPR
+			if err := rows.Scan(&ln.SalesOrderLineID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName,
+				&ln.Description, &ln.OpenQty, &ln.UnitVatInc, &ln.Remark); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
+				return
+			}
+			if ln.OpenQty <= 0.0001 {
+				continue
+			}
+			out = append(out, ln)
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+// openSalesOrderSlipLine is a residual Sales Order line offered by the "Load Slip
+// (from Sales Order)" picker inside a Purchase Request. It carries enough header
+// context so the PR editor can adopt the source document's tax type, currency,
+// location, partner and PIC when lines are pulled in.
+type openSalesOrderSlipLine struct {
+	SalesOrderID     int64   `json:"sales_order_id"`
+	SalesOrderLineID int64   `json:"sales_order_line_id"`
+	DateNoDisplay    string  `json:"date_no_display"`
+	ReferenceNo      string  `json:"reference_no"`
+	CustomerName     string  `json:"customer_name"`
+	LocationID       int64   `json:"location_id"`
+	LocationName     string  `json:"location_name"`
+	PartnerID        int64   `json:"partner_id"`
+	TaxTypeID        int64   `json:"tax_type_id"`
+	CurrencyID       int64   `json:"currency_id"`
+	PicName          string  `json:"pic_name"`
+	ItemID           *int64  `json:"item_id,omitempty"`
+	ItemCode         string  `json:"item_code"`
+	ItemName         string  `json:"item_name"`
+	Description      *string `json:"description,omitempty"`
+	Qty              float64 `json:"qty"`
+	BalanceQty       float64 `json:"balance_qty"`
+	UnitVatInc       float64 `json:"unit_vat_inc"`
+	Remark           *string `json:"remark,omitempty"`
+}
+
+// listOpenSalesOrderSlipLines lists residual lines across all Sales Orders for the
+// PR "Load Slip" picker. Residual is derived from PR lines that already reference a
+// SO line (source_sales_order_line_id), never from the SO slip ledger, so procurement
+// pulls never reduce the sales-fulfilment balance of the Sales Order.
+func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "order_date", map[string]string{
+			"order_date":    "so.order_date",
+			"reference_no":  "so.sales_order_no",
+			"customer_name": "pt.company_name",
+			"item_code":     "ln.item_code",
+		})
+		offset := httputil.Offset(p)
+
+		where := `so.tenant_id = $1 and so.deleted_at is null
+			and (ln.qty - coalesce(req.requested, 0)) > 0.0001`
+		args := []any{tu.TenantID}
+		argN := 2
+
+		if p.Q != "" {
+			where += fmt.Sprintf(` and (
+				so.sales_order_no ilike $%d or pt.company_name ilike $%d or
+				ln.item_code ilike $%d or ln.item_name ilike $%d)`, argN, argN, argN, argN)
+			args = append(args, "%"+p.Q+"%")
+			argN++
+		}
+
+		q := fmt.Sprintf(`
+			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no,
+			  pt.company_name, so.location_id, l.location_name, so.partner_id,
+			  so.tax_type_id, so.currency_id, so.pic_name,
+			  ln.item_id, ln.item_code, ln.item_name, ln.description,
+			  ln.qty::float8,
+			  (ln.qty - coalesce(req.requested, 0))::float8,
+			  ln.unit_vat_inc::float8, ln.remark,
+			  count(*) over()
+			from public.so_sales_orders so
+			join public.inv_partners pt on pt.id = so.partner_id
+			join public.inv_locations l on l.id = so.location_id
+			join public.so_sales_order_lines ln on ln.sales_order_id = so.id
+			left join (
+			  select source_sales_order_line_id, sum(qty) as requested
+			  from public.pr_purchase_request_lines
+			  where source_sales_order_line_id is not null
+			  group by source_sales_order_line_id
+			) req on req.source_sales_order_line_id = ln.id
+			where %s
+			order by so.order_date desc, ln.line_no asc
+			limit $%d offset $%d`, where, argN, argN+1)
+		args = append(args, p.PageSize, offset)
+
+		rows, err := pool.Query(r.Context(), q, args...)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list sales order lines.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		out := []openSalesOrderSlipLine{}
+		var total int64
+		for rows.Next() {
+			var row openSalesOrderSlipLine
+			var orderDate time.Time
+			var dateSeq int
+			if err := rows.Scan(
+				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.ReferenceNo,
+				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
+				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
+				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
+				&row.Qty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &total,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
+				return
+			}
+			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
+			out = append(out, row)
+		}
+		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
 }
 
 func getCreatedSlips(pool *pgxpool.Pool) http.HandlerFunc {

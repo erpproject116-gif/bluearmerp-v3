@@ -1,5 +1,7 @@
 import type { JSX } from "solid-js";
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
+
+export type ModalTab = { id: string; label: string };
 
 export function WideEntityModal(props: {
   open: boolean;
@@ -8,13 +10,43 @@ export function WideEntityModal(props: {
   onSave?: () => void;
   saving?: boolean;
   readOnly?: boolean;
+  /** Optional tab strip shown under the title. Parent controls tab content. */
+  tabs?: ModalTab[];
+  activeTab?: string;
+  onTabChange?: (id: string) => void;
+  /** Optional controls rendered at the right of the header (e.g. a History button). */
+  headerActions?: JSX.Element;
   children: JSX.Element;
 }) {
   return (
     <Show when={props.open}>
       <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6">
         <div class="my-4 w-full max-w-6xl rounded-2xl border border-stroke bg-white p-6 shadow-xl">
-          <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
+            <Show when={props.headerActions}>
+              <div class="flex items-center gap-2">{props.headerActions}</div>
+            </Show>
+          </div>
+          <Show when={props.tabs && props.tabs.length > 0}>
+            <div class="mt-4 flex gap-1 border-b border-stroke">
+              <For each={props.tabs}>
+                {(tab) => (
+                  <button
+                    type="button"
+                    class={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+                      props.activeTab === tab.id
+                        ? "border-brand-600 text-brand-700"
+                        : "border-transparent text-text-secondary hover:text-text-primary"
+                    }`}
+                    onClick={() => props.onTabChange?.(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
           <div class="mt-5 w-full min-w-0 space-y-4">{props.children}</div>
           <div class="mt-6 flex justify-end gap-3 border-t border-stroke pt-4">
             <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => props.onClose()}>

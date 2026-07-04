@@ -10,10 +10,13 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
+import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { PurchaseRequestApprovalPanel } from "./PurchaseRequestApprovalPanel";
+import { SalesOrderLinePickerModal, type PickedSalesOrderLine } from "./SalesOrderLinePickerModal";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -151,6 +154,8 @@ export function PurchaseRequestModal(props: Props) {
   const toast = useToast();
   const { fields } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseRequest);
   const [saving, setSaving] = createSignal(false);
+  const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [requestDate, setRequestDate] = createSignal(todayISO());
   const [dateSeq, setDateSeq] = createSignal(1);
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
@@ -235,6 +240,36 @@ export function PurchaseRequestModal(props: Props) {
     if (!newId || !meta) return;
     const recalc = await recalculatePurchaseRequestLines(lines(), newId, meta);
     setLines(recalc);
+  };
+
+  const applySalesOrderLines = async (picked: PickedSalesOrderLine[]) => {
+    if (picked.length === 0) return;
+    const first = picked[0];
+    setTaxTypeId(first.tax_type_id);
+    setCurrencyId(first.currency_id);
+    setLocationId(first.location_id);
+    setLocationLabel(first.location_name);
+    if (first.pic_name) setPicName(first.pic_name);
+
+    const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
+      ...emptyPurchaseRequestLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      description: row.description ?? "",
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      remark: row.remark ?? "",
+      source_sales_order_line_id: row.source_sales_order_line_id,
+    }));
+    if (meta && first.tax_type_id) {
+      const recalc = await recalculatePurchaseRequestLines(newLines, first.tax_type_id, meta);
+      setLines(recalc);
+    } else {
+      setLines(newLines);
+    }
   };
 
   const loadPreview = async (date: string, seq?: number) => {
@@ -375,6 +410,7 @@ export function PurchaseRequestModal(props: Props) {
         unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
         input_basis: ln.input_basis,
         remark: ln.remark || null,
+        source_sales_order_line_id: ln.source_sales_order_line_id ?? null,
       })),
     };
     if (!props.editing) {
@@ -399,12 +435,20 @@ export function PurchaseRequestModal(props: Props) {
   };
 
   return (
+    <>
     <WideEntityModal
       open={props.open}
       title={props.editing ? "Edit Purchase Request" : "New Purchase Request"}
       onClose={() => props.onClose()}
       onSave={() => void save()}
       saving={saving()}
+      headerActions={
+        <Show when={props.editing}>
+          <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
+            History
+          </button>
+        </Show>
+      }
     >
       <draft.DraftBanner />
       <Field label="Date-no">
@@ -554,6 +598,15 @@ export function PurchaseRequestModal(props: Props) {
           <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
         </Field>
       </Show>
+      <div class="col-span-full mb-2">
+        <button
+          type="button"
+          class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
+          onClick={() => setSoPickerOpen(true)}
+        >
+          Load Slip (from Sales Order)
+        </button>
+      </div>
       <PurchaseRequestLineGrid
         lines={lines}
         onChange={setLines}
@@ -564,6 +617,14 @@ export function PurchaseRequestModal(props: Props) {
         }}
         locationId={locationId}
       />
+      <ChangeLogPanel targetType="pr_purchase_request" targetId={props.editing?.id} />
     </WideEntityModal>
+    <HistoryLogModal open={historyOpen()} onClose={() => setHistoryOpen(false)} targetType="pr_purchase_request" targetId={props.editing?.id} title="History — Purchase Request" />
+    <SalesOrderLinePickerModal
+      open={soPickerOpen()}
+      onClose={() => setSoPickerOpen(false)}
+      onConfirm={(picked) => void applySalesOrderLines(picked)}
+    />
+    </>
   );
 }

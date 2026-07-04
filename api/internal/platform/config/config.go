@@ -25,6 +25,10 @@ type Config struct {
 	AuditFlushIntervalMs  int
 	AuditChannelSize      int
 	GzipEnabled           bool
+	DemoSignupEnabled     bool
+	DemoLeadgenTenantCode string
+	DemoJobSecret         string
+	DemoTTLDays           int
 }
 
 func Load() Config {
@@ -65,6 +69,10 @@ func Load() Config {
 		AuditFlushIntervalMs: ParseIntDefault(os.Getenv("AUDIT_FLUSH_INTERVAL_MS"), 75),
 		AuditChannelSize:    ParseIntDefault(os.Getenv("AUDIT_CHANNEL_SIZE"), 4096),
 		GzipEnabled:         os.Getenv("GZIP_ENABLED") == "true",
+		DemoSignupEnabled:   os.Getenv("DEMO_SIGNUP_ENABLED") != "false",
+		DemoLeadgenTenantCode: envOr("DEMO_LEADGEN_TENANT_CODE", "BLUEARM"),
+		DemoJobSecret:       os.Getenv("DEMO_JOB_SECRET"),
+		DemoTTLDays:         ParseIntDefault(os.Getenv("DEMO_TTL_DAYS"), 14),
 	}
 }
 

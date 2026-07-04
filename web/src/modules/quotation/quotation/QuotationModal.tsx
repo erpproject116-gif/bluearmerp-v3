@@ -12,6 +12,9 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
+import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import {
@@ -158,6 +161,7 @@ export function QuotationModal(props: Props) {
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
   const [customerLabel, setCustomerLabel] = createSignal("");
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [historyOpen, setHistoryOpen] = createSignal(false);
   const [newCustomerName, setNewCustomerName] = createSignal("");
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
   const [picName, setPicName] = createSignal("");
@@ -406,6 +410,13 @@ export function QuotationModal(props: Props) {
       onClose={() => props.onClose()}
       onSave={() => void save()}
       saving={saving()}
+      headerActions={
+        <Show when={props.editing}>
+          <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
+            History
+          </button>
+        </Show>
+      }
     >
       <draft.DraftBanner />
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -504,6 +515,12 @@ export function QuotationModal(props: Props) {
       <Field label="Payment terms">
         <input class={inputClass} value={paymentTerms()} onInput={(e) => setPaymentTerms(e.currentTarget.value)} />
       </Field>
+      <AttachmentsField
+        scope="quotation/quotations"
+        docId={props.editing?.id}
+        label="Attachments (carried to Sales Order & Sales)"
+        emptyUnsavedHint="Save the quotation first to attach files (max 25 MB each)."
+      />
       <Field label="Note for PIC only" span="full">
         <textarea class={inputClass} rows={2} value={noteForPic()} onInput={(e) => setNoteForPic(e.currentTarget.value)} />
       </Field>
@@ -551,7 +568,10 @@ export function QuotationModal(props: Props) {
         locationId={locationId}
         partnerId={partnerId}
       />
+      <ChangeLogPanel targetType="quo_quotation" targetId={props.editing?.id} />
     </WideEntityModal>
+
+    <HistoryLogModal open={historyOpen()} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={props.editing?.id} title="History — Quotation" />
 
     <QuickCustomerModal
       open={showNewCustomer()}

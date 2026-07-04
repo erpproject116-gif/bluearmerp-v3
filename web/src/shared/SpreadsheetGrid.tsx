@@ -438,7 +438,7 @@ export function EntityModal(props: {
   );
 }
 
-export function Field(props: { label: string; span?: "full"; children: JSX.Element }) {
+export function Field(props: { label: string | JSX.Element; span?: "full"; children: JSX.Element }) {
   return (
     <label class={props.span === "full" ? "col-span-full block" : "block"}>
       <span class="mb-1 block text-sm font-medium" style={{ color: "var(--color-label, var(--color-text-primary))" }}>

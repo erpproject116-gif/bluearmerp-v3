@@ -21,6 +21,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/dashboard"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/datacenter"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demodata"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demoonboard"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/docgen"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/fixedassets"
@@ -100,6 +101,7 @@ func main() {
 		crm.RegisterJobRoutes(api, pool)
 		platformreports.RegisterJobRoutes(api, pool)
 		portal.RegisterRoutes(api, pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret)
+		demoonboard.RegisterRoutes(api, pool, cfg)
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Use(audit.Middleware(pool))

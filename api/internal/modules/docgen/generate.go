@@ -12,6 +12,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/deliveryreceipt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaseorder"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaserequest"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/salesorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -102,6 +103,7 @@ func validateGenerate(ctx context.Context, pool *pgxpool.Pool, tenantID int64, b
 	pair := body.SourceEntity + "->" + body.TargetEntity
 	switch pair {
 	case "quotation->sales_order", "sales_order->sales", "sales_order->delivery_receipt",
+		"sales_order->purchase_request",
 		"purchase_request->purchase_order", "goods_receipt->supplier_invoice", "sales_order->release":
 	default:
 		return warnings, fmt.Errorf("unsupported generation pair: %s", pair)
@@ -125,6 +127,8 @@ func executeGenerate(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 		return generateSalesFromSO(ctx, pool, tu, sourceIDs)
 	case "sales_order->delivery_receipt":
 		return generateDRFromSO(ctx, pool, tu, sourceIDs)
+	case "sales_order->purchase_request":
+		return generatePRFromSO(ctx, pool, tu, sourceIDs)
 	case "goods_receipt->supplier_invoice":
 		return generateSupplierInvoiceFromGR(ctx, pool, tu, sourceIDs)
 	default:
@@ -176,6 +180,18 @@ func generateDRFromSO(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUse
 			return out, fmt.Errorf("sales order %d: %w", soID, err)
 		}
 		out = append(out, drID)
+	}
+	return out, nil
+}
+
+func generatePRFromSO(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, soIDs []int64) ([]int64, error) {
+	var out []int64
+	for _, soID := range soIDs {
+		prID, err := purchaserequest.CreateFromSalesOrder(ctx, pool, tu, soID)
+		if err != nil {
+			return out, fmt.Errorf("sales order %d: %w", soID, err)
+		}
+		out = append(out, prID)
 	}
 	return out, nil
 }

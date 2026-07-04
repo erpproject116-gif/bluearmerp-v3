@@ -203,10 +203,11 @@ func listQuotations(pool *pgxpool.Pool) http.HandlerFunc {
 		if p.Q != "" {
 			where += fmt.Sprintf(` and (
 				q.reference_no ilike $%d or p.company_name ilike $%d or
+				(to_char(q.order_date, 'MM/DD/YYYY') || '-' || q.date_seq) ilike $%d or
 				exists (
 					select 1 from public.quo_quotation_lines ln
 					where ln.quotation_id = q.id and ln.item_name ilike $%d
-				))`, argN, argN, argN)
+				))`, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}

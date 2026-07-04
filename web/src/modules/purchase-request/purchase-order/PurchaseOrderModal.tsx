@@ -9,12 +9,17 @@ import { useToast } from "../../../shared/toast";
 import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
+import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { TermHint } from "../../../shared/TermHint";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
   recalculatePurchaseRequestLines,
   type PurchaseRequestLineRow,
 } from "../purchase-request/PurchaseRequestLineGrid";
+import { PurchaseRequestLinePickerModal, type PickedPurchaseRequestLine } from "./PurchaseRequestLinePickerModal";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 
 export type PurchaseOrderDetail = {
@@ -156,6 +161,8 @@ export function PurchaseOrderModal(props: Props) {
   const toast = useToast();
   const [loading, setLoading] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
+  const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [prPickerOpen, setPrPickerOpen] = createSignal(false);
   const [detail, setDetail] = createSignal<PurchaseOrderDetail | null>(null);
   const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
   const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
@@ -268,6 +275,42 @@ export function PurchaseOrderModal(props: Props) {
     setLines(recalc);
   };
 
+  const applyPurchaseRequestLines = async (picked: PickedPurchaseRequestLine[]) => {
+    if (picked.length === 0) return;
+    const first = picked[0];
+    setTaxTypeId(first.tax_type_id);
+    setCurrencyId(first.currency_id);
+    setLocationId(first.location_id);
+    setLocationLabel(first.location_name);
+    if (first.pic_name) setPicName(first.pic_name);
+    if (first.partner_id) {
+      setPartnerId(first.partner_id);
+      setPartnerLabel(first.partner_name);
+      setPartnerCode(first.partner_code);
+    }
+
+    const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
+      ...emptyPurchaseRequestLine(i + 1, String(row.unit_price), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      spec_name: row.spec_name ?? "",
+      description: row.description ?? "",
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_price),
+      remark: row.remark ?? "",
+      purchase_request_line_id: row.source_purchase_request_line_id,
+    }));
+    if (meta && first.tax_type_id) {
+      const recalc = await recalculatePurchaseRequestLines(newLines, first.tax_type_id, meta);
+      setLines(recalc);
+    } else {
+      setLines(newLines);
+    }
+  };
+
   const save = async () => {
     if (!isDraft()) return;
     if (!taxTypeId() || !currencyId() || !locationId()) {
@@ -296,6 +339,7 @@ export function PurchaseOrderModal(props: Props) {
       notes: notes() || null,
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
+        purchase_request_line_id: ln.purchase_request_line_id ?? null,
         partner_id: vendorId,
         partner_code: vendorCode,
         partner_name: vendorName,
@@ -336,6 +380,7 @@ export function PurchaseOrderModal(props: Props) {
   const po = () => detail();
 
   return (
+    <>
     <WideEntityModal
       open={props.open}
       title={isCreate() ? "New Purchase Order" : po() ? `Purchase Order — ${po()!.purchase_order_no}` : "Purchase Order"}
@@ -343,6 +388,13 @@ export function PurchaseOrderModal(props: Props) {
       onSave={() => void save()}
       readOnly={readOnly()}
       saving={saving()}
+      headerActions={
+        <Show when={props.purchaseOrderId}>
+          <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
+            History
+          </button>
+        </Show>
+      }
     >
       <Show when={loading()}>
         <p class="text-sm text-text-secondary">Loading…</p>
@@ -380,7 +432,7 @@ export function PurchaseOrderModal(props: Props) {
                   disabled={readOnly()}
                 />
               </Field>
-              <Field label="Transaction type">
+              <Field label={<TermHint term="tax_treatment" />}>
                 <select
                   class={inputClass}
                   value={taxTypeId() ?? ""}
@@ -561,6 +613,15 @@ export function PurchaseOrderModal(props: Props) {
                 </Show>
               }
             >
+              <div class="mb-2">
+                <button
+                  type="button"
+                  class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
+                  onClick={() => setPrPickerOpen(true)}
+                >
+                  Load Slip (from Purchase Request)
+                </button>
+              </div>
               <PurchaseRequestLineGrid
                 lines={lines}
                 onChange={setLines}
@@ -575,6 +636,20 @@ export function PurchaseOrderModal(props: Props) {
             </Show>
           </div>
       </Show>
+      <AttachmentsField
+        scope="purchase-order/purchase-orders"
+        docId={props.purchaseOrderId ?? undefined}
+        label="Attachments (carried to Purchases)"
+        emptyUnsavedHint="Save the purchase order first to attach files (max 25 MB each)."
+      />
+      <ChangeLogPanel targetType="po_purchase_order" targetId={props.purchaseOrderId} />
     </WideEntityModal>
+    <HistoryLogModal open={historyOpen()} onClose={() => setHistoryOpen(false)} targetType="po_purchase_order" targetId={props.purchaseOrderId} title="History — Purchase Order" />
+    <PurchaseRequestLinePickerModal
+      open={prPickerOpen()}
+      onClose={() => setPrPickerOpen(false)}
+      onConfirm={(picked) => void applyPurchaseRequestLines(picked)}
+    />
+    </>
   );
 }

@@ -1,7 +1,8 @@
 import { onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { supabase } from "../../shared/api";
-import { useAuth } from "../../shared/auth-context";
+import { apiFetch, supabase } from "../../shared/api";
+import { setActiveTenantId } from "../../shared/activeContext";
+import { useAuth, type MeData } from "../../shared/auth-context";
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -33,6 +34,23 @@ export default function AuthCallbackPage() {
     }
 
     window.history.replaceState({}, document.title, "/auth/callback");
+
+    // Demo users who verify via a magic link (rather than the /demo OTP form) land
+    // here with a session but no tenant yet. If there is a pending demo signup for
+    // this email, provision their workspace so the link "just works". This is a
+    // no-op (400) for regular OAuth users with no signup, preserving existing flow.
+    const me = await apiFetch<MeData>("/api/v1/auth/me", {}, { silent: true });
+    if (!me.success && (me.status === 403 || me.code === "ERR_FORBIDDEN")) {
+      const prov = await apiFetch<{ tenant_id: number }>(
+        "/api/v1/demo/provision",
+        { method: "POST", body: "{}" },
+        { silent: true },
+      );
+      if (prov.success && prov.data?.tenant_id) {
+        setActiveTenantId(prov.data.tenant_id);
+      }
+    }
+
     await auth.refresh();
     navigate("/app/inventory/partners", { replace: true });
   });

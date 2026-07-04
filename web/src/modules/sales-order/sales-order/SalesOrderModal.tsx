@@ -10,6 +10,9 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
+import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
@@ -156,6 +159,7 @@ export function SalesOrderModal(props: Props) {
   const [saving, setSaving] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [historyOpen, setHistoryOpen] = createSignal(false);
   const [newCustomerName, setNewCustomerName] = createSignal("");
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
@@ -464,10 +468,17 @@ export function SalesOrderModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={props.editing ? "Edit Sales Order" : "New Sales Order"}
+        title={props.editing ? "Edit Sales Order (upcoming sale)" : "New Sales Order (upcoming sale)"}
         onClose={() => props.onClose()}
         onSave={() => void save()}
         saving={saving()}
+        headerActions={
+          <Show when={props.editing}>
+            <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
+              History
+            </button>
+          </Show>
+        }
       >
         <draft.DraftBanner />
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -590,6 +601,12 @@ export function SalesOrderModal(props: Props) {
         <Field label="Payment terms">
           <input class={inputClass} value={paymentTerms()} onInput={(e) => setPaymentTerms(e.currentTarget.value)} />
         </Field>
+        <AttachmentsField
+          scope="sales-order/sales-orders"
+          docId={props.editing?.id}
+          label="Attachments (carried from Quotation, on to Sales)"
+          emptyUnsavedHint="Save the sales order first to attach files (max 25 MB each)."
+        />
         <Field label="Delivery remarks" span="full">
           <textarea class={inputClass} rows={2} value={deliveryRemarks()} onInput={(e) => setDeliveryRemarks(e.currentTarget.value)} />
         </Field>
@@ -627,7 +644,7 @@ export function SalesOrderModal(props: Props) {
             class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
             onClick={() => setQuotationPickerOpen(true)}
           >
-            From Quotation
+            Load Slip (from Quotation)
           </button>
         </div>
         <SalesOrderLineGrid
@@ -641,7 +658,10 @@ export function SalesOrderModal(props: Props) {
           locationId={locationId}
           partnerId={partnerId}
         />
+        <ChangeLogPanel targetType="so_sales_order" targetId={props.editing?.id} />
       </WideEntityModal>
+
+      <HistoryLogModal open={historyOpen()} onClose={() => setHistoryOpen(false)} targetType="so_sales_order" targetId={props.editing?.id} title="History — Sales Order" />
 
       <QuotationLinePickerModal
         open={quotationPickerOpen()}

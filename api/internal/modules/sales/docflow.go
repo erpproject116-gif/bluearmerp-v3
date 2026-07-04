@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
@@ -229,5 +230,18 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 	}
 
 	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "sales.create_from_sales_order", "sa_sales", &id, nil, map[string]any{"sales_order_id": soID})
+
+	// Carry the sales order's attachments (which include any from the quotation) to the sale (best-effort).
+	_ = attachmentx.Copy(ctx, pool, attachmentx.CopyParams{
+		SrcBaseDir: attachmentx.Dir("sales_order"),
+		DstBaseDir: attachmentx.Dir("sales"),
+		SrcTable:   "public.so_sales_order_attachments",
+		SrcFKCol:   "sales_order_id",
+		SrcID:      soID,
+		DstTable:   "public.sa_sales_attachments",
+		DstFKCol:   "sales_id",
+		DstID:      id,
+		TenantID:   tu.TenantID,
+	})
 	return id, nil
 }

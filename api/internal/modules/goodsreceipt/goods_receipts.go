@@ -122,11 +122,12 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 			where += fmt.Sprintf(` and (
 				po.purchase_order_no ilike $%d or
 				coalesce(gr.reference, '') ilike $%d or
+				(to_char(gr.receipt_date, 'MM/DD/YYYY') || '-' || gr.date_seq) ilike $%d or
 				exists (
 					select 1 from public.gr_goods_receipt_lines grl
 					join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
 					where grl.goods_receipt_id = gr.id and pol.item_name ilike $%d
-				))`, argN, argN, argN)
+				))`, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}

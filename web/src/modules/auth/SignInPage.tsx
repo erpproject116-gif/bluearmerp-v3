@@ -128,6 +128,20 @@ export default function SignInPage() {
             </Show>
           </div>
 
+          <div class="mt-6 flex items-center gap-3 text-xs text-text-secondary">
+            <span class="h-px flex-1 bg-stroke" />
+            <span>new to Bluearm?</span>
+            <span class="h-px flex-1 bg-stroke" />
+          </div>
+          <button
+            type="button"
+            class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
+            disabled={loading()}
+            onClick={() => navigate("/demo")}
+          >
+            Start a free demo
+          </button>
+
           <Show when={error()}>
             <p class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error()}</p>
           </Show>

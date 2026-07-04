@@ -163,6 +163,8 @@ func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/{id}/print", getSalesPrint(pool))
 	r.Patch("/{id}/progress-status", patchSalesProgressStatus(pool))
 	r.Patch("/{id}/invoicing-status", patchSalesInvoicingStatus(pool))
+	r.Get("/{id}/invoice", getSalesInvoice(pool))
+	r.Put("/{id}/invoice", putSalesInvoice(pool))
 	r.Get("/{id}", getSale(pool))
 	r.Patch("/{id}", updateSale(pool))
 	r.Delete("/{id}", deleteSale(pool))
@@ -222,10 +224,11 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 			where += fmt.Sprintf(` and (
 				s.sales_no ilike $%d or p.company_name ilike $%d or
 				coalesce(s.si_dr_no, '') ilike $%d or
+				(to_char(s.order_date, 'MM/DD/YYYY') || '-' || s.date_seq) ilike $%d or
 				exists (
 					select 1 from public.sa_sales_lines ln
 					where ln.sales_id = s.id and ln.item_name ilike $%d
-				))`, argN, argN, argN, argN)
+				))`, argN, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}

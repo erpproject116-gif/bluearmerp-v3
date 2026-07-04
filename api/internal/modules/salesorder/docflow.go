@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -203,5 +204,18 @@ func CreateFromQuotation(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenant
 	}
 
 	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "sales_order.create_from_quotation", "so_sales_order", &id, nil, map[string]any{"quotation_id": quotationID})
+
+	// Carry the quotation's attachments along to the sales order (best-effort).
+	_ = attachmentx.Copy(ctx, pool, attachmentx.CopyParams{
+		SrcBaseDir: attachmentx.Dir("quotation"),
+		DstBaseDir: attachmentx.Dir("sales_order"),
+		SrcTable:   "public.quo_quotation_attachments",
+		SrcFKCol:   "quotation_id",
+		SrcID:      quotationID,
+		DstTable:   "public.so_sales_order_attachments",
+		DstFKCol:   "sales_order_id",
+		DstID:      id,
+		TenantID:   tu.TenantID,
+	})
 	return id, nil
 }

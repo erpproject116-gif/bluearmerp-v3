@@ -225,10 +225,12 @@ func listSalesOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		if p.Q != "" {
 			where += fmt.Sprintf(` and (
 				so.sales_order_no ilike $%d or p.company_name ilike $%d or
+				coalesce(so.reference, '') ilike $%d or
+				(to_char(so.order_date, 'MM/DD/YYYY') || '-' || so.date_seq) ilike $%d or
 				exists (
 					select 1 from public.so_sales_order_lines ln
 					where ln.sales_order_id = so.id and ln.item_name ilike $%d
-				))`, argN, argN, argN)
+				))`, argN, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}

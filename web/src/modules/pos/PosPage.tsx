@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
+import { formatPeso, sanitizeDecimalInput } from "../../shared/money";
 import { AuthImage } from "../../shared/AuthImage";
 import { QuickCustomerModal } from "../../shared/QuickCustomerModal";
 import { useToast } from "../../shared/toast";
@@ -41,7 +42,7 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 }
 
 function money(n: number): string {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatPeso(n);
 }
 
 function initials(name: string): string {
@@ -413,14 +414,13 @@ export default function PosPage() {
                   </div>
                 </div>
                 <div>
-                  <label class="mb-1 block text-sm font-medium text-slate-600">Opening cash</label>
+                  <label class="mb-1 block text-sm font-medium text-slate-600">Starting cash</label>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    inputmode="decimal"
                     class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
                     value={openingCash()}
-                    onInput={(e) => setOpeningCash(e.currentTarget.value)}
+                    onInput={(e) => setOpeningCash(sanitizeDecimalInput(e.currentTarget.value))}
                   />
                 </div>
                 <button
@@ -609,15 +609,14 @@ export default function PosPage() {
               </Show>
             </div>
 
-            <label class="mb-1 block text-xs font-medium text-slate-500">Counted closing cash</label>
+            <label class="mb-1 block text-xs font-medium text-slate-500">Cash counted at close</label>
             <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Closing cash count"
+              type="text"
+              inputmode="decimal"
+              placeholder="Cash counted at close"
               class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
               value={closingCash()}
-              onInput={(e) => setClosingCash(e.currentTarget.value)}
+              onInput={(e) => setClosingCash(sanitizeDecimalInput(e.currentTarget.value))}
             />
 
             <Show when={shiftReport() && closingCash() !== ""}>
@@ -718,14 +717,21 @@ function PaymentModal(props: {
   const setLine = (i: number, patch: Partial<PayLine>) =>
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
+  // Allow duplicate tenders (e.g. two cash drawers, or cash + gcash). New line pre-fills the balance.
   const addLine = () => {
-    const used = new Set(lines().map((l) => l.type));
-    const next = props.tenders.find((t) => !used.has(t)) ?? first();
     const rem = remaining();
-    setLines((prev) => [...prev, { type: next, amount: rem > 0 ? rem.toFixed(2) : "" }]);
+    setLines((prev) => [...prev, { type: first(), amount: rem > 0 ? rem.toFixed(2) : "" }]);
   };
 
   const removeLine = (i: number) => setLines((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+
+  // One-tap assign the outstanding balance to a line (excluding that line's own current amount).
+  const fillRemaining = (i: number) => {
+    const current = Number(lines()[i]?.amount);
+    const others = paid() - (Number.isFinite(current) && current > 0 ? current : 0);
+    const rem = Math.max(0, Number((props.total - others).toFixed(2)));
+    setLine(i, { amount: rem.toFixed(2) });
+  };
 
   const quickAmounts = createMemo(() => {
     const t = remaining() > 0 ? remaining() : props.total;
@@ -761,12 +767,11 @@ function PaymentModal(props: {
                     <For each={props.tenders}>{(t) => <option value={t}>{posTenderLabel(t)}</option>}</For>
                   </select>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    inputmode="decimal"
                     class="w-28 rounded-lg border border-slate-300 px-2 py-2 text-right text-sm font-semibold focus:border-emerald-500 focus:outline-none"
                     value={line.amount}
-                    onInput={(e) => setLine(i(), { amount: e.currentTarget.value })}
+                    onInput={(e) => setLine(i(), { amount: sanitizeDecimalInput(e.currentTarget.value) })}
                   />
                   <Show when={lines().length > 1}>
                     <button
@@ -779,8 +784,17 @@ function PaymentModal(props: {
                     </button>
                   </Show>
                 </div>
-                <Show when={isCashTender(line.type)}>
-                  <div class="mt-2 flex flex-wrap gap-2">
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <Show when={remaining() > 0.005}>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                      onClick={() => fillRemaining(i())}
+                    >
+                      Fill remaining {money(remaining())}
+                    </button>
+                  </Show>
+                  <Show when={isCashTender(line.type)}>
                     <For each={quickAmounts()}>
                       {(amt) => (
                         <button
@@ -792,22 +806,20 @@ function PaymentModal(props: {
                         </button>
                       )}
                     </For>
-                  </div>
-                </Show>
+                  </Show>
+                </div>
               </div>
             )}
           </For>
         </div>
 
-        <Show when={props.tenders.length > 1}>
-          <button
-            type="button"
-            class="mt-3 w-full rounded-lg border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50"
-            onClick={addLine}
-          >
-            + Split payment
-          </button>
-        </Show>
+        <button
+          type="button"
+          class="mt-3 w-full rounded-lg border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50"
+          onClick={addLine}
+        >
+          + Pay with another method
+        </button>
 
         <div class="mt-4 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-sm">
           <div class="flex justify-between">

@@ -41,8 +41,9 @@ func getStatus(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 type populateRequest struct {
-	PurgeFirst    bool `json:"purge_first"`
-	IncludeVerify bool `json:"include_verify"`
+	PurgeFirst    bool   `json:"purge_first"`
+	IncludeVerify bool   `json:"include_verify"`
+	Industry      string `json:"industry"`
 }
 
 func postPopulate(pool *pgxpool.Pool) http.HandlerFunc {
@@ -52,11 +53,11 @@ func postPopulate(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 			return
 		}
-		code, err := assertDemoTenant(r.Context(), pool, tu.TenantID, tu.IsPlatformSuperadmin)
+		code, industry, err := assertDemoTenant(r.Context(), pool, tu.TenantID, tu.IsPlatformSuperadmin)
 		if err != nil {
 			if errors.Is(err, errNotDemoTenant) {
 				response.Err(w, http.StatusForbidden,
-					"Demo populate is only available on DEMO000 or BLUEARM tenants.",
+					"Demo populate is only available on demo tenants.",
 					"ERR_FORBIDDEN")
 				return
 			}
@@ -74,10 +75,14 @@ func postPopulate(pool *pgxpool.Pool) http.HandlerFunc {
 		if !body.IncludeVerify {
 			body.IncludeVerify = true
 		}
+		// Superadmins may override the seed template; everyone else uses the tenant's own.
+		if tu.IsPlatformSuperadmin && body.Industry != "" {
+			industry = body.Industry
+		}
 
-		steps := make([]StepResult, 0, len(PopulateScripts)+2)
+		steps := make([]StepResult, 0, len(PopulateScripts)+3)
 		if body.PurgeFirst {
-			purgeSteps, err := runPurge(r.Context(), pool)
+			purgeSteps, err := runPurge(r.Context(), pool, industry, tu.TenantID)
 			steps = append(steps, purgeSteps...)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, err.Error(), "ERR_INTERNAL")
@@ -89,7 +94,7 @@ func postPopulate(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		popSteps, err := runPopulate(r.Context(), pool, body.IncludeVerify)
+		popSteps, err := runPopulate(r.Context(), pool, industry, tu.TenantID, body.IncludeVerify, false)
 		steps = append(steps, popSteps...)
 		if err != nil {
 			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.demo_data.populate_failed", "demo_data", nil, map[string]any{
@@ -123,11 +128,11 @@ func postPurge(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 			return
 		}
-		code, err := assertDemoTenant(r.Context(), pool, tu.TenantID, tu.IsPlatformSuperadmin)
+		code, industry, err := assertDemoTenant(r.Context(), pool, tu.TenantID, tu.IsPlatformSuperadmin)
 		if err != nil {
 			if errors.Is(err, errNotDemoTenant) {
 				response.Err(w, http.StatusForbidden,
-					"Demo purge is only available on DEMO000 or BLUEARM tenants.",
+					"Demo purge is only available on demo tenants.",
 					"ERR_FORBIDDEN")
 				return
 			}
@@ -135,7 +140,7 @@ func postPurge(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		steps, err := runPurge(r.Context(), pool)
+		steps, err := runPurge(r.Context(), pool, industry, tu.TenantID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, err.Error(), "ERR_INTERNAL")
 			return

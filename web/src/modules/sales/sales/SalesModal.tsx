@@ -10,6 +10,10 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
+import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { InvoicePanel } from "../../../shared/InvoicePanel";
+import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
@@ -160,6 +164,8 @@ export function SalesModal(props: Props) {
   const [saving, setSaving] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
+  const [historyOpen, setHistoryOpen] = createSignal(false);
   const [newCustomerName, setNewCustomerName] = createSignal("");
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
@@ -459,11 +465,34 @@ export function SalesModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={props.editing ? "Edit Sales" : "New Sales"}
+        title={props.editing ? "Edit Sale (actual sale)" : "New Sale (actual sale)"}
         onClose={() => props.onClose()}
-        onSave={() => void save()}
+        onSave={activeTab() === "details" ? () => void save() : undefined}
         saving={saving()}
+        tabs={props.editing ? [{ id: "details", label: "Details" }, { id: "invoice", label: "Invoice" }] : undefined}
+        activeTab={activeTab()}
+        onTabChange={(id) => setActiveTab(id as "details" | "invoice")}
+        headerActions={
+          <Show when={props.editing}>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => setHistoryOpen(true)}
+            >
+              History
+            </button>
+          </Show>
+        }
       >
+        <Show when={activeTab() === "invoice"}>
+          <InvoicePanel
+            kind="sales"
+            docId={props.editing?.id}
+            attachmentsScope="sales"
+            onPrint={() => props.editing && window.open(`/app/sales/sales/${props.editing.id}/invoice/print`, "_blank", "noopener,noreferrer")}
+          />
+        </Show>
+        <Show when={activeTab() === "details"}>
         <draft.DraftBanner />
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Date-no">
@@ -571,6 +600,12 @@ export function SalesModal(props: Props) {
         <Field label="Payment terms">
           <input class={inputClass} value={paymentTerms()} onInput={(e) => setPaymentTerms(e.currentTarget.value)} />
         </Field>
+        <AttachmentsField
+          scope="sales"
+          docId={props.editing?.id}
+          label="Attachments (carried from Quotation/Sales Order)"
+          emptyUnsavedHint="Save the sale first to attach files (max 25 MB each)."
+        />
         <Field label="Sales category">
           <select class={inputClass} value={salesCategory()} onChange={(e) => setSalesCategory(e.currentTarget.value)}>
             <option value="">—</option>
@@ -612,7 +647,7 @@ export function SalesModal(props: Props) {
             class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
             onClick={() => setSoPickerOpen(true)}
           >
-            From Sales Order
+            Load Slip (from Sales Order)
           </button>
         </div>
         <SalesLineGrid
@@ -627,7 +662,17 @@ export function SalesModal(props: Props) {
           templateCode={templateCode}
           partnerId={partnerId}
         />
+        <ChangeLogPanel targetType="sa_sales" targetId={props.editing?.id} />
+        </Show>
       </WideEntityModal>
+
+      <HistoryLogModal
+        open={historyOpen()}
+        onClose={() => setHistoryOpen(false)}
+        targetType="sa_sales"
+        targetId={props.editing?.id}
+        title={props.editing ? `History — Sale ${props.editing.sales_no}` : "History"}
+      />
 
       <SalesOrderLinePickerModal
         open={soPickerOpen()}

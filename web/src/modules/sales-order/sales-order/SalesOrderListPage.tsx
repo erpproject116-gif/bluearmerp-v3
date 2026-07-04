@@ -224,8 +224,9 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
           <GenerateOtherSlipsMenu
             sourceEntity="sales_order"
             targets={[
-              { label: "Sales Invoice", targetEntity: "sales" },
-              { label: "Delivery Receipt", targetEntity: "delivery_receipt" },
+              { label: "Sales (actual sale)", targetEntity: "sales" },
+              { label: "Delivery Slip", targetEntity: "delivery_receipt" },
+              { label: "Purchase Request (buy to fulfill)", targetEntity: "purchase_request" },
             ]}
             selectedIds={selectedIds}
             onSuccess={() => invalidate()}

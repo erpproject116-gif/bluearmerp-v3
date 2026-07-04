@@ -8,6 +8,7 @@ import { ToastProvider } from "./shared/toast";
 import { AuthEntryRedirect } from "./shared/AuthRedirect";
 import { ProtectedRoute } from "./shared/ProtectedRoute";
 import SignInPage from "./modules/auth/SignInPage";
+import DemoSignupPage from "./modules/auth/DemoSignupPage";
 import AuthCallbackPage from "./modules/auth/AuthCallbackPage";
 import PartnersPage from "./modules/inventory/PartnersPage";
 import LocationsPage from "./modules/inventory/LocationsPage";
@@ -111,6 +112,7 @@ import CollectiveInvoiceStatusPage from "./modules/sales/collective-invoicing/Co
 import CollectiveInvoiceSlipPrintPage from "./modules/sales/collective-invoicing/CollectiveInvoiceSlipPrintPage";
 import CollectiveInvoicePrintPage from "./modules/sales/collective-invoicing/CollectiveInvoicePrintPage";
 import CollectiveInvoiceStatusPrintPage from "./modules/sales/collective-invoicing/CollectiveInvoiceStatusPrintPage";
+import { SalesInvoicePrintPage, PurchaseInvoicePrintPage } from "./shared/InvoiceVoucherPrintPage";
 import UsersPage from "./modules/user-management/users/UsersPage";
 import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
 import RolesPage from "./modules/user-management/roles/RolesPage";
@@ -241,6 +243,7 @@ export default function App() {
         <CrmTaskModalProvider>
         <Router>
         <Route path="/signin" component={SignInPage} />
+        <Route path="/demo" component={DemoSignupPage} />
         <Route path="/auth/callback" component={AuthCallbackPage} />
         <Route path="/portal/login" component={PortalLoginPage} />
         <Route path="/portal/dashboard" component={PortalDashboardPage} />
@@ -256,6 +259,8 @@ export default function App() {
         <Route path="/app/purchase-request/purchase-requests/:purchaseRequestId/print" component={PurchaseRequestPrintPage} />
         <Route path="/app/purchase-request/purchase-requests/status/print" component={PurchaseRequestStatusPrintPage} />
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
+        <Route path="/app/sales/sales/:id/invoice/print" component={SalesInvoicePrintPage} />
+        <Route path="/app/finance/supplier-invoices/:id/print" component={PurchaseInvoicePrintPage} />
         <Route path="/app/finance/payment-vouchers/:id/2307" component={Bir2307PrintPage} />
         <Route path="/app/sales/reports/discount-status/print" component={SalesDiscountStatusPrintPage} />
         <Route path="/app/sales/collective-invoicing/status/print" component={CollectiveInvoiceStatusPrintPage} />

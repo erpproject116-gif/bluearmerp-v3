@@ -2,30 +2,36 @@ package demodata
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type StatusPayload struct {
-	Eligible         bool              `json:"eligible"`
-	CompanyCode      string            `json:"company_code"`
-	IsDemoTenant     bool              `json:"is_demo_tenant"`
-	CanManage        bool              `json:"can_manage"`
-	ScriptsAvailable bool              `json:"scripts_available"`
-	Checks           map[string]bool   `json:"checks"`
-	Counts           map[string]int    `json:"counts"`
+	Eligible         bool            `json:"eligible"`
+	CompanyCode      string          `json:"company_code"`
+	IsDemoTenant     bool            `json:"is_demo_tenant"`
+	IndustryCode     string          `json:"industry_code"`
+	CanManage        bool            `json:"can_manage"`
+	ScriptsAvailable bool            `json:"scripts_available"`
+	Checks           map[string]bool `json:"checks"`
+	Counts           map[string]int  `json:"counts"`
 }
 
 func loadStatus(ctx context.Context, pool *pgxpool.Pool, tenantID int64, canManage bool) (StatusPayload, error) {
 	var companyCode string
-	err := pool.QueryRow(ctx, `select company_code from public.tenants where id = $1`, tenantID).Scan(&companyCode)
+	var isDemo bool
+	var industry *string
+	err := pool.QueryRow(ctx,
+		`select company_code, is_demo, industry_type from public.tenants where id = $1`,
+		tenantID).Scan(&companyCode, &isDemo, &industry)
 	if err != nil {
 		return StatusPayload{}, err
 	}
 
-	_, isDemo := DemoTenantCodes[companyCode]
+	industryCode := resolveIndustry(industry)
 	scriptsOK := true
-	if _, err := readSQL(purgeScript); err != nil {
+	if _, err := readSQL("", purgeScript); err != nil {
 		scriptsOK = false
 	}
 
@@ -33,6 +39,7 @@ func loadStatus(ctx context.Context, pool *pgxpool.Pool, tenantID int64, canMana
 		Eligible:         isDemo && canManage,
 		CompanyCode:      companyCode,
 		IsDemoTenant:     isDemo,
+		IndustryCode:     industryCode,
 		CanManage:        canManage,
 		ScriptsAvailable: scriptsOK,
 		Checks:           map[string]bool{},
@@ -123,21 +130,33 @@ func reconciliationGapCount(ctx context.Context, pool *pgxpool.Pool, tenantID in
 	return n
 }
 
-func tenantCompanyCode(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (string, error) {
-	var code string
-	err := pool.QueryRow(ctx, `select company_code from public.tenants where id = $1`, tenantID).Scan(&code)
-	return code, err
+// resolveIndustry maps a tenant's free-text industry_type to a demo template code,
+// defaulting to manufacturing (the one fully-verified dataset) when unknown/empty.
+func resolveIndustry(industry *string) string {
+	if industry == nil {
+		return "manufacturing"
+	}
+	code := strings.ToLower(strings.TrimSpace(*industry))
+	if code == "" {
+		return "manufacturing"
+	}
+	return code
 }
 
-func assertDemoTenant(ctx context.Context, pool *pgxpool.Pool, tenantID int64, isSuperadmin bool) (string, error) {
-	code, err := tenantCompanyCode(ctx, pool, tenantID)
+// assertDemoTenant enforces that populate/purge only run on demo tenants (is_demo)
+// or for platform superadmins, and returns the tenant's company code + industry code.
+func assertDemoTenant(ctx context.Context, pool *pgxpool.Pool, tenantID int64, isSuperadmin bool) (string, string, error) {
+	var code string
+	var isDemo bool
+	var industry *string
+	err := pool.QueryRow(ctx,
+		`select company_code, is_demo, industry_type from public.tenants where id = $1`,
+		tenantID).Scan(&code, &isDemo, &industry)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	if !isSuperadmin {
-		if _, ok := DemoTenantCodes[code]; !ok {
-			return code, errNotDemoTenant
-		}
+	if !isSuperadmin && !isDemo {
+		return code, "", errNotDemoTenant
 	}
-	return code, nil
+	return code, resolveIndustry(industry), nil
 }

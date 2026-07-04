@@ -1,5 +1,3 @@
-import type { TaxMode } from "./taxcalc";
-
 export type LineGridColumnKey =
   | "line_no"
   | "item_code"
@@ -29,16 +27,17 @@ export type TaxLineGridVisibility = {
   showVatInc: boolean;
 };
 
-/** Which tax amount columns to show based on transaction type tax_mode. */
-export function taxLineGridVisibility(taxMode: string | undefined): TaxLineGridVisibility {
-  switch (taxMode as TaxMode) {
-    case "included":
-    case "excluded":
-      return { showBasis: true, showNonVat: true, showTax: true, showVatInc: true };
-    case "none":
-    default:
-      return { showBasis: false, showNonVat: false, showTax: false, showVatInc: false };
-  }
+/**
+ * Which tax amount columns to show in a line-item grid.
+ *
+ * Once a transaction type is selected the per-line tax breakdown (Unit (Non-VAT),
+ * Non-VAT Total, Tax, Unit (VAT inc.)) is redundant noise for end-users - the tax
+ * treatment is already fixed at the header and the totals are shown in the summary.
+ * So these columns are hidden for every tax mode. Only Qty, Unit Price and Line Total
+ * remain on the line. Amounts are still computed and stored server-side.
+ */
+export function taxLineGridVisibility(_taxMode: string | undefined): TaxLineGridVisibility {
+  return { showBasis: false, showNonVat: false, showTax: false, showVatInc: false };
 }
 
 export function filterTaxLineColumns<T extends { key: string }>(

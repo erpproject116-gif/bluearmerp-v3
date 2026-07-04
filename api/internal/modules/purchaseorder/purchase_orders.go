@@ -165,6 +165,7 @@ left join public.inv_partners hp on hp.id = po.partner_id`
 func registerPurchaseOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/purchase-orders/preview-sequences", previewPurchaseOrderSequences(pool))
 	r.Get("/purchase-orders", listPurchaseOrders(pool))
+	r.Get("/purchase-orders/purchase-request-lines/open", listOpenPurchaseRequestSlipLines(pool))
 	r.Post("/purchase-orders", createPurchaseOrder(pool))
 	r.Post("/purchase-orders/from-purchase-request/{prId}", createFromPurchaseRequest(pool))
 	r.With(auth.RequirePermission("purchase_order.purchase_orders_from_quote", auth.AccessWrite)).Post("/purchase-orders/from-supplier-quotation/{sqId}", createFromSupplierQuotation(pool))
@@ -236,10 +237,12 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			where += fmt.Sprintf(` and (
 				po.purchase_order_no ilike $%d or
 				coalesce(hp.company_name, line_partner.company_name, '') ilike $%d or
+				coalesce(po.reference, '') ilike $%d or
+				(to_char(po.order_date, 'MM/DD/YYYY') || '-' || po.date_seq) ilike $%d or
 				exists (
 					select 1 from public.po_purchase_order_lines ln
 					where ln.purchase_order_id = po.id and ln.item_name ilike $%d
-				))`, argN, argN, argN)
+				))`, argN, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}

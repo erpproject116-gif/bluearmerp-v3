@@ -10,6 +10,10 @@ import {
 } from "../../../shared/useSupplierInvoiceList";
 import { FinanceLayout } from "../FinanceLayout";
 import { SupplierInvoiceModal } from "./SupplierInvoiceModal";
+import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { InvoicePanel } from "../../../shared/InvoicePanel";
+import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { Show } from "solid-js";
 
 function money(n: number, currency?: string) {
   const formatted = n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,6 +31,8 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [viewRow, setViewRow] = createSignal<SupplierInvoiceRow | null>(null);
+  const [historyOpen, setHistoryOpen] = createSignal(false);
 
   const list = useSupplierInvoiceList(() => ({
     page: page(),
@@ -61,7 +67,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onEdit={() => {}}
+        onEdit={(row) => setViewRow(row)}
         onNew={openNew}
         codeKey="invoice_no"
         nameKey="date_no_display"
@@ -78,6 +84,38 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         settingsHref={FINANCE_SETTINGS_HREF.officialReceipt}
       />
       <SupplierInvoiceModal open={modalOpen()} onClose={closeModal} onSaved={() => { invalidate(); closeModal(); }} />
+      <WideEntityModal
+        open={viewRow() != null}
+        title={viewRow() ? `Purchase ${viewRow()!.invoice_no} — Invoice` : "Invoice"}
+        onClose={() => setViewRow(null)}
+        readOnly
+        headerActions={
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+            onClick={() => setHistoryOpen(true)}
+          >
+            History
+          </button>
+        }
+      >
+        <Show when={viewRow()}>
+          <InvoicePanel
+            kind="purchase"
+            docId={viewRow()!.id}
+            attachmentsScope="finance/supplier-invoices"
+            onPrint={() => window.open(`/app/finance/supplier-invoices/${viewRow()!.id}/print`, "_blank", "noopener,noreferrer")}
+            onSaved={invalidate}
+          />
+        </Show>
+      </WideEntityModal>
+      <HistoryLogModal
+        open={historyOpen()}
+        onClose={() => setHistoryOpen(false)}
+        targetType="fin_supplier_invoice"
+        targetId={viewRow()?.id}
+        title={viewRow() ? `History — Purchase ${viewRow()!.invoice_no}` : "History"}
+      />
     </FinanceLayout>
   );
 }

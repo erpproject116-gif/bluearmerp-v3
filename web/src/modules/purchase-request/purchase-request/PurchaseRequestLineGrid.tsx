@@ -28,6 +28,8 @@ export type PurchaseRequestLineRow = {
   unit_vat_inc: string;
   line_total: string;
   remark: string;
+  source_sales_order_line_id?: number | null;
+  purchase_request_line_id?: number | null;
 };
 
 export function emptyPurchaseRequestLine(

@@ -45,7 +45,7 @@ declare
 begin
   v_d := current_date;
 
-  foreach v_code in array array['DEMO000', 'BLUEARM']
+  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then

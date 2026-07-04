@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/filedownload"
@@ -37,10 +38,7 @@ func registerAttachmentRoutes(r chi.Router, pool *pgxpool.Pool) {
 }
 
 func uploadDir() string {
-	if d := strings.TrimSpace(os.Getenv("SALES_ORDER_UPLOAD_DIR")); d != "" {
-		return d
-	}
-	return "data/sales-order-attachments"
+	return attachmentx.Dir("sales_order")
 }
 
 func uploadSalesOrderAttachment(pool *pgxpool.Pool) http.HandlerFunc {

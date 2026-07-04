@@ -97,6 +97,8 @@ func registerSupplierInvoiceRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/supplier-invoices/open-gr-lines", listOpenGRLines(pool))
 	r.Get("/supplier-invoices", listSupplierInvoices(pool))
 	r.Post("/supplier-invoices", createSupplierInvoice(pool))
+	r.Get("/supplier-invoices/{id}/invoice", getPurchaseInvoice(pool))
+	r.Put("/supplier-invoices/{id}/invoice", putPurchaseInvoice(pool))
 	r.Get("/supplier-invoices/{id}", getSupplierInvoice(pool))
 	r.Delete("/supplier-invoices/{id}", deleteSupplierInvoice(pool))
 }
@@ -213,7 +215,7 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 		args := []any{tu.TenantID}
 		argN := 2
 		if p.Q != "" {
-			where += fmt.Sprintf(` and (si.invoice_no ilike $%d or p.company_name ilike $%d or coalesce(si.vendor_invoice_no, '') ilike $%d)`, argN, argN, argN)
+			where += fmt.Sprintf(` and (si.invoice_no ilike $%d or p.company_name ilike $%d or coalesce(si.vendor_invoice_no, '') ilike $%d or (to_char(si.invoice_date, 'MM/DD/YYYY') || '-' || si.date_seq) ilike $%d)`, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
