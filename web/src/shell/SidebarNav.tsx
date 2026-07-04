@@ -68,6 +68,40 @@ function NavModuleLink(props: { module: AppModule }) {
   );
 }
 
+function NavCustomLink(props: { label: string; href: string; basePath: string; iconId: string }) {
+  const loc = useLocation();
+  const shell = useShell();
+  const active = () =>
+    loc.pathname === props.basePath || loc.pathname.startsWith(`${props.basePath}/`);
+
+  return (
+    <A
+      href={props.href}
+      title={shell.collapsed() ? props.label : undefined}
+      class="flex items-center rounded-lg text-sm font-medium transition-colors"
+      classList={{
+        "justify-center px-2 py-2.5": shell.collapsed(),
+        "gap-3 px-3 py-2.5": !shell.collapsed(),
+        "bg-brand-50 text-brand-600": active(),
+        "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),
+      }}
+    >
+      <span
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        classList={{
+          "bg-brand-100 text-brand-600": active(),
+          "erp-panel text-text-secondary": !active(),
+        }}
+      >
+        <ModuleIcon id={props.iconId} />
+      </span>
+      <Show when={!shell.collapsed()}>
+        <span class="truncate">{props.label}</span>
+      </Show>
+    </A>
+  );
+}
+
 function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
   const loc = useLocation();
   const shell = useShell();
@@ -106,11 +140,26 @@ function NavGroupBlock(props: {
 
   const visibleEntries = () =>
     props.entries.filter((entry) => {
-      if (entry.kind === "module") {
+      if (entry.kind === "module" || entry.kind === "link") {
         return isTenantModuleEnabled(auth.me, entry.moduleId);
       }
       return isTenantFeatureEnabled(auth.me, entry.featureCode, entry.moduleId);
     });
+
+  const renderEntry = (entry: NavGroupEntry) => {
+    if (entry.kind === "link") {
+      return (
+        <NavCustomLink label={entry.label} href={entry.href} basePath={entry.basePath} iconId="purchases" />
+      );
+    }
+    const mod = appModules.find((m) => m.id === entry.moduleId);
+    if (!mod) return null;
+    if (entry.kind === "module") {
+      return <NavModuleLink module={mod} />;
+    }
+    const branch = subBranchByFeature(mod, entry.featureCode);
+    return branch ? <NavSubBranchLink module={mod} branch={branch} /> : null;
+  };
 
   const toggle = () => {
     const next = !open();
@@ -127,26 +176,7 @@ function NavGroupBlock(props: {
       <div class="space-y-0.5">
         <Show
           when={!shell.collapsed()}
-          fallback={
-            <For each={visibleEntries()}>
-              {(entry) => {
-                const mod = () => appModules.find((m) => m.id === entry.moduleId);
-                return (
-                  <Show when={mod()}>
-                    {(m) =>
-                      entry.kind === "module" ? (
-                        <NavModuleLink module={m()} />
-                      ) : (
-                        <Show when={subBranchByFeature(m(), entry.featureCode)}>
-                          {(branch) => <NavSubBranchLink module={m()} branch={branch()} />}
-                        </Show>
-                      )
-                    }
-                  </Show>
-                );
-              }}
-            </For>
-          }
+          fallback={<For each={visibleEntries()}>{(entry) => renderEntry(entry)}</For>}
         >
           <button
             type="button"
@@ -164,24 +194,7 @@ function NavGroupBlock(props: {
           </button>
           <Show when={open()}>
             <div class="ml-2 space-y-0.5 border-l border-stroke pl-2">
-              <For each={visibleEntries()}>
-                {(entry) => {
-                  const mod = () => appModules.find((m) => m.id === entry.moduleId);
-                  return (
-                    <Show when={mod()}>
-                      {(m) =>
-                        entry.kind === "module" ? (
-                          <NavModuleLink module={m()} />
-                        ) : (
-                          <Show when={subBranchByFeature(m(), entry.featureCode)}>
-                            {(branch) => <NavSubBranchLink module={m()} branch={branch()} />}
-                          </Show>
-                        )
-                      }
-                    </Show>
-                  );
-                }}
-              </For>
+              <For each={visibleEntries()}>{(entry) => renderEntry(entry)}</For>
             </div>
           </Show>
         </Show>

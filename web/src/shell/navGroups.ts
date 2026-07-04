@@ -7,7 +7,11 @@ import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 
 export type NavGroupEntry =
   | { kind: "module"; moduleId: string }
-  | { kind: "subBranch"; moduleId: string; featureCode: string; branchLabel: string };
+  | { kind: "subBranch"; moduleId: string; featureCode: string; branchLabel: string }
+  // A direct link to a feature that lives under another module (e.g. Purchases,
+  // which is the Supplier Invoices page under the Accounts module). moduleId is
+  // used only for tenant-enablement gating.
+  | { kind: "link"; moduleId: string; label: string; href: string; basePath: string };
 
 export type NavGroup = {
   id: string;
@@ -30,36 +34,43 @@ export const navGroups: NavGroup[] = [
     label: "Stock",
     defaultExpanded: true,
     entries: [
+      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "WMS" },
       { kind: "module", moduleId: "inventory" },
       { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Serial & Lot" },
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "WMS" },
       { kind: "module", moduleId: "after_sales" },
     ],
   },
   {
     id: "sales_process",
     label: "Selling",
-    defaultExpanded: false,
+    defaultExpanded: true,
     entries: [
       { kind: "module", moduleId: "quotation" },
-      { kind: "subBranch", moduleId: "quotation", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
+      { kind: "module", moduleId: "sales_order" },
       { kind: "module", moduleId: "sales" },
+      { kind: "subBranch", moduleId: "quotation", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
       {
         kind: "subBranch",
         moduleId: "sales",
         featureCode: "sales.collective_invoicing",
         branchLabel: "Group Invoicing",
       },
-      { kind: "module", moduleId: "sales_order" },
     ],
   },
   {
     id: "procurement_process",
     label: "Buying",
-    defaultExpanded: false,
+    defaultExpanded: true,
     entries: [
       { kind: "module", moduleId: "purchase_request" },
       { kind: "module", moduleId: "purchase_order" },
+      {
+        kind: "link",
+        moduleId: "finance",
+        label: "Purchases",
+        href: "/app/finance/supplier-invoices",
+        basePath: "/app/finance/supplier-invoices",
+      },
     ],
   },
   {

@@ -182,7 +182,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "sales",
-    label: "Sales (actual sale)",
+    label: "Sales",
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
@@ -219,7 +219,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "sales_order",
-    label: "Sales Order (upcoming sale)",
+    label: "Sales Order",
     href: "/app/sales-order/sales-orders",
     basePath: "/app/sales-order",
     features: [
@@ -254,7 +254,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "purchase_request",
-    label: "Purchase Request (request to buy)",
+    label: "Purchase Request",
     href: "/app/purchase-request/purchase-requests",
     basePath: "/app/purchase-request",
     features: [
@@ -265,7 +265,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "purchase_order",
-    label: "Purchase Order (order to supplier)",
+    label: "Purchase Order",
     href: "/app/purchase-order/purchase-orders",
     basePath: "/app/purchase-order",
     features: [
@@ -277,7 +277,7 @@ export const appModules: AppModule[] = [
         prefix: "/app/purchase-order/rfq",
       },
       { label: "Purchase Returns", href: "/app/purchase-order/purchase-returns", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "Receiving (items received)", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "Receiving", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "PO Analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Items to Receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
     ],
@@ -378,8 +378,8 @@ export const appModules: AppModule[] = [
       { label: "Workspace", href: "/app/finance", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "New Payment Receipt", href: "/app/finance/official-receipts/new", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Payment Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "New Purchase (supplier bill)", href: "/app/finance/supplier-invoices/new", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Purchases (supplier bills)", href: "/app/finance/supplier-invoices", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "New Purchase", href: "/app/finance/supplier-invoices/new", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Purchases", href: "/app/finance/supplier-invoices", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "New Payment Voucher", href: "/app/finance/payment-vouchers/new", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Payment Voucher List", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Chart of Accounts", href: "/app/finance/chart-of-accounts", settingsHref: "/app/finance/official-receipts/settings" },
