@@ -42,7 +42,7 @@ func SelectiveGzip(enabled bool) func(http.Handler) http.Handler {
 				cw.status = http.StatusOK
 			}
 			if len(body) < gzipMinBytes {
-				for k, vals := range cw.ResponseWriter.Header() {
+				for k, vals := range cw.Header() {
 					for _, v := range vals {
 						w.Header().Add(k, v)
 					}
@@ -50,6 +50,11 @@ func SelectiveGzip(enabled bool) func(http.Handler) http.Handler {
 				w.WriteHeader(cw.status)
 				_, _ = w.Write(body)
 				return
+			}
+			for k, vals := range cw.Header() {
+				for _, v := range vals {
+					w.Header().Add(k, v)
+				}
 			}
 			w.Header().Set("Content-Encoding", "gzip")
 			w.Header().Set("Vary", "Accept-Encoding")

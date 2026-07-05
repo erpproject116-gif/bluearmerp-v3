@@ -80,17 +80,18 @@ func main() {
 	audit.StartWorker(pool, cfg)
 
 	r := chi.NewRouter()
+	// CORS must wrap all handlers so every response (including errors) carries ACAO.
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   cfg.CORSOrigins(),
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	}))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(platformmw.SelectiveGzip(cfg.GzipEnabled))
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   cfg.CORSOrigins(),
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CRM-Job-Secret", "X-Portal-Token"},
-		AllowCredentials: true,
-	}))
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		response.OK(w, map[string]string{"status": "ok"}, "OK")

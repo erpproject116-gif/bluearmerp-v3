@@ -115,12 +115,70 @@ export async function apiFetch<T>(
     headers.set("X-Tenant-ID", String(activeTenantId));
   }
   const base = apiBase || "";
+  const headerNames = [...headers.keys()];
+  // #region agent log
+  fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+    body: JSON.stringify({
+      sessionId: "a1498a",
+      runId: "pre-fix",
+      hypothesisId: "H1-H2-H6",
+      location: "api.ts:apiFetch:before",
+      message: "apiFetch request",
+      data: {
+        path,
+        method: init.method ?? "GET",
+        apiBase: base || "(same-origin)",
+        headerNames,
+        hasToken: Boolean(token),
+        activeTenantId,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   let res: Response;
   try {
     res = await fetch(`${base}${path}`, { ...init, headers });
-  } catch {
+  } catch (err) {
+    // #region agent log
+    fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+      body: JSON.stringify({
+        sessionId: "a1498a",
+        runId: "pre-fix",
+        hypothesisId: "H1-H6",
+        location: "api.ts:apiFetch:catch",
+        message: "apiFetch network failure",
+        data: { path, err: String(err) },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     throw new Error("ERR_NETWORK");
   }
+  // #region agent log
+  fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+    body: JSON.stringify({
+      sessionId: "a1498a",
+      runId: "pre-fix",
+      hypothesisId: "H1-H3",
+      location: "api.ts:apiFetch:after",
+      message: "apiFetch response",
+      data: {
+        path,
+        status: res.status,
+        ok: res.ok,
+        acao: res.headers.get("access-control-allow-origin"),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   const body = (await res.json()) as ApiEnvelope<T>;
   const result = { ...body, status: res.status, ok: res.ok };
   if (body.success && shouldAutoSuccessToast(path, init.method, options)) {
