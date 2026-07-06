@@ -21,3 +21,22 @@ export type DocGroup = {
   description: string;
   sectionIds: string[];
 };
+
+/** Scenario-style help article (question → steps). */
+export type KbArticle = {
+  id: string;
+  title: string;
+  scenario: string;
+  intro: string;
+  blocks: DocBlock[];
+  primaryHref?: string;
+  primaryLabel?: string;
+  relatedGuideIds?: string[];
+};
+
+export type KbGroup = {
+  id: string;
+  title: string;
+  description: string;
+  articleIds: string[];
+};

@@ -12,6 +12,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demodata"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/provision"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -222,6 +223,10 @@ func (s *service) createDemoTenant(ctx context.Context, a createDemoArgs) (int64
 		values ($1, $2, $3, 'PH', 'PHP', 'active', true, $4, true)
 		returning id`,
 		a.company, a.companyCode, a.industry, a.expiresAt).Scan(&tenantID); err != nil {
+		return 0, err
+	}
+
+	if err := provision.SeedTenantDefaults(ctx, tx, tenantID); err != nil {
 		return 0, err
 	}
 

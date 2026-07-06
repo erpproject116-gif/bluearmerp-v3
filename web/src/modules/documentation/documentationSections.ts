@@ -27,7 +27,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "tip",
-        text: "Need step-by-step help for a specific area? Open Help & guides from the sidebar or from your account menu (click your name at the bottom of the sidebar).",
+        text: "Have a specific situation in mind—multiple businesses, branches, or moving stock? Open Help & guides → Knowledge base for scenario walkthroughs.",
       },
       {
         type: "paragraph",

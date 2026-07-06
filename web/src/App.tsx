@@ -292,6 +292,8 @@ export default function App() {
           <Route path="/dashboard/approvals" component={ApprovalsQueuePage} />
           <Route path="/reports/saved-views" component={SavedViewsPage} />
           <Route path="/reports" component={ReportsIndexPage} />
+          <Route path="/documentation/kb/:articleId" component={DocumentationPage} />
+          <Route path="/documentation/kb" component={DocumentationPage} />
           <Route path="/documentation" component={DocumentationPage} />
           <Route path="/documentation/:sectionId" component={DocumentationPage} />
           <Route path="/pos/manage" component={PosSettingsPage} />

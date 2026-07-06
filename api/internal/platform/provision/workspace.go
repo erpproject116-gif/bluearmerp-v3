@@ -102,6 +102,10 @@ func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArg
 		return TenantResult{}, err
 	}
 
+	if err := SeedTenantDefaults(ctx, tx, tenantID); err != nil {
+		return TenantResult{}, err
+	}
+
 	var result TenantResult
 	result.CompanyCode = a.CompanyCode
 

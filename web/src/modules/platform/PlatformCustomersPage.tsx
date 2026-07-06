@@ -78,6 +78,7 @@ export default function PlatformCustomersPage() {
   };
 
   const submitProvision = async () => {
+    if (busy()) return;
     const f = form();
     if (!f.email.trim() || !f.full_name.trim()) {
       toast.warning("Email and full name are required.");

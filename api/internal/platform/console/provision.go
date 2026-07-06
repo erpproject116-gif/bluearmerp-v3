@@ -2,7 +2,9 @@ package console
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -86,7 +88,12 @@ func (s *service) provisionCustomer(w http.ResponseWriter, r *http.Request) {
 		AuthUserID:  authUserID,
 	})
 	if err != nil {
-		response.Err(w, http.StatusInternalServerError, "Failed to create workspace.", "ERR_INTERNAL")
+		log.Printf("console: provision workspace for %s: %v", email, err)
+		msg := "Failed to create workspace."
+		if errors.Is(err, provision.ErrEmailConflict) {
+			msg = "This email already has a user record in the workspace."
+		}
+		response.Err(w, http.StatusInternalServerError, msg, "ERR_INTERNAL")
 		return
 	}
 

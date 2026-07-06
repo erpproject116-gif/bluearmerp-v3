@@ -18,6 +18,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/provision"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -216,6 +217,10 @@ func (s *service) createTrialTenant(ctx context.Context, a trialArgs) (int64, er
 		values ($1, $2, 'general', 'PH', 'PHP', 'active', false, true)
 		returning id`,
 		a.company, a.companyCode).Scan(&tenantID); err != nil {
+		return 0, err
+	}
+
+	if err := provision.SeedTenantDefaults(ctx, tx, tenantID); err != nil {
 		return 0, err
 	}
 

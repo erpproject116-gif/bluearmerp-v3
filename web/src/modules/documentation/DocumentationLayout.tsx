@@ -1,8 +1,38 @@
 import { A } from "@solidjs/router";
 import { For, Show, createMemo, createSignal } from "solid-js";
-import type { DocBlock, DocGroup, DocSection } from "./documentationTypes";
+import type { DocBlock, DocGroup, DocSection, KbArticle, KbGroup } from "./documentationTypes";
 import { ModuleIcon } from "../../shell/ModuleIcon";
-import { filterSections } from "./documentationSearch";
+import { filterKbArticles, filterSections } from "./documentationSearch";
+
+export type DocTab = "guides" | "knowledgebase";
+
+export function DocumentationHeaderTabs(props: { active: DocTab }) {
+  const tabClass = (tab: DocTab) =>
+    [
+      "border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+      props.active === tab
+        ? "border-brand-600 text-brand-700"
+        : "border-transparent text-text-secondary hover:border-stroke hover:text-text-primary",
+    ].join(" ");
+
+  return (
+    <div class="mb-6 border-b border-stroke" role="tablist" aria-label="Help content">
+      <div class="flex gap-1">
+        <A href="/app/documentation" class={tabClass("guides")} role="tab" aria-selected={props.active === "guides"}>
+          Guides
+        </A>
+        <A
+          href="/app/documentation/kb"
+          class={tabClass("knowledgebase")}
+          role="tab"
+          aria-selected={props.active === "knowledgebase"}
+        >
+          Knowledge base
+        </A>
+      </div>
+    </div>
+  );
+}
 
 function DocBlockView(props: { block: DocBlock }) {
   return (
@@ -67,9 +97,13 @@ type ContentProps = {
   primaryHref?: string;
   primaryLabel?: string;
   adminNote?: string;
+  scenario?: string;
+  relatedGuideIds?: string[];
+  sectionsById?: Map<string, DocSection>;
   prev?: { id: string; title: string };
   next?: { id: string; title: string };
   onNavigate: (id: string) => void;
+  onNavigateGuide?: (id: string) => void;
 };
 
 export function DocumentationContent(props: ContentProps) {
@@ -80,6 +114,9 @@ export function DocumentationContent(props: ContentProps) {
       </Show>
 
       <header class="border-b border-stroke pb-5">
+        <Show when={props.scenario}>
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-600">{props.scenario}</p>
+        </Show>
         <h1 class="text-2xl font-semibold tracking-tight text-text-primary">{props.title}</h1>
         <p class="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">{props.intro}</p>
       </header>
@@ -97,6 +134,34 @@ export function DocumentationContent(props: ContentProps) {
             {props.primaryLabel ?? "Open this area"}
             <span aria-hidden="true">→</span>
           </A>
+        </div>
+      </Show>
+
+      <Show when={props.relatedGuideIds?.length && props.sectionsById && props.onNavigateGuide}>
+        <div class="mt-8 max-w-2xl rounded-lg border border-stroke bg-slate-50/80 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Related guides</p>
+          <ul class="mt-2 space-y-1">
+            <For each={props.relatedGuideIds}>
+              {(guideId) => {
+                const guide = props.sectionsById!.get(guideId);
+                return (
+                  <Show when={guide}>
+                    {(g) => (
+                      <li>
+                        <button
+                          type="button"
+                          class="text-sm font-medium text-brand-600 hover:underline"
+                          onClick={() => props.onNavigateGuide!(guideId)}
+                        >
+                          {g().title}
+                        </button>
+                      </li>
+                    )}
+                  </Show>
+                );
+              }}
+            </For>
+          </ul>
         </div>
       </Show>
 
@@ -252,10 +317,14 @@ export function DocumentationHome(props: HomeProps) {
   return (
     <div class="space-y-8">
       <header class="max-w-2xl">
-        <h1 class="text-2xl font-semibold tracking-tight text-text-primary">Help &amp; guides</h1>
+        <h1 class="text-2xl font-semibold tracking-tight text-text-primary">Guides</h1>
         <p class="mt-2 text-sm leading-relaxed text-text-secondary">
-          Plain-language instructions grouped by what you are trying to do. Pick a category below, or use the sidebar search when
-          reading a topic.
+          Module-by-module reference grouped by what you are trying to do. For step-by-step scenarios (multiple
+          businesses, branches, stock transfers), open the{" "}
+          <A href="/app/documentation/kb" class="font-medium text-brand-600 hover:underline">
+            Knowledge base
+          </A>{" "}
+          tab.
         </p>
       </header>
 
@@ -280,6 +349,176 @@ export function DocumentationHome(props: HomeProps) {
                             >
                               <ModuleIcon id={s().iconId} class="h-3.5 w-3.5 shrink-0" />
                               {s().title}
+                            </button>
+                          </li>
+                        )}
+                      </Show>
+                    );
+                  }}
+                </For>
+              </ul>
+            </section>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+type KbNavProps = {
+  groups: KbGroup[];
+  articlesById: Map<string, KbArticle>;
+  activeId: string;
+  onSelect: (id: string) => void;
+  onHome: () => void;
+};
+
+export function KnowledgebaseNav(props: KbNavProps) {
+  const [query, setQuery] = createSignal("");
+  const [collapsed, setCollapsed] = createSignal<Record<string, boolean>>({});
+
+  const filteredIds = createMemo(() => {
+    const all = props.groups.flatMap((g) => g.articleIds);
+    const q = query().trim().toLowerCase();
+    if (!q) return new Set(all);
+    const matched = filterKbArticles(
+      all.map((id) => props.articlesById.get(id)).filter((a): a is KbArticle => !!a),
+      q,
+    ).map((a) => a.id);
+    return new Set(matched);
+  });
+
+  const toggleGroup = (groupId: string) => {
+    setCollapsed((c) => ({ ...c, [groupId]: !c[groupId] }));
+  };
+
+  const isGroupOpen = (group: KbGroup) => {
+    if (query().trim()) return true;
+    if (collapsed()[group.id] === true) return false;
+    if (collapsed()[group.id] === false) return true;
+    if (!props.activeId) return false;
+    return group.articleIds.includes(props.activeId);
+  };
+
+  return (
+    <aside class="w-full shrink-0 lg:w-60 xl:w-64">
+      <div class="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
+        <button
+          type="button"
+          class="mb-3 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-brand-600 transition hover:bg-brand-50"
+          onClick={props.onHome}
+        >
+          <span aria-hidden="true">←</span>
+          All scenarios
+        </button>
+
+        <label class="mb-3 block">
+          <span class="sr-only">Search knowledge base</span>
+          <input
+            type="search"
+            placeholder="Search scenarios…"
+            class="w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+            value={query()}
+            onInput={(e) => setQuery(e.currentTarget.value)}
+          />
+        </label>
+
+        <nav class="space-y-4" aria-label="Knowledge base scenarios">
+          <For each={props.groups}>
+            {(group) => {
+              const visibleArticles = () =>
+                group.articleIds
+                  .map((id) => props.articlesById.get(id))
+                  .filter((a): a is KbArticle => !!a && filteredIds().has(a.id));
+              return (
+                <Show when={visibleArticles().length > 0}>
+                  <div>
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary hover:text-text-primary"
+                      onClick={() => toggleGroup(group.id)}
+                      aria-expanded={isGroupOpen(group)}
+                    >
+                      {group.title}
+                      <span class="text-[10px] font-normal normal-case text-text-secondary">
+                        {visibleArticles().length}
+                      </span>
+                    </button>
+                    <Show when={isGroupOpen(group)}>
+                      <ul class="mt-1 space-y-0.5 border-l border-stroke pl-2">
+                        <For each={visibleArticles()}>
+                          {(article) => (
+                            <li>
+                              <button
+                                type="button"
+                                class="flex w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors"
+                                classList={{
+                                  "bg-brand-50 font-medium text-brand-700": props.activeId === article.id,
+                                  "text-text-secondary hover:bg-slate-50 hover:text-text-primary":
+                                    props.activeId !== article.id,
+                                }}
+                                onClick={() => props.onSelect(article.id)}
+                              >
+                                <span class="line-clamp-2">{article.title}</span>
+                              </button>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    </Show>
+                  </div>
+                </Show>
+              );
+            }}
+          </For>
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
+type KbHomeProps = {
+  groups: KbGroup[];
+  articlesById: Map<string, KbArticle>;
+  onSelect: (id: string) => void;
+};
+
+export function KnowledgebaseHome(props: KbHomeProps) {
+  return (
+    <div class="space-y-8">
+      <header class="max-w-2xl">
+        <h1 class="text-2xl font-semibold tracking-tight text-text-primary">Knowledge base</h1>
+        <p class="mt-2 text-sm leading-relaxed text-text-secondary">
+          Scenario-based answers for common “how do I…?” questions. Each article walks through one real-world situation
+          step by step. For module overviews, use the{" "}
+          <A href="/app/documentation" class="font-medium text-brand-600 hover:underline">
+            Guides
+          </A>{" "}
+          tab.
+        </p>
+      </header>
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <For each={props.groups}>
+          {(group) => (
+            <section class="flex flex-col rounded-xl border border-stroke bg-white p-4 shadow-sm">
+              <h2 class="text-sm font-semibold text-text-primary">{group.title}</h2>
+              <p class="mt-1 flex-1 text-xs leading-relaxed text-text-secondary">{group.description}</p>
+              <ul class="mt-3 space-y-2 border-t border-stroke pt-3">
+                <For each={group.articleIds}>
+                  {(id) => {
+                    const article = props.articlesById.get(id);
+                    return (
+                      <Show when={article}>
+                        {(a) => (
+                          <li>
+                            <button
+                              type="button"
+                              class="w-full rounded-md px-1 py-1 text-left hover:bg-brand-50"
+                              onClick={() => props.onSelect(a().id)}
+                            >
+                              <span class="text-sm font-medium text-brand-600 hover:underline">{a().title}</span>
+                              <p class="mt-0.5 text-xs text-text-secondary">{a().scenario}</p>
                             </button>
                           </li>
                         )}
