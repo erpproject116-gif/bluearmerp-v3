@@ -1,4 +1,5 @@
 import { createMemo, createSignal, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
@@ -18,9 +19,7 @@ type Row = {
 
 type GridRow = Row & { id: number };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export default function SupplierPaymentStatusPage() {
   const [searched, setSearched] = createSignal(false);
@@ -52,9 +51,9 @@ export default function SupplierPaymentStatusPage() {
             { key: "date_no_display", header: "Date-no" },
             { key: "invoice_no", header: "Invoice No." },
             { key: "vendor_name", header: "Vendor" },
-            { key: "grand_total", header: "Grand total", render: (r) => money(r.grand_total) },
-            { key: "paid_amount", header: "Paid", render: (r) => money(r.paid_amount) },
-            { key: "balance", header: "Balance", render: (r) => money(r.balance) },
+            { key: "grand_total", header: "Grand total", render: (r) => formatPeso(r.grand_total) },
+            { key: "paid_amount", header: "Paid", render: (r) => formatPeso(r.paid_amount) },
+            { key: "balance", header: "Balance", render: (r) => formatPeso(r.balance) },
             { key: "payment_status", header: "Status" },
           ]}
           rows={rows()}

@@ -4,7 +4,7 @@ import { LookupCombo } from "./LookupCombo";
 import { AttachmentsField } from "./AttachmentsField";
 import type { AttachmentScope } from "./attachments";
 import { fetchAccountOptions } from "./accounts";
-import { formatPeso, sanitizeDecimalInput } from "./money";
+import { formatPeso, bindDecimalInput } from "./money";
 import { useToast } from "./toast";
 import {
   getPurchaseInvoice,
@@ -175,7 +175,7 @@ export function InvoicePanel(props: Props) {
             required
           />
           <Field label="Fees">
-            <input class={inputClass} inputmode="decimal" value={fees()} onInput={(e) => setFees(sanitizeDecimalInput(e.currentTarget.value))} />
+            <input class={inputClass} inputmode="decimal" value={fees()} onInput={(e) => bindDecimalInput(e.currentTarget, setFees)} />
           </Field>
           <Field label="Remark">
             <input class={inputClass} value={remark()} onInput={(e) => setRemark(e.currentTarget.value)} />

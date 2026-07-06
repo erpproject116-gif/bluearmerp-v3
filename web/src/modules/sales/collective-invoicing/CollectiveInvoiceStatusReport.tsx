@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
 import {
@@ -28,9 +29,7 @@ type Props = {
   onSort: (field: InvoiceSortField) => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function sortIndicator(active: boolean, order: "asc" | "desc") {
   if (!active) return "";
@@ -53,9 +52,9 @@ function ReportRow(props: { line: InvoiceReportLine; onViewTrans: (id: number) =
     return (
       <tr class="bg-slate-50 font-semibold">
         <td class="px-3 py-2" colSpan={3}>{props.line.label}</td>
-        <td class="px-3 py-2 text-right tabular-nums">{money(props.line.pretax_amount)}</td>
-        <td class="px-3 py-2 text-right tabular-nums">{money(props.line.sales_tax)}</td>
-        <td class="px-3 py-2 text-right tabular-nums">{money(props.line.total_sales)}</td>
+        <td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.line.pretax_amount)}</td>
+        <td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.line.sales_tax)}</td>
+        <td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.line.total_sales)}</td>
         <td class="px-3 py-2" colSpan={3} />
       </tr>
     );
@@ -66,9 +65,9 @@ function ReportRow(props: { line: InvoiceReportLine; onViewTrans: (id: number) =
       <td class="px-3 py-2">{row.date_no_display}</td>
       <td class="px-3 py-2">{row.receivable_no}</td>
       <td class="px-3 py-2">{row.customer_name}</td>
-      <td class="px-3 py-2 text-right tabular-nums">{money(row.pretax_amount)}</td>
-      <td class="px-3 py-2 text-right tabular-nums">{money(row.sales_tax)}</td>
-      <td class="px-3 py-2 text-right tabular-nums">{money(row.total_sales)}</td>
+      <td class="px-3 py-2 text-right tabular-nums">{formatPeso(row.pretax_amount)}</td>
+      <td class="px-3 py-2 text-right tabular-nums">{formatPeso(row.sales_tax)}</td>
+      <td class="px-3 py-2 text-right tabular-nums">{formatPeso(row.total_sales)}</td>
       <td class="px-3 py-2">{row.due_date ?? ""}</td>
       <td class="px-3 py-2">
         <button type="button" class="text-brand-600 hover:underline" onClick={() => props.onViewTrans(row.id)}>
@@ -161,9 +160,9 @@ export function CollectiveInvoiceStatusReport(props: Props) {
           <tfoot class="border-t-2 border-stroke bg-slate-50 font-semibold">
             <tr>
               <td class="px-3 py-2" colSpan={3}>Total</td>
-              <td class="px-3 py-2 text-right tabular-nums">{money(props.totalPretax)}</td>
-              <td class="px-3 py-2 text-right tabular-nums">{money(props.totalTax)}</td>
-              <td class="px-3 py-2 text-right tabular-nums">{money(props.totalSales)}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.totalPretax)}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.totalTax)}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.totalSales)}</td>
               <td class="px-3 py-2" colSpan={3} />
             </tr>
           </tfoot>

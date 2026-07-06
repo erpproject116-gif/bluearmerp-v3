@@ -1,15 +1,14 @@
 import { useParams } from "@solidjs/router";
+import { formatPeso } from "../../shared/money";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { usePlatformCustomer, usePlatformPlansAdmin, type PlatformPlan } from "../../shared/usePlatform";
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function planLabel(p: PlatformPlan) {
   const price = p.promo_active ? p.effective_monthly_amount : p.regular_monthly_amount;
-  return `${p.display_name} — ₱${money(price)}/mo`;
+  return `${p.display_name} — ${formatPeso(price)}/mo`;
 }
 
 export default function PlatformCustomerDetailPage() {
@@ -98,7 +97,7 @@ export default function PlatformCustomerDetailPage() {
                         <li class="rounded-lg border border-stroke p-3">
                           {String(s.plan_kind)} · {String(s.status)}
                           {s.ends_at ? ` · ends ${String(s.ends_at).slice(0, 10)}` : ""}
-                          · ₱{money(Number(s.monthly_amount) || 0)}/mo
+                          · {formatPeso(Number(s.monthly_amount) || 0)}/mo
                           <button
                             type="button"
                             class="ml-3 text-xs text-brand-600 hover:underline"

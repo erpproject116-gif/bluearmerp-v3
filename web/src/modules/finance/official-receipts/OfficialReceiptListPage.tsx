@@ -1,4 +1,5 @@
 import { createSignal, onMount } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
@@ -13,10 +14,7 @@ import { FinanceLayout } from "../FinanceLayout";
 import { OfficialReceiptModal, type OfficialReceiptDetail } from "./OfficialReceiptModal";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 
-function money(n: number, currency?: string) {
-  const formatted = n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return currency ? `${currency} ${formatted}` : formatted;
-}
+
 
 function paymentLabel(m: string) {
   if (m === "cash") return "Cash";
@@ -89,7 +87,7 @@ export function OfficialReceiptListPageInner(props: PageOptions = {}) {
           {
             key: "amount_total",
             header: "Amount",
-            render: (r) => money(r.amount_total, r.currency_code),
+            render: (r) => formatPeso(r.amount_total),
           },
           { key: "created_by_name", header: "Created by", render: (r) => r.created_by_name ?? "" },
           {

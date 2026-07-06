@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
+import { DecimalInput } from "../../../shared/DecimalInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -268,13 +269,11 @@ export function PaymentVoucherModal(props: Props) {
                 fetchOptions={() => (partnerId() ? fetchInvoicesForVendor(partnerId()!) : Promise.resolve([]))}
               />
               <Field label="Applied amount">
-                <input
+                <DecimalInput
                   class={inputClass}
-                  type="number"
-                  step="any"
                   value={applications()[index()]?.applied_amount ?? ""}
-                  onInput={(e) =>
-                    setApplications((rows) => rows.map((r, idx) => (idx === index() ? { ...r, applied_amount: e.currentTarget.value } : r)))
+                  onValue={(v) =>
+                    setApplications((rows) => rows.map((r, idx) => (idx === index() ? { ...r, applied_amount: v } : r)))
                   }
                 />
               </Field>
@@ -321,14 +320,11 @@ export function PaymentVoucherModal(props: Props) {
                 </select>
               </Field>
               <Field label="Income base amount">
-                <input
+                <DecimalInput
                   class={inputClass}
-                  type="number"
-                  step="any"
-                  min="0"
                   value={withholdingLines()[index()]?.base_amount ?? ""}
-                  onInput={(e) =>
-                    setWithholdingLines((rows) => rows.map((r, idx) => (idx === index() ? { ...r, base_amount: e.currentTarget.value } : r)))
+                  onValue={(v) =>
+                    setWithholdingLines((rows) => rows.map((r, idx) => (idx === index() ? { ...r, base_amount: v } : r)))
                   }
                 />
               </Field>

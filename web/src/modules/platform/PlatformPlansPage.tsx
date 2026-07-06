@@ -1,10 +1,9 @@
 import { A } from "@solidjs/router";
+import { formatPeso } from "../../shared/money";
 import { For, Show } from "solid-js";
 import { usePlatformPlansAdmin } from "../../shared/usePlatform";
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export default function PlatformPlansPage() {
   const q = usePlatformPlansAdmin();
@@ -58,22 +57,22 @@ export default function PlatformPlansPage() {
                   <div class="mt-4 grid gap-4 sm:grid-cols-2">
                     <div class="rounded-lg bg-slate-50 p-3 text-sm">
                       <p class="text-xs font-medium uppercase text-text-secondary">Regular price</p>
-                      <p class="mt-1 text-lg font-semibold">₱{money(p.regular_monthly_amount)}/mo</p>
+                      <p class="mt-1 text-lg font-semibold">{formatPeso(p.regular_monthly_amount)}/mo</p>
                       <Show when={p.regular_total_amount != null}>
-                        <p class="text-xs text-text-secondary">Contract: ₱{money(p.regular_total_amount!)}</p>
+                        <p class="text-xs text-text-secondary">Contract: {formatPeso(p.regular_total_amount!)}</p>
                       </Show>
                     </div>
                     <div class="rounded-lg bg-slate-50 p-3 text-sm">
                       <p class="text-xs font-medium uppercase text-text-secondary">Effective price</p>
                       <Show
                         when={p.promo_active && p.promo_monthly_amount != null}
-                        fallback={<p class="mt-1 text-lg font-semibold">₱{money(p.effective_monthly_amount)}/mo</p>}
+                        fallback={<p class="mt-1 text-lg font-semibold">{formatPeso(p.effective_monthly_amount)}/mo</p>}
                       >
                         <p class="mt-1 text-lg font-semibold text-brand-700">
-                          ₱{money(p.effective_monthly_amount)}/mo
+                          {formatPeso(p.effective_monthly_amount)}/mo
                         </p>
                         <p class="text-xs line-through text-text-secondary">
-                          Was ₱{money(p.regular_monthly_amount)}/mo
+                          Was {formatPeso(p.regular_monthly_amount)}/mo
                         </p>
                       </Show>
                       <Show when={p.lock_in_months > 0}>

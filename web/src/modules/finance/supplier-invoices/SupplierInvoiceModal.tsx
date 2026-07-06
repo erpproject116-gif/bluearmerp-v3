@@ -1,5 +1,7 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Index, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { DecimalInput } from "../../../shared/DecimalInput";
+import { parseNum, roundMoney } from "../../../shared/money";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -216,24 +218,22 @@ export function SupplierInvoiceModal(props: Props) {
         </Show>
       </div>
       <div class="col-span-full">
-        <For each={lines()}>
+        <Index each={lines()}>
           {(ln, i) => (
             <div class="mb-2 grid grid-cols-3 gap-2 text-sm">
-              <span class="col-span-2 truncate">{ln.label}</span>
-              <input
+              <span class="col-span-2 truncate">{ln().label}</span>
+              <DecimalInput
+                mode="qty"
                 class={inputClass}
-                type="number"
-                step="any"
-                value={ln.qty}
-                onInput={(e) => {
-                  const qty = e.currentTarget.value;
-                  const total = (Number(qty) * ln.unit_vat_inc).toFixed(4);
-                  setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, qty, line_total: total } : r)));
+                value={ln().qty}
+                onValue={(qty) => {
+                  const total = String(roundMoney(parseNum(qty) * ln().unit_vat_inc));
+                  setLines((rows) => rows.map((r, idx) => (idx === i ? { ...r, qty, line_total: total } : r)));
                 }}
               />
             </div>
           )}
-        </For>
+        </Index>
       </div>
       <Field label="Notes">
         <textarea class={`${inputClass} min-h-[60px]`} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />

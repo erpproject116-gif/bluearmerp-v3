@@ -5,7 +5,7 @@ import { AuthImage } from "../../shared/AuthImage";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { useToast } from "../../shared/toast";
 import { useAuth, hasPermission } from "../../shared/auth-context";
-import { sanitizeDecimalInput, sanitizeIntegerInput } from "../../shared/money";
+import { sanitizeIntegerInput, bindDecimalInput } from "../../shared/money";
 import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
 
 type ItemRow = {
@@ -270,7 +270,7 @@ function ProductRow(props: {
           autocomplete="off"
           class="w-24 rounded-lg border border-stroke px-2 py-1.5 text-right text-sm focus:border-brand-500 focus:outline-none"
           value={price()}
-          onInput={(e) => setPrice(sanitizeDecimalInput(e.currentTarget.value))}
+          onInput={(e) => bindDecimalInput(e.currentTarget, setPrice)}
         />
       </td>
       <td class="px-4 py-2">
@@ -707,7 +707,7 @@ function ModifierGroupCard(props: {
           class="w-24 rounded-lg border border-stroke px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
           placeholder="+ price"
           value={optPrice()}
-          onInput={(e) => setOptPrice(sanitizeDecimalInput(e.currentTarget.value))}
+          onInput={(e) => bindDecimalInput(e.currentTarget, setOptPrice)}
         />
         <button
           type="button"

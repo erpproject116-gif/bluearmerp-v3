@@ -1,6 +1,8 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, Index, Show } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { DecimalInput } from "../../../shared/DecimalInput";
+import { formatAmount, parseNum } from "../../../shared/money";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
@@ -44,15 +46,6 @@ export function emptyQuotationLine(lineNo: number, salesPrice = "", inputBasis: 
     line_total: "",
     remark: "",
   };
-}
-
-function parseNum(s: string) {
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 const QUOTATION_LINE_COLUMNS = [
@@ -257,34 +250,34 @@ export function QuotationLineGrid(props: Props) {
             </tr>
           </thead>
           <tbody>
-            <For each={props.lines()}>
+            <Index each={props.lines()}>
               {(line, idx) => (
                 <tr>
-                  <ResizableTd width={widthFor("line_no")} class="px-2 py-1">{line.line_no}</ResizableTd>
+                  <ResizableTd width={widthFor("line_no")} class="px-2 py-1">{line().line_no}</ResizableTd>
                   <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
                       class={`${inputClass} w-full cursor-pointer`}
-                      value={line.item_code}
+                      value={line().item_code}
                       readOnly
-                      onDblClick={() => openSearch(idx())}
+                      onDblClick={() => openSearch(idx)}
                       title="Double-click to search items"
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={line.item_name} onInput={(e) => void updateLine(idx(), { item_name: e.currentTarget.value })} />
+                    <input class={`${inputClass} w-full`} value={line().item_name} onInput={(e) => void updateLine(idx, { item_name: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("description")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={line.description} onInput={(e) => void updateLine(idx(), { description: e.currentTarget.value })} />
+                    <input class={`${inputClass} w-full`} value={line().description} onInput={(e) => void updateLine(idx, { description: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("qty")} class="px-2 py-1">
-                    <input type="number" class={`${inputClass} w-full text-right`} value={line.qty} onInput={(e) => void updateLine(idx(), { qty: e.currentTarget.value })} />
+                    <DecimalInput mode="qty" class={`${inputClass} w-full text-right`} value={line().qty} onValue={(v) => void updateLine(idx, { qty: v })} />
                   </ResizableTd>
                   <Show when={hasCol("basis")}>
                     <ResizableTd width={widthFor("basis")} class="px-2 py-1">
                       <select
                         class={inputClass}
-                        value={line.input_basis}
-                        onChange={(e) => void updateLine(idx(), { input_basis: e.currentTarget.value as QuotationLineRow["input_basis"] })}
+                        value={line().input_basis}
+                        onChange={(e) => void updateLine(idx, { input_basis: e.currentTarget.value as QuotationLineRow["input_basis"] })}
                       >
                         <option value="vat_inc_unit">VAT inc.</option>
                         <option value="non_vat_unit">Non-VAT</option>
@@ -292,32 +285,32 @@ export function QuotationLineGrid(props: Props) {
                     </ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("unit_price")} class="px-2 py-1">
-                    <input type="number" class={`${inputClass} w-full text-right`} value={line.unit_price} onInput={(e) => void updateLine(idx(), { unit_price: e.currentTarget.value })} />
+                    <DecimalInput class={`${inputClass} w-full text-right`} value={line().unit_price} onValue={(v) => void updateLine(idx, { unit_price: v })} />
                   </ResizableTd>
                   <Show when={hasCol("unit_non_vat")}>
-                    <ResizableTd width={widthFor("unit_non_vat")} class="px-2 py-1 text-right">{money(parseNum(line.unit_non_vat))}</ResizableTd>
+                    <ResizableTd width={widthFor("unit_non_vat")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().unit_non_vat))}</ResizableTd>
                   </Show>
                   <Show when={hasCol("non_vat_total")}>
-                    <ResizableTd width={widthFor("non_vat_total")} class="px-2 py-1 text-right">{money(parseNum(line.non_vat_total))}</ResizableTd>
+                    <ResizableTd width={widthFor("non_vat_total")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().non_vat_total))}</ResizableTd>
                   </Show>
                   <Show when={hasCol("tax")}>
-                    <ResizableTd width={widthFor("tax")} class="px-2 py-1 text-right">{money(parseNum(line.tax_amount))}</ResizableTd>
+                    <ResizableTd width={widthFor("tax")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().tax_amount))}</ResizableTd>
                   </Show>
                   <Show when={hasCol("unit_vat_inc")}>
-                    <ResizableTd width={widthFor("unit_vat_inc")} class="px-2 py-1 text-right">{money(parseNum(line.unit_vat_inc))}</ResizableTd>
+                    <ResizableTd width={widthFor("unit_vat_inc")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().unit_vat_inc))}</ResizableTd>
                   </Show>
-                  <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{money(parseNum(line.line_total))}</ResizableTd>
+                  <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().line_total))}</ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={line.remark} onInput={(e) => void updateLine(idx(), { remark: e.currentTarget.value })} />
+                    <input class={`${inputClass} w-full`} value={line().remark} onInput={(e) => void updateLine(idx, { remark: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("actions")} class="px-2 py-1">
-                    <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeLine(idx())}>
+                    <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeLine(idx)}>
                       Remove
                     </button>
                   </ResizableTd>
                 </tr>
               )}
-            </For>
+            </Index>
           </tbody>
           <tfoot class="bg-slate-50 font-semibold">
             <tr>
@@ -330,15 +323,15 @@ export function QuotationLineGrid(props: Props) {
               </Show>
               <td />
               <Show when={hasCol("non_vat_total")}>
-                <td class="px-2 py-2 text-right">{money(totals().nonVat)}</td>
+                <td class="px-2 py-2 text-right">{formatAmount(totals().nonVat)}</td>
               </Show>
               <Show when={hasCol("tax")}>
-                <td class="px-2 py-2 text-right">{money(totals().tax)}</td>
+                <td class="px-2 py-2 text-right">{formatAmount(totals().tax)}</td>
               </Show>
               <Show when={hasCol("unit_vat_inc")}>
                 <td />
               </Show>
-              <td class="px-2 py-2 text-right">{money(totals().grand)}</td>
+              <td class="px-2 py-2 text-right">{formatAmount(totals().grand)}</td>
               <td colSpan={2} />
             </tr>
           </tfoot>

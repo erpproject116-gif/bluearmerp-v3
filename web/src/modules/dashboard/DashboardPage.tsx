@@ -1,4 +1,5 @@
 import { A } from "@solidjs/router";
+import { formatPeso } from "../../shared/money";
 import { createMemo, For, Show } from "solid-js";
 import { DashboardLayout } from "./DashboardLayout";
 import { OnboardingChecklist } from "../../shared/OnboardingChecklist";
@@ -14,9 +15,7 @@ import {
   type DashboardTrendPoint,
 } from "../../shared/useDashboard";
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function int(n: number) {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -57,7 +56,7 @@ const redFlagLinks: Record<string, string> = {
 
 function CssBarChart(props: { title: string; points: DashboardTrendPoint[]; valueFormat?: "money" | "int" }) {
   const max = () => Math.max(...props.points.map((p) => p.value), 1);
-  const format = (v: number) => (props.valueFormat === "money" ? money(v) : int(v));
+  const format = (v: number) => (props.valueFormat === "money" ? formatPeso(v) : int(v));
 
   return (
     <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
@@ -177,14 +176,14 @@ export default function DashboardPage() {
   const customerItems = createMemo(() =>
     (topCustomers.data ?? []).map((c) => ({
       label: c.partner_name,
-      value: money(c.total_amount),
+      value: formatPeso(c.total_amount),
     })),
   );
 
   const vendorItems = createMemo(() =>
     (topVendors.data ?? []).map((v) => ({
       label: v.partner_name,
-      value: money(v.total_amount),
+      value: formatPeso(v.total_amount),
     })),
   );
 
@@ -221,7 +220,7 @@ export default function DashboardPage() {
         <For each={kpiTiles}>
           {(tile) => {
             const raw = () => tile.value(summaryData());
-            const display = () => (tile.format === "money" ? money(Number(raw())) : int(Number(raw())));
+            const display = () => (tile.format === "money" ? formatPeso(Number(raw())) : int(Number(raw())));
             const inner = (
               <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm transition hover:shadow-md">
                 <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">{tile.label}</p>

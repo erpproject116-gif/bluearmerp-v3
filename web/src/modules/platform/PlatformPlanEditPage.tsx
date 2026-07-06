@@ -1,6 +1,8 @@
 import { useNavigate, useParams } from "@solidjs/router";
 import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { DecimalInput } from "../../shared/DecimalInput";
+import { parseNum } from "../../shared/money";
 import { usePlatformPlan } from "../../shared/usePlatform";
 
 function parseInclusions(raw: string): string[] {
@@ -139,21 +141,20 @@ export default function PlatformPlanEditPage() {
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block text-sm">
             <span class="font-medium">Lock-in (months)</span>
-            <input
-              type="number"
-              min={0}
+            <DecimalInput
+              mode="integer"
               class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
-              value={lockInMonths()}
-              onInput={(e) => setLockInMonths(Number(e.currentTarget.value))}
+              value={String(lockInMonths())}
+              onValue={(v) => setLockInMonths(parseNum(v))}
             />
           </label>
           <label class="block text-sm">
             <span class="font-medium">Sort order</span>
-            <input
-              type="number"
+            <DecimalInput
+              mode="integer"
               class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
-              value={sortOrder()}
-              onInput={(e) => setSortOrder(Number(e.currentTarget.value))}
+              value={String(sortOrder())}
+              onValue={(v) => setSortOrder(parseNum(v))}
             />
           </label>
         </div>
@@ -163,24 +164,18 @@ export default function PlatformPlanEditPage() {
           <div class="mt-2 grid gap-4 sm:grid-cols-2">
             <label class="block text-sm">
               <span>Monthly (₱)</span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
+              <DecimalInput
                 class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
-                value={regularMonthly()}
-                onInput={(e) => setRegularMonthly(Number(e.currentTarget.value))}
+                value={String(regularMonthly())}
+                onValue={(v) => setRegularMonthly(parseNum(v))}
               />
             </label>
             <label class="block text-sm">
               <span>Total contract (₱)</span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
+              <DecimalInput
                 class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
-                value={regularTotal()}
-                onInput={(e) => setRegularTotal(e.currentTarget.value === "" ? "" : Number(e.currentTarget.value))}
+                value={regularTotal() === "" ? "" : String(regularTotal())}
+                onValue={(v) => setRegularTotal(v === "" ? "" : parseNum(v))}
               />
             </label>
           </div>
@@ -200,24 +195,18 @@ export default function PlatformPlanEditPage() {
           <div class="mt-3 grid gap-4 sm:grid-cols-2">
             <label class="block text-sm">
               <span>Promo monthly (₱)</span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
+              <DecimalInput
                 class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
-                value={promoMonthly()}
-                onInput={(e) => setPromoMonthly(e.currentTarget.value === "" ? "" : Number(e.currentTarget.value))}
+                value={promoMonthly() === "" ? "" : String(promoMonthly())}
+                onValue={(v) => setPromoMonthly(v === "" ? "" : parseNum(v))}
               />
             </label>
             <label class="block text-sm">
               <span>Promo total contract (₱)</span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
+              <DecimalInput
                 class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
-                value={promoTotal()}
-                onInput={(e) => setPromoTotal(e.currentTarget.value === "" ? "" : Number(e.currentTarget.value))}
+                value={promoTotal() === "" ? "" : String(promoTotal())}
+                onValue={(v) => setPromoTotal(v === "" ? "" : parseNum(v))}
               />
             </label>
             <label class="block text-sm">

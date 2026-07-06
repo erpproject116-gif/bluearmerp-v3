@@ -1,4 +1,5 @@
 import { createEffect, createSignal, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { getAccessToken } from "../../../shared/api";
 import { Modal } from "../../../shared/Modal";
 import {
@@ -12,9 +13,7 @@ type Props = {
   onClose: () => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export function CollectiveInvoiceTransactionsModal(props: Props) {
   const [rows, setRows] = createSignal<CollectiveTransactionRow[]>([]);
@@ -94,10 +93,10 @@ export function CollectiveInvoiceTransactionsModal(props: Props) {
                   <td class="px-2 py-1.5">{r.transaction_date_no_display}</td>
                   <td class="px-2 py-1.5">{r.item_name_spec}</td>
                   <td class="px-2 py-1.5 text-right tabular-nums">{r.qty}</td>
-                  <td class="px-2 py-1.5 text-right tabular-nums">{money(r.price)}</td>
-                  <td class="px-2 py-1.5 text-right tabular-nums">{money(r.pretax_amount)}</td>
-                  <td class="px-2 py-1.5 text-right tabular-nums">{money(r.tax)}</td>
-                  <td class="px-2 py-1.5 text-right tabular-nums">{money(r.total)}</td>
+                  <td class="px-2 py-1.5 text-right tabular-nums">{formatPeso(r.price)}</td>
+                  <td class="px-2 py-1.5 text-right tabular-nums">{formatPeso(r.pretax_amount)}</td>
+                  <td class="px-2 py-1.5 text-right tabular-nums">{formatPeso(r.tax)}</td>
+                  <td class="px-2 py-1.5 text-right tabular-nums">{formatPeso(r.total)}</td>
                   <td class="px-2 py-1.5">{r.customer_name}</td>
                 </tr>
               ))}

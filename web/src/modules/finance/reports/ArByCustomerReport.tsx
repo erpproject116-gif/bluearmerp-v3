@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
 import { arByCustomerExportUrl } from "../../../shared/useArByCustomerReport";
@@ -16,9 +17,7 @@ type Props = {
   onPageChange: (page: number) => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export function ArByCustomerReport(props: Props) {
   const auth = useAuth();
@@ -96,9 +95,9 @@ export function ArByCustomerReport(props: Props) {
               {(row) => (
                 <tr class="border-t border-stroke/60 hover:bg-slate-50/50">
                   <td class="px-3 py-2">{row.customer_name}</td>
-                  <td class="px-3 py-2 text-right">{money(row.total_sales)}</td>
-                  <td class="px-3 py-2 text-right">{money(row.total_received)}</td>
-                  <td class="px-3 py-2 text-right font-medium">{money(row.balance)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.total_sales)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.total_received)}</td>
+                  <td class="px-3 py-2 text-right font-medium">{formatPeso(row.balance)}</td>
                 </tr>
               )}
             </For>
@@ -107,9 +106,9 @@ export function ArByCustomerReport(props: Props) {
             <tfoot class="border-t-2 border-stroke bg-slate-50 font-semibold">
               <tr>
                 <td class="px-3 py-2">Page totals</td>
-                <td class="px-3 py-2 text-right">{money(totals().sales)}</td>
-                <td class="px-3 py-2 text-right">{money(totals().received)}</td>
-                <td class="px-3 py-2 text-right">{money(totals().balance)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(totals().sales)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(totals().received)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(totals().balance)}</td>
               </tr>
             </tfoot>
           </Show>

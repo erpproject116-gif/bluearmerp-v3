@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
 import { discountStatusExportUrl, type SalesDiscountStatusRow } from "../../../shared/useSalesDiscountStatusReport";
@@ -30,9 +31,7 @@ type Props = {
   onSort: (field: DiscountSortField) => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function sortIndicator(active: boolean, order: "asc" | "desc") {
   if (!active) return "";
@@ -130,7 +129,7 @@ export function SalesDiscountStatusReport(props: Props) {
                     line={line}
                     displayApvlLine={props.template.displayApvlLine}
                     columnVisibility={props.template.columnVisibility}
-                    money={money}
+                    money={formatPeso}
                   />
                 )}
               </For>
@@ -140,9 +139,9 @@ export function SalesDiscountStatusReport(props: Props) {
                 <Show when={showCol("order_date") || showCol("customer_name")}>
                   <td class="px-3 py-2" colSpan={labelColspan()}>Total</td>
                 </Show>
-                <Show when={showCol("sales_amount")}><td class="px-3 py-2 text-right tabular-nums">{money(props.totalSales)}</td></Show>
-                <Show when={showCol("invoicing_amount")}><td class="px-3 py-2 text-right tabular-nums">{money(props.totalInvoicing)}</td></Show>
-                <Show when={showCol("difference_amount")}><td class="px-3 py-2 text-right tabular-nums">{money(props.totalDifference)}</td></Show>
+                <Show when={showCol("sales_amount")}><td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.totalSales)}</td></Show>
+                <Show when={showCol("invoicing_amount")}><td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.totalInvoicing)}</td></Show>
+                <Show when={showCol("difference_amount")}><td class="px-3 py-2 text-right tabular-nums">{formatPeso(props.totalDifference)}</td></Show>
                 <Show when={showCol("apvl_line")}><td class="px-3 py-2" /></Show>
                 <Show when={showCol("remark")}><td class="px-3 py-2" /></Show>
               </tr>

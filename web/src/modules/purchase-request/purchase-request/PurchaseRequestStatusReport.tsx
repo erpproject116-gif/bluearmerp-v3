@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
 import { formatDisplayDate, statusExportUrl, statusPrintPath, type PurchaseRequestStatusFilters } from "./purchaseRequestStatusFilters";
@@ -22,9 +23,7 @@ type Props = {
   onApprovalChanged: () => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export function PurchaseRequestStatusReport(props: Props) {
   const auth = useAuth();
@@ -129,7 +128,7 @@ export function PurchaseRequestStatusReport(props: Props) {
                   <td class="px-3 py-2">{row.item_name}</td>
                   <td class="px-3 py-2">{row.spec_name ?? ""}</td>
                   <td class="px-3 py-2 text-right">{row.qty}</td>
-                  <td class="px-3 py-2 text-right">{money(row.line_total)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.line_total)}</td>
                   <td class="px-3 py-2">{row.remark ?? ""}</td>
                 </tr>
               )}
@@ -141,7 +140,7 @@ export function PurchaseRequestStatusReport(props: Props) {
                 Total
               </td>
               <td class="px-3 py-2 text-right">{props.totalQty}</td>
-              <td class="px-3 py-2 text-right">{money(props.totalAmount)}</td>
+              <td class="px-3 py-2 text-right">{formatPeso(props.totalAmount)}</td>
               <td />
             </tr>
           </tfoot>

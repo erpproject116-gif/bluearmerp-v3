@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
 import { receiptStatusExportUrl } from "../../../shared/useReceiptStatusReport";
@@ -18,9 +19,7 @@ type Props = {
   onPageChange: (page: number) => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export function ReceiptStatusReport(props: Props) {
   const auth = useAuth();
@@ -97,14 +96,14 @@ export function ReceiptStatusReport(props: Props) {
                   <td class="px-3 py-2">{row.date_no_display}</td>
                   <td class="px-3 py-2">{row.sales_no}</td>
                   <td class="px-3 py-2">{row.customer_name}</td>
-                  <td class="px-3 py-2 text-right">{money(row.grand_total)}</td>
-                  <td class="px-3 py-2 text-right">{money(row.received_amount)}</td>
-                  <td class="px-3 py-2 text-right">{money(row.balance)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.grand_total)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.received_amount)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.balance)}</td>
                   <td class="px-3 py-2">{receiptStatusLabel(row.receipt_status)}</td>
                   <td class="px-3 py-2">{row.item_code}</td>
                   <td class="px-3 py-2">{row.item_name}</td>
-                  <td class="px-3 py-2 text-right">{money(row.qty)}</td>
-                  <td class="px-3 py-2 text-right">{money(row.line_total)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.qty)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.line_total)}</td>
                 </tr>
               )}
             </For>
@@ -115,8 +114,8 @@ export function ReceiptStatusReport(props: Props) {
                 <td class="px-3 py-2" colSpan={9}>
                   Totals
                 </td>
-                <td class="px-3 py-2 text-right">{money(props.totalQty)}</td>
-                <td class="px-3 py-2 text-right">{money(props.totalAmount)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(props.totalQty)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(props.totalAmount)}</td>
               </tr>
             </tfoot>
           </Show>

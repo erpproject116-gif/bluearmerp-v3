@@ -1,9 +1,8 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../shared/money";
 import { useBilling, usePublicPlans } from "../../shared/usePlatform";
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export default function BillingPage() {
   const q = useBilling();
@@ -61,12 +60,12 @@ export default function BillingPage() {
                           <Show
                             when={p.promo_active}
                             fallback={
-                              <p class="font-semibold">₱{money(p.regular_monthly_amount)}/mo</p>
+                              <p class="font-semibold">{formatPeso(p.regular_monthly_amount)}/mo</p>
                             }
                           >
-                            <p class="font-semibold text-brand-700">₱{money(p.effective_monthly_amount)}/mo</p>
+                            <p class="font-semibold text-brand-700">{formatPeso(p.effective_monthly_amount)}/mo</p>
                             <p class="text-xs line-through text-text-secondary">
-                              ₱{money(p.regular_monthly_amount)}/mo
+                              {formatPeso(p.regular_monthly_amount)}/mo
                             </p>
                             <Show when={p.promo_label}>
                               <p class="text-xs text-amber-700">{p.promo_label}</p>

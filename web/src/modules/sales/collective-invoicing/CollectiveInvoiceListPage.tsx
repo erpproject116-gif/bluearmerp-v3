@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { SALES_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
@@ -13,9 +14,7 @@ import {
 import { CollectiveInvoiceTransactionsModal } from "./CollectiveInvoiceTransactionsModal";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function openSlipPrint(id: number) {
   window.open(`/app/sales/collective-invoicing/${id}/slip/print`, "_blank", "noopener,noreferrer");
@@ -81,18 +80,18 @@ export default function CollectiveInvoiceListPage() {
             key: "subtotal",
             header: "Pretax Amount",
             sortable: true,
-            render: (r: CollectiveInvoiceRow) => money(r.subtotal),
+            render: (r: CollectiveInvoiceRow) => formatPeso(r.subtotal),
           },
           {
             key: "tax_total",
             header: "Sales Tax",
-            render: (r: CollectiveInvoiceRow) => money(r.tax_total),
+            render: (r: CollectiveInvoiceRow) => formatPeso(r.tax_total),
           },
           {
             key: "grand_total",
             header: "Total Sales",
             sortable: true,
-            render: (r: CollectiveInvoiceRow) => money(r.grand_total),
+            render: (r: CollectiveInvoiceRow) => formatPeso(r.grand_total),
           },
           {
             key: "view_trans",

@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import type { PriceBatchLineRow } from "../../../shared/usePriceBatchLines";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { progressStatusLabel } from "./progressStatus";
@@ -19,9 +20,7 @@ type Props = {
   editableRows: () => EditablePriceBatchRow[];
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function initEditable(rows: PriceBatchLineRow[]): EditablePriceBatchRow[] {
   return rows.map((r) => ({
@@ -109,8 +108,8 @@ export function ChangeSalesPriceBatchGrid(props: Props) {
                       onInput={(e) => updateUnit(row.line_id, e.currentTarget.value)}
                     />
                   </td>
-                  <td class="px-3 py-2 text-right">{money(row.non_vat_total)}</td>
-                  <td class="px-3 py-2 text-right">{money(row.tax_amount)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.non_vat_total)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.tax_amount)}</td>
                   <td class="px-3 py-2">{progressStatusLabel(row.progress_status)}</td>
                 </tr>
               )}

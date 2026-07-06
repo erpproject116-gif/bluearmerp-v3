@@ -1,5 +1,6 @@
-import { createSignal, For, Show } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { apiFetch } from "./api";
+import { DecimalInput } from "./DecimalInput";
 import { Field, inputClass } from "./SpreadsheetGrid";
 import { modalDismissClass } from "./Modal";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
@@ -197,16 +198,16 @@ export function ItemSearchModal(props: Props) {
                 </select>
               </Field>
               <Field label="Purchase price min">
-                <input type="number" class={inputClass} value={filters().purchase_price_min} onInput={(e) => setFilters((f) => ({ ...f, purchase_price_min: e.currentTarget.value }))} />
+                <DecimalInput class={inputClass} value={filters().purchase_price_min} onValue={(v) => setFilters((f) => ({ ...f, purchase_price_min: v }))} />
               </Field>
               <Field label="Purchase price max">
-                <input type="number" class={inputClass} value={filters().purchase_price_max} onInput={(e) => setFilters((f) => ({ ...f, purchase_price_max: e.currentTarget.value }))} />
+                <DecimalInput class={inputClass} value={filters().purchase_price_max} onValue={(v) => setFilters((f) => ({ ...f, purchase_price_max: v }))} />
               </Field>
               <Field label="Sale price min">
-                <input type="number" class={inputClass} value={filters().sales_price_min} onInput={(e) => setFilters((f) => ({ ...f, sales_price_min: e.currentTarget.value }))} />
+                <DecimalInput class={inputClass} value={filters().sales_price_min} onValue={(v) => setFilters((f) => ({ ...f, sales_price_min: v }))} />
               </Field>
               <Field label="Sale price max">
-                <input type="number" class={inputClass} value={filters().sales_price_max} onInput={(e) => setFilters((f) => ({ ...f, sales_price_max: e.currentTarget.value }))} />
+                <DecimalInput class={inputClass} value={filters().sales_price_max} onValue={(v) => setFilters((f) => ({ ...f, sales_price_max: v }))} />
               </Field>
               <Field label="Keyword" span="full">
                 <input class={inputClass} value={filters().keyword} onInput={(e) => setFilters((f) => ({ ...f, keyword: e.currentTarget.value }))} />

@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import type { SalesDiscountStatusRow } from "../../../shared/useSalesDiscountStatusReport";
 
 type Props = {
@@ -6,9 +7,7 @@ type Props = {
   metric?: "difference_amount" | "sales_amount" | "invoicing_amount";
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export function SalesDiscountStatusGraph(props: Props) {
   const metric = () => props.metric ?? "difference_amount";
@@ -52,7 +51,7 @@ export function SalesDiscountStatusGraph(props: Props) {
                     style={{ width: `${(entry.value / chartData().max) * 100}%` }}
                   />
                 </div>
-                <span class="tabular-nums text-text-secondary">{money(entry.value)}</span>
+                <span class="tabular-nums text-text-secondary">{formatPeso(entry.value)}</span>
               </div>
             )}
           </For>

@@ -1,4 +1,5 @@
 import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
 import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import {
@@ -24,9 +25,7 @@ import {
 import { parseTemplateFromSearch } from "./salesDiscountStatusTemplate";
 import "../../quotation/quotation/quotationPrint.css";
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 async function fetchAllRows(filters: SalesDiscountStatusFilters, template: ReturnType<typeof parseTemplateFromSearch>) {
   const rows: SalesDiscountStatusRow[] = [];
@@ -140,7 +139,7 @@ function PrintView() {
                         line={line}
                         displayApvlLine={template().displayApvlLine}
                         columnVisibility={template().columnVisibility}
-                        money={money}
+                        money={formatPeso}
                         variant="print"
                       />
                     )}
@@ -151,9 +150,9 @@ function PrintView() {
                     <Show when={showCol("order_date") || showCol("customer_name")}>
                       <td colSpan={labelColspan()}><strong>Total</strong></td>
                     </Show>
-                    <Show when={showCol("sales_amount")}><td class="text-right"><strong>{money(payload().summary.total_sales_amount)}</strong></td></Show>
-                    <Show when={showCol("invoicing_amount")}><td class="text-right"><strong>{money(payload().summary.total_invoicing_amount)}</strong></td></Show>
-                    <Show when={showCol("difference_amount")}><td class="text-right"><strong>{money(payload().summary.total_difference_amount)}</strong></td></Show>
+                    <Show when={showCol("sales_amount")}><td class="text-right"><strong>{formatPeso(payload().summary.total_sales_amount)}</strong></td></Show>
+                    <Show when={showCol("invoicing_amount")}><td class="text-right"><strong>{formatPeso(payload().summary.total_invoicing_amount)}</strong></td></Show>
+                    <Show when={showCol("difference_amount")}><td class="text-right"><strong>{formatPeso(payload().summary.total_difference_amount)}</strong></td></Show>
                     <Show when={showCol("apvl_line")}><td /></Show>
                     <Show when={showCol("remark")}><td /></Show>
                   </tr>

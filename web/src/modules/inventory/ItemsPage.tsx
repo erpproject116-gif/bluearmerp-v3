@@ -1,5 +1,7 @@
 import { createSignal } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { DecimalInput } from "../../shared/DecimalInput";
+import { formatAmount, parseNum } from "../../shared/money";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
 import { INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
@@ -26,8 +28,6 @@ type Item = {
   status: string;
   custom_values?: Record<string, unknown>;
 };
-
-const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function ItemsPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("item_code");
@@ -133,9 +133,9 @@ export default function ItemsPage() {
         columns={[
           { key: "item_code", header: "Code", clickable: true },
           { key: "item_name", header: "Name", clickable: true },
-          { key: "purchase_price", header: "Purchase", render: (r) => money(r.purchase_price) },
-          { key: "sales_price", header: "Sales", render: (r) => money(r.sales_price) },
-          { key: "vip_price", header: "VIP", render: (r) => money(r.vip_price) },
+          { key: "purchase_price", header: "Purchase", render: (r) => formatAmount(r.purchase_price) },
+          { key: "sales_price", header: "Sales", render: (r) => formatAmount(r.sales_price) },
+          { key: "vip_price", header: "VIP", render: (r) => formatAmount(r.vip_price) },
           { key: "warranty_duration_months", header: "Warranty (mo)", render: (r) => r.warranty_duration_months ?? "—" },
           { key: "reorder_level", header: "Reorder", render: (r) => (r.reorder_level != null ? r.reorder_level : "—") },
           { key: "track_serial", header: "Serial", render: (r) => (r.track_serial ? "Yes" : "—") },
@@ -180,77 +180,65 @@ export default function ItemsPage() {
         </ModalField>
         <ModalField settings={byKey} fieldKey="purchase_price" fallbackLabel="Purchase price">
           {(m) => (
-            <input
-              type="number"
-              step="0.01"
+            <DecimalInput
               class={inputClass}
-              value={form().purchase_price}
               disabled={m.disabled}
-              onInput={(e) => setForm((f) => ({ ...f, purchase_price: Number(e.currentTarget.value) }))}
+              value={String(form().purchase_price)}
+              onValue={(v) => setForm((f) => ({ ...f, purchase_price: parseNum(v) }))}
             />
           )}
         </ModalField>
         <ModalField settings={byKey} fieldKey="sales_price" fallbackLabel="Sales price">
           {(m) => (
-            <input
-              type="number"
-              step="0.01"
+            <DecimalInput
               class={inputClass}
-              value={form().sales_price}
               disabled={m.disabled}
-              onInput={(e) => setForm((f) => ({ ...f, sales_price: Number(e.currentTarget.value) }))}
+              value={String(form().sales_price)}
+              onValue={(v) => setForm((f) => ({ ...f, sales_price: parseNum(v) }))}
             />
           )}
         </ModalField>
         <ModalField settings={byKey} fieldKey="vip_price" fallbackLabel="VIP price">
           {(m) => (
-            <input
-              type="number"
-              step="0.01"
+            <DecimalInput
               class={inputClass}
-              value={form().vip_price}
               disabled={m.disabled}
-              onInput={(e) => setForm((f) => ({ ...f, vip_price: Number(e.currentTarget.value) }))}
+              value={String(form().vip_price)}
+              onValue={(v) => setForm((f) => ({ ...f, vip_price: parseNum(v) }))}
             />
           )}
         </ModalField>
         <ModalField settings={byKey} fieldKey="warranty_duration_months" fallbackLabel="Warranty (months)">
           {(m) => (
-            <input
-              type="number"
-              min="0"
-              step="1"
+            <DecimalInput
+              mode="integer"
               class={inputClass}
-              value={form().warranty_duration_months ?? ""}
-              disabled={m.disabled}
               placeholder="No warranty"
-              onInput={(e) => {
-                const v = e.currentTarget.value;
+              disabled={m.disabled}
+              value={form().warranty_duration_months == null ? "" : String(form().warranty_duration_months)}
+              onValue={(v) =>
                 setForm((f) => ({
                   ...f,
-                  warranty_duration_months: v === "" ? null : Number(v),
-                }));
-              }}
+                  warranty_duration_months: v === "" ? null : parseNum(v),
+                }))
+              }
             />
           )}
         </ModalField>
         <ModalField settings={byKey} fieldKey="reorder_level" fallbackLabel="Reorder level">
           {(m) => (
-            <input
-              type="number"
-              min="0"
-              step="0.0001"
+            <DecimalInput
+              mode="qty"
               class={inputClass}
-              value={form().reorder_level ?? ""}
-              disabled={m.disabled}
               placeholder="Not set"
-              onInput={(e) => {
-                const v = e.currentTarget.value;
+              disabled={m.disabled}
+              value={form().reorder_level == null ? "" : String(form().reorder_level)}
+              onValue={(v) =>
                 setForm((f) => ({
                   ...f,
-                  reorder_level: v === "" ? null : Number(v),
-                }));
-              }}
+                  reorder_level: v === "" ? null : parseNum(v),
+                }))
+              }
             />
           )}
         </ModalField>

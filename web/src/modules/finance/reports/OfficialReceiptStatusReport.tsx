@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
 import { officialReceiptStatusExportUrl } from "../../../shared/useOfficialReceiptStatusReport";
@@ -17,9 +18,7 @@ type Props = {
   onOpenReceipt: (receiptId: number) => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export function OfficialReceiptStatusReport(props: Props) {
   const auth = useAuth();
@@ -78,7 +77,7 @@ export function OfficialReceiptStatusReport(props: Props) {
                     </button>
                   </td>
                   <td class="px-3 py-2">{row.customer_name}</td>
-                  <td class="px-3 py-2 text-right tabular-nums">{money(row.amount)}</td>
+                  <td class="px-3 py-2 text-right tabular-nums">{formatPeso(row.amount)}</td>
                   <td class="px-3 py-2 max-w-md truncate" title={row.remark}>{row.remark}</td>
                 </tr>
               )}

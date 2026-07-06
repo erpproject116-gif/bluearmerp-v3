@@ -1,4 +1,5 @@
 import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
@@ -32,9 +33,7 @@ type Props = {
   onApply: (rows: ApplicationRow[]) => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 async function fetchOpen(partnerId: number, receiptId: number | null) {
   const qs = new URLSearchParams({ partner_id: String(partnerId) });
@@ -103,7 +102,7 @@ export function ReceivableApplicationModal(props: Props) {
                 return (
                   <tr>
                     <td class="px-2 py-1">{recv.date_no_display} — {recv.sales_no}</td>
-                    <td class="px-2 py-1 text-right tabular-nums">{money(recv.balance)}</td>
+                    <td class="px-2 py-1 text-right tabular-nums">{formatPeso(recv.balance)}</td>
                     <td class="px-2 py-1">
                       <input
                         class={inputClass}
@@ -132,7 +131,7 @@ export function ReceivableApplicationModal(props: Props) {
           </tbody>
         </table>
       </div>
-      <p class="mt-2 text-sm text-text-secondary">Total applied: {money(totalApplied())}</p>
+      <p class="mt-2 text-sm text-text-secondary">Total applied: {formatPeso(totalApplied())}</p>
       <div class="mt-4 flex justify-end gap-2">
         <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={props.onClose}>
           Cancel

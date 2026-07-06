@@ -1,4 +1,5 @@
 import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import { apiFetch } from "../../../shared/api";
@@ -17,9 +18,7 @@ import {
 import { parseTemplateFromSearch } from "./collectiveInvoiceStatusTemplate";
 import "../../quotation/quotation/quotationPrint.css";
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 async function fetchAllRows(filters: CollectiveInvoiceStatusFilters, template: ReturnType<typeof parseTemplateFromSearch>) {
   const rows: CollectiveInvoiceStatusRow[] = [];
@@ -140,9 +139,9 @@ function PrintView() {
                           return (
                             <tr>
                               <td colSpan={3}><strong>{line.label}</strong></td>
-                              <td class="text-right"><strong>{money(line.pretax_amount)}</strong></td>
-                              <td class="text-right"><strong>{money(line.sales_tax)}</strong></td>
-                              <td class="text-right"><strong>{money(line.total_sales)}</strong></td>
+                              <td class="text-right"><strong>{formatPeso(line.pretax_amount)}</strong></td>
+                              <td class="text-right"><strong>{formatPeso(line.sales_tax)}</strong></td>
+                              <td class="text-right"><strong>{formatPeso(line.total_sales)}</strong></td>
                               <td />
                             </tr>
                           );
@@ -153,9 +152,9 @@ function PrintView() {
                             <td>{row.date_no_display}</td>
                             <td>{row.receivable_no}</td>
                             <td>{row.customer_name}</td>
-                            <td class="text-right">{money(row.pretax_amount)}</td>
-                            <td class="text-right">{money(row.sales_tax)}</td>
-                            <td class="text-right">{money(row.total_sales)}</td>
+                            <td class="text-right">{formatPeso(row.pretax_amount)}</td>
+                            <td class="text-right">{formatPeso(row.sales_tax)}</td>
+                            <td class="text-right">{formatPeso(row.total_sales)}</td>
                             <td>{row.due_date ?? ""}</td>
                           </tr>
                         );
@@ -166,9 +165,9 @@ function PrintView() {
                     <tfoot>
                       <tr>
                         <td colSpan={3}><strong>Total</strong></td>
-                        <td class="text-right"><strong>{money(payload().summary.total_pretax)}</strong></td>
-                        <td class="text-right"><strong>{money(payload().summary.total_tax)}</strong></td>
-                        <td class="text-right"><strong>{money(payload().summary.total_sales)}</strong></td>
+                        <td class="text-right"><strong>{formatPeso(payload().summary.total_pretax)}</strong></td>
+                        <td class="text-right"><strong>{formatPeso(payload().summary.total_tax)}</strong></td>
+                        <td class="text-right"><strong>{formatPeso(payload().summary.total_sales)}</strong></td>
                         <td />
                       </tr>
                     </tfoot>

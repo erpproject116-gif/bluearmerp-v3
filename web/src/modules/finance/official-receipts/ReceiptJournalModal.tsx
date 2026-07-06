@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { apiFetch } from "../../../shared/api";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
@@ -66,9 +67,7 @@ function emptyLine(no: number): JournalLine {
   };
 }
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export function ReceiptJournalModal(props: Props) {
   const toast = useToast();
@@ -252,7 +251,7 @@ export function ReceiptJournalModal(props: Props) {
                   </tbody>
                 </table>
               </div>
-              <p class="text-sm text-text-secondary">Line total: {money(lineTotal())} · Applied: {money(appTotal())}</p>
+              <p class="text-sm text-text-secondary">Line total: {formatPeso(lineTotal())} · Applied: {formatPeso(appTotal())}</p>
               <div class="flex items-center gap-2">
                 <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setReceivableOpen(true)}>
                   Receivable Applications ({applications().length})

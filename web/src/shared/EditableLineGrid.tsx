@@ -1,5 +1,6 @@
-import { For, Show, createSignal } from "solid-js";
+import { Index, Show, createSignal } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
+import { DecimalInput } from "./DecimalInput";
 import { ItemSearchModal, type ItemSearchRow } from "./ItemSearchModal";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
@@ -118,64 +119,64 @@ export function EditableLineGrid(props: Props) {
             </tr>
           </thead>
           <tbody>
-            <For each={props.lines()}>
+            <Index each={props.lines()}>
               {(row, index) => (
                 <tr>
                   <ResizableTd width={widthFor("line_no")} class="px-2 py-1 text-text-secondary">
-                    {row.line_no}
+                    {row().line_no}
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
                       class={`${inputClass} w-full cursor-pointer`}
-                      value={row.item_code}
+                      value={row().item_code}
                       title="Double-click to search items"
-                      onDblClick={() => openPicker(index())}
-                      onInput={(e) => updateRow(index(), { item_code: e.currentTarget.value, item_id: null })}
+                      onDblClick={() => openPicker(index)}
+                      onInput={(e) => updateRow(index, { item_code: e.currentTarget.value, item_id: null })}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">
                     <input
                       class={`${inputClass} w-full`}
-                      value={row.item_name}
-                      onInput={(e) => updateRow(index(), { item_name: e.currentTarget.value })}
+                      value={row().item_name}
+                      onInput={(e) => updateRow(index, { item_name: e.currentTarget.value })}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("problem_issue")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={row.problem_issue} onInput={(e) => updateRow(index(), { problem_issue: e.currentTarget.value })} />
+                    <input class={`${inputClass} w-full`} value={row().problem_issue} onInput={(e) => updateRow(index, { problem_issue: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("service_charge")} class="px-2 py-1">
-                    <input type="number" step="0.01" class={`${inputClass} w-full`} value={row.service_charge} onInput={(e) => updateRow(index(), { service_charge: e.currentTarget.value })} />
+                    <DecimalInput class={`${inputClass} w-full`} value={row().service_charge} onValue={(v) => updateRow(index, { service_charge: v })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("tax_type")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={row.tax_type} onInput={(e) => updateRow(index(), { tax_type: e.currentTarget.value })} />
+                    <input class={`${inputClass} w-full`} value={row().tax_type} onInput={(e) => updateRow(index, { tax_type: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("qty")} class="px-2 py-1">
-                    <input type="number" step="0.01" class={`${inputClass} w-full`} value={row.qty} onInput={(e) => updateRow(index(), { qty: e.currentTarget.value })} />
+                    <DecimalInput mode="qty" class={`${inputClass} w-full`} value={row().qty} onValue={(v) => updateRow(index, { qty: v })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("mop")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={row.mop} onInput={(e) => updateRow(index(), { mop: e.currentTarget.value })} />
+                    <input class={`${inputClass} w-full`} value={row().mop} onInput={(e) => updateRow(index, { mop: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("serial_lot_no")} class="px-2 py-1">
                     <input
                       class={`${inputClass} w-full`}
-                      value={row.serial_lot_no}
-                      onInput={(e) => updateRow(index(), { serial_lot_no: e.currentTarget.value })}
-                      onBlur={(e) => void props.onSerialLotBlur?.(index(), e.currentTarget.value)}
+                      value={row().serial_lot_no}
+                      onInput={(e) => updateRow(index, { serial_lot_no: e.currentTarget.value })}
+                      onBlur={(e) => void props.onSerialLotBlur?.(index, e.currentTarget.value)}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={row.remark} onInput={(e) => updateRow(index(), { remark: e.currentTarget.value })} />
+                    <input class={`${inputClass} w-full`} value={row().remark} onInput={(e) => updateRow(index, { remark: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("actions")} class="px-2 py-1">
                     <Show when={props.lines().length > 1}>
-                      <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeRow(index())}>
+                      <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeRow(index)}>
                         Remove
                       </button>
                     </Show>
                   </ResizableTd>
                 </tr>
               )}
-            </For>
+            </Index>
           </tbody>
         </table>
       </DataTableScroll>

@@ -1,4 +1,6 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
+import { DecimalInput } from "../../../shared/DecimalInput";
 import { apiFetch } from "../../../shared/api";
 import { FINANCE_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
@@ -32,9 +34,7 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 async function fetchPartners(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
@@ -63,7 +63,7 @@ async function fetchSalesForPartner(partnerId: number, q: string): Promise<Looku
     .map((s) => ({
       id: s.id,
       label: `${s.date_no_display} — ${s.sales_no}`,
-      sublabel: money(s.grand_total),
+      sublabel: formatPeso(s.grand_total),
     }));
 }
 
@@ -367,15 +367,12 @@ export function OfficialReceiptModal(props: Props) {
                         />
                       </Show>
                     </td>
-                    <td class="px-3 py-2 text-right">{money(row.grand_total)}</td>
+                    <td class="px-3 py-2 text-right">{formatPeso(row.grand_total)}</td>
                     <td class="px-3 py-2">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
+                      <DecimalInput
                         class={`${inputClass} text-right`}
                         value={row.applied_amount}
-                        onInput={(e) => patchApplication(index(), { applied_amount: e.currentTarget.value })}
+                        onValue={(v) => patchApplication(index(), { applied_amount: v })}
                       />
                     </td>
                     <td class="px-3 py-2 text-right">
@@ -392,7 +389,7 @@ export function OfficialReceiptModal(props: Props) {
                 <td class="px-3 py-2" colSpan={2}>
                   Total
                 </td>
-                <td class="px-3 py-2 text-right">{money(amountTotal())}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(amountTotal())}</td>
                 <td />
               </tr>
             </tfoot>

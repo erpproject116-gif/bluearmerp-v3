@@ -1,4 +1,5 @@
 import { For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
 import { formatDisplayDate, outstandingExportUrl, type OutstandingQuoteFilters } from "./quotationStatusFilters";
@@ -18,9 +19,7 @@ type Props = {
   onPageChange: (page: number) => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export function OutstandingQuoteStatusReport(props: Props) {
   const auth = useAuth();
@@ -103,7 +102,7 @@ export function OutstandingQuoteStatusReport(props: Props) {
                   <td class="px-3 py-2 text-right">{row.location_stock}</td>
                   <td class="px-3 py-2 text-right">{row.total_stock}</td>
                   <td class="px-3 py-2">{row.valid_until ?? ""}</td>
-                  <td class="px-3 py-2 text-right">{money(row.line_total)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.line_total)}</td>
                 </tr>
               )}
             </For>
@@ -115,7 +114,7 @@ export function OutstandingQuoteStatusReport(props: Props) {
               </td>
               <td class="px-3 py-2 text-right">{props.totalBalanceQty}</td>
               <td colSpan={3} />
-              <td class="px-3 py-2 text-right">{money(props.totalAmount)}</td>
+              <td class="px-3 py-2 text-right">{formatPeso(props.totalAmount)}</td>
             </tr>
           </tfoot>
         </table>

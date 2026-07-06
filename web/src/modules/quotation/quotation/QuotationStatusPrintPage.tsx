@@ -1,4 +1,5 @@
 import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import { apiFetch } from "../../../shared/api";
@@ -28,9 +29,7 @@ const QUOTE_STATUS_PRINT_COLUMNS_META = [
   { key: "line_total", label: "Line Total" },
 ] as const;
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function quotationStatusPrintColumns(): StatusPrintColumn<QuotationStatusReportRow>[] {
   return [
@@ -44,7 +43,7 @@ function quotationStatusPrintColumns(): StatusPrintColumn<QuotationStatusReportR
     { key: "item_code", label: "Item Code", render: (r) => r.item_code },
     { key: "item_name", label: "Item Name", render: (r) => r.item_name },
     { key: "qty", label: "Qty", align: "right", render: (r) => r.qty },
-    { key: "line_total", label: "Line Total", align: "right", render: (r) => money(r.line_total) },
+    { key: "line_total", label: "Line Total", align: "right", render: (r) => formatPeso(r.line_total) },
   ];
 }
 
@@ -132,7 +131,7 @@ function StatusPrintView() {
                       {col.key === "qty"
                         ? payload().totalQty
                         : col.key === "line_total"
-                          ? money(payload().totalAmount)
+                          ? formatPeso(payload().totalAmount)
                           : index() === 0
                             ? "Total"
                             : ""}

@@ -1,4 +1,5 @@
 import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import { apiFetch } from "../../../shared/api";
@@ -34,9 +35,7 @@ const PR_STATUS_PRINT_COLUMNS_META = [
   { key: "remark", label: "Remark" },
 ] as const;
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function purchaseRequestStatusPrintColumns(): StatusPrintColumn<PurchaseRequestStatusReportRow>[] {
   return [
@@ -52,7 +51,7 @@ function purchaseRequestStatusPrintColumns(): StatusPrintColumn<PurchaseRequestS
     { key: "item_name", label: "Item Name", render: (r) => r.item_name },
     { key: "spec_name", label: "Spec", render: (r) => r.spec_name ?? "" },
     { key: "qty", label: "Qty", align: "right", render: (r) => r.qty },
-    { key: "line_total", label: "Line Total", align: "right", render: (r) => money(r.line_total) },
+    { key: "line_total", label: "Line Total", align: "right", render: (r) => formatPeso(r.line_total) },
     { key: "remark", label: "Remark", render: (r) => r.remark ?? "" },
   ];
 }
@@ -150,7 +149,7 @@ function StatusPrintView() {
                       {col.key === "qty"
                         ? payload().totalQty
                         : col.key === "line_total"
-                          ? money(payload().totalAmount)
+                          ? formatPeso(payload().totalAmount)
                           : index() === 0
                             ? "Total"
                             : ""}

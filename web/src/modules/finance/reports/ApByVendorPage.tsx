@@ -1,4 +1,5 @@
 import { createMemo, createSignal, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
@@ -15,9 +16,7 @@ type ApRow = {
 
 type ApGridRow = ApRow & { id: number };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export default function ApByVendorPage() {
   const [searched, setSearched] = createSignal(false);
@@ -47,9 +46,9 @@ export default function ApByVendorPage() {
         <SpreadsheetGrid<ApGridRow>
           columns={[
             { key: "vendor_name", header: "Vendor" },
-            { key: "total_billed", header: "Total billed", render: (r) => money(r.total_billed) },
-            { key: "total_paid", header: "Total paid", render: (r) => money(r.total_paid) },
-            { key: "balance", header: "Balance", render: (r) => money(r.balance) },
+            { key: "total_billed", header: "Total billed", render: (r) => formatPeso(r.total_billed) },
+            { key: "total_paid", header: "Total paid", render: (r) => formatPeso(r.total_paid) },
+            { key: "balance", header: "Balance", render: (r) => formatPeso(r.balance) },
           ]}
           rows={rows()}
           loading={report.isFetching}

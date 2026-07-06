@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, Index, Show } from "solid-
 import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
-import { formatPeso, sanitizeDecimalInput, sanitizeIntegerInput } from "../../shared/money";
+import { formatPeso, sanitizeIntegerInput, parseDecimalInput, bindDecimalInput, computePosOrderTax, roundMoney } from "../../shared/money";
 import { AuthImage } from "../../shared/AuthImage";
 import { QuickCustomerModal } from "../../shared/QuickCustomerModal";
 import { useToast } from "../../shared/toast";
@@ -111,19 +111,12 @@ export default function PosPage() {
     const s = settings.data;
     const rawSub = subtotalLines();
     const disc = Math.min(Math.max(discount(), 0), rawSub);
-    const sub = rawSub - disc;
+    const sub = roundMoney(rawSub - disc);
     const rate = s?.tax_rate_percent ?? 0;
-    let mode = s?.tax_mode ?? "none";
-    if (mode === "included" && s && !s.tax_inclusive) mode = "excluded";
-    if (mode === "included") {
-      const tax = (sub * rate) / (100 + rate);
-      return { discount: disc, subtotal: sub - tax, tax, total: sub };
-    }
-    if (mode === "excluded") {
-      const tax = (sub * rate) / 100;
-      return { discount: disc, subtotal: sub, tax, total: sub + tax };
-    }
-    return { discount: disc, subtotal: sub, tax: 0, total: sub };
+    const mode = s?.tax_mode ?? "none";
+    const taxInclusive = s?.tax_inclusive ?? true;
+    const computed = computePosOrderTax(sub, mode, rate, taxInclusive);
+    return { discount: disc, subtotal: computed.subtotal, tax: computed.tax, total: computed.total };
   });
 
   const openShift = async () => {
@@ -320,6 +313,7 @@ export default function PosPage() {
   const openClose = async () => {
     const s = session.data;
     if (!s?.id) return;
+    setClosingCash("");
     setShiftReport(null);
     setShowClose(true);
     setShiftReport(await fetchSessionReport(s.id));
@@ -328,9 +322,24 @@ export default function PosPage() {
   const closeShift = async () => {
     const s = session.data;
     if (!s?.id) return;
-    const res = await closePosSession(s.id, { closing_cash: Number(closingCash()) || 0 });
+    const raw = closingCash().trim();
+    if (!raw) {
+      toast.warning("Enter the cash you counted in the drawer before closing.");
+      return;
+    }
+    const counted = parseDecimalInput(raw);
+    if (counted === null) {
+      toast.warning("Finish the amount — include cents if needed (e.g. 58450 or 58450.00).");
+      return;
+    }
+    const res = await closePosSession(s.id, { closing_cash: counted });
     if (!res.success) {
-      toast.warning(res.message ?? "Could not close session.");
+      const cartMsg = res.errors?.cart;
+      toast.warning(
+        cartMsg
+          ? "There are still items in the cart. Check out or clear the order before closing the shift."
+          : (res.message ?? "Could not close session."),
+      );
       return;
     }
     toast.success("Session closed.");
@@ -423,7 +432,7 @@ export default function PosPage() {
                     inputmode="decimal"
                     class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
                     value={openingCash()}
-                    onInput={(e) => setOpeningCash(sanitizeDecimalInput(e.currentTarget.value))}
+                    onInput={(e) => bindDecimalInput(e.currentTarget, setOpeningCash)}
                   />
                 </div>
                 <button
@@ -622,29 +631,53 @@ export default function PosPage() {
             </div>
 
             <label class="mb-1 block text-xs font-medium text-slate-500">Cash counted at close</label>
+            <p class="mb-2 text-xs text-slate-500">
+              Count all bills and coins in the drawer, then enter the total. Expected is opening cash plus cash sales
+              {shiftReport() ? ` (${money(shiftReport()!.expected_cash)}).` : "."}
+            </p>
             <input
               type="text"
               inputmode="decimal"
-              placeholder="Cash counted at close"
-              class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
+              autocomplete="off"
+              placeholder="0.00"
+              class="mb-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
               value={closingCash()}
-              onInput={(e) => setClosingCash(sanitizeDecimalInput(e.currentTarget.value))}
+              onInput={(e) => bindDecimalInput(e.currentTarget, setClosingCash)}
             />
 
-            <Show when={shiftReport() && closingCash() !== ""}>
+            <Show when={shiftReport() && parseDecimalInput(closingCash()) !== null}>
               {(() => {
-                const variance = () => Number(closingCash()) - (shiftReport()?.expected_cash ?? 0);
+                const counted = () => parseDecimalInput(closingCash())!;
+                const variance = () => counted() - (shiftReport()?.expected_cash ?? 0);
+                const absVar = () => Math.abs(variance());
                 return (
-                  <div
-                    class="mb-4 flex justify-between rounded-lg px-3 py-2 text-sm font-medium"
-                    classList={{
-                      "bg-emerald-50 text-emerald-700": Math.abs(variance()) < 0.005,
-                      "bg-amber-50 text-amber-700": Math.abs(variance()) >= 0.005,
-                    }}
-                  >
-                    <span>{variance() < 0 ? "Short" : variance() > 0 ? "Over" : "Balanced"}</span>
-                    <span class="tabular-nums">{money(Math.abs(variance()))}</span>
-                  </div>
+                  <>
+                    <div
+                      class="mb-2 flex justify-between rounded-lg px-3 py-2 text-sm font-medium"
+                      classList={{
+                        "bg-emerald-50 text-emerald-700": absVar() < 0.005,
+                        "bg-amber-50 text-amber-700": absVar() >= 0.005,
+                      }}
+                    >
+                      <span>{variance() < -0.005 ? "Short" : variance() > 0.005 ? "Over" : "Balanced"}</span>
+                      <span class="tabular-nums">{absVar() < 0.005 ? money(0) : money(absVar())}</span>
+                    </div>
+                    <p class="mb-4 text-xs leading-relaxed text-slate-500">
+                      {absVar() < 0.005 ? (
+                        "Counted cash matches expected. You can close the shift."
+                      ) : variance() < 0 ? (
+                        <>
+                          You counted <span class="font-medium text-amber-700">{money(absVar())}</span> less than expected.
+                          This is an informational warning — you may still close, but note the shortage for your records.
+                        </>
+                      ) : (
+                        <>
+                          You counted <span class="font-medium text-amber-700">{money(absVar())}</span> more than expected.
+                          Double-check the count or look for unrecorded cash-in before closing.
+                        </>
+                      )}
+                    </p>
+                  </>
                 );
               })()}
             </Show>
@@ -784,7 +817,7 @@ function PaymentModal(props: {
                     autocomplete="off"
                     class="w-28 rounded-lg border border-slate-300 px-2 py-2 text-right text-sm font-semibold focus:border-emerald-500 focus:outline-none"
                     value={line().amount}
-                    onInput={(e) => setLine(i, { amount: sanitizeDecimalInput(e.currentTarget.value) })}
+                    onInput={(e) => bindDecimalInput(e.currentTarget, (v) => setLine(i, { amount: v }))}
                   />
                   <Show when={lines().length > 1}>
                     <button
@@ -892,7 +925,7 @@ function DiscountModal(props: {
           class="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
           placeholder="0.00"
           value={amount()}
-          onInput={(e) => setAmount(sanitizeDecimalInput(e.currentTarget.value))}
+          onInput={(e) => bindDecimalInput(e.currentTarget, setAmount)}
         />
         <div class="flex gap-2">
           <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>

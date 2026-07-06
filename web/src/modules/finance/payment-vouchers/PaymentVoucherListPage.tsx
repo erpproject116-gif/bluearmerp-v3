@@ -1,4 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { FINANCE_SETTINGS_HREF } from "../../../shared/entityTypes";
@@ -12,10 +13,7 @@ import { FinanceLayout } from "../FinanceLayout";
 import { PaymentVoucherModal } from "./PaymentVoucherModal";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 
-function money(n: number, currency?: string) {
-  const formatted = n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return currency ? `${currency} ${formatted}` : formatted;
-}
+
 
 function paymentLabel(m: string) {
   if (m === "cash") return "Cash";
@@ -76,7 +74,7 @@ export function PaymentVoucherListPageInner(props: PageOptions = {}) {
           { key: "vendor_name", header: "Vendor" },
           { key: "payment_method", header: "Method", render: (r) => paymentLabel(r.payment_method) },
           { key: "reference_no", header: "Reference", render: (r) => r.reference_no ?? "" },
-          { key: "amount_total", header: "Amount", render: (r) => money(r.amount_total, r.currency_code) },
+          { key: "amount_total", header: "Amount", render: (r) => formatPeso(r.amount_total) },
           {
             key: "history",
             header: "History",

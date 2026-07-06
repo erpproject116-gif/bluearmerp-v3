@@ -1,4 +1,5 @@
 import { createQuery } from "@tanstack/solid-query";
+import { formatPeso } from "../../../shared/money";
 import { createSignal, For, onMount, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
@@ -32,9 +33,7 @@ type BudgetVsActualSummary = {
   lines: BudgetVsActualRow[];
 };
 
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 export default function BudgetVsActualReportPage() {
   const [searchParams] = useSearchParams();
@@ -142,8 +141,8 @@ export default function BudgetVsActualReportPage() {
             <Show when={report.data}>
               {(data) => (
                 <p class="text-sm text-text-secondary">
-                  {data().name} ({data().fiscal_year}) — Budget {money(data().total_budget)} / Actual{" "}
-                  {money(data().total_actual)} / Variance {money(data().variance)}
+                  {data().name} ({data().fiscal_year}) — Budget {formatPeso(data().total_budget)} / Actual{" "}
+                  {formatPeso(data().total_actual)} / Variance {formatPeso(data().variance)}
                 </p>
               )}
             </Show>
@@ -167,9 +166,9 @@ export default function BudgetVsActualReportPage() {
                       <td class="px-3 py-2">{row.account_code}</td>
                       <td class="px-3 py-2">{row.account_name}</td>
                       <td class="px-3 py-2">{row.period_month}</td>
-                      <td class="px-3 py-2 text-right">{money(row.budget)}</td>
-                      <td class="px-3 py-2 text-right">{money(row.actual)}</td>
-                      <td class="px-3 py-2 text-right">{money(row.variance)}</td>
+                      <td class="px-3 py-2 text-right">{formatPeso(row.budget)}</td>
+                      <td class="px-3 py-2 text-right">{formatPeso(row.actual)}</td>
+                      <td class="px-3 py-2 text-right">{formatPeso(row.variance)}</td>
                     </tr>
                   )}
                 </For>

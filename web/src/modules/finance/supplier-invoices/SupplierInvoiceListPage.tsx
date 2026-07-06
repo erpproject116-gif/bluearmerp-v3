@@ -1,4 +1,5 @@
 import { createSignal, onMount } from "solid-js";
+import { formatPeso } from "../../../shared/money";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { FINANCE_SETTINGS_HREF } from "../../../shared/entityTypes";
@@ -16,10 +17,7 @@ import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { Show } from "solid-js";
 
-function money(n: number, currency?: string) {
-  const formatted = n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return currency ? `${currency} ${formatted}` : formatted;
-}
+
 
 type PageOptions = { openNewOnMount?: boolean };
 
@@ -61,7 +59,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
           { key: "invoice_no", header: "Invoice No.", clickable: true },
           { key: "vendor_name", header: "Vendor" },
           { key: "vendor_invoice_no", header: "Vendor ref", render: (r) => r.vendor_invoice_no ?? "" },
-          { key: "grand_total", header: "Amount", render: (r) => money(r.grand_total, r.currency_code) },
+          { key: "grand_total", header: "Amount", render: (r) => formatPeso(r.grand_total) },
           {
             key: "history",
             header: "History",
