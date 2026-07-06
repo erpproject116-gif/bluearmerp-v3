@@ -11,6 +11,7 @@ import {
   type CollectiveInvoiceRow,
 } from "../../../shared/useCollectiveInvoices";
 import { CollectiveInvoiceTransactionsModal } from "./CollectiveInvoiceTransactionsModal";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 
 function money(n: number) {
   return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -154,6 +155,19 @@ export default function CollectiveInvoiceListPage() {
                   AR Stmt
                 </button>
               </div>
+            ),
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r: CollectiveInvoiceRow) => (
+              <ActivityHistoryLink
+                module="sales"
+                targetType="sa_collective_invoice"
+                targetId={r.id}
+                title={`History — ${r.date_no_display}`}
+              />
             ),
           },
         ]}

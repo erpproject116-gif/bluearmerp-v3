@@ -10,6 +10,7 @@ import { ModalField } from "../../../shared/ModalField";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import type { OfficialReceiptDetail } from "../../../shared/useOfficialReceiptList";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 
 export type { OfficialReceiptDetail };
 
@@ -221,6 +222,14 @@ export function OfficialReceiptModal(props: Props) {
       onClose={() => props.onClose()}
       onSave={() => void save()}
       saving={saving()}
+      headerActions={
+        <RecordHistoryButton
+          variant="button"
+          targetType="fin_official_receipt"
+          targetId={props.editing?.id}
+          title={props.editing ? `History — ${props.editing.receipt_no}` : "History — Official Receipt"}
+        />
+      }
     >
       <ModalField settings={byKey} fieldKey="receipt_date" fallbackLabel="Date" fallbackRequired>
           {(m) => (

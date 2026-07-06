@@ -16,6 +16,7 @@ import {
 import { useToast } from "../../../shared/toast";
 import { PurchaseOrderModal } from "./PurchaseOrderModal";
 import { PurchaseRequestLayout } from "../PurchaseRequestLayout";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 
 const STATUS_TABS = [
@@ -382,6 +383,19 @@ export default function PurchaseOrderListPage() {
                   Confirm
                 </button>
               </Show>
+            ),
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink
+                module="purchase_order"
+                targetType="po_purchase_order"
+                targetId={r.id}
+                title={`History — ${r.purchase_order_no}`}
+              />
             ),
           },
         ]}

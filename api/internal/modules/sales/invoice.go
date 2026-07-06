@@ -40,6 +40,25 @@ type salesInvoice struct {
 	JournalStatus    string   `json:"journal_status"`
 }
 
+type salesInvoiceAudit struct {
+	SalesAccountID   *int64  `json:"sales_account_id"`
+	DepositAccountID *int64  `json:"deposit_account_id"`
+	Fees             float64 `json:"fees"`
+	Remark           string  `json:"remark"`
+	JournalEntryID   *int64  `json:"journal_entry_id"`
+}
+
+func loadSalesInvoiceAudit(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (salesInvoiceAudit, error) {
+	var snap salesInvoiceAudit
+	err := pool.QueryRow(ctx, `
+		select sales_account_id, deposit_account_id, invoice_fees::float8,
+		  coalesce(invoice_remark, ''), invoice_journal_entry_id
+		from public.sa_sales
+		where id = $1 and tenant_id = $2 and deleted_at is null`,
+		id, tenantID).Scan(&snap.SalesAccountID, &snap.DepositAccountID, &snap.Fees, &snap.Remark, &snap.JournalEntryID)
+	return snap, err
+}
+
 func getSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -129,6 +148,8 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		before, _ := loadSalesInvoiceAudit(r.Context(), pool, tu.TenantID, id)
+
 		lines := []invoicejournal.Line{
 			{AccountID: body.DepositAccountID, Debit: grandTotal, PartyID: &partnerID, Remark: "A/R - " + salesNo},
 			{AccountID: body.SalesAccountID, Credit: subtotal, Remark: "Sales - " + salesNo},
@@ -156,11 +177,8 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.invoice.update", "sa_sales", &id, nil, map[string]any{
-			"sales_account_id":   body.SalesAccountID,
-			"deposit_account_id": body.DepositAccountID,
-			"journal_entry_id":   jeID,
-		})
+		after, _ := loadSalesInvoiceAudit(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.invoice.update", "sa_sales", &id, before, after)
 		response.OK(w, map[string]any{"journal_entry_id": jeID}, "Invoice saved.")
 	}
 }

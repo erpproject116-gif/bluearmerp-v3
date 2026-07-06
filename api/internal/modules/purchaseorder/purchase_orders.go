@@ -997,9 +997,9 @@ func updatePurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.update", "po_purchase_order", &id, before, body)
-		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, po, "Updated.")
+		after, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.update", "po_purchase_order", &id, before, after)
+		response.OK(w, after, "Updated.")
 	}
 }
 
@@ -1080,8 +1080,8 @@ func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.confirm", "po_purchase_order", &id, before, nil)
 		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.confirm", "po_purchase_order", &id, before, po)
 		response.OK(w, po, "Confirmed.")
 	}
 }

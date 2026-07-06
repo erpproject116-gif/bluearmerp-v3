@@ -39,6 +39,25 @@ type purchaseInvoice struct {
 	JournalStatus       string  `json:"journal_status"`
 }
 
+type purchaseInvoiceAudit struct {
+	PurchaseAccountID   *int64  `json:"purchase_account_id"`
+	WithdrawalAccountID *int64  `json:"withdrawal_account_id"`
+	Fees                float64 `json:"fees"`
+	Remark              string  `json:"remark"`
+	JournalEntryID      *int64  `json:"journal_entry_id"`
+}
+
+func loadPurchaseInvoiceAudit(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (purchaseInvoiceAudit, error) {
+	var snap purchaseInvoiceAudit
+	err := pool.QueryRow(ctx, `
+		select purchase_account_id, withdrawal_account_id, invoice_fees::float8,
+		  coalesce(invoice_remark, ''), invoice_journal_entry_id
+		from public.fin_supplier_invoices
+		where id = $1 and tenant_id = $2 and deleted_at is null`,
+		id, tenantID).Scan(&snap.PurchaseAccountID, &snap.WithdrawalAccountID, &snap.Fees, &snap.Remark, &snap.JournalEntryID)
+	return snap, err
+}
+
 func getPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -127,6 +146,8 @@ func putPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		before, _ := loadPurchaseInvoiceAudit(r.Context(), pool, tu.TenantID, id)
+
 		lines := []invoicejournal.Line{
 			{AccountID: body.PurchaseAccountID, Debit: subtotal, Remark: "Purchase - " + invoiceNo},
 		}
@@ -154,11 +175,8 @@ func putPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase.invoice.update", "fin_supplier_invoice", &id, nil, map[string]any{
-			"purchase_account_id":   body.PurchaseAccountID,
-			"withdrawal_account_id": body.WithdrawalAccountID,
-			"journal_entry_id":      jeID,
-		})
+		after, _ := loadPurchaseInvoiceAudit(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase.invoice.update", "fin_supplier_invoice", &id, before, after)
 		response.OK(w, map[string]any{"journal_entry_id": jeID}, "Invoice saved.")
 	}
 }

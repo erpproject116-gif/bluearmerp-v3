@@ -11,6 +11,7 @@ import {
 } from "../../../shared/useOfficialReceiptList";
 import { FinanceLayout } from "../FinanceLayout";
 import { OfficialReceiptModal, type OfficialReceiptDetail } from "./OfficialReceiptModal";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 
 function money(n: number, currency?: string) {
   const formatted = n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -91,6 +92,19 @@ export function OfficialReceiptListPageInner(props: PageOptions = {}) {
             render: (r) => money(r.amount_total, r.currency_code),
           },
           { key: "created_by_name", header: "Created by", render: (r) => r.created_by_name ?? "" },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink
+                module="finance"
+                targetType="fin_official_receipt"
+                targetId={r.id}
+                title={`History — ${r.receipt_no}`}
+              />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}

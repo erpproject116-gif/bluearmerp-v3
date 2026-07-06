@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { useToast } from "../../../shared/toast";
 
 type RfqLine = {
@@ -189,9 +190,19 @@ export function SupplierQuotationModal(props: Props) {
             <h2 class="text-lg font-semibold text-text-primary">
               {isEdit() ? "Edit supplier quotation" : "New supplier quotation"}
             </h2>
-            <button type="button" class={modalDismissClass} onClick={props.onClose}>
-              Close
-            </button>
+            <div class="flex items-center gap-2">
+              <Show when={isEdit()}>
+                <RecordHistoryButton
+                  variant="button"
+                  targetType="rfq_supplier_quotation"
+                  targetId={props.quotationId}
+                  title="History — Supplier Quotation"
+                />
+              </Show>
+              <button type="button" class={modalDismissClass} onClick={props.onClose}>
+                Close
+              </button>
+            </div>
           </div>
 
           <Show when={!loading()} fallback={<p class="text-sm text-slate-500">Loading…</p>}>

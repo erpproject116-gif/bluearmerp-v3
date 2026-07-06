@@ -713,9 +713,9 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.update", "sa_sales", &id, before, body)
-		sale, _ := loadSale(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, sale, "Updated.")
+		after, _ := loadSale(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.update", "sa_sales", &id, before, after)
+		response.OK(w, after, "Updated.")
 	}
 }
 

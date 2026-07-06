@@ -357,8 +357,9 @@ func updateSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.supplier_quotation_update", "rfq_supplier_quotation", &id, before, body)
-		x, _ := loadSupplierQuotation(r.Context(), pool, tu.TenantID, id)
+		after, _ := loadSupplierQuotation(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.supplier_quotation_update", "rfq_supplier_quotation", &id, before, after)
+		x := after
 		response.OK(w, x, "Supplier quotation updated.")
 	}
 }

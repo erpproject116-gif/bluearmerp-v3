@@ -3,6 +3,7 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { modalDismissClass } from "../../shared/Modal";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useToast } from "../../shared/toast";
 
 type SalesReturnRow = {
@@ -166,16 +167,24 @@ export default function SalesReturnsPage() {
                   <td class="px-3 py-2 capitalize">{row.status}</td>
                   <td class="px-3 py-2 text-right">{row.grand_total.toFixed(2)}</td>
                   <td class="px-3 py-2">
-                    <Show when={row.status === "draft"}>
-                      <button
-                        type="button"
-                        class="text-brand-600 hover:underline disabled:opacity-50"
-                        disabled={submittingId() === row.id}
-                        onClick={() => void submitReturn(row)}
-                      >
-                        {submittingId() === row.id ? "Submitting…" : "Submit"}
-                      </button>
-                    </Show>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <ActivityHistoryLink
+                        module="sales"
+                        targetType="sr_sales_return"
+                        targetId={row.id}
+                        title={`History — ${row.return_no}`}
+                      />
+                      <Show when={row.status === "draft"}>
+                        <button
+                          type="button"
+                          class="text-brand-600 hover:underline disabled:opacity-50"
+                          disabled={submittingId() === row.id}
+                          onClick={() => void submitReturn(row)}
+                        >
+                          {submittingId() === row.id ? "Submitting…" : "Submit"}
+                        </button>
+                      </Show>
+                    </div>
                   </td>
                 </tr>
               )}

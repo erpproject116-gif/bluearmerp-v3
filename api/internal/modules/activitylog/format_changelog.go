@@ -36,6 +36,12 @@ var fieldLabels = map[string]string{
 	"purchase_price":           "Purchase price",
 	"vip_price":                "VIP price",
 	"company_name":             "Company name",
+	"customer_name":            "Customer",
+	"location_name":            "Location",
+	"sales_person_name":        "Salesperson",
+	"delivery_date":            "Delivery date",
+	"delivery_remarks":         "Delivery remarks",
+	"mop":                      "Mode of payment",
 	"partner_kind":             "Partner type",
 	"payment_terms":            "Payment terms",
 	"notes":                    "Notes",
@@ -51,7 +57,20 @@ var fieldLabels = map[string]string{
 	"amount_total":             "Amount",
 	"payment_method":           "Payment method",
 	"repair_details":           "Repair details",
-	"scheduled_completion_date": "Scheduled completion",
+	"invoice_remark":           "Invoice remark",
+	"invoice_fees":             "Invoice fees",
+	"purchase_account_id":      "Purchase account",
+	"withdrawal_account_id":    "Withdrawal account",
+	"sales_account_id":         "Sales account",
+	"deposit_account_id":       "Deposit account",
+	"journal_entry_id":         "Journal entry",
+	"inspection_status":        "Inspection status",
+	"inspection_notes":         "Inspection notes",
+	"vendor_invoice_no":        "Vendor invoice no.",
+	"quote_no":                 "Quote no.",
+	"rfq_no":                   "RFQ no.",
+	"payment_no":               "Payment no.",
+	"receivable_no":            "Receivable no.",
 }
 
 var entityLabels = map[string]string{
@@ -59,6 +78,16 @@ var entityLabels = map[string]string{
 	"so_sales_order":            "Sales Order",
 	"pr_purchase_request":       "Purchase Request",
 	"quo_quotation":             "Quotation",
+	"po_purchase_order":         "Purchase Order",
+	"fin_supplier_invoice":      "Supplier Invoice",
+	"fin_payment_voucher":       "Payment Voucher",
+	"gr_goods_receipt":          "Goods Receipt",
+	"dr_delivery_receipt":       "Delivery Receipt",
+	"rfq_supplier_quotation":    "Supplier Quotation",
+	"rfq_request":               "RFQ",
+	"sr_sales_return":           "Sales Return",
+	"prt_purchase_return":       "Purchase Return",
+	"sa_collective_invoice":     "Collective Invoice",
 	"fin_official_receipt":      "Official Receipt",
 	"fin_bank_account":          "Bank account",
 	"crm_warranty_asset":        "Warranty record",
@@ -88,6 +117,16 @@ var referenceLabels = map[string]string{
 	"so_sales_order":          "Sales Order No.",
 	"pr_purchase_request":     "Purchase Request No.",
 	"quo_quotation":           "Quote Ref.",
+	"po_purchase_order":       "PO No.",
+	"fin_supplier_invoice":    "Invoice No.",
+	"fin_payment_voucher":     "Payment No.",
+	"gr_goods_receipt":        "GR Ref.",
+	"dr_delivery_receipt":     "Delivery No.",
+	"rfq_supplier_quotation":  "Quote No.",
+	"rfq_request":             "RFQ No.",
+	"sr_sales_return":         "Return No.",
+	"prt_purchase_return":     "Return No.",
+	"sa_collective_invoice":   "Receivable No.",
 	"fin_official_receipt":    "Receipt No.",
 	"crm_warranty_asset":      "Serial No.",
 	"inv_repair_order":        "Repair Order No.",
@@ -122,6 +161,18 @@ func actionVerb(actionCode string) string {
 		return "changed invoicing on"
 	case strings.HasSuffix(actionCode, ".stage"):
 		return "moved stage on"
+	case strings.HasSuffix(actionCode, ".confirm"):
+		return "confirmed"
+	case strings.HasSuffix(actionCode, ".post"):
+		return "posted"
+	case strings.HasSuffix(actionCode, ".submit"):
+		return "submitted"
+	case strings.HasSuffix(actionCode, ".link"):
+		return "linked sales to"
+	case strings.HasSuffix(actionCode, ".unlink"):
+		return "unlinked sales from"
+	case strings.HasSuffix(actionCode, ".status"):
+		return "changed status on"
 	case strings.HasSuffix(actionCode, ".release"):
 		return "released"
 	case strings.HasSuffix(actionCode, ".convert"):
@@ -207,27 +258,48 @@ func diffChanges(oldM, newM map[string]any) []string {
 	}
 	skipKeys := map[string]bool{
 		"lines": true, "applications": true, "password": true,
+		// Stable identifiers and list-only display fields — not meaningful on edit diffs.
+		"id": true, "date_seq": true, "date_no_display": true,
+		"created_by_user_id": true, "created_by_name": true,
+		"item_name_summary": true, "updated_at": true, "created_at": true,
+		"sales_order_no": true, "sales_no": true, "reference_no": true,
+		"purchase_order_no": true, "purchase_request_no": true, "invoice_no": true,
+		"receipt_no": true, "repair_order_no": true, "registration_no": true,
 	}
-	keys := map[string]bool{}
-	for k := range oldM {
-		keys[k] = true
-	}
-	for k := range newM {
-		keys[k] = true
-	}
-	sorted := make([]string, 0, len(keys))
-	for k := range keys {
-		if skipKeys[k] || strings.HasSuffix(k, "_id") && k != "partner_id" {
-			continue
+	// For updates, diff only keys present in the new snapshot so partial request
+	// bodies (or slim audit payloads) do not produce false "cleared" lines.
+	var sorted []string
+	if newM != nil {
+		sorted = make([]string, 0, len(newM))
+		for k := range newM {
+			if skipKeys[k] || (strings.HasSuffix(k, "_id") && k != "partner_id") {
+				continue
+			}
+			sorted = append(sorted, k)
 		}
-		sorted = append(sorted, k)
+	} else {
+		keys := map[string]bool{}
+		for k := range oldM {
+			keys[k] = true
+		}
+		sorted = make([]string, 0, len(keys))
+		for k := range keys {
+			if skipKeys[k] || (strings.HasSuffix(k, "_id") && k != "partner_id") {
+				continue
+			}
+			sorted = append(sorted, k)
+		}
 	}
 	sort.Strings(sorted)
 
 	var out []string
 	for _, k := range sorted {
 		oldV, hasOld := oldM[k]
-		newV, hasNew := newM[k]
+		var newV any
+		hasNew := false
+		if newM != nil {
+			newV, hasNew = newM[k]
+		}
 		if !hasOld && !hasNew {
 			continue
 		}
@@ -244,10 +316,25 @@ func diffChanges(oldM, newM map[string]any) []string {
 			out = append(out, fmt.Sprintf("%s cleared (was %s)", lbl, formatValue(oldV)))
 		}
 	}
-	if _, ok := newM["lines"]; ok || oldM["lines"] != nil {
+	if linesChanged(oldM, newM) {
 		out = append(out, "Line items were updated")
 	}
 	return out
+}
+
+func linesChanged(oldM, newM map[string]any) bool {
+	if oldM == nil && newM == nil {
+		return false
+	}
+	if oldM == nil || newM == nil {
+		return newM["lines"] != nil || oldM["lines"] != nil
+	}
+	ob, err1 := json.Marshal(oldM["lines"])
+	nb, err2 := json.Marshal(newM["lines"])
+	if err1 != nil || err2 != nil {
+		return oldM["lines"] != nil || newM["lines"] != nil
+	}
+	return string(ob) != string(nb)
 }
 
 func formatChangeSummary(actorName, actionCode, targetType, referenceNo string, oldJSON, newJSON json.RawMessage) (summary string, details []string) {
@@ -393,6 +480,24 @@ func describeCreatePayload(targetType string, newM map[string]any) []string {
 		pick("sales_order_no", "partner_id", "grand_total")
 	case "pr_purchase_request":
 		pick("purchase_request_no", "partner_id", "grand_total")
+	case "po_purchase_order":
+		pick("purchase_order_no", "partner_id", "grand_total")
+	case "fin_supplier_invoice":
+		pick("invoice_no", "partner_id", "grand_total")
+	case "fin_payment_voucher":
+		pick("payment_no", "amount_total", "payment_method")
+	case "gr_goods_receipt":
+		pick("reference", "purchase_order_id", "status")
+	case "dr_delivery_receipt":
+		pick("delivery_no", "delivery_date", "status")
+	case "rfq_supplier_quotation":
+		pick("quote_no", "partner_id", "grand_total")
+	case "rfq_request":
+		pick("rfq_no", "status")
+	case "sr_sales_return", "prt_purchase_return":
+		pick("return_no", "grand_total", "status")
+	case "sa_collective_invoice":
+		pick("receivable_no", "grand_total", "status")
 	case "fin_official_receipt":
 		pick("receipt_no", "amount_total", "payment_method")
 	case "inv_partner":

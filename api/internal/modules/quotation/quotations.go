@@ -580,9 +580,9 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "quotation.update", "quo_quotation", &id, before, body)
-		q, _ := loadQuotation(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, q, "Updated.")
+		after, _ := loadQuotation(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "quotation.update", "quo_quotation", &id, before, after)
+		response.OK(w, after, "Updated.")
 	}
 }
 

@@ -12,7 +12,8 @@ import { FinanceLayout } from "../FinanceLayout";
 import { SupplierInvoiceModal } from "./SupplierInvoiceModal";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
-import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { Show } from "solid-js";
 
 function money(n: number, currency?: string) {
@@ -32,7 +33,6 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [viewRow, setViewRow] = createSignal<SupplierInvoiceRow | null>(null);
-  const [historyOpen, setHistoryOpen] = createSignal(false);
 
   const list = useSupplierInvoiceList(() => ({
     page: page(),
@@ -62,6 +62,19 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
           { key: "vendor_name", header: "Vendor" },
           { key: "vendor_invoice_no", header: "Vendor ref", render: (r) => r.vendor_invoice_no ?? "" },
           { key: "grand_total", header: "Amount", render: (r) => money(r.grand_total, r.currency_code) },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink
+                module="finance"
+                targetType="fin_supplier_invoice"
+                targetId={r.id}
+                title={`History — ${r.invoice_no}`}
+              />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -90,13 +103,12 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onClose={() => setViewRow(null)}
         readOnly
         headerActions={
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
-            onClick={() => setHistoryOpen(true)}
-          >
-            History
-          </button>
+          <RecordHistoryButton
+            variant="button"
+            targetType="fin_supplier_invoice"
+            targetId={viewRow()?.id}
+            title={viewRow() ? `History — Purchase ${viewRow()!.invoice_no}` : "History"}
+          />
         }
       >
         <Show when={viewRow()}>
@@ -109,13 +121,6 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
           />
         </Show>
       </WideEntityModal>
-      <HistoryLogModal
-        open={historyOpen()}
-        onClose={() => setHistoryOpen(false)}
-        targetType="fin_supplier_invoice"
-        targetId={viewRow()?.id}
-        title={viewRow() ? `History — Purchase ${viewRow()!.invoice_no}` : "History"}
-      />
     </FinanceLayout>
   );
 }

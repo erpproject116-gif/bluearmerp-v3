@@ -9,6 +9,7 @@ import {
   type GoodsReceiptRow,
 } from "../../../shared/useGoodsReceiptList";
 import { PurchaseRequestLayout } from "../PurchaseRequestLayout";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
@@ -127,6 +128,19 @@ export default function GoodsReceiptListPage() {
           },
           { key: "reference", header: "Reference" },
           { key: "created_by_name", header: "Created by" },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink
+                module="purchase_request"
+                targetType="gr_goods_receipt"
+                targetId={r.id}
+                title={`History — ${r.purchase_order_no}`}
+              />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}

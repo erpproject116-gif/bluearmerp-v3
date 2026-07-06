@@ -104,6 +104,8 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 			where += fmt.Sprintf(" and al.target_id = $%d", n)
 			args = append(args, id)
 			n++
+			// Per-record history: business document events only, not generic API access logs.
+			where += ` and al.action_code not like 'api.%'`
 		}
 		if v := strings.TrimSpace(q.Get("module")); v != "" {
 			where += fmt.Sprintf(" and al.action_code like $%d", n)

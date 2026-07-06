@@ -10,6 +10,7 @@ import {
 } from "../../../shared/usePaymentVoucherList";
 import { FinanceLayout } from "../FinanceLayout";
 import { PaymentVoucherModal } from "./PaymentVoucherModal";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 
 function money(n: number, currency?: string) {
   const formatted = n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -76,6 +77,19 @@ export function PaymentVoucherListPageInner(props: PageOptions = {}) {
           { key: "payment_method", header: "Method", render: (r) => paymentLabel(r.payment_method) },
           { key: "reference_no", header: "Reference", render: (r) => r.reference_no ?? "" },
           { key: "amount_total", header: "Amount", render: (r) => money(r.amount_total, r.currency_code) },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink
+                module="finance"
+                targetType="fin_payment_voucher"
+                targetId={r.id}
+                title={`History — ${r.payment_no}`}
+              />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}

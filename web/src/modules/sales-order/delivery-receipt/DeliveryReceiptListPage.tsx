@@ -11,6 +11,7 @@ import {
 } from "../../../shared/useDeliveryReceiptList";
 import { SalesOrderLayout } from "../SalesOrderLayout";
 import { DeliveryReceiptModal } from "./DeliveryReceiptModal";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 
 const STATUS_TABS = [
   { value: "", label: "All" },
@@ -122,6 +123,19 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
             header: "Status",
             sortable: false,
             render: (r) => <span class="capitalize">{statusLabel(r.status)}</span>,
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink
+                module="sales_order"
+                targetType="dr_delivery_receipt"
+                targetId={r.id}
+                title={`History — ${r.delivery_no}`}
+              />
+            ),
           },
         ]}
         rows={list.data?.rows ?? []}

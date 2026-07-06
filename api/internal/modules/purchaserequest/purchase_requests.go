@@ -711,9 +711,9 @@ func updatePurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_request.update", "pr_purchase_request", &id, before, body)
-		pr, _ := loadPurchaseRequest(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, pr, "Updated.")
+		after, _ := loadPurchaseRequest(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_request.update", "pr_purchase_request", &id, before, after)
+		response.OK(w, after, "Updated.")
 	}
 }
 
