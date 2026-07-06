@@ -19,6 +19,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.Get("/platform/console/customers", svc.listCustomers)
 		cr.Get("/platform/console/customers/{id}", svc.getCustomer)
 		cr.Post("/platform/console/customers", svc.createCustomer)
+		cr.Post("/platform/console/customers/provision", svc.provisionCustomer)
 		cr.Patch("/platform/console/customers/{id}", svc.patchCustomer)
 		cr.Post("/platform/console/customers/{id}/subscriptions", svc.createSubscription)
 		cr.Post("/platform/console/customers/{id}/extend-trial", svc.extendTrial)
