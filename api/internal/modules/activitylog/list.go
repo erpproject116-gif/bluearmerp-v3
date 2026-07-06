@@ -90,22 +90,38 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, v)
 			n++
 		}
-		if v := strings.TrimSpace(q.Get("target_type")); v != "" {
-			where += fmt.Sprintf(" and al.target_type = $%d", n)
-			args = append(args, v)
-			n++
-		}
-		if v := strings.TrimSpace(q.Get("target_id")); v != "" {
-			id, err := strconv.ParseInt(v, 10, 64)
+		scopedTargetType := strings.TrimSpace(q.Get("target_type"))
+		scopedTargetID := strings.TrimSpace(q.Get("target_id"))
+		if scopedTargetType != "" && scopedTargetID != "" {
+			id, err := strconv.ParseInt(scopedTargetID, 10, 64)
 			if err != nil || id <= 0 {
 				response.Validation(w, map[string]string{"target_id": "Invalid target id."})
 				return
 			}
-			where += fmt.Sprintf(" and al.target_id = $%d", n)
+			typeArg := n
+			args = append(args, scopedTargetType)
+			n++
+			idArg := n
 			args = append(args, id)
 			n++
-			// Per-record history: business document events only, not generic API access logs.
+			where = appendScopedRecordWhere(where, scopedTargetType, typeArg, idArg)
 			where += ` and al.action_code not like 'api.%'`
+		} else {
+			if scopedTargetType != "" {
+				where += fmt.Sprintf(" and al.target_type = $%d", n)
+				args = append(args, scopedTargetType)
+				n++
+			}
+			if scopedTargetID != "" {
+				id, err := strconv.ParseInt(scopedTargetID, 10, 64)
+				if err != nil || id <= 0 {
+					response.Validation(w, map[string]string{"target_id": "Invalid target id."})
+					return
+				}
+				where += fmt.Sprintf(" and al.target_id = $%d", n)
+				args = append(args, id)
+				n++
+			}
 		}
 		if v := strings.TrimSpace(q.Get("module")); v != "" {
 			where += fmt.Sprintf(" and al.action_code like $%d", n)

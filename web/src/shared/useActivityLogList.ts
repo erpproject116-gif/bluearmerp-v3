@@ -52,9 +52,26 @@ export function useActivityLogList(params: () => ActivityLogFilters & { enabled?
     if (p.module) qs.set("module", p.module);
     if (p.referenceNo) qs.set("reference_no", p.referenceNo);
 
+    const enabled = p.enabled !== false && (!scoped || Boolean(p.targetId));
+
     return {
-      queryKey: ["activity-logs", p],
-      enabled: p.enabled !== false && (!scoped || Boolean(p.targetId)),
+      queryKey: [
+        "activity-logs",
+        p.page,
+        p.pageSize,
+        p.sort,
+        p.order,
+        p.dateFrom ?? "",
+        p.dateTo ?? "",
+        p.actorUserId ?? "",
+        p.actionCode ?? "",
+        p.targetType ?? "",
+        p.targetId ?? "",
+        p.module ?? "",
+        p.referenceNo ?? "",
+        enabled,
+      ],
+      enabled,
       queryFn: async () => {
         const res = await apiFetch<ActivityLogRow[]>(`/api/v1/activity-logs?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load activity logs");
@@ -67,7 +84,6 @@ export function useActivityLogList(params: () => ActivityLogFilters & { enabled?
       },
       staleTime: 30_000,
       gcTime: 300_000,
-      placeholderData: (prev: { rows: ActivityLogRow[]; total: number; page: number; perPage: number } | undefined) => prev,
     };
   });
 }

@@ -39,7 +39,7 @@ export function HistoryLogModal(props: Props) {
         when={props.targetId}
         fallback={<p class="py-4 text-sm text-text-secondary">Save the transaction first to see its history.</p>}
       >
-        <Show when={list.isFetching && (list.data?.rows.length ?? 0) === 0}>
+        <Show when={list.isPending}>
           <p class="py-4 text-sm text-text-secondary">Loading…</p>
         </Show>
         <Show when={list.isError}>
@@ -47,7 +47,7 @@ export function HistoryLogModal(props: Props) {
             {list.error instanceof Error ? list.error.message : "Failed to load history."}
           </p>
         </Show>
-        <Show when={!list.isFetching && !list.isError && (list.data?.rows.length ?? 0) === 0}>
+        <Show when={!list.isPending && !list.isError && (list.data?.rows.length ?? 0) === 0}>
           <p class="py-4 text-sm text-text-secondary">No activity recorded yet.</p>
         </Show>
         <Show when={(list.data?.rows.length ?? 0) > 0}>

@@ -37,6 +37,7 @@ export function ChangeLogPanel(props: Props) {
     order: "desc" as const,
     targetType: props.targetType,
     targetId: enabled() && open() ? String(props.targetId) : undefined,
+    enabled: enabled() && open(),
   }));
 
   return (
@@ -63,7 +64,10 @@ export function ChangeLogPanel(props: Props) {
         </button>
         <Show when={open()}>
           <div class="border-t border-stroke px-3 py-2">
-            <Show when={!list.isFetching || (list.data?.rows.length ?? 0) > 0} fallback={<p class="py-2 text-sm text-text-secondary">Loading…</p>}>
+            <Show when={list.isPending}>
+              <p class="py-2 text-sm text-text-secondary">Loading…</p>
+            </Show>
+            <Show when={!list.isPending && !list.isError}>
               <Show
                 when={(list.data?.rows.length ?? 0) > 0}
                 fallback={<p class="py-2 text-sm text-text-secondary">No changes recorded yet.</p>}

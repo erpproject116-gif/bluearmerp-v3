@@ -1,5 +1,4 @@
 import { createSignal, Show } from "solid-js";
-import { canViewActivityLogs, useAuth } from "./auth-context";
 import { HistoryLogModal } from "./HistoryLogModal";
 
 type Props = {
@@ -13,14 +12,14 @@ type Props = {
 
 /**
  * Opens transaction-scoped history in a modal (create, edits, status changes, attachments, …).
+ * Per-record access is allowed without global activity-log permission (matches API).
  */
 export function RecordHistoryButton(props: Props) {
-  const auth = useAuth();
   const [open, setOpen] = createSignal(false);
   const variant = () => props.variant ?? "link";
 
   return (
-    <Show when={canViewActivityLogs(auth.me) && props.targetId}>
+    <Show when={props.targetId}>
       <>
         <Show
           when={variant() === "button"}

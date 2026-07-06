@@ -11,6 +11,9 @@ func TestIsCriticalActionCode(t *testing.T) {
 		"group.permissions.update",
 		"crm.job.evaluate",
 		"sales.price_batch",
+		"sales.create",
+		"sales_order.update",
+		"quotation.update",
 	}
 	for _, code := range critical {
 		if !IsCriticalActionCode(code) {
@@ -19,8 +22,6 @@ func TestIsCriticalActionCode(t *testing.T) {
 	}
 	async := []string{
 		"inventory.item.create",
-		"sales.create",
-		"quotation.update",
 		"crm.task.create",
 	}
 	for _, code := range async {

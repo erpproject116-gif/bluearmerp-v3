@@ -69,6 +69,16 @@ func IsCriticalActionCode(actionCode string) bool {
 		"group.",
 		"crm.job.",
 		"settings.",
+		"sales_order.",
+		"sales.",
+		"quotation.",
+		"purchase_order.",
+		"purchase_request.",
+		"goods_receipt.",
+		"delivery_receipt.",
+		"purchase_return.",
+		"sales_return.",
+		"purchase.",
 	}
 	for _, p := range criticalPrefixes {
 		if strings.HasPrefix(actionCode, p) {
@@ -79,11 +89,17 @@ func IsCriticalActionCode(actionCode string) bool {
 }
 
 func Log(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, oldValues, newValues any) error {
-	markLogged(ctx)
 	if IsCriticalActionCode(actionCode) || !asyncEnabled {
-		return LogSync(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, oldValues, newValues)
+		if err := LogSync(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, oldValues, newValues); err != nil {
+			return err
+		}
+		markLogged(ctx)
+		return nil
 	}
-	Enqueue(ctx, tenantID, actorUserID, actionCode, targetType, targetID, oldValues, newValues)
+	if err := enqueueWithFallback(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, oldValues, newValues); err != nil {
+		return err
+	}
+	markLogged(ctx)
 	return nil
 }
 
@@ -95,33 +111,48 @@ func LogSync(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int6
 	return insertOne(ctx, pool, ev)
 }
 
-func Enqueue(ctx context.Context, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, oldValues, newValues any) {
+func enqueueWithFallback(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, oldValues, newValues any) error {
 	ev, err := buildEvent(tenantID, actorUserID, actionCode, targetType, targetID, oldValues, newValues)
 	if err != nil {
 		log.Printf("audit: enqueue marshal: %v", err)
-		return
+		return err
 	}
 	if eventCh == nil {
-		return
+		if pool == nil {
+			return nil
+		}
+		return insertOne(ctx, pool, ev)
 	}
 	select {
 	case eventCh <- ev:
+		return nil
 	default:
 		deadline := time.NewTimer(50 * time.Millisecond)
 		defer deadline.Stop()
 		select {
 		case eventCh <- ev:
+			return nil
 		case <-deadline.C:
 			if workerPool != nil {
 				if err := insertOne(context.Background(), workerPool, ev); err != nil {
 					log.Printf("audit: sync fallback failed: %v", err)
-				} else {
-					log.Printf("audit: channel full, sync fallback for %s", actionCode)
+					return err
 				}
+				log.Printf("audit: channel full, sync fallback for %s", actionCode)
+				return nil
 			}
+			if pool != nil {
+				return insertOne(ctx, pool, ev)
+			}
+			return nil
 		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
+}
+
+func Enqueue(ctx context.Context, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, oldValues, newValues any) {
+	_ = enqueueWithFallback(ctx, workerPool, tenantID, actorUserID, actionCode, targetType, targetID, oldValues, newValues)
 }
 
 func buildEvent(tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, oldValues, newValues any) (logEvent, error) {

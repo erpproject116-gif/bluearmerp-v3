@@ -21,9 +21,10 @@ export type ChangeLogFilters = ActivityLogFilters & {
   referenceNo?: string;
 };
 
-export function useChangeLogList(params: () => ChangeLogFilters) {
+export function useChangeLogList(params: () => ChangeLogFilters & { enabled?: boolean }) {
   return createQuery(() => {
     const p = params();
+    const scoped = Boolean(p.targetType && p.targetId);
     const qs = new URLSearchParams({
       page: String(p.page),
       pageSize: String(p.pageSize),
@@ -39,8 +40,26 @@ export function useChangeLogList(params: () => ChangeLogFilters) {
     if (p.module) qs.set("module", p.module);
     if (p.referenceNo) qs.set("reference_no", p.referenceNo);
 
+    const enabled = p.enabled !== false && (!scoped || Boolean(p.targetId));
+
     return {
-      queryKey: ["change-logs", p],
+      queryKey: [
+        "change-logs",
+        p.page,
+        p.pageSize,
+        p.sort,
+        p.order,
+        p.dateFrom ?? "",
+        p.dateTo ?? "",
+        p.actorUserId ?? "",
+        p.actionCode ?? "",
+        p.targetType ?? "",
+        p.targetId ?? "",
+        p.module ?? "",
+        p.referenceNo ?? "",
+        enabled,
+      ],
+      enabled,
       queryFn: async () => {
         const res = await apiFetch<ChangeLogRow[]>(`/api/v1/activity-logs/changes?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load change logs");
@@ -53,7 +72,6 @@ export function useChangeLogList(params: () => ChangeLogFilters) {
       },
       staleTime: 30_000,
       gcTime: 300_000,
-      placeholderData: (prev: { rows: ChangeLogRow[]; total: number; page: number; perPage: number } | undefined) => prev,
     };
   });
 }
