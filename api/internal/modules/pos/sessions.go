@@ -110,11 +110,13 @@ type tenderBody struct {
 }
 
 type checkoutResult struct {
-	SalesID    int64    `json:"sales_id"`
-	SalesNo    string   `json:"sales_no"`
-	GrandTotal float64  `json:"grand_total"`
-	Change     float64  `json:"change"`
-	Tenders    []Tender `json:"tenders"`
+	SalesID           int64    `json:"sales_id"`
+	SalesNo           string   `json:"sales_no"`
+	GrandTotal        float64  `json:"grand_total"`
+	Change            float64  `json:"change"`
+	Tenders           []Tender `json:"tenders"`
+	JournalEntryID    *int64   `json:"journal_entry_id,omitempty"`
+	OfficialReceiptID *int64   `json:"official_receipt_id,omitempty"`
 }
 
 type cartLineQuerier interface {
@@ -635,6 +637,11 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"serials": err.Error()})
 			return
 		}
+		acct, err := postCheckoutAccounting(r.Context(), tx, tu.TenantID, tu.AppUserID, salesID, partnerID, currencyID, orderDate, salesNo, subtotal, taxTotal, grandTotal, primaryTender)
+		if err != nil {
+			response.Validation(w, map[string]string{"accounting": err.Error()})
+			return
+		}
 		var outTenders []Tender
 		for _, t := range body.Tenders {
 			tt := normalizeTenderType(t.TenderType)
@@ -658,7 +665,10 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "pos.checkout", "sa_sales", &salesID, nil, body)
-		response.OK(w, checkoutResult{SalesID: salesID, SalesNo: salesNo, GrandTotal: grandTotal, Change: change, Tenders: outTenders}, "Checkout complete.")
+		response.OK(w, checkoutResult{
+			SalesID: salesID, SalesNo: salesNo, GrandTotal: grandTotal, Change: change, Tenders: outTenders,
+			JournalEntryID: acct.JournalEntryID, OfficialReceiptID: acct.OfficialReceiptID,
+		}, "Checkout complete.")
 	}
 }
 

@@ -76,17 +76,22 @@ func journalAlreadyPosted(ctx context.Context, tx pgx.Tx, tenantID int64, source
 }
 
 func postWithJournalPoster(ctx context.Context, tx pgx.Tx, tenantID int64, ev ledger.PostingEvent) error {
-	already, err := journalAlreadyPosted(ctx, tx, tenantID, ev.SourceType, ev.SourceID)
+	policy, err := processpolicy.LoadTx(ctx, tx, tenantID)
+	if err != nil {
+		return fmt.Errorf("load process policy: %w", err)
+	}
+	poster := ledger.JournalPoster{AutoOR: policy.AccountsAutoPostOR, AutoPV: policy.AccountsAutoPostPV}
+	return PostLedgerEventTx(ctx, tx, poster, ev)
+}
+
+// PostLedgerEventTx posts a sub-ledger event using the supplied poster within tx.
+func PostLedgerEventTx(ctx context.Context, tx pgx.Tx, poster ledger.JournalPoster, ev ledger.PostingEvent) error {
+	already, err := journalAlreadyPosted(ctx, tx, ev.TenantID, ev.SourceType, ev.SourceID)
 	if err != nil {
 		return err
 	}
 	if already {
 		return nil
 	}
-	policy, err := processpolicy.LoadTx(ctx, tx, tenantID)
-	if err != nil {
-		return fmt.Errorf("load process policy: %w", err)
-	}
-	poster := ledger.JournalPoster{AutoOR: policy.AccountsAutoPostOR, AutoPV: policy.AccountsAutoPostPV}
 	return poster.Post(ctx, tx, ev)
 }

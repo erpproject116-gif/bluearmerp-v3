@@ -1,6 +1,7 @@
-import { A } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { OnboardingChecklist, OnboardingTrackPanel } from "../../shared/OnboardingChecklist";
+import { useQueryClient } from "@tanstack/solid-query";
+import { OnboardingTrackPanel } from "../../shared/OnboardingChecklist";
 import { apiFetch } from "../../shared/api";
 import { useOnboarding } from "../../shared/usePlatform";
 
@@ -29,13 +30,21 @@ const PLAYBOOK_WEEKS = [
 
 export default function OnboardingPage() {
   const q = useOnboarding();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
   const data = () => q.data;
   const tracks = () => data()?.tracks ?? [];
   const overall = () => data()?.overall_percent ?? 0;
+  const showPlaybook = () => data()?.show_playbook ?? false;
 
-  const dismiss = async () => {
-    await apiFetch("/api/v1/platform/onboarding/dismiss", { method: "POST" }, { silent: true });
-    window.location.href = "/app/dashboard";
+  const dismiss = async (snoozeOnly: boolean) => {
+    await apiFetch(
+      "/api/v1/platform/onboarding/dismiss",
+      { method: "POST", body: JSON.stringify({ snooze_only: snoozeOnly }) },
+      { silent: true },
+    );
+    await qc.invalidateQueries({ queryKey: ["onboarding"] });
+    navigate("/app/dashboard");
   };
 
   const trackById = (id: string) => tracks().find((t) => t.id === id);
@@ -129,19 +138,26 @@ export default function OnboardingPage() {
             for step-by-step scenarios including POS checkout and serial scanning.
           </p>
         </div>
-
-        <div class="mt-6">
-          <OnboardingChecklist />
-        </div>
       </Show>
 
-      <button
-        type="button"
-        class="mt-8 text-xs text-text-secondary hover:underline"
-        onClick={() => void dismiss()}
-      >
-        Remind me later
-      </button>
+      <Show when={showPlaybook()}>
+        <div class="mt-8 flex flex-wrap gap-4">
+          <button
+            type="button"
+            class="text-xs text-text-secondary hover:underline"
+            onClick={() => void dismiss(true)}
+          >
+            Remind me later
+          </button>
+          <button
+            type="button"
+            class="text-xs text-text-secondary hover:underline"
+            onClick={() => void dismiss(false)}
+          >
+            Don&apos;t show playbook again
+          </button>
+        </div>
+      </Show>
     </div>
   );
 }

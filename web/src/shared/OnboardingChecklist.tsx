@@ -7,19 +7,21 @@ import { useOnboarding, type OnboardingTrack, type OnboardingTrackStep } from ".
 export function OnboardingChecklist(props: { compact?: boolean }) {
   const q = useOnboarding();
   const data = () => q.data;
-  const overall = () => data()?.overall_percent ?? data()?.percent ?? 0;
-  const foundationDone = () => data()?.required_complete ?? false;
-  const show = () => data() && overall() < 100;
+  const showSetup = () => data()?.show_setup_checklist ?? false;
+  const showPlaybook = () => data()?.show_playbook ?? false;
+  const show = () => showSetup() || showPlaybook();
+  const progressPercent = () =>
+    showPlaybook() ? (data()?.overall_percent ?? 0) : (data()?.percent ?? 0);
 
   const nextHref = () => {
-    if (!foundationDone()) return data()!.next_step?.href ?? "/app/setup";
+    if (showSetup()) return data()!.next_step?.href ?? "/app/setup";
     return data()!.next_extended_step?.href ?? "/app/onboarding";
   };
   const nextLabel = () => {
-    if (!foundationDone()) return data()!.next_step?.label ?? "Continue setup";
+    if (showSetup()) return data()!.next_step?.label ?? "Continue setup";
     const ext = data()!.next_extended_step;
     if (ext) return `${ext.track_title}: ${ext.label}`;
-    return "Continue onboarding";
+    return "Open playbook";
   };
 
   return (
@@ -28,29 +30,31 @@ export function OnboardingChecklist(props: { compact?: boolean }) {
         <div class="flex items-start justify-between gap-3">
           <div>
             <h2 class="text-sm font-semibold text-text-primary">
-              {foundationDone() ? "Onboarding playbook" : "Start here — workspace setup"}
+              {showPlaybook() ? "Onboarding playbook" : "Start here — workspace setup"}
             </h2>
             <p class="mt-1 text-xs text-text-secondary">
-              {overall()}% complete
-              <Show when={foundationDone()}>
+              {progressPercent()}% complete
+              <Show when={showPlaybook()}>
                 {" "}
                 — ERP modules, POS, and operations
               </Show>
             </p>
           </div>
-          <A href="/app/onboarding" class="text-xs font-medium text-brand-600 hover:underline">
-            Full playbook
-          </A>
+          <Show when={showPlaybook()}>
+            <A href="/app/onboarding" class="text-xs font-medium text-brand-600 hover:underline">
+              Full playbook
+            </A>
+          </Show>
         </div>
 
         <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
           <div
             class="h-full rounded-full bg-brand-600 transition-all"
-            style={{ width: `${overall()}%` }}
+            style={{ width: `${progressPercent()}%` }}
           />
         </div>
 
-        <Show when={!foundationDone()}>
+        <Show when={showSetup()}>
           <ul class="mt-4 space-y-2">
             <For each={data()!.steps.slice(0, props.compact ? 3 : undefined)}>
               {(step) => <OnboardingStepRow step={step} />}
@@ -58,7 +62,7 @@ export function OnboardingChecklist(props: { compact?: boolean }) {
           </ul>
         </Show>
 
-        <Show when={foundationDone() && props.compact}>
+        <Show when={showPlaybook() && props.compact}>
           <p class="mt-3 text-xs text-text-secondary">
             Foundation is complete. Work through selling, buying, POS, finance, and more.
           </p>

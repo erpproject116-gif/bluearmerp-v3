@@ -97,6 +97,8 @@ export type CheckoutResult = {
   sales_no: string;
   grand_total: number;
   change: number;
+  journal_entry_id?: number;
+  official_receipt_id?: number;
 };
 
 export type HeldOrder = {
@@ -160,6 +162,12 @@ export type PosSettings = {
   receipt_footer?: string;
   tax_mode?: string;
   tax_rate_percent?: number;
+  auto_post_accounting?: boolean;
+  auto_create_receipt?: boolean;
+  sales_account_id?: number | null;
+  receivable_account_id?: number | null;
+  cash_account_id?: number | null;
+  card_account_id?: number | null;
 };
 
 export function usePosCatalogCategories() {

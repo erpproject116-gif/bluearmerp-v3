@@ -142,7 +142,11 @@ export function useOnboarding() {
         tracks?: OnboardingTrack[];
         percent: number;
         overall_percent?: number;
-        dismissed: boolean;
+        show_setup_checklist?: boolean;
+        show_playbook?: boolean;
+        playbook_dismissed?: boolean;
+        is_new_user?: boolean;
+        dismissed?: boolean;
         required_complete?: boolean;
         ready?: boolean;
         blocking_reason?: string;

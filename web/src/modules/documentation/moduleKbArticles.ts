@@ -151,8 +151,16 @@ export const moduleKbArticles: KbArticle[] = [
         text: "Each serial-tracked line must have exactly one serial unit attached before checkout succeeds. The server marks units sold and reduces stock like a sales invoice.",
       },
       {
+        type: "heading",
+        text: "Accounting on checkout",
+      },
+      {
+        type: "paragraph",
+        text: "When enabled in POS → Manage → Settings, checkout automatically creates a sales invoice journal (DR A/R, CR sales, CR VAT) and an official receipt (DR cash/card, CR A/R). Stock still comes from buying (GR) or stock entries — not from POS.",
+      },
+      {
         type: "tip",
-        text: "Configure catalog, tax, and barcode under POS → Manage.",
+        text: "Configure GL accounts and auto-post under POS → Manage → Settings. Enable accounts_auto_post_sales and accounts_auto_post_or in Process Policies to post journals immediately.",
       },
     ],
     primaryHref: "/app/pos",

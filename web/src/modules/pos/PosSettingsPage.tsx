@@ -36,6 +36,7 @@ type CategoryRow = {
 
 type TaxType = { id: number; name: string; tax_mode: string; rate_percent: number };
 type LocationRow = { id: number; location_name: string };
+type FinAccount = { id: number; account_code: string; account_name: string; account_type: string };
 
 const TAB_LABELS: { id: string; label: string }[] = [
   { id: "products", label: "Products" },
@@ -736,6 +737,10 @@ function SettingsTab() {
     const res = await apiFetch<LocationRow[]>("/api/v1/inventory/locations?page=1&pageSize=100");
     return res.data ?? [];
   });
+  const [accounts] = createResource(async () => {
+    const res = await apiFetch<FinAccount[]>("/api/v1/finance/accounts?page=1&pageSize=500&is_active=true");
+    return res.data ?? [];
+  });
 
   const [draft, setDraft] = createSignal<PosSettings | null>(null);
   const current = (): PosSettings =>
@@ -746,6 +751,8 @@ function SettingsTab() {
       allowed_tenders: ["cash", "gcash", "maya", "qrph", "card", "bank_transfer"],
       require_customer: false,
       enable_barcode: false,
+      auto_post_accounting: true,
+      auto_create_receipt: true,
     };
 
   const update = (patch: Partial<PosSettings>) => setDraft({ ...current(), ...patch });
@@ -850,6 +857,31 @@ function SettingsTab() {
           </div>
         </div>
 
+        <div class="rounded-xl border border-stroke bg-white p-5">
+          <h3 class="mb-2 text-sm font-semibold text-text-primary">Accounting (auto on checkout)</h3>
+          <p class="mb-4 text-xs text-text-secondary">
+            Each POS checkout creates a sales invoice and can post GL plus an official receipt. Defaults use chart
+            accounts 1089 (A/R), 210 (sales), 1020 (cash), 1023 (card/bank).
+          </p>
+          <label class="flex items-center gap-2 text-sm text-text-primary">
+            <input type="checkbox" checked={current().auto_post_accounting !== false} onChange={(e) => update({ auto_post_accounting: e.currentTarget.checked })} />
+            Auto-post sales invoice journal (DR A/R, CR sales, CR VAT)
+          </label>
+          <label class="mt-2 flex items-center gap-2 text-sm text-text-primary">
+            <input type="checkbox" checked={current().auto_create_receipt !== false} onChange={(e) => update({ auto_create_receipt: e.currentTarget.checked })} />
+            Auto-create official receipt (DR cash/card, CR A/R)
+          </label>
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <AccountSelect label="Sales revenue account" accounts={accounts() ?? []} value={current().sales_account_id} onChange={(id) => update({ sales_account_id: id })} />
+            <AccountSelect label="Receivable account (A/R)" accounts={accounts() ?? []} value={current().receivable_account_id} onChange={(id) => update({ receivable_account_id: id })} />
+            <AccountSelect label="Cash tender account" accounts={accounts() ?? []} value={current().cash_account_id} onChange={(id) => update({ cash_account_id: id })} />
+            <AccountSelect label="Card / e-wallet account" accounts={accounts() ?? []} value={current().card_account_id} onChange={(id) => update({ card_account_id: id })} />
+          </div>
+          <p class="mt-3 text-xs text-text-secondary">
+            Journal auto-post follows Process Policies → accounts_auto_post_sales / accounts_auto_post_or.
+          </p>
+        </div>
+
         <div class="flex justify-end">
           <button type="button" class="rounded-lg bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-40" disabled={!draft()} onClick={save}>
             Save settings
@@ -857,5 +889,32 @@ function SettingsTab() {
         </div>
       </div>
     </Show>
+  );
+}
+
+function AccountSelect(props: {
+  label: string;
+  accounts: FinAccount[];
+  value?: number | null;
+  onChange: (id: number | null) => void;
+}) {
+  return (
+    <div>
+      <label class="mb-1 block text-xs font-medium text-text-secondary">{props.label}</label>
+      <select
+        class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+        value={props.value ?? ""}
+        onChange={(e) => props.onChange(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+      >
+        <option value="">— Chart default —</option>
+        <For each={props.accounts}>
+          {(a) => (
+            <option value={a.id}>
+              {a.account_code} — {a.account_name}
+            </option>
+          )}
+        </For>
+      </select>
+    </div>
   );
 }

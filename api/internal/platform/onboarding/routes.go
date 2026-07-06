@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -74,16 +75,19 @@ func (s *service) dismissOnboarding(w http.ResponseWriter, r *http.Request) {
 		response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 		return
 	}
-	if !tu.IsTenantOwner && tu.TenantRole != "store_admin" {
-		response.Err(w, http.StatusForbidden, "Admin access required.", "ERR_FORBIDDEN")
+	var body struct {
+		SnoozeOnly bool `json:"snooze_only"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if err := dismissPlaybookForUser(r.Context(), s.pool, tu.AppUserID, body.SnoozeOnly); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to save preference.", "ERR_INTERNAL")
 		return
 	}
-	_, _ = s.pool.Exec(r.Context(), `
-		update public.platform_customers
-		set onboarding_progress = coalesce(onboarding_progress, '{}'::jsonb) || '{"remind_later_at": "now"}'::jsonb,
-		    updated_at = now()
-		where tenant_id = $1`, tu.TenantID)
-	response.OK(w, map[string]bool{"dismissed": false, "remind_later": true}, "Remind later saved.")
+	msg := "Playbook hidden."
+	if body.SnoozeOnly {
+		msg = "We will remind you in about a week."
+	}
+	response.OK(w, map[string]bool{"dismissed": !body.SnoozeOnly, "snoozed": body.SnoozeOnly}, msg)
 }
 
 func (s *service) getBilling(w http.ResponseWriter, r *http.Request) {
@@ -157,6 +161,13 @@ func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) 
 		return nil, err
 	}
 
+	_ = touchFirstAppSeen(ctx, pool, tu.AppUserID)
+	userState, err := loadUserOnboardingState(ctx, pool, tu.TenantID, tu.AppUserID, tu.IsTenantOwner)
+	if err != nil {
+		return nil, err
+	}
+	showSetup, showPlaybook := resolveVisibility(readiness.RequiredComplete, userState)
+
 	tracks, overallPercent, meta := buildTracks(ctx, pool, tu.TenantID, readiness)
 
 	steps := make([]map[string]any, 0, len(readiness.Steps))
@@ -170,23 +181,28 @@ func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) 
 	}
 
 	out := map[string]any{
-		"steps":             steps,
-		"percent":           readiness.Percent,
-		"overall_percent":   overallPercent,
-		"tracks":            tracks,
-		"meta":              meta,
-		"dismissed":         readiness.RequiredComplete,
-		"required_complete": readiness.RequiredComplete,
-		"ready":             readiness.Ready,
-		"blocking_reason":   readiness.BlockingReason,
+		"steps":                  steps,
+		"percent":                readiness.Percent,
+		"overall_percent":        overallPercent,
+		"tracks":                 tracks,
+		"meta":                   meta,
+		"show_setup_checklist":   showSetup,
+		"show_playbook":          showPlaybook,
+		"playbook_dismissed":     userState.DismissedAt != nil,
+		"is_new_user":            userState.playbookEligible(time.Now()) || !readiness.RequiredComplete,
+		"required_complete":      readiness.RequiredComplete,
+		"ready":                  readiness.Ready,
+		"blocking_reason":        readiness.BlockingReason,
 	}
 	if readiness.NextStep != nil {
 		out["next_step"] = map[string]any{
 			"id": readiness.NextStep.ID, "label": readiness.NextStep.Label, "href": readiness.NextStep.Href,
 		}
 	}
-	if next := nextIncompleteTrackStep(tracks); next != nil {
-		out["next_extended_step"] = next
+	if showPlaybook {
+		if next := nextIncompleteTrackStep(tracks); next != nil {
+			out["next_extended_step"] = next
+		}
 	}
 
 	completedMap := make(map[string]bool)

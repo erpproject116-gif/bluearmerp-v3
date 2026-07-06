@@ -31,6 +31,15 @@ func ResolveAccountID(ctx context.Context, pool *pgxpool.Pool, tenantID int64, c
 	return id, err
 }
 
+// ResolveAccountIDTx looks up an account within an existing transaction.
+func ResolveAccountIDTx(ctx context.Context, tx pgx.Tx, tenantID int64, code string) (int64, error) {
+	var id int64
+	err := tx.QueryRow(ctx,
+		`select id from public.fin_accounts where tenant_id = $1 and account_code = $2 and is_active`,
+		tenantID, code).Scan(&id)
+	return id, err
+}
+
 // Sync creates a new draft journal entry for the source document, or refreshes an
 // existing DRAFT one in place. A posted/cancelled entry is left untouched and its
 // id returned unchanged. When autoPost is true the (balanced) draft is posted.
@@ -38,12 +47,26 @@ func Sync(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, entry
 	if len(lines) < 2 {
 		return 0, errors.New("journal entry needs at least two lines")
 	}
-
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback(ctx)
+	jeID, err := SyncTx(ctx, tx, tenantID, userID, entryDate, remarks, existingJEID, lines, autoPost)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return jeID, nil
+}
+
+// SyncTx is like Sync but participates in the caller's transaction.
+func SyncTx(ctx context.Context, tx pgx.Tx, tenantID, userID int64, entryDate time.Time, remarks string, existingJEID *int64, lines []Line, autoPost bool) (int64, error) {
+	if len(lines) < 2 {
+		return 0, errors.New("journal entry needs at least two lines")
+	}
 
 	var jeID int64
 	if existingJEID != nil && *existingJEID > 0 {
@@ -51,7 +74,6 @@ func Sync(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, entry
 		err := tx.QueryRow(ctx, `select status from public.fin_journal_entries where id = $1 and tenant_id = $2`, *existingJEID, tenantID).Scan(&status)
 		if err == nil {
 			if status != "draft" {
-				// Immutable once posted/cancelled — keep as is.
 				return *existingJEID, nil
 			}
 			jeID = *existingJEID
@@ -104,10 +126,6 @@ func Sync(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, entry
 			jeID); err != nil {
 			return 0, err
 		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return 0, err
 	}
 	return jeID, nil
 }
