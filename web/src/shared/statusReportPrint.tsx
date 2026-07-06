@@ -70,7 +70,7 @@ export function StatusReportPrintDocument<T>(props: Props<T>) {
         </table>
         <PrintBrandingFooter
           class="quotation-print__footer"
-          defaultFooter={`Generated from Bluearm ERP · ${props.generatedAt.toLocaleString()}`}
+          defaultFooter={`Generated from BluearmERP · ${props.generatedAt.toLocaleString()}`}
         />
       </article>
 

@@ -1,5 +1,5 @@
 @theme {
-  /* TailAdmin-inspired palette (light only) — overridden per tenant via applyBrandingTheme() */
+  /* BluearmERP design tokens (light only) — overridden per tenant via applyBrandingTheme() */
   --color-brand-50: #ecf3ff;
   --color-brand-100: #dde9ff;
   --color-brand-500: #3c50e0;

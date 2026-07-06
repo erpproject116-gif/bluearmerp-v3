@@ -61,7 +61,7 @@ Run after migrations `036`–`039`, `053`, and `scripts/seed-demo-inventory.sql`
 ## Out of scope (MVP)
 
 - Multi-level BPM / workflow engine
-- Email / Send / ECOUNT integrations
+- Email / Send integrations
 - Mgmt Field filter (use custom fields later)
 
 PO conversion and goods receipt are implemented (migrations `042`–`044`); see golden scenarios S2/S10.

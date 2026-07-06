@@ -156,7 +156,7 @@ function PrintDocument(props: { payload: SalesPrintPayload }) {
 
         <PrintBrandingFooter
           class="quotation-print__footer"
-          defaultFooter={`Generated from Bluearm ERP · ${new Date().toLocaleString()}`}
+          defaultFooter={`Generated from BluearmERP · ${new Date().toLocaleString()}`}
         />
       </article>
 

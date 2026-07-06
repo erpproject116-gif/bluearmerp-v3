@@ -168,8 +168,7 @@ export default function MappingCenterPage() {
       <div>
         <h1 class="text-xl font-semibold text-slate-900">Mapping Center</h1>
         <p class="mt-1 text-sm text-slate-600">
-          Configure document generation rules that map source slips to target documents (ECOUNT-style slip
-          generation).
+          Configure document generation rules that map source slips to target documents in BluearmERP.
         </p>
       </div>
 

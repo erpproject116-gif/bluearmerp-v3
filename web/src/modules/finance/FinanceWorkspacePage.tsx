@@ -40,7 +40,7 @@ export default function FinanceWorkspacePage() {
         <h2 class="text-lg font-semibold text-text-primary">Finance workspace</h2>
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-2 text-sm text-text-secondary">
-          ECOUNT-style accounting: <strong class="font-medium text-text-primary">Acct. I</strong> for core GL and vouchers;{" "}
+          BluearmERP accounting: <strong class="font-medium text-text-primary">Acct. I</strong> for core GL and vouchers;{" "}
           <strong class="font-medium text-text-primary">Acct. II</strong> for checks, withholding, budgets, import cost, contracts, and notes.
         </p>
       </section>

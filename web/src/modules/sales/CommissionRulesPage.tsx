@@ -111,7 +111,7 @@ export default function CommissionRulesPage() {
       <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="text-lg font-semibold text-text-primary">Sales commission rules</h2>
         <p class="mt-1 text-sm text-text-secondary">
-          ECOUNT Sales II — accrues on completed sales. Match by salesperson (PIC), item category line totals, or both.
+          Accrues on completed sales. Match by salesperson (PIC), item category line totals, or both.
         </p>
       </section>
       <SpreadsheetGrid<CommissionRule>

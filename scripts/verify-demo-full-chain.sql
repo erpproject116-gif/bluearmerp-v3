@@ -156,7 +156,7 @@ begin
       raise exception 'verify-full-chain [%]: S9 SO→reserve→DR→SI chain missing', v_code;
     end if;
 
-    -- ECOUNT gap closure: default doc generation rules seeded
+    -- Platform feature gap closure: default doc generation rules seeded
     select count(*) into v_count
     from public.doc_generation_rules
     where tenant_id = v_tenant and active;

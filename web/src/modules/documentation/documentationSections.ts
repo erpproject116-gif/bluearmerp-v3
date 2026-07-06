@@ -835,7 +835,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Most day-to-day ECOUNT-style features are live: document generation (Mapping Center), approvals with email, company budgets, Data Center, WMS, shipping rules, Acct II (withholding/2307, landed cost, checks), sales commission, and CAPA.",
+        text: "Most day-to-day BluearmERP features are live: document generation (Mapping Center), approvals with email, company budgets, Data Center, WMS, shipping rules, Acct II (withholding/2307, landed cost, checks), sales commission, and CAPA.",
       },
       {
         type: "paragraph",

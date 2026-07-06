@@ -160,7 +160,7 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 ---
 
-## ECOUNT gap closure (migrations 086–101)
+## Platform feature gap closure (migrations 086–101)
 
 | Area | Status | Migration |
 |------|--------|-----------|
@@ -179,7 +179,7 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 | Area | Notes |
 |------|--------|
-| Full ECOUNT menu parity | Out of scope |
+| Full legacy ERP menu parity | Out of scope |
 | Groupware suite | Use approvals queue + dashboard instead |
 
 ---

@@ -6,7 +6,7 @@ Accepted (2026-06)
 
 ## Context
 
-ECOUNT ERP exposes **Generate Other Slips** on list toolbars backed by tenant-configurable **Mapping Center** rules. Bluearm v3 already implements hard-coded slip-line chains (quotation→SO, PR→PO, etc.) but lacks a unified rule store and list-toolbar UX.
+BluearmERP exposes **Generate Other Slips** on list toolbars backed by tenant-configurable **Mapping Center** rules. Bluearm v3 already implements hard-coded slip-line chains (quotation→SO, PR→PO, etc.) but lacked a unified rule store and list-toolbar UX at the time of this ADR.
 
 ## Decision
 

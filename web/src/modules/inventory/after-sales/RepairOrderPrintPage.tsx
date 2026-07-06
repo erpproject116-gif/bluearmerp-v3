@@ -196,7 +196,7 @@ function PrintDocument(props: { payload: RepairOrderPrintPayload }) {
 
         <PrintBrandingFooter
           class="repair-print__footer"
-          defaultFooter={`Generated from Bluearm ERP · ${new Date().toLocaleString()}`}
+          defaultFooter={`Generated from BluearmERP · ${new Date().toLocaleString()}`}
         />
       </article>
 

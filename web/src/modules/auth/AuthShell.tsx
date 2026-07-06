@@ -14,13 +14,13 @@ export const AuthShell: ParentComponent<Props> = (props) => {
       <div class="hidden w-1/2 flex-col justify-between bg-brand-600 p-12 text-white lg:flex">
         <div class="flex items-center gap-3">
           <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-bold">B</div>
-          <span class="text-2xl font-semibold">Bluearm ERP</span>
+          <span class="text-2xl font-semibold">BluearmERP</span>
         </div>
         <div>
           <h2 class="text-3xl font-semibold leading-tight">{props.heroTitle ?? "Modular inventory master data"}</h2>
           <p class="mt-4 max-w-md text-brand-100">
             {props.heroBody ??
-              "Spreadsheet-style grids, tenant-scoped codes, and enterprise-ready modules — styled with TailAdmin."}
+              "Spreadsheet-style grids, tenant-scoped codes, and enterprise-ready modules — built for BluearmERP."}
           </p>
         </div>
         <p class="text-sm text-brand-100">© Bluearm Philippines</p>

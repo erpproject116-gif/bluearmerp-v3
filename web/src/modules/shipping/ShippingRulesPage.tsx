@@ -76,7 +76,7 @@ export default function ShippingRulesPage() {
         <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
           <h2 class="text-lg font-semibold text-text-primary">Shipping rules</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            ECOUNT-style freight rules — flat amounts matched by zone and carrier when creating shipping orders.
+            Freight rules — flat amounts matched by zone and carrier when creating shipping orders.
           </p>
         </section>
         <SpreadsheetGrid<ShippingRule>

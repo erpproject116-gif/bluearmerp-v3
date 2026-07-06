@@ -6,7 +6,7 @@ export type AcctNavLink = {
 
 export const ACCT_II_PREFIX = "/app/finance/acct-ii";
 
-/** ECOUNT Acct. II — receivable/payable depth, checks, budget, withholding, import cost, contracts, notes */
+/** BluearmERP Acct. II — receivable/payable depth, checks, budget, withholding, import cost, contracts, notes */
 export const acctIINavLinks: AcctNavLink[] = [
   { label: "Check Register", href: "/app/finance/acct-ii/checks", permissionCode: "finance.check_read" },
   { label: "Withholding Tax", href: "/app/finance/acct-ii/withholding-codes", permissionCode: "finance.withholding_read" },
