@@ -167,6 +167,7 @@ func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) 
 		return nil, err
 	}
 	showSetup, showPlaybook := resolveVisibility(readiness.RequiredComplete, userState)
+	showSetup = false // setup reminders use header bar, not dashboard checklist
 
 	tracks, overallPercent, meta := buildTracks(ctx, pool, tu.TenantID, readiness)
 

@@ -3,8 +3,11 @@ package setupreadiness
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 )
 
 const minCOAAccounts = 10
@@ -42,12 +45,15 @@ type NextStep struct {
 }
 
 type Payload struct {
-	Percent          int       `json:"percent"`
-	Ready            bool      `json:"ready"`
-	RequiredComplete bool      `json:"required_complete"`
-	Steps            []Step    `json:"steps"`
-	NextStep         *NextStep `json:"next_step,omitempty"`
-	BlockingReason   string    `json:"blocking_reason,omitempty"`
+	Percent              int       `json:"percent"`
+	Ready                bool      `json:"ready"`
+	RequiredComplete     bool      `json:"required_complete"`
+	Steps                []Step    `json:"steps"`
+	NextStep             *NextStep `json:"next_step,omitempty"`
+	BlockingReason       string    `json:"blocking_reason,omitempty"`
+	ShowSetupBanner      bool      `json:"show_setup_banner"`
+	ShowBreadcrumbHint   bool      `json:"show_breadcrumb_hint"`
+	SetupWizardSkipped   bool      `json:"setup_wizard_skipped"`
 }
 
 type progressStore struct {
@@ -106,6 +112,23 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Payload, err
 		NextStep:         next,
 		BlockingReason:   blocking,
 	}, nil
+}
+
+func LoadForUser(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) (Payload, error) {
+	p, err := Load(ctx, pool, tu.TenantID)
+	if err != nil {
+		return p, err
+	}
+	canManage := tu.IsTenantOwner || tu.TenantRole == "store_admin" || tu.IsPlatformSuperadmin
+	userState, err := loadUserReminderState(ctx, pool, tu.AppUserID)
+	if err != nil {
+		return p, err
+	}
+	now := time.Now()
+	p.ShowSetupBanner = showSetupBanner(p.RequiredComplete, canManage, userState, now)
+	p.ShowBreadcrumbHint = showBreadcrumbHint(p.RequiredComplete, canManage, userState, now)
+	p.SetupWizardSkipped = userState.SkippedAt != nil
+	return p, nil
 }
 
 func IsReady(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (bool, error) {

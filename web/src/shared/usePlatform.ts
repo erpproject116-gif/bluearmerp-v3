@@ -173,6 +173,9 @@ export type SetupReadiness = {
   steps: { id: string; label: string; href: string; done: boolean; required: boolean }[];
   next_step?: { id: string; label: string; href: string };
   blocking_reason?: string;
+  show_setup_banner?: boolean;
+  show_breadcrumb_hint?: boolean;
+  setup_wizard_skipped?: boolean;
 };
 
 export function useSetupReadiness() {

@@ -30,6 +30,7 @@ import { UserAccountMenu } from "./UserAccountMenu";
 import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
 import { SidebarNav } from "./SidebarNav";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
+import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBar";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -150,6 +151,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 when={activeModule()}
                 fallback={
                   <>
+                    <SetupBreadcrumbHint />
                     <p class="text-xs font-medium text-text-secondary">{appTitle()}</p>
                     <h1 class="text-xl font-semibold text-text-primary">Dashboard</h1>
                   </>
@@ -158,7 +160,15 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 {(mod) => (
                   <>
                     <p class="text-xs font-medium text-text-secondary">
-                      <Show when={activeSubBranch()} fallback={mod().label}>
+                      <Show
+                        when={activeSubBranch()}
+                        fallback={
+                          <>
+                            <SetupBreadcrumbHint />
+                            <span>{mod().label}</span>
+                          </>
+                        }
+                      >
                         {(branch) => (
                           <>
                             <span>{mod().label}</span>
@@ -197,6 +207,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               <CrmNotificationBell enabled={canViewCrm(auth.me)} />
             </div>
           </div>
+          <SetupReminderBar />
           <Show when={featureNavModule()}>
             {(mod) => (
               <nav class="erp-header-features mt-3" aria-label={`${mod().label} features`}>

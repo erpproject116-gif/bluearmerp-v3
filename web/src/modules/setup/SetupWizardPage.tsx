@@ -110,6 +110,12 @@ export default function SetupWizardPage() {
     }
   };
 
+  const skipWizard = async () => {
+    await apiFetch("/api/v1/platform/setup-readiness/skip", { method: "POST" }, { silent: true });
+    refresh();
+    navigate("/app/dashboard");
+  };
+
   return (
     <div class="mx-auto max-w-2xl p-6">
       <div class="mb-6">
@@ -176,6 +182,13 @@ export default function SetupWizardPage() {
             onClick={goNext}
           >
             Continue
+          </button>
+          <button
+            type="button"
+            class="mt-3 block text-sm text-text-secondary hover:text-brand-600 hover:underline"
+            onClick={() => void skipWizard()}
+          >
+            Skip for now — remind me in the header
           </button>
         </div>
       </Show>
