@@ -545,6 +545,11 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if err := validateSaleSerialRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+
 		if err := applySaleSerialUnits(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.Lines); err != nil {
 			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
@@ -680,6 +685,11 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if err := replaceSaleLines(r.Context(), tx, id, computed); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := validateSaleSerialRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
 		}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/setupreadiness"
 )
 
 // RegisterRoutes mounts tenant onboarding progress endpoints.
@@ -24,21 +25,6 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 type service struct {
 	pool *pgxpool.Pool
-}
-
-type stepDef struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-	Href  string `json:"href"`
-}
-
-var defaultSteps = []stepDef{
-	{ID: "profile", Label: "Set your company name and logo", Href: "/app/settings/branding"},
-	{ID: "partner", Label: "Add a customer or supplier", Href: "/app/inventory/partners"},
-	{ID: "item", Label: "Add your first product", Href: "/app/inventory/items"},
-	{ID: "quote_or_sale", Label: "Create a quote or sale", Href: "/app/quotation/quotations/new"},
-	{ID: "teammate", Label: "Invite a teammate", Href: "/app/user-management/users"},
-	{ID: "dashboard", Label: "Open your Business Dashboard", Href: "/app/dashboard"},
 }
 
 func (s *service) getOnboarding(w http.ResponseWriter, r *http.Request) {
@@ -61,12 +47,16 @@ func (s *service) dismissOnboarding(w http.ResponseWriter, r *http.Request) {
 		response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 		return
 	}
+	if !tu.IsTenantOwner && tu.TenantRole != "store_admin" {
+		response.Err(w, http.StatusForbidden, "Admin access required.", "ERR_FORBIDDEN")
+		return
+	}
 	_, _ = s.pool.Exec(r.Context(), `
 		update public.platform_customers
-		set onboarding_progress = onboarding_progress || '{"dismissed": true}'::jsonb,
+		set onboarding_progress = coalesce(onboarding_progress, '{}'::jsonb) || '{"remind_later_at": "now"}'::jsonb,
 		    updated_at = now()
 		where tenant_id = $1`, tu.TenantID)
-	response.OK(w, map[string]bool{"dismissed": true}, "Dismissed.")
+	response.OK(w, map[string]bool{"dismissed": false, "remind_later": true}, "Remind later saved.")
 }
 
 func (s *service) getBilling(w http.ResponseWriter, r *http.Request) {
@@ -135,107 +125,44 @@ func (s *service) getBilling(w http.ResponseWriter, r *http.Request) {
 }
 
 func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) (map[string]any, error) {
-	steps := make([]map[string]any, 0, len(defaultSteps))
-	completed := map[string]bool{}
-
-	var progressJSON []byte
-	_ = pool.QueryRow(ctx, `
-		select onboarding_progress from public.platform_customers where tenant_id = $1 limit 1`,
-		tu.TenantID).Scan(&progressJSON)
-	if len(progressJSON) > 0 {
-		var stored map[string]any
-		_ = json.Unmarshal(progressJSON, &stored)
-		if v, ok := stored["completed"].(map[string]any); ok {
-			for k, val := range v {
-				if b, ok := val.(bool); ok && b {
-					completed[k] = true
-				}
-			}
-		}
-		if d, ok := stored["dismissed"].(bool); ok && d {
-			return map[string]any{"dismissed": true, "steps": steps, "percent": 100}, nil
-		}
-		if d, ok := stored["dashboard"].(bool); ok && d {
-			completed["dashboard"] = true
-		}
-	}
-
-	detected, err := detectCompletion(ctx, pool, tu.TenantID)
+	readiness, err := setupreadiness.Load(ctx, pool, tu.TenantID)
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range detected {
-		if v {
-			completed[k] = true
-		}
-	}
 
-	done := 0
-	var nextStep *stepDef
-	for _, def := range defaultSteps {
-		isDone := completed[def.ID]
-		if isDone {
-			done++
-		} else if nextStep == nil {
-			cp := def
-			nextStep = &cp
+	steps := make([]map[string]any, 0, len(readiness.Steps))
+	for _, s := range readiness.Steps {
+		if s.ID == "ready" {
+			continue
 		}
 		steps = append(steps, map[string]any{
-			"id": def.ID, "label": def.Label, "href": def.Href, "done": isDone,
+			"id": s.ID, "label": s.Label, "href": s.Href, "done": s.Done, "required": s.Required,
 		})
 	}
-	pct := 0
-	if len(defaultSteps) > 0 {
-		pct = (done * 100) / len(defaultSteps)
+
+	out := map[string]any{
+		"steps":             steps,
+		"percent":           readiness.Percent,
+		"dismissed":         readiness.RequiredComplete,
+		"required_complete": readiness.RequiredComplete,
+		"ready":             readiness.Ready,
+		"blocking_reason":   readiness.BlockingReason,
+	}
+	if readiness.NextStep != nil {
+		out["next_step"] = map[string]any{
+			"id": readiness.NextStep.ID, "label": readiness.NextStep.Label, "href": readiness.NextStep.Href,
+		}
 	}
 
-	// Persist detected progress best-effort.
 	completedMap := make(map[string]bool)
-	for k, v := range completed {
-		completedMap[k] = v
+	for _, s := range readiness.Steps {
+		completedMap[s.ID] = s.Done
 	}
 	blob, _ := json.Marshal(map[string]any{"completed": completedMap})
 	_, _ = pool.Exec(ctx, `
 		update public.platform_customers
-		set onboarding_progress = onboarding_progress || $2::jsonb, updated_at = now()
+		set onboarding_progress = coalesce(onboarding_progress, '{}'::jsonb) || $2::jsonb, updated_at = now()
 		where tenant_id = $1`, tu.TenantID, string(blob))
-
-	out := map[string]any{
-		"steps": steps, "percent": pct, "dismissed": false,
-	}
-	if nextStep != nil {
-		out["next_step"] = map[string]any{"id": nextStep.ID, "label": nextStep.Label, "href": nextStep.Href}
-	}
-	return out, nil
-}
-
-func detectCompletion(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (map[string]bool, error) {
-	out := make(map[string]bool)
-
-	var brandingName string
-	_ = pool.QueryRow(ctx, `
-		select coalesce(settings->'receipt'->>'company_name', '')
-		from public.tenant_branding where tenant_id = $1`, tenantID).Scan(&brandingName)
-	if brandingName != "" {
-		out["profile"] = true
-	}
-
-	var partners int
-	_ = pool.QueryRow(ctx, `select count(*)::int from public.inv_partners where tenant_id = $1`, tenantID).Scan(&partners)
-	out["partner"] = partners >= 1
-
-	var items int
-	_ = pool.QueryRow(ctx, `select count(*)::int from public.inv_items where tenant_id = $1 and deleted_at is null`, tenantID).Scan(&items)
-	out["item"] = items >= 1
-
-	var quotes, sales int
-	_ = pool.QueryRow(ctx, `select count(*)::int from public.quo_quotations where tenant_id = $1`, tenantID).Scan(&quotes)
-	_ = pool.QueryRow(ctx, `select count(*)::int from public.sa_sales where tenant_id = $1`, tenantID).Scan(&sales)
-	out["quote_or_sale"] = quotes >= 1 || sales >= 1
-
-	var users int
-	_ = pool.QueryRow(ctx, `select count(*)::int from public.users where tenant_id = $1 and status = 'active'`, tenantID).Scan(&users)
-	out["teammate"] = users > 1
 
 	return out, nil
 }

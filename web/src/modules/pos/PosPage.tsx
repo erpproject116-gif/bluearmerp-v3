@@ -301,13 +301,47 @@ export default function PosPage() {
   const handleSearchKey = async (e: KeyboardEvent) => {
     if (e.key !== "Enter" || !settings.data?.enable_barcode) return;
     const list = items.data ?? [];
-    const code = search().trim().toLowerCase();
+    const code = search().trim();
     if (!code) return;
-    const exact = list.find((i) => i.item_code.toLowerCase() === code) ?? (list.length === 1 ? list[0] : null);
+    const exact = list.find((i) => i.item_code.toLowerCase() === code.toLowerCase()) ?? (list.length === 1 ? list[0] : null);
     if (exact) {
       await addItem(exact);
       setSearch("");
+      return;
     }
+    const s = session.data;
+    if (!s?.id) return;
+    const serialRes = await apiFetch<{
+      serial_unit_id: number;
+      item_id: number;
+      item_code: string;
+      serial_no: string;
+    }>(
+      "/api/v1/inventory/serial-units/resolve-scan",
+      {
+        method: "POST",
+        body: JSON.stringify({ serial_no: code, context: "pos", location_id: s.location_id }),
+      },
+      { silent: true },
+    );
+    if (!serialRes.success || !serialRes.data) return;
+    const unit = serialRes.data;
+    const catalogItem = list.find((i) => i.id === unit.item_id);
+    if (!catalogItem) {
+      toast.warning(`Serial ${unit.serial_no} is not in this POS catalog.`);
+      return;
+    }
+    const addRes = await addPosCartLine(s.id, {
+      item_id: catalogItem.id,
+      qty: 1,
+      unit_price: catalogItem.price,
+      modifier_ids: [],
+    });
+    if (addRes.success && addRes.data?.id) {
+      await patchPosCartLine(s.id, addRes.data.id, { serial_unit_ids: [unit.serial_unit_id] });
+    }
+    invalidate();
+    setSearch("");
   };
 
   const openClose = async () => {

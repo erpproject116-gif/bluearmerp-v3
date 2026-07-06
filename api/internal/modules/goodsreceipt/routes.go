@@ -14,6 +14,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Post("/goods-receipts", createGoodsReceipt(pool))
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Post("/goods-receipts/{id}/serials", addGoodsReceiptSerial(pool))
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Post("/goods-receipts/{id}/serials/batch", addGoodsReceiptSerialBatch(pool))
+		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "read")).Get("/goods-receipts/{id}/scan-context", getGoodsReceiptScanContext(pool))
+		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Post("/goods-receipts/{id}/scan", postGoodsReceiptUnifiedScan(pool))
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Delete("/goods-receipts/{id}/serials/{serialId}", removeGoodsReceiptSerial(pool))
 		gr.With(auth.RequirePermission("purchase_order.goods_receipts", "write")).Post("/goods-receipts/{id}/lots", addGoodsReceiptLot(pool))
 		gr.With(auth.RequireSubmit("purchase_order.goods_receipts_post")).Post("/goods-receipts/{id}/post", postGoodsReceipt(pool))

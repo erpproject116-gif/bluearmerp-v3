@@ -44,10 +44,16 @@ export type SalesOrderFeature = keyof typeof SALES_ORDER_ENTITY;
 
 export const PURCHASE_REQUEST_ENTITY = {
   purchaseRequest: "pr_purchase_request",
+  purchaseOrder: "po_purchase_order",
+  goodsReceipt: "gr_goods_receipt",
+  supplierInvoice: "fin_supplier_invoice",
 } as const;
 
 export const PURCHASE_REQUEST_SETTINGS_HREF = {
   purchaseRequest: "/app/purchase-request/purchase-requests/settings",
+  purchaseOrder: "/app/purchase-order/purchase-orders/settings",
+  goodsReceipt: "/app/purchase-order/goods-receipt/settings",
+  supplierInvoice: "/app/finance/supplier-invoices/settings",
 } as const;
 
 export type PurchaseRequestFeature = keyof typeof PURCHASE_REQUEST_ENTITY;

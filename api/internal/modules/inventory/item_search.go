@@ -44,6 +44,7 @@ type itemSearchResult struct {
 	SalesPrice          float64  `json:"sales_price"`
 	Status              string   `json:"status"`
 	TrackInventoryQty   bool     `json:"track_inventory_qty"`
+	TrackSerial         bool     `json:"track_serial"`
 	DefaultLocationQty  *float64 `json:"default_location_qty,omitempty"`
 	TotalInvQty         *float64 `json:"total_inv_qty,omitempty"`
 }
@@ -210,7 +211,7 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := fmt.Sprintf(`
 			select i.id, i.item_code, i.item_name, i.spec_name, i.sales_price::float8, i.status,
-			       i.track_inventory_qty,
+			       i.track_inventory_qty, coalesce(i.track_serial, false),
 			       max(case
 			         when $%d::bigint > 0 and defloc.location_id = $%d::bigint then defloc.qty_on_hand
 			         when $%d::bigint = 0 and i.default_location_id is not null and defloc.location_id = i.default_location_id then defloc.qty_on_hand
@@ -241,7 +242,7 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 			var row itemSearchResult
 			var defQty, totQty *float64
 			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.SalesPrice, &row.Status,
-				&row.TrackInventoryQty, &defQty, &totQty, &total); err != nil {
+				&row.TrackInventoryQty, &row.TrackSerial, &defQty, &totQty, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read items.", "ERR_INTERNAL")
 				return
 			}

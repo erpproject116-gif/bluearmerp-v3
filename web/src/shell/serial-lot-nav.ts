@@ -9,6 +9,11 @@ export const SERIAL_LOT_PREFIX = "/app/inventory/serial-lot";
 
 export const serialLotNavLinks: SerialLotNavLink[] = [
   {
+    label: "Trace",
+    href: "/app/inventory/serial-lot/trace",
+    permissionCode: "inventory.serial_trace",
+  },
+  {
     label: "Registry",
     href: "/app/inventory/serial-lot/registry",
     permissionCode: "inventory.serial_registry",
@@ -24,9 +29,9 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     permissionCode: "inventory.serial_movements",
   },
   {
-    label: "Trace",
-    href: "/app/inventory/serial-lot/trace",
-    permissionCode: "inventory.serial_trace",
+    label: "Settings",
+    href: "/app/inventory/serial-lot/settings",
+    permissionCode: "inventory.serial_settings",
   },
   {
     label: "Receive",
@@ -42,11 +47,6 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     label: "Work Orders",
     href: "/app/inventory/serial-lot/manufacturing/work-orders",
     permissionCode: "manufacturing.work_orders",
-  },
-  {
-    label: "Settings",
-    href: "/app/inventory/serial-lot/settings",
-    permissionCode: "inventory.serial_settings",
   },
 ];
 

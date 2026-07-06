@@ -73,6 +73,9 @@ import SalesOrderStatusPrintPage from "./modules/sales-order/sales-order/SalesOr
 import PurchaseRequestListPage from "./modules/purchase-request/purchase-request/PurchaseRequestListPage";
 import PurchaseRequestNewPage from "./modules/purchase-request/purchase-request/PurchaseRequestNewPage";
 import PurchaseRequestSettingsPage from "./modules/purchase-request/purchase-request/PurchaseRequestSettingsPage";
+import PurchaseOrderSettingsPage from "./modules/purchase-request/purchase-order/PurchaseOrderSettingsPage";
+import GoodsReceiptSettingsPage from "./modules/purchase-request/goods-receipt/GoodsReceiptSettingsPage";
+import SupplierInvoiceSettingsPage from "./modules/finance/supplier-invoices/SupplierInvoiceSettingsPage";
 import PurchaseRequestStatusPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPage";
 import PurchaseRequestPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestPrintPage";
 import PurchaseRequestStatusPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPrintPage";
@@ -152,6 +155,8 @@ import ConversionFunnelReportPage from "./modules/crm/reports/ConversionFunnelRe
 import BrandingSettingsPage from "./modules/settings/BrandingSettingsPage";
 import BillingPage from "./modules/settings/BillingPage";
 import OnboardingPage from "./modules/onboarding/OnboardingPage";
+import SetupWizardPage from "./modules/setup/SetupWizardPage";
+import { SetupGate } from "./shared/SetupGate";
 import PlatformCustomersPage from "./modules/platform/PlatformCustomersPage";
 import PlatformCustomerDetailPage from "./modules/platform/PlatformCustomerDetailPage";
 import PlatformPlansPage from "./modules/platform/PlatformPlansPage";
@@ -236,7 +241,9 @@ function LegacyInventoryAfterSalesRedirect() {
 function AppLayout(props: RouteSectionProps) {
   return (
     <ProtectedRoute>
-      <AppShell>{props.children}</AppShell>
+      <SetupGate>
+        <AppShell>{props.children}</AppShell>
+      </SetupGate>
     </ProtectedRoute>
   );
 }
@@ -373,6 +380,8 @@ export default function App() {
           <Route path="/purchase-order/rfq/:id" component={RfqDetailPage} />
           <Route path="/purchase-order/purchase-returns" component={PurchaseReturnsPage} />
           <Route path="/purchase-order/goods-receipt" component={GoodsReceiptListPage} />
+          <Route path="/purchase-order/goods-receipt/settings" component={GoodsReceiptSettingsPage} />
+          <Route path="/purchase-order/purchase-orders/settings" component={PurchaseOrderSettingsPage} />
           <Route path="/purchase-request/purchase-orders" component={() => <Navigate href="/app/purchase-order/purchase-orders" />} />
           <Route path="/purchase-request/goods-receipt" component={() => <Navigate href="/app/purchase-order/goods-receipt" />} />
           <Route path="/purchase-request/purchase-requests/new" component={PurchaseRequestNewPage} />
@@ -414,6 +423,7 @@ export default function App() {
           <Route path="/finance/acct-i/chart-of-accounts" component={ChartOfAccountsPage} />
           <Route path="/finance/acct-i/journal-entries" component={JournalEntriesPage} />
           <Route path="/finance/supplier-invoices/new" component={SupplierInvoiceNewPage} />
+          <Route path="/finance/supplier-invoices/settings" component={SupplierInvoiceSettingsPage} />
           <Route path="/finance/supplier-invoices" component={SupplierInvoiceListPage} />
           <Route path="/finance/payment-vouchers/new" component={PaymentVoucherNewPage} />
           <Route path="/finance/payment-vouchers" component={PaymentVoucherListPage} />
@@ -518,6 +528,8 @@ export default function App() {
           )} />
           <Route path="/settings/branding" component={BrandingSettingsPage} />
           <Route path="/settings/billing" component={BillingPage} />
+          <Route path="/setup/*" component={SetupWizardPage} />
+          <Route path="/setup" component={SetupWizardPage} />
           <Route path="/onboarding" component={OnboardingPage} />
           <Route path="/platform/customers" component={() => (
             <PlatformRoute>

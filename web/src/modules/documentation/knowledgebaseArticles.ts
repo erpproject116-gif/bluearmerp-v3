@@ -1,5 +1,6 @@
 import type { KbArticle } from "./documentationTypes";
 import { knowledgebaseGroups } from "./knowledgebaseGroups";
+import { moduleKbArticles } from "./moduleKbArticles";
 
 export const knowledgebaseArticles: KbArticle[] = [
   {
@@ -235,6 +236,69 @@ export const knowledgebaseArticles: KbArticle[] = [
     primaryLabel: "Open stock entries",
     relatedGuideIds: ["inventory", "sales"],
   },
+  {
+    id: "setup-wizard",
+    title: "Workspace setup wizard",
+    scenario: "You are setting up a new business before creating quotes or purchases.",
+    intro:
+      "BluearmERP guides you through company details, chart of accounts, currency and tax, locations, partners, and products before any transactions are allowed.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Sign in — if setup is incomplete you are redirected to /app/setup.",
+          "Complete each required step; the API blocks new quotations, sales, and purchases until foundation data exists.",
+          "On the chart of accounts step, review the seeded accounts and click Looks good to continue.",
+          "Add at least one partner and one product; enable Track serial on items you will scan.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Team members see read-only status until an administrator finishes setup.",
+      },
+    ],
+    primaryHref: "/app/setup",
+    primaryLabel: "Open setup wizard",
+    relatedGuideIds: ["inventory"],
+  },
+  {
+    id: "serial-barcode-scanning",
+    title: "Barcode serial scanning (purchase and sales)",
+    scenario: "You receive or sell items that track individual serial numbers.",
+    intro:
+      "On goods receipt, scan the item code to select a line, then scan each serial. On sales, scan serial numbers directly — quantity must equal the number of serials.",
+    blocks: [
+      {
+        type: "heading",
+        text: "Receiving (replenish stock)",
+      },
+      {
+        type: "steps",
+        items: [
+          "Create a draft goods receipt from a purchase order.",
+          "Open the scan panel on the GR list or Serial Receive page.",
+          "Scan item code, then scan each serial until the line is complete.",
+          "Post the goods receipt to move serials to in_stock.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Selling (diminish stock)",
+      },
+      {
+        type: "steps",
+        items: [
+          "On a sales invoice or SO release line with Track serial, use the serial scan box.",
+          "Each accepted scan adds one unit; you cannot save without matching serial count.",
+          "POS and SO-to-sales flows follow the same server rules.",
+        ],
+      },
+    ],
+    primaryHref: "/app/inventory/serial-lot/receive",
+    primaryLabel: "Open serial receive",
+    relatedGuideIds: ["inventory", "sales"],
+  },
+  ...moduleKbArticles,
 ];
 
 export function getKbArticle(id: string): KbArticle | undefined {

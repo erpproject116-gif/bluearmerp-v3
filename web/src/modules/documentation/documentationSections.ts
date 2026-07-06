@@ -27,7 +27,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "tip",
-        text: "Have a specific situation in mind—multiple businesses, branches, or moving stock? Open Help & guides → Knowledge base for scenario walkthroughs.",
+        text: "Have a specific situation in mind—multiple businesses, branches, POS checkout, or moving stock? Open Help & guides → Knowledge base for scenario walkthroughs covering every module.",
       },
       {
         type: "paragraph",
@@ -40,8 +40,8 @@ export const documentationSections: DocSection[] = [
     title: "Your first week",
     iconId: "documentation",
     intro: "A plain-language playbook for getting your business running in Bluearm.",
-    primaryHref: "/app/onboarding",
-    primaryLabel: "Open onboarding checklist",
+    primaryHref: "/app/setup",
+    primaryLabel: "Open setup wizard",
     blocks: [
       {
         type: "steps",

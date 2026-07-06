@@ -56,6 +56,7 @@ import (
 	platformmw "github.com/bluearm/bluearm-erp-v3/api/internal/platform/middleware"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/onboard"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/onboarding"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/setupreadiness"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/presence"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/retention"
@@ -112,10 +113,12 @@ func main() {
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Use(platformmw.Entitlement(pool, cfg.EntitlementGraceDays))
+			protected.Use(setupreadiness.RequireSetupReady(pool))
 			protected.Use(audit.Middleware(pool))
 			protected.Get("/auth/me", auth.MeHandler(pool, cfg))
 			auth.RegisterAuthRoutes(protected, pool)
 			onboarding.RegisterRoutes(protected, pool)
+			setupreadiness.RegisterRoutes(protected, pool)
 			console.RegisterRoutes(protected, pool, cfg)
 			presence.RegisterRoutes(protected, pool)
 			customfields.RegisterRoutes(protected, pool)

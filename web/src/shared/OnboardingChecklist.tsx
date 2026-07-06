@@ -7,7 +7,7 @@ export function OnboardingChecklist(props: { compact?: boolean }) {
   const data = () => q.data;
 
   return (
-    <Show when={data() && !data()!.dismissed && (data()!.percent ?? 0) < 100}>
+    <Show when={data() && !data()!.required_complete && (data()!.percent ?? 0) < 100}>
       <div class={`rounded-xl border border-stroke bg-white ${props.compact ? "p-4" : "p-6 shadow-sm"}`}>
         <div class="flex items-start justify-between gap-3">
           <div>
@@ -17,8 +17,8 @@ export function OnboardingChecklist(props: { compact?: boolean }) {
             </p>
           </div>
           <Show when={!props.compact}>
-            <A href="/app/onboarding" class="text-xs font-medium text-brand-600 hover:underline">
-              Full guide
+            <A href="/app/setup" class="text-xs font-medium text-brand-600 hover:underline">
+              Continue setup
             </A>
           </Show>
         </div>

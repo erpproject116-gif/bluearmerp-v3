@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { SerialPickModal } from "../../../shared/SerialPickModal";
+import { SerialSaleScanner } from "../../../shared/SerialSaleScanner";
 import { useListState } from "../../../shared/useListState";
 import {
   postSalesOrderReleases,
@@ -190,13 +191,25 @@ export default function ReleaseSalesOrderPage() {
                     </td>
                     <td class="px-3 py-2">
                       <Show when={row.track_serial}>
-                        <button
-                          type="button"
-                          class="text-xs text-brand-600 hover:underline"
-                          onClick={() => openSerialPick(row)}
-                        >
-                          Pick ({(serialIds()[row.sales_order_line_id] ?? []).length})
-                        </button>
+                        <div class="max-w-[12rem] space-y-1">
+                          <SerialSaleScanner
+                            itemId={row.item_id}
+                            locationId={row.location_id}
+                            serialUnitIds={serialIds()[row.sales_order_line_id] ?? []}
+                            context="release"
+                            onChange={(ids) => {
+                              setSerialIds((prev) => ({ ...prev, [row.sales_order_line_id]: ids }));
+                              setQty(row.sales_order_line_id, String(ids.length));
+                            }}
+                          />
+                          <button
+                            type="button"
+                            class="text-xs text-brand-600 hover:underline"
+                            onClick={() => openSerialPick(row)}
+                          >
+                            Pick list
+                          </button>
+                        </div>
                       </Show>
                     </td>
                   </tr>

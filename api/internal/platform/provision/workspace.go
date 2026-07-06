@@ -177,6 +177,10 @@ func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArg
 		return TenantResult{}, err
 	}
 
+	if _, err := tx.Exec(ctx, `select public.seed_tenant_base_config($1)`, tenantID); err != nil {
+		return TenantResult{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return TenantResult{}, err
 	}

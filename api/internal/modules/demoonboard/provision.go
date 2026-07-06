@@ -262,6 +262,10 @@ func (s *service) createDemoTenant(ctx context.Context, a createDemoArgs) (int64
 		return 0, err
 	}
 
+	if _, err := tx.Exec(ctx, `select public.seed_tenant_base_config($1)`, tenantID); err != nil {
+		return 0, err
+	}
+
 	// Default the user's active business to this demo tenant.
 	if _, err := tx.Exec(ctx, `
 		insert into public.user_active_tenant (auth_user_id, tenant_id)

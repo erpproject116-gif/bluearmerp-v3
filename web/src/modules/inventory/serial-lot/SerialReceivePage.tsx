@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
@@ -13,6 +14,7 @@ import {
   type QueuedScan,
 } from "../../../shared/useSerialScanQueue";
 import { SerialLotLayout } from "./SerialLotLayout";
+import { SerialReceiveScanner } from "../../../shared/SerialReceiveScanner";
 
 type PurchaseOrderRow = {
   id: number;
@@ -103,6 +105,7 @@ async function fetchOpenPurchaseOrders(q: string): Promise<LookupOption[]> {
 export default function SerialReceivePage() {
   const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
+  const [params] = useSearchParams();
 
   const [poLabel, setPoLabel] = createSignal("");
   const [selectedPoId, setSelectedPoId] = createSignal<number | null>(null);
@@ -110,7 +113,6 @@ export default function SerialReceivePage() {
   const [receiptDate, setReceiptDate] = createSignal(todayISO());
   const [goodsReceipt, setGoodsReceipt] = createSignal<GoodsReceipt | null>(null);
   const [scanLineId, setScanLineId] = createSignal<number | null>(null);
-  const [scanInput, setScanInput] = createSignal("");
   const [lotLineId, setLotLineId] = createSignal<number | null>(null);
   const [lotNo, setLotNo] = createSignal("");
   const [lotQty, setLotQty] = createSignal("1");
@@ -128,7 +130,6 @@ export default function SerialReceivePage() {
 
   const serialLines = () => (goodsReceipt()?.lines ?? []).filter((l) => l.track_serial);
   const lotLines = () => (goodsReceipt()?.lines ?? []).filter((l) => l.track_lot);
-  const singleSerialLine = () => serialLines().length === 1;
 
   const serialPostBlocked = createMemo(() => {
     const lines = serialLines();
@@ -242,17 +243,6 @@ export default function SerialReceivePage() {
     toast.success("Goods receipt created. Scan serial numbers or enter lots.");
   };
 
-  const scanSerial = () => {
-    const gr = goodsReceipt();
-    const lineId = scanLineId();
-    const serialNo = scanInput().trim();
-    if (!gr || !lineId || !serialNo) return;
-
-    if (serialNo.length > 0) {
-      scanQueue.enqueue(lineId, serialNo);
-      setScanInput("");
-    }
-  };
 
   const undoLastSerial = async () => {
     const gr = goodsReceipt();
@@ -392,7 +382,6 @@ export default function SerialReceivePage() {
     setSelectedPo(null);
     setPoLabel("");
     setScanLineId(null);
-    setScanInput("");
     setLotLineId(null);
     setLotNo("");
     setLotQty("1");
@@ -402,6 +391,21 @@ export default function SerialReceivePage() {
     setPasteOpen(false);
     setPasteText("");
   };
+
+  createEffect(() => {
+    const grId = Number(params.gr_id);
+    if (goodsReceipt() || !grId || grId <= 0) return;
+    void (async () => {
+      const res = await apiFetch<GoodsReceipt>(`/api/v1/goods-receipt/goods-receipts/${grId}`);
+      if (res.success && res.data?.status === "draft") {
+        setGoodsReceipt(res.data);
+        scanQueue.initFromStorage(res.data.id);
+        const firstSerialLine = res.data.lines?.find((l) => l.track_serial);
+        if (firstSerialLine) setScanLineId(firstSerialLine.id);
+        void loadGrGaps(res.data.id);
+      }
+    })();
+  });
 
   onMount(() => {
     const gr = goodsReceipt();
@@ -586,50 +590,15 @@ export default function SerialReceivePage() {
               </Show>
 
               <Show when={serialLines().length > 0}>
-                <div class="grid gap-4 md:grid-cols-2">
-                  <Field label={singleSerialLine() ? "Serial line (auto)" : "Scan into line"}>
-                    <select
-                      class={inputClass}
-                      value={scanLineId() ?? ""}
-                      disabled={singleSerialLine()}
-                      onChange={(e) => setScanLineId(Number(e.currentTarget.value) || null)}
-                    >
-                      <option value="">Select line…</option>
-                      <For each={serialLines()}>
-                        {(line) => (
-                          <option value={line.id}>
-                            {line.item_code} — {line.item_name} ({line.received_qty}/{line.expected_qty})
-                          </option>
-                        )}
-                      </For>
-                    </select>
-                  </Field>
-                  <Field label="Serial no.">
-                    <div class="flex gap-2">
-                      <input
-                        class={inputClass}
-                        value={scanInput()}
-                        onInput={(e) => setScanInput(e.currentTarget.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            scanSerial();
-                          }
-                        }}
-                        placeholder="Scan or type serial…"
-                        autofocus
-                      />
-                      <button
-                        type="button"
-                        class="shrink-0 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-                        disabled={!scanLineId() || !scanInput().trim()}
-                        onClick={() => scanSerial()}
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </Field>
-                </div>
+                <SerialReceiveScanner
+                  grId={goodsReceipt()!.id}
+                  lines={goodsReceipt()!.lines ?? []}
+                  status={goodsReceipt()!.status}
+                  onLinesUpdate={(lines) => {
+                    setGoodsReceipt((gr) => (gr ? { ...gr, lines: lines as GoodsReceiptLine[] } : gr));
+                  }}
+                  onAfterScan={() => void loadGrGaps(goodsReceipt()!.id)}
+                />
 
                 <div class="flex flex-wrap gap-2">
                   <button

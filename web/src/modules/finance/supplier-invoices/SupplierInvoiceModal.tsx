@@ -9,6 +9,8 @@ import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import type { OpenGRLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
+import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
+import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 
 type LineRow = {
   goods_receipt_line_id: number | null;
@@ -22,6 +24,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  editingId?: number | null;
 };
 
 function todayISO() {
@@ -51,6 +54,8 @@ export function SupplierInvoiceModal(props: Props) {
   const [notes, setNotes] = createSignal("");
   const [openLines, setOpenLines] = createSignal<OpenGRLine[]>([]);
   const [lines, setLines] = createSignal<LineRow[]>([]);
+  const [grPickerOpen, setGrPickerOpen] = createSignal(false);
+  const [historyOpen, setHistoryOpen] = createSignal(false);
 
   const loadPreview = async (date: string) => {
     const res = await apiFetch<{ date_no_display: string; invoice_no: string }>(
@@ -101,20 +106,27 @@ export function SupplierInvoiceModal(props: Props) {
     if (pid) void loadOpenLines(pid);
   });
 
-  const addLineFromGR = (gr: OpenGRLine) => {
-    const qty = gr.balance_qty;
-    const total = qty * gr.unit_vat_inc;
-    setLines((rows) => [
-      ...rows,
-      {
-        goods_receipt_line_id: gr.goods_receipt_line_id,
-        label: `${gr.purchase_order_no} — ${gr.item_code} ${gr.item_name}`,
-        qty: String(qty),
-        unit_vat_inc: gr.unit_vat_inc,
-        line_total: total.toFixed(4),
-      },
-    ]);
+  const addLinesFromGR = (grLines: OpenGRLine[]) => {
+    setLines((rows) => {
+      const existing = new Set(rows.map((r) => r.goods_receipt_line_id));
+      const added = grLines
+        .filter((gr) => !existing.has(gr.goods_receipt_line_id))
+        .map((gr) => {
+          const qty = gr.balance_qty;
+          const total = qty * gr.unit_vat_inc;
+          return {
+            goods_receipt_line_id: gr.goods_receipt_line_id,
+            label: `${gr.purchase_order_no} — ${gr.item_code} ${gr.item_name}`,
+            qty: String(qty),
+            unit_vat_inc: gr.unit_vat_inc,
+            line_total: total.toFixed(4),
+          };
+        });
+      return [...rows, ...added];
+    });
   };
+
+  const addLineFromGR = (gr: OpenGRLine) => addLinesFromGR([gr]);
 
   const save = async () => {
     if (!partnerId() || !currencyId()) {
@@ -169,7 +181,21 @@ export function SupplierInvoiceModal(props: Props) {
   };
 
   return (
-    <WideEntityModal open={props.open} title="New Supplier Invoice" onClose={props.onClose} onSave={() => void save()} saving={saving()}>
+    <>
+    <WideEntityModal
+      open={props.open}
+      title="New Supplier Invoice"
+      onClose={props.onClose}
+      onSave={() => void save()}
+      saving={saving()}
+      headerActions={
+        <Show when={props.editingId}>
+          <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => setHistoryOpen(true)}>
+            History
+          </button>
+        </Show>
+      }
+    >
       <Field label="Invoice date">
         <DateInput value={invoiceDate()} onInput={(e) => setInvoiceDate(e.currentTarget.value)} />
       </Field>
@@ -205,7 +231,16 @@ export function SupplierInvoiceModal(props: Props) {
       </Field>
       <div class="col-span-full">
         <Show when={partnerId()}>
-          <p class="mb-2 text-sm font-medium text-slate-700">Open goods receipt lines (click to add)</p>
+          <div class="mb-2 flex flex-wrap items-center gap-2">
+            <p class="text-sm font-medium text-slate-700">Goods receipt lines</p>
+            <button
+              type="button"
+              class="rounded border border-stroke px-3 py-1 text-xs text-brand-600 hover:bg-brand-50"
+              onClick={() => setGrPickerOpen(true)}
+            >
+              Load Slip (from Goods Receipt)
+            </button>
+          </div>
           <div class="max-h-32 space-y-1 overflow-y-auto rounded border border-slate-200 p-2">
             <For each={openLines()}>
               {(gr) => (
@@ -239,5 +274,19 @@ export function SupplierInvoiceModal(props: Props) {
         <textarea class={`${inputClass} min-h-[60px]`} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
       </Field>
     </WideEntityModal>
+    <OpenGRLinePickerModal
+      open={grPickerOpen()}
+      partnerId={partnerId()}
+      onClose={() => setGrPickerOpen(false)}
+      onConfirm={(picked) => addLinesFromGR(picked)}
+    />
+    <HistoryLogModal
+      open={historyOpen}
+      onClose={() => setHistoryOpen(false)}
+      targetType="fin_supplier_invoice"
+      targetId={props.editingId}
+      title="History — Supplier Invoice"
+    />
+    </>
   );
 }

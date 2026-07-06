@@ -1,5 +1,7 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
+import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
@@ -159,6 +161,7 @@ function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
 }
 
 export function SalesModal(props: Props) {
+  const queryClient = useQueryClient();
   const toast = useToast();
   const { fields } = useFormFieldSettings(SALES_ENTITY.sales);
   const [saving, setSaving] = createSignal(false);
@@ -456,6 +459,9 @@ export function SalesModal(props: Props) {
     );
     setSaving(false);
     if (!ok) return;
+    if (ed?.id) {
+      invalidateRecordHistory(queryClient, "sa_sales", ed.id);
+    }
     await draft.clearOnSave();
     props.onSaved();
     props.onClose();

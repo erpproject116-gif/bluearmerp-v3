@@ -125,7 +125,7 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 			continue
 		}
 		soLineIDCopy := soLineID
-		lineBodies = append(lineBodies, saleLineBody{
+		body := saleLineBody{
 			LineNo:                 lineNo,
 			ItemID:                 itemID,
 			ItemCode:               itemCode,
@@ -136,7 +136,17 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 			InputBasis:             taxcalc.InputVatIncUnit,
 			Remark:                 remark,
 			SourceSalesOrderLineID: &soLineIDCopy,
-		})
+		}
+		if itemID != nil {
+			ids, loadErr := loadReservedSerialUnitIDsForSOLine(ctx, pool, tu.TenantID, soLineID)
+			if loadErr == nil && len(ids) > 0 {
+				body.SerialUnitIDs = ids
+				if float64(len(ids)) < balance {
+					body.Qty = float64(len(ids))
+				}
+			}
+		}
+		lineBodies = append(lineBodies, body)
 	}
 	if len(lineBodies) == 0 {
 		msg := "No released balance available on this sales order."
@@ -205,6 +215,10 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 
 	if err := insertSaleLines(ctx, tx, id, computed); err != nil {
 		return 0, err
+	}
+
+	if err := validateSaleSerialRequirements(ctx, tx, tu.TenantID, lineBodies); err != nil {
+		return 0, docflowValidation(map[string]string{"lines": err.Error()})
 	}
 
 	if err := applySaleSerialUnits(ctx, tx, tu.TenantID, id, partnerID, lineBodies); err != nil {

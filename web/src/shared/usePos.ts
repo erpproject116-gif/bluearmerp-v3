@@ -65,6 +65,7 @@ export type PosCartLine = {
   line_total: number;
   notes?: string | null;
   size_label?: string | null;
+  serial_unit_ids?: number[];
   modifiers?: PosCartLineModifier[];
 };
 
@@ -208,7 +209,11 @@ export async function savePosSettings(body: PosSettings) {
   return apiFetch<PosSettings>("/api/v1/pos/settings", { method: "PUT", body: JSON.stringify(body) });
 }
 
-export async function patchPosCartLine(sessionId: number, lineId: number, body: { qty?: number; unit_price?: number }) {
+export async function patchPosCartLine(
+  sessionId: number,
+  lineId: number,
+  body: { qty?: number; unit_price?: number; serial_unit_ids?: number[] },
+) {
   return apiFetch<PosCartLine>(`/api/v1/pos/sessions/${sessionId}/cart-lines/${lineId}`, {
     method: "PATCH",
     body: JSON.stringify(body),

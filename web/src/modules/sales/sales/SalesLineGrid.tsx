@@ -4,6 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import { SerialPickModal } from "../../../shared/SerialPickModal";
+import { SerialSaleScanner } from "../../../shared/SerialSaleScanner";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
@@ -33,6 +34,7 @@ export type SalesLineRow = {
   remark: string;
   serial_lot_no: string;
   serial_unit_ids?: number[];
+  track_serial?: boolean;
   source_sales_order_line_id?: number | null;
 };
 
@@ -87,6 +89,8 @@ const DISCOUNT_COLUMNS: GridColumn[] = [
   { key: "discount_amount", header: "Discount", width: 100 },
   { key: "serial_lot_no", header: "Serial/Lot No.", width: 120 },
 ];
+
+const SERIAL_COLUMN: GridColumn = { key: "serials", header: "Serials", width: 150 };
 
 const TAIL_COLUMNS: GridColumn[] = [
   { key: "remark", header: "Remark", width: 120 },
@@ -193,6 +197,7 @@ export function SalesLineGrid(props: Props) {
     const taxCols = filterTaxLineColumns(BASE_COLUMNS, props.taxTypeMeta()?.tax_mode);
     const cols = [...taxCols];
     if (hasDiscountTemplate(props.templateCode())) cols.push(...DISCOUNT_COLUMNS);
+    cols.push(SERIAL_COLUMN);
     cols.push(...TAIL_COLUMNS);
     return cols;
   });
@@ -262,6 +267,9 @@ export function SalesLineGrid(props: Props) {
       item_name: first.item_name,
       unit_price: String(rate0),
       input_basis: basis,
+      track_serial: Boolean(first.track_serial),
+      serial_unit_ids: [],
+      serial_lot_no: "",
     };
     for (let i = 1; i < items.length; i++) {
       const it = items[i];
@@ -273,6 +281,7 @@ export function SalesLineGrid(props: Props) {
         item_id: it.id,
         item_code: it.item_code,
         item_name: it.item_name,
+        track_serial: Boolean(it.track_serial),
       };
     }
     const numbered = current.map((ln, i) => ({ ...ln, line_no: i + 1 }));
@@ -398,6 +407,24 @@ export function SalesLineGrid(props: Props) {
                       </div>
                     </ResizableTd>
                   </Show>
+                  <ResizableTd width={widthFor("serials")} class="px-2 py-1">
+                    <Show when={line().item_id && line().track_serial} fallback={<span class="text-xs text-text-secondary">—</span>}>
+                      <SerialSaleScanner
+                        itemId={line().item_id}
+                        locationId={props.locationId()}
+                        serialUnitIds={line().serial_unit_ids ?? []}
+                        serialLabels={line().serial_lot_no}
+                        context="sale"
+                        onChange={(ids, labels, qty) => {
+                          void updateLine(idx, {
+                            serial_unit_ids: ids,
+                            serial_lot_no: labels,
+                            qty,
+                          });
+                        }}
+                      />
+                    </Show>
+                  </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">
                     <input class={`${inputClass} w-full`} value={line().remark} onInput={(e) => void updateLine(idx, { remark: e.currentTarget.value })} />
                   </ResizableTd>

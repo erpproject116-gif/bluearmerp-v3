@@ -120,6 +120,41 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 100},
 		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 110},
 	},
+	"pr_purchase_request": {
+		{FieldKey: "request_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "partner_id", Label: "Supplier", FieldType: "select", SortOrder: 20},
+		{FieldKey: "location_id", Label: "Location", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "tax_type_id", Label: "Transaction type", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+		{FieldKey: "currency_id", Label: "Currency", FieldType: "select", DefaultRequired: true, SortOrder: 50},
+		{FieldKey: "pic_name", Label: "PIC", FieldType: "text", SortOrder: 60},
+		{FieldKey: "reference_no", Label: "Reference", FieldType: "text", SortOrder: 70},
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 80},
+		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 90},
+	},
+	"po_purchase_order": {
+		{FieldKey: "order_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "partner_id", Label: "Supplier", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "location_id", Label: "Location", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "tax_type_id", Label: "Transaction type", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+		{FieldKey: "currency_id", Label: "Currency", FieldType: "select", DefaultRequired: true, SortOrder: 50},
+		{FieldKey: "pic_name", Label: "PIC", FieldType: "text", SortOrder: 60},
+		{FieldKey: "reference", Label: "Reference", FieldType: "text", SortOrder: 70},
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 80},
+		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 90},
+	},
+	"gr_goods_receipt": {
+		{FieldKey: "receipt_date", Label: "Receipt date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "location_id", Label: "Location", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "reference", Label: "Reference", FieldType: "text", SortOrder: 30},
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 40},
+	},
+	"fin_supplier_invoice": {
+		{FieldKey: "invoice_date", Label: "Invoice date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "partner_id", Label: "Vendor", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "currency_id", Label: "Currency", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "vendor_invoice_no", Label: "Vendor invoice no.", FieldType: "text", SortOrder: 40},
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 50},
+	},
 }
 
 func StandardFields(entityType string) []StandardField {

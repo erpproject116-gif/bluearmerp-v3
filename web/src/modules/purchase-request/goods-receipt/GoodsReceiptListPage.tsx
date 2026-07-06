@@ -10,6 +10,7 @@ import {
 } from "../../../shared/useGoodsReceiptList";
 import { PurchaseRequestLayout } from "../PurchaseRequestLayout";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { GoodsReceiptScanPanel } from "../../../shared/GoodsReceiptScanPanel";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
@@ -148,7 +149,7 @@ export default function GoodsReceiptListPage() {
         onSelect={setSelectedId}
         onNew={() => {}}
         onEdit={() => {}}
-        settingsHref={PURCHASE_REQUEST_SETTINGS_HREF.purchaseRequest}
+        settingsHref={PURCHASE_REQUEST_SETTINGS_HREF.goodsReceipt}
         codeKey="purchase_order_no"
         nameKey="receipt_date"
         sortKey={sort()}
@@ -167,6 +168,10 @@ export default function GoodsReceiptListPage() {
         statusOptions={STATUS_TABS}
         onRefresh={invalidate}
       />
+
+      <Show when={selectedId()}>
+        <GoodsReceiptScanPanel grId={selectedId()!} onClose={() => setSelectedId(null)} />
+      </Show>
     </PurchaseRequestLayout>
   );
 }

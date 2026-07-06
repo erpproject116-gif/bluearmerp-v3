@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { useAuth } from "../../shared/auth-context";
 import { useInventoryWorkspace } from "../../shared/reports/useModuleReports";
+import { ReconciliationBanner } from "../../shared/ReconciliationBanner";
 
 type KpiTile = {
   label: string;
@@ -35,6 +36,8 @@ export default function StockWorkspacePage() {
         <h2 class="text-lg font-semibold text-text-primary">Stock workspace</h2>
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
       </section>
+
+      <ReconciliationBanner />
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <For each={tiles}>

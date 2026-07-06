@@ -120,12 +120,35 @@ export function useOnboarding() {
     queryKey: ["onboarding"],
     queryFn: async () => {
       const res = await apiFetch<{
-        steps: { id: string; label: string; href: string; done: boolean }[];
+        steps: { id: string; label: string; href: string; done: boolean; required?: boolean }[];
         percent: number;
         dismissed: boolean;
+        required_complete?: boolean;
+        ready?: boolean;
+        blocking_reason?: string;
         next_step?: { id: string; label: string; href: string };
       }>("/api/v1/platform/onboarding");
       if (!res.ok) throw new Error(res.message ?? "Failed to load onboarding");
+      return res.data!;
+    },
+  }));
+}
+
+export type SetupReadiness = {
+  percent: number;
+  ready: boolean;
+  required_complete: boolean;
+  steps: { id: string; label: string; href: string; done: boolean; required: boolean }[];
+  next_step?: { id: string; label: string; href: string };
+  blocking_reason?: string;
+};
+
+export function useSetupReadiness() {
+  return createQuery(() => ({
+    queryKey: ["setup-readiness"],
+    queryFn: async () => {
+      const res = await apiFetch<SetupReadiness>("/api/v1/platform/setup-readiness");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load setup readiness");
       return res.data!;
     },
   }));
