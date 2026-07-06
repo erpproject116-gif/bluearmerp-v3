@@ -50,6 +50,14 @@ func getBranding(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load branding.", "ERR_INTERNAL")
 			return
 		}
+		staleCleared := stripStaleLogoAsset(r.Context(), pool, tu.TenantID, settings)
+		if staleCleared {
+			_, _ = pool.Exec(r.Context(), `
+				update public.tenant_branding
+				set settings = settings #- '{receipt,logo_asset_id}',
+				    updated_at = now()
+				where tenant_id = $1 and (settings->'receipt'->>'logo_asset_id') is not null`, tu.TenantID)
+		}
 		response.OK(w, map[string]any{
 			"settings":   settings,
 			"can_manage": tu.CanManageBranding(),

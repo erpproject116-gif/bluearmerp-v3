@@ -571,7 +571,7 @@ export function QuotationModal(props: Props) {
       <ChangeLogPanel targetType="quo_quotation" targetId={props.editing?.id} />
     </WideEntityModal>
 
-    <HistoryLogModal open={historyOpen()} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={props.editing?.id} title="History — Quotation" />
+    <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={props.editing?.id} title="History — Quotation" />
 
     <QuickCustomerModal
       open={showNewCustomer()}

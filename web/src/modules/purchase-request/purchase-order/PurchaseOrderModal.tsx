@@ -644,7 +644,7 @@ export function PurchaseOrderModal(props: Props) {
       />
       <ChangeLogPanel targetType="po_purchase_order" targetId={props.purchaseOrderId} />
     </WideEntityModal>
-    <HistoryLogModal open={historyOpen()} onClose={() => setHistoryOpen(false)} targetType="po_purchase_order" targetId={props.purchaseOrderId} title="History — Purchase Order" />
+    <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="po_purchase_order" targetId={props.purchaseOrderId} title="History — Purchase Order" />
     <PurchaseRequestLinePickerModal
       open={prPickerOpen()}
       onClose={() => setPrPickerOpen(false)}

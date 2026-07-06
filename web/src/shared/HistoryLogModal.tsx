@@ -1,15 +1,20 @@
-import { For, Show } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
 import { Modal } from "./Modal";
 import { useActivityLogList } from "./useActivityLogList";
 
 type Props = {
-  open: boolean;
+  /** Boolean or Solid accessor — accessor form keeps the query in sync when the modal opens. */
+  open: boolean | (() => boolean);
   onClose: () => void;
   /** Backend target_type, e.g. "sa_sales", "so_sales_order". */
   targetType: string;
   targetId: number | null | undefined;
   title?: string;
 };
+
+function readOpen(open: boolean | (() => boolean)): boolean {
+  return typeof open === "function" ? open() : open;
+}
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -23,23 +28,26 @@ function formatWhen(iso: string): string {
  * invoice posting, ...) with timestamp and the PIC (actor) who made it.
  */
 export function HistoryLogModal(props: Props) {
+  const isOpen = createMemo(() => readOpen(props.open));
+  const targetId = createMemo(() => props.targetId);
+
   const list = useActivityLogList(() => ({
     page: 1,
     pageSize: 100,
     sort: "created_at",
     order: "desc" as const,
     targetType: props.targetType,
-    targetId: props.open && props.targetId ? String(props.targetId) : undefined,
-    enabled: props.open && Boolean(props.targetId),
+    targetId: isOpen() && targetId() ? String(targetId()) : undefined,
+    enabled: isOpen() && Boolean(targetId()),
   }));
 
   return (
-    <Modal open={props.open} title={props.title ?? "History log"} onClose={props.onClose} wide>
+    <Modal open={isOpen()} title={props.title ?? "History log"} onClose={props.onClose} wide>
       <Show
-        when={props.targetId}
+        when={targetId()}
         fallback={<p class="py-4 text-sm text-text-secondary">Save the transaction first to see its history.</p>}
       >
-        <Show when={list.isPending}>
+        <Show when={list.isLoading}>
           <p class="py-4 text-sm text-text-secondary">Loading…</p>
         </Show>
         <Show when={list.isError}>
@@ -47,7 +55,7 @@ export function HistoryLogModal(props: Props) {
             {list.error instanceof Error ? list.error.message : "Failed to load history."}
           </p>
         </Show>
-        <Show when={!list.isPending && !list.isError && (list.data?.rows.length ?? 0) === 0}>
+        <Show when={!list.isLoading && !list.isError && (list.data?.rows.length ?? 0) === 0}>
           <p class="py-4 text-sm text-text-secondary">No activity recorded yet.</p>
         </Show>
         <Show when={(list.data?.rows.length ?? 0) > 0}>

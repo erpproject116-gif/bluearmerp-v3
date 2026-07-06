@@ -667,7 +667,7 @@ export function SalesModal(props: Props) {
       </WideEntityModal>
 
       <HistoryLogModal
-        open={historyOpen()}
+        open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         targetType="sa_sales"
         targetId={props.editing?.id}

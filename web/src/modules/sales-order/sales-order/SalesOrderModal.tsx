@@ -661,7 +661,7 @@ export function SalesOrderModal(props: Props) {
         <ChangeLogPanel targetType="so_sales_order" targetId={props.editing?.id} />
       </WideEntityModal>
 
-      <HistoryLogModal open={historyOpen()} onClose={() => setHistoryOpen(false)} targetType="so_sales_order" targetId={props.editing?.id} title="History — Sales Order" />
+      <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="so_sales_order" targetId={props.editing?.id} title="History — Sales Order" />
 
       <QuotationLinePickerModal
         open={quotationPickerOpen()}

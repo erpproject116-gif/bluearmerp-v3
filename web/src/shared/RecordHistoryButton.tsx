@@ -48,7 +48,7 @@ export function RecordHistoryButton(props: Props) {
           </button>
         </Show>
         <HistoryLogModal
-          open={open()}
+          open={open}
           onClose={() => setOpen(false)}
           targetType={props.targetType}
           targetId={props.targetId}

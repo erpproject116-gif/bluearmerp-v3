@@ -3,6 +3,7 @@ package activitylog
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -166,6 +167,7 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 
 		rows, err := pool.Query(r.Context(), sql, args...)
 		if err != nil {
+			log.Printf("activity-logs list: tenant=%d: %v", tu.TenantID, err)
 			response.Err(w, http.StatusInternalServerError, "Failed to list activity logs.", "ERR_INTERNAL")
 			return
 		}

@@ -619,7 +619,7 @@ export function PurchaseRequestModal(props: Props) {
       />
       <ChangeLogPanel targetType="pr_purchase_request" targetId={props.editing?.id} />
     </WideEntityModal>
-    <HistoryLogModal open={historyOpen()} onClose={() => setHistoryOpen(false)} targetType="pr_purchase_request" targetId={props.editing?.id} title="History — Purchase Request" />
+    <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="pr_purchase_request" targetId={props.editing?.id} title="History — Purchase Request" />
     <SalesOrderLinePickerModal
       open={soPickerOpen()}
       onClose={() => setSoPickerOpen(false)}

@@ -307,3 +307,51 @@ func enrichReceiptFromTenant(ctx context.Context, pool *pgxpool.Pool, tenantID i
 	setIfEmpty(receipt, "phone", phone)
 	setIfEmpty(receipt, "address", address)
 }
+
+// stripStaleLogoAsset removes logo_asset_id from settings when the DB row or file is missing
+// (common on Render after redeploy when the ephemeral upload volume was wiped).
+func stripStaleLogoAsset(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settings map[string]any) bool {
+	receipt, _ := settings["receipt"].(map[string]any)
+	if receipt == nil {
+		return false
+	}
+	assetID := logoAssetIDFromMap(receipt["logo_asset_id"])
+	if assetID <= 0 {
+		return false
+	}
+	var storagePath string
+	err := pool.QueryRow(ctx, `
+		select storage_path
+		from public.tenant_branding_assets
+		where id = $1 and tenant_id = $2`, assetID, tenantID).Scan(&storagePath)
+	if err != nil {
+		delete(receipt, "logo_asset_id")
+		return true
+	}
+	abs, err := filedownload.ResolveSafePath(uploadDir(), storagePath)
+	if err != nil {
+		delete(receipt, "logo_asset_id")
+		return true
+	}
+	if _, err := os.Stat(abs); err != nil {
+		delete(receipt, "logo_asset_id")
+		return true
+	}
+	return false
+}
+
+func logoAssetIDFromMap(v any) int64 {
+	switch n := v.(type) {
+	case float64:
+		return int64(n)
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	case json.Number:
+		i, _ := n.Int64()
+		return i
+	default:
+		return 0
+	}
+}

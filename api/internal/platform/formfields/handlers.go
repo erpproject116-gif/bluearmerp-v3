@@ -3,6 +3,7 @@ package formfields
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -42,6 +43,7 @@ func listSettingsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		fields, err := LoadMergedSettings(r.Context(), pool, tu.TenantID, entityType)
 		if err != nil {
+			log.Printf("form-field-settings: tenant=%d entity=%s: %v", tu.TenantID, entityType, err)
 			response.Err(w, http.StatusInternalServerError, "Failed to load form settings.", "ERR_INTERNAL")
 			return
 		}
