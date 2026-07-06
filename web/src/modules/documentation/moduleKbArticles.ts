@@ -3,6 +3,33 @@ import type { KbArticle } from "./documentationTypes";
 /** Module and feature guides — merged into knowledgebaseArticles. */
 export const moduleKbArticles: KbArticle[] = [
   {
+    id: "onboarding-playbook",
+    title: "Onboarding playbook (ERP + POS)",
+    scenario: "You want a guided path through every module after initial setup.",
+    intro:
+      "The onboarding playbook tracks progress across foundation, selling, buying, serials, POS, finance, CRM, and dashboard health.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Finish required workspace setup at /app/setup.",
+          "Open /app/onboarding for the multi-track playbook with auto-detected progress.",
+          "Week 1: admin — process policies, modules, Mapping Center, team.",
+          "Week 2: selling + serials — quote, SO, pick list, invoice, payment.",
+          "Week 3: buying + finance — PR, PO, GR, supplier invoice, GL reports.",
+          "Week 4: POS + operations — configure POS, shift, checkout, CRM, support.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Use Mark reviewed on review-only steps such as process policies and POS Manage.",
+      },
+    ],
+    primaryHref: "/app/onboarding",
+    primaryLabel: "Open onboarding playbook",
+    relatedGuideIds: ["setup-wizard", "pos-checkout-guide"],
+  },
+  {
     id: "sales-order-release",
     title: "Sales orders: pick list, delivery notes, and release modes",
     scenario: "You confirmed a customer order and need to allocate stock before invoicing.",

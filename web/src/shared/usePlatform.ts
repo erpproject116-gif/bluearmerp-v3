@@ -115,18 +115,46 @@ export function usePlatformCustomer(id: () => number | undefined) {
   }));
 }
 
+export type OnboardingTrackStep = {
+  id: string;
+  label: string;
+  href: string;
+  done: boolean;
+  required?: boolean;
+  description?: string;
+  ack_step?: boolean;
+};
+
+export type OnboardingTrack = {
+  id: string;
+  title: string;
+  description: string;
+  percent: number;
+  steps: OnboardingTrackStep[];
+};
+
 export function useOnboarding() {
   return createQuery(() => ({
     queryKey: ["onboarding"],
     queryFn: async () => {
       const res = await apiFetch<{
         steps: { id: string; label: string; href: string; done: boolean; required?: boolean }[];
+        tracks?: OnboardingTrack[];
         percent: number;
+        overall_percent?: number;
         dismissed: boolean;
         required_complete?: boolean;
         ready?: boolean;
         blocking_reason?: string;
         next_step?: { id: string; label: string; href: string };
+        next_extended_step?: {
+          id: string;
+          label: string;
+          href: string;
+          track_id: string;
+          track_title: string;
+        };
+        meta?: { pos_enabled?: boolean; foundation_required_complete?: boolean };
       }>("/api/v1/platform/onboarding");
       if (!res.ok) throw new Error(res.message ?? "Failed to load onboarding");
       return res.data!;

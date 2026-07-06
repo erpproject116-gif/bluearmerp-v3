@@ -31,7 +31,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "New to Bluearm? Open the interactive checklist from your Dashboard (Start here) or go to Onboarding under your account menu for a first-week playbook.",
+        text: "New to Bluearm? Open the interactive checklist from your Dashboard (Start here), go to /app/onboarding for the full ERP + POS playbook, or use Onboarding under your account menu.",
       },
     ],
   },
@@ -40,18 +40,19 @@ export const documentationSections: DocSection[] = [
     title: "Your first week",
     iconId: "documentation",
     intro: "A plain-language playbook for getting your business running in Bluearm.",
-    primaryHref: "/app/setup",
-    primaryLabel: "Open setup wizard",
+    primaryHref: "/app/onboarding",
+    primaryLabel: "Open onboarding playbook",
     blocks: [
       {
         type: "steps",
         items: [
-          "Set your company name and logo in Settings → Branding.",
-          "Add at least one customer or supplier under Stock → Partners.",
-          "Create your first product under Stock → Items.",
-          "Create a quotation or sales invoice to complete your first sale.",
-          "Invite a teammate from User Management → Users.",
-          "Open the Business Dashboard to see alerts and monthly totals.",
+          "Complete workspace setup at /app/setup (company, COA, tax, location, partners, items).",
+          "Open /app/onboarding for the full ERP + POS playbook with tracked progress.",
+          "Week 1: Review process policies and enable modules (POS, WMS, Quality).",
+          "Week 2: First selling flow — quotation, sales order, pick list, invoice.",
+          "Week 3: First buying flow — purchase request, PO, goods receipt, supplier invoice.",
+          "Week 4: POS — configure Manage, open shift, checkout, close shift.",
+          "Invite teammates and open the Business Dashboard for alerts and reconciliation.",
         ],
       },
       {

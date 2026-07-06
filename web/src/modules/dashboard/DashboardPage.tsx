@@ -3,6 +3,7 @@ import { formatPeso } from "../../shared/money";
 import { createMemo, For, Show } from "solid-js";
 import { DashboardLayout } from "./DashboardLayout";
 import { OnboardingChecklist } from "../../shared/OnboardingChecklist";
+import { ReconciliationBanner } from "../../shared/ReconciliationBanner";
 import {
   useDashboardInventoryTrend,
   useDashboardRedFlags,
@@ -211,6 +212,8 @@ export default function DashboardPage() {
       <div class="mb-6">
         <OnboardingChecklist compact />
       </div>
+
+      <ReconciliationBanner compact />
 
       <Show when={loading()}>
         <p class="text-sm text-text-secondary">Loading dashboard…</p>

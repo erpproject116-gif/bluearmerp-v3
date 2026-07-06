@@ -19,9 +19,9 @@ const STEP_COPY: Record<string, { title: string; why: string; action: string; li
   },
   currency_tax: {
     title: "Currency & taxes",
-    why: "Confirm your default currency and VAT types for quotations and invoices.",
+    why: "Confirm your default currency and VAT types for quotations, invoices, and POS.",
     action: "Review tax types",
-    link: "/app/quotation/tax-types",
+    link: "/app/quotation/tax-mngt/tax-types",
   },
   location: {
     title: "Stock location",
@@ -184,20 +184,27 @@ export default function SetupWizardPage() {
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-6">
           <h2 class="text-lg font-semibold text-emerald-900">Foundation complete</h2>
           <p class="mt-2 text-sm text-emerald-800">
-            You can start selling (quotation → sales) or buying (purchase request → goods receipt).
+            You can start selling, buying, or retail POS. Open the full onboarding playbook for every module —
+            quotation through accounts, serial scanning, POS shifts, CRM, and more.
           </p>
           <div class="mt-4 flex flex-wrap gap-3">
             <A
-              href="/app/quotation/quotations/new"
+              href="/app/onboarding"
               class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+            >
+              Open onboarding playbook
+            </A>
+            <A
+              href="/app/quotation/quotations/new"
+              class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
             >
               Create quotation
             </A>
             <A
-              href="/app/purchase-request/purchase-requests/new"
+              href="/app/pos/manage"
               class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
             >
-              Create purchase request
+              Configure POS
             </A>
             <A href="/app/dashboard" class="text-sm text-brand-700 hover:underline">
               Open dashboard

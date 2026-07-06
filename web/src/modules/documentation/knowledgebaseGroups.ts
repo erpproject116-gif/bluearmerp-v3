@@ -17,6 +17,7 @@ export const knowledgebaseGroups: KbGroup[] = [
     description: "First-time workspace setup and daily basics.",
     articleIds: [
       "setup-wizard",
+      "onboarding-playbook",
       "inventory-master-data",
       "user-management-admin",
       "form-field-settings",

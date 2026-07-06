@@ -14,10 +14,15 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/setupreadiness"
 )
 
+type ackStepBody struct {
+	StepID string `json:"step_id"`
+}
+
 // RegisterRoutes mounts tenant onboarding progress endpoints.
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	svc := &service{pool: pool}
 	r.Get("/platform/onboarding", svc.getOnboarding)
+	r.Post("/platform/onboarding/ack-step", svc.ackOnboardingStep)
 	r.Post("/platform/onboarding/dismiss", svc.dismissOnboarding)
 	r.Get("/platform/billing", svc.getBilling)
 	r.Get("/platform/plans", svc.listPublicPlans)
@@ -39,6 +44,28 @@ func (s *service) getOnboarding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, payload, "OK")
+}
+
+func (s *service) ackOnboardingStep(w http.ResponseWriter, r *http.Request) {
+	tu, ok := auth.FromContext(r.Context())
+	if !ok {
+		response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+		return
+	}
+	var body ackStepBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.StepID == "" {
+		response.Err(w, http.StatusBadRequest, "step_id is required.", "ERR_VALIDATION")
+		return
+	}
+	if _, ok := ackStepKeys[body.StepID]; !ok {
+		response.Err(w, http.StatusBadRequest, "Unknown step_id.", "ERR_VALIDATION")
+		return
+	}
+	if err := AckOnboardingStep(r.Context(), s.pool, tu.TenantID, body.StepID); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to save progress.", "ERR_INTERNAL")
+		return
+	}
+	response.OK(w, map[string]bool{"acknowledged": true}, "OK")
 }
 
 func (s *service) dismissOnboarding(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +157,8 @@ func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) 
 		return nil, err
 	}
 
+	tracks, overallPercent, meta := buildTracks(ctx, pool, tu.TenantID, readiness)
+
 	steps := make([]map[string]any, 0, len(readiness.Steps))
 	for _, s := range readiness.Steps {
 		if s.ID == "ready" {
@@ -143,6 +172,9 @@ func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) 
 	out := map[string]any{
 		"steps":             steps,
 		"percent":           readiness.Percent,
+		"overall_percent":   overallPercent,
+		"tracks":            tracks,
+		"meta":              meta,
 		"dismissed":         readiness.RequiredComplete,
 		"required_complete": readiness.RequiredComplete,
 		"ready":             readiness.Ready,
@@ -152,6 +184,9 @@ func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) 
 		out["next_step"] = map[string]any{
 			"id": readiness.NextStep.ID, "label": readiness.NextStep.Label, "href": readiness.NextStep.Href,
 		}
+	}
+	if next := nextIncompleteTrackStep(tracks); next != nil {
+		out["next_extended_step"] = next
 	}
 
 	completedMap := make(map[string]bool)
