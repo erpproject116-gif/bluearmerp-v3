@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
-import { formatPeso, sanitizeDecimalInput } from "../../shared/money";
+import { formatPeso, sanitizeDecimalInput, sanitizeIntegerInput } from "../../shared/money";
 import { AuthImage } from "../../shared/AuthImage";
 import { QuickCustomerModal } from "../../shared/QuickCustomerModal";
 import { useToast } from "../../shared/toast";
@@ -98,6 +98,7 @@ export default function PosPage() {
   const [showBills, setShowBills] = createSignal(false);
   const [heldOrders, setHeldOrders] = createSignal<HeldOrder[]>([]);
   const [showCustomer, setShowCustomer] = createSignal(false);
+  const [showDiscount, setShowDiscount] = createSignal(false);
 
   const items = usePosCatalogItems(() => ({ categoryId: activeCategory(), q: search().trim() || undefined }));
 
@@ -295,11 +296,13 @@ export default function PosPage() {
     setHeldOrders(await fetchHeldOrders());
   };
 
-  const applyDiscount = () => {
-    const raw = window.prompt("Discount amount:", String(discount() || ""));
-    if (raw === null) return;
+  const applyDiscount = () => setShowDiscount(true);
+
+  const confirmDiscount = (raw: string) => {
     const val = Number(raw);
-    setDiscount(Number.isFinite(val) && val > 0 ? val : 0);
+    const max = subtotalLines();
+    setDiscount(Number.isFinite(val) && val > 0 ? Math.min(val, max) : 0);
+    setShowDiscount(false);
   };
 
   const handleSearchKey = async (e: KeyboardEvent) => {
@@ -549,6 +552,15 @@ export default function PosPage() {
 
       <Show when={showBills()}>
         <BillsModal orders={heldOrders()} onCancel={() => setShowBills(false)} onResume={resumeBill} onDelete={removeBill} />
+      </Show>
+
+      <Show when={showDiscount()}>
+        <DiscountModal
+          current={discount()}
+          max={subtotalLines()}
+          onCancel={() => setShowDiscount(false)}
+          onConfirm={confirmDiscount}
+        />
       </Show>
 
       <Show when={showClose()}>
@@ -858,6 +870,46 @@ function PaymentModal(props: {
   );
 }
 
+function DiscountModal(props: {
+  current: number;
+  max: number;
+  onCancel: () => void;
+  onConfirm: (amount: string) => void;
+}) {
+  const [amount, setAmount] = createSignal(props.current > 0 ? props.current.toFixed(2) : "");
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
+      <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 class="mb-1 text-lg font-semibold">Discount</h3>
+        <p class="mb-4 text-sm text-slate-500">Enter a fixed discount amount (max {money(props.max)}).</p>
+        <label class="mb-1 block text-xs font-medium text-slate-500">Amount</label>
+        <input
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          class="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
+          placeholder="0.00"
+          value={amount()}
+          onInput={(e) => setAmount(sanitizeDecimalInput(e.currentTarget.value))}
+        />
+        <div class="flex gap-2">
+          <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
+            onClick={() => props.onConfirm(amount())}
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CustomerModal(props: { onCancel: () => void; onSelect: (id: number, label: string) => void }) {
   const [label, setLabel] = createSignal("");
   const [id, setId] = createSignal<number | null>(null);
@@ -972,10 +1024,22 @@ function ProductModal(props: {
 }) {
   const [groups, setGroups] = createSignal<PosModifierGroup[]>([]);
   const [loading, setLoading] = createSignal(true);
-  const [qty, setQty] = createSignal(1);
+  const [qtyInput, setQtyInput] = createSignal("1");
+  const qty = createMemo(() => {
+    const n = parseInt(qtyInput(), 10);
+    return Number.isFinite(n) && n >= 1 ? n : 1;
+  });
+  const bumpQty = (delta: number) => {
+    setQtyInput(String(Math.max(1, qty() + delta)));
+  };
   const [notes, setNotes] = createSignal("");
   // Map of groupId -> Set of selected modifier ids.
   const [selected, setSelected] = createSignal<Record<number, number[]>>({});
+
+  createEffect(() => {
+    props.item.id;
+    setQtyInput("1");
+  });
 
   createEffect(() => {
     const id = props.item.id;
@@ -1055,11 +1119,21 @@ function ProductModal(props: {
           <div class="mb-4 flex items-center justify-between">
             <span class="text-sm font-medium text-slate-700">Qty</span>
             <div class="flex items-center gap-3">
-              <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => setQty((q) => Math.max(1, q - 1))}>
+              <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => bumpQty(-1)}>
                 −
               </button>
-              <span class="w-6 text-center text-sm tabular-nums">{qty()}</span>
-              <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => setQty((q) => q + 1)}>
+              <input
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                class="w-10 rounded-lg border border-slate-200 px-1 py-1 text-center text-sm tabular-nums focus:border-emerald-500 focus:outline-none"
+                value={qtyInput()}
+                onInput={(e) => setQtyInput(sanitizeIntegerInput(e.currentTarget.value))}
+                onBlur={() => {
+                  if (!qtyInput() || parseInt(qtyInput(), 10) < 1) setQtyInput("1");
+                }}
+              />
+              <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => bumpQty(1)}>
                 +
               </button>
             </div>

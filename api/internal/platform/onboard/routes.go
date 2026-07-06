@@ -36,10 +36,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		svc.validator = v
 	}
 
-	r.Route("/platform", func(pr chi.Router) {
-		pr.Post("/intake", svc.postIntake)
-		pr.Post("/trial/provision", svc.postTrialProvision)
-	})
+	r.Post("/platform/intake", svc.postIntake)
+	r.Post("/platform/trial/provision", svc.postTrialProvision)
 }
 
 type intakeRequest struct {

@@ -22,3 +22,8 @@ export function sanitizeDecimalInput(raw: string): string {
   }
   return v;
 }
+
+/** Digits only — for qty, sort order, and other whole-number fields. */
+export function sanitizeIntegerInput(raw: string): string {
+  return raw.replace(/[^0-9]/g, "");
+}

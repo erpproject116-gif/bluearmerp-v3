@@ -14,21 +14,21 @@ import (
 // RegisterRoutes mounts superadmin-only platform console endpoints.
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 	svc := &service{pool: pool, cfg: cfg}
-	r.Route("/platform/console", func(cr chi.Router) {
+	r.Group(func(cr chi.Router) {
 		cr.Use(requirePlatformSuperadmin)
-		cr.Get("/customers", svc.listCustomers)
-		cr.Get("/customers/{id}", svc.getCustomer)
-		cr.Post("/customers", svc.createCustomer)
-		cr.Patch("/customers/{id}", svc.patchCustomer)
-		cr.Post("/customers/{id}/subscriptions", svc.createSubscription)
-		cr.Post("/customers/{id}/extend-trial", svc.extendTrial)
-		cr.Post("/customers/{id}/convert-demo", svc.convertDemo)
-		cr.Post("/subscriptions/{id}/invoices", svc.createInvoice)
-		cr.Post("/invoices/{id}/mark-paid", svc.markInvoicePaid)
-		cr.Get("/plans", svc.listPlans)
-		cr.Get("/plans/{id}", svc.getPlan)
-		cr.Post("/plans", svc.createPlan)
-		cr.Patch("/plans/{id}", svc.patchPlan)
+		cr.Get("/platform/console/customers", svc.listCustomers)
+		cr.Get("/platform/console/customers/{id}", svc.getCustomer)
+		cr.Post("/platform/console/customers", svc.createCustomer)
+		cr.Patch("/platform/console/customers/{id}", svc.patchCustomer)
+		cr.Post("/platform/console/customers/{id}/subscriptions", svc.createSubscription)
+		cr.Post("/platform/console/customers/{id}/extend-trial", svc.extendTrial)
+		cr.Post("/platform/console/customers/{id}/convert-demo", svc.convertDemo)
+		cr.Post("/platform/console/subscriptions/{id}/invoices", svc.createInvoice)
+		cr.Post("/platform/console/invoices/{id}/mark-paid", svc.markInvoicePaid)
+		cr.Get("/platform/console/plans", svc.listPlans)
+		cr.Get("/platform/console/plans/{id}", svc.getPlan)
+		cr.Post("/platform/console/plans", svc.createPlan)
+		cr.Patch("/platform/console/plans/{id}", svc.patchPlan)
 	})
 }
 

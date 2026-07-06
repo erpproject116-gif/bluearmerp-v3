@@ -16,12 +16,10 @@ import (
 // RegisterRoutes mounts tenant onboarding progress endpoints.
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	svc := &service{pool: pool}
-	r.Route("/platform", func(pr chi.Router) {
-		pr.Get("/onboarding", svc.getOnboarding)
-		pr.Post("/onboarding/dismiss", svc.dismissOnboarding)
-		pr.Get("/billing", svc.getBilling)
-		pr.Get("/plans", svc.listPublicPlans)
-	})
+	r.Get("/platform/onboarding", svc.getOnboarding)
+	r.Post("/platform/onboarding/dismiss", svc.dismissOnboarding)
+	r.Get("/platform/billing", svc.getBilling)
+	r.Get("/platform/plans", svc.listPublicPlans)
 }
 
 type service struct {

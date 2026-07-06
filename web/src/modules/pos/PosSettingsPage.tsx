@@ -5,6 +5,7 @@ import { AuthImage } from "../../shared/AuthImage";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { useToast } from "../../shared/toast";
 import { useAuth, hasPermission } from "../../shared/auth-context";
+import { sanitizeDecimalInput, sanitizeIntegerInput } from "../../shared/money";
 import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
 
 type ItemRow = {
@@ -264,12 +265,12 @@ function ProductRow(props: {
       </td>
       <td class="px-4 py-2 text-right">
         <input
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
           class="w-24 rounded-lg border border-stroke px-2 py-1.5 text-right text-sm focus:border-brand-500 focus:outline-none"
           value={price()}
-          onInput={(e) => setPrice(e.currentTarget.value)}
+          onInput={(e) => setPrice(sanitizeDecimalInput(e.currentTarget.value))}
         />
       </td>
       <td class="px-4 py-2">
@@ -423,7 +424,14 @@ function CategoryRowEdit(props: { row: CategoryRow; onSave: (row: CategoryRow, p
         <input class="w-full rounded-lg border border-stroke px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none" value={name()} onInput={(e) => setName(e.currentTarget.value)} />
       </td>
       <td class="px-4 py-2">
-        <input type="number" class="w-16 rounded-lg border border-stroke px-2 py-1.5 text-sm" value={sortOrder()} onInput={(e) => setSortOrder(e.currentTarget.value)} />
+        <input
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          class="w-16 rounded-lg border border-stroke px-2 py-1.5 text-sm"
+          value={sortOrder()}
+          onInput={(e) => setSortOrder(sanitizeIntegerInput(e.currentTarget.value))}
+        />
       </td>
       <td class="px-4 py-2">
         <input type="checkbox" checked={props.row.active} onChange={(e) => props.onSave(props.row, { active: e.currentTarget.checked })} />
@@ -627,7 +635,14 @@ function ModifiersTab() {
           </Show>
           <div>
             <label class="mb-1 block text-xs font-medium text-text-secondary">Max selectable</label>
-            <input type="number" min="1" class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" value={maxSelect()} onInput={(e) => setMaxSelect(e.currentTarget.value)} />
+            <input
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+              value={maxSelect()}
+              onInput={(e) => setMaxSelect(sanitizeIntegerInput(e.currentTarget.value))}
+            />
           </div>
           <label class="flex items-center gap-2 text-sm text-text-primary">
             <input type="checkbox" checked={required()} onChange={(e) => setRequired(e.currentTarget.checked)} />
@@ -685,7 +700,15 @@ function ModifierGroupCard(props: {
       </ul>
       <div class="flex gap-2">
         <input class="flex-1 rounded-lg border border-stroke px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none" placeholder="Option name" value={optName()} onInput={(e) => setOptName(e.currentTarget.value)} />
-        <input type="number" step="0.01" class="w-24 rounded-lg border border-stroke px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none" placeholder="+ price" value={optPrice()} onInput={(e) => setOptPrice(e.currentTarget.value)} />
+        <input
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          class="w-24 rounded-lg border border-stroke px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+          placeholder="+ price"
+          value={optPrice()}
+          onInput={(e) => setOptPrice(sanitizeDecimalInput(e.currentTarget.value))}
+        />
         <button
           type="button"
           class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
