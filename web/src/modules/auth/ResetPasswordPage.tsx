@@ -104,8 +104,13 @@ export default function ResetPasswordPage() {
     <AuthShell
       title="Choose a new password"
       subtitle="Enter and confirm your new password below."
-      heroTitle="Secure your account"
-      heroBody="Pick a strong password you haven't used elsewhere. You'll be signed in automatically after saving."
+      heroTitle="Set a password you can rely on."
+      heroBody="Choose something unique and at least eight characters. You'll return to your workspace as soon as it's saved."
+      trustPoints={[
+        "Passwords are never stored in readable form",
+        "Active sessions stay protected after you update",
+        "Need help? Contact your company admin or Bluearm support",
+      ]}
       footer={
         <p class="mt-8 text-xs text-text-secondary">
           <button type="button" class="font-medium text-brand-600 hover:underline" onClick={() => navigate("/signin")}>

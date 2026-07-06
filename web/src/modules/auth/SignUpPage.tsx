@@ -84,8 +84,13 @@ export default function SignUpPage() {
     <AuthShell
       title="Create your account"
       subtitle="Register with email and password. Your admin can invite you to a company workspace afterward."
-      heroTitle="Get started with Bluearm"
-      heroBody="Create a personal login, then join your company workspace when an administrator invites you — or start a free demo to explore on your own."
+      heroTitle="Start with a workspace you can trust."
+      heroBody="Create your login in minutes. Launch a free trial or demo on your own—or join your company when an admin invites you with the same email."
+      trustPoints={[
+        "90-day free trial with a real, empty workspace",
+        "Demo sandbox with sample data—no setup required",
+        "Same secure sign-in whether you trial, demo, or join by invite",
+      ]}
       footer={
         <p class="mt-8 text-xs text-text-secondary">
           Already have an account?{" "}

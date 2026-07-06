@@ -47,8 +47,13 @@ export default function ForgotPasswordPage() {
     <AuthShell
       title="Reset your password"
       subtitle="Enter the email for your account. We'll send a link to choose a new password."
-      heroTitle="Forgot your password?"
-      heroBody="We'll email you a secure link to set a new password. The link expires after a short time for your security."
+      heroTitle="Account recovery, handled securely."
+      heroBody="We'll send a one-time link to your email. Links expire quickly and never share your password in plain text."
+      trustPoints={[
+        "Encrypted sign-in powered by industry-standard auth",
+        "Recovery links are single-use and time-limited",
+        "Your company workspace and data remain untouched",
+      ]}
       footer={
         <p class="mt-8 text-xs text-text-secondary">
           Remember your password?{" "}

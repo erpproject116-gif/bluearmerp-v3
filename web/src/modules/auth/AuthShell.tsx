@@ -1,36 +1,92 @@
 import type { ParentComponent, JSX } from "solid-js";
+import { For, Show } from "solid-js";
+
+const DEFAULT_HERO_TITLE = "One platform for how you run the business.";
+const DEFAULT_HERO_BODY =
+  "Inventory, sales, purchasing, and finance on the same live data—built for Philippine teams who need control without legacy ERP overhead.";
+
+const DEFAULT_TRUST_POINTS = [
+  "Tenant-isolated workspaces with role-based access",
+  "BIR-aware finance, withholding, and audit trails",
+  "Spreadsheet-fast entry your operations team expects",
+];
 
 type Props = {
   title: string;
   subtitle?: string;
   heroTitle?: string;
   heroBody?: string;
+  /** Omit to use default trust points; pass [] to hide. */
+  trustPoints?: string[];
   footer?: JSX.Element;
 };
 
+function TrustCheck() {
+  return (
+    <svg class="mt-0.5 h-4 w-4 shrink-0 text-white/90" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path
+        fill-rule="evenodd"
+        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+        clip-rule="evenodd"
+      />
+    </svg>
+  );
+}
+
 export const AuthShell: ParentComponent<Props> = (props) => {
+  const trustPoints = () =>
+    props.trustPoints === undefined ? DEFAULT_TRUST_POINTS : props.trustPoints;
+
   return (
     <div class="flex min-h-screen bg-body">
       <div class="hidden w-1/2 flex-col justify-between bg-brand-600 p-12 text-white lg:flex">
-        <div class="flex items-center gap-3">
-          <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-bold">B</div>
-          <span class="text-2xl font-semibold">BluearmERP</span>
-        </div>
         <div>
-          <h2 class="text-3xl font-semibold leading-tight">{props.heroTitle ?? "Modular inventory master data"}</h2>
-          <p class="mt-4 max-w-md text-brand-100">
-            {props.heroBody ??
-              "Spreadsheet-style grids, tenant-scoped codes, and enterprise-ready modules — built for BluearmERP."}
-          </p>
+          <div class="flex items-center gap-3">
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-bold shadow-sm">
+              B
+            </div>
+            <div>
+              <span class="text-2xl font-semibold tracking-tight">BluearmERP</span>
+              <p class="text-sm font-medium text-brand-100">Business management, simplified.</p>
+            </div>
+          </div>
         </div>
-        <p class="text-sm text-brand-100">© Bluearm Philippines</p>
+
+        <div class="max-w-lg">
+          <p class="text-xs font-semibold uppercase tracking-widest text-brand-200/90">
+            Trusted by growing Philippine businesses
+          </p>
+          <h2 class="mt-3 text-3xl font-semibold leading-tight tracking-tight">
+            {props.heroTitle ?? DEFAULT_HERO_TITLE}
+          </h2>
+          <p class="mt-4 text-base leading-relaxed text-brand-50/95">
+            {props.heroBody ?? DEFAULT_HERO_BODY}
+          </p>
+          <Show when={trustPoints().length > 0}>
+            <ul class="mt-8 space-y-3.5">
+              <For each={trustPoints()}>
+                {(point) => (
+                  <li class="flex items-start gap-3 text-sm leading-snug text-brand-50/90">
+                    <TrustCheck />
+                    <span>{point}</span>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+
+        <p class="text-xs text-brand-200/80">© {new Date().getFullYear()} Bluearm Solutions</p>
       </div>
 
       <div class="flex w-full flex-col justify-center px-6 py-12 lg:w-1/2 lg:px-16">
         <div class="mx-auto w-full max-w-md">
           <div class="mb-8 lg:hidden">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">
-              B
+            <div class="flex items-center gap-2.5">
+              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">
+                B
+              </div>
+              <span class="text-lg font-semibold text-text-primary">BluearmERP</span>
             </div>
           </div>
           <h1 class="text-2xl font-semibold text-text-primary">{props.title}</h1>

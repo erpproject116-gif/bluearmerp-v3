@@ -46,8 +46,13 @@ export default function WelcomePage() {
     <AuthShell
       title="Choose how to start"
       subtitle="Your account is ready. Pick a path below."
-      heroTitle="Welcome to Bluearm"
-      heroBody="Explore with sample data in a short demo, or start a full 90-day trial with your own empty workspace."
+      heroTitle="You're in. Choose how to begin."
+      heroBody="Pick the path that fits today—a guided demo with sample data, or a full trial workspace ready for your real operations."
+      trustPoints={[
+        "No credit card required for the 90-day trial",
+        "Your data stays in an isolated, tenant-scoped workspace",
+        "Upgrade to a paid plan only when you're ready",
+      ]}
     >
       <div class="mt-8 space-y-4">
         <button
