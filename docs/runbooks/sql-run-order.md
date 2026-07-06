@@ -269,6 +269,19 @@ psql "$DATABASE_URL" -f scripts/verify-demo-inventory.sql
 | Fix linked Gmail missing superadmin | `scripts/repair-platform-owners.sql` |
 | Check demo inventory counts | `scripts/verify-demo-inventory.sql` |
 
+| `119_platform_subscriptions.sql` | Platform customers, subscriptions, manual billing, CRM retention task types |
+| `120_platform_plan_catalog.sql` | Configurable plan tiers, regular/promo pricing, inclusions |
+
+### Scheduled jobs (production)
+
+| Job | Endpoint | Secret header | Suggested schedule |
+|-----|----------|---------------|-------------------|
+| Demo cleanup | `POST /api/v1/demo/jobs/cleanup` | `X-Demo-Job-Secret` | Daily |
+| CRM alerts | `POST /api/v1/crm/jobs/evaluate` | `X-CRM-Job-Secret` | Daily |
+| Platform retention | `POST /api/v1/platform/jobs/retention` | `X-Platform-Job-Secret` | Daily |
+
+Set `PLATFORM_JOB_SECRET` on the API (Render) alongside existing `DEMO_JOB_SECRET` and `CRM_JOB_SECRET`.
+
 ---
 
 ## Tenants at a glance

@@ -29,6 +29,8 @@ type Config struct {
 	DemoLeadgenTenantCode string
 	DemoJobSecret         string
 	DemoTTLDays           int
+	PlatformJobSecret     string
+	EntitlementGraceDays  int
 }
 
 func Load() Config {
@@ -73,6 +75,8 @@ func Load() Config {
 		DemoLeadgenTenantCode: envOr("DEMO_LEADGEN_TENANT_CODE", "BLUEARM"),
 		DemoJobSecret:       os.Getenv("DEMO_JOB_SECRET"),
 		DemoTTLDays:         ParseIntDefault(os.Getenv("DEMO_TTL_DAYS"), 14),
+		PlatformJobSecret:   os.Getenv("PLATFORM_JOB_SECRET"),
+		EntitlementGraceDays: ParseIntDefault(os.Getenv("ENTITLEMENT_GRACE_DAYS"), 0),
 	}
 }
 

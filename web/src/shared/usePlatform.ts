@@ -1,0 +1,147 @@
+import { createQuery } from "@tanstack/solid-query";
+import { apiFetch } from "./api";
+
+export type Entitlement = {
+  plan_kind?: string;
+  status?: string;
+  ends_at?: string;
+  days_remaining?: number;
+  urgency_label?: string;
+  write_blocked?: boolean;
+  message?: string;
+};
+
+export type PlatformCustomer = {
+  id: number;
+  email: string;
+  full_name: string;
+  company_name?: string | null;
+  entry_source: string;
+  urgency_label: string;
+  tenant_id?: number | null;
+  company_code?: string | null;
+  plan_kind?: string | null;
+  subscription_status?: string | null;
+  ends_at?: string | null;
+  days_remaining?: number;
+  crm_lead_id?: number | null;
+};
+
+export type PlatformPlan = {
+  id: number;
+  plan_code: string;
+  display_name: string;
+  description?: string;
+  lock_in_months: number;
+  regular_monthly_amount: number;
+  regular_total_amount?: number | null;
+  promo_monthly_amount?: number | null;
+  promo_total_amount?: number | null;
+  promo_label?: string;
+  promo_starts_at?: string | null;
+  promo_ends_at?: string | null;
+  inclusions?: string[] | unknown;
+  effective_monthly_amount: number;
+  effective_total_amount?: number | null;
+  promo_active: boolean;
+  is_active: boolean;
+  is_public: boolean;
+  sort_order: number;
+};
+
+export function usePlatformPlansAdmin() {
+  return createQuery(() => ({
+    queryKey: ["platform-plans-admin"],
+    queryFn: async () => {
+      const res = await apiFetch<{ plans: PlatformPlan[] }>(
+        "/api/v1/platform/console/plans?include_inactive=1",
+      );
+      if (!res.ok) throw new Error(res.message ?? "Failed to load plans");
+      return res.data?.plans ?? [];
+    },
+  }));
+}
+
+export function usePlatformPlan(id: () => number | undefined) {
+  return createQuery(() => ({
+    queryKey: ["platform-plan", id()],
+    enabled: Boolean(id() && id()! > 0),
+    queryFn: async () => {
+      const res = await apiFetch<{ plan: PlatformPlan }>(
+        `/api/v1/platform/console/plans/${id()}`,
+      );
+      if (!res.ok) throw new Error(res.message ?? "Failed to load plan");
+      return res.data!;
+    },
+  }));
+}
+
+export function usePublicPlans() {
+  return createQuery(() => ({
+    queryKey: ["platform-plans-public"],
+    queryFn: async () => {
+      const res = await apiFetch<{ plans: PlatformPlan[] }>("/api/v1/platform/plans");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load plans");
+      return res.data?.plans ?? [];
+    },
+  }));
+}
+
+export function usePlatformCustomers(q?: () => string) {
+  return createQuery(() => ({
+    queryKey: ["platform-customers", q?.() ?? ""],
+    queryFn: async () => {
+      const search = q?.() ? `?q=${encodeURIComponent(q()!)}` : "";
+      const res = await apiFetch<{ customers: PlatformCustomer[] }>(
+        `/api/v1/platform/console/customers${search}`,
+      );
+      if (!res.ok) throw new Error(res.message ?? "Failed to load customers");
+      return res.data?.customers ?? [];
+    },
+  }));
+}
+
+export function usePlatformCustomer(id: () => number | undefined) {
+  return createQuery(() => ({
+    queryKey: ["platform-customer", id()],
+    enabled: Boolean(id() && id()! > 0),
+    queryFn: async () => {
+      const res = await apiFetch<{ customer: Record<string, unknown>; subscriptions: unknown[]; invoices: unknown[] }>(
+        `/api/v1/platform/console/customers/${id()}`,
+      );
+      if (!res.ok) throw new Error(res.message ?? "Failed to load customer");
+      return res.data;
+    },
+  }));
+}
+
+export function useOnboarding() {
+  return createQuery(() => ({
+    queryKey: ["onboarding"],
+    queryFn: async () => {
+      const res = await apiFetch<{
+        steps: { id: string; label: string; href: string; done: boolean }[];
+        percent: number;
+        dismissed: boolean;
+        next_step?: { id: string; label: string; href: string };
+      }>("/api/v1/platform/onboarding");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load onboarding");
+      return res.data!;
+    },
+  }));
+}
+
+export function useBilling() {
+  return createQuery(() => ({
+    queryKey: ["billing"],
+    queryFn: async () => {
+      const res = await apiFetch<{
+        subscription: Record<string, unknown> | null;
+        invoices: Record<string, unknown>[];
+        message?: string;
+      }>("/api/v1/platform/billing");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load billing");
+      return res.data!;
+    },
+  }));
+}

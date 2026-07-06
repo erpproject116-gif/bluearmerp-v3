@@ -10,6 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demodata"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -120,6 +122,32 @@ func (s *service) postProvision(w http.ResponseWriter, r *http.Request) {
 			    notes = coalesce(notes, '') || E'\n[verified] Email confirmed; demo workspace #' || $3::text || ' provisioned.',
 			    updated_at = now()
 			where tenant_id = $1 and id = $2`, *leadTenant, *leadID, tenantID)
+	}
+
+	// Platform registry: link customer + demo subscription.
+	custID, hasCust := customerregistry.CustomerIDByEmail(ctx, s.pool, email)
+	if !hasCust {
+		if tid, ok := s.leadgenTenantID(ctx); ok {
+			res, err := customerregistry.UpsertCustomerLead(ctx, s.pool, tid, customerregistry.UpsertParams{
+				Email: email, AuthUserID: authUserID, FullName: fullName,
+				CompanyName: ptrStr(companyName), EntrySource: customerregistry.EntryDemoSignup,
+				DemoSignupID: &signupID, CRMLeadSource: "demo_signup",
+			})
+			if err == nil {
+				custID = res.CustomerID
+				hasCust = true
+			}
+		}
+	}
+	if hasCust {
+		_ = customerregistry.LinkTenant(ctx, s.pool, custID, tenantID, authUserID)
+		var demoPlanID *int64
+		if dp, err := plans.GetByCode(ctx, s.pool, customerregistry.PlanDemo); err == nil {
+			demoPlanID = &dp.ID
+		}
+		_, _ = customerregistry.CreateSubscription(ctx, s.pool, custID, tenantID,
+			customerregistry.PlanDemo, demoPlanID, time.Now(), &expiresAt, 0, 0, 0, "Demo sandbox")
+		_, _ = customerregistry.UpdateCustomerUrgency(ctx, s.pool, custID, time.Now())
 	}
 
 	// Seed the industry dataset in the background so login is instant; the account
@@ -251,4 +279,11 @@ func bearer(r *http.Request) string {
 		return ""
 	}
 	return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
+}
+
+func ptrStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return strings.TrimSpace(*s)
 }

@@ -44,6 +44,15 @@ export type MeData = {
   memberships?: TenantMembership[];
   enabled_module_codes: string[];
   modules?: { module_code: string; is_enabled: boolean }[];
+  entitlement?: {
+    plan_kind?: string;
+    status?: string;
+    ends_at?: string;
+    days_remaining?: number;
+    urgency_label?: string;
+    write_blocked?: boolean;
+    message?: string;
+  };
 };
 
 export function canManageFormSettings(me: MeData | null | undefined): boolean {

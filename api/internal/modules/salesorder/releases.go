@@ -328,7 +328,13 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			salesOrderIDs = append(salesOrderIDs, id)
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.release", "so_sales_order", nil, nil, body)
+		var auditTarget *int64
+		if len(salesOrderIDs) == 1 {
+			auditTarget = &salesOrderIDs[0]
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.release", "so_sales_order", auditTarget, nil, map[string]any{
+			"lines": body.Lines, "sales_order_ids": salesOrderIDs,
+		})
 		response.OK(w, map[string]any{"released_count": releasedCount, "sales_order_ids": salesOrderIDs}, "Released.")
 	}
 }

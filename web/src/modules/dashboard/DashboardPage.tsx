@@ -1,6 +1,7 @@
 import { A } from "@solidjs/router";
 import { createMemo, For, Show } from "solid-js";
 import { DashboardLayout } from "./DashboardLayout";
+import { OnboardingChecklist } from "../../shared/OnboardingChecklist";
 import {
   useDashboardInventoryTrend,
   useDashboardRedFlags,
@@ -206,6 +207,10 @@ export default function DashboardPage() {
         >
           Approvals queue
         </A>
+      </div>
+
+      <div class="mb-6">
+        <OnboardingChecklist compact />
       </div>
 
       <Show when={loading()}>

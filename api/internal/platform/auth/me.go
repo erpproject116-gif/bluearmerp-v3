@@ -7,6 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/entitlement"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -30,13 +32,14 @@ type MePayload struct {
 	Memberships        []Membership   `json:"memberships"`
 	EnabledModuleCodes []string       `json:"enabled_module_codes"`
 	Modules            []ModuleRow    `json:"modules"`
+	Entitlement        *entitlement.Snapshot `json:"entitlement,omitempty"`
 }
 
 func fullModuleAccess(tu TenantUser) bool {
 	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.AutoEnableAllModules
 }
 
-func MeHandler(pool *pgxpool.Pool) http.HandlerFunc {
+func MeHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, ok := FromContext(r.Context())
 		if !ok {
@@ -44,7 +47,7 @@ func MeHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		payload, err := buildMe(r.Context(), pool, tu)
+		payload, err := buildMe(r.Context(), pool, tu, cfg)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load session.", "ERR_INTERNAL")
 			return
@@ -53,7 +56,7 @@ func MeHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload, error) {
+func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.Config) (MePayload, error) {
 	var companyName, companyCode, tenantStatus string
 	var autoEnableAll bool
 	err := pool.QueryRow(ctx, `
@@ -146,6 +149,8 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 		user["avatar_url"] = resolveBrandingAvatarURL(strings.TrimSpace(*avatarURL))
 	}
 
+	ent, _ := entitlement.LoadForTenant(ctx, pool, tu.TenantID, tu.IsPlatformSuperadmin, cfg.EntitlementGraceDays)
+
 	return MePayload{
 		User: user,
 		Tenant: map[string]any{
@@ -159,6 +164,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) (MePayload,
 		Memberships:        memberships,
 		EnabledModuleCodes: enabled,
 		Modules:            modules,
+		Entitlement:        ent,
 	}, nil
 }
 

@@ -29,6 +29,35 @@ export const documentationSections: DocSection[] = [
         type: "tip",
         text: "Need step-by-step help for a specific area? Open Help & guides from the sidebar or from your account menu (click your name at the bottom of the sidebar).",
       },
+      {
+        type: "paragraph",
+        text: "New to Bluearm? Open the interactive checklist from your Dashboard (Start here) or go to Onboarding under your account menu for a first-week playbook.",
+      },
+    ],
+  },
+  {
+    id: "first-week",
+    title: "Your first week",
+    iconId: "documentation",
+    intro: "A plain-language playbook for getting your business running in Bluearm.",
+    primaryHref: "/app/onboarding",
+    primaryLabel: "Open onboarding checklist",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Set your company name and logo in Settings → Branding.",
+          "Add at least one customer or supplier under Stock → Partners.",
+          "Create your first product under Stock → Items.",
+          "Create a quotation or sales invoice to complete your first sale.",
+          "Invite a teammate from User Management → Users.",
+          "Open the Business Dashboard to see alerts and monthly totals.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "On a demo workspace? Explore the sample data first, then start a 90-day trial when you are ready to enter your own records.",
+      },
     ],
   },
   {

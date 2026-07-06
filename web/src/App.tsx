@@ -8,7 +8,11 @@ import { ToastProvider } from "./shared/toast";
 import { AuthEntryRedirect } from "./shared/AuthRedirect";
 import { ProtectedRoute } from "./shared/ProtectedRoute";
 import SignInPage from "./modules/auth/SignInPage";
+import SignUpPage from "./modules/auth/SignUpPage";
+import ForgotPasswordPage from "./modules/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./modules/auth/ResetPasswordPage";
 import DemoSignupPage from "./modules/auth/DemoSignupPage";
+import WelcomePage from "./modules/auth/WelcomePage";
 import AuthCallbackPage from "./modules/auth/AuthCallbackPage";
 import PartnersPage from "./modules/inventory/PartnersPage";
 import LocationsPage from "./modules/inventory/LocationsPage";
@@ -146,6 +150,13 @@ import CustomerQuotationsReportPage from "./modules/crm/reports/CustomerQuotatio
 import ItemDemandReportPage from "./modules/crm/reports/ItemDemandReportPage";
 import ConversionFunnelReportPage from "./modules/crm/reports/ConversionFunnelReportPage";
 import BrandingSettingsPage from "./modules/settings/BrandingSettingsPage";
+import BillingPage from "./modules/settings/BillingPage";
+import OnboardingPage from "./modules/onboarding/OnboardingPage";
+import PlatformCustomersPage from "./modules/platform/PlatformCustomersPage";
+import PlatformCustomerDetailPage from "./modules/platform/PlatformCustomerDetailPage";
+import PlatformPlansPage from "./modules/platform/PlatformPlansPage";
+import PlatformPlanEditPage from "./modules/platform/PlatformPlanEditPage";
+import { PlatformRoute } from "./shared/PlatformRoute";
 import { BrandingProvider } from "./shared/branding/BrandingProvider";
 import LowStockReportPage from "./modules/crm/reports/LowStockReportPage";
 import ExpiredQuotationsReportPage from "./modules/crm/reports/ExpiredQuotationsReportPage";
@@ -243,7 +254,11 @@ export default function App() {
         <CrmTaskModalProvider>
         <Router>
         <Route path="/signin" component={SignInPage} />
+        <Route path="/signup" component={SignUpPage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        <Route path="/auth/reset-password" component={ResetPasswordPage} />
         <Route path="/demo" component={DemoSignupPage} />
+        <Route path="/welcome" component={WelcomePage} />
         <Route path="/auth/callback" component={AuthCallbackPage} />
         <Route path="/portal/login" component={PortalLoginPage} />
         <Route path="/portal/dashboard" component={PortalDashboardPage} />
@@ -500,6 +515,28 @@ export default function App() {
             </ActivityLogRoute>
           )} />
           <Route path="/settings/branding" component={BrandingSettingsPage} />
+          <Route path="/settings/billing" component={BillingPage} />
+          <Route path="/onboarding" component={OnboardingPage} />
+          <Route path="/platform/customers" component={() => (
+            <PlatformRoute>
+              <PlatformCustomersPage />
+            </PlatformRoute>
+          )} />
+          <Route path="/platform/customers/:id" component={() => (
+            <PlatformRoute>
+              <PlatformCustomerDetailPage />
+            </PlatformRoute>
+          )} />
+          <Route path="/platform/plans" component={() => (
+            <PlatformRoute>
+              <PlatformPlansPage />
+            </PlatformRoute>
+          )} />
+          <Route path="/platform/plans/:id" component={() => (
+            <PlatformRoute>
+              <PlatformPlanEditPage />
+            </PlatformRoute>
+          )} />
           <Route path="/user-management/users" component={() => (
             <AdminModuleRoute>
               <UsersPage />

@@ -3,12 +3,15 @@ import { useNavigate } from "@solidjs/router";
 import { supabase, supabaseConfigured } from "../../shared/api";
 import { useAuth } from "../../shared/auth-context";
 import { SessionLoading } from "../../shared/AuthRedirect";
+import { AuthAlert, AuthShell, authInputClass } from "./AuthShell";
 
 const demoSignInEnabled = import.meta.env.VITE_DEMO_SIGNIN_ENABLED === true;
 
 export default function SignInPage() {
   const navigate = useNavigate();
   const auth = useAuth();
+  const [email, setEmail] = createSignal("");
+  const [password, setPassword] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(false);
 
@@ -41,6 +44,28 @@ export default function SignInPage() {
     setLoading(false);
   };
 
+  const signInEmail = async (e: Event) => {
+    e.preventDefault();
+    if (!supabaseConfigured) {
+      setError("Supabase is not configured.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const { error: err } = await supabase.auth.signInWithPassword({
+      email: email().trim(),
+      password: password(),
+    });
+    if (err) {
+      setError(err.message);
+      setLoading(false);
+      return;
+    }
+    await auth.refresh();
+    navigate("/app/inventory/partners", { replace: true });
+    setLoading(false);
+  };
+
   const signInDemo = async () => {
     if (!supabaseConfigured) {
       setError("Supabase is not configured.");
@@ -48,9 +73,9 @@ export default function SignInPage() {
     }
     setLoading(true);
     setError(null);
-    const email = import.meta.env.VITE_DEMO_USER_EMAIL ?? "demo@demo.bluearm.local";
-    const password = import.meta.env.VITE_DEMO_USER_PASSWORD ?? "DemoBluearm2026!";
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+    const demoEmail = import.meta.env.VITE_DEMO_USER_EMAIL ?? "demo@demo.bluearm.local";
+    const demoPassword = import.meta.env.VITE_DEMO_USER_PASSWORD ?? "DemoBluearm2026!";
+    const { error: err } = await supabase.auth.signInWithPassword({ email: demoEmail, password: demoPassword });
     if (err) {
       setError(err.message);
       setLoading(false);
@@ -64,32 +89,67 @@ export default function SignInPage() {
   return (
     <Show when={!auth.bootstrapping} fallback={<SessionLoading />}>
       <Show when={!auth.me} fallback={<SessionLoading />}>
-        <div class="flex min-h-screen bg-body">
-      <div class="hidden w-1/2 flex-col justify-between bg-brand-600 p-12 text-white lg:flex">
-        <div class="flex items-center gap-3">
-          <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-bold">B</div>
-          <span class="text-2xl font-semibold">Bluearm ERP</span>
-        </div>
-        <div>
-          <h2 class="text-3xl font-semibold leading-tight">Modular inventory master data</h2>
-          <p class="mt-4 max-w-md text-brand-100">
-            Spreadsheet-style grids, tenant-scoped codes, and enterprise-ready modules — styled with TailAdmin.
-          </p>
-        </div>
-        <p class="text-sm text-brand-100">© Bluearm Philippines</p>
-      </div>
-
-      <div class="flex w-full flex-col justify-center px-6 py-12 lg:w-1/2 lg:px-16">
-        <div class="mx-auto w-full max-w-md">
-          <div class="mb-8 lg:hidden">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">
-              B
+        <AuthShell
+          title="Sign in"
+          subtitle="Continue to your inventory workspace"
+          footer={
+            <p class="mt-8 text-xs text-text-secondary">
+              New to Bluearm?{" "}
+              <button type="button" class="font-medium text-brand-600 hover:underline" onClick={() => navigate("/signup")}>
+                Create an account
+              </button>
+            </p>
+          }
+        >
+          <form class="mt-8 space-y-4" onSubmit={(e) => void signInEmail(e)}>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-text-primary">Email</label>
+              <input
+                type="email"
+                required
+                autocomplete="email"
+                value={email()}
+                onInput={(e) => setEmail(e.currentTarget.value)}
+                class={authInputClass}
+                placeholder="you@company.com"
+              />
             </div>
-          </div>
-          <h1 class="text-2xl font-semibold text-text-primary">Sign in</h1>
-          <p class="mt-2 text-sm text-text-secondary">Continue to your inventory workspace</p>
+            <div>
+              <div class="mb-1 flex items-center justify-between">
+                <label class="text-sm font-medium text-text-primary">Password</label>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-brand-600 hover:underline"
+                  onClick={() => navigate("/forgot-password")}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <input
+                type="password"
+                required
+                autocomplete="current-password"
+                value={password()}
+                onInput={(e) => setPassword(e.currentTarget.value)}
+                class={authInputClass}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading()}
+              class="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
+            >
+              {loading() ? "Signing in…" : "Sign in with email"}
+            </button>
+          </form>
 
-          <div class="mt-8 space-y-3">
+          <div class="mt-6 flex items-center gap-3 text-xs text-text-secondary">
+            <span class="h-px flex-1 bg-stroke" />
+            <span>or continue with</span>
+            <span class="h-px flex-1 bg-stroke" />
+          </div>
+
+          <div class="mt-4 space-y-3">
             <button
               type="button"
               class="flex w-full items-center justify-center gap-2 rounded-lg border border-stroke bg-white px-4 py-3 text-sm font-medium text-text-primary shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
@@ -119,41 +179,30 @@ export default function SignInPage() {
             <Show when={demoSignInEnabled}>
               <button
                 type="button"
-                class="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
+                class="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-sm font-medium text-text-primary shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
                 disabled={loading()}
                 onClick={() => void signInDemo()}
               >
-                Try free demo
+                Try free demo (quick sign-in)
               </button>
             </Show>
           </div>
 
-          <div class="mt-6 flex items-center gap-3 text-xs text-text-secondary">
-            <span class="h-px flex-1 bg-stroke" />
-            <span>new to Bluearm?</span>
-            <span class="h-px flex-1 bg-stroke" />
-          </div>
           <button
             type="button"
-            class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
+            class="mt-4 w-full rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
             disabled={loading()}
             onClick={() => navigate("/demo")}
           >
-            Start a free demo
+            Start a free demo workspace
           </button>
 
-          <Show when={error()}>
-            <p class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error()}</p>
-          </Show>
+          <AuthAlert error={error()} />
 
           <Show when={demoSignInEnabled}>
-            <p class="mt-8 text-xs text-text-secondary">
-              Demo tenant DEMO000 · Platform owners use Google sign-in
-            </p>
+            <p class="mt-6 text-xs text-text-secondary">Demo tenant DEMO000 · Platform owners may use Google sign-in</p>
           </Show>
-        </div>
-      </div>
-        </div>
+        </AuthShell>
       </Show>
     </Show>
   );

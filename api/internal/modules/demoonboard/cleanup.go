@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/retention"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -47,7 +48,9 @@ func (s *service) postCleanup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Mark signups expired before the cascade nulls their tenant_id.
+	// Mark signups + platform subscriptions expired before the cascade nulls their tenant_id.
+	retention.MarkDemoSubscriptionsExpired(ctx, s.pool, ids)
+
 	_, _ = s.pool.Exec(ctx, `
 		update public.demo_signups
 		set status = 'expired', updated_at = now()

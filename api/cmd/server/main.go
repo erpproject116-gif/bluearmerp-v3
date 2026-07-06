@@ -48,13 +48,17 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/console"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/drafts"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/formfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/health"
 	platformmw "github.com/bluearm/bluearm-erp-v3/api/internal/platform/middleware"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/onboard"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/onboarding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/presence"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/retention"
 	platformreports "github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reporttemplates"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -101,13 +105,18 @@ func main() {
 	r.Route("/api/v1", func(api chi.Router) {
 		crm.RegisterJobRoutes(api, pool)
 		platformreports.RegisterJobRoutes(api, pool)
+		retention.RegisterJobRoutes(api, pool, cfg)
 		portal.RegisterRoutes(api, pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret)
 		demoonboard.RegisterRoutes(api, pool, cfg)
+		onboard.RegisterRoutes(api, pool, cfg)
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
+			protected.Use(platformmw.Entitlement(pool, cfg.EntitlementGraceDays))
 			protected.Use(audit.Middleware(pool))
-			protected.Get("/auth/me", auth.MeHandler(pool))
+			protected.Get("/auth/me", auth.MeHandler(pool, cfg))
 			auth.RegisterAuthRoutes(protected, pool)
+			onboarding.RegisterRoutes(protected, pool)
+			console.RegisterRoutes(protected, pool, cfg)
 			presence.RegisterRoutes(protected, pool)
 			customfields.RegisterRoutes(protected, pool)
 			drafts.RegisterRoutes(protected, pool)

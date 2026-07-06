@@ -53,10 +53,23 @@ export const ProtectedRoute: ParentComponent = (props) => {
                 <div class="max-w-lg rounded-xl border border-stroke bg-white p-6 shadow-sm">
                   <p class="text-sm font-medium text-text-primary">Account not provisioned yet</p>
                   <p class="mt-2 text-sm text-text-secondary">
-                    Your Google sign-in worked, but this email is not linked to a tenant user. Ask a tenant
-                    administrator to invite you from <strong>User Management → Users</strong>, then sign in again
-                    with the same Gmail address.
+                    Your sign-in worked, but this email is not linked to a company workspace yet. You can:
                   </p>
+                  <ul class="mt-3 list-inside list-disc space-y-1 text-sm text-text-secondary">
+                    <li>
+                      <a href="/welcome" class="font-medium text-brand-600 hover:underline">
+                        Start a 90-day free trial
+                      </a>{" "}
+                      (empty workspace for real data)
+                    </li>
+                    <li>
+                      <a href="/demo" class="font-medium text-brand-600 hover:underline">
+                        Start a free demo
+                      </a>{" "}
+                      (sample data, ~14 days)
+                    </li>
+                    <li>Ask your administrator to invite you, then sign in again with the same email</li>
+                  </ul>
                   {auth.bootstrapMessage && (
                     <p class="mt-2 text-xs text-text-secondary">{auth.bootstrapMessage}</p>
                   )}

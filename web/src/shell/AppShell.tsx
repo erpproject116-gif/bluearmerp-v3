@@ -29,6 +29,7 @@ import { brandingLabel } from "../shared/branding/brandingStore";
 import { UserAccountMenu } from "./UserAccountMenu";
 import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
 import { SidebarNav } from "./SidebarNav";
+import { EntitlementBanner } from "../shared/EntitlementBanner";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -235,7 +236,10 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <AcctIHeaderNav />
           <AcctIIHeaderNav />
         </header>
-        <main class="flex-1 p-6">{props.children}</main>
+        <main class="flex-1 p-6">
+          <EntitlementBanner />
+          {props.children}
+        </main>
       </div>
     </div>
   );

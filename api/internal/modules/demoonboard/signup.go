@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -105,23 +106,28 @@ func (s *service) postSignup(w http.ResponseWriter, r *http.Request) {
 	ip := clientIP(r)
 	ua := strings.TrimSpace(r.UserAgent())
 
-	// Create the CRM lead in the home (leadgen) tenant, best-effort.
+	// Create platform customer + CRM lead in the home (leadgen) tenant.
 	var leadTenantID *int64
 	var leadID *int64
+	var customerID int64
 	if tid, ok := s.leadgenTenantID(r.Context()); ok {
 		leadTenantID = &tid
 		note := "Free demo signup. Industry: " + industry + ". Mobile: " + mobile + ". Awaiting email verification."
 		if company != "" {
 			note = "Company: " + company + ". " + note
 		}
-		var newLeadID int64
-		if err := s.pool.QueryRow(r.Context(), `
-			insert into public.crm_leads
-			  (tenant_id, lead_name, company_name, email, phone, source, status, pic_name, notes)
-			values ($1, $2, nullif($3,''), $4, $5, 'demo_signup', 'new', '', $6)
-			returning id`,
-			tid, fullName, company, email, mobile, note).Scan(&newLeadID); err == nil {
-			leadID = &newLeadID
+		res, err := customerregistry.UpsertCustomerLead(r.Context(), s.pool, tid, customerregistry.UpsertParams{
+			Email:         email,
+			FullName:      fullName,
+			CompanyName:   company,
+			Mobile:        mobile,
+			EntrySource:   customerregistry.EntryDemoSignup,
+			CRMLeadSource: "demo_signup",
+			LeadNote:      note,
+		})
+		if err == nil {
+			customerID = res.CustomerID
+			leadID = res.LeadID
 		}
 	}
 
@@ -136,6 +142,12 @@ func (s *service) postSignup(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to record demo signup.", "ERR_INTERNAL")
 		return
+	}
+
+	if customerID > 0 {
+		_, _ = s.pool.Exec(r.Context(), `
+			update public.platform_customers set demo_signup_id = $2, updated_at = now() where id = $1`,
+			customerID, signupID)
 	}
 
 	response.OK(w, map[string]any{

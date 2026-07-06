@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -81,6 +83,18 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 					linkErr := tryAutoLinkProvisionedUser(r.Context(), pool, claims.Sub, claims.Email)
 					if linkErr == nil {
 						user, err = resolveTenantUser(r.Context(), pool, claims.Sub, activeTenantID)
+						if err == nil {
+							leadgenCode := os.Getenv("DEMO_LEADGEN_TENANT_CODE")
+							if leadgenCode == "" {
+								leadgenCode = "BLUEARM"
+							}
+							if leadgenID, ok := customerregistry.LeadgenTenantID(r.Context(), pool, leadgenCode); ok {
+								_ = customerregistry.EnsureCustomerForLinkedUser(
+									r.Context(), pool, leadgenID,
+									claims.Sub, claims.Email, user.FullName,
+									customerregistry.EntryInvite, user.TenantID)
+							}
+						}
 					}
 				}
 			}
