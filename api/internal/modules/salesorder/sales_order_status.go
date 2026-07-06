@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -105,7 +106,7 @@ func optionalInt64Query(r *http.Request, key string) (*int64, bool) {
 	return &n, true
 }
 
-func parseSalesOrderStatusFilters(r *http.Request) (salesOrderStatusFilters, map[string]string) {
+func parseSalesOrderStatusFilters(r *http.Request, tu auth.TenantUser) (salesOrderStatusFilters, map[string]string) {
 	dr, errs := parseDateRangeFilters(r)
 	if errs != nil {
 		return salesOrderStatusFilters{}, errs
@@ -133,6 +134,7 @@ func parseSalesOrderStatusFilters(r *http.Request) (salesOrderStatusFilters, map
 	if progress == "unconfirmed" || progress == "in_progress" || progress == "completed" {
 		f.ProgressStatus = progress
 	}
+	f.LocationID = datascope.ResolveLocationFilter(tu, f.LocationID)
 	return f, nil
 }
 
@@ -277,7 +279,7 @@ func listSalesOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		f, errs := parseSalesOrderStatusFilters(r)
+		f, errs := parseSalesOrderStatusFilters(r, tu)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -316,7 +318,7 @@ func listSalesOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 func exportSalesOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		f, errs := parseSalesOrderStatusFilters(r)
+		f, errs := parseSalesOrderStatusFilters(r, tu)
 		if errs != nil {
 			response.Validation(w, errs)
 			return

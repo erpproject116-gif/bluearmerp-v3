@@ -59,3 +59,8 @@ export function getActiveBranchCurrent(): ActiveBranch | null {
   const tid = getActiveTenantId();
   return tid ? getActiveBranch(tid) : null;
 }
+
+/** Active branch id for the currently-selected business, for X-Branch-ID header. */
+export function getActiveBranchIdCurrent(): number | null {
+  return getActiveBranchCurrent()?.id ?? null;
+}

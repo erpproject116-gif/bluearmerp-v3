@@ -51,8 +51,8 @@ type outstandingPayload struct {
 	Summary outstandingSummary `json:"summary"`
 }
 
-func parseOutstandingFilters(r *http.Request) (outstandingFilters, map[string]string) {
-	base, errs := parseQuotationStatusFilters(r)
+func parseOutstandingFilters(r *http.Request, tu auth.TenantUser) (outstandingFilters, map[string]string) {
+	base, errs := parseQuotationStatusFilters(r, tu)
 	if errs != nil {
 		return outstandingFilters{}, errs
 	}
@@ -207,7 +207,7 @@ func listOutstandingReport(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		f, errs := parseOutstandingFilters(r)
+		f, errs := parseOutstandingFilters(r, tu)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -246,7 +246,7 @@ func listOutstandingReport(pool *pgxpool.Pool) http.HandlerFunc {
 func exportOutstandingReport(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		f, errs := parseOutstandingFilters(r)
+		f, errs := parseOutstandingFilters(r, tu)
 		if errs != nil {
 			response.Validation(w, errs)
 			return

@@ -9,7 +9,7 @@ import (
 
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/activity-logs", func(ar chi.Router) {
-		ar.With(auth.RequireViewActivityLogs).Get("/", listActivityLogs(pool))
-		ar.With(auth.RequireViewChangeLogs).Get("/changes", listChangeLogs(pool))
+		ar.With(auth.RequireViewActivityLogsOrRecordScoped).Get("/", listActivityLogs(pool))
+		ar.With(auth.RequireViewChangeLogsOrRecordScoped).Get("/changes", listChangeLogs(pool))
 	})
 }

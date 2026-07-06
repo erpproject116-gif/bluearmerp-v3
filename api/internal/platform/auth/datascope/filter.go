@@ -14,6 +14,9 @@ import (
 type ListFilter struct {
 	CustomerColumn string // e.g. "so.partner_id"
 	LocationColumn string // e.g. "so.location_id"
+	// ExplicitLocationID is set from ?location_id= when the caller wants to override
+	// the active branch header. When nil, ApplyUserScopesSQL uses X-Branch-ID.
+	ExplicitLocationID *int64
 }
 
 // ApplyUserScopesSQL appends AND fragments when the user's role enforces data scopes.
@@ -85,6 +88,13 @@ func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 			argIdx++
 		}
 		frag.WriteString(fmt.Sprintf(" and %s in (%s)", f.LocationColumn, strings.Join(placeholders, ",")))
+	}
+
+	locID := ResolveLocationFilter(tu, f.ExplicitLocationID)
+	if locID != nil && f.LocationColumn != "" {
+		frag.WriteString(fmt.Sprintf(" and %s = $%d", f.LocationColumn, argIdx))
+		*args = append(*args, *locID)
+		argIdx++
 	}
 	return frag.String(), argIdx, nil
 }

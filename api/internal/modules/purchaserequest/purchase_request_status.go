@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -108,7 +109,7 @@ func optionalInt64Query(r *http.Request, key string) (*int64, bool) {
 	return &n, true
 }
 
-func parsePurchaseRequestStatusFilters(r *http.Request) (purchaseRequestStatusFilters, map[string]string) {
+func parsePurchaseRequestStatusFilters(r *http.Request, tu auth.TenantUser) (purchaseRequestStatusFilters, map[string]string) {
 	dr, errs := parseDateRangeFilters(r)
 	if errs != nil {
 		return purchaseRequestStatusFilters{}, errs
@@ -138,6 +139,7 @@ func parsePurchaseRequestStatusFilters(r *http.Request) (purchaseRequestStatusFi
 	if isValidProgressStatus(progress) {
 		f.ProgressStatus = progress
 	}
+	f.LocationID = datascope.ResolveLocationFilter(tu, f.LocationID)
 	return f, nil
 }
 
@@ -292,7 +294,7 @@ func listPurchaseRequestStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		f, errs := parsePurchaseRequestStatusFilters(r)
+		f, errs := parsePurchaseRequestStatusFilters(r, tu)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -331,7 +333,7 @@ func listPurchaseRequestStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 func exportPurchaseRequestStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		f, errs := parsePurchaseRequestStatusFilters(r)
+		f, errs := parsePurchaseRequestStatusFilters(r, tu)
 		if errs != nil {
 			response.Validation(w, errs)
 			return

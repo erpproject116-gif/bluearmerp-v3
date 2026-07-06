@@ -2,6 +2,8 @@ package auth
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -92,6 +94,51 @@ func RequireViewActivityLogs(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// hasScopedRecordHistoryQuery reports whether the request filters to a single record.
+func hasScopedRecordHistoryQuery(r *http.Request) bool {
+	targetType := strings.TrimSpace(r.URL.Query().Get("target_type"))
+	targetID := strings.TrimSpace(r.URL.Query().Get("target_id"))
+	if targetType == "" || targetID == "" {
+		return false
+	}
+	id, err := strconv.ParseInt(targetID, 10, 64)
+	return err == nil && id > 0
+}
+
+// RequireViewActivityLogsOrRecordScoped allows global activity-log access, or per-record
+// history when target_type and target_id are both supplied (transaction History modal).
+func RequireViewActivityLogsOrRecordScoped(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if tu.CanViewActivityLogs() || hasScopedRecordHistoryQuery(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		response.Err(w, http.StatusForbidden, "You do not have permission to view activity logs.", "ERR_FORBIDDEN")
+	})
+}
+
+// RequireViewChangeLogsOrRecordScoped allows global change-log access, or per-record
+// history when target_type and target_id are both supplied.
+func RequireViewChangeLogsOrRecordScoped(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if tu.CanViewChangeLogs() || hasScopedRecordHistoryQuery(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		response.Err(w, http.StatusForbidden, "You do not have permission to view change logs.", "ERR_FORBIDDEN")
 	})
 }
 

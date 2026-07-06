@@ -1,5 +1,5 @@
 import { apiBase, getAccessToken, type ApiResult } from "./api";
-import { getActiveTenantId } from "./activeContext";
+import { getActiveTenantId, getActiveBranchIdCurrent } from "./activeContext";
 
 export type Attachment = {
   id: number;
@@ -28,6 +28,8 @@ async function authHeaders(): Promise<Record<string, string>> {
   if (token) headers.Authorization = `Bearer ${token}`;
   const tenantId = getActiveTenantId();
   if (tenantId) headers["X-Tenant-ID"] = String(tenantId);
+  const branchId = getActiveBranchIdCurrent();
+  if (branchId) headers["X-Branch-ID"] = String(branchId);
   return headers;
 }
 

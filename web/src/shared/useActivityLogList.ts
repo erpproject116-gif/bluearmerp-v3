@@ -33,9 +33,10 @@ export type ActivityLogFilters = {
   referenceNo?: string;
 };
 
-export function useActivityLogList(params: () => ActivityLogFilters) {
+export function useActivityLogList(params: () => ActivityLogFilters & { enabled?: boolean }) {
   return createQuery(() => {
     const p = params();
+    const scoped = Boolean(p.targetType && p.targetId);
     const qs = new URLSearchParams({
       page: String(p.page),
       pageSize: String(p.pageSize),
@@ -53,6 +54,7 @@ export function useActivityLogList(params: () => ActivityLogFilters) {
 
     return {
       queryKey: ["activity-logs", p],
+      enabled: p.enabled !== false && (!scoped || Boolean(p.targetId)),
       queryFn: async () => {
         const res = await apiFetch<ActivityLogRow[]>(`/api/v1/activity-logs?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load activity logs");

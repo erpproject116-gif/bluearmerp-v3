@@ -50,8 +50,8 @@ type preInvoicingPayload struct {
 	Summary preInvoicingSummary `json:"summary"`
 }
 
-func parsePreInvoicingFilters(r *http.Request) (preInvoicingFilters, map[string]string) {
-	base, errs := parseSalesStatusFilters(r)
+func parsePreInvoicingFilters(r *http.Request, tu auth.TenantUser) (preInvoicingFilters, map[string]string) {
+	base, errs := parseSalesStatusFilters(r, tu)
 	if errs != nil {
 		return preInvoicingFilters{}, errs
 	}
@@ -143,7 +143,7 @@ func listPreInvoicingReport(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		f, errs := parsePreInvoicingFilters(r)
+		f, errs := parsePreInvoicingFilters(r, tu)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -182,7 +182,7 @@ func listPreInvoicingReport(pool *pgxpool.Pool) http.HandlerFunc {
 func exportPreInvoicingReport(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		f, errs := parsePreInvoicingFilters(r)
+		f, errs := parsePreInvoicingFilters(r, tu)
 		if errs != nil {
 			response.Validation(w, errs)
 			return

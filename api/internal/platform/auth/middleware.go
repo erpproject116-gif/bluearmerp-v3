@@ -42,6 +42,7 @@ type TenantUser struct {
 	canViewCrmAnalyticsRole   bool
 	AutoEnableAllModules      bool
 	AuthRevision              int64
+	ActiveBranchID            int64
 	permissions               map[string]string
 	submitPerms               map[string]bool
 }
@@ -108,6 +109,8 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 					}
 				}
 			}
+
+			user.ActiveBranchID = resolveActiveBranchID(r.Context(), pool, user, parseActiveBranchHeader(r))
 
 			ctx := context.WithValue(r.Context(), UserContextKey, user)
 			next.ServeHTTP(w, r.WithContext(ctx))

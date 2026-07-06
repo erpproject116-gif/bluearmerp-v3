@@ -117,6 +117,7 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 		where := "gr.tenant_id = $1"
 		args := []any{tu.TenantID}
 		argN := 2
+		var explicitLoc *int64
 
 		if p.Q != "" {
 			where += fmt.Sprintf(` and (
@@ -142,9 +143,7 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 		if id, ok := optionalInt64Query(r, "location_id"); ok {
-			where += fmt.Sprintf(" and gr.location_id = $%d", argN)
-			args = append(args, *id)
-			argN++
+			explicitLoc = id
 		}
 		if fromStr := strings.TrimSpace(r.URL.Query().Get("date_from")); fromStr != "" {
 			if from, err := parseDate(fromStr); err == nil {
@@ -167,8 +166,9 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
-			CustomerColumn: "po.partner_id",
-			LocationColumn: "gr.location_id",
+			CustomerColumn:       "po.partner_id",
+			LocationColumn:       "gr.location_id",
+			ExplicitLocationID: explicitLoc,
 		}, argN, &args)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")

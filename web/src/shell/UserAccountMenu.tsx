@@ -1,5 +1,5 @@
 import { A, useNavigate } from "@solidjs/router";
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useAuth, canManageBranding } from "../shared/auth-context";
 import { AvatarUploadButton } from "../shared/AvatarUploadButton";
 import { signOutWithPresenceClear } from "../shared/PresenceHeartbeat";
@@ -31,21 +31,6 @@ function SignOutIcon() {
   );
 }
 
-function BuildingIcon() {
-  return (
-    <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9h.01M9 12h.01M9 15h.01M9 18h.01" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg class="h-4 w-4 shrink-0 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
 
 export function UserAccountMenu() {
   const auth = useAuth();
@@ -57,12 +42,6 @@ export function UserAccountMenu() {
     setOpen(false);
     await signOutWithPresenceClear();
     navigate("/signin", { replace: true });
-  };
-
-  const switchTenant = async (tenantId: number) => {
-    setOpen(false);
-    await auth.setActiveTenant(tenantId);
-    navigate("/app", { replace: true });
   };
 
   onMount(() => {
@@ -141,31 +120,6 @@ export function UserAccountMenu() {
                   </div>
                 </div>
               </div>
-              <Show when={(me().memberships?.length ?? 0) > 1}>
-                <div class="border-b border-stroke p-2">
-                  <p class="px-3 pb-1 pt-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                    Switch business
-                  </p>
-                  <For each={me().memberships}>
-                    {(m) => (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
-                        classList={{ "text-text-primary": m.tenant_id === me().tenant.id }}
-                        disabled={m.tenant_id === me().tenant.id}
-                        onClick={() => void switchTenant(m.tenant_id)}
-                      >
-                        <BuildingIcon />
-                        <span class="min-w-0 flex-1 truncate">{m.company_name}</span>
-                        <Show when={m.tenant_id === me().tenant.id}>
-                          <CheckIcon />
-                        </Show>
-                      </button>
-                    )}
-                  </For>
-                </div>
-              </Show>
               <div class="flex flex-col gap-1 p-2">
                 <A
                   href="/app/documentation"

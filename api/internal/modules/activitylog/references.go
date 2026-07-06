@@ -8,6 +8,8 @@ left join lateral (
     when 'so_sales_order' then (select so.sales_order_no from public.so_sales_orders so where so.id = al.target_id and so.tenant_id = al.tenant_id limit 1)
     when 'pr_purchase_request' then (select pr.purchase_request_no from public.pr_purchase_requests pr where pr.id = al.target_id and pr.tenant_id = al.tenant_id limit 1)
     when 'quo_quotation' then (select q.reference_no from public.quo_quotations q where q.id = al.target_id and q.tenant_id = al.tenant_id limit 1)
+    when 'po_purchase_order' then (select po.purchase_order_no from public.po_purchase_orders po where po.id = al.target_id and po.tenant_id = al.tenant_id limit 1)
+    when 'fin_supplier_invoice' then (select si.invoice_no from public.fin_supplier_invoices si where si.id = al.target_id and si.tenant_id = al.tenant_id limit 1)
     when 'fin_official_receipt' then (select r.receipt_no from public.fin_official_receipts r where r.id = al.target_id and r.tenant_id = al.tenant_id limit 1)
     when 'crm_warranty_asset' then (select wa.serial_no from public.crm_warranty_assets wa where wa.id = al.target_id and wa.tenant_id = al.tenant_id limit 1)
     when 'inv_repair_order' then (select ro.repair_order_no from public.inv_repair_orders ro where ro.id = al.target_id and ro.tenant_id = al.tenant_id limit 1)
