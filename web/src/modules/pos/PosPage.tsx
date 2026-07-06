@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Index, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
@@ -767,30 +767,31 @@ function PaymentModal(props: {
         <p class="mb-4 text-sm text-slate-500">Amount due <span class="font-semibold text-slate-900">{money(props.total)}</span></p>
 
         <div class="space-y-3">
-          <For each={lines()}>
+          <Index each={lines()}>
             {(line, i) => (
               <div class="rounded-xl border border-slate-200 p-3">
                 <div class="flex items-center gap-2">
                   <select
                     class="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-                    value={line.type}
-                    onChange={(e) => setLine(i(), { type: e.currentTarget.value })}
+                    value={line().type}
+                    onChange={(e) => setLine(i, { type: e.currentTarget.value })}
                   >
                     <For each={props.tenders}>{(t) => <option value={t}>{posTenderLabel(t)}</option>}</For>
                   </select>
                   <input
                     type="text"
                     inputmode="decimal"
+                    autocomplete="off"
                     class="w-28 rounded-lg border border-slate-300 px-2 py-2 text-right text-sm font-semibold focus:border-emerald-500 focus:outline-none"
-                    value={line.amount}
-                    onInput={(e) => setLine(i(), { amount: sanitizeDecimalInput(e.currentTarget.value) })}
+                    value={line().amount}
+                    onInput={(e) => setLine(i, { amount: sanitizeDecimalInput(e.currentTarget.value) })}
                   />
                   <Show when={lines().length > 1}>
                     <button
                       type="button"
                       class="shrink-0 rounded-lg border border-slate-200 px-2 py-2 text-slate-400 hover:bg-slate-50 hover:text-red-500"
                       aria-label="Remove payment"
-                      onClick={() => removeLine(i())}
+                      onClick={() => removeLine(i)}
                     >
                       ✕
                     </button>
@@ -801,18 +802,18 @@ function PaymentModal(props: {
                     <button
                       type="button"
                       class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
-                      onClick={() => fillRemaining(i())}
+                      onClick={() => fillRemaining(i)}
                     >
                       Fill remaining {money(remaining())}
                     </button>
                   </Show>
-                  <Show when={isCashTender(line.type)}>
+                  <Show when={isCashTender(line().type)}>
                     <For each={quickAmounts()}>
                       {(amt) => (
                         <button
                           type="button"
                           class="rounded-lg border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:bg-slate-50"
-                          onClick={() => setLine(i(), { amount: amt.toFixed(2) })}
+                          onClick={() => setLine(i, { amount: amt.toFixed(2) })}
                         >
                           {money(amt)}
                         </button>
@@ -822,7 +823,7 @@ function PaymentModal(props: {
                 </div>
               </div>
             )}
-          </For>
+          </Index>
         </div>
 
         <button
