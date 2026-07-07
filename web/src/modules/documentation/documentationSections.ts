@@ -31,7 +31,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "New to Bluearm? Open the interactive checklist from your Dashboard (Start here), go to /app/onboarding for the full ERP + POS playbook, or use Onboarding under your account menu.",
+        text: "New to Bluearm? After a trial, you land on the workspace setup wizard. The Dashboard shows a Start here checklist until foundation is complete. Then open /app/onboarding for the full ERP + POS playbook.",
       },
     ],
   },
@@ -46,9 +46,9 @@ export const documentationSections: DocSection[] = [
       {
         type: "steps",
         items: [
-          "Complete workspace setup at /app/setup (company, COA, tax, location, partners, items).",
+          "Complete workspace setup at /app/setup — confirm seeded company, COA, tax, process policies, and location; add partners and products.",
           "Open /app/onboarding for the full ERP + POS playbook with tracked progress.",
-          "Week 1: Review process policies and enable modules (POS, WMS, Quality).",
+          "Week 1: Review process policies again if needed and enable modules (POS, WMS, Quality).",
           "Week 2: First selling flow — quotation, sales order, pick list, invoice.",
           "Week 3: First buying flow — purchase request, PO, goods receipt, supplier invoice.",
           "Week 4: POS — configure Manage, open shift, checkout, close shift.",
@@ -62,6 +62,41 @@ export const documentationSections: DocSection[] = [
     ],
   },
   {
+    id: "setup-wizard",
+    title: "Workspace setup wizard",
+    iconId: "documentation",
+    intro: "Required foundation before quotations, sales, purchases, or POS transactions.",
+    primaryHref: "/app/setup",
+    primaryLabel: "Open setup wizard",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Every new trial workspace is provisioned with a chart of accounts, PHP currency, standard VAT types, and a default Main location. The setup wizard makes you review and confirm those seeds, then add at least one partner and one product. Until required steps are done, the API blocks new selling and buying documents.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Company — open branding, set your legal name and logo, then click Confirm.",
+          "Chart of accounts — review seeded GL accounts, then Looks good.",
+          "Currency & tax — open tax types, adjust if needed, then Confirm.",
+          "Process policies — review quotation/SO/GR gates and release mode, then Confirm.",
+          "Location — confirm Main or add branches, then Confirm.",
+          "Partners — add at least one customer or supplier.",
+          "Products — add at least one item; enable Track serial if you will scan units.",
+          "Optional: invite teammates under User Management.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "Owners and store admins are sent to /app/setup after starting a trial or when opening the dashboard with incomplete setup. You can Skip for now — a reminder bar stays in the header until foundation is complete.",
+      },
+      {
+        type: "tip",
+        text: "Invited team members see that setup is in progress; only administrators can finish the wizard. Use the Dashboard checklist or /app/onboarding for the extended playbook after foundation.",
+      },
+    ],
+  },
+  {
     id: "dashboard",
     title: "Business Dashboard",
     iconId: "dashboard",
@@ -71,7 +106,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "The Business Dashboard shows sales totals, stock warnings, open purchase orders, and other alerts in one place. It is meant for people who oversee the whole store, not just one salesperson.",
+        text: "The Business Dashboard shows sales totals, stock warnings, open purchase orders, and other alerts in one place. It is meant for people who oversee the whole store, not just one salesperson. While workspace setup is incomplete, a Start here checklist appears at the top for administrators.",
       },
       {
         type: "paragraph",
@@ -820,7 +855,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Process policies let administrators enforce commercial flow gates: quotation before sales order, sales order before invoice, PR approval before PO, goods receipt before supplier invoice, and whether SO release combines reservation with stock deduction (legacy) or uses delivery receipts to issue stock.",
+        text: "Process policies let administrators enforce commercial flow gates: quotation before sales order, sales order before invoice, PR approval before PO, goods receipt before supplier invoice, and whether SO release combines reservation with stock deduction (legacy) or uses delivery receipts to issue stock. Review and confirm policies during workspace setup (/app/setup/process-policies) before your first transactions.",
       },
       {
         type: "paragraph",

@@ -34,7 +34,7 @@ export default function WelcomePage() {
         return;
       }
       await auth.refresh();
-      navigate("/app/dashboard", { replace: true });
+      navigate("/app/setup", { replace: true });
     } catch {
       setError("Network error. Check your connection and try again.");
     } finally {

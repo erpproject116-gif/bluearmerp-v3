@@ -241,25 +241,139 @@ export const knowledgebaseArticles: KbArticle[] = [
     title: "Workspace setup wizard",
     scenario: "You are setting up a new business before creating quotes or purchases.",
     intro:
-      "BluearmERP guides you through company details, chart of accounts, currency and tax, locations, partners, and products before any transactions are allowed.",
+      "BluearmERP provisions COA, PHP currency, VAT types, and a Main location automatically. The setup wizard requires you to confirm each seeded default, then add partners and products before transactions are allowed.",
     blocks: [
       {
-        type: "steps",
+        type: "flow",
         items: [
-          "Sign in — if setup is incomplete you are redirected to /app/setup.",
-          "Complete each required step; the API blocks new quotations, sales, and purchases until foundation data exists.",
-          "On the chart of accounts step, review the seeded accounts and click Looks good to continue.",
-          "Add at least one partner and one product; enable Track serial on items you will scan.",
+          "Company (confirm)",
+          "Chart of accounts (review)",
+          "Currency & tax (confirm)",
+          "Process policies (confirm)",
+          "Location (confirm)",
+          "Partners + products",
         ],
       },
       {
+        type: "steps",
+        items: [
+          "Start a 90-day trial at /welcome — you land on /app/setup.",
+          "On each confirm step, open the linked screen if you need to edit, then click Confirm or Looks good.",
+          "Add at least one customer or supplier and one product.",
+          "When all required steps show complete, create your first quotation or purchase request.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "The API blocks POST requests for quotations, sales orders, sales invoices, purchase documents, and POS until foundation is complete. Inventory and finance setup screens stay available while you configure.",
+      },
+      {
         type: "tip",
-        text: "Team members see read-only status until an administrator finishes setup.",
+        text: "Skip for now keeps a header reminder. The Dashboard Start here checklist tracks progress until foundation is done.",
       },
     ],
     primaryHref: "/app/setup",
     primaryLabel: "Open setup wizard",
-    relatedGuideIds: ["inventory"],
+    relatedGuideIds: ["first-week", "process-policies", "inventory"],
+  },
+  {
+    id: "start-90-day-trial",
+    title: "How do I start a 90-day free trial?",
+    scenario: "You want an empty workspace for your real company data.",
+    intro:
+      "Trials are self-service: sign up, confirm email, then provision an isolated tenant with seeded accounting defaults.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open /signup and register with email or Google.",
+          "On /welcome, click Start 90-day free trial.",
+          "BluearmERP creates your workspace (company code like TRIAL-xxx) and opens the setup wizard.",
+          "Complete foundation setup, then use /app/onboarding for module-by-module guidance.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "No credit card is required for the trial period. Your data stays in a tenant-scoped database — never mixed with other customers.",
+      },
+      {
+        type: "tip",
+        text: "Prefer sample data first? Use Start a free demo on /welcome instead, then migrate to a trial when ready.",
+      },
+    ],
+    primaryHref: "/welcome",
+    primaryLabel: "Start trial",
+    relatedGuideIds: ["setup-wizard", "demo-data-training"],
+  },
+  {
+    id: "process-policies-foundation",
+    title: "Why must I review process policies during setup?",
+    scenario: "Setup wizard asks you to confirm process policies before transactions.",
+    intro:
+      "Process policies control whether quotations, sales orders, goods receipts, and reservations are mandatory before the next document. Confirming them during setup prevents surprise blocks later.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open /app/setup/process-policies or User Management → Process Policies.",
+          "Review gates: Sales require SO, Sales require quotation, Purchase require PR, GR before supplier invoice, reservation before release.",
+          "Choose legacy combined SO release (stock on pick list) vs split mode (delivery note issues stock).",
+          "Click Confirm on the setup step when policies match how you operate.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Start permissive (policies off) while learning, then tighten controls before go-live. The Business Dashboard red flags surface gaps when stricter policies are on.",
+      },
+    ],
+    primaryHref: "/app/user-management/process-policies",
+    primaryLabel: "Process policies",
+    relatedGuideIds: ["process-policies", "setup-wizard"],
+  },
+  {
+    id: "invited-during-setup",
+    title: "I was invited but setup is still in progress",
+    scenario: "You joined a company workspace that has not finished foundation setup.",
+    intro:
+      "Only tenant owners and store admins can complete the setup wizard. Invited members can sign in but cannot create selling or buying documents until foundation is done.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Sign in with the email your administrator invited.",
+          "If you see a banner that setup is in progress, ask your admin to finish /app/setup.",
+          "You can still explore read-only areas depending on your role once setup completes.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Administrators see an amber setup reminder in the header with a Continue setup link.",
+      },
+    ],
+    primaryHref: "/app/setup",
+    primaryLabel: "Setup wizard (admins)",
+    relatedGuideIds: ["join-business-by-invite", "setup-wizard"],
+  },
+  {
+    id: "skip-setup-remind-later",
+    title: "Can I skip setup and finish later?",
+    scenario: "You need to explore the app before entering master data.",
+    intro:
+      "Owners and store admins can skip the wizard; reminders stay visible until required steps are complete.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "On any setup step, click Skip for now — remind me in the header.",
+          "An amber bar appears at the top with percent complete and Continue setup.",
+          "Click Remind me later to snooze the bar for about a week (breadcrumb hint may still show).",
+          "Transactions remain blocked until partners, products, and confirm steps are done.",
+        ],
+      },
+    ],
+    primaryHref: "/app/setup",
+    primaryLabel: "Resume setup",
+    relatedGuideIds: ["setup-wizard"],
   },
   {
     id: "serial-barcode-scanning",

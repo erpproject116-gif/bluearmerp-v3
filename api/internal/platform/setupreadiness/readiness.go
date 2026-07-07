@@ -3,6 +3,7 @@ package setupreadiness
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,7 +24,8 @@ var WizardSteps = []StepDef{
 	{ID: "company", Label: "Set your company name and logo", Href: "/app/setup/company", Required: true},
 	{ID: "chart_of_accounts", Label: "Review your chart of accounts", Href: "/app/setup/chart-of-accounts", Required: true},
 	{ID: "currency_tax", Label: "Confirm currency and tax types", Href: "/app/setup/currency-tax", Required: true},
-	{ID: "location", Label: "Add your first stock location", Href: "/app/setup/location", Required: true},
+	{ID: "process_policies", Label: "Review process policies", Href: "/app/setup/process-policies", Required: true},
+	{ID: "location", Label: "Confirm your stock location", Href: "/app/setup/location", Required: true},
 	{ID: "partners", Label: "Add a customer or supplier", Href: "/app/setup/partners", Required: true},
 	{ID: "items", Label: "Add your first product", Href: "/app/setup/items", Required: true},
 	{ID: "team", Label: "Invite your team", Href: "/app/setup/team", Required: false},
@@ -57,8 +59,20 @@ type Payload struct {
 }
 
 type progressStore struct {
-	ChartOfAccountsAck bool `json:"chart_of_accounts_ack"`
+	ChartOfAccountsAck bool   `json:"chart_of_accounts_ack"`
+	CompanyAck         bool   `json:"company_ack"`
+	CurrencyTaxAck     bool   `json:"currency_tax_ack"`
+	LocationAck        bool   `json:"location_ack"`
+	ProcessPoliciesAck bool   `json:"process_policies_ack"`
 	RemindLaterAt      string `json:"remind_later_at,omitempty"`
+}
+
+var foundationAckKeys = map[string]string{
+	"company":           "company_ack",
+	"currency_tax":      "currency_tax_ack",
+	"location":          "location_ack",
+	"process_policies":  "process_policies_ack",
+	"chart_of_accounts": "chart_of_accounts_ack",
 }
 
 func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Payload, error) {
@@ -140,13 +154,7 @@ func IsReady(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (bool, err
 }
 
 func AckChartOfAccounts(ctx context.Context, pool *pgxpool.Pool, tenantID int64) error {
-	blob, _ := json.Marshal(map[string]any{"chart_of_accounts_ack": true})
-	_, err := pool.Exec(ctx, `
-		update public.platform_customers
-		set onboarding_progress = coalesce(onboarding_progress, '{}'::jsonb) || $2::jsonb,
-		    updated_at = now()
-		where tenant_id = $1`, tenantID, string(blob))
-	return err
+	return AckFoundationStep(ctx, pool, tenantID, "chart_of_accounts")
 }
 
 func loadProgress(ctx context.Context, pool *pgxpool.Pool, tenantID int64) progressStore {
@@ -170,7 +178,7 @@ func detect(ctx context.Context, pool *pgxpool.Pool, tenantID int64, store progr
 	_ = pool.QueryRow(ctx, `
 		select coalesce(settings->'receipt'->>'company_name', '')
 		from public.tenant_branding where tenant_id = $1`, tenantID).Scan(&brandingName)
-	out["company"] = companyName != "" || brandingName != ""
+	out["company"] = (companyName != "" || brandingName != "") && store.CompanyAck
 
 	var coaCount int
 	_ = pool.QueryRow(ctx, `
@@ -186,13 +194,15 @@ func detect(ctx context.Context, pool *pgxpool.Pool, tenantID int64, store progr
 	_ = pool.QueryRow(ctx, `
 		select count(*)::int from public.quo_tax_types
 		where tenant_id = $1 and status = 'active'`, tenantID).Scan(&taxes)
-	out["currency_tax"] = currencies >= 1 && taxes >= 1
+	out["currency_tax"] = currencies >= 1 && taxes >= 1 && store.CurrencyTaxAck
+
+	out["process_policies"] = store.ProcessPoliciesAck
 
 	var locations int
 	_ = pool.QueryRow(ctx, `
 		select count(*)::int from public.inv_locations
 		where tenant_id = $1 and deleted_at is null`, tenantID).Scan(&locations)
-	out["location"] = locations >= 1
+	out["location"] = locations >= 1 && store.LocationAck
 
 	var partners int
 	_ = pool.QueryRow(ctx, `
@@ -213,10 +223,31 @@ func detect(ctx context.Context, pool *pgxpool.Pool, tenantID int64, store progr
 	out["team"] = users > 1
 
 	requiredDone := out["company"] && out["chart_of_accounts"] && out["currency_tax"] &&
-		out["location"] && out["partners"] && out["items"]
+		out["process_policies"] && out["location"] && out["partners"] && out["items"]
 	out["ready"] = requiredDone
 
 	return out, nil
+}
+
+func mergeOnboardingProgress(ctx context.Context, pool *pgxpool.Pool, tenantID int64, patch map[string]any) error {
+	blob, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+	_, err = pool.Exec(ctx, `
+		update public.platform_customers
+		set onboarding_progress = coalesce(onboarding_progress, '{}'::jsonb) || $2::jsonb,
+		    updated_at = now()
+		where tenant_id = $1`, tenantID, string(blob))
+	return err
+}
+
+func AckFoundationStep(ctx context.Context, pool *pgxpool.Pool, tenantID int64, stepID string) error {
+	key, ok := foundationAckKeys[stepID]
+	if !ok {
+		return fmt.Errorf("unknown foundation step: %s", stepID)
+	}
+	return mergeOnboardingProgress(ctx, pool, tenantID, map[string]any{key: true})
 }
 
 func blockingMessage(stepID string) string {
@@ -227,6 +258,8 @@ func blockingMessage(stepID string) string {
 		return "Review your chart of accounts before creating transactions."
 	case "currency_tax":
 		return "Configure currency and tax types before creating transactions."
+	case "process_policies":
+		return "Review process policies before creating transactions."
 	case "location":
 		return "Add at least one stock location before creating transactions."
 	case "partners":

@@ -4,30 +4,41 @@ import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useSetupReadiness } from "../../shared/usePlatform";
 
-const STEP_COPY: Record<string, { title: string; why: string; action: string; link?: string }> = {
+const STEP_COPY: Record<string, { title: string; why: string; action: string; link?: string; ackStep?: string }> = {
   company: {
     title: "Your business",
-    why: "Your company name appears on invoices, receipts, and reports.",
+    why: "Your company name appears on invoices, receipts, and reports. Update branding, then confirm.",
     action: "Open branding settings",
     link: "/app/settings/branding",
+    ackStep: "company",
   },
   chart_of_accounts: {
     title: "Chart of accounts",
     why: "We seeded a standard chart of accounts. Review it before posting transactions.",
     action: "Review accounts",
     link: "/app/finance/chart-of-accounts",
+    ackStep: "chart_of_accounts",
   },
   currency_tax: {
     title: "Currency & taxes",
-    why: "Confirm your default currency and VAT types for quotations, invoices, and POS.",
+    why: "We seeded PHP and standard VAT types. Open the list, adjust if needed, then confirm.",
     action: "Review tax types",
     link: "/app/quotation/tax-mngt/tax-types",
+    ackStep: "currency_tax",
+  },
+  process_policies: {
+    title: "Process policies",
+    why: "Control whether quotations, sales orders, goods receipts, and reservations are required before the next document.",
+    action: "Review process policies",
+    link: "/app/user-management/process-policies",
+    ackStep: "process_policies",
   },
   location: {
     title: "Stock location",
-    why: "Every stock movement needs a warehouse or branch location.",
-    action: "Add a location",
+    why: "A default Main location was created. Confirm it or add branches before moving stock.",
+    action: "Review locations",
     link: "/app/inventory/locations",
+    ackStep: "location",
   },
   partners: {
     title: "Customers & suppliers",
@@ -61,6 +72,7 @@ function stepFromPath(path: string): string {
     company: "company",
     "chart-of-accounts": "chart_of_accounts",
     "currency-tax": "currency_tax",
+    "process-policies": "process_policies",
     location: "location",
     partners: "partners",
     items: "items",
@@ -91,6 +103,19 @@ export default function SetupWizardPage() {
     setAcking(true);
     try {
       await apiFetch("/api/v1/platform/setup-readiness/ack-coa", { method: "POST" });
+      refresh();
+    } finally {
+      setAcking(false);
+    }
+  };
+
+  const ackStep = async (stepId: string) => {
+    setAcking(true);
+    try {
+      await apiFetch("/api/v1/platform/setup-readiness/ack-step", {
+        method: "POST",
+        body: JSON.stringify({ step_id: stepId }),
+      });
       refresh();
     } finally {
       setAcking(false);
@@ -174,6 +199,16 @@ export default function SetupWizardPage() {
               onClick={() => void ackCOA()}
             >
               Looks good — continue
+            </button>
+          </Show>
+          <Show when={copy().ackStep && currentId() !== "chart_of_accounts"}>
+            <button
+              type="button"
+              disabled={acking() || currentStep()?.done}
+              class="mt-4 block text-sm text-brand-600 hover:underline disabled:opacity-50"
+              onClick={() => void ackStep(copy().ackStep!)}
+            >
+              {currentStep()?.done ? "Confirmed" : "Confirm — continue"}
             </button>
           </Show>
           <button

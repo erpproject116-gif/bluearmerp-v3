@@ -16,7 +16,11 @@ export const knowledgebaseGroups: KbGroup[] = [
     title: "Getting started",
     description: "First-time workspace setup and daily basics.",
     articleIds: [
+      "start-90-day-trial",
       "setup-wizard",
+      "process-policies-foundation",
+      "skip-setup-remind-later",
+      "invited-during-setup",
       "onboarding-playbook",
       "inventory-master-data",
       "user-management-admin",
@@ -39,13 +43,14 @@ export const knowledgebaseGroups: KbGroup[] = [
       "quotation-to-sales-flow",
       "sales-order-release",
       "collective-invoicing",
+      "sales-cash-in-after-save",
     ],
   },
   {
     id: "buying",
     title: "Buying",
     description: "Purchase requests through supplier invoices.",
-    articleIds: ["purchase-request-to-ap-flow", "goods-receipt-load-slip"],
+    articleIds: ["purchase-request-to-ap-flow", "goods-receipt-load-slip", "purchasing-load-slip-po"],
   },
   {
     id: "inventory",
@@ -69,7 +74,7 @@ export const knowledgebaseGroups: KbGroup[] = [
     id: "finance",
     title: "Accounts & finance",
     description: "Receipts, vouchers, GL, and reporting.",
-    articleIds: ["finance-accounts-overview"],
+    articleIds: ["finance-accounts-overview", "receivable-payable-status", "acct-vs-inventory-reconciliation"],
   },
   {
     id: "operations",
@@ -103,6 +108,6 @@ export const knowledgebaseGroups: KbGroup[] = [
     id: "insights",
     title: "Dashboard & reconciliation",
     description: "KPIs, reports, and fixing data gaps.",
-    articleIds: ["reports-and-dashboard"],
+    articleIds: ["reports-and-dashboard", "stock-reconciliation-walkthrough"],
   },
 ];

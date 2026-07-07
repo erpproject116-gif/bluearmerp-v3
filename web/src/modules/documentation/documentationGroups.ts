@@ -6,7 +6,7 @@ export const documentationGroups: DocGroup[] = [
     id: "start",
     title: "Start here",
     description: "Layout, dashboard, and how to find your way around.",
-    sectionIds: ["getting-started", "first-week", "dashboard"],
+    sectionIds: ["getting-started", "setup-wizard", "first-week", "dashboard"],
   },
   {
     id: "stock",

@@ -33,6 +33,7 @@ import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
 import { SidebarNav } from "./SidebarNav";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBar";
+import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -77,6 +78,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
   return (
     <div class="flex min-h-screen bg-body">
+      <SetupFirstRunRedirect />
       <aside
         class="erp-surface fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-stroke py-6 transition-[width,padding] duration-200 ease-in-out"
         classList={{

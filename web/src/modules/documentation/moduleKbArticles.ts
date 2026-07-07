@@ -7,22 +7,22 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Onboarding playbook (ERP + POS)",
     scenario: "You want a guided path through every module after initial setup.",
     intro:
-      "The onboarding playbook tracks progress across foundation, selling, buying, serials, POS, finance, CRM, and dashboard health.",
+      "The onboarding playbook tracks progress across foundation, selling, buying, serials, POS, finance, CRM, and dashboard health. Steps auto-complete when you create real documents.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Finish required workspace setup at /app/setup.",
-          "Open /app/onboarding for the multi-track playbook with auto-detected progress.",
+          "Finish required workspace setup at /app/setup (confirm seeds + partners + products).",
+          "Open /app/onboarding — the Dashboard also shows a Start here checklist until foundation is done.",
           "Week 1: admin — process policies, modules, Mapping Center, team.",
-          "Week 2: selling + serials — quote, SO, pick list, invoice, payment.",
-          "Week 3: buying + finance — PR, PO, GR, supplier invoice, GL reports.",
+          "Week 2: selling + serials — quote, SO, pick list, delivery note, invoice, official receipt.",
+          "Week 3: buying + finance — PR, PO, GR, supplier invoice, payment voucher, trial balance.",
           "Week 4: POS + operations — configure POS, shift, checkout, CRM, support.",
         ],
       },
       {
         type: "tip",
-        text: "Use Mark reviewed on review-only steps such as process policies and POS Manage.",
+        text: "Use Mark reviewed on review-only steps such as process policies and POS Manage. Dismiss or snooze the playbook banner if you prefer the header setup reminder only.",
       },
     ],
     primaryHref: "/app/onboarding",
@@ -126,6 +126,126 @@ export const moduleKbArticles: KbArticle[] = [
     ],
     primaryHref: "/app/purchases/purchases/new",
     primaryLabel: "New supplier invoice",
+  },
+  {
+    id: "purchasing-load-slip-po",
+    title: "Load Slip: supplier invoice from purchase order",
+    scenario: "You want to bill open PO lines without posting a goods receipt first.",
+    intro:
+      "When process policy allows, open PO lines with residual quantity can be pulled directly onto a supplier invoice for the same vendor.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Buying → New Purchase (or Accounts → Supplier Invoices → New).",
+          "Select the vendor — Load Slip lists open PO lines for that partner.",
+          "Choose Load Slip → Purchase Order, tick lines, and apply residual qty.",
+          "Save the supplier invoice; billed qty updates on the PO line.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "If your policy requires GR before supplier invoice, use Load Slip (from Goods Receipt) instead.",
+      },
+    ],
+    primaryHref: "/app/purchases/purchases/new",
+    primaryLabel: "New supplier invoice",
+    relatedGuideIds: ["goods-receipt-load-slip", "purchase-request-to-ap-flow"],
+  },
+  {
+    id: "sales-cash-in-after-save",
+    title: "Cash In and accounting after saving a sales invoice",
+    scenario: "You just created a sales invoice and want to record payment or GL immediately.",
+    intro:
+      "After saving a new sale, BluearmERP can prompt for Cash In (official receipt) or jump to the Invoice tab for accounting voucher setup.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Save a new sales invoice from Sales → New Sale.",
+          "On the post-save dialog, choose Cash In to open the receipt form prefilled with customer and amount.",
+          "Or choose Accounting to open the Invoice tab and configure auto-post sales / AR journal when enabled.",
+          "Enable accounts_auto_post_sales under Process Policies if checkout should post GL automatically.",
+        ],
+      },
+    ],
+    primaryHref: "/app/sales/sales/new",
+    primaryLabel: "New sale",
+    relatedGuideIds: ["quotation-to-sales-flow", "finance-accounts-overview"],
+  },
+  {
+    id: "receivable-payable-status",
+    title: "Receivable and Payable Status (as-of reports)",
+    scenario: "You need open AR or AP balances at a specific date, not just aging buckets.",
+    intro:
+      "Receivable Status and Payable Status mirror ECount E040721/E040722 — customer or vendor balances as-of a date.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Selling → Reports → Receivable Status for open customer balances.",
+          "Buying → Reports → Payable Status for open vendor balances.",
+          "Set the as-of date and search; export CSV from the report toolbar.",
+          "For combined AR/AP position, use Finance → AR/AP Status.",
+        ],
+      },
+    ],
+    primaryHref: "/app/selling/reports/receivable-status",
+    primaryLabel: "Receivable Status",
+    relatedGuideIds: ["finance-accounts-overview", "reports-and-dashboard"],
+  },
+  {
+    id: "acct-vs-inventory-reconciliation",
+    title: "Accounting vs Inventory reconciliation",
+    scenario: "You want GL inventory accounts to match stock valuation.",
+    intro:
+      "The Acct vs Inventory report compares posted GL balances for inventory-related accounts against stock on-hand valuation at an as-of date.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Finance → Reports → Accounting vs Inventory.",
+          "Pick as-of date and run the report.",
+          "Investigate variances using Stock Reconciliation and journal entries.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Ensure goods receipts and sales postings are complete before month-end reconciliation.",
+      },
+    ],
+    primaryHref: "/app/finance/reports/acct-inventory-reconciliation",
+    primaryLabel: "Acct vs Inventory",
+    relatedGuideIds: ["reports-and-dashboard"],
+  },
+  {
+    id: "stock-reconciliation-walkthrough",
+    title: "Fix stock reconciliation red flags",
+    scenario: "Dashboard or Stock workspace shows serial, GR, or SO release gaps.",
+    intro:
+      "Stock Reconciliation groups common data-health issues so you can drill into the underlying documents.",
+    blocks: [
+      {
+        type: "flow",
+        items: [
+          "Open reconciliation list",
+          "Pick issue category",
+          "Open source document",
+          "Post correction",
+        ],
+      },
+      {
+        type: "steps",
+        items: [
+          "Open Stock → Stock Reconciliation (or follow a red flag link from the Dashboard).",
+          "Review categories: serial qty mismatch, GR without supplier invoice, SO release without delivery, etc.",
+          "Open the linked document and post the missing step (invoice, delivery note, or adjustment).",
+        ],
+      },
+    ],
+    primaryHref: "/app/inventory/stock-reconciliation",
+    primaryLabel: "Stock reconciliation",
+    relatedGuideIds: ["reports-and-dashboard", "serial-barcode-scanning"],
   },
   {
     id: "pos-checkout-guide",
@@ -310,7 +430,9 @@ export const moduleKbArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Dashboard for sales, stock, and finance alerts.",
+          "Open Dashboard for sales, stock, and finance alerts — Start here checklist until setup is complete.",
+          "Selling → Receivable Status and Buying → Payable Status for as-of AR/AP.",
+          "Finance → Accounting vs Inventory for GL vs stock valuation.",
           "Stock → Stock Reconciliation lists serial qty mismatches, GR gaps, SO release gaps, and more.",
           "Report Catalogue (/app/reports) runs saved analytics across modules.",
         ],
@@ -499,12 +621,14 @@ export const moduleKbArticles: KbArticle[] = [
     id: "tax-and-currency",
     title: "Tax types and currency",
     scenario: "You need VAT or multi-currency on quotations and orders.",
-    intro: "Tax Management under Quotation configures tax types and currencies used on selling documents.",
+    intro:
+      "New workspaces are seeded with PHP and standard VAT types. Confirm them during setup, then maintain tax types and currencies under Quotation → Tax Management.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Quotation → Taxes (Tax Management sub-branch).",
+          "During /app/setup/currency-tax, open Tax Types, review seeded codes, then Confirm.",
+          "Open Quotation → Taxes (Tax Management sub-branch) for ongoing maintenance.",
           "Maintain Tax Types (inclusive vs exclusive VAT).",
           "Set default currency and exchange rates under Currencies.",
           "New quotations and sales orders pick up these defaults.",
