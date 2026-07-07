@@ -308,6 +308,8 @@ export function PurchaseOrderModal(props: Props) {
       unit_price: String(row.unit_price),
       remark: row.remark ?? "",
       purchase_request_line_id: row.source_purchase_request_line_id,
+      track_serial: Boolean(row.track_serial),
+      planned_serial_nos: row.planned_serial_nos ?? [],
     }));
     if (meta && first.tax_type_id) {
       const recalc = await recalculatePurchaseRequestLines(newLines, first.tax_type_id, meta);

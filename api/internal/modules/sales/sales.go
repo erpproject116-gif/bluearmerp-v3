@@ -44,6 +44,8 @@ type SaleLine struct {
 	DiscountedUnitVatInc   float64 `json:"discounted_unit_vat_inc"`
 	Remark                 *string `json:"remark,omitempty"`
 	SerialLotNo            *string `json:"serial_lot_no,omitempty"`
+	SerialUnitIDs          []int64 `json:"serial_unit_ids,omitempty"`
+	TrackSerial            bool    `json:"track_serial,omitempty"`
 	SourceSalesOrderLineID *int64  `json:"source_sales_order_line_id,omitempty"`
 }
 
@@ -399,15 +401,23 @@ func loadSale(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Sale
 
 func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]SaleLine, error) {
 	rows, err := pool.Query(ctx, `
-		select id, line_no, item_id, item_code, item_name, description,
-		  qty::float8, coalesce(returned_qty, 0)::float8,
-		  unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
-		  unit_vat_inc::float8, line_total::float8,
-		  discount_amount::float8, discounted_unit_non_vat::float8, discounted_unit_vat_inc::float8,
-		  remark, serial_lot_no, source_sales_order_line_id
-		from public.sa_sales_lines
-		where sales_id = $1
-		order by line_no`, salesID)
+		select sl.id, sl.line_no, sl.item_id, sl.item_code, sl.item_name, sl.description,
+		  sl.qty::float8, coalesce(sl.returned_qty, 0)::float8,
+		  sl.unit_non_vat::float8, sl.non_vat_total::float8, sl.tax_amount::float8,
+		  sl.unit_vat_inc::float8, sl.line_total::float8,
+		  sl.discount_amount::float8, sl.discounted_unit_non_vat::float8, sl.discounted_unit_vat_inc::float8,
+		  sl.remark, sl.serial_lot_no, sl.source_sales_order_line_id,
+		  coalesce(i.track_serial, false),
+		  coalesce((
+		    select array_agg(j.serial_unit_id order by su.serial_no)
+		    from public.inv_serial_unit_sales_lines j
+		    join public.inv_serial_units su on su.id = j.serial_unit_id
+		    where j.sales_line_id = sl.id
+		  ), '{}')
+		from public.sa_sales_lines sl
+		left join public.inv_items i on i.id = sl.item_id
+		where sl.sales_id = $1
+		order by sl.line_no`, salesID)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +430,7 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 			&ln.Qty, &ln.ReturnedQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal,
 			&ln.DiscountAmount, &ln.DiscountedUnitNonVat, &ln.DiscountedUnitVatInc,
-			&ln.Remark, &ln.SerialLotNo, &ln.SourceSalesOrderLineID); err != nil {
+			&ln.Remark, &ln.SerialLotNo, &ln.SourceSalesOrderLineID, &ln.TrackSerial, &ln.SerialUnitIDs); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)

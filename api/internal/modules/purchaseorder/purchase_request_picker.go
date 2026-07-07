@@ -43,8 +43,10 @@ type openPurchaseRequestSlipLine struct {
 	InputBasis            string  `json:"input_basis"`
 	UnitPrice             float64 `json:"unit_price"`
 	UnitNonVat            float64 `json:"unit_non_vat"`
-	UnitVatInc            float64 `json:"unit_vat_inc"`
-	Remark                *string `json:"remark,omitempty"`
+	UnitVatInc            float64  `json:"unit_vat_inc"`
+	Remark                *string  `json:"remark,omitempty"`
+	TrackSerial           bool     `json:"track_serial,omitempty"`
+	PlannedSerialNos      []string `json:"planned_serial_nos,omitempty"`
 }
 
 // listOpenPurchaseRequestSlipLines lists residual lines across all Purchase Requests
@@ -90,10 +92,13 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  (ln.qty - coalesce(sl.slipped, 0))::float8,
 			  coalesce(nullif(ln.input_basis, ''), 'vat_inc_unit'),
 			  ln.unit_non_vat::float8, ln.unit_vat_inc::float8, ln.remark,
+			  coalesce(i.track_serial, false),
+			  coalesce(ln.planned_serial_nos, '{}'),
 			  count(*) over()
 			from public.pr_purchase_requests pr
 			join public.inv_locations l on l.id = pr.location_id
 			join public.pr_purchase_request_lines ln on ln.purchase_request_id = pr.id
+			left join public.inv_items i on i.id = ln.item_id
 			left join (
 			  select purchase_request_line_id, sum(qty) as slipped
 			  from public.pr_purchase_request_slip_lines
@@ -123,7 +128,7 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.PartnerID, &row.PartnerCode, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Description,
 				&row.Qty, &row.BalanceQty, &row.InputBasis,
-				&row.UnitNonVat, &row.UnitVatInc, &row.Remark, &total,
+				&row.UnitNonVat, &row.UnitVatInc, &row.Remark, &row.TrackSerial, &row.PlannedSerialNos, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read purchase request lines.", "ERR_INTERNAL")
 				return

@@ -1044,10 +1044,12 @@ type openSalesOrderSlipLine struct {
 	ItemCode         string  `json:"item_code"`
 	ItemName         string  `json:"item_name"`
 	Description      *string `json:"description,omitempty"`
-	Qty              float64 `json:"qty"`
-	BalanceQty       float64 `json:"balance_qty"`
-	UnitVatInc       float64 `json:"unit_vat_inc"`
-	Remark           *string `json:"remark,omitempty"`
+	Qty              float64  `json:"qty"`
+	BalanceQty       float64  `json:"balance_qty"`
+	UnitVatInc       float64  `json:"unit_vat_inc"`
+	Remark           *string  `json:"remark,omitempty"`
+	TrackSerial      bool     `json:"track_serial,omitempty"`
+	PlannedSerialNos []string `json:"planned_serial_nos,omitempty"`
 }
 
 // listOpenSalesOrderSlipLines lists residual lines across all Sales Orders for the
@@ -1096,11 +1098,14 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  ln.qty::float8,
 			  (ln.qty - coalesce(req.requested, 0))::float8,
 			  ln.unit_vat_inc::float8, ln.remark,
+			  coalesce(i.track_serial, false),
+			  coalesce(ln.planned_serial_nos, '{}'),
 			  count(*) over()
 			from public.so_sales_orders so
 			join public.inv_partners pt on pt.id = so.partner_id
 			join public.inv_locations l on l.id = so.location_id
 			join public.so_sales_order_lines ln on ln.sales_order_id = so.id
+			left join public.inv_items i on i.id = ln.item_id
 			left join (
 			  select source_sales_order_line_id, sum(qty) as requested
 			  from public.pr_purchase_request_lines
@@ -1130,7 +1135,7 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
-				&row.Qty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &total,
+				&row.Qty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &row.TrackSerial, &row.PlannedSerialNos, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
 				return

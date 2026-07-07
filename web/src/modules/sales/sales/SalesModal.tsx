@@ -79,6 +79,8 @@ export type SalesDetail = {
     discount_amount?: number;
     remark?: string | null;
     serial_lot_no?: string | null;
+    serial_unit_ids?: number[];
+    track_serial?: boolean;
     source_sales_order_line_id?: number | null;
   }>;
 };
@@ -157,6 +159,8 @@ function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
     discount_amount: String(ln.discount_amount ?? 0),
     remark: ln.remark ?? "",
     serial_lot_no: ln.serial_lot_no ?? "",
+    serial_unit_ids: ln.serial_unit_ids ?? [],
+    track_serial: Boolean(ln.track_serial),
     source_sales_order_line_id: ln.source_sales_order_line_id ?? null,
   }));
 }
@@ -374,6 +378,7 @@ export function SalesModal(props: Props) {
       unit_price: String(row.unit_vat_inc),
       remark: row.remark ?? "",
       source_sales_order_line_id: row.source_sales_order_line_id,
+      track_serial: Boolean(row.track_serial),
     }));
     if (meta && first.tax_type_id) {
       const recalc = await recalculateSalesLines(newLines, first.tax_type_id, meta, templateCode());

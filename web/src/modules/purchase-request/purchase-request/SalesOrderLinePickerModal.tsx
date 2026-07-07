@@ -23,6 +23,8 @@ export type OpenSalesOrderLineRow = {
   balance_qty: number;
   unit_vat_inc: number;
   remark?: string | null;
+  track_serial?: boolean;
+  planned_serial_nos?: string[];
 };
 
 export type PickedSalesOrderLine = OpenSalesOrderLineRow & {

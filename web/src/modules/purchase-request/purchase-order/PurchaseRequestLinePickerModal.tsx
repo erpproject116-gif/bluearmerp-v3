@@ -28,6 +28,8 @@ export type OpenPurchaseRequestLineRow = {
   unit_non_vat: number;
   unit_vat_inc: number;
   remark?: string | null;
+  track_serial?: boolean;
+  planned_serial_nos?: string[];
 };
 
 export type PickedPurchaseRequestLine = OpenPurchaseRequestLineRow & {
