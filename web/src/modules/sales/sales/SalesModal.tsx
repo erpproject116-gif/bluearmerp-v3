@@ -7,7 +7,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ENTITY } from "../../../shared/entityTypes";
-import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
@@ -16,6 +16,7 @@ import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
@@ -32,6 +33,8 @@ import {
   type SalesLineRow,
   type SalesTemplateCode,
 } from "./SalesLineGrid";
+import { CashInFromCustomerModal } from "./CashInFromCustomerModal";
+import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
 
 export type SalesDetail = {
   id: number;
@@ -171,6 +174,10 @@ export function SalesModal(props: Props) {
   const { fields } = useFormFieldSettings(SALES_ENTITY.sales);
   const [saving, setSaving] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [createdSale, setCreatedSale] = createSignal<SalesDetail | null>(null);
+  const [postSaveOpen, setPostSaveOpen] = createSignal(false);
+  const [cashInOpen, setCashInOpen] = createSignal(false);
+  const effectiveEditing = () => props.editing ?? createdSale();
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
   const [historyOpen, setHistoryOpen] = createSignal(false);
@@ -298,7 +305,12 @@ export function SalesModal(props: Props) {
   };
 
   createEffect(() => {
-    if (!props.open) return;
+    if (!props.open) {
+      setCreatedSale(null);
+      setPostSaveOpen(false);
+      setCashInOpen(false);
+      return;
+    }
     void loadLookups();
     const ed = props.editing;
     if (ed) {
@@ -455,21 +467,30 @@ export function SalesModal(props: Props) {
 
     setSaving(true);
     const ed = props.editing;
-    const ok = await submitEntity(
-      () =>
-        ed
-          ? apiFetch(`/api/v1/sales/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
-          : apiFetch("/api/v1/sales", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
-      toast,
-      ed ? "Sales updated." : "Sales created.",
-    );
+    const res = await (ed
+      ? apiFetch<SalesDetail>(`/api/v1/sales/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+      : apiFetch<SalesDetail>("/api/v1/sales", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
-    if (!ok) return;
+    if (!res.success || !res.data) {
+      handleSaveResult(res, toast, ed ? "Sales updated." : "Sales created.");
+      return;
+    }
+    toast.success(ed ? "Sales updated." : "Sales created.");
     if (ed?.id) {
       invalidateRecordHistory(queryClient, "sa_sales", ed.id);
     }
     await draft.clearOnSave();
     props.onSaved();
+    if (ed) {
+      props.onClose();
+      return;
+    }
+    setCreatedSale(res.data);
+    setPostSaveOpen(true);
+  };
+
+  const finishPostSave = () => {
+    setPostSaveOpen(false);
     props.onClose();
   };
 
@@ -477,15 +498,15 @@ export function SalesModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={props.editing ? "Edit Sale (actual sale)" : "New Sale (actual sale)"}
+        title={effectiveEditing() ? "Edit Sale (actual sale)" : "New Sale (actual sale)"}
         onClose={() => props.onClose()}
         onSave={activeTab() === "details" ? () => void save() : undefined}
         saving={saving()}
-        tabs={props.editing ? [{ id: "details", label: "Details" }, { id: "invoice", label: "Invoice" }] : undefined}
+        tabs={effectiveEditing() ? [{ id: "details", label: "Details" }, { id: "invoice", label: "Invoice" }] : undefined}
         activeTab={activeTab()}
         onTabChange={(id) => setActiveTab(id as "details" | "invoice")}
         headerActions={
-          <Show when={props.editing}>
+          <Show when={effectiveEditing()}>
             <button
               type="button"
               class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
@@ -499,9 +520,9 @@ export function SalesModal(props: Props) {
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
             kind="sales"
-            docId={props.editing?.id}
+            docId={effectiveEditing()?.id}
             attachmentsScope="sales"
-            onPrint={() => props.editing && window.open(`/app/sales/sales/${props.editing.id}/invoice/print`, "_blank", "noopener,noreferrer")}
+            onPrint={() => effectiveEditing() && window.open(`/app/sales/sales/${effectiveEditing()!.id}/invoice/print`, "_blank", "noopener,noreferrer")}
           />
         </Show>
         <Show when={activeTab() === "details"}>
@@ -658,13 +679,13 @@ export function SalesModal(props: Props) {
         </Show>
         </div>
         <div class="col-span-full mb-2">
-          <button
-            type="button"
-            class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
-            onClick={() => setSoPickerOpen(true)}
-          >
-            Load Slip (from Sales Order)
-          </button>
+          <LoadSlipMenu
+            disabled={!partnerId()}
+            options={SALES_LOAD_SLIP_OPTIONS}
+            onSelect={(id) => {
+              if (id === "so") setSoPickerOpen(true);
+            }}
+          />
         </div>
         <SalesLineGrid
           lines={lines}
@@ -678,13 +699,13 @@ export function SalesModal(props: Props) {
           templateCode={templateCode}
           partnerId={partnerId}
         />
-        <Show when={props.editing?.id}>
+        <Show when={effectiveEditing()?.id}>
           <SalesApprovalPanel
-            salesId={props.editing!.id}
+            salesId={effectiveEditing()!.id}
             progressStatus={progressStatus()}
             onChanged={() => {
               void (async () => {
-                const res = await apiFetch<SalesDetail>(`/api/v1/sales/${props.editing!.id}`);
+                const res = await apiFetch<SalesDetail>(`/api/v1/sales/${effectiveEditing()!.id}`);
                 if (res.success && res.data) {
                   setProgressStatus(res.data.progress_status);
                   props.onSaved();
@@ -693,7 +714,7 @@ export function SalesModal(props: Props) {
             }}
           />
         </Show>
-        <ChangeLogPanel targetType="sa_sales" targetId={props.editing?.id} />
+        <ChangeLogPanel targetType="sa_sales" targetId={effectiveEditing()?.id} />
         </Show>
       </WideEntityModal>
 
@@ -701,9 +722,43 @@ export function SalesModal(props: Props) {
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         targetType="sa_sales"
-        targetId={props.editing?.id}
-        title={props.editing ? `History — Sale ${props.editing.sales_no}` : "History"}
+        targetId={effectiveEditing()?.id}
+        title={effectiveEditing() ? `History — Sale ${effectiveEditing()!.sales_no}` : "History"}
       />
+
+      <SalesPostSaveDialog
+        open={postSaveOpen()}
+        salesNo={createdSale()?.sales_no ?? ""}
+        amount={createdSale()?.grand_total ?? 0}
+        onCashIn={() => {
+          setPostSaveOpen(false);
+          setCashInOpen(true);
+        }}
+        onAccounting={() => {
+          setPostSaveOpen(false);
+          setActiveTab("invoice");
+        }}
+        onDone={finishPostSave}
+      />
+
+      <Show when={createdSale()}>
+        {(sale) => (
+          <CashInFromCustomerModal
+            open={cashInOpen()}
+            salesId={sale().id}
+            partnerId={sale().partner_id}
+            currencyId={sale().currency_id}
+            amount={sale().grand_total}
+            salesNo={sale().sales_no}
+            receiptDate={sale().order_date}
+            onClose={() => {
+              setCashInOpen(false);
+              finishPostSave();
+            }}
+            onSaved={() => props.onSaved()}
+          />
+        )}
+      </Show>
 
       <SalesOrderLinePickerModal
         open={soPickerOpen()}

@@ -34,6 +34,7 @@ export type PurchaseRequestLineRow = {
   source_sales_order_line_id?: number | null;
   purchase_request_line_id?: number | null;
   goods_receipt_line_id?: number | null;
+  purchase_order_line_id?: number | null;
   track_serial?: boolean;
   planned_serial_nos?: string[];
 };

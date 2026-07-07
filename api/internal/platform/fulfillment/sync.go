@@ -23,15 +23,15 @@ func SyncSOLineQty(ctx context.Context, tx pgx.Tx, salesOrderLineID int64) error
 	return err
 }
 
-// SyncPOLineBilledQty updates billed_qty from GR supplier-invoice slips.
+// SyncPOLineBilledQty updates billed_qty from supplier invoice lines.
 func SyncPOLineBilledQty(ctx context.Context, tx pgx.Tx, purchaseOrderLineID int64) error {
 	_, err := tx.Exec(ctx, `
 		update public.po_purchase_order_lines pol
 		set billed_qty = coalesce((
-		  select sum(gs.qty)
-		  from public.gr_goods_receipt_slip_lines gs
-		  join public.gr_goods_receipt_lines grl on grl.id = gs.goods_receipt_line_id
-		  where grl.purchase_order_line_id = pol.id and gs.slip_type = 'supplier_invoice'
+		  select sum(sil.qty)
+		  from public.fin_supplier_invoice_lines sil
+		  join public.fin_supplier_invoices si on si.id = sil.supplier_invoice_id and si.deleted_at is null
+		  where sil.purchase_order_line_id = pol.id
 		), 0)
 		where pol.id = $1`, purchaseOrderLineID)
 	return err

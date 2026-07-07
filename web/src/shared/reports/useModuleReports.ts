@@ -411,6 +411,59 @@ export function useArApStatusReport(params: () => ReportParams<ArApStatusFilters
   });
 }
 
+// --- Acct vs Inventory reconciliation ---
+
+export type AcctInventoryReconSummary = {
+  acct_closing_balance: number;
+  inv_closing_valuation: number;
+  closing_difference: number;
+  acct_period_net: number;
+  inv_period_net: number;
+  period_difference: number;
+};
+
+export type AcctInventoryReconAccountRow = {
+  account_code: string;
+  account_name: string;
+  period_debit: number;
+  period_credit: number;
+  period_net: number;
+  closing_balance: number;
+};
+
+export type AcctInventoryReconPayload = {
+  summary: AcctInventoryReconSummary;
+  accounts: AcctInventoryReconAccountRow[];
+};
+
+export function acctInventoryReconExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/finance/reports/acct-inventory-reconciliation/export", filters);
+}
+
+export function useAcctInventoryReconciliationReport(params: () => { filters: DateRangeFilters; enabled: boolean }) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string | number>, {
+      page: 1,
+      pageSize: 1,
+      sort: "",
+      order: "asc",
+    });
+    return {
+      queryKey: ["report-acct-inventory-recon", p.filters],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<AcctInventoryReconPayload>(
+          `/api/v1/finance/reports/acct-inventory-reconciliation?${qs}`,
+        );
+        if (!res.success || !res.data) throw new Error(res.message ?? "Failed to load reconciliation");
+        return res.data;
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
 // --- Trial Balance ---
 
 export type TrialBalanceRow = {

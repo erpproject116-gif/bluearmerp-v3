@@ -17,6 +17,7 @@ import type { SalesTemplateCode } from "../../sales/sales/SalesLineGrid";
 const reportLinks = [
   { label: "A/R by Customer", href: "/app/sales/reports/ar-by-customer" },
   { label: "Receipt Status", href: "/app/finance/reports/receipt-status" },
+  { label: "Receivable Status", href: "/app/selling/reports/receivable-status" },
   { label: "SO Analysis", href: "/app/sales-order/reports/so-analysis" },
 ];
 

@@ -15,6 +15,8 @@ type ProcessPolicy = {
   sales_enforce_credit_limit: boolean;
   accounts_auto_post_or: boolean;
   accounts_auto_post_pv: boolean;
+  accounts_auto_post_sales: boolean;
+  accounts_auto_post_purchase: boolean;
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
@@ -84,6 +86,16 @@ const BOOLEAN_FIELDS: PolicyField[] = [
     key: "accounts_auto_post_pv",
     label: "Auto-post payment vouchers to journal",
     help: "When on, supplier payment vouchers create posted journal entries.",
+  },
+  {
+    key: "accounts_auto_post_sales",
+    label: "Auto-post sales invoice journal",
+    help: "When on, saving the sales Invoice tab posts the A/R journal entry immediately.",
+  },
+  {
+    key: "accounts_auto_post_purchase",
+    label: "Auto-post purchase invoice journal",
+    help: "When on, saving the purchase Invoice tab posts the A/P journal entry immediately.",
   },
   {
     key: "sales_require_so_approval",

@@ -12,11 +12,13 @@ import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { ProgressStatusMenu } from "../../sales/sales/ProgressStatusMenu";
-import type { OpenGRLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
+import type { OpenGRLine, OpenPOLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
 import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
+import { OpenPOLinePickerModal } from "./OpenPOLinePickerModal";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -103,6 +105,7 @@ function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseReques
     line_total: String(ln.line_total ?? 0),
     remark: ln.remark ?? "",
     goods_receipt_line_id: ln.goods_receipt_line_id ?? null,
+    purchase_order_line_id: ln.purchase_order_line_id ?? null,
     track_serial: Boolean(ln.track_serial),
     planned_serial_nos: [],
   }));
@@ -113,6 +116,7 @@ export function SupplierInvoiceModal(props: Props) {
   const toast = useToast();
   const [saving, setSaving] = createSignal(false);
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
+  const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
   const [invoiceDate, setInvoiceDate] = createSignal(todayISO());
@@ -255,6 +259,29 @@ export function SupplierInvoiceModal(props: Props) {
     }
   };
 
+  const applyPOLines = async (picked: OpenPOLine[]) => {
+    if (picked.length === 0) return;
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const start = lines().length;
+    const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
+      ...emptyPurchaseRequestLine(start + i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      purchase_order_line_id: row.purchase_order_line_id,
+      track_serial: row.track_serial,
+    }));
+    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...newLines].map((ln, i) => ({ ...ln, line_no: i + 1 }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculatePurchaseRequestLines(merged.length ? merged : newLines, taxTypeId()!, meta));
+    } else {
+      setLines(merged.length ? merged : newLines);
+    }
+  };
+
   const save = async () => {
     if (!taxTypeId()) {
       toast.warning("Please select a transaction type.");
@@ -291,10 +318,11 @@ export function SupplierInvoiceModal(props: Props) {
       notes: notes() || null,
       progress_status: progressStatus(),
       lines: lines()
-        .filter((ln) => ln.item_id || ln.item_code || ln.goods_receipt_line_id)
+        .filter((ln) => ln.item_id || ln.item_code || ln.goods_receipt_line_id || ln.purchase_order_line_id)
         .map((ln, i) => ({
           line_no: i + 1,
           goods_receipt_line_id: ln.goods_receipt_line_id ?? null,
+          purchase_order_line_id: ln.purchase_order_line_id ?? null,
           item_id: ln.item_id || null,
           item_code: ln.item_code,
           item_name: ln.item_name,
@@ -507,14 +535,14 @@ export function SupplierInvoiceModal(props: Props) {
             </Show>
           </div>
           <div class="col-span-full mb-2 mt-2">
-            <button
-              type="button"
-              class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50 disabled:opacity-50"
+            <LoadSlipMenu
               disabled={!partnerId()}
-              onClick={() => setGrPickerOpen(true)}
-            >
-              Load Slip (from Receiving)
-            </button>
+              options={PURCHASE_LOAD_SLIP_OPTIONS}
+              onSelect={(id) => {
+                if (id === "po") setPoPickerOpen(true);
+                if (id === "gr") setGrPickerOpen(true);
+              }}
+            />
           </div>
           <PurchaseRequestLineGrid
             lines={lines}
@@ -544,6 +572,13 @@ export function SupplierInvoiceModal(props: Props) {
         partnerId={partnerId()}
         onClose={() => setGrPickerOpen(false)}
         onConfirm={(picked) => void applyGRLines(picked)}
+      />
+
+      <OpenPOLinePickerModal
+        open={poPickerOpen()}
+        partnerId={partnerId()}
+        onClose={() => setPoPickerOpen(false)}
+        onConfirm={(picked) => void applyPOLines(picked)}
       />
 
       <HistoryLogModal

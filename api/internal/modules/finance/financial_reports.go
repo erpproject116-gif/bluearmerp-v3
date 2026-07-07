@@ -72,6 +72,8 @@ func registerFinancialReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 		rr.Get("/profit-and-loss", listProfitAndLoss(pool))
 		rr.Get("/balance-sheet/export", exportBalanceSheet(pool))
 		rr.Get("/balance-sheet", listBalanceSheet(pool))
+		rr.Get("/acct-inventory-reconciliation/export", exportAcctInventoryReconciliation(pool))
+		rr.Get("/acct-inventory-reconciliation", listAcctInventoryReconciliation(pool))
 	})
 }
 

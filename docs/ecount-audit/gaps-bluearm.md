@@ -8,13 +8,13 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 |-----|-----------------|-------------|--------|
 | Supplier invoices showed full Accounts header | Purchases/review under Inv. I **Purchases** tab (C000031), not Acct. I | `ReviewPurchasesHeaderNav` + `resolveModule` override | **Done** |
 | Sidebar label | Purchases review area | Renamed to **Review Purchases** in Buying group | **Done** |
-| List status filter pills | Purchase List: All / e-Approval / Unconfirmed / Confirm | Payment status filter done; doc-status pills + list template tabs 1–6 pending |
+| List status filter pills | Purchase List: All / e-Approval / Unconfirmed / Confirm | Payment status filter done; doc-status pills on Purchases list | **Done** (`DOC_PROGRESS_STATUS_TABS`) |
 
 ## Tab pill parity (cross-cutting)
 
 | Gap | ECount | Bluearm target |
 |-----|--------|----------------|
-| Form split across 7 pills | Item New form: Default/Qty/Price/Cost/Additional/Management | Item modal — use tab panels not one long form |
+| Form split across 7 pills | Item New form: Default/Qty/Price/Cost/Additional/Management | Item modal — use tab panels not one long form | Partial — 3 tabs on item modal |
 | Option filter pills mirror form | Same 7 sections in search Option | Advanced search drawer with sections |
 | Module L0 tabs switch menu tree | Setup vs Purchases vs Sales | Already similar; ensure each tab's programs cataloged |
 | Safety stock per document type | Qty pill — 7 doc types | Extend reorder / safety stock model |
@@ -25,7 +25,8 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Gap | ECount | Bluearm target |
 |-----|--------|----------------|
 | Advanced item search | 7-section Option filter with 50+ fields | Extend item list filters + saved views |
-| Multi price levels | VIP + Price B–J + O/E | Price lists + default prices on item |
+| Multi price levels | VIP + Price B–J + O/E | Price lists + default prices on item | Partial — VIP + price lists; item **Qty/Price** tab |
+| Item modal tabs | 7-section ECount form | Tab panels on item modal | Partial — Default / Qty·Price / Management tabs |
 | Item categories | 6 manufacturing/merchandise categories | Item type / category enum |
 | Bundle & service items | Naming + bundle status column | Product bundles module |
 | Barcode from list toolbar | Barcode button | Item barcode + POS scan |
@@ -35,10 +36,16 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 
 ## P1 — Buying / Review Purchases
 
-| Gap | ECount | Bluearm target |
-|-----|--------|----------------|
-| Purchase review header | Purchases tab under Inv. I | Review Purchases nav (done) |
-| GR → invoice → payment chain | Integrated under Purchases | PO → GR → supplier invoice → PV |
+| Gap | ECount | Bluearm target | Status |
+|-----|--------|----------------|--------|
+| Purchase review header | Purchases tab under Inv. I | Review Purchases nav | **Done** |
+| GR → invoice → payment chain | Integrated under Purchases | PO → GR → supplier invoice → PV | Partial |
+| Purchases module (peer to Sales) | New Purchases `E040303` under Inv. I Purchases | `/app/purchases` + `SupplierInvoiceModal` parity | **Done** (migration 133) |
+| Load Slip from Receiving | GR line picker on New Purchases | `OpenGRLinePickerModal` + `GET .../open-gr-lines` | **Done** |
+| Load Slip from Purchase Order | PO line picker (direct bill without GR) | `OpenPOLinePickerModal` + `GET .../open-po-lines` + `billed_qty` sync | **Done** |
+| Load Slip slip-type menu | ECount multi-type picker (21 slip types) | `LoadSlipMenu` on Sales/Purchases | Partial — PO/GR/SO enabled; others catalogued |
+| Bulk serial barcode scan | Scan many serials into lines | `POST .../resolve-scan/batch` + `ScannedSerialTable` | **Done** |
+| Live list refresh (no manual F5) | Real-time slip updates | Query invalidation + 30s polling | **Done** (not WebSocket) |
 
 ## P1 — Sales (E040205 / C000030)
 
@@ -46,9 +53,9 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 |-----|--------|----------------|
 | Sales list status pills | All / e-Approval / Unconfirmed / Confirm | **Done** — list filter + submit/approve/reject (migration 128) |
 | New Sales Hold | Line-level stock hold | Reservation/hold model |
-| SO pull on invoice | Sales Order toolbar | SO → sales line picker |
-| Cash In on save | Inline receipt modal (Cash In - From Customer) | Receipt vouchers |
-| Link with Accounting Vouchers | E010301 accounting block + confirm dialog | GL posting panel on sales save |
+| Cash In on save | Inline receipt modal (Cash In - From Customer) | Receipt vouchers | **Done** — post-save dialog + `CashInFromCustomerModal` |
+| Link with Accounting Vouchers | E010301 accounting block + confirm dialog | GL posting panel on sales save | **Done** — Invoice tab + post-save prompt; auto-post via process policies |
+| SO pull on invoice | Sales Order toolbar | SO → sales line picker | **Done** — Load Slip → Sales Order |
 | Create Shipping Order from line | Shipping integration | Shipping module |
 
 ## P1 — Serial/Lot (Inv. II — pass 17)
@@ -91,7 +98,7 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Receipt Status | Dept/PIC dimensional receipt inquiry | Receipt voucher list — add dimensions |
 | Quotation Status | Status/Summary + Reference No. + Mgmt Field | Quote analytics — **crawled pass 6** |
 | Sales Order Status | Delivery Date by Item + SO No. filter | SO fulfillment reporting — **crawled pass 6** |
-| Receivable Status | As-of open receivable (Inv. I `E040721`) | AR aging uses period range only — **crawled pass 6** |
+| Receivable Status | As-of open receivable (Inv. I `E040721`) | AR aging uses period range only — **crawled pass 6** | **Done** — `/app/selling/reports/receivable-status` |
 | Outstanding Quote/S/O backlog | As-of + outstanding qty filters | Open quote/SO reports — **crawled pass 7** |
 | Shipment Status | Status/Summary + line inquiry | Shipping module reports partial — **crawled pass 7** |
 | Pending Shipment + Shipping Order Status | As-of backlog + SO line inquiry | Shipping trio — **crawled pass 8** |
@@ -107,7 +114,7 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | A/P by Vendor | Inv. vs Acct. purchase + payment roll-forward | AP aging by vendor — extend with purchase source split |
 | Purchase Order Status | PO line inquiry mirror of SO | `/app/buying/reports` — **crawled pass 7** |
 | Outstanding P/O + Payment Status | Open PO backlog + payment inquiry | PO fulfillment + PV list dimensions — **crawled pass 7** |
-| Payable Status | As-of open payable (`E040722`) mirror of Receivable | AP aging uses period range only — **crawled pass 8** |
+| Payable Status | As-of open payable (`E040722`) mirror of Receivable | AP aging uses period range only — **crawled pass 8** | **Done** — `/app/buying/reports/payable-status` |
 | Purchase Discount + Pre-Invoicing + PR/Plan Status | Buying analytics subtree | **crawled pass 9** |
 | Customer/Vendor Book I (AP) | AP sub-ledger statement | **crawled pass 9** |
 | Purchase Invoice Status (Inv.) + Monthly Payable Fluctuation | Tax slip + AP fluctuation | **crawled pass 10** |
@@ -176,7 +183,7 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 |-----|--------|----------------|
 | Voucher status inquiry | E010847 (title Voucher Status) | GL voucher analytics — **crawled pass 16** |
 | Batch voucher print | E010702 Print Voucher | Voucher print queue — **crawled pass 16** |
-| Acct vs Inv reconciliation | E010730 | Accounting vs inventory — **crawled pass 16** |
+| Acct vs Inv reconciliation | E010730 | Accounting vs inventory — **crawled pass 16** | **Done** — GL vs stock valuation at `/app/finance/reports/acct-inventory-reconciliation` |
 | Acct. change history | E010712 Change History (Acct.) | Voucher audit — **crawled pass 16** |
 | GL balance rebuild | E010705 Update Balance | Period close job — **crawled pass 16** |
 | All-In-One (Acct. path) | E040627 menuSeq 001352 | Partner cockpit — **crawled pass 16** |
@@ -218,7 +225,7 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 - Inv. I Production reports (pass 12): `E040413` · `E040414` · `E040409` · `E040410` — see `inv1-reports-production.md`
 - Inv. I Inv. Movement reports (pass 12): `E040505` · `E040506` · `E040509` — **No Authorization**; `E040615` · `E040608` catalog only — see `inv1-reports-inv-movement.md`
 - Acct. I invoice status (pass 11): Sales Invoice Status `N000118` · Purchase Invoice Status `N000126` — require `menuType=MENUTREE_000001`
-- New Purchases `E040303` Load Slip slip-type modal — **pass 5 done**; PO line-picker — **pass 8 done**
+- New Purchases `E040303` Load Slip slip-type modal — **pass 5 done**; PO line-picker — **pass 8 done**; **Bluearm PO + GR line pickers implemented**
 - Online Store setup `E041003`/`E041004` — pass 2 done (`C000654-online-store.md`); E041004 blocked until store registered
 - Cash Flow **Enter** line grid + Apply Formula — pass 4 done
 - Ledger IV `E010856` · Sales/Purchase Book `N000122` — empty render in tenant (verify license)

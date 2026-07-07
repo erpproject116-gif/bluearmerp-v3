@@ -73,9 +73,10 @@ type SupplierInvoice struct {
 }
 
 type supplierInvoiceLineBody struct {
-	LineNo             int     `json:"line_no"`
-	GoodsReceiptLineID *int64  `json:"goods_receipt_line_id"`
-	ItemID             *int64  `json:"item_id"`
+	LineNo              int     `json:"line_no"`
+	GoodsReceiptLineID  *int64  `json:"goods_receipt_line_id"`
+	PurchaseOrderLineID *int64  `json:"purchase_order_line_id"`
+	ItemID              *int64  `json:"item_id"`
 	ItemCode           string  `json:"item_code"`
 	ItemName           string  `json:"item_name"`
 	Description        *string `json:"description"`
@@ -110,6 +111,81 @@ type supplierInvoiceBody struct {
 	Lines           []supplierInvoiceLineBody `json:"lines"`
 }
 
+type openPOLineRow struct {
+	PurchaseOrderLineID int64   `json:"purchase_order_line_id"`
+	PurchaseOrderID     int64   `json:"purchase_order_id"`
+	PurchaseOrderNo     string  `json:"purchase_order_no"`
+	ItemID              int64   `json:"item_id"`
+	ItemCode            string  `json:"item_code"`
+	ItemName            string  `json:"item_name"`
+	OrderedQty          float64 `json:"ordered_qty"`
+	BilledQty           float64 `json:"billed_qty"`
+	BalanceQty          float64 `json:"balance_qty"`
+	UnitNonVat          float64 `json:"unit_non_vat"`
+	UnitVatInc          float64 `json:"unit_vat_inc"`
+	TrackSerial         bool    `json:"track_serial,omitempty"`
+}
+
+func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		where := `po.tenant_id = $1 and po.deleted_at is null
+			and po.status in ('confirmed', 'partially_received', 'received')`
+		args := []any{tu.TenantID}
+		argN := 2
+		if pid, ok := optionalInt64Query(r, "partner_id"); ok {
+			where += fmt.Sprintf(" and po.partner_id = $%d", argN)
+			args = append(args, *pid)
+			argN++
+		}
+		if poid, ok := optionalInt64Query(r, "purchase_order_id"); ok {
+			where += fmt.Sprintf(" and po.id = $%d", argN)
+			args = append(args, *poid)
+			argN++
+		}
+
+		q := fmt.Sprintf(`
+			select pol.id, po.id, po.purchase_order_no,
+			  pol.item_id, pol.item_code, pol.item_name,
+			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
+			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
+			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8,
+			  coalesce(i.track_serial, false)
+			from public.po_purchase_order_lines pol
+			join public.po_purchase_orders po on po.id = pol.purchase_order_id
+			left join public.inv_items i on i.id = pol.item_id
+			where %s
+			  and (pol.qty - coalesce(pol.billed_qty, 0)) > 0.0001
+			order by po.order_date desc, pol.line_no`, where)
+
+		rows, err := pool.Query(r.Context(), q, args...)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list open PO lines.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		var out []openPOLineRow
+		for rows.Next() {
+			var row openPOLineRow
+			if err := rows.Scan(
+				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo,
+				&row.ItemID, &row.ItemCode, &row.ItemName,
+				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
+				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read PO lines.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, row)
+		}
+		if out == nil {
+			out = []openPOLineRow{}
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
 type openGRLineRow struct {
 	GoodsReceiptLineID  int64   `json:"goods_receipt_line_id"`
 	GoodsReceiptID      int64   `json:"goods_receipt_id"`
@@ -128,6 +204,7 @@ type openGRLineRow struct {
 func registerSupplierInvoiceRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/supplier-invoices/preview-sequences", previewSupplierInvoiceSequences(pool))
 	r.Get("/supplier-invoices/open-gr-lines", listOpenGRLines(pool))
+	r.Get("/supplier-invoices/open-po-lines", listOpenPOLines(pool))
 	r.Get("/supplier-invoices", listSupplierInvoices(pool))
 	r.Post("/supplier-invoices", createSupplierInvoice(pool))
 	r.Get("/supplier-invoices/{id}/invoice", getPurchaseInvoice(pool))
@@ -459,6 +536,22 @@ func grLineBalance(ctx context.Context, tx pgx.Tx, tenantID, grLineID int64) (fl
 	return receivedQty - billed, poLineID, partnerID, nil
 }
 
+func poLineBalance(ctx context.Context, tx pgx.Tx, tenantID, poLineID int64) (float64, int64, error) {
+	var orderedQty, billedQty float64
+	var partnerID int64
+	err := tx.QueryRow(ctx, `
+		select pol.qty::float8, coalesce(pol.billed_qty, 0)::float8, po.partner_id
+		from public.po_purchase_order_lines pol
+		join public.po_purchase_orders po on po.id = pol.purchase_order_id
+		where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null
+		  and po.status in ('confirmed', 'partially_received', 'received')`,
+		poLineID, tenantID).Scan(&orderedQty, &billedQty, &partnerID)
+	if err != nil {
+		return 0, 0, err
+	}
+	return orderedQty - billedQty, partnerID, nil
+}
+
 func validateSupplierInvoiceBody(body supplierInvoiceBody) map[string]string {
 	errs := map[string]string{}
 	if strings.TrimSpace(body.InvoiceDate) == "" {
@@ -487,8 +580,10 @@ func validateSupplierInvoiceBody(body supplierInvoiceBody) map[string]string {
 		if ln.LineTotal <= 0 {
 			errs[key+".line_total"] = "Line total must be greater than zero."
 		}
-		if (ln.GoodsReceiptLineID == nil || *ln.GoodsReceiptLineID <= 0) && (ln.ItemID == nil || *ln.ItemID <= 0) {
-			errs[key+".item_id"] = "Item is required when no goods receipt line is linked."
+		if (ln.GoodsReceiptLineID == nil || *ln.GoodsReceiptLineID <= 0) &&
+			(ln.PurchaseOrderLineID == nil || *ln.PurchaseOrderLineID <= 0) &&
+			(ln.ItemID == nil || *ln.ItemID <= 0) {
+			errs[key+".item_id"] = "Item is required when no source slip line is linked."
 		}
 	}
 	if len(errs) > 0 {
@@ -500,30 +595,51 @@ func validateSupplierInvoiceBody(body supplierInvoiceBody) map[string]string {
 func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, partnerID int64, requireGR bool, lines []supplierInvoiceLineBody) map[string]string {
 	errs := map[string]string{}
 	seenGR := map[int64]bool{}
+	seenPO := map[int64]bool{}
 	for i, ln := range lines {
 		key := fmt.Sprintf("lines[%d]", i)
-		if requireGR && (ln.GoodsReceiptLineID == nil || *ln.GoodsReceiptLineID <= 0) {
-			errs[key+".goods_receipt_line_id"] = "Goods receipt line is required."
+		hasGR := ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0
+		hasPO := ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0
+		if requireGR && !hasGR && !hasPO {
+			errs[key+".goods_receipt_line_id"] = "Goods receipt or purchase order line is required."
 			continue
 		}
-		if ln.GoodsReceiptLineID == nil || *ln.GoodsReceiptLineID <= 0 {
+		if hasGR {
+			if seenGR[*ln.GoodsReceiptLineID] {
+				errs[key+".goods_receipt_line_id"] = "Duplicate goods receipt line."
+				continue
+			}
+			seenGR[*ln.GoodsReceiptLineID] = true
+			balance, _, linePartnerID, err := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
+			if err != nil {
+				errs[key+".goods_receipt_line_id"] = "Goods receipt line not found or not posted."
+				continue
+			}
+			if linePartnerID != partnerID {
+				errs[key+".goods_receipt_line_id"] = "Vendor does not match purchase order."
+			}
+			if ln.Qty > balance+0.0001 {
+				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds GR balance (%.4f).", balance)
+			}
 			continue
 		}
-		if seenGR[*ln.GoodsReceiptLineID] {
-			errs[key+".goods_receipt_line_id"] = "Duplicate goods receipt line."
-			continue
-		}
-		seenGR[*ln.GoodsReceiptLineID] = true
-		balance, _, linePartnerID, err := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
-		if err != nil {
-			errs[key+".goods_receipt_line_id"] = "Goods receipt line not found or not posted."
-			continue
-		}
-		if linePartnerID != partnerID {
-			errs[key+".goods_receipt_line_id"] = "Vendor does not match purchase order."
-		}
-		if ln.Qty > balance+0.0001 {
-			errs[key+".qty"] = fmt.Sprintf("Quantity exceeds GR balance (%.4f).", balance)
+		if hasPO {
+			if seenPO[*ln.PurchaseOrderLineID] {
+				errs[key+".purchase_order_line_id"] = "Duplicate purchase order line."
+				continue
+			}
+			seenPO[*ln.PurchaseOrderLineID] = true
+			balance, linePartnerID, err := poLineBalance(ctx, tx, tenantID, *ln.PurchaseOrderLineID)
+			if err != nil {
+				errs[key+".purchase_order_line_id"] = "Purchase order line not found or not confirmed."
+				continue
+			}
+			if linePartnerID != partnerID {
+				errs[key+".purchase_order_line_id"] = "Vendor does not match purchase order."
+			}
+			if ln.Qty > balance+0.0001 {
+				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds PO balance (%.4f).", balance)
+			}
 		}
 	}
 	if len(errs) > 0 {
@@ -653,6 +769,18 @@ func resolveSupplierInvoiceLineItem(ctx context.Context, tx pgx.Tx, tenantID int
 			from public.po_purchase_order_lines pol where pol.id = $1`, polID).Scan(&itemID, &itemCode, &itemName)
 		return itemID, itemCode, itemName, poLineID, nil
 	}
+	if ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
+		poLineID = ln.PurchaseOrderLineID
+		err := tx.QueryRow(ctx, `
+			select pol.item_id, pol.item_code, pol.item_name
+			from public.po_purchase_order_lines pol
+			join public.po_purchase_orders po on po.id = pol.purchase_order_id
+			where pol.id = $1 and po.tenant_id = $2`, *ln.PurchaseOrderLineID, tenantID).Scan(&itemID, &itemCode, &itemName)
+		if err != nil {
+			return nil, "", "", nil, err
+		}
+		return itemID, itemCode, itemName, poLineID, nil
+	}
 	itemID = ln.ItemID
 	itemCode = strings.TrimSpace(ln.ItemCode)
 	itemName = strings.TrimSpace(ln.ItemName)
@@ -693,9 +821,9 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 			if err != nil {
 				return err
 			}
-			if poLineID != nil {
-				poLinesToSync[*poLineID] = true
-			}
+		}
+		if poLineID != nil {
+			poLinesToSync[*poLineID] = true
 		}
 	}
 	for poLineID := range poLinesToSync {

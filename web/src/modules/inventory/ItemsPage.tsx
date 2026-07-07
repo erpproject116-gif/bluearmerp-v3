@@ -1,4 +1,5 @@
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { DecimalInput } from "../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../shared/money";
@@ -33,6 +34,7 @@ export default function ItemsPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("item_code");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [itemTab, setItemTab] = createSignal<"default" | "prices" | "management">("default");
   const [editing, setEditing] = createSignal<Item | null>(null);
   const [nextCode, setNextCode] = createSignal("");
   const [form, setForm] = createSignal({
@@ -166,7 +168,19 @@ export default function ItemsPage() {
         onImportComplete={() => invalidate("items")}
         settingsHref={INVENTORY_SETTINGS_HREF.items}
       />
-      <EntityModal open={modalOpen()} title={editing() ? "Edit item" : "New item"} onClose={() => setModalOpen(false)} onSave={() => void save()} saving={saving()}>
+      <EntityModal open={modalOpen()} title={editing() ? "Edit item" : "New item"} onClose={() => { setModalOpen(false); setItemTab("default"); }} onSave={() => void save()} saving={saving()}>
+        <div class="col-span-full mb-3 flex flex-wrap gap-2 border-b border-stroke pb-3">
+          {(["default", "prices", "management"] as const).map((tab) => (
+            <button
+              type="button"
+              class={`rounded-lg px-3 py-1.5 text-sm ${itemTab() === tab ? "bg-brand-600 text-white" : "border border-stroke text-text-secondary"}`}
+              onClick={() => setItemTab(tab)}
+            >
+              {tab === "default" ? "Default" : tab === "prices" ? "Qty / Price" : "Management"}
+            </button>
+          ))}
+        </div>
+        <Show when={itemTab() === "default"}>
         <Field label="Item code"><input class={inputClass} value={nextCode()} readOnly /></Field>
         <ModalField settings={byKey} fieldKey="item_name" fallbackLabel="Item name" fallbackRequired>
           {(m) => (
@@ -178,6 +192,8 @@ export default function ItemsPage() {
             />
           )}
         </ModalField>
+        </Show>
+        <Show when={itemTab() === "prices"}>
         <ModalField settings={byKey} fieldKey="purchase_price" fallbackLabel="Purchase price">
           {(m) => (
             <DecimalInput
@@ -208,23 +224,9 @@ export default function ItemsPage() {
             />
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="warranty_duration_months" fallbackLabel="Warranty (months)">
-          {(m) => (
-            <DecimalInput
-              mode="integer"
-              class={inputClass}
-              placeholder="No warranty"
-              disabled={m.disabled}
-              value={form().warranty_duration_months == null ? "" : String(form().warranty_duration_months)}
-              onValue={(v) =>
-                setForm((f) => ({
-                  ...f,
-                  warranty_duration_months: v === "" ? null : parseNum(v),
-                }))
-              }
-            />
-          )}
-        </ModalField>
+        <p class="col-span-full text-xs text-text-secondary">
+          Partner-specific rates use <A href="/app/inventory/price-lists" class="text-brand-600 hover:underline">Price lists</A> assigned on the customer or vendor master.
+        </p>
         <ModalField settings={byKey} fieldKey="reorder_level" fallbackLabel="Reorder level">
           {(m) => (
             <DecimalInput
@@ -237,6 +239,25 @@ export default function ItemsPage() {
                 setForm((f) => ({
                   ...f,
                   reorder_level: v === "" ? null : parseNum(v),
+                }))
+              }
+            />
+          )}
+        </ModalField>
+        </Show>
+        <Show when={itemTab() === "management"}>
+        <ModalField settings={byKey} fieldKey="warranty_duration_months" fallbackLabel="Warranty (months)">
+          {(m) => (
+            <DecimalInput
+              mode="integer"
+              class={inputClass}
+              placeholder="No warranty"
+              disabled={m.disabled}
+              value={form().warranty_duration_months == null ? "" : String(form().warranty_duration_months)}
+              onValue={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  warranty_duration_months: v === "" ? null : parseNum(v),
                 }))
               }
             />
@@ -298,6 +319,7 @@ export default function ItemsPage() {
           )}
         </ModalField>
         <CustomFieldsSection entityType={INVENTORY_ENTITY.items} values={customValues} onChange={setCustom} />
+        </Show>
       </EntityModal>
     </div>
   );

@@ -19,6 +19,7 @@ export type SupplierInvoiceLine = {
   id?: number;
   line_no: number;
   goods_receipt_line_id?: number | null;
+  purchase_order_line_id?: number | null;
   item_id?: number | null;
   item_code?: string;
   item_name?: string;
@@ -64,6 +65,21 @@ export type OpenGRLine = {
   balance_qty: number;
   unit_non_vat: number;
   unit_vat_inc: number;
+};
+
+export type OpenPOLine = {
+  purchase_order_line_id: number;
+  purchase_order_id: number;
+  purchase_order_no: string;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  ordered_qty: number;
+  billed_qty: number;
+  balance_qty: number;
+  unit_non_vat: number;
+  unit_vat_inc: number;
+  track_serial?: boolean;
 };
 
 export function useSupplierInvoiceList(params: () => {

@@ -20,6 +20,7 @@ const tiles: KpiTile[] = [
 
 const reportLinks = [
   { label: "Sales Status", href: "/app/selling/reports" },
+  { label: "Receivable Status", href: "/app/selling/reports/receivable-status" },
   { label: "SO Analysis", href: "/app/sales-order/reports/so-analysis" },
   { label: "Sales Order Status", href: "/app/sales-order/sales-orders/status" },
   { label: "Sales Invoice Status", href: "/app/sales/sales/status" },

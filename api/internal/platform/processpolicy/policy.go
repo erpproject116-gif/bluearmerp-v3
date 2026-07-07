@@ -24,6 +24,8 @@ type Policy struct {
 	SalesEnforceCreditLimit             bool  `json:"sales_enforce_credit_limit"`
 	AccountsAutoPostOR                  bool   `json:"accounts_auto_post_or"`
 	AccountsAutoPostPV                  bool   `json:"accounts_auto_post_pv"`
+	AccountsAutoPostSales               bool   `json:"accounts_auto_post_sales"`
+	AccountsAutoPostPurchase            bool   `json:"accounts_auto_post_purchase"`
 	SalesRequireSOApproval              bool   `json:"sales_require_so_approval"`
 	PurchaseRequirePOApproval           bool   `json:"purchase_require_po_approval"`
 	FinanceRequireJEApproval            bool   `json:"finance_require_je_approval"`
@@ -43,6 +45,8 @@ type Patch struct {
 	SalesEnforceCreditLimit            *bool `json:"sales_enforce_credit_limit,omitempty"`
 	AccountsAutoPostOR                 *bool   `json:"accounts_auto_post_or,omitempty"`
 	AccountsAutoPostPV                 *bool   `json:"accounts_auto_post_pv,omitempty"`
+	AccountsAutoPostSales              *bool   `json:"accounts_auto_post_sales,omitempty"`
+	AccountsAutoPostPurchase           *bool   `json:"accounts_auto_post_purchase,omitempty"`
 	SalesRequireSOApproval             *bool   `json:"sales_require_so_approval,omitempty"`
 	PurchaseRequirePOApproval          *bool   `json:"purchase_require_po_approval,omitempty"`
 	FinanceRequireJEApproval           *bool   `json:"finance_require_je_approval,omitempty"`
@@ -64,6 +68,8 @@ const selectCols = `
   sales_enforce_credit_limit,
   accounts_auto_post_or,
   accounts_auto_post_pv,
+  coalesce(accounts_auto_post_sales, false),
+  coalesce(accounts_auto_post_purchase, false),
   coalesce(sales_require_so_approval, false),
   coalesce(purchase_require_po_approval, false),
   coalesce(finance_require_je_approval, false),
@@ -97,6 +103,8 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, erro
 		&p.SalesEnforceCreditLimit,
 		&p.AccountsAutoPostOR,
 		&p.AccountsAutoPostPV,
+		&p.AccountsAutoPostSales,
+		&p.AccountsAutoPostPurchase,
 		&p.SalesRequireSOApproval,
 		&p.PurchaseRequirePOApproval,
 		&p.FinanceRequireJEApproval,
@@ -146,6 +154,12 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 	if patch.AccountsAutoPostPV != nil {
 		next.AccountsAutoPostPV = *patch.AccountsAutoPostPV
 	}
+	if patch.AccountsAutoPostSales != nil {
+		next.AccountsAutoPostSales = *patch.AccountsAutoPostSales
+	}
+	if patch.AccountsAutoPostPurchase != nil {
+		next.AccountsAutoPostPurchase = *patch.AccountsAutoPostPurchase
+	}
 	if patch.SalesRequireSOApproval != nil {
 		next.SalesRequireSOApproval = *patch.SalesRequireSOApproval
 	}
@@ -177,11 +191,13 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		  sales_enforce_credit_limit = $10,
 		  accounts_auto_post_or = $11,
 		  accounts_auto_post_pv = $12,
-		  sales_require_so_approval = $13,
-		  purchase_require_po_approval = $14,
-		  finance_require_je_approval = $15,
-		  budget_control_mode = $16,
-		  updated_by_user_id = $17,
+		  accounts_auto_post_sales = $13,
+		  accounts_auto_post_purchase = $14,
+		  sales_require_so_approval = $15,
+		  purchase_require_po_approval = $16,
+		  finance_require_je_approval = $17,
+		  budget_control_mode = $18,
+		  updated_by_user_id = $19,
 		  updated_at = now()
 		where tenant_id = $1`,
 		tenantID,
@@ -196,6 +212,8 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		next.SalesEnforceCreditLimit,
 		next.AccountsAutoPostOR,
 		next.AccountsAutoPostPV,
+		next.AccountsAutoPostSales,
+		next.AccountsAutoPostPurchase,
 		next.SalesRequireSOApproval,
 		next.PurchaseRequirePOApproval,
 		next.FinanceRequireJEApproval,
@@ -245,6 +263,8 @@ func LoadTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error) {
 		&p.SalesEnforceCreditLimit,
 		&p.AccountsAutoPostOR,
 		&p.AccountsAutoPostPV,
+		&p.AccountsAutoPostSales,
+		&p.AccountsAutoPostPurchase,
 		&p.SalesRequireSOApproval,
 		&p.PurchaseRequirePOApproval,
 		&p.FinanceRequireJEApproval,

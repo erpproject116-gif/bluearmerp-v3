@@ -124,6 +124,27 @@ func Catalog() []ReportDef {
 			Description: "Combined receivable and payable position as-of date.",
 		},
 		{
+			Key: "receivable_status", Label: "Receivable Status", Module: "selling",
+			APIPath:    "/api/v1/finance/reports/ar-ap-status",
+			ExportPath: "/api/v1/finance/reports/ar-ap-status/export",
+			WebPath:    "/app/selling/reports/receivable-status", Tier: "R5",
+			Description: "Open customer receivable balances as-of date (E040721).",
+		},
+		{
+			Key: "payable_status", Label: "Payable Status", Module: "buying",
+			APIPath:    "/api/v1/finance/reports/ar-ap-status",
+			ExportPath: "/api/v1/finance/reports/ar-ap-status/export",
+			WebPath:    "/app/buying/reports/payable-status", Tier: "R5",
+			Description: "Open vendor payable balances as-of date (E040722).",
+		},
+		{
+			Key: "acct_inventory_reconciliation", Label: "Accounting vs Inventory", Module: "finance",
+			APIPath:    "/api/v1/finance/reports/acct-inventory-reconciliation",
+			ExportPath: "/api/v1/finance/reports/acct-inventory-reconciliation/export",
+			WebPath:    "/app/finance/reports/acct-inventory-reconciliation", Tier: "R5",
+			Description: "Compare inventory GL balances to operational stock valuation.",
+		},
+		{
 			Key: "trial_balance", Label: "Trial Balance", Module: "finance",
 			APIPath:    "/api/v1/finance/reports/trial-balance",
 			ExportPath: "/api/v1/finance/reports/trial-balance/export",

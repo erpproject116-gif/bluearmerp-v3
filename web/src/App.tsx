@@ -199,6 +199,7 @@ import BalanceSheetReportPage from "./modules/finance/reports/BalanceSheetReport
 import ArAgingReportPage from "./modules/finance/reports/ArAgingReportPage";
 import ApAgingReportPage from "./modules/finance/reports/ApAgingReportPage";
 import ArApStatusReportPage from "./modules/finance/reports/ArApStatusReportPage";
+import ReceivableStatusReportPage from "./modules/selling/reports/ReceivableStatusReportPage";
 import AcctInventoryReconciliationPage from "./modules/finance/reports/AcctInventoryReconciliationPage";
 import PaymentEntriesPage from "./modules/finance/PaymentEntriesPage";
 import ChartOfAccountsPage from "./modules/finance/ChartOfAccountsPage";
@@ -207,6 +208,7 @@ import FiscalYearsPage from "./modules/finance/FiscalYearsPage";
 import SellingWorkspacePage from "./modules/selling/SellingWorkspacePage";
 import BuyingWorkspacePage from "./modules/buying/BuyingWorkspacePage";
 import PurchaseStatusPage from "./modules/buying/reports/PurchaseStatusPage";
+import PayableStatusReportPage from "./modules/buying/reports/PayableStatusReportPage";
 import SellingReportsPage from "./modules/selling/reports/SellingReportsPage";
 import FinanceWorkspacePage from "./modules/finance/FinanceWorkspacePage";
 import PortalLoginPage from "./modules/portal/PortalLoginPage";
@@ -364,8 +366,10 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
+          <Route path="/selling/reports/receivable-status" component={ReceivableStatusReportPage} />
           <Route path="/selling/reports" component={SellingReportsPage} />
           <Route path="/selling" component={SellingWorkspacePage} />
+          <Route path="/buying/reports/payable-status" component={PayableStatusReportPage} />
           <Route path="/buying/reports/purchase-status" component={PurchaseStatusPage} />
           <Route path="/buying" component={BuyingWorkspacePage} />
           <Route path="/sales-order/reports/so-analysis" component={SOAnalysisReportPage} />
