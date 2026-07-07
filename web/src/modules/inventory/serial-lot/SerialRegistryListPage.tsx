@@ -6,6 +6,7 @@ import {
   type SerialUnitRow,
 } from "../../../shared/useSerialLotList";
 import { SerialLotLayout } from "./SerialLotLayout";
+import { SerialRegisterModal } from "./SerialRegisterModal";
 import {
   defaultSerialRegistryFilters,
   serialStatusLabel,
@@ -22,6 +23,7 @@ export default function SerialRegistryListPage() {
   const [sort, setSort] = createSignal("created_at");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [registerOpen, setRegisterOpen] = createSignal(false);
   const pageSize = 25;
 
   const list = useSerialUnitList(() => {
@@ -101,11 +103,17 @@ export default function SerialRegistryListPage() {
             total={list.data?.total ?? 0}
             onPageChange={setPage}
             onRefresh={invalidate}
-            onNew={() => {}}
+            onNew={() => setRegisterOpen(true)}
             onEdit={() => {}}
           />
         </div>
       </Show>
+
+      <SerialRegisterModal
+        open={registerOpen()}
+        onClose={() => setRegisterOpen(false)}
+        onSaved={invalidate}
+      />
     </SerialLotLayout>
   );
 }

@@ -40,7 +40,9 @@ type PurchaseRequestLine struct {
 	TaxAmount   float64 `json:"tax_amount"`
 	UnitVatInc  float64 `json:"unit_vat_inc"`
 	LineTotal   float64 `json:"line_total"`
-	Remark      *string `json:"remark,omitempty"`
+	Remark             *string  `json:"remark,omitempty"`
+	PlannedSerialNos   []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial        bool     `json:"track_serial,omitempty"`
 }
 
 type PurchaseRequest struct {
@@ -95,7 +97,8 @@ type purchaseRequestLineBody struct {
 	InputBasis  string  `json:"input_basis"`
 	Remark      *string `json:"remark"`
 
-	SourceSalesOrderLineID *int64 `json:"source_sales_order_line_id"`
+	SourceSalesOrderLineID *int64   `json:"source_sales_order_line_id"`
+	PlannedSerialNos       []string `json:"planned_serial_nos"`
 }
 
 type purchaseRequestBody struct {
@@ -133,6 +136,7 @@ type computedLine struct {
 	Amounts                taxcalc.LineAmounts
 	Remark                 *string
 	SourceSalesOrderLineID *int64
+	PlannedSerialNos       []string
 }
 
 type createdSlipRow struct {
@@ -486,13 +490,16 @@ func loadPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 
 func loadPurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, purchaseRequestID int64) ([]PurchaseRequestLine, error) {
 	rows, err := pool.Query(ctx, `
-		select id, line_no, partner_id, partner_code, partner_name,
-		  item_id, item_code, item_name, spec_name, description,
-		  qty::float8, unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
-		  unit_vat_inc::float8, line_total::float8, remark
-		from public.pr_purchase_request_lines
-		where purchase_request_id = $1
-		order by line_no`, purchaseRequestID)
+		select ln.id, ln.line_no, ln.partner_id, ln.partner_code, ln.partner_name,
+		  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
+		  ln.qty::float8, ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
+		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark,
+		  coalesce(ln.planned_serial_nos, '{}'),
+		  coalesce(i.track_serial, false)
+		from public.pr_purchase_request_lines ln
+		left join public.inv_items i on i.id = ln.item_id
+		where ln.purchase_request_id = $1
+		order by ln.line_no`, purchaseRequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +511,7 @@ func loadPurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, purchaseR
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.PartnerID, &ln.PartnerCode, &ln.PartnerName,
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.SpecName, &ln.Description,
 			&ln.Qty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -540,7 +547,7 @@ func createPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		computed, errs := computePurchaseRequestLines(tt, applyBuyingRatesToPRLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
+		computed, errs := computePurchaseRequestLines(r.Context(), pool, tu.TenantID, tt, applyBuyingRatesToPRLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -633,7 +640,7 @@ func updatePurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		computed, errs := computePurchaseRequestLines(tt, applyBuyingRatesToPRLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
+		computed, errs := computePurchaseRequestLines(r.Context(), pool, tu.TenantID, tt, applyBuyingRatesToPRLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -802,14 +809,14 @@ func insertPurchaseRequestLines(ctx context.Context, tx pgx.Tx, purchaseRequestI
 			  purchase_request_id, line_no, partner_id, partner_code, partner_name,
 			  item_id, item_code, item_name, spec_name, description,
 			  qty, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
-			  source_sales_order_line_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+			  source_sales_order_line_id, planned_serial_nos
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 			returning id`,
 			purchaseRequestID, lineNo, ln.PartnerID, strings.TrimSpace(ln.PartnerCode), strings.TrimSpace(ln.PartnerName),
 			ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.SpecName, ln.Description,
 			ln.Qty, ln.InputBasis, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
 			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark,
-			ln.SourceSalesOrderLineID).Scan(&id)
+			ln.SourceSalesOrderLineID, ln.PlannedSerialNos).Scan(&id)
 		if err != nil {
 			return nil, err
 		}
@@ -843,11 +850,16 @@ func applyBuyingRatesToPRLines(ctx context.Context, pool *pgxpool.Pool, tenantID
 	return out
 }
 
-func computePurchaseRequestLines(tt taxcalc.TaxType, lines []purchaseRequestLineBody) ([]computedLine, map[string]string) {
+func computePurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, tt taxcalc.TaxType, lines []purchaseRequestLineBody) ([]computedLine, map[string]string) {
 	errs := map[string]string{}
 	var out []computedLine
 	for i, ln := range lines {
 		if ln.Qty <= 0 {
+			continue
+		}
+		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
+		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.ItemID, ln.Qty, planned); err != nil {
+			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}
 		inputBasis := ln.InputBasis
@@ -872,9 +884,9 @@ func computePurchaseRequestLines(tt taxcalc.TaxType, lines []purchaseRequestLine
 			Qty:         ln.Qty,
 			InputBasis:  inputBasis,
 			Amounts:     amounts,
-			Remark:      ln.Remark,
-
+			Remark:                 ln.Remark,
 			SourceSalesOrderLineID: ln.SourceSalesOrderLineID,
+			PlannedSerialNos:       planned,
 		})
 	}
 	if len(errs) > 0 {

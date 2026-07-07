@@ -94,6 +94,7 @@ func main() {
 	}))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	r.Use(platformmw.RateLimitPublic(cfg.RateLimit))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(platformmw.SelectiveGzip(cfg.GzipEnabled))
@@ -112,6 +113,7 @@ func main() {
 		onboard.RegisterRoutes(api, pool, cfg)
 		api.Group(func(protected chi.Router) {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
+			protected.Use(platformmw.RateLimitProtected(cfg.RateLimit))
 			protected.Use(platformmw.Entitlement(pool, cfg.EntitlementGraceDays))
 			protected.Use(setupreadiness.RequireSetupReady(pool))
 			protected.Use(audit.Middleware(pool))

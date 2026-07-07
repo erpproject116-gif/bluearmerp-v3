@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
@@ -81,7 +82,8 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 	rows, err := pool.Query(ctx, `
 		select ln.id, ln.line_no, ln.item_id, ln.item_code, ln.item_name, ln.description,
 		  ln.qty::float8, ln.unit_vat_inc::float8, ln.remark,
-		  coalesce(req.requested, 0)::float8
+		  coalesce(req.requested, 0)::float8,
+		  coalesce(ln.planned_serial_nos, '{}')
 		from public.so_sales_order_lines ln
 		left join (
 		  select source_sales_order_line_id, sum(qty) as requested
@@ -105,8 +107,9 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		var itemCode, itemName string
 		var description, remark *string
 		var qty, unitVatInc, requested float64
+		var planned []string
 		if err := rows.Scan(&soLineID, &lnLineNo, &itemID, &itemCode, &itemName, &description,
-			&qty, &unitVatInc, &remark, &requested); err != nil {
+			&qty, &unitVatInc, &remark, &requested, &planned); err != nil {
 			return 0, err
 		}
 		openQty := qty - requested
@@ -127,6 +130,7 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 			Amounts:                amounts,
 			Remark:                 remark,
 			SourceSalesOrderLineID: &soLineIDCopy,
+			PlannedSerialNos:       inventory.NormalizePlannedSerialNos(planned),
 		})
 	}
 	if len(computed) == 0 {

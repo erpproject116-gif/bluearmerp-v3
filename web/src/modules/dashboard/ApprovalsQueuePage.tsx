@@ -19,6 +19,7 @@ const ENTITY_LABELS: Record<string, string> = {
   purchase_request: "Purchase Request",
   journal_entry: "Journal Entry",
   collective_invoice: "Collective Invoice",
+  sa_sales: "Sales",
 };
 
 function entityLabel(type: string): string {
@@ -58,10 +59,32 @@ export default function ApprovalsQueuePage() {
     const action = approve ? "approve" : "reject";
     const key = `${row.entity_type}:${row.entity_id}:${action}`;
     setBusyKey(key);
-    const res = await apiFetch(`/api/v1/approvals/${row.entity_type}/${row.entity_id}/${action}`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
+    let res;
+    if (row.entity_type === "sa_sales") {
+      if (approve) {
+        res = await apiFetch(`/api/v1/sales/${row.entity_id}/approve`, { method: "POST", body: JSON.stringify({}) });
+      } else {
+        const remarks = window.prompt("Rejection remarks (required):");
+        if (remarks === null) {
+          setBusyKey(null);
+          return;
+        }
+        if (!remarks.trim()) {
+          setBusyKey(null);
+          toast.warning("Rejection remarks are required.");
+          return;
+        }
+        res = await apiFetch(`/api/v1/sales/${row.entity_id}/reject`, {
+          method: "POST",
+          body: JSON.stringify({ remarks: remarks.trim() }),
+        });
+      }
+    } else {
+      res = await apiFetch(`/api/v1/approvals/${row.entity_type}/${row.entity_id}/${action}`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+    }
     setBusyKey(null);
     if (!res.success) {
       toast.error(res.message ?? `Failed to ${action}.`);

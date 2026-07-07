@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -105,7 +106,8 @@ func CreateFromPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tu auth.
 		select ln.id, ln.line_no, ln.partner_id, ln.partner_code, ln.partner_name,
 		  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
 		  ln.qty::float8, ln.input_basis, ln.unit_non_vat::float8, ln.unit_vat_inc::float8,
-		  ln.remark, coalesce(sl.slipped, 0)::float8
+		  ln.remark, coalesce(sl.slipped, 0)::float8,
+		  coalesce(ln.planned_serial_nos, '{}')
 		from public.pr_purchase_request_lines ln
 		left join (
 		  select purchase_request_line_id, sum(qty) as slipped
@@ -129,9 +131,10 @@ func CreateFromPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tu auth.
 		var specName, description, remark *string
 		var qty, unitNonVat, unitVatInc, slipped float64
 		var inputBasis string
+		var planned []string
 		if err := rows.Scan(&prLineID, &lnLineNo, &partnerID, &partnerCode, &partnerName,
 			&itemID, &itemCode, &itemName, &specName, &description,
-			&qty, &inputBasis, &unitNonVat, &unitVatInc, &remark, &slipped); err != nil {
+			&qty, &inputBasis, &unitNonVat, &unitVatInc, &remark, &slipped, &planned); err != nil {
 			return 0, err
 		}
 		openQty := qty - slipped
@@ -163,6 +166,7 @@ func CreateFromPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tu auth.
 			InputBasis:            inputBasis,
 			Amounts:               amounts,
 			Remark:                remark,
+			PlannedSerialNos:      inventory.NormalizePlannedSerialNos(planned),
 		})
 	}
 	if len(computed) == 0 {

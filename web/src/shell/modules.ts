@@ -4,6 +4,7 @@ import { SERIAL_LOT_PREFIX } from "./serial-lot-nav";
 import { WMS_PREFIX } from "./wms-nav";
 import { ACCT_I_PREFIX } from "./acct-i-nav";
 import { ACCT_II_PREFIX } from "./acct-ii-nav";
+import { isReviewPurchasesPath, REVIEW_PURCHASES_SUB_BRANCH } from "./review-purchases-nav";
 import { isSubBranchPath } from "./sub-branch-nav";
 
 export { TAX_MNGT_PREFIX, COLLECTIVE_INVOICING_PREFIX, SERIAL_LOT_PREFIX, WMS_PREFIX, ACCT_I_PREFIX, ACCT_II_PREFIX, isSubBranchPath };
@@ -60,6 +61,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/selling",
     features: [
       { label: "Workspace", href: "/app/selling", settingsHref: "/app/selling" },
+      { label: "Sales Status", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings" },
     ],
   },
   {
@@ -78,7 +80,9 @@ export const appModules: AppModule[] = [
       { label: "Stock Entries", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries" },
       { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation" },
       { label: "Stock Balance", href: "/app/inventory/reports/stock-balance", settingsHref: "/app/inventory/stock-movements" },
+      { label: "On Hand", href: "/app/inventory/reports/on-hand", settingsHref: "/app/inventory/stock-movements" },
       { label: "Stock Ledger", href: "/app/inventory/reports/stock-ledger", settingsHref: "/app/inventory/stock-movements" },
+      { label: "Inv. Book", href: "/app/inventory/reports/inv-book", settingsHref: "/app/inventory/stock-movements" },
       { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing", settingsHref: "/app/inventory/stock-movements" },
       { label: "Price List", href: "/app/inventory/price-lists", settingsHref: "/app/inventory/price-lists" },
       { label: "Product Bundles", href: "/app/inventory/product-bundles", settingsHref: "/app/inventory/product-bundles" },
@@ -105,12 +109,15 @@ export const appModules: AppModule[] = [
     basePath: "/app/buying",
     features: [
       { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying" },
-      { label: "Purchase Orders", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "RFQ", href: "/app/purchase-order/rfq", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "PO Analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "Items to Receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "A/P Aging", href: "/app/finance/reports/ap-aging", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Purchase Status", href: "/app/buying/reports/purchase-status", settingsHref: "/app/finance/supplier-invoices/settings" },
+    ],
+    subBranches: [
+      {
+        label: "Review Purchases",
+        prefix: REVIEW_PURCHASES_SUB_BRANCH,
+        href: "/app/finance/supplier-invoices",
+        settingsHref: "/app/finance/supplier-invoices/settings",
+      },
     ],
   },
   {
@@ -278,7 +285,6 @@ export const appModules: AppModule[] = [
       },
       { label: "Purchase Returns", href: "/app/purchase-order/purchase-returns", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Receiving", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/goods-receipt/settings" },
-      { label: "Supplier Invoices", href: "/app/finance/supplier-invoices", settingsHref: "/app/finance/supplier-invoices/settings" },
       { label: "PO Analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Items to Receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
     ],
@@ -320,6 +326,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/quality",
     features: [
       { label: "NCRs", href: "/app/quality/ncrs", settingsHref: "/app/quality/ncrs" },
+      { label: "QC Requests", href: "/app/quality/qc-requests", settingsHref: "/app/quality/ncrs" },
       { label: "CAPA", href: "/app/quality/capa", settingsHref: "/app/quality/ncrs" },
     ],
   },
@@ -381,25 +388,11 @@ export const appModules: AppModule[] = [
       { label: "Payment Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "New Payment Voucher", href: "/app/finance/payment-vouchers/new", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Payment Voucher List", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Chart of Accounts", href: "/app/finance/chart-of-accounts", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Bank Reconciliation", href: "/app/finance/bank-reconciliation", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Fiscal Years", href: "/app/finance/fiscal-years", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Payment Entries", href: "/app/finance/payment-entries", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "SI Receipt Status", href: "/app/finance/reports/receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Supplier Payment Status", href: "/app/finance/reports/supplier-payment-status", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Journal Entry", href: "/app/finance/journal-entries", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Trial Balance", href: "/app/finance/reports/trial-balance", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "General Ledger", href: "/app/finance/reports/general-ledger", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Profit & Loss", href: "/app/finance/reports/profit-and-loss", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Balance Sheet", href: "/app/finance/reports/balance-sheet", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "A/R Aging", href: "/app/finance/reports/ar-aging", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "A/P Aging", href: "/app/finance/reports/ap-aging", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "AR/AP Status", href: "/app/finance/reports/ar-ap-status", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Company Budgets", href: "/app/finance/budgets", settingsHref: "/app/finance/budgets" },
       { label: "Budget vs Actual", href: "/app/finance/reports/budget-vs-actual", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Acct. I — Journal", href: "/app/finance/acct-i/journal-entries", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Acct. II — Checks", href: "/app/finance/acct-ii/checks", settingsHref: "/app/finance/acct-ii/checks" },
     ],
     subBranches: [
       {
@@ -504,16 +497,26 @@ export const appModules: AppModule[] = [
 ];
 
 export function resolveModule(pathname: string): AppModule | undefined {
+  // Review Purchases screens live under /app/finance/* but use Buying header context.
+  if (isReviewPurchasesPath(pathname)) {
+    return appModules.find((m) => m.id === "buying");
+  }
   return appModules.find((m) => pathname === m.basePath || pathname.startsWith(`${m.basePath}/`));
 }
 
-export function resolveSubBranch(module: AppModule, pathname: string): ModuleFeature | undefined {
-  return module.subBranches?.find(
-    (b) =>
-      b.href === pathname ||
-      b.settingsHref === pathname ||
-      (b.prefix != null && isSubBranchPath(pathname, b.prefix)),
+function matchesSubBranch(pathname: string, branch: ModuleFeature): boolean {
+  if (branch.prefix === REVIEW_PURCHASES_SUB_BRANCH) {
+    return isReviewPurchasesPath(pathname);
+  }
+  return (
+    branch.href === pathname ||
+    branch.settingsHref === pathname ||
+    (branch.prefix != null && isSubBranchPath(pathname, branch.prefix))
   );
+}
+
+export function resolveSubBranch(module: AppModule, pathname: string): ModuleFeature | undefined {
+  return module.subBranches?.find((b) => matchesSubBranch(pathname, b));
 }
 
 export function resolveFeature(module: AppModule, pathname: string): ModuleFeature | undefined {
@@ -523,7 +526,7 @@ export function resolveFeature(module: AppModule, pathname: string): ModuleFeatu
     (f.prefix != null && isSubBranchPath(pathname, f.prefix)) ||
     (pathname.startsWith(f.href + "/") && f.href !== module.basePath);
 
-  return module.features.find(match) ?? module.subBranches?.find(match);
+  return module.features.find(match) ?? module.subBranches?.find((b) => matchesSubBranch(pathname, b));
 }
 
 export function isFeatureSettings(pathname: string, feature: ModuleFeature): boolean {

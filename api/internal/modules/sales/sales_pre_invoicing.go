@@ -65,11 +65,11 @@ func buildPreInvoicingWhere(f preInvoicingFilters, tenantID int64) (string, []an
 }
 
 func preInvoicingFromClause() string {
-	return salesStatusFromClause()
+	return salesStatusFromClause(salesStatusFilters{ReportType: "details"})
 }
 
 func preInvoicingOrderBy(sort, order string) string {
-	return salesStatusOrderBy(sort, order)
+	return salesStatusOrderBy(salesStatusFilters{ReportType: "details"}, sort, order)
 }
 
 func queryPreInvoicingRows(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f preInvoicingFilters, sort, order string, limit, offset int) ([]preInvoicingRow, int64, error) {

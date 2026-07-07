@@ -6,6 +6,10 @@ export const PROGRESS_STATUS_GROUPS = [
     options: [{ value: "unconfirmed", label: "Unconfirmed" }],
   },
   {
+    label: "E-Approval",
+    options: [{ value: "e_approval", label: "E-Approval" }],
+  },
+  {
     label: "Confirm",
     options: [
       { value: "in_progress", label: "In progress" },
@@ -16,6 +20,7 @@ export const PROGRESS_STATUS_GROUPS = [
 
 const FALLBACK_LABELS: Record<string, string> = {
   unconfirmed: "Unconfirmed",
+  e_approval: "E-Approval",
   completed: "Completed",
   in_progress: "In progress",
   received: "Received",

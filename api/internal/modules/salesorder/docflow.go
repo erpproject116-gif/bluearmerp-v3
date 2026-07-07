@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -83,7 +84,8 @@ func CreateFromQuotation(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenant
 	rows, err := pool.Query(ctx, `
 		select ln.id, ln.line_no, ln.item_id, ln.item_code, ln.item_name, ln.description,
 		  ln.qty::float8, ln.unit_vat_inc::float8, ln.remark,
-		  coalesce(slip.fulfilled, 0)::float8
+		  coalesce(slip.fulfilled, 0)::float8,
+		  coalesce(ln.planned_serial_nos, '{}')
 		from public.quo_quotation_lines ln
 		left join (
 		  select quotation_line_id, sum(qty) as fulfilled
@@ -105,8 +107,9 @@ func CreateFromQuotation(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenant
 		var itemCode, itemName string
 		var description, remark *string
 		var qty, unitVatInc, fulfilled float64
+		var planned []string
 		if err := rows.Scan(&quotationLineID, &lineNo, &itemID, &itemCode, &itemName, &description,
-			&qty, &unitVatInc, &remark, &fulfilled); err != nil {
+			&qty, &unitVatInc, &remark, &fulfilled, &planned); err != nil {
 			return 0, err
 		}
 		openQty := qty - fulfilled
@@ -125,6 +128,7 @@ func CreateFromQuotation(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenant
 			InputBasis:            taxcalc.InputVatIncUnit,
 			Remark:                remark,
 			SourceQuotationLineID: &qLineID,
+			PlannedSerialNos:      inventory.NormalizePlannedSerialNos(planned),
 		})
 	}
 	if len(lineBodies) == 0 {
@@ -132,7 +136,7 @@ func CreateFromQuotation(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenant
 	}
 
 	lineBodies = applyPartnerRatesToSOLines(ctx, pool, tu.TenantID, partnerID, lineBodies)
-	computed, errs := computeSalesOrderLines(tt, lineBodies)
+	computed, errs := computeSalesOrderLines(ctx, pool, tu.TenantID, tt, lineBodies)
 	if errs != nil {
 		return 0, docflowValidation(errs)
 	}

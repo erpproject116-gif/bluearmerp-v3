@@ -39,11 +39,16 @@ import PriceListsPage from "./modules/inventory/PriceListsPage";
 import StockWorkspacePage from "./modules/inventory/StockWorkspacePage";
 import ProductBundlesPage from "./modules/inventory/ProductBundlesPage";
 import SerialRegistryListPage from "./modules/inventory/serial-lot/SerialRegistryListPage";
+import SerialAdjustmentPage from "./modules/inventory/serial-lot/SerialAdjustmentPage";
 import LotBatchesListPage from "./modules/inventory/serial-lot/LotBatchesListPage";
 import SerialMovementsListPage from "./modules/inventory/serial-lot/SerialMovementsListPage";
 import SerialTracePage from "./modules/inventory/serial-lot/SerialTracePage";
 import SerialReceivePage from "./modules/inventory/serial-lot/SerialReceivePage";
 import SerialLotSettingsPage from "./modules/inventory/serial-lot/SerialLotSettingsPage";
+import SerialStatusReportPage from "./modules/inventory/serial-lot/SerialStatusReportPage";
+import SerialBookReportPage from "./modules/inventory/serial-lot/SerialBookReportPage";
+import SerialBalanceReportPage from "./modules/inventory/serial-lot/SerialBalanceReportPage";
+import SerialReconciliationReportPage from "./modules/inventory/serial-lot/SerialReconciliationReportPage";
 import {
   RepairOrderReceiptPrintPage,
   RepairOrderWarrantyPrintPage,
@@ -179,6 +184,7 @@ import BomsPage from "./modules/manufacturing/BomsPage";
 import WorkOrdersPage from "./modules/manufacturing/WorkOrdersPage";
 import NcrsPage from "./modules/quality/NcrsPage";
 import CapaPage from "./modules/quality/CapaPage";
+import QcRequestsPage from "./modules/quality/QcRequestsPage";
 import CommissionRulesPage from "./modules/sales/CommissionRulesPage";
 import SOAnalysisReportPage from "./modules/sales-order/reports/SOAnalysisReportPage";
 import POAnalysisReportPage from "./modules/purchase-order/reports/POAnalysisReportPage";
@@ -186,18 +192,24 @@ import ItemsToReceiveReportPage from "./modules/purchase-order/reports/ItemsToRe
 import StockBalanceReportPage from "./modules/inventory/reports/StockBalanceReportPage";
 import StockLedgerReportPage from "./modules/inventory/reports/StockLedgerReportPage";
 import StockAgeingReportPage from "./modules/inventory/reports/StockAgeingReportPage";
+import OnHandReportPage from "./modules/inventory/reports/OnHandReportPage";
+import InvBookReportPage from "./modules/inventory/reports/InvBookReportPage";
 import TrialBalanceReportPage from "./modules/finance/reports/TrialBalanceReportPage";
 import GeneralLedgerReportPage from "./modules/finance/reports/GeneralLedgerReportPage";
 import ProfitAndLossReportPage from "./modules/finance/reports/ProfitAndLossReportPage";
 import BalanceSheetReportPage from "./modules/finance/reports/BalanceSheetReportPage";
 import ArAgingReportPage from "./modules/finance/reports/ArAgingReportPage";
 import ApAgingReportPage from "./modules/finance/reports/ApAgingReportPage";
+import ArApStatusReportPage from "./modules/finance/reports/ArApStatusReportPage";
+import AcctInventoryReconciliationPage from "./modules/finance/reports/AcctInventoryReconciliationPage";
 import PaymentEntriesPage from "./modules/finance/PaymentEntriesPage";
 import ChartOfAccountsPage from "./modules/finance/ChartOfAccountsPage";
 import BankReconciliationPage from "./modules/finance/BankReconciliationPage";
 import FiscalYearsPage from "./modules/finance/FiscalYearsPage";
 import SellingWorkspacePage from "./modules/selling/SellingWorkspacePage";
 import BuyingWorkspacePage from "./modules/buying/BuyingWorkspacePage";
+import PurchaseStatusPage from "./modules/buying/reports/PurchaseStatusPage";
+import SellingReportsPage from "./modules/selling/reports/SellingReportsPage";
 import FinanceWorkspacePage from "./modules/finance/FinanceWorkspacePage";
 import PortalLoginPage from "./modules/portal/PortalLoginPage";
 import PortalDashboardPage from "./modules/portal/PortalDashboardPage";
@@ -318,6 +330,8 @@ export default function App() {
           <Route path="/inventory/reports/stock-balance" component={StockBalanceReportPage} />
           <Route path="/inventory/reports/stock-ledger" component={StockLedgerReportPage} />
           <Route path="/inventory/reports/stock-ageing" component={StockAgeingReportPage} />
+          <Route path="/inventory/reports/on-hand" component={OnHandReportPage} />
+          <Route path="/inventory/reports/inv-book" component={InvBookReportPage} />
           <Route path="/inventory/stock-movements" component={StockMovementsPage} />
           <Route path="/inventory/stock-entries" component={StockEntriesPage} />
           <Route path="/inventory/stock-reconciliation" component={StockReconciliationPage} />
@@ -325,8 +339,13 @@ export default function App() {
           <Route path="/inventory/product-bundles" component={ProductBundlesPage} />
           <Route path="/inventory/wms/scheduled-receipts" component={ScheduledReceiptsPage} />
           <Route path="/inventory/serial-lot/registry" component={SerialRegistryListPage} />
+          <Route path="/inventory/serial-lot/adjustment" component={SerialAdjustmentPage} />
           <Route path="/inventory/serial-lot/lots" component={LotBatchesListPage} />
           <Route path="/inventory/serial-lot/movements" component={SerialMovementsListPage} />
+          <Route path="/inventory/serial-lot/reports/status" component={SerialStatusReportPage} />
+          <Route path="/inventory/serial-lot/reports/book" component={SerialBookReportPage} />
+          <Route path="/inventory/serial-lot/reports/balance" component={SerialBalanceReportPage} />
+          <Route path="/inventory/serial-lot/reports/reconciliation" component={SerialReconciliationReportPage} />
           <Route path="/inventory/serial-lot/trace" component={SerialTracePage} />
           <Route path="/inventory/serial-lot/receive" component={SerialReceivePage} />
           <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
@@ -359,7 +378,9 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
+          <Route path="/selling/reports" component={SellingReportsPage} />
           <Route path="/selling" component={SellingWorkspacePage} />
+          <Route path="/buying/reports/purchase-status" component={PurchaseStatusPage} />
           <Route path="/buying" component={BuyingWorkspacePage} />
           <Route path="/sales-order/reports/so-analysis" component={SOAnalysisReportPage} />
           <Route path="/sales-order/sales-orders/new" component={SalesOrderNewPage} />
@@ -444,6 +465,8 @@ export default function App() {
           <Route path="/finance/reports/balance-sheet" component={BalanceSheetReportPage} />
           <Route path="/finance/reports/ar-aging" component={ArAgingReportPage} />
           <Route path="/finance/reports/ap-aging" component={ApAgingReportPage} />
+          <Route path="/finance/reports/ar-ap-status" component={ArApStatusReportPage} />
+          <Route path="/finance/reports/acct-inventory-reconciliation" component={AcctInventoryReconciliationPage} />
           <Route path="/finance/reports/ap-by-vendor" component={ApByVendorPage} />
           <Route path="/finance/reports/supplier-payment-status" component={SupplierPaymentStatusPage} />
           <Route path="/finance/reports/ar-by-customer" component={ArByCustomerPage} />
@@ -508,6 +531,9 @@ export default function App() {
             <JobCostingRoute><JobCostingPage /></JobCostingRoute>
           )} />
           <Route path="/sales/commission-rules" component={CommissionRulesPage} />
+          <Route path="/quality/qc-requests" component={() => (
+            <QualityRoute><QcRequestsPage /></QualityRoute>
+          )} />
           <Route path="/quality/capa" component={() => (
             <QualityRoute><CapaPage /></QualityRoute>
           )} />

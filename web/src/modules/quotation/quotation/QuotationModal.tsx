@@ -69,6 +69,8 @@ export type QuotationDetail = {
     unit_vat_inc: number;
     line_total: number;
     remark?: string | null;
+    planned_serial_nos?: string[];
+    track_serial?: boolean;
   }>;
 };
 
@@ -143,6 +145,8 @@ function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
     unit_vat_inc: String(ln.unit_vat_inc ?? 0),
     line_total: String(ln.line_total ?? 0),
     remark: ln.remark ?? "",
+    planned_serial_nos: ln.planned_serial_nos ?? [],
+    track_serial: Boolean(ln.track_serial),
   }));
 }
 
@@ -381,6 +385,7 @@ export function QuotationModal(props: Props) {
         unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
         input_basis: ln.input_basis,
         remark: ln.remark || null,
+        planned_serial_nos: ln.planned_serial_nos ?? [],
       })),
       custom_values: customValues(),
     };

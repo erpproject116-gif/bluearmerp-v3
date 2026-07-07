@@ -270,6 +270,147 @@ export function useStockAgeingReport(params: () => Omit<ReportParams<Record<stri
   });
 }
 
+// --- On Hand (Inventory Balance) ---
+
+export type OnHandFilters = {
+  as_of?: string;
+  min_qty?: number;
+  max_qty?: number;
+  below_safety?: boolean;
+  item_id?: number;
+  location_id?: number;
+};
+
+export type OnHandRow = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  location_id: number;
+  location_name: string;
+  qty_on_hand: number;
+  qty_reserved: number;
+  reorder_level?: number;
+  below_safety: boolean;
+};
+
+export function onHandExportUrl(filters: OnHandFilters): string {
+  return exportUrl("/api/v1/inventory/reports/on-hand/export", {
+    ...filters,
+    below_safety: filters.below_safety ? "true" : undefined,
+  } as Record<string, string | number | null | undefined>);
+}
+
+export function useOnHandReport(params: () => ReportParams<OnHandFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(
+      {
+        ...p.filters,
+        below_safety: p.filters.below_safety ? "true" : undefined,
+      } as Record<string, string | number | null | undefined>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-on-hand", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<OnHandRow[]>(`/api/v1/inventory/reports/on-hand?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- Inv. Book ---
+
+export type InvBookRow = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  location_id: number;
+  location_name: string;
+  opening_qty: number;
+  receipt_qty: number;
+  issue_qty: number;
+  closing_qty: number;
+  purchase_price: number;
+  sales_price: number;
+};
+
+export function invBookExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/inventory/reports/inv-book/export", filters);
+}
+
+export function useInvBookReport(params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-inv-book", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<InvBookRow[]>(`/api/v1/inventory/reports/inv-book?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
+// --- AR/AP Status ---
+
+export type ArApStatusFilters = {
+  as_of: string;
+  status_type: "combined" | "receivable" | "payable";
+  partner_id?: number;
+};
+
+export type ArApStatusRow = {
+  partner_id: number;
+  partner_name: string;
+  partner_kind: string;
+  ar_balance: number;
+  ap_balance: number;
+  net_balance: number;
+};
+
+export function arApStatusExportUrl(filters: ArApStatusFilters): string {
+  return exportUrl("/api/v1/finance/reports/ar-ap-status/export", filters);
+}
+
+export function useArApStatusReport(params: () => ReportParams<ArApStatusFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string | number>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-ar-ap-status", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<ArApStatusRow[]>(`/api/v1/finance/reports/ar-ap-status?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
 // --- Trial Balance ---
 
 export type TrialBalanceRow = {

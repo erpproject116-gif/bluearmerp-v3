@@ -19,6 +19,11 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     permissionCode: "inventory.serial_registry",
   },
   {
+    label: "Adjustment",
+    href: "/app/inventory/serial-lot/adjustment",
+    permissionCode: "inventory.serial_adjustment",
+  },
+  {
     label: "Lots",
     href: "/app/inventory/serial-lot/lots",
     permissionCode: "inventory.serial_registry",
@@ -27,6 +32,26 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     label: "Movements",
     href: "/app/inventory/serial-lot/movements",
     permissionCode: "inventory.serial_movements",
+  },
+  {
+    label: "Status",
+    href: "/app/inventory/serial-lot/reports/status",
+    permissionCode: "inventory.serial_registry",
+  },
+  {
+    label: "Inv. Book",
+    href: "/app/inventory/serial-lot/reports/book",
+    permissionCode: "inventory.serial_movements",
+  },
+  {
+    label: "Inv. Balance",
+    href: "/app/inventory/serial-lot/reports/balance",
+    permissionCode: "inventory.serial_registry",
+  },
+  {
+    label: "Reconciliation",
+    href: "/app/inventory/serial-lot/reports/reconciliation",
+    permissionCode: "inventory.serial_registry",
   },
   {
     label: "Settings",

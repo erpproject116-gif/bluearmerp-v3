@@ -29,6 +29,7 @@ function statusLabel(status: string): string {
 export default function GoodsReceiptListPage() {
   const auth = useAuth();
   const canInspect = () => hasPermission(auth.me, "quality.gr_inspection", "write");
+  const canQc = () => hasPermission(auth.me, "quality.qc_requests", "write");
   const toast = useToast();
   const invalidate = useInvalidateGoodsReceipts();
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -39,6 +40,21 @@ export default function GoodsReceiptListPage() {
 
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [inspectingId, setInspectingId] = createSignal<number | null>(null);
+  const [qcCreatingId, setQcCreatingId] = createSignal<number | null>(null);
+
+  const createQcRequest = async (row: GoodsReceiptRow) => {
+    setQcCreatingId(row.id);
+    const res = await apiFetch("/api/v1/quality/qc-requests", {
+      method: "POST",
+      body: JSON.stringify({ source_type: "goods_receipt", goods_receipt_id: row.id }),
+    });
+    setQcCreatingId(null);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to create QC request.");
+      return;
+    }
+    toast.success("QC request created.");
+  };
 
   const patchInspection = async (row: GoodsReceiptRow, status: "held" | "released") => {
     if (row.status !== "draft") return;
@@ -126,6 +142,23 @@ export default function GoodsReceiptListPage() {
             header: "Status",
             sortable: false,
             render: (r) => <span class="capitalize">{statusLabel(r.status)}</span>,
+          },
+          {
+            key: "qc",
+            header: "QC",
+            sortable: false,
+            render: (r) => (
+              <Show when={canQc()}>
+                <button
+                  type="button"
+                  class="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                  disabled={qcCreatingId() === r.id}
+                  onClick={(e) => { e.stopPropagation(); void createQcRequest(r); }}
+                >
+                  {qcCreatingId() === r.id ? "Creating…" : "Create QC Request"}
+                </button>
+              </Show>
+            ),
           },
           { key: "reference", header: "Reference" },
           { key: "created_by_name", header: "Created by" },

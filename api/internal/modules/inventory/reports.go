@@ -59,6 +59,10 @@ func registerInventoryReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 		rr.Get("/stock-ledger", listStockLedger(pool))
 		rr.Get("/stock-ageing/export", exportStockAgeing(pool))
 		rr.Get("/stock-ageing", listStockAgeing(pool))
+		rr.Get("/on-hand/export", exportOnHandReport(pool))
+		rr.Get("/on-hand", listOnHandReport(pool))
+		rr.Get("/inv-book/export", exportInvBookReport(pool))
+		rr.Get("/inv-book", listInvBookReport(pool))
 	})
 }
 

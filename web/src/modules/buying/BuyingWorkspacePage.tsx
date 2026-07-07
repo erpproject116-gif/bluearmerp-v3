@@ -18,6 +18,7 @@ const tiles: KpiTile[] = [
 ];
 
 const reportLinks = [
+  { label: "Purchase Status", href: "/app/buying/reports/purchase-status" },
   { label: "PO Analysis", href: "/app/purchase-order/reports/po-analysis" },
   { label: "Items to Receive", href: "/app/purchase-order/reports/items-to-receive" },
   { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor" },

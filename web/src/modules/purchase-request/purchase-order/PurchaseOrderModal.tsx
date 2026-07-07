@@ -66,6 +66,9 @@ export type PurchaseOrderDetail = {
     unit_vat_inc: number;
     line_total: number;
     remark?: string | null;
+    purchase_request_line_id?: number | null;
+    planned_serial_nos?: string[];
+    track_serial?: boolean;
   }>;
 };
 
@@ -146,6 +149,9 @@ function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestL
     unit_vat_inc: String(ln.unit_vat_inc ?? 0),
     line_total: String(ln.line_total ?? 0),
     remark: ln.remark ?? "",
+    purchase_request_line_id: ln.purchase_request_line_id ?? null,
+    planned_serial_nos: ln.planned_serial_nos ?? [],
+    track_serial: Boolean(ln.track_serial),
   }));
 }
 
@@ -352,6 +358,7 @@ export function PurchaseOrderModal(props: Props) {
         unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
         input_basis: ln.input_basis,
         remark: ln.remark || null,
+        planned_serial_nos: ln.planned_serial_nos ?? [],
       })),
     };
 

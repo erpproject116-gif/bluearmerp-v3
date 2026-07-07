@@ -8,6 +8,7 @@ export type PurchaseOrderListParams = {
   order: "asc" | "desc";
   q?: string;
   status?: string;
+  progressStatus?: string;
   purchase_request_id?: number;
   supplier_quotation_id?: number;
 };
@@ -31,6 +32,7 @@ export type PurchaseOrderRow = {
   pic_name: string;
   location_id: number;
   status: string;
+  progress_status: string;
   pct_received?: number;
   pct_billed?: number;
   grand_total: number;
@@ -49,6 +51,7 @@ export function usePurchaseOrderList(params: () => PurchaseOrderListParams) {
     });
     if (p.q) qs.set("q", p.q);
     if (p.status) qs.set("status", p.status);
+    if (p.progressStatus) qs.set("progress_status", p.progressStatus);
     if (p.purchase_request_id) qs.set("purchase_request_id", String(p.purchase_request_id));
     if (p.supplier_quotation_id) qs.set("supplier_quotation_id", String(p.supplier_quotation_id));
 

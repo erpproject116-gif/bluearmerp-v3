@@ -32,6 +32,7 @@ export default function BankReconciliationPage() {
   const [bankAccountId, setBankAccountId] = createSignal("");
   const [selectedStatementLineId, setSelectedStatementLineId] = createSignal<number | null>(null);
   const [matching, setMatching] = createSignal<number | null>(null);
+  const [pendingMatch, setPendingMatch] = createSignal<UnmatchedPayment | null>(null);
 
   const accounts = createQuery(() => ({
     queryKey: ["finance-bank-accounts-options"],
@@ -75,6 +76,13 @@ export default function BankReconciliationPage() {
     void client.invalidateQueries({ queryKey: ["finance-bank-recon-unmatched"] });
   };
 
+  const amountDelta = createMemo(() => {
+    const stmt = selectedStatementLine();
+    const pay = pendingMatch();
+    if (!stmt || !pay) return null;
+    return Math.abs(stmt.amount - pay.amount);
+  });
+
   const match = async (row: UnmatchedPayment) => {
     const statementLine = selectedStatementLine();
     if (!statementLine) {
@@ -95,6 +103,7 @@ export default function BankReconciliationPage() {
       toast.warning(res.message ?? "Failed to match statement line.");
       return;
     }
+    setPendingMatch(null);
     setSelectedStatementLineId(null);
     refresh();
   };
@@ -187,10 +196,10 @@ export default function BankReconciliationPage() {
                         <button
                           type="button"
                           class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
-                          disabled={!selectedStatementLine() || matching() === row.payment_id}
-                          onClick={() => void match(row)}
+                          disabled={!selectedStatementLine()}
+                          onClick={() => setPendingMatch(row)}
                         >
-                          {matching() === row.payment_id ? "Matching…" : "Match"}
+                          Match…
                         </button>
                       </td>
                     </tr>
@@ -201,6 +210,32 @@ export default function BankReconciliationPage() {
           </Show>
         </div>
       </div>
+
+      <Show when={pendingMatch() && selectedStatementLine()}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-5 shadow-lg">
+            <h3 class="text-lg font-semibold text-text-primary">Confirm match</h3>
+            <div class="mt-3 space-y-2 text-sm text-text-secondary">
+              <p>Statement: {selectedStatementLine()!.reference_no || selectedStatementLine()!.description || "—"} — {selectedStatementLine()!.amount.toFixed(2)}</p>
+              <p>Payment: {pendingMatch()!.document_no} — {pendingMatch()!.amount.toFixed(2)}</p>
+              <Show when={(amountDelta() ?? 0) > 0.01}>
+                <p class="font-medium text-amber-700">Amount difference: {amountDelta()!.toFixed(2)}</p>
+              </Show>
+            </div>
+            <div class="mt-4 flex justify-end gap-2">
+              <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => setPendingMatch(null)}>Cancel</button>
+              <button
+                type="button"
+                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={matching() !== null}
+                onClick={() => pendingMatch() && void match(pendingMatch()!)}
+              >
+                {matching() !== null ? "Matching…" : "Confirm match"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </FinanceLayout>
   );
 }

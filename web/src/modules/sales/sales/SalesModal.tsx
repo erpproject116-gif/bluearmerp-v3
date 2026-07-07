@@ -20,6 +20,7 @@ import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
+import { SalesApprovalPanel } from "./SalesApprovalPanel";
 import {
   SalesOrderLinePickerModal,
   type PickedSalesOrderLine,
@@ -591,7 +592,11 @@ export function SalesModal(props: Props) {
           fetchOptions={fetchLocations}
         />
         <Field label="Progress status">
-          <ProgressStatusMenu value={progressStatus()} onChange={setProgressStatus} />
+          <ProgressStatusMenu
+            value={progressStatus()}
+            onChange={setProgressStatus}
+            disabled={progressStatus() === "e_approval"}
+          />
         </Field>
         <Field label="SI/DR No.">
           <input class={inputClass} value={siDrNo()} onInput={(e) => setSiDrNo(e.currentTarget.value)} />
@@ -668,6 +673,21 @@ export function SalesModal(props: Props) {
           templateCode={templateCode}
           partnerId={partnerId}
         />
+        <Show when={props.editing?.id}>
+          <SalesApprovalPanel
+            salesId={props.editing!.id}
+            progressStatus={progressStatus()}
+            onChanged={() => {
+              void (async () => {
+                const res = await apiFetch<SalesDetail>(`/api/v1/sales/${props.editing!.id}`);
+                if (res.success && res.data) {
+                  setProgressStatus(res.data.progress_status);
+                  props.onSaved();
+                }
+              })();
+            }}
+          />
+        </Show>
         <ChangeLogPanel targetType="sa_sales" targetId={props.editing?.id} />
         </Show>
       </WideEntityModal>

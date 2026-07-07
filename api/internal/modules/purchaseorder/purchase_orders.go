@@ -46,7 +46,9 @@ type PurchaseOrderLine struct {
 	TaxAmount               float64 `json:"tax_amount"`
 	UnitVatInc              float64 `json:"unit_vat_inc"`
 	LineTotal               float64 `json:"line_total"`
-	Remark                  *string `json:"remark,omitempty"`
+	Remark               *string  `json:"remark,omitempty"`
+	PlannedSerialNos     []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial          bool     `json:"track_serial,omitempty"`
 }
 
 type PurchaseOrder struct {
@@ -71,6 +73,7 @@ type PurchaseOrder struct {
 	ProjectID           *int64              `json:"project_id,omitempty"`
 	ProjectName         *string             `json:"project_name,omitempty"`
 	Status              string              `json:"status"`
+	ProgressStatus      string              `json:"progress_status"`
 	PctReceived         float64             `json:"pct_received"`
 	PctBilled           float64             `json:"pct_billed"`
 	Reference           *string             `json:"reference,omitempty"`
@@ -98,7 +101,8 @@ type purchaseOrderLineBody struct {
 	Qty                   float64 `json:"qty"`
 	UnitPrice             float64 `json:"unit_price"`
 	InputBasis            string  `json:"input_basis"`
-	Remark                *string `json:"remark"`
+	Remark                *string  `json:"remark"`
+	PlannedSerialNos      []string `json:"planned_serial_nos"`
 }
 
 type purchaseOrderBody struct {
@@ -149,6 +153,7 @@ type computedLine struct {
 	InputBasis              string
 	Amounts                 taxcalc.LineAmounts
 	Remark                  *string
+	PlannedSerialNos        []string
 }
 
 const hybridPartnerLateral = `
@@ -211,6 +216,7 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		"partner_name":      "coalesce(hp.company_name, line_partner.company_name, '')",
 		"grand_total":       "po.grand_total",
 		"status":            "po.status",
+		"progress_status":   "po.progress_status",
 		"created_at":        "po.created_at",
 		"updated_at":        "po.updated_at",
 	}
@@ -311,6 +317,16 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, p.Status)
 			argN++
 		}
+		progress := strings.TrimSpace(r.URL.Query().Get("progress_status"))
+		if progress == "unconfirmed" || progress == "e_approval" || progress == "completed" {
+			where += fmt.Sprintf(" and po.progress_status = $%d", argN)
+			args = append(args, progress)
+			argN++
+		} else if progress == "confirm" {
+			where += fmt.Sprintf(" and po.progress_status = $%d", argN)
+			args = append(args, "completed")
+			argN++
+		}
 
 		scope, argN := tu.PicOrCreatedScopeSQL("po", argN, &args)
 		where += scope
@@ -338,7 +354,7 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(po.partner_id, line_partner.partner_id),
 			  coalesce(hp.company_name, line_partner.company_name, ''),
 			  po.pic_user_id, po.pic_name,
-			  po.location_id, po.status, po.grand_total::float8,
+			  po.location_id, po.status, po.progress_status, po.grand_total::float8,
 			  coalesce(u.full_name, ''),
 			  (select ln.item_name from public.po_purchase_order_lines ln
 			   where ln.purchase_order_id = po.id order by ln.line_no limit 1),
@@ -385,7 +401,7 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.PurchaseRequestID, &row.RFQID, &row.SupplierQuotationID,
 				&row.TaxTypeID, &row.TaxTypeName, &row.CurrencyID, &row.CurrencyCode,
 				&partnerID, &row.PartnerName, &row.PicUserID, &row.PicName,
-				&row.LocationID, &row.Status, &row.GrandTotal,
+				&row.LocationID, &row.Status, &row.ProgressStatus, &row.GrandTotal,
 				&row.CreatedByName, &firstItemName, &lineCount, &row.PctReceived, &row.PctBilled, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read purchase orders.", "ERR_INTERNAL")
@@ -435,7 +451,7 @@ func loadPurchaseOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int
 		  coalesce(hp.company_name, line_partner.company_name, ''),
 		  po.pic_user_id, po.pic_name,
 		  po.location_id, l.location_name, po.project_id, po.project_name,
-		  po.status, po.reference, po.notes,
+		  po.status, po.progress_status, po.reference, po.notes,
 		  po.subtotal::float8, po.tax_total::float8, po.grand_total::float8,
 		  po.created_by_user_id, u.full_name
 		from public.po_purchase_orders po
@@ -452,7 +468,7 @@ func loadPurchaseOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int
 		&partnerID, &po.PartnerName,
 		&po.PicUserID, &po.PicName,
 		&po.LocationID, &po.LocationName, &po.ProjectID, &po.ProjectName,
-		&po.Status, &po.Reference, &po.Notes,
+		&po.Status, &po.ProgressStatus, &po.Reference, &po.Notes,
 		&po.Subtotal, &po.TaxTotal, &po.GrandTotal,
 		&po.CreatedByUserID, &createdByName,
 	)
@@ -476,15 +492,18 @@ func loadPurchaseOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int
 
 func loadPurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, purchaseOrderID int64) ([]PurchaseOrderLine, error) {
 	rows, err := pool.Query(ctx, `
-		select id, line_no, purchase_request_line_id, rfq_request_line_id, supplier_quotation_line_id,
-		  partner_id, partner_code, partner_name,
-		  item_id, item_code, item_name, spec_name, description,
-		  qty::float8, received_qty::float8, coalesce(billed_qty, 0)::float8,
-		  unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
-		  unit_vat_inc::float8, line_total::float8, remark
-		from public.po_purchase_order_lines
-		where purchase_order_id = $1
-		order by line_no`, purchaseOrderID)
+		select ln.id, ln.line_no, ln.purchase_request_line_id, ln.rfq_request_line_id, ln.supplier_quotation_line_id,
+		  ln.partner_id, ln.partner_code, ln.partner_name,
+		  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
+		  ln.qty::float8, ln.received_qty::float8, coalesce(ln.billed_qty, 0)::float8,
+		  ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
+		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark,
+		  coalesce(ln.planned_serial_nos, '{}'),
+		  coalesce(i.track_serial, false)
+		from public.po_purchase_order_lines ln
+		left join public.inv_items i on i.id = ln.item_id
+		where ln.purchase_order_id = $1
+		order by ln.line_no`, purchaseOrderID)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +517,7 @@ func loadPurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, purchaseOrd
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.SpecName, &ln.Description,
 			&ln.Qty, &ln.ReceivedQty, &ln.BilledQty,
 			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -544,7 +563,7 @@ func createPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		computed, errs := computePurchaseOrderLines(tt, applyBuyingRatesToPOLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
+		computed, errs := computePurchaseOrderLines(r.Context(), pool, tu.TenantID, tt, applyBuyingRatesToPOLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -931,7 +950,7 @@ func updatePurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		computed, errs := computePurchaseOrderLines(tt, applyBuyingRatesToPOLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
+		computed, errs := computePurchaseOrderLines(r.Context(), pool, tu.TenantID, tt, applyBuyingRatesToPOLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines))
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -1050,7 +1069,7 @@ func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 
 		tag, err := tx.Exec(r.Context(), `
 			update public.po_purchase_orders
-			set status = 'confirmed', updated_at = now()
+			set status = 'confirmed', progress_status = 'completed', updated_at = now()
 			where id = $1 and tenant_id = $2 and deleted_at is null and status = 'draft'`,
 			id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
@@ -1187,14 +1206,15 @@ func insertPurchaseOrderLines(ctx context.Context, tx pgx.Tx, purchaseOrderID in
 			  purchase_order_id, purchase_request_line_id, rfq_request_line_id, supplier_quotation_line_id, line_no,
 			  partner_id, partner_code, partner_name,
 			  item_id, item_code, item_name, spec_name, description,
-			  qty, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+			  qty, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
+			  planned_serial_nos
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 			returning id`,
 			purchaseOrderID, ln.PurchaseRequestLineID, ln.RFQRequestLineID, ln.SupplierQuotationLineID, lineNo,
 			ln.PartnerID, strings.TrimSpace(ln.PartnerCode), strings.TrimSpace(ln.PartnerName),
 			ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.SpecName, ln.Description,
 			ln.Qty, ln.InputBasis, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
-			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark).Scan(&id)
+			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark, ln.PlannedSerialNos).Scan(&id)
 		if err != nil {
 			return nil, err
 		}
@@ -1228,11 +1248,16 @@ func applyBuyingRatesToPOLines(ctx context.Context, pool *pgxpool.Pool, tenantID
 	return out
 }
 
-func computePurchaseOrderLines(tt taxcalc.TaxType, lines []purchaseOrderLineBody) ([]computedLine, map[string]string) {
+func computePurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, tt taxcalc.TaxType, lines []purchaseOrderLineBody) ([]computedLine, map[string]string) {
 	errs := map[string]string{}
 	var out []computedLine
 	for i, ln := range lines {
 		if ln.Qty <= 0 {
+			continue
+		}
+		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
+		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.ItemID, ln.Qty, planned); err != nil {
+			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}
 		inputBasis := ln.InputBasis
@@ -1259,6 +1284,7 @@ func computePurchaseOrderLines(tt taxcalc.TaxType, lines []purchaseOrderLineBody
 			InputBasis:            inputBasis,
 			Amounts:               amounts,
 			Remark:                ln.Remark,
+			PlannedSerialNos:      planned,
 		})
 	}
 	if len(errs) > 0 {

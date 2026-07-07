@@ -19,5 +19,9 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 		qr.With(auth.RequirePermission("quality.capa_read", auth.AccessRead)).Get("/capa", listCapaRecords(pool))
 		qr.With(auth.RequirePermission("quality.capa_write", auth.AccessWrite)).Post("/capa", createCapaRecord(pool))
+
+		qr.With(auth.RequirePermission("quality.qc_requests", auth.AccessRead)).Get("/qc-requests", listQcRequests(pool))
+		qr.With(auth.RequirePermission("quality.qc_requests", auth.AccessWrite)).Post("/qc-requests", createQcRequest(pool))
+		qr.With(auth.RequirePermission("quality.qc_requests", auth.AccessWrite)).Patch("/qc-requests/{id}", patchQcRequest(pool))
 	})
 }

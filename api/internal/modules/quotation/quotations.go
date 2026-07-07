@@ -35,7 +35,9 @@ type QuotationLine struct {
 	TaxAmount   float64 `json:"tax_amount"`
 	UnitVatInc  float64 `json:"unit_vat_inc"`
 	LineTotal   float64 `json:"line_total"`
-	Remark      *string `json:"remark,omitempty"`
+	Remark            *string  `json:"remark,omitempty"`
+	PlannedSerialNos  []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial       bool     `json:"track_serial,omitempty"`
 }
 
 type Quotation struct {
@@ -83,7 +85,8 @@ type quotationLineBody struct {
 	Qty         float64 `json:"qty"`
 	UnitPrice   float64 `json:"unit_price"`
 	InputBasis  string  `json:"input_basis"`
-	Remark      *string `json:"remark"`
+	Remark           *string  `json:"remark"`
+	PlannedSerialNos []string `json:"planned_serial_nos"`
 }
 
 type quotationBody struct {
@@ -114,7 +117,8 @@ type computedLine struct {
 	Description *string
 	Qty         float64
 	Amounts     taxcalc.LineAmounts
-	Remark      *string
+	Remark           *string
+	PlannedSerialNos []string
 }
 
 type createdSlipRow struct {
@@ -377,11 +381,14 @@ func loadQuotation(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 
 func loadQuotationLines(ctx context.Context, pool *pgxpool.Pool, quotationID int64) ([]QuotationLine, error) {
 	rows, err := pool.Query(ctx, `
-		select id, line_no, item_id, item_code, item_name, description,
-		  qty::float8, unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
-		  unit_vat_inc::float8, line_total::float8, remark
-		from public.quo_quotation_lines
-		where quotation_id = $1
+		select ln.id, ln.line_no, ln.item_id, ln.item_code, ln.item_name, ln.description,
+		  ln.qty::float8, ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
+		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark,
+		  coalesce(ln.planned_serial_nos, '{}'),
+		  coalesce(i.track_serial, false)
+		from public.quo_quotation_lines ln
+		left join public.inv_items i on i.id = ln.item_id
+		where ln.quotation_id = $1
 		order by line_no`, quotationID)
 	if err != nil {
 		return nil, err
@@ -393,7 +400,7 @@ func loadQuotationLines(ctx context.Context, pool *pgxpool.Pool, quotationID int
 		var ln QuotationLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -430,7 +437,7 @@ func createQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		body.Lines = applyPartnerRatesToQuotationLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
-		computed, errs := computeQuotationLines(tt, body.Lines)
+		computed, errs := computeQuotationLines(r.Context(), pool, tu.TenantID, tt, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -527,7 +534,7 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		body.Lines = applyPartnerRatesToQuotationLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
-		computed, errs := computeQuotationLines(tt, body.Lines)
+		computed, errs := computeQuotationLines(r.Context(), pool, tu.TenantID, tt, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -604,11 +611,12 @@ func replaceQuotationLines(ctx context.Context, tx pgx.Tx, quotationID int64, li
 		_, err := tx.Exec(ctx, `
 			insert into public.quo_quotation_lines (
 			  quotation_id, line_no, item_id, item_code, item_name, description,
-			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
+			  planned_serial_nos
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
 			quotationID, lineNo, ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.Description,
 			ln.Qty, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
-			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark)
+			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark, ln.PlannedSerialNos)
 		if err != nil {
 			return err
 		}
@@ -616,12 +624,17 @@ func replaceQuotationLines(ctx context.Context, tx pgx.Tx, quotationID int64, li
 	return nil
 }
 
-func computeQuotationLines(tt taxcalc.TaxType, lines []quotationLineBody) ([]computedLine, map[string]string) {
+func computeQuotationLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, tt taxcalc.TaxType, lines []quotationLineBody) ([]computedLine, map[string]string) {
 	errs := map[string]string{}
 	var out []computedLine
 	for i, ln := range lines {
 		if ln.Qty <= 0 {
 			errs[fmt.Sprintf("lines[%d].qty", i)] = "Quantity must be greater than zero."
+			continue
+		}
+		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
+		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.ItemID, ln.Qty, planned); err != nil {
+			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}
 		inputBasis := ln.InputBasis
@@ -634,14 +647,15 @@ func computeQuotationLines(tt taxcalc.TaxType, lines []quotationLineBody) ([]com
 		}
 		amounts := taxcalc.ComputeLine(tt, ln.UnitPrice, ln.Qty, inputBasis)
 		out = append(out, computedLine{
-			LineNo:      ln.LineNo,
-			ItemID:      ln.ItemID,
-			ItemCode:    ln.ItemCode,
-			ItemName:    ln.ItemName,
-			Description: ln.Description,
-			Qty:         ln.Qty,
-			Amounts:     amounts,
-			Remark:      ln.Remark,
+			LineNo:           ln.LineNo,
+			ItemID:           ln.ItemID,
+			ItemCode:         ln.ItemCode,
+			ItemName:         ln.ItemName,
+			Description:      ln.Description,
+			Qty:              ln.Qty,
+			Amounts:          amounts,
+			Remark:           ln.Remark,
+			PlannedSerialNos: planned,
 		})
 	}
 	if len(errs) > 0 {

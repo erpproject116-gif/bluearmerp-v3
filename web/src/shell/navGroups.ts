@@ -1,5 +1,6 @@
 import type { AppModule } from "./modules";
 import { appModules } from "./modules";
+import { REVIEW_PURCHASES_SUB_BRANCH } from "./review-purchases-nav";
 import { COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
 import { SERIAL_LOT_PREFIX } from "./serial-lot-nav";
 import { WMS_PREFIX } from "./wms-nav";
@@ -26,6 +27,7 @@ export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
   [WMS_PREFIX]: "inventory.wms",
   [TAX_MNGT_PREFIX]: "quotation.tax_mngt",
   [COLLECTIVE_INVOICING_PREFIX]: "sales.collective_invoicing",
+  [REVIEW_PURCHASES_SUB_BRANCH]: "finance.supplier_invoices",
 };
 
 export const navGroups: NavGroup[] = [
@@ -62,14 +64,14 @@ export const navGroups: NavGroup[] = [
     label: "Buying",
     defaultExpanded: true,
     entries: [
+      { kind: "module", moduleId: "buying" },
       { kind: "module", moduleId: "purchase_request" },
       { kind: "module", moduleId: "purchase_order" },
       {
-        kind: "link",
-        moduleId: "finance",
-        label: "Purchases",
-        href: "/app/finance/supplier-invoices",
-        basePath: "/app/finance/supplier-invoices",
+        kind: "subBranch",
+        moduleId: "buying",
+        featureCode: "finance.supplier_invoices",
+        branchLabel: "Review Purchases",
       },
     ],
   },

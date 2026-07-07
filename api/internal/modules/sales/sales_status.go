@@ -33,6 +33,7 @@ type salesStatusFilters struct {
 	ItemID         *int64
 	ProgressStatus string
 	TaxTypeID      *int64
+	ReportType     string
 }
 
 type salesStatusRow struct {
@@ -134,6 +135,13 @@ func parseSalesStatusFilters(r *http.Request, tu auth.TenantUser) (salesStatusFi
 	if progress == "unconfirmed" || progress == "completed" {
 		f.ProgressStatus = progress
 	}
+	rt := strings.TrimSpace(r.URL.Query().Get("report_type"))
+	switch rt {
+	case "summary", "by_line":
+		f.ReportType = rt
+	default:
+		f.ReportType = "details"
+	}
 	f.LocationID = datascope.ResolveLocationFilter(tu, f.LocationID)
 	return f, nil
 }
@@ -181,48 +189,92 @@ func buildSalesStatusWhere(f salesStatusFilters, tenantID int64) (string, []any)
 	return where, args
 }
 
-func salesStatusFromClause() string {
-	return `
+func salesStatusFromClause(f salesStatusFilters) string {
+	switch f.ReportType {
+	case "summary":
+		return `
 		from public.sa_sales s
 		join public.inv_partners p on p.id = s.partner_id
 		join public.inv_locations l on l.id = s.location_id
 		join public.quo_tax_types tt on tt.id = s.tax_type_id
 		join public.sa_sales_lines ln on ln.sales_id = s.id`
+	case "by_line":
+		return `
+		from public.sa_sales s
+		join public.sa_sales_lines ln on ln.sales_id = s.id`
+	default:
+		return `
+		from public.sa_sales s
+		join public.inv_partners p on p.id = s.partner_id
+		join public.inv_locations l on l.id = s.location_id
+		join public.quo_tax_types tt on tt.id = s.tax_type_id
+		join public.sa_sales_lines ln on ln.sales_id = s.id`
+	}
 }
 
-func salesStatusOrderBy(sort, order string) string {
+func salesStatusSelect(f salesStatusFilters) string {
+	switch f.ReportType {
+	case "summary":
+		return `select s.id, 0::bigint, s.order_date, s.date_seq, s.sales_no, s.progress_status,
+		  l.location_name, s.pic_name, p.company_name, tt.name, s.due_date,
+		  ''::varchar, '(summary)'::text, coalesce(sum(ln.qty), 0)::float8,
+		  coalesce(sum(ln.line_total), 0)::float8, null::text`
+	case "by_line":
+		return `select 0::bigint, 0::bigint, min(s.order_date), 0, '—'::varchar, ''::varchar,
+		  '—'::text, '—'::text, '—'::text, ''::text, null::date,
+		  ln.item_code, ln.item_name, coalesce(sum(ln.qty), 0)::float8,
+		  coalesce(sum(ln.line_total), 0)::float8, null::text`
+	default:
+		return `select s.id, ln.id, s.order_date, s.date_seq, s.sales_no, s.progress_status,
+		  l.location_name, s.pic_name, p.company_name, tt.name, s.due_date,
+		  ln.item_code, ln.item_name, ln.qty::float8, ln.line_total::float8, ln.remark`
+	}
+}
+
+func salesStatusGroupBy(f salesStatusFilters) string {
+	switch f.ReportType {
+	case "summary":
+		return ` group by s.id, s.order_date, s.date_seq, s.sales_no, s.progress_status,
+		  l.location_name, s.pic_name, p.company_name, tt.name, s.due_date`
+	case "by_line":
+		return ` group by ln.item_id, ln.item_code, ln.item_name`
+	default:
+		return ""
+	}
+}
+
+func salesStatusOrderBy(f salesStatusFilters, sort, order string) string {
+	if f.ReportType == "by_line" {
+		return "item_code asc"
+	}
 	allowed := map[string]string{
-		"order_date":      "s.order_date",
-		"sales_no":        "s.sales_no",
-		"progress_status": "s.progress_status",
-		"location_name":   "l.location_name",
-		"pic_name":        "s.pic_name",
-		"customer_name":   "p.company_name",
-		"due_date":        "s.due_date",
-		"item_code":       "ln.item_code",
-		"qty":             "ln.qty",
-		"line_total":      "ln.line_total",
+		"order_date":      "order_date",
+		"sales_no":        "sales_no",
+		"progress_status": "progress_status",
+		"location_name":   "location_name",
+		"pic_name":        "pic_name",
+		"customer_name":   "customer_name",
+		"due_date":        "due_date",
+		"item_code":       "item_code",
+		"qty":             "qty",
+		"line_total":      "line_total",
 	}
 	col := allowed["order_date"]
 	if c, ok := allowed[sort]; ok {
 		col = c
 	}
-	return fmt.Sprintf("%s %s, ln.line_no asc", col, orderSQL(order))
+	if f.ReportType == "details" {
+		return fmt.Sprintf("%s %s, line_id asc", col, orderSQL(order))
+	}
+	return fmt.Sprintf("%s %s", col, orderSQL(order))
 }
 
 func querySalesStatusRows(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f salesStatusFilters, sort, order string, limit, offset int) ([]salesStatusRow, int64, error) {
 	where, args := buildSalesStatusWhere(f, tenantID)
-	orderClause := salesStatusOrderBy(sort, order)
-	q := fmt.Sprintf(`
-		select s.id, ln.id, s.order_date, s.date_seq, s.sales_no, s.progress_status,
-		  l.location_name, s.pic_name, p.company_name, tt.name, s.due_date,
-		  ln.item_code, ln.item_name, ln.qty::float8, ln.line_total::float8, ln.remark,
-		  count(*) over()
-		%s
-		where %s
-		order by %s
-		limit $%d offset $%d`,
-		salesStatusFromClause(), where, orderClause, len(args)+1, len(args)+2)
+	orderClause := salesStatusOrderBy(f, sort, order)
+	q := fmt.Sprintf(`%s %s where %s%s order by %s limit $%d offset $%d`,
+		salesStatusSelect(f), salesStatusFromClause(f), where, salesStatusGroupBy(f),
+		orderClause, len(args)+1, len(args)+2)
 	args = append(args, limit, offset)
 
 	rows, err := pool.Query(ctx, q, args...)
@@ -232,7 +284,6 @@ func querySalesStatusRows(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 	defer rows.Close()
 
 	var out []salesStatusRow
-	var total int64
 	for rows.Next() {
 		var row salesStatusRow
 		var orderDate time.Time
@@ -241,13 +292,24 @@ func querySalesStatusRows(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 		if err := rows.Scan(
 			&row.SalesID, &row.LineID, &orderDate, &dateSeq, &row.SalesNo, &row.ProgressStatus,
 			&row.LocationName, &row.PicName, &row.CustomerName, &row.TaxTypeName, &dueDate,
-			&row.ItemCode, &row.ItemName, &row.Qty, &row.LineTotal, &row.Remark, &total,
+			&row.ItemCode, &row.ItemName, &row.Qty, &row.LineTotal, &row.Remark,
 		); err != nil {
 			return nil, 0, err
 		}
-		row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
+		if f.ReportType == "by_line" {
+			row.DateNoDisplay = "—"
+		} else {
+			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
+		}
 		row.DueDate = datePtrToStr(dueDate)
 		out = append(out, row)
+	}
+
+	countQ := fmt.Sprintf(`select count(*) from (select 1 %s where %s%s) sub`,
+		salesStatusFromClause(f), where, salesStatusGroupBy(f))
+	var total int64
+	if err := pool.QueryRow(ctx, countQ, args[:len(args)-2]...).Scan(&total); err != nil {
+		return nil, 0, err
 	}
 	if out == nil {
 		out = []salesStatusRow{}
@@ -258,7 +320,7 @@ func querySalesStatusRows(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 func querySalesStatusSummary(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f salesStatusFilters) (salesStatusSummary, error) {
 	where, args := buildSalesStatusWhere(f, tenantID)
 	q := fmt.Sprintf(`select coalesce(sum(ln.qty), 0)::float8, coalesce(sum(ln.line_total), 0)::float8 %s where %s`,
-		salesStatusFromClause(), where)
+		salesStatusFromClause(f), where)
 	var summary salesStatusSummary
 	err := pool.QueryRow(ctx, q, args...).Scan(&summary.TotalQty, &summary.TotalAmount)
 	return summary, err

@@ -10,6 +10,7 @@ import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/Resiz
 import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
 import { PartnerSearchModal, type PartnerSearchRow } from "./PartnerSearchModal";
+import { SerialLineCell } from "../../../shared/SerialLineCell";
 
 export type PurchaseRequestLineRow = {
   line_no: number;
@@ -32,6 +33,8 @@ export type PurchaseRequestLineRow = {
   remark: string;
   source_sales_order_line_id?: number | null;
   purchase_request_line_id?: number | null;
+  track_serial?: boolean;
+  planned_serial_nos?: string[];
 };
 
 export function emptyPurchaseRequestLine(
@@ -77,6 +80,7 @@ const LINE_COLUMNS = [
   { key: "tax", header: "Tax", width: 90 },
   { key: "unit_vat_inc", header: "Unit (VAT inc.)", width: 110 },
   { key: "line_total", header: "Line Total", width: 110 },
+  { key: "serials", header: "Planned Serials", width: 150 },
   { key: "remark", header: "Remark", width: 100 },
   { key: "actions", header: "", width: 72 },
 ] as const;
@@ -197,6 +201,8 @@ export function PurchaseRequestLineGrid(props: Props) {
             spec_name: item.spec_name ?? "",
             unit_price: String(item.sales_price ?? 0),
             input_basis: basis,
+            track_serial: Boolean(item.track_serial),
+            planned_serial_nos: [],
           }
         : ln,
     );
@@ -351,6 +357,16 @@ export function PurchaseRequestLineGrid(props: Props) {
                     <ResizableTd width={widthFor("unit_vat_inc")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().unit_vat_inc))}</ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().line_total))}</ResizableTd>
+                  <ResizableTd width={widthFor("serials")} class="px-2 py-1">
+                    <Show when={line().item_id && line().track_serial} fallback={<span class="text-xs text-text-secondary">—</span>}>
+                      <SerialLineCell
+                        mode="planned"
+                        qty={parseNum(line().qty)}
+                        plannedSerials={line().planned_serial_nos ?? []}
+                        onChange={(serials) => void updateLine(idx, { planned_serial_nos: serials })}
+                      />
+                    </Show>
+                  </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">
                     <input class={`${inputClass} w-full`} value={line().remark} onInput={(e) => void updateLine(idx, { remark: e.currentTarget.value })} />
                   </ResizableTd>
@@ -386,7 +402,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                 <td />
               </Show>
               <td class="px-2 py-2 text-right">{formatAmount(totals().grand)}</td>
-              <td colSpan={2} />
+              <td colSpan={3} />
             </tr>
           </tfoot>
         </table>

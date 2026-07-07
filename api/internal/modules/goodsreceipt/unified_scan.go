@@ -39,8 +39,9 @@ type scanContextLine struct {
 	TrackSerial  bool    `json:"track_serial"`
 	ExpectedQty  float64 `json:"expected_qty"`
 	ReceivedQty  float64 `json:"received_qty"`
-	SerialCount  int     `json:"serial_count"`
-	IsOpen       bool    `json:"is_open"`
+	SerialCount        int      `json:"serial_count"`
+	IsOpen             bool     `json:"is_open"`
+	PlannedSerialNos   []string `json:"planned_serial_nos,omitempty"`
 }
 
 type scanContextPayload struct {
@@ -172,7 +173,8 @@ func loadScanContext(ctx context.Context, pool *pgxpool.Pool, tenantID, grID int
 	rows, err := pool.Query(ctx, `
 		select grl.id, grl.line_no, coalesce(i.item_code, ''), coalesce(i.item_name, ''),
 		  coalesce(i.track_serial, false), grl.expected_qty::float8, grl.received_qty::float8,
-		  (select count(*)::int from public.gr_goods_receipt_serials gs where gs.goods_receipt_line_id = grl.id)
+		  (select count(*)::int from public.gr_goods_receipt_serials gs where gs.goods_receipt_line_id = grl.id),
+		  coalesce(pol.planned_serial_nos, '{}')
 		from public.gr_goods_receipt_lines grl
 		join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
 		left join public.inv_items i on i.id = pol.item_id
@@ -188,7 +190,7 @@ func loadScanContext(ctx context.Context, pool *pgxpool.Pool, tenantID, grID int
 		var ln scanContextLine
 		if err := rows.Scan(
 			&ln.LineID, &ln.LineNo, &ln.ItemCode, &ln.ItemName, &ln.TrackSerial,
-			&ln.ExpectedQty, &ln.ReceivedQty, &ln.SerialCount,
+			&ln.ExpectedQty, &ln.ReceivedQty, &ln.SerialCount, &ln.PlannedSerialNos,
 		); err != nil {
 			return scanContextPayload{}, err
 		}
@@ -278,7 +280,8 @@ func findOpenLinesByItemCode(ctx context.Context, tx pgx.Tx, grID int64, itemCod
 	rows, err := tx.Query(ctx, `
 		select grl.id, grl.line_no, coalesce(i.item_code, ''), coalesce(i.item_name, ''),
 		  coalesce(i.track_serial, false), grl.expected_qty::float8, grl.received_qty::float8,
-		  (select count(*)::int from public.gr_goods_receipt_serials gs where gs.goods_receipt_line_id = grl.id)
+		  (select count(*)::int from public.gr_goods_receipt_serials gs where gs.goods_receipt_line_id = grl.id),
+		  coalesce(pol.planned_serial_nos, '{}')
 		from public.gr_goods_receipt_lines grl
 		join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
 		join public.inv_items i on i.id = pol.item_id
@@ -297,7 +300,7 @@ func findOpenLinesByItemCode(ctx context.Context, tx pgx.Tx, grID int64, itemCod
 		var ln scanContextLine
 		if err := rows.Scan(
 			&ln.LineID, &ln.LineNo, &ln.ItemCode, &ln.ItemName, &ln.TrackSerial,
-			&ln.ExpectedQty, &ln.ReceivedQty, &ln.SerialCount,
+			&ln.ExpectedQty, &ln.ReceivedQty, &ln.SerialCount, &ln.PlannedSerialNos,
 		); err != nil {
 			return nil, err
 		}

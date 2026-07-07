@@ -20,6 +20,10 @@ type workspaceSummary struct {
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/buying", func(br chi.Router) {
 		br.Get("/workspace", workspaceHandler(pool))
+		br.Route("/reports", func(rr chi.Router) {
+			rr.With(auth.RequirePermission("buying.purchase_status", auth.AccessRead)).Get("/purchase-status/export", exportPurchaseStatusReport(pool))
+			rr.With(auth.RequirePermission("buying.purchase_status", auth.AccessRead)).Get("/purchase-status", listPurchaseStatusReport(pool))
+		})
 	})
 }
 

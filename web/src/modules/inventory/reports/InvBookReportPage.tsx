@@ -1,0 +1,97 @@
+import { createSignal, For, onMount, Show } from "solid-js";
+import { ReportPageLayout, defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
+import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
+import { invBookExportUrl, useInvBookReport } from "../../../shared/reports/useModuleReports";
+import { formatPeso } from "../../../shared/money";
+
+export default function InvBookReportPage() {
+  const defaults = defaultReportDateRange();
+  const [dateFrom, setDateFrom] = createSignal(defaults.date_from);
+  const [dateTo, setDateTo] = createSignal(defaults.date_to);
+  const [submitted, setSubmitted] = createSignal(false);
+  const [page, setPage] = createSignal(1);
+  const pageSize = 50;
+
+  const report = useInvBookReport(() => ({
+    filters: { date_from: dateFrom(), date_to: dateTo() },
+    page: page(),
+    pageSize,
+    sort: "item_code",
+    order: "asc",
+    enabled: submitted(),
+  }));
+
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F8") {
+        e.preventDefault();
+        search();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const search = () => {
+    setSubmitted(true);
+    setPage(1);
+  };
+
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+
+  return (
+    <ReportPageLayout
+      title="Inv. Book"
+      description="Opening, receipt, issue, and closing qty by item and location — Search (F8)."
+      dateFrom={dateFrom}
+      dateTo={dateTo}
+      onDateFromChange={setDateFrom}
+      onDateToChange={setDateTo}
+      submitted={submitted()}
+      loading={report.isFetching}
+      page={page()}
+      totalPages={totalPages()}
+      onPageChange={setPage}
+      onSearch={search}
+      onReset={() => {
+        setSubmitted(false);
+        setPage(1);
+      }}
+      onExportCsv={() => void downloadReportCsv(invBookExportUrl({ date_from: dateFrom(), date_to: dateTo() }), "inv-book.csv")}
+    >
+      <table class="erp-grid min-w-full text-left text-sm">
+        <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+          <tr>
+            <th class="px-3 py-2">Item</th>
+            <th class="px-3 py-2">Location</th>
+            <th class="px-3 py-2 text-right">Opening</th>
+            <th class="px-3 py-2 text-right">Receipt</th>
+            <th class="px-3 py-2 text-right">Issue</th>
+            <th class="px-3 py-2 text-right">Closing</th>
+            <th class="px-3 py-2 text-right">Purchase Price</th>
+            <th class="px-3 py-2 text-right">Sales Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <For each={report.data?.rows ?? []}>
+            {(row) => (
+              <tr class="border-t border-stroke/60">
+                <td class="px-3 py-2">{row.item_code} — {row.item_name}</td>
+                <td class="px-3 py-2">{row.location_name}</td>
+                <td class="px-3 py-2 text-right">{row.opening_qty}</td>
+                <td class="px-3 py-2 text-right">{row.receipt_qty}</td>
+                <td class="px-3 py-2 text-right">{row.issue_qty}</td>
+                <td class="px-3 py-2 text-right">{row.closing_qty}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(row.purchase_price)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(row.sales_price)}</td>
+              </tr>
+            )}
+          </For>
+        </tbody>
+      </table>
+      <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
+        <p class="px-5 py-8 text-center text-sm text-text-secondary">No stock ledger rows for this period.</p>
+      </Show>
+    </ReportPageLayout>
+  );
+}

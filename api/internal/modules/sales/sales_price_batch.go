@@ -124,7 +124,7 @@ func priceBatchFromClause() string {
 
 func queryPriceBatchRows(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f priceBatchFilters, sort, order string, limit, offset int) ([]priceBatchRow, int64, error) {
 	where, args := buildPriceBatchWhere(f, tenantID)
-	orderClause := salesStatusOrderBy(sort, order)
+	orderClause := salesStatusOrderBy(salesStatusFilters{ReportType: "details"}, sort, order)
 	q := fmt.Sprintf(`
 		select s.id, ln.id, s.order_date, s.date_seq, s.sales_no,
 		  p.company_name, s.pic_name, l.location_name, tt.name, s.progress_status,

@@ -11,6 +11,7 @@ import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/Resiz
 import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
 import { QuotationItemSearchModal } from "./QuotationItemSearchModal";
+import { SerialLineCell } from "../../../shared/SerialLineCell";
 
 export type QuotationLineRow = {
   line_no: number;
@@ -27,6 +28,8 @@ export type QuotationLineRow = {
   unit_vat_inc: string;
   line_total: string;
   remark: string;
+  track_serial?: boolean;
+  planned_serial_nos?: string[];
 };
 
 export function emptyQuotationLine(lineNo: number, salesPrice = "", inputBasis: QuotationLineRow["input_basis"] = "vat_inc_unit"): QuotationLineRow {
@@ -61,6 +64,7 @@ const QUOTATION_LINE_COLUMNS = [
   { key: "tax", header: "Tax", width: 90 },
   { key: "unit_vat_inc", header: "Unit (VAT inc.)", width: 110 },
   { key: "line_total", header: "Line Total", width: 110 },
+  { key: "serials", header: "Planned Serials", width: 150 },
   { key: "remark", header: "Remark", width: 120 },
   { key: "actions", header: "", width: 72 },
 ] as const;
@@ -176,6 +180,8 @@ export function QuotationLineGrid(props: Props) {
       item_name: first.item_name,
       unit_price: String(rate0),
       input_basis: basis,
+      track_serial: Boolean(first.track_serial),
+      planned_serial_nos: [],
     };
     for (let i = 1; i < items.length; i++) {
       const it = items[i];
@@ -187,6 +193,7 @@ export function QuotationLineGrid(props: Props) {
         item_id: it.id,
         item_code: it.item_code,
         item_name: it.item_name,
+        track_serial: Boolean(it.track_serial),
       };
     }
     const numbered = current.map((ln, i) => ({ ...ln, line_no: i + 1 }));
@@ -300,6 +307,16 @@ export function QuotationLineGrid(props: Props) {
                     <ResizableTd width={widthFor("unit_vat_inc")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().unit_vat_inc))}</ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().line_total))}</ResizableTd>
+                  <ResizableTd width={widthFor("serials")} class="px-2 py-1">
+                    <Show when={line().item_id && line().track_serial} fallback={<span class="text-xs text-text-secondary">—</span>}>
+                      <SerialLineCell
+                        mode="planned"
+                        qty={parseNum(line().qty)}
+                        plannedSerials={line().planned_serial_nos ?? []}
+                        onChange={(serials) => void updateLine(idx, { planned_serial_nos: serials })}
+                      />
+                    </Show>
+                  </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">
                     <input class={`${inputClass} w-full`} value={line().remark} onInput={(e) => void updateLine(idx, { remark: e.currentTarget.value })} />
                   </ResizableTd>

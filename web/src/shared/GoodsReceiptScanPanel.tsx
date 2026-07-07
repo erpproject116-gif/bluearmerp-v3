@@ -1,7 +1,8 @@
-import { createResource, Show } from "solid-js";
+import { createResource, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { apiFetch } from "./api";
 import { SerialReceiveScanner, type SerialReceiveLine } from "./SerialReceiveScanner";
+import { SerialLineCell } from "./SerialLineCell";
 
 type GoodsReceiptDetail = {
   id: number;
@@ -65,6 +66,59 @@ export function GoodsReceiptScanPanel(props: { grId: number; onClose?: () => voi
           }}
           onAfterScan={() => void refetch()}
         />
+
+        <Show when={(detail()!.lines ?? []).some((l) => l.track_serial)}>
+          <div class="mt-4 overflow-x-auto rounded-lg border border-stroke">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-50 text-left text-text-secondary">
+                <tr>
+                  <th class="px-3 py-2">Line</th>
+                  <th class="px-3 py-2">Item</th>
+                  <th class="px-3 py-2">Expected</th>
+                  <th class="px-3 py-2">Serials</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For each={(detail()!.lines ?? []).filter((l) => l.track_serial)}>
+                  {(line) => (
+                    <tr class="border-t border-stroke">
+                      <td class="px-3 py-2">{line.line_no}</td>
+                      <td class="px-3 py-2">
+                        {line.item_code} — {line.item_name}
+                      </td>
+                      <td class="px-3 py-2">{line.expected_qty}</td>
+                      <td class="px-3 py-2">
+                        <SerialLineCell
+                          mode="receive"
+                          grId={props.grId}
+                          lineId={line.id}
+                          itemCode={line.item_code}
+                          itemName={line.item_name}
+                          expectedQty={line.expected_qty}
+                          receivedQty={line.received_qty}
+                          serials={line.serials ?? []}
+                          status={detail()!.status}
+                          onSerialsChange={(serials, receivedQty) => {
+                            mutate((d: GoodsReceiptDetail | undefined) => {
+                              if (!d?.lines) return d;
+                              return {
+                                ...d,
+                                lines: d.lines.map((l) =>
+                                  l.id === line.id ? { ...l, serials, received_qty: receivedQty } : l,
+                                ),
+                              };
+                            });
+                          }}
+                          onAfterScan={() => void refetch()}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </Show>
       </Show>
       <Show when={detail() && detail()!.status !== "draft"}>
         <p class="text-sm text-text-secondary">Only draft receipts accept serial scans.</p>

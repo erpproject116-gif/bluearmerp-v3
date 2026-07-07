@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, Show } from "solid-js";
+import { createResource, createSignal, For, Show, createEffect } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
@@ -20,6 +20,13 @@ async function fetchOpenLines(partnerId: number) {
 export function OpenGRLinePickerModal(props: Props) {
   const [q, setQ] = createSignal("");
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
+
+  createEffect(() => {
+    if (!props.open) {
+      setQ("");
+      setSelected(new Set<number>());
+    }
+  });
 
   const [data] = createResource(
     () => (props.open && props.partnerId ? props.partnerId : null),
@@ -48,7 +55,8 @@ export function OpenGRLinePickerModal(props: Props) {
   };
 
   const confirm = () => {
-    const picked = filtered().filter((r) => selected().has(r.goods_receipt_line_id));
+    const rows = data() ?? [];
+    const picked = rows.filter((r) => selected().has(r.goods_receipt_line_id));
     if (picked.length === 0) return;
     props.onConfirm(picked);
     props.onClose();
@@ -82,6 +90,12 @@ export function OpenGRLinePickerModal(props: Props) {
           <div class="max-h-[50vh] overflow-auto px-5 py-3">
             <Show when={data.loading}>
               <p class="text-sm text-text-secondary">Loading open lines…</p>
+            </Show>
+            <Show when={data.error}>
+              <p class="text-sm text-red-600">Failed to load open lines.</p>
+            </Show>
+            <Show when={!data.loading && !data.error && filtered().length === 0}>
+              <p class="text-sm text-text-secondary">No open goods receipt lines for this vendor.</p>
             </Show>
             <table class="min-w-full text-sm">
               <thead class="sticky top-0 bg-white text-left text-xs uppercase text-text-secondary">
@@ -127,7 +141,7 @@ export function OpenGRLinePickerModal(props: Props) {
               disabled={selected().size === 0}
               onClick={confirm}
             >
-              Add {selected().size || ""} line{selected().size === 1 ? "" : "s"}
+              Apply residual qty ({selected().size || 0})
             </button>
           </div>
         </div>

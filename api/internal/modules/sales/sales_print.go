@@ -153,6 +153,10 @@ func patchSalesProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"progress_status": "Must be unconfirmed or completed."})
 			return
 		}
+		if body.ProgressStatus == "e_approval" {
+			response.Validation(w, map[string]string{"progress_status": "Use Submit for approval instead."})
+			return
+		}
 		status := defaultProgress(body.ProgressStatus)
 
 		var priorStatus string

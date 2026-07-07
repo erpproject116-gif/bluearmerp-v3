@@ -17,7 +17,8 @@ import {
   ungroupedModuleIds,
   type NavGroupEntry,
 } from "./navGroups";
-import { isAnySubBranchPath } from "./sub-branch-nav";
+import { isAnySubBranchPath, isSubBranchPath } from "./sub-branch-nav";
+import { isReviewPurchasesPath } from "./review-purchases-nav";
 
 function readExpanded(groupId: string, defaultExpanded: boolean): boolean {
   try {
@@ -33,7 +34,11 @@ function readExpanded(groupId: string, defaultExpanded: boolean): boolean {
 function NavModuleLink(props: { module: AppModule }) {
   const loc = useLocation();
   const shell = useShell();
-  const inModule = () => loc.pathname.startsWith(props.module.basePath);
+  const inModule = () => {
+    if (props.module.id === "finance" && isReviewPurchasesPath(loc.pathname)) return false;
+    if (props.module.id === "buying" && isReviewPurchasesPath(loc.pathname)) return true;
+    return loc.pathname.startsWith(props.module.basePath);
+  };
   const inSubBranch = () => isAnySubBranchPath(loc.pathname, props.module.subBranches);
   const moduleActive = () => inModule() && !inSubBranch();
   const moduleExpanded = () => inModule() && inSubBranch();
@@ -107,9 +112,9 @@ function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
   const shell = useShell();
   const branchActive = () =>
     props.branch.prefix != null
-      ? loc.pathname === props.branch.href ||
-        loc.pathname === props.branch.settingsHref ||
-        loc.pathname.startsWith(`${props.branch.prefix}/`)
+      ? props.branch.href === loc.pathname ||
+        props.branch.settingsHref === loc.pathname ||
+        isSubBranchPath(loc.pathname, props.branch.prefix)
       : loc.pathname === props.branch.href || loc.pathname === props.branch.settingsHref;
 
   return (

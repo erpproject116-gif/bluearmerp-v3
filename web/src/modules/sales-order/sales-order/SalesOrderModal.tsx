@@ -75,6 +75,8 @@ export type SalesOrderDetail = {
     line_total: number;
     remark?: string | null;
     source_quotation_line_id?: number | null;
+    planned_serial_nos?: string[];
+    track_serial?: boolean;
   }>;
 };
 
@@ -150,6 +152,8 @@ function linesFromDetail(lines?: SalesOrderDetail["lines"]): SalesOrderLineRow[]
     line_total: String(ln.line_total ?? 0),
     remark: ln.remark ?? "",
     source_quotation_line_id: ln.source_quotation_line_id ?? null,
+    planned_serial_nos: ln.planned_serial_nos ?? [],
+    track_serial: Boolean(ln.track_serial),
   }));
 }
 
@@ -444,6 +448,7 @@ export function SalesOrderModal(props: Props) {
         input_basis: ln.input_basis,
         remark: ln.remark || null,
         source_quotation_line_id: ln.source_quotation_line_id || null,
+        planned_serial_nos: ln.planned_serial_nos ?? [],
       })),
     };
 

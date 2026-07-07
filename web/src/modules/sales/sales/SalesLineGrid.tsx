@@ -3,8 +3,7 @@ import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
-import { SerialPickModal } from "../../../shared/SerialPickModal";
-import { SerialSaleScanner } from "../../../shared/SerialSaleScanner";
+import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
@@ -85,12 +84,9 @@ const BASE_COLUMNS: GridColumn[] = [
   { key: "line_total", header: "Line Total", width: 110 },
 ];
 
-const DISCOUNT_COLUMNS: GridColumn[] = [
-  { key: "discount_amount", header: "Discount", width: 100 },
-  { key: "serial_lot_no", header: "Serial/Lot No.", width: 120 },
-];
+const DISCOUNT_COLUMNS: GridColumn[] = [{ key: "discount_amount", header: "Discount", width: 100 }];
 
-const SERIAL_COLUMN: GridColumn = { key: "serials", header: "Serials", width: 150 };
+const SERIAL_COLUMN: GridColumn = { key: "serials", header: "Serials", width: 160 };
 
 const TAIL_COLUMNS: GridColumn[] = [
   { key: "remark", header: "Remark", width: 120 },
@@ -189,9 +185,6 @@ type Props = {
 export function SalesLineGrid(props: Props) {
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchLineIdx, setSearchLineIdx] = createSignal<number | null>(null);
-  const [serialPickOpen, setSerialPickOpen] = createSignal(false);
-  const [serialPickIdx, setSerialPickIdx] = createSignal<number | null>(null);
-
   const columns = createMemo(() => {
     props.taxTypeId();
     const taxCols = filterTaxLineColumns(BASE_COLUMNS, props.taxTypeMeta()?.tax_mode);
@@ -239,11 +232,6 @@ export function SalesLineGrid(props: Props) {
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const next = props.lines().filter((_, i) => i !== idx).map((ln, i) => ({ ...ln, line_no: i + 1 }));
     props.onChange(next.length ? next : [emptySalesLine(1, "", basis)]);
-  };
-
-  const openSerialPick = (idx: number) => {
-    setSerialPickIdx(idx);
-    setSerialPickOpen(true);
   };
 
   const openSearch = (idx: number) => {
@@ -396,22 +384,14 @@ export function SalesLineGrid(props: Props) {
                     <ResizableTd width={widthFor("discount_amount")} class="px-2 py-1">
                       <DecimalInput class={`${inputClass} w-full text-right`} value={line().discount_amount} onValue={(v) => void updateLine(idx, { discount_amount: v })} />
                     </ResizableTd>
-                    <ResizableTd width={widthFor("serial_lot_no")} class="px-2 py-1">
-                      <div class="flex items-center gap-1">
-                        <input class={`${inputClass} min-w-0 flex-1`} value={line().serial_lot_no} readOnly={Boolean(line().serial_unit_ids?.length)} onInput={(e) => void updateLine(idx, { serial_lot_no: e.currentTarget.value })} />
-                        <Show when={line().item_id}>
-                          <button type="button" class="shrink-0 text-xs text-brand-600 hover:underline" onClick={() => openSerialPick(idx)}>
-                            Pick
-                          </button>
-                        </Show>
-                      </div>
-                    </ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
                     <Show when={line().item_id && line().track_serial} fallback={<span class="text-xs text-text-secondary">—</span>}>
-                      <SerialSaleScanner
+                      <SerialLineCell
+                        mode="units"
                         itemId={line().item_id}
                         locationId={props.locationId()}
+                        qty={parseNum(line().qty)}
                         serialUnitIds={line().serial_unit_ids ?? []}
                         serialLabels={line().serial_lot_no}
                         context="sale"
@@ -419,7 +399,7 @@ export function SalesLineGrid(props: Props) {
                           void updateLine(idx, {
                             serial_unit_ids: ids,
                             serial_lot_no: labels,
-                            qty,
+                            qty: qty ?? String(ids.length),
                           });
                         }}
                       />
@@ -458,7 +438,7 @@ export function SalesLineGrid(props: Props) {
               </Show>
               <td class="px-2 py-2 text-right">{formatAmount(totals().grand)}</td>
               <Show when={hasDiscountTemplate(props.templateCode())}>
-                <td colSpan={2} />
+                <td />
               </Show>
               <td colSpan={2} />
             </tr>
@@ -473,33 +453,6 @@ export function SalesLineGrid(props: Props) {
         onConfirm={applyItems}
       />
 
-      <SerialPickModal
-        open={serialPickOpen()}
-        itemId={serialPickIdx() != null ? props.lines()[serialPickIdx()!]?.item_id ?? null : null}
-        locationId={props.locationId()}
-        maxQty={
-          serialPickIdx() != null
-            ? Math.max(1, Math.floor(parseNum(props.lines()[serialPickIdx()!]?.qty ?? "1")))
-            : 1
-        }
-        selectedIds={
-          serialPickIdx() != null ? props.lines()[serialPickIdx()!]?.serial_unit_ids ?? [] : []
-        }
-        itemLabel={
-          serialPickIdx() != null
-            ? `${props.lines()[serialPickIdx()!]?.item_code} — ${props.lines()[serialPickIdx()!]?.item_name}`
-            : undefined
-        }
-        onClose={() => setSerialPickOpen(false)}
-        onConfirm={(ids, serials) => {
-          const idx = serialPickIdx();
-          if (idx == null) return;
-          void updateLine(idx, {
-            serial_unit_ids: ids,
-            serial_lot_no: serials.map((s) => s.serial_no).join(", "),
-          });
-        }}
-      />
     </div>
   );
 }

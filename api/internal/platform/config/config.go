@@ -6,6 +6,15 @@ import (
 	"strings"
 )
 
+type RateLimitConfig struct {
+	Enabled             bool
+	WindowSeconds       int
+	PublicStrictRPM     int
+	PublicProvisionRPM  int
+	AuthenticatedRPM    int
+	ExpensiveRPM        int
+}
+
 type Config struct {
 	Port                  string
 	SupabaseURL           string
@@ -31,6 +40,7 @@ type Config struct {
 	DemoTTLDays           int
 	PlatformJobSecret     string
 	EntitlementGraceDays  int
+	RateLimit             RateLimitConfig
 }
 
 func Load() Config {
@@ -77,6 +87,14 @@ func Load() Config {
 		DemoTTLDays:         ParseIntDefault(os.Getenv("DEMO_TTL_DAYS"), 14),
 		PlatformJobSecret:   os.Getenv("PLATFORM_JOB_SECRET"),
 		EntitlementGraceDays: ParseIntDefault(os.Getenv("ENTITLEMENT_GRACE_DAYS"), 0),
+		RateLimit: RateLimitConfig{
+			Enabled:            os.Getenv("RATE_LIMIT_ENABLED") != "false",
+			WindowSeconds:      ParseIntDefault(os.Getenv("RATE_LIMIT_WINDOW_SECONDS"), 60),
+			PublicStrictRPM:      ParseIntDefault(os.Getenv("RATE_LIMIT_PUBLIC_STRICT_RPM"), 10),
+			PublicProvisionRPM:   ParseIntDefault(os.Getenv("RATE_LIMIT_PUBLIC_PROVISION_RPM"), 30),
+			AuthenticatedRPM:     ParseIntDefault(os.Getenv("RATE_LIMIT_AUTHENTICATED_RPM"), 200),
+			ExpensiveRPM:         ParseIntDefault(os.Getenv("RATE_LIMIT_EXPENSIVE_RPM"), 60),
+		},
 	}
 }
 

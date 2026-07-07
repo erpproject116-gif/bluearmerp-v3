@@ -13,6 +13,7 @@ export type ScanContextLine = {
   received_qty: number;
   serial_count: number;
   is_open: boolean;
+  planned_serial_nos?: string[];
 };
 
 export type UnifiedScanResult = {
@@ -102,6 +103,29 @@ export function SerialReceiveScanner(props: {
     if (!ln) return "";
     if ("line_id" in ln) return `${ln.received_qty} / ${ln.expected_qty}`;
     return `${ln.received_qty} / ${ln.expected_qty}`;
+  };
+
+  const activeLineIdValue = () => {
+    const ln = activeLine();
+    if (!ln) return null;
+    return "line_id" in ln ? ln.line_id : ln.id;
+  };
+
+  const receivedSerialNos = () => {
+    const id = activeLineIdValue();
+    if (id == null) return new Set<string>();
+    const grLine = props.lines.find((l) => l.id === id);
+    return new Set((grLine?.serials ?? []).map((s) => s.serial_no));
+  };
+
+  const plannedSerialSuggestions = () => {
+    const id = activeLineIdValue();
+    if (id == null) return [];
+    const ctxLine = contextLines().find((l) => l.line_id === id);
+    const planned = ctxLine?.planned_serial_nos ?? [];
+    if (planned.length === 0) return [];
+    const received = receivedSerialNos();
+    return planned.filter((sn) => !received.has(sn));
   };
 
   const loadContext = async () => {
@@ -218,6 +242,28 @@ export function SerialReceiveScanner(props: {
           }}
         />
       </Field>
+
+      <Show when={plannedSerialSuggestions().length > 0}>
+        <Field label="Planned serials (tap to scan)">
+          <div class="flex flex-wrap gap-1">
+            <For each={plannedSerialSuggestions()}>
+              {(serialNo) => (
+                <button
+                  type="button"
+                  class="rounded border border-stroke bg-white px-2 py-0.5 text-xs hover:bg-slate-100"
+                  disabled={props.status !== "draft" || scanning()}
+                  onClick={() => {
+                    setScanInput(serialNo);
+                    inputRef?.focus();
+                  }}
+                >
+                  {serialNo}
+                </button>
+              )}
+            </For>
+          </div>
+        </Field>
+      </Show>
 
       <Show when={props.showLinePicker !== false && serialLines().length > 1}>
         <Field label="Active line (fallback)">

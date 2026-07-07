@@ -1,7 +1,9 @@
 import type { ModuleFeature } from "./modules";
+import { isReviewPurchasesPath, REVIEW_PURCHASES_SUB_BRANCH } from "./review-purchases-nav";
 
 export function isSubBranchPath(pathname: string, prefix?: string): boolean {
   if (!prefix) return false;
+  if (prefix === REVIEW_PURCHASES_SUB_BRANCH) return isReviewPurchasesPath(pathname);
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 

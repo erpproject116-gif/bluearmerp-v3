@@ -1,0 +1,314 @@
+tab_id,prgId,parent_context,tab_level,tab_label,default_active,fields_summary,sub_tabs,toolbar_in_tab,grid_columns,posting_effect,bluearm_target,audited,notes
+module-inv1-setup,C000029,Inv. I module bar,L0,Setup,yes,Left setup menu (Item Customer/Vendor etc),,,,,/app/inventory,yes,
+module-inv1-sales,C000029,Inv. I module bar,L0,Sales,no,Opens Sales List C000030 and sales left menu,,,,,/app/selling,yes,Breadth pass Jul 2026
+module-inv1-purchases,C000029,Inv. I module bar,L0,Purchases,no,Opens Purchase List C000031 and purchase left menu,,,,,/app/buying,yes,Clicked — navigates to C000031
+module-inv1-production,C000029,Inv. I module bar,L0,Production,no,Opens Goods Receipt List C000032,,,,,/app/job-costing,yes,Breadth pass Jul 2026
+module-inv1-inv-mov,C000029,Inv. I module bar,L0,Inv. Mov.,no,Opens Location Tran. List C000033,,,,,/app/inventory/stock-movements,yes,Breadth pass Jul 2026
+module-inv1-online,C000029,Inv. I module bar,L0,Online Store Mgmt,no,Opens Register Online Store C000654,,,,,—,yes,Breadth pass Jul 2026
+module-inv1-reports,C000029,Inv. I module bar,L0,Reports,no,Opens Reports hub C000035,,,,,/app/reports,yes,Breadth pass Jul 2026
+filter-default,C000029,Item List Option panel,L2,Default,yes,"Date ranges, item code/name, category, type, usage",,,,,/app/inventory/items,yes,
+filter-item-info,C000029,Item List Option panel,L2,Item Information,no,"Groups 1-3, barcode, tax rates, QC, remark, dates, creators",,,,,/app/inventory/items,yes,
+filter-qty,C000029,Item List Option panel,L2,Qty,no,"Safety stock per doc type, lead time, min PO qty, vendor, C-Portal min SO",,,,,/app/inventory/items,yes,
+filter-price,C000029,Item List Option panel,L2,Price,no,"Purchase/Sale/VIP, Price B–J, O/E ranges",,,,,/app/inventory/price-lists,yes,
+filter-cost,C000029,Item List Option panel,L2,Cost,no,"Std material/labor/expense/OE, OH weight, labor time",,,,,/app/inventory/items,yes,
+filter-additional,C000029,Item List Option panel,L2,Additional Information,no,"Text add fields 1-6, Number add fields 1-10",,,,,/app/inventory/items/settings,yes,
+filter-management,C000029,Item List Option panel,L2,Management,no,"Serial/lot, auto mfg slip, auto QC request flags",,,,,/app/inventory/serial-lot,yes,
+form-default,C000029,Inline New/Edit form,L2,Default,yes,"Code, name, group1, spec modes, unit, category, inv qty mgmt, process, prices+tax",,,,,/app/inventory/items,yes,
+form-item-info,C000029,Inline New/Edit form,L2,Item Information,no,"Edit panel: tax rates, barcode, keyword, sharing, image, QC, item groups 1-3, remark",,,,,/app/inventory/items,yes,Pass 7 edit 00002 — richer than Default tab
+form-qty,C000029,Inline New/Edit form,L2,Qty,no,"Aux qty conversion ratio, Safety stock qty, Safety stock control per doc type (SO/Sales/GI/GR/Loc/Internal/Defect), Set by location, C-Portal min SO check/unit, Inventory qty enter, Lead time, Min purchase qty, Vendor",,,,,/app/inventory/items,yes,Pass 2 clicked
+form-price,C000029,Inline New/Edit form,L2,Price,no,"Purchase/Sale/VIP + tax included (may duplicate Default)",,,,,/app/inventory/items,yes,
+form-cost,C000029,Inline New/Edit form,L2,Cost,no,"O/E price, Std labor time, OH allocation weight, Std material/labor/expense/OE costs",,,,,/app/inventory/items,yes,Pass 2 clicked
+form-additional,C000029,Inline New/Edit form,L2,Additional Information,no,"Text add fields 1-6, Number add fields 1-10",,,,,/app/inventory/items/settings,yes,Pass 2 clicked
+form-management,C000029,Inline New/Edit form,L2,Management,no,"Serial/Lot mode (Default/Required/Optional/Do Not Use), Auto-create mfg slip (sales/loc trans), Auto-create QC (purchases/GR), Mgmt field, QC method",,,,,/app/inventory/serial-lot,yes,Pass 2 clicked
+module-inv1-purchases,C000031,Inv. I module bar,L0,Purchases,yes,Purchase left menu (PR/Plan/RFQ/PO/Purchases subtree),,,,,/app/buying,yes,Active when on Purchase List
+purchase-status-all,C000031,Purchase List status pills,L2,All,yes,List filter — all confirmation states,,,,,/app/finance/supplier-invoices,yes,Repeated pill row per list area
+purchase-status-eapproval,C000031,Purchase List status pills,L2,e-Approval,no,Filter e-approval docs,,,,,/app/dashboard/approvals,yes,
+purchase-status-unconfirmed,C000031,Purchase List status pills,L2,Unconfirmed,no,Filter unconfirmed purchases,,,,,/app/finance/supplier-invoices,yes,
+purchase-status-confirm,C000031,Purchase List status pills,L2,Confirm,no,Filter confirmed purchases,,,,,/app/finance/supplier-invoices,yes,
+purchase-filter-default,C000031,Purchase List Option,L2,Default,yes,"Date range, transaction type, domestic/foreign, location, project, customer, item, send status",,,,,/app/finance/supplier-invoices,yes,
+purchase-list-tab-1,C000031,Purchase List view tabs,L2,1,yes,List column template tab 1,,,,,/app/finance/supplier-invoices,yes,Tabs 1-6 live Jul 2026
+purchase-list-tab-2,C000031,Purchase List view tabs,L2,2,no,List column template tab 2,,,,,/app/finance/supplier-invoices,yes,
+qc-inspection-all,E040622,QC Inspection List status pills,L2,All,yes,All inspection docs,,,,,/app/qms,yes,4-pill set — no e-Approval
+qc-inspection-inprogress,E040622,QC Inspection List status pills,L2,In Progress,no,Underway,,,,,/app/qms,yes,
+qc-inspection-completed,E040622,QC Inspection List status pills,L2,Completed,no,Closed,,,,,/app/qms,yes,
+qc-inspection-history,E040622,QC Inspection List status pills,L2,History,no,Historical view,,,,,/app/qms,yes,
+qc-inspection-result-pass,E040622,QC Inspection List Option,L2,Pass,no,Inspection result filter,,,,,/app/qms,yes,Option sub-filter Not applicable/Fail also
+qc-inspection-method-lot,E040622,QC Inspection List Option,L2,Lot,no,Sampling vs Lot method,,,,,/app/qms,yes,
+form-sales-inv-i-live,E040205,New Sales form,L2,Sales Invoice I,yes,"Date, customer, location-out, VAT, SO#, accounting L3",,,,,/app/selling/sales/new,yes,Pass 2 Jul 2026Only Default pill in tenant
+module-inv1-sales,C000030,Inv. I module bar,L0,Sales,yes,Sales left menu (Quote/SO/Sales/Shipping),,,,,/app/selling,yes,
+sales-status-all,C000030,Sales List status pills,L2,All,yes,List filter — all states,,,,,/app/selling/sales,yes,
+sales-status-eapproval,C000030,Sales List status pills,L2,e-Approval,no,Filter e-approval docs,,,,,/app/dashboard/approvals,yes,
+sales-status-unconfirmed,C000030,Sales List status pills,L2,Unconfirmed,no,Filter unconfirmed sales,,,,,/app/selling/sales,yes,
+sales-status-confirm,C000030,Sales List status pills,L2,Confirm,no,Filter confirmed sales,,,,,/app/selling/sales,yes,
+sales-filter-default,C000030,Sales List Option,L2,Default,yes,"Date, transaction type, currency, location-out, project, customer, item, send status",,,,,/app/selling/sales,yes,
+module-inv1-production,C000032,Inv. I module bar,L0,Production,yes,Production left menu (BOM/JO/GR etc),,,,,/app/job-costing,yes,
+gr-status-all,C000032,Goods Receipt List status pills,L2,All,yes,Standard status filter,,,,,/app/job-costing,yes,
+gr-type-all,C000032,Goods Receipt List type pills,L2,All,yes,Filter all GR types,,,,,/app/job-costing,yes,
+gr-type-i,C000032,Goods Receipt List type pills,L2,Goods Receipt I,no,Filter GR I only,,,,,/app/job-costing,yes,
+gr-type-ii,C000032,Goods Receipt List type pills,L2,Goods Receipt II,no,Filter GR II only,,,,,/app/job-costing,yes,
+gr-type-iii,C000032,Goods Receipt List type pills,L2,Goods Receipt III,no,Filter GR III only,,,,,/app/job-costing,yes,
+gr-source-web,C000032,Goods Receipt List source pills,L2,Web (ERP),no,Filter ERP-entered docs,,,,,/app/job-costing,yes,
+gr-delete-undeleted,C000032,Goods Receipt List delete pills,L2,Undeleted,no,Exclude deleted,,,,,/app/job-costing,yes,
+module-inv1-inv-mov,C000033,Inv. I module bar,L0,Inv. Mov.,yes,Inv movement left menu,,,,,/app/inventory/stock-movements,yes,
+loc-tran-status-all,C000033,Location Tran. List status pills,L2,All,yes,Standard status filter,,,,,/app/inventory/stock-movements,yes,
+loc-tran-source-web,C000033,Location Tran. List source pills,L2,Web (ERP),no,Filter ERP-entered docs,,,,,/app/inventory/stock-movements,yes,
+loc-tran-delete-undeleted,C000033,Location Tran. List delete pills,L2,Undeleted,no,Exclude deleted,,,,,/app/inventory/stock-movements,yes,
+module-inv1-reports,C000035,Inv. I module bar,L0,Reports,yes,Reports hub categories,,,,,/app/reports,yes,No status pills on hub
+module-inv1-online,C000654,Inv. I module bar,L0,Online Store Mgmt,yes,Online store setup + order mgmt,,,,,—,yes,
+online-filter-default,C000654,Register Online Store Option,L2,Default,yes,"Store code/name, type, customer, ID, usage status",,,,,,yes,
+form-purchase-inv-i,E040303,New Purchases form,L2,Purchase Invoice I,yes,"Date, vendor, PIC, location, VAT, currency, notes, SI/DR, PO#, terms, project",,,,,/app/finance/supplier-invoices/new,yes,Pass 4
+form-purchase-new-dropdown,E040303,New Purchases form,L2,New Purchase,no,Template dropdown (only Invoice I seen),,,,,/app/finance/supplier-invoices/new,yes,
+form-purchase-acct-voucher,E040303,New Purchases accounting,L3,Voucher Date,no,Accounting voucher date block,,,,,/app/finance/supplier-invoices,yes,
+form-purchase-acct-tax,E040303,New Purchases accounting,L3,Tax Type,no,BIR/tax invoice fields,,,,,/app/finance/supplier-invoices,yes,
+form-purchase-acct-accounts,E040303,New Purchases accounting,L3,Accounts,no,Purchase acct, withdrawal, payable, due date, fees,,,,,/app/finance/supplier-invoices,yes,
+form-sales-inv-i,E040205,New Sales form,L2,Sales Invoice I,yes,"Date, due date, customer, PIC, location-out, VAT, currency, notes, SI/DR, SO#, terms, project",,,,,/app/selling/sales/new,yes,Pass 1 Jul 2026
+form-sales-new-dropdown,E040205,New Sales form,L2,New Sales,no,Template dropdown (only Invoice I seen),,,,,/app/selling/sales/new,yes,
+form-sales-notification,E040205,New Sales form,L3,Notification,no,Target + Email/Messenger/Msg/Push,,,,,/app/selling/sales,yes,
+modal-sales-hold,E040205,New Sales Hold modal,L2,Hold List,yes,"Hold No, customer, item, amount, type, location; max 5 slots",,,,,/app/selling/sales/new,yes,Pass 3 Jul 2026
+modal-sales-cash-in,E040205,New Sales Cash In modal,L2,Cash In - From Customer,yes,"Voucher date, deposit acct, customer, amount, fees, remark, acct slip no",,,,,/app/finance/cash/receipts,yes,Pass 3 Jul 2026
+modal-sales-link-acct,E040205,New Sales Link w/ Vouchers,L3,Sales Invoice I (E010301),yes,"Tax/BIR fields, sales/deposit accts, receivable, receipt projection",,,,,/app/selling/sales/new,yes,Pass 3 — confirm dialog if block exists
+bank-recon-filter-default,E010208,Bank Reconciliation list Option,L2,Default,yes,"Last used date, bank account, sort by modified date",,,,,/app/finance/acct-i/bank-reconciliation,yes,Tenant pill label 기본
+bank-recon-match-all,E010208,Bank Reconciliation New modal,L2,All,yes,Show all bank/ERP lines for matching,,,,,/app/finance/acct-i/bank-reconciliation,yes,
+bank-recon-match-unchecked,E010208,Bank Reconciliation New modal,L2,Unchecked,no,Unmatched lines only,,,,,/app/finance/acct-i/bank-reconciliation,yes,
+bank-recon-match-check,E010208,Bank Reconciliation New modal,L2,Check,no,Matched/checked lines,,,,,/app/finance/acct-i/bank-reconciliation,yes,
+bank-recon-match-exclude,E010208,Bank Reconciliation New modal,L2,Exclude,no,Excluded lines,,,,,/app/finance/acct-i/bank-reconciliation,yes,
+module-inv2-serial,C000092,Inv. II module bar,L0,Serial/Lot No.,yes,Serial/lot left menu; default slip list C000092,,,,,/app/inventory/serial-lot,yes,Pass 17 Jul 2026
+module-inv2-costing,C000140,Inv. II module bar,L0,Costing,yes,Costing/profit left menu; default C000140,,,,,/app/job-costing,yes,Default on Inv II open
+serial-slip-all,C000092,Serial/Lot Slip List type pills,L2,All,yes,All slip types,,,,,/app/inventory/serial-lot,yes,Pass 17
+serial-slip-type-1,C000092,Serial/Lot Slip List type pills,L2,1,yes,Slip type filter 1; clicked live Jul 2026,,,,,/app/inventory/serial-lot,yes,
+serial-slip-type-2,C000092,Serial/Lot Slip List type pills,L2,2,yes,Slip type filter 2; same pattern as 1,,,,,/app/inventory/serial-lot,yes,Pass 17 pattern audit
+serial-slip-type-3,C000092,Serial/Lot Slip List type pills,L2,3,yes,Slip type filter 3,,,,,/app/inventory/serial-lot,yes,
+serial-slip-type-4,C000092,Serial/Lot Slip List type pills,L2,4,yes,Slip type filter 4,,,,,/app/inventory/serial-lot,yes,
+serial-slip-type-5,C000092,Serial/Lot Slip List type pills,L2,5,yes,Slip type filter 5,,,,,/app/inventory/serial-lot,yes,
+serial-slip-type-6,C000092,Serial/Lot Slip List type pills,L2,6,yes,Slip type filter 6,,,,,/app/inventory/serial-lot,yes,
+serial-slip-type-7,C000092,Serial/Lot Slip List type pills,L2,7,yes,Slip type filter 7,,,,,/app/inventory/serial-lot,yes,
+serial-slip-type-8,C000092,Serial/Lot Slip List type pills,L2,8,yes,Slip type filter 8,,,,,/app/inventory/serial-lot,yes,
+serial-slip-type-9,C000092,Serial/Lot Slip List type pills,L2,9,yes,Slip type filter 9,,,,,/app/inventory/serial-lot,yes,
+serial-slip-type-10,C000092,Serial/Lot Slip List type pills,L2,10,yes,Slip type filter 10,,,,,/app/inventory/serial-lot,yes,
+serial-slip-option-default,C000092,Serial/Lot Slip List Option,L2,Default,yes,"Date Recent 30 Days (+1 Month); Terms of Validity; Item categories; Linked Slip/Set Manually; Sort Modified Date; Template",,,,,/app/inventory/serial-lot,yes,Pass 17
+serial-status-default,E040639,Serial/Lot No. Status Option,L2,Default,yes,Saved filter template,,,,,/app/inventory/serial-lot,yes,Pass 17
+serial-status-details,E040639,Serial/Lot No. Status type,L2,Details,yes,Detail report layout,,,,,/app/inventory/serial-lot,yes,Pass 17 default active
+serial-status-summary,E040639,Serial/Lot No. Status type,L2,Summary,no,Summary + by Line layout,,,,,/app/inventory/serial-lot,yes,Pass 17
+serial-reg-form-tab,C000690,Reg Serial New F2 form,L2,Input Serial/Lot No. Details,yes,"Date, Slip Type, Location, Item, Qty, Serial/Lot No, Remark, Project",,,,,/app/inventory/serial-lot,yes,Pass 18 Jul 2026
+serial-reg-slip-type,C000690,Reg Serial New F2 Slip Type,L2,Quotation,yes,Default slip type; 21 doc types in dropdown,,,,,/app/inventory/serial-lot,yes,Pass 18; full list in inv2-serial-lot.md
+serial-adj-default,C000691,Inv Adj by Serial Option,L2,Default,yes,"Terms of Validity, Serial/Lot, Location, Item tree, Inv Qty All/1/0/Others, Include Unassigned Locations",,,,,/app/inventory/serial-lot,yes,Pass 18; E040634 same UI
+serial-adj-inv-qty-all,C000691,Inv Adj Inv Qty pills,L2,All,yes,Filter all inventory qty states,,,,,/app/inventory/serial-lot,yes,Pass 18
+serial-adj-inv-qty-1,C000691,Inv Adj Inv Qty pills,L2,1,yes,Qty equals 1,,,,,/app/inventory/serial-lot,yes,Pass 18
+serial-adj-inv-qty-0,C000691,Inv Adj Inv Qty pills,L2,0,yes,Qty equals 0,,,,,/app/inventory/serial-lot,yes,Pass 18
+serial-adj-inv-qty-others,C000691,Inv Adj Inv Qty pills,L2,Others,yes,Other qty states,,,,,/app/inventory/serial-lot,yes,Pass 18
+serial-inv-book-default,E040620,Serial/Lot Inv Book Option,L2,Default,yes,Saved filter template,,,,,/app/inventory/serial-lot,yes,Pass 18 Jul 2026
+serial-inv-book-all,E040620,Serial/Lot Inv Book Option,L2,All,no,Extended template drawer,,,,,/app/inventory/serial-lot,yes,Pass 18
+serial-inv-book-general,E040620,Serial/Lot Inv Book Type,L2,General,yes,Detail ledger layout,,,,,/app/inventory/serial-lot,yes,Pass 18 default
+serial-inv-book-summary,E040620,Serial/Lot Inv Book Type,L2,Summary by Serial/Lot No.,no,Summary layout,,,,,/app/inventory/serial-lot,yes,Pass 18
+serial-inv-bal-type-serial,E040619,Serial/Lot Inv Balance Type,L2,Serial/Lot No.,yes,Balance by serial unit,,,,,/app/inventory/serial-lot,yes,Pass 18 Jul 2026
+serial-inv-bal-type-loc,E040619,Serial/Lot Inv Balance Type,L2,Serial/Lot No. (By Location),no,Balance by serial and location,,,,,/app/inventory/serial-lot,yes,Pass 18
+serial-vs-item-serial,E041018,Item vs Serial Balance Compare,L2,Serial/Lot No.,yes,Reconcile by serial,,,,,/app/inventory/serial-lot,yes,Pass 18 Jul 2026
+serial-vs-item-item,E041018,Item vs Serial Balance Compare,L2,Item,no,Reconcile by item,,,,,/app/inventory/serial-lot,yes,Pass 18
+module-acct1-reports,C000001,Acct. I module bar,L0,Reports,yes,Accounting reports hub; default on Acct I open,,,,,/app/finance/reports,yes,Breadth pass Jul 2026
+module-acct1-setup,C000001,Acct. I module bar,L0,Setup,no,COA and fiscal setup,,,,,/app/finance/settings,yes,
+module-acct1-fast-entry,C000001,Acct. I module bar,L0,Fast Entry,no,Quick journal,,,,,/app/finance/journal,yes,
+module-acct1-invoice,C000001,Acct. I module bar,L0,Invoice,no,Invoice accounting,,,,,/app/finance,yes,
+module-acct1-bank,C000001,Acct. I module bar,L0,Bank Acct./Card,no,Bank/card vouchers,,,,,/app/finance/banking,yes,
+module-acct1-cash,C000001,Acct. I module bar,L0,Cash,no,Cash transactions,,,,,/app/finance/cash,yes,
+module-inv2-qc,C000093,Inv. II module bar,L0,Quality Control,yes,QC left menu; default Request List C000093,,,,,/app/qms,yes,Live Jul 2026
+qc-request-all,C000093,QC Request List status pills,L2,All,yes,All QC request docs,,,,,/app/qms,yes,5-pill set — no Unconfirmed
+qc-request-eapproval,C000093,QC Request List status pills,L2,e-Approval,no,Pending approval,,,,,/app/dashboard/approvals,yes,
+qc-request-confirm,C000093,QC Request List status pills,L2,Confirm,no,Confirmed requests,,,,,/app/qms,yes,
+qc-request-inprogress,C000093,QC Request List status pills,L2,In Progress,no,Inspection underway,,,,,/app/qms,yes,
+qc-request-completed,C000093,QC Request List status pills,L2,Completed,no,Closed requests,,,,,/app/qms,yes,
+qc-filter-default,C000093,QC Request List Option,L2,Default,yes,"Date, request no, location, customer, item, project, mgmt field, PIC, send status",,,,,/app/qms,yes,
+module-acct1-fast-entry-live,C000010,Acct. I module bar,L0,Fast Entry,yes,Opens General Journal E010201 by default,,,,,/app/finance/journal,yes,Live Jul 2026
+form-general-journal,E010201,General Journal form,L2,General Journal,yes,"Voucher date, type, slip no, comment, attachment; Dr/Cr grid; Load Slip",,,,,/app/finance/journal,yes,No switchable form tabs; Option = settings gear
+form-payment-journal,E010408,Payment Journal form,L2,Payment Journal,yes,"Voucher date, type, slip no; Hold/Projection/Bank/Card toolbar",,,,,/app/finance/cash/payments,yes,No Load Slip vs General
+form-receipt-journal,E010403,Receipt Journal form,L2,Receipt Journal,yes,"Voucher date, type, slip no; Hold/Projection/Bank/Payment Agency toolbar",,,,,/app/finance/cash/receipts,yes,
+item-list-tab-1,C000029,Item List view tabs,L2,1,yes,List column template tab 1,,,,,/app/inventory/items,yes,Tabs 1-10 live Jul 2026
+item-list-tab-10,C000029,Item List view tabs,L2,10,no,List column template tab 10,,,,,/app/inventory/items,yes,
+sales-list-alias,C000004,Sales List (tenant alias),L0,Sales,yes,Same as C000030 — Sales List in BLUEARM tenant,,,,,/app/selling/sales,yes,prgId alias Jul 2026 live crawl
+form-sa-journal,E010505,S/A Journal form,L2,S/A Journal,yes,"Voucher date, type, slip no; Employee Code/Name grid; Hold toolbar",,,,,/app/finance/journal/sa,yes,No Projection/Bank/Card; no Web Uploader footer
+form-auto-voucher-all,E010213,Auto Generate Voucher List,L2,All,yes,Single status pill — all auto-generated vouchers,,,,,/app/finance/auto-vouchers,yes,List not form; Date-No/Total/Remark/Print columns
+item-list-alias,E040103,Item List (tenant alias),L0,Setup,yes,Same as C000029 — Item List in BLUEARM tenant,,,,,/app/inventory/items,yes,prgId alias Jul 2026 live crawl
+item-toolbar-barcode,C000029,Item List Barcode modal,L3,Barcode (Item),yes,"Qty, Item Code/Name/Spec, Barcode; Print Barcode",,,,,/app/inventory/items,yes,Requires checkbox row select
+item-toolbar-inv-adj,C000029,Item List Inv. Adj. modal,L3,Inv. Count I,yes,"Date, Location, Adjust → per-location qty grid, Save F8",,,,,/app/inventory/stock-entries,yes,Pass 7 — 8 location columns on 00002
+item-toolbar-relation,C000029,Item List Relation modal,L3,Item Relation List,yes,"Main/linked item grid + qty conversion columns",,,,,/app/inventory/items,yes,New F2 / Excel / Uploader on modal
+online-order-status-all,E041005,Online Store Order Mgmt Status,L2,All,yes,11 status pills with counts,,,,,—,yes,Pass 1 Jul 2026
+online-order-confirm-all,E041006,Order Confirmation,L2,All,yes,,,,,,—,yes,Pass 1 Jul 2026
+online-delivery-all,E041007,Delivery,L2,All,yes,,,,,,—,yes,Pass 1 Jul 2026
+item-relation-register,C001130,Register Item Relation,L4,Quantity Control Basis,yes,"Main Item / Individual Item radios",,,,,/app/inventory/items,yes,Child of Item Relation List New F2; formType SI903; Save F8
+item-relation-register-grid,C001130,Register Item Relation,L4,Linked lines grid,yes,"Linked Item Code/Name/Spec/Qty + Bom Sync",,,,,/app/inventory/items,yes,Find F3; default 3 blank rows
+item-relation-option,C001130,Register Item Relation,L4,Default Setting,yes,Option dropdown — form layout only,,,,,/app/inventory/items,yes,Pass 7 standalone; no filter pills
+export-status-all,C000652,Export Invoice/Packing List,L2,All,yes,Default status filter,,,,,—,yes,Pass 2 Jul 2026
+export-status-unconfirmed,C000652,Export Invoice/Packing List,L2,Unconfirmed,no,,,,,,—,yes,
+export-status-confirm,C000652,Export Invoice/Packing List,L2,Confirm,no,,,,,,—,yes,
+plan-forecast-all,C000094,Sales Forecast List,L2,All,yes,,,,,,—,yes,Pass 2 Jul 2026
+plan-forecast-history,C000094,Sales Forecast List,L2,History,no,,,,,,—,yes,
+budget-status-default,C000021,Budget Status,L2,Default,yes,Display Method Summary/Dept/Project,,,,,—,yes,Pass 1 Acct II
+budget-status-all,C000021,Budget Status,L2,All,no,,,,,,—,yes,
+expenses-voucher-all,C000005,Trade Voucher List,L2,All,yes,,,,,,—,yes,Pass 1 Acct II Exps tab
+expenses-voucher-eapproval,C000005,Trade Voucher List,L2,e-Approval,no,,,,,,—,yes,
+expenses-voucher-unconfirmed,C000005,Trade Voucher List,L2,Unconfirmed,no,,,,,,—,yes,
+expenses-voucher-confirm,C000005,Trade Voucher List,L2,Confirm,no,,,,,,—,yes,
+billing-note-all,C001256,Billing Note List,L2,All,yes,,,,,,—,yes,Pass 2 Acct II
+billing-note-unconfirmed,C001256,Billing Note List,L2,Unconfirmed,no,,,,,,—,yes,
+billing-note-confirm,C001256,Billing Note List,L2,Confirm,no,,,,,,—,yes,
+check-received-all,C000127,Checks Received List,L2,All,yes,,,,,,—,yes,Pass 2 Acct II
+withholding-sales-all,C001258,Withholding Tax on Sales List,L2,All,yes,,,,,,—,yes,Pass 2 Acct II
+ledger1-default,E010807,LedgerⅠ,L2,Default,yes,"Date, Dept, Project, Account, Template",,,,,/app/finance/reports,yes,Pass 2 Jul 2026
+ledger1-type-byline,E010807,LedgerⅠ Type,L2,by Line,yes,Default aggregation,,,,,/app/finance/reports,yes,
+ledger1-type-daily,E010807,LedgerⅠ Type,L2,Daily,no,,,,,,/app/finance/reports,yes,
+ledger1-type-monthly,E010807,LedgerⅠ Type,L2,Monthly,no,,,,,,/app/finance/reports,yes,
+ledger1-type-recalc,E010807,LedgerⅠ Type,L2,Recalculate by Account,no,,,,,,/app/finance/reports,yes,
+bs-default,E010813,Balance Sheet,L2,Default,yes,"Dept/Project display type, comparison period",,,,,/app/finance/reports,yes,Pass 2 Jul 2026
+is-default,E010812,Income Statement,L2,Default,yes,"Date range, comparison, Beginning/Increase/Ending",,,,,/app/finance/reports,yes,Pass 2 Jul 2026
+ledger2-default,E010808,LedgerⅡ,L2,Default,yes,"Customer-centric; Summary by Customer/Vendor type",,,,,/app/finance/reports,yes,Pass 3 Jul 2026
+ledger2-type-summary,E010808,LedgerⅡ Type,L2,Summary by Customer/Vendor,no,,,,,,/app/finance/reports,yes,
+ledger3-default,E010809,LedgerⅢ,L2,Default,yes,"Account+customer hybrid",,,,,/app/finance/reports,yes,Pass 3 Jul 2026
+scf-period-default,E010861,Statement of Cash Flows,L2,Default,yes,Accounting Period list,,,,,/app/finance/reports,yes,Pass 3 Jul 2026
+online-order-option-default,E041005,Order Mgmt Status Option,L2,Default,yes,"Date ranges, store, mapping status",,,,,—,yes,Pass 3 Jul 2026
+online-order-option-all,E041005,Order Mgmt Status Option,L2,All,no,,,,,,—,yes,Pass 3 Jul 2026
+sales-status-default,E040207,Sales Status,L2,Default,yes,"Details type; date, customer, item filters",,,,,/app/selling/reports,yes,Pass 5 Jul 2026
+sales-status-type-details,E040207,Sales Status Type,L2,Details,yes,Line-level grid,,,,,/app/selling/reports,yes,
+sales-status-type-summary,E040207,Sales Status Type,L2,Summary,no,,,,,,/app/selling/reports,yes,
+sales-status-type-byline,E040207,Sales Status Type,L2,by Line,no,,,,,,/app/selling/reports,yes,
+ar-customer-default,E040214,A/R by Customer,L2,Default,yes,"By Customer/Vendor type",,,,,/app/selling/reports,yes,Pass 5 Jul 2026
+ar-customer-type-cust,E040214,A/R by Customer Type,L2,By Customer/Vendor,yes,,,,,,/app/selling/reports,yes,
+ar-customer-type-pic,E040214,A/R by Customer Type,L2,by PIC,no,,,,,,/app/selling/reports,yes,
+receipt-status-default,E040217,Receipt Status,L2,Default,yes,"Customer, dept, PIC filters",,,,,/app/selling/reports,yes,Pass 5 Jul 2026
+quotation-status-status,E040208,Quotation Status Menu,L2,Status,yes,Line-level quote inquiry,,,,,/app/selling/reports,yes,Pass 6 Jul 2026
+quotation-status-summary,E040208,Quotation Status Menu,L2,Summary,no,Aggregated view,,,,,/app/selling/reports,yes,
+quotation-status-type-byline,E040208,Quotation Status Type,L2,by Line,yes,Comparison period optional,,,,,/app/selling/reports,yes,
+so-status-status,E040209,Sales Order Status Menu,L2,Status,yes,Line-level S/O inquiry,,,,,/app/selling/reports,yes,Pass 6 Jul 2026
+so-status-summary,E040209,Sales Order Status Menu,L2,Summary,no,Aggregated view,,,,,/app/selling/reports,yes,
+so-status-type-byline,E040209,Sales Order Status Type,L2,by Line,yes,Delivery Date by Item filter,,,,,/app/selling/reports,yes,
+receivable-status-default,E040721,Receivable Status,L2,Default,yes,As-of date + customer relation,,,,,/app/selling/reports,yes,Pass 6 Jul 2026
+purchase-status-default,E040305,Purchase Status,L2,Default,yes,"Date type; vendor, item filters",,,,,/app/buying/reports,yes,Pass 6 Jul 2026
+purchase-status-type-date,E040305,Purchase Status Type,L2,Date,yes,Line detail by date,,,,,/app/buying/reports,yes,
+purchase-status-type-summary,E040305,Purchase Status Type,L2,Summary,no,,,,,,/app/buying/reports,yes,
+purchase-status-type-byline,E040305,Purchase Status Type,L2,by Line,no,,,,,,/app/buying/reports,yes,
+ap-vendor-default,E040309,A/P by Vendor,L2,Default,yes,By Customer/Vendor type,,,,,/app/buying/reports,yes,Pass 6 Jul 2026
+ap-vendor-type-cust,E040309,A/P by Vendor Type,L2,By Customer/Vendor,yes,,,,,,/app/buying/reports,yes,
+ap-vendor-type-pic,E040309,A/P by Vendor Type,L2,by PIC,no,,,,,,/app/buying/reports,yes,
+outstanding-quote-default,E040211,Outstanding Quote Status,L2,Default,yes,As-of date + Outstanding Quote Qty,,,,,/app/selling/reports,yes,Pass 7 Jul 2026
+outstanding-quote-type-line,E040211,Outstanding Quote Type,L2,by Line,yes,,,,,,/app/selling/reports,yes,
+outstanding-so-default,E040212,Outstanding S/O Status,L2,Default,yes,Delivery Date by Item filter,,,,,/app/selling/reports,yes,Pass 7 Jul 2026
+outstanding-so-type-line,E040212,Outstanding S/O Type,L2,by Line,yes,,,,,,/app/selling/reports,yes,
+shipment-status-status,E040227,Shipment Status Menu,L2,Status,yes,Details/Summary/by Line,,,,,/app/selling/reports,yes,Pass 7 Jul 2026
+shipment-status-summary,E040227,Shipment Status Menu,L2,Summary,no,,,,,,/app/selling/reports,yes,
+po-status-default,E040306,Purchase Order Status,L2,Default,yes,PO No. + Delivery Date filters,,,,,/app/buying/reports,yes,Pass 7 Jul 2026
+po-status-type-details,E040306,Purchase Order Status Type,L2,Details,yes,,,,,,/app/buying/reports,yes,
+outstanding-po-default,E040307,Outstanding P/O Status,L2,Default,yes,Outstanding P/O Qty range,,,,,/app/buying/reports,yes,Pass 7 Jul 2026
+payment-status-default,E040310,Payment Status,L2,Default,yes,"Vendor, dept, PIC filters",,,,,/app/buying/reports,yes,Pass 7 Jul 2026
+cash-book-default,E010801,Cash Book,L2,Default,yes,"Dept, project, Include Deposit",,,,,/app/finance/reports,yes,Pass 5 Jul 2026
+form-purchase-load-slip,E040303,Load Slip modal,L2,Slip type picker,yes,"PO/GR/SO/quotation/etc. source types",,,,,/app/finance/supplier-invoices/new,yes,Pass 5 Jul 2026
+form-purchase-po-picker,E040303,Purchase Order picker modal,L2,Default,yes,"PO No., vendor, item filters; Apply Residual Qty",,,,,/app/finance/supplier-invoices/new,yes,Pass 8 Jul 2026
+pending-shipment-default,E040228,Pending Shipment Status,L2,Default,yes,As-of + Pending Shipment Qty,,,,,/app/selling/reports,yes,Pass 8 Jul 2026
+pending-shipment-type-line,E040228,Pending Shipment Type,L2,by Line,yes,,,,,,/app/selling/reports,yes,
+shipping-order-status-status,E040222,Shipping Order Status Menu,L2,Status,yes,Details/Summary/by Line,,,,,/app/selling/reports,yes,Pass 8 Jul 2026
+shipping-order-status-summary,E040222,Shipping Order Status Menu,L2,Summary,no,,,,,,/app/selling/reports,yes,
+payable-status-default,E040722,Payable Status,L2,Default,yes,As-of date mirror Receivable Status,,,,,/app/buying/reports,yes,Pass 8 Jul 2026
+sales-discount-default,E040216,Sales Discount Status,L2,Default,yes,Discount Amount range filter,,,,,/app/selling/reports,yes,Pass 9 Jul 2026
+preinvoicing-sales-default,E040609,Pre-Invoicing Status (Sales),L2,Default,yes,Base Date as-of + Amount,,,,,/app/selling/reports,yes,Pass 9 Jul 2026
+cv-book-ar-default,E040723,Customer/Vendor Book I (AR),L2,Default,yes,Summary Type By Slip+Details,,,,,/app/selling/reports,yes,Pass 9 Jul 2026
+cv-book-ar-type-slip,E040723,Customer/Vendor Book I (AR) Type,L2,By Slip + Details,yes,,,,,,/app/selling/reports,yes,
+purchase-discount-default,E040313,Purchase Discount Status,L2,Default,yes,Discount Amount range,,,,,/app/buying/reports,yes,Pass 9 Jul 2026
+pr-status-default,E040318,Purchase Request Status,L2,Default,yes,PR No. + Delivery Date,,,,,/app/buying/reports,yes,Pass 9 Jul 2026
+pr-status-type-details,E040318,Purchase Request Status Type,L2,Details,yes,,,,,,/app/buying/reports,yes,
+purchase-plan-default,E041015,Purchase Plan Status,L2,Default,yes,Delivery Date + item status filters,,,,,/app/buying/reports,yes,Pass 9 Jul 2026
+preinvoicing-purchase-default,E040319,Pre-Invoicing Status (Purchases),L2,Default,yes,Base Date as-of + Amount,,,,,/app/buying/reports,yes,Pass 9 Jul 2026
+cv-book-ap-default,E040724,Customer/Vendor Book I (AP),L2,Default,yes,Mirror AR book for vendors,,,,,/app/buying/reports,yes,Pass 9 Jul 2026
+sales-invoice-inv-default,N000119,Sales Invoice Status (Inv.),L2,Default,yes,Accounting Slip No. + Tax Entity + Status Confirm,,,,,/app/selling/reports,yes,Pass 10 Jul 2026
+sales-invoice-inv-status-confirm,N000119,Sales Invoice Status (Inv.) Status,L2,Confirm,yes,All/e-Approval/Unconfirmed/Confirm,,,,,/app/selling/reports,yes,
+monthly-receivable-default,E040713,Monthly Receivable Change Details,L2,Default,yes,Month range + customer relation,,,,,/app/selling/reports,yes,Pass 10 Jul 2026
+purchase-invoice-inv-default,N000127,Purchase Invoice Status (Inv.),L2,Default,yes,Mirror N000119 minus Tax Entity,,,,,/app/buying/reports,yes,Pass 10 Jul 2026
+purchase-invoice-inv-status-confirm,N000127,Purchase Invoice Status (Inv.) Status,L2,Confirm,yes,All/e-Approval/Unconfirmed/Confirm,,,,,/app/buying/reports,yes,
+monthly-payable-default,E040714,Monthly Payable Fluctuation,L2,Default,yes,Month range mirror E040713,,,,,/app/buying/reports,yes,Pass 10 Jul 2026
+arap-status-default,E040703,AR/AP Status,L2,Default,yes,As-of date + customer relation,,,,,/app/reports,yes,Pass 10 Jul 2026
+arap-status-type-receivable,E040703,AR/AP Status Type,L2,Receivable,yes,Payables and Receivable/Payable toggles,,,,,/app/reports,yes,
+daily-profit-default,E040806,Daily Profit Status,L2,Default,yes,by Item + FIFO cost + Pretax Amount,,,,,/app/reports,yes,Pass 10 Jul 2026
+daily-profit-all,E040806,Daily Profit Status,L2,All,no,Comparison period + horizontal view options,,,,,/app/reports,yes,
+daily-profit-type-item,E040806,Daily Profit Status Type,L2,by Item,yes,by Line/Customer/Item combos,,,,,/app/reports,yes,
+daily-costing-default,E040807,Daily Costing Status,L2,Default,yes,As-of + FIFO cost + Last Purchase Price,,,,,/app/reports,yes,Pass 11 Jul 2026
+daily-costing-all,E040807,Daily Costing Status,L2,All,no,Extended sort/subtotal,,,,,/app/reports,yes,
+inv-balance-default,E040701,Inventory Balance,L2,Default,yes,As-of + Inventory Qty range + safety stock,,,,,/app/inventory/reports,yes,Pass 11; menuSeq MENUTREE_001888
+inv-balance-location-default,E040711,Inv. Balance by Location,L2,Default,yes,Horizontal location matrix,,,,,/app/inventory/reports,yes,Pass 11 Jul 2026
+inv-balance-location-type-h,E040711,Inv. Balance by Location Type,L2,by Location (Horizontal),yes,Vertical toggle,,,,,/app/inventory/reports,yes,
+inv-balance-relation-default,E040728,Inv. Balance by Item Relation,L2,Default,yes,Item relation rollup,,,,,/app/inventory/reports,yes,Pass 11 Jul 2026
+inv-book-default,E040702,Inv. Book,L2,Default,yes,Stock ledger + Display Price radios,,,,,/app/inventory/reports,yes,Pass 11 Jul 2026
+inv-book-all,E040702,Inv. Book,L2,All,no,Extended price/cost options,,,,,/app/inventory/reports,yes,
+inv-change-history-default,E040719,Inventory Change History,L2,Default,yes,Summary type pivot,,,,,/app/inventory/reports,yes,Pass 11 Jul 2026
+inv-change-history-type-summary,E040719,Inventory Change History Type,L2,Summary,yes,Daily/Monthly toggles,,,,,/app/inventory/reports,yes,
+inv-aging-default,E040727,Inventory Aging Details,L2,Default,yes,As-of aging buckets,,,,,/app/inventory/reports,yes,Pass 11 Jul 2026
+sales-invoice-acct-default,N000118,Sales Invoice Status (Acct. I),L2,Default,yes,menuType MENUTREE_000001; mirror N000119,,,,,/app/finance/reports,yes,Pass 11 Jul 2026
+purchase-invoice-acct-default,N000126,Purchase Invoice Status (Acct. I),L2,Default,yes,menuType MENUTREE_000001; mirror N000127,,,,,/app/finance/reports,yes,Pass 11 Jul 2026
+inv-balance-multispec-default,E040720,Inv. Balance by Multi Spec.,L2,Default,yes,As-of + Spec. Group/Code 1-3,,,,,/app/inventory/reports,yes,Pass 12 Jul 2026
+inv-balance-multispec-all,E040720,Inv. Balance by Multi Spec.,L2,All,no,Extended sort/subtotal,,,,,/app/inventory/reports,yes,
+inv-balance-multispec-type-v,E040720,Inv. Balance by Multi Spec. Type,L2,by Multi Spec. Item (Vertical),yes,Horizontal toggle; Include Zero Inv. Qty disabled,,,,,/app/inventory/reports,yes,
+inv-balance-bom-default,E040726,Inv. balance converted by BOM,L2,Default,yes,As-of + BOM parent Item Code,,,,,/app/inventory/reports,yes,Pass 12 Jul 2026
+daily-report-default,E040708,Daily Report,L2,Default,yes,Date range + customer relation type,,,,,/app/inventory/reports,yes,Pass 12 Jul 2026
+daily-report-all,E040708,Daily Report,L2,All,no,Extended type options,,,,,/app/inventory/reports,yes,
+jo-status-default,E040413,Job Order Status,L2,Default,yes,J/O No. + delivery date range,,,,,/app/job-costing/reports,yes,Pass 12 Jul 2026
+jo-status-type-details,E040413,Job Order Status Type,L2,Details,yes,Summary + by Line,,,,,/app/job-costing/reports,yes,
+jo-progress-default,E040414,Progress Status by J/O,L2,Default,yes,Base Date business cycle,,,,,/app/job-costing/reports,yes,Pass 12 Jul 2026
+jo-progress-type-production,E040414,Progress Status by J/O Type,L2,Production Progress Status,yes,GI progress + std vs act + job progress,,,,,/app/job-costing/reports,yes,
+gi-status-default,E040409,Goods Issued Status,L2,Default,yes,Goods Issued No. + date range,,,,,/app/job-costing/reports,yes,Pass 12 Jul 2026
+gi-status-type-details,E040409,Goods Issued Status Type,L2,Details,yes,Summary + by Line,,,,,/app/job-costing/reports,yes,
+gr-status-default,E040410,Goods Receipt Status,L2,Default,yes,GR No. + Payable No. + GR I/II/III,,,,,/app/job-costing/reports,yes,Pass 12 Jul 2026
+gr-status-type-details,E040410,Goods Receipt Status Type,L2,Details,yes,Summary + by Line,,,,,/app/job-costing/reports,yes,
+sales-purch-summary-default,E040725,Sales/Purchases Summary,L2,Default,yes,Summary Condition 1/2/Target + comparison,,,,,/app/reports,yes,Pass 13 Jul 2026
+summary-default,E040710,Summary,L2,Default,yes,Menu Type Sales default + PIC condition,,,,,/app/reports,yes,Pass 13 Jul 2026
+summary-menu-sales,E040710,Summary Menu Type,L2,Sales,yes,Purchases/SO/PO/GR/Sales-Purchases toggles,,,,,/app/reports,yes,
+price-change-default,E040819,Price Change History,L2,Default,yes,by Slip + Simple Average Price,,,,,/app/inventory/reports,yes,Pass 13 Jul 2026
+price-change-all,E040819,Price Change History,L2,All,no,Project/PIC extended filters,,,,,/app/inventory/reports,yes,
+mgmt-report-default,E040704,Management Report,L2,Default,yes,Date-only template report,,,,,/app/reports,yes,Pass 13 Jul 2026
+mgmt-report-all,E040704,Management Report,L2,All,no,Extended template drawer,,,,,/app/reports,yes,
+status-grand-default,E040709,Status Grand Total,L2,Default,yes,Vertical display + comparison period,,,,,/app/reports,yes,Pass 13 Jul 2026
+status-grand-type-v,E040709,Status Grand Total Type,L2,Vertical,yes,Horizontal toggle,,,,,/app/reports,yes,
+txn-history-default,E040716,View Transaction History,L2,Default,yes,Slip vs Basic Code audit trail,,,,,/app/reports,yes,Pass 13; title Change History
+cv-book1-default,E010833,Customer/Vendor Book I,L2,Default,yes,AR/AP toggle + five summary types,,,,,/app/finance/reports,yes,Pass 13 Jul 2026
+cv-book1-type-receivable,E010833,Customer/Vendor Book I Account,L2,Receivable,yes,Payables toggle,,,,,/app/finance/reports,yes,
+cv-book2-default,E010842,Customer/Vendor Book II,L2,Default,yes,Summary book Receivable default,,,,,/app/finance/reports,yes,Pass 13 Jul 2026
+cv-book2-all,E010842,Customer/Vendor Book II,L2,All,no,Foreign currency amount option,,,,,/app/finance/reports,yes,
+msg-log-all,E010851,Message Log status pills,L2,All,yes,Unconfirmed/Confirm/SB/Sent Msg,,,,,/app/reports/communication,yes,Pass 14; title Msg.
+msg-log-unconfirmed,E010851,Message Log status pills,L2,Unconfirmed,no,Pending messages,,,,,/app/reports/communication,yes,
+msg-log-sent,E010851,Message Log status pills,L2,Sent Msg,no,Outbox view,,,,,/app/reports/communication,yes,
+sent-doc-default,E010858,Sent Doc. History,L2,Default,yes,by Line + All/Email channel,,,,,/app/reports/communication,yes,Pass 14 Jul 2026
+sent-doc-type-line,E010858,Sent Doc. History Type,L2,by Line,yes,SMS/LMS/Kakao in drawer,,,,,/app/reports/communication,yes,
+proof-center-default,E040730,Proof Center,L2,Default,yes,Voucher date + proof method filters,,,,,/app/reports/proof,yes,Pass 14 Jul 2026
+proof-method-receipts,E040730,Proof Center Proof Method,L2,Attach Receipts,yes,e-Sign toggle,,,,,/app/reports/proof,yes,
+cash-report-default,E010830,Cash Report,L2,Default,yes,Date + dept/project + Status preset,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+cash-report-all,E010830,Cash Report,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+cash-flow-default,E010805,Cash Flow,L2,Default,yes,Same Period Prev. Day comparison,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+cash-flow-all,E010805,Cash Flow,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+fund-stmt-default,E010804,Fund Statement,L2,Default,yes,Customer relation Standard/Individual,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+fund-stmt-all,E010804,Fund Statement,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+fund-inde-default,E010815,Fund In./De. Details,L2,Default,yes,Date + dept/project line detail,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+fund-inde-all,E010815,Fund In./De. Details,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+monthly-is-default,E010819,Monthly Income Statement,L2,Default,yes,Month range + Beginning/Increase/Ending,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+monthly-is-all,E010819,Monthly Income Statement,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+monthly-cost-default,E010824,Monthly Cost,L2,Default,yes,Type Manufacturing/Service/Etc.,,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+monthly-cost-type-mfg,E010824,Monthly Cost Type,L2,Manufacturing,yes,Service + Etc. toggles,,,,,/app/finance/reports,yes,
+arap-aging-default,E010822,AR/AP Aging,L2,Default,yes,As-of + customer/account/dept/PIC,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+arap-aging-all,E010822,AR/AP Aging,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+arap-aging-dtl-default,E010823,AR/AP Aging Details,L2,Default,yes,Receivable/Payables + Summary by PIC,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+arap-aging-dtl-receivable,E010823,AR/AP Aging Details Account,L2,Receivable,yes,Payables toggle,,,,,/app/finance/reports,yes,
+acct-mgmt-report-default,E010821,Management Report (Acct. I),L2,Default,yes,Type chart template selector,,,,,/app/finance/reports,yes,Pass 15; distinct from E040704
+acct-mgmt-report-all,E010821,Management Report (Acct. I),L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+acct-summary-default,E010843,Accounting Summary,L2,Default,yes,Summary Condition 1-3 + Target,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+acct-summary-all,E010843,Accounting Summary,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+sales-summary-default,N000121,Sales Summary,L2,Default,yes,Pretax+Tax amount + Exclude Duplicate by Month,,,,,/app/finance/reports,yes,Pass 15; N-prefix Acct. I hash
+purchase-summary-default,N000128,Purchase Summary,L2,Default,yes,Mirror N000121 purchase side,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+pay-journal-sum-default,E010835,Payments Journal Sum.,L2,Default,yes,Details/Summary + by Bank Account type,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+pay-journal-sum-type-line,E010835,Payments Journal Sum. Type,L2,by Line,yes,by Bank Account and Account + Recalculate,,,,,/app/finance/reports,yes,
+rcpt-journal-sum-default,E010836,Receipts Journal Sum.,L2,Default,yes,Deposit Account filter,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+sa-journal-sum-default,E010840,S/A Journal Sum.,L2,Default,yes,by Employee and Account type,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+sa-journal-sum-type-emp,E010840,S/A Journal Sum. Type,L2,by Employee and Account,yes,Recalculate by Account,,,,,/app/finance/reports,yes,
+voucher-status-default,E010847,Voucher Status,L2,Default,yes,Details/Summary + by Slip type,,,,,/app/finance/reports,yes,Pass 16; site map Accounting Transaction Status
+voucher-status-type-slip,E010847,Voucher Status Type,L2,by Slip,yes,Daily/Monthly/By Customer-Vendor,,,,,/app/finance/reports,yes,
+print-voucher-default,E010702,Print Voucher,L2,Default,yes,Initial/Last Modifier + Sort by Modified Date,,,,,/app/finance/reports,yes,Pass 16 Jul 2026
+print-voucher-all,E010702,Print Voucher,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+acct-vs-inv-default,E010730,Accounting vs. Inventory,L2,Default,yes,Acct + Inv side filters + Pretax/Total,,,,,/app/finance/reports,yes,Pass 16 Jul 2026
+acct-vs-inv-type-sales,E010730,Accounting vs. Inventory Inv. Type,L2,Sales,yes,Other inv types in drawer,,,,,/app/finance/reports,yes,
+acct-vs-inv-all,E010730,Accounting vs. Inventory,L2,All,no,Initial Creator + Last Modifier,,,,,/app/finance/reports,yes,
+acct-txn-history-default,E010712,Change History (Acct.),L2,Default,yes,Voucher Status All/e-Apvl/Unconfirmed/Confirm,,,,,/app/finance/reports,yes,Pass 16; distinct from E040716
+acct-txn-history-all,E010712,Change History (Acct.),L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
+acct-all-in-one-customer,E040627,All-In-One I (Acct. I),L0,Customer workspace,yes,Quick links AR/AP/Sales/Purchase/Slip Entry,,,,,/app/reports,yes,Pass 16; menuSeq MENUTREE_001352
+update-balance-acct,E010705,Update Balance for Accounting,action,—,yes,Start/End month + F8 rebuild,,,,,/app/finance/period-close,yes,Pass 16 Jul 2026

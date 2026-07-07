@@ -11,6 +11,7 @@ export type SupplierInvoiceRow = {
   currency_code: string;
   vendor_invoice_no?: string | null;
   grand_total: number;
+  progress_status: string;
 };
 
 export type SupplierInvoiceLine = {
@@ -43,11 +44,21 @@ export type OpenGRLine = {
   unit_vat_inc: number;
 };
 
-export function useSupplierInvoiceList(params: () => { page: number; pageSize: number; sort: string; order: "asc" | "desc"; q?: string }) {
+export function useSupplierInvoiceList(params: () => {
+  page: number;
+  pageSize: number;
+  sort: string;
+  order: "asc" | "desc";
+  q?: string;
+  progressStatus?: string;
+  paymentStatus?: string;
+}) {
   return createQuery(() => {
     const p = params();
     const qs = new URLSearchParams({ page: String(p.page), pageSize: String(p.pageSize), sort: p.sort, order: p.order });
     if (p.q) qs.set("q", p.q);
+    if (p.progressStatus) qs.set("progress_status", p.progressStatus);
+    if (p.paymentStatus) qs.set("payment_status", p.paymentStatus);
     return {
       queryKey: ["supplier-invoices", p],
       queryFn: async () => {

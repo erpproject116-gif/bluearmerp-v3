@@ -158,8 +158,8 @@ func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Po
 		insert into public.fin_supplier_invoices (
 		  tenant_id, invoice_date, date_seq, invoice_no,
 		  partner_id, currency_id,
-		  subtotal, tax_total, grand_total, created_by_user_id
-		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		  subtotal, tax_total, grand_total, progress_status, created_by_user_id
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'completed',$10)
 		returning id`,
 		tu.TenantID, receiptDate, dateSeq, invoiceNo,
 		body.PartnerID, body.CurrencyID,

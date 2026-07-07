@@ -40,7 +40,9 @@ type SalesOrderLine struct {
 	UnitVatInc             float64 `json:"unit_vat_inc"`
 	LineTotal              float64 `json:"line_total"`
 	Remark                 *string `json:"remark,omitempty"`
-	SourceQuotationLineID  *int64  `json:"source_quotation_line_id,omitempty"`
+	SourceQuotationLineID  *int64   `json:"source_quotation_line_id,omitempty"`
+	PlannedSerialNos       []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial            bool     `json:"track_serial,omitempty"`
 }
 
 type SalesOrder struct {
@@ -94,7 +96,8 @@ type salesOrderLineBody struct {
 	UnitPrice             float64 `json:"unit_price"`
 	InputBasis            string  `json:"input_basis"`
 	Remark                *string `json:"remark"`
-	SourceQuotationLineID *int64  `json:"source_quotation_line_id"`
+	SourceQuotationLineID *int64   `json:"source_quotation_line_id"`
+	PlannedSerialNos      []string `json:"planned_serial_nos"`
 }
 
 type salesOrderBody struct {
@@ -130,6 +133,7 @@ type computedLine struct {
 	Amounts               taxcalc.LineAmounts
 	Remark                *string
 	SourceQuotationLineID *int64
+	PlannedSerialNos      []string
 }
 
 type createdSlipRow struct {
@@ -409,13 +413,16 @@ func loadSalesOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 
 func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID int64) ([]SalesOrderLine, error) {
 	rows, err := pool.Query(ctx, `
-		select id, line_no, item_id, item_code, item_name, description,
-		  qty::float8, coalesce(delivered_qty, 0)::float8, coalesce(billed_qty, 0)::float8,
-		  unit_non_vat::float8, non_vat_total::float8, tax_amount::float8,
-		  unit_vat_inc::float8, line_total::float8, remark, source_quotation_line_id
-		from public.so_sales_order_lines
-		where sales_order_id = $1
-		order by line_no`, salesOrderID)
+		select ln.id, ln.line_no, ln.item_id, ln.item_code, ln.item_name, ln.description,
+		  ln.qty::float8, coalesce(ln.delivered_qty, 0)::float8, coalesce(ln.billed_qty, 0)::float8,
+		  ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
+		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark, ln.source_quotation_line_id,
+		  coalesce(ln.planned_serial_nos, '{}'),
+		  coalesce(i.track_serial, false)
+		from public.so_sales_order_lines ln
+		left join public.inv_items i on i.id = ln.item_id
+		where ln.sales_order_id = $1
+		order by ln.line_no`, salesOrderID)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +433,7 @@ func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID i
 		var ln SalesOrderLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.DeliveredQty, &ln.BilledQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.SourceQuotationLineID); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.SourceQuotationLineID, &ln.PlannedSerialNos, &ln.TrackSerial); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -483,7 +490,7 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		body.Lines = applyPartnerRatesToSOLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
-		computed, errs := computeSalesOrderLines(tt, body.Lines)
+		computed, errs := computeSalesOrderLines(r.Context(), pool, tu.TenantID, tt, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -626,7 +633,7 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		body.Lines = applyPartnerRatesToSOLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
-		computed, errs := computeSalesOrderLines(tt, body.Lines)
+		computed, errs := computeSalesOrderLines(r.Context(), pool, tu.TenantID, tt, body.Lines)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
@@ -752,12 +759,12 @@ func insertSalesOrderLines(ctx context.Context, tx pgx.Tx, salesOrderID int64, l
 			insert into public.so_sales_order_lines (
 			  sales_order_id, line_no, item_id, item_code, item_name, description,
 			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
-			  source_quotation_line_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+			  source_quotation_line_id, planned_serial_nos
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 			returning id`,
 			salesOrderID, lineNo, ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.Description,
 			ln.Qty, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
-			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark, ln.SourceQuotationLineID).Scan(&id)
+			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark, ln.SourceQuotationLineID, ln.PlannedSerialNos).Scan(&id)
 		if err != nil {
 			return nil, err
 		}
@@ -774,11 +781,16 @@ func replaceSalesOrderLines(ctx context.Context, tx pgx.Tx, salesOrderID int64, 
 	return err
 }
 
-func computeSalesOrderLines(tt taxcalc.TaxType, lines []salesOrderLineBody) ([]computedLine, map[string]string) {
+func computeSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, tt taxcalc.TaxType, lines []salesOrderLineBody) ([]computedLine, map[string]string) {
 	errs := map[string]string{}
 	var out []computedLine
 	for i, ln := range lines {
 		if ln.Qty <= 0 {
+			continue
+		}
+		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
+		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.ItemID, ln.Qty, planned); err != nil {
+			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}
 		inputBasis := ln.InputBasis
@@ -800,6 +812,7 @@ func computeSalesOrderLines(tt taxcalc.TaxType, lines []salesOrderLineBody) ([]c
 			Amounts:               amounts,
 			Remark:                ln.Remark,
 			SourceQuotationLineID: ln.SourceQuotationLineID,
+			PlannedSerialNos:      planned,
 		})
 	}
 	if len(errs) > 0 {

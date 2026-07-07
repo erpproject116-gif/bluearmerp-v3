@@ -2,8 +2,7 @@ import { createSignal, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_SETTINGS_HREF } from "../../../shared/entityTypes";
-import { SerialPickModal } from "../../../shared/SerialPickModal";
-import { SerialSaleScanner } from "../../../shared/SerialSaleScanner";
+import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { useListState } from "../../../shared/useListState";
 import {
   postSalesOrderReleases,
@@ -22,8 +21,7 @@ export default function ReleaseSalesOrderPage() {
   const { page, setPage, q, setQ, sort, order, pageSize } = useListState("order_date", 25, { defaultOrder: "desc" });
   const [releaseQty, setReleaseQty] = createSignal<Record<number, string>>({});
   const [serialIds, setSerialIds] = createSignal<Record<number, number[]>>({});
-  const [serialPickOpen, setSerialPickOpen] = createSignal(false);
-  const [serialPickRow, setSerialPickRow] = createSignal<ReleaseQueueRow | null>(null);
+  const [serialLabels, setSerialLabels] = createSignal<Record<number, string>>({});
   const [submitting, setSubmitting] = createSignal(false);
 
   const queue = useReleaseQueue(() => ({
@@ -70,6 +68,7 @@ export default function ReleaseSalesOrderPage() {
     toast.success(res.message ?? `Released ${res.data?.released_count ?? lines.length} line(s).`);
     setReleaseQty({});
     setSerialIds({});
+    setSerialLabels({});
     invalidate();
 
     const soId = res.data?.sales_order_ids?.[0];
@@ -78,16 +77,10 @@ export default function ReleaseSalesOrderPage() {
     }
   };
 
-  const openSerialPick = (row: ReleaseQueueRow) => {
-    setSerialPickRow(row);
-    setSerialPickOpen(true);
-  };
-
-  const serialPickQty = () => {
-    const row = serialPickRow();
-    if (!row) return 1;
-    const qty = Number(releaseQty()[row.sales_order_line_id] ?? row.balance_qty);
-    return Math.max(1, Math.floor(qty));
+  const releaseQtyFor = (row: ReleaseQueueRow) => {
+    const raw = releaseQty()[row.sales_order_line_id];
+    if (raw) return Number(raw);
+    return row.balance_qty;
   };
 
   const fillBalance = (row: ReleaseQueueRow) => {
@@ -191,25 +184,20 @@ export default function ReleaseSalesOrderPage() {
                     </td>
                     <td class="px-3 py-2">
                       <Show when={row.track_serial}>
-                        <div class="max-w-[12rem] space-y-1">
-                          <SerialSaleScanner
-                            itemId={row.item_id}
-                            locationId={row.location_id}
-                            serialUnitIds={serialIds()[row.sales_order_line_id] ?? []}
-                            context="release"
-                            onChange={(ids) => {
-                              setSerialIds((prev) => ({ ...prev, [row.sales_order_line_id]: ids }));
-                              setQty(row.sales_order_line_id, String(ids.length));
-                            }}
-                          />
-                          <button
-                            type="button"
-                            class="text-xs text-brand-600 hover:underline"
-                            onClick={() => openSerialPick(row)}
-                          >
-                            Pick list
-                          </button>
-                        </div>
+                        <SerialLineCell
+                          mode="units"
+                          itemId={row.item_id}
+                          locationId={row.location_id}
+                          qty={releaseQtyFor(row)}
+                          serialUnitIds={serialIds()[row.sales_order_line_id] ?? []}
+                          serialLabels={serialLabels()[row.sales_order_line_id]}
+                          context="release"
+                          onChange={(ids, labels, qty) => {
+                            setSerialIds((prev) => ({ ...prev, [row.sales_order_line_id]: ids }));
+                            setSerialLabels((prev) => ({ ...prev, [row.sales_order_line_id]: labels }));
+                            if (qty) setQty(row.sales_order_line_id, qty);
+                          }}
+                        />
                       </Show>
                     </td>
                   </tr>
@@ -242,25 +230,6 @@ export default function ReleaseSalesOrderPage() {
         </div>
       </section>
 
-      <SerialPickModal
-        open={serialPickOpen()}
-        itemId={serialPickRow()?.item_id ?? null}
-        locationId={serialPickRow()?.location_id}
-        maxQty={serialPickQty()}
-        selectedIds={serialIds()[serialPickRow()?.sales_order_line_id ?? 0] ?? []}
-        itemLabel={
-          serialPickRow()
-            ? `${serialPickRow()!.item_code} — ${serialPickRow()!.item_name}`
-            : undefined
-        }
-        onClose={() => setSerialPickOpen(false)}
-        onConfirm={(ids) => {
-          const row = serialPickRow();
-          if (!row) return;
-          setSerialIds((prev) => ({ ...prev, [row.sales_order_line_id]: ids }));
-          toast.success(`Selected ${ids.length} serial(s).`);
-        }}
-      />
     </SalesOrderLayout>
   );
 }

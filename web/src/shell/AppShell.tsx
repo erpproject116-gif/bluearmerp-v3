@@ -16,6 +16,7 @@ import { SerialLotHeaderNav } from "./SerialLotHeaderNav";
 import { WmsHeaderNav } from "./WmsHeaderNav";
 import { AcctIHeaderNav } from "./AcctIHeaderNav";
 import { AcctIIHeaderNav } from "./AcctIIHeaderNav";
+import { ReviewPurchasesHeaderNav } from "./ReviewPurchasesHeaderNav";
 import { taxMngtHeaderTitle } from "./tax-mngt-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 import { collectiveInvoicingHeaderTitle, COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
@@ -23,6 +24,7 @@ import { serialLotHeaderTitle, SERIAL_LOT_PREFIX } from "./serial-lot-nav";
 import { wmsHeaderTitle, WMS_PREFIX } from "./wms-nav";
 import { acctIHeaderTitle, ACCT_I_PREFIX } from "./acct-i-nav";
 import { acctIIHeaderTitle, ACCT_II_PREFIX } from "./acct-ii-nav";
+import { isReviewPurchasesPath, reviewPurchasesHeaderTitle } from "./review-purchases-nav";
 import { useBranding } from "../shared/branding/BrandingProvider";
 import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
@@ -68,7 +70,8 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
   const featureNavModule = () => {
     const mod = activeModule();
-    if (!mod || activeSubBranch()) return undefined;
+    if (!mod || activeSubBranch() || isReviewPurchasesPath(loc.pathname)) return undefined;
+    if (mod.id === "finance" && isReviewPurchasesPath(loc.pathname)) return undefined;
     return mod;
   };
 
@@ -181,11 +184,13 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                       </Show>
                     </p>
                     <h1 class="truncate text-xl font-semibold text-text-primary">
-                      {activeSubBranch()
-                        ? subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix)
-                        : activeFeature()
-                          ? featureHeaderTitle(activeFeature()!, loc.pathname)
-                          : mod().label}
+                      {isReviewPurchasesPath(loc.pathname)
+                        ? reviewPurchasesHeaderTitle(loc.pathname)
+                        : activeSubBranch()
+                          ? subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix)
+                          : activeFeature()
+                            ? featureHeaderTitle(activeFeature()!, loc.pathname)
+                            : mod().label}
                     </h1>
                   </>
                 )}
@@ -244,6 +249,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <CollectiveInvoicingHeaderNav />
           <SerialLotHeaderNav />
           <WmsHeaderNav />
+          <ReviewPurchasesHeaderNav />
           <AcctIHeaderNav />
           <AcctIIHeaderNav />
         </header>

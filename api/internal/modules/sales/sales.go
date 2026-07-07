@@ -147,6 +147,7 @@ func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerCollectiveInvoiceLinkRoutes(r, pool)
 	registerSalesReturnRoutes(r, pool)
 	registerCustomerCreditBalanceRoutes(r, pool)
+	registerSalesApprovalRoutes(r, pool)
 	r.Get("/preview-sequences", previewSalesSequences(pool))
 	r.Get("/sales-order-lines/open", listOpenSalesOrderLines(pool))
 	r.Get("/status-report/export", exportSalesStatusReport(pool))
@@ -233,11 +234,15 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 		progress := strings.TrimSpace(r.URL.Query().Get("progress_status"))
-		if progress == "unconfirmed" || progress == "completed" {
+		if progress == "unconfirmed" || progress == "e_approval" || progress == "completed" {
 			where += fmt.Sprintf(" and s.progress_status = $%d", argN)
 			args = append(args, progress)
 			argN++
-		} else if p.Status == "unconfirmed" || p.Status == "completed" {
+		} else if progress == "confirm" {
+			where += fmt.Sprintf(" and s.progress_status = $%d", argN)
+			args = append(args, "completed")
+			argN++
+		} else if p.Status == "unconfirmed" || p.Status == "e_approval" || p.Status == "completed" {
 			where += fmt.Sprintf(" and s.progress_status = $%d", argN)
 			args = append(args, p.Status)
 			argN++
@@ -641,7 +646,11 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		before, _ := loadSale(r.Context(), pool, tu.TenantID, id)
+		before, errBefore := loadSale(r.Context(), pool, tu.TenantID, id)
+		if errBefore == nil && before.ProgressStatus == "e_approval" {
+			response.Validation(w, map[string]string{"progress_status": "Cannot edit a sale pending approval."})
+			return
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -892,6 +901,9 @@ func validateSaleBody(b saleBody, create bool) map[string]string {
 	}
 	if b.LocationID <= 0 {
 		errs["location_id"] = "Location is required."
+	}
+	if b.ProgressStatus == "e_approval" {
+		errs["progress_status"] = "Use Submit for approval."
 	}
 	if b.ProgressStatus != "" && b.ProgressStatus != "unconfirmed" && b.ProgressStatus != "completed" {
 		errs["progress_status"] = "Must be unconfirmed or completed."

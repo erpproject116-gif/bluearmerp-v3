@@ -8,6 +8,7 @@ export type SalesStatusFilters = {
   item_id?: number | null;
   tax_type_id?: number | null;
   progress_status?: string;
+  report_type?: "details" | "summary" | "by_line";
 };
 
 export type PriceBatchFilters = SalesStatusFilters;
@@ -30,7 +31,7 @@ export function thisMonthRange(): { from: string; to: string } {
 
 export function defaultStatusFilters(): SalesStatusFilters {
   const { from, to } = thisMonthRange();
-  return { date_from: from, date_to: to };
+  return { date_from: from, date_to: to, report_type: "details" };
 }
 
 export function filtersToSearchParams(
@@ -48,6 +49,7 @@ export function filtersToSearchParams(
   if (filters.item_id) qs.set("item_id", String(filters.item_id));
   if (filters.tax_type_id) qs.set("tax_type_id", String(filters.tax_type_id));
   if (filters.progress_status) qs.set("progress_status", filters.progress_status);
+  if (filters.report_type) qs.set("report_type", filters.report_type);
   if (extra?.page) qs.set("page", String(extra.page));
   if (extra?.pageSize) qs.set("pageSize", String(extra.pageSize));
   if (extra?.sort) qs.set("sort", extra.sort);

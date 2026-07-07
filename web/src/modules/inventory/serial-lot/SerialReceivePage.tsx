@@ -15,6 +15,7 @@ import {
 } from "../../../shared/useSerialScanQueue";
 import { SerialLotLayout } from "./SerialLotLayout";
 import { SerialReceiveScanner } from "../../../shared/SerialReceiveScanner";
+import { SerialLineCell } from "../../../shared/SerialLineCell";
 
 type PurchaseOrderRow = {
   id: number;
@@ -140,6 +141,19 @@ export default function SerialReceivePage() {
       return gap > 0.0001 || l.received_qty + 0.0001 < l.expected_qty;
     });
   });
+
+  const updateLineSerials = (lineId: number, serials: { id: number; serial_no: string }[], receivedQty: number) => {
+    setGoodsReceipt((gr) => {
+      if (!gr?.lines) return gr;
+      return {
+        ...gr,
+        lines: gr.lines.map((l) => (l.id === lineId ? { ...l, serials, received_qty: receivedQty } : l)),
+      };
+    });
+    setScanLineId(lineId);
+    const gr = goodsReceipt();
+    if (gr) void loadGrGaps(gr.id);
+  };
 
   const loadGrGaps = async (grId: number) => {
     const qs = new URLSearchParams({ goods_receipt_id: String(grId) });
@@ -488,7 +502,21 @@ export default function SerialReceivePage() {
                               </td>
                               <td class="py-1 pr-3">{line.expected_qty}</td>
                               <td class="py-1 pr-3">{line.received_qty}</td>
-                              <td class="py-1 pr-3">{serialCount()}</td>
+                              <td class="py-1 pr-3">
+                                <SerialLineCell
+                                  mode="receive"
+                                  grId={goodsReceipt()!.id}
+                                  lineId={line.id}
+                                  itemCode={line.item_code}
+                                  itemName={line.item_name}
+                                  expectedQty={line.expected_qty}
+                                  receivedQty={line.received_qty}
+                                  serials={line.serials ?? []}
+                                  status={goodsReceipt()!.status}
+                                  onSerialsChange={(serials, receivedQty) => updateLineSerials(line.id, serials, receivedQty)}
+                                  onAfterScan={() => void loadGrGaps(goodsReceipt()!.id)}
+                                />
+                              </td>
                               <td class={`py-1 ${gap() > 0.0001 ? "font-medium text-red-600" : "text-green-700"}`}>
                                 {gap() > 0.0001 ? gap().toFixed(0) : "OK"}
                               </td>
@@ -664,7 +692,19 @@ export default function SerialReceivePage() {
                             <td class="px-3 py-2">{line.expected_qty}</td>
                             <td class="px-3 py-2">{line.received_qty}</td>
                             <td class="px-3 py-2">
-                              {(line.serials ?? []).map((s) => s.serial_no).join(", ") || "—"}
+                              <SerialLineCell
+                                mode="receive"
+                                grId={goodsReceipt()!.id}
+                                lineId={line.id}
+                                itemCode={line.item_code}
+                                itemName={line.item_name}
+                                expectedQty={line.expected_qty}
+                                receivedQty={line.received_qty}
+                                serials={line.serials ?? []}
+                                status={goodsReceipt()!.status}
+                                onSerialsChange={(serials, receivedQty) => updateLineSerials(line.id, serials, receivedQty)}
+                                onAfterScan={() => void loadGrGaps(goodsReceipt()!.id)}
+                              />
                             </td>
                           </tr>
                         )}

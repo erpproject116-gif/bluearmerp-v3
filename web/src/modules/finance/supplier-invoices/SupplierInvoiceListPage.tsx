@@ -15,22 +15,45 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
 import { Show } from "solid-js";
+import { apiFetch } from "../../../shared/api";
+import { useToast } from "../../../shared/toast";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 
 
 
 type PageOptions = { openNewOnMount?: boolean };
 
 export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
+  const auth = useAuth();
+  const toast = useToast();
+  const canQc = () => hasPermission(auth.me, "quality.qc_requests", "write");
   const loc = useLocation();
   const navigate = useNavigate();
   const invalidate = useInvalidateSupplierInvoices();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("invoice_date", 25, {
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("invoice_date", 25, {
     defaultOrder: "desc",
+    defaultStatus: "",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [viewRow, setViewRow] = createSignal<SupplierInvoiceRow | null>(null);
+  const [qcCreatingId, setQcCreatingId] = createSignal<number | null>(null);
+
+  const createQcRequest = async (row: SupplierInvoiceRow) => {
+    setQcCreatingId(row.id);
+    const res = await apiFetch("/api/v1/quality/qc-requests", {
+      method: "POST",
+      body: JSON.stringify({ source_type: "supplier_invoice", supplier_invoice_id: row.id }),
+    });
+    setQcCreatingId(null);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to create QC request.");
+      return;
+    }
+    toast.success("QC request created.");
+  };
 
   const list = useSupplierInvoiceList(() => ({
     page: page(),
@@ -38,6 +61,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
     sort: sort(),
     order: order(),
     q: q() || undefined,
+    progressStatus: statusFilter() || undefined,
   }));
 
   const openNew = () => setModalOpen(true);
@@ -59,7 +83,30 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
           { key: "invoice_no", header: "Invoice No.", clickable: true },
           { key: "vendor_name", header: "Vendor" },
           { key: "vendor_invoice_no", header: "Vendor ref", render: (r) => r.vendor_invoice_no ?? "" },
+          {
+            key: "progress_status",
+            header: "Progress",
+            sortable: false,
+            render: (r) => <span>{docProgressStatusLabel(r.progress_status)}</span>,
+          },
           { key: "grand_total", header: "Amount", render: (r) => formatPeso(r.grand_total) },
+          {
+            key: "qc",
+            header: "QC",
+            sortable: false,
+            render: (r) => (
+              <Show when={canQc()}>
+                <button
+                  type="button"
+                  class="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                  disabled={qcCreatingId() === r.id}
+                  onClick={(e) => { e.stopPropagation(); void createQcRequest(r); }}
+                >
+                  {qcCreatingId() === r.id ? "Creating…" : "Create QC Request"}
+                </button>
+              </Show>
+            ),
+          },
           {
             key: "history",
             header: "History",
@@ -91,6 +138,13 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onPageChange={setPage}
         search={q()}
         onSearchChange={setQ}
+        status={statusFilter()}
+        onStatusChange={(status) => {
+          setStatusFilter(status);
+          setPage(1);
+        }}
+        statusLabel="Progress"
+        statusOptions={[...DOC_PROGRESS_STATUS_TABS]}
         onRefresh={invalidate}
         settingsHref={FINANCE_SETTINGS_HREF.officialReceipt}
       />

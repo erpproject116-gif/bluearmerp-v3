@@ -1,5 +1,5 @@
 import { A } from "@solidjs/router";
-import { createSignal, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
@@ -18,9 +18,10 @@ import { PurchaseOrderModal } from "./PurchaseOrderModal";
 import { PurchaseRequestLayout } from "../PurchaseRequestLayout";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
+import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
 
-const STATUS_TABS = [
-  { value: "", label: "All" },
+const OPERATIONAL_STATUS_TABS = [
+  { value: "", label: "All statuses" },
   { value: "draft", label: "Draft" },
   { value: "confirmed", label: "Confirmed" },
   { value: "partially_received", label: "Partially received" },
@@ -29,7 +30,7 @@ const STATUS_TABS = [
 ];
 
 function statusLabel(status: string): string {
-  return STATUS_TABS.find((t) => t.value === status)?.label ?? status;
+  return OPERATIONAL_STATUS_TABS.find((t) => t.value === status)?.label ?? status;
 }
 
 type PurchaseRequestLookupRow = {
@@ -274,6 +275,7 @@ export default function PurchaseOrderListPage() {
     25,
     { defaultOrder: "desc", defaultStatus: "" },
   );
+  const [operationalFilter, setOperationalFilter] = createSignal("");
 
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [fromPrOpen, setFromPrOpen] = createSignal(false);
@@ -287,7 +289,8 @@ export default function PurchaseOrderListPage() {
     sort: sort(),
     order: order(),
     q: q() || undefined,
-    status: statusFilter() || undefined,
+    status: operationalFilter() || undefined,
+    progressStatus: statusFilter() || undefined,
   }));
 
   const onConfirm = async (row: PurchaseOrderRow) => {
@@ -361,6 +364,12 @@ export default function PurchaseOrderListPage() {
             render: (r) => formatMoney(r.grand_total, r.currency_code),
           },
           {
+            key: "progress_status",
+            header: "Progress",
+            sortable: false,
+            render: (r) => <span>{docProgressStatusLabel(r.progress_status)}</span>,
+          },
+          {
             key: "status",
             header: "Status",
             sortable: false,
@@ -422,8 +431,25 @@ export default function PurchaseOrderListPage() {
         searchPlaceholder="Search PO no., vendor, item…"
         status={statusFilter()}
         onStatusChange={setStatusFilter}
-        statusLabel="Status"
-        statusOptions={STATUS_TABS}
+        statusLabel="Progress"
+        statusOptions={[...DOC_PROGRESS_STATUS_TABS]}
+        toolbarExtra={
+          <label class="shrink-0">
+            <span class="mb-1 block text-xs font-medium text-text-primary">Fulfillment</span>
+            <select
+              class="rounded-lg border border-stroke bg-white px-3 py-1.5 text-sm"
+              value={operationalFilter()}
+              onChange={(e) => {
+                setOperationalFilter(e.currentTarget.value);
+                setPage(1);
+              }}
+            >
+              <For each={OPERATIONAL_STATUS_TABS}>
+                {(opt) => <option value={opt.value}>{opt.label}</option>}
+              </For>
+            </select>
+          </label>
+        }
         onRefresh={invalidate}
       />
 

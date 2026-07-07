@@ -128,6 +128,33 @@ func entityLabel(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entity
 		if ref != "" {
 			return ref
 		}
+	case "sa_sales":
+		var ref string
+		_ = pool.QueryRow(ctx, `
+			select coalesce(nullif(trim(sales_no), ''), '')
+			from public.sa_sales
+			where id = $1 and tenant_id = $2 and deleted_at is null`, entityID, tenantID).Scan(&ref)
+		if ref != "" {
+			return ref
+		}
+	case "purchase_order", "po_purchase_order":
+		var ref string
+		_ = pool.QueryRow(ctx, `
+			select coalesce(nullif(trim(purchase_order_no), ''), '')
+			from public.po_purchase_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null`, entityID, tenantID).Scan(&ref)
+		if ref != "" {
+			return ref
+		}
+	case "fin_supplier_invoice":
+		var ref string
+		_ = pool.QueryRow(ctx, `
+			select coalesce(nullif(trim(invoice_no), ''), '')
+			from public.fin_supplier_invoices
+			where id = $1 and tenant_id = $2 and deleted_at is null`, entityID, tenantID).Scan(&ref)
+		if ref != "" {
+			return ref
+		}
 	}
 	return fmt.Sprintf("%s #%d", entityType, entityID)
 }

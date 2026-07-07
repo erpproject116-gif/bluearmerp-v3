@@ -47,11 +47,32 @@ func Catalog() []ReportDef {
 			Description: "Open PO lines with pending receipt quantity.",
 		},
 		{
+			Key: "purchase_status", Label: "Purchase Status", Module: "buying",
+			APIPath:    "/api/v1/buying/reports/purchase-status",
+			ExportPath: "/api/v1/buying/reports/purchase-status/export",
+			WebPath:    "/app/buying/reports/purchase-status", Tier: "R3",
+			Description: "Supplier invoice line inquiry with Details/Summary/by Line.",
+		},
+		{
 			Key: "stock_balance", Label: "Stock Balance", Module: "inventory",
 			APIPath:    "/api/v1/inventory/reports/stock-balance",
 			ExportPath: "/api/v1/inventory/reports/stock-balance/export",
 			WebPath:    "/app/inventory/reports/stock-balance", Tier: "R4",
 			Description: "On-hand and reserved quantity by item and location.",
+		},
+		{
+			Key: "inventory_on_hand", Label: "Inventory Balance (On Hand)", Module: "inventory",
+			APIPath:    "/api/v1/inventory/reports/on-hand",
+			ExportPath: "/api/v1/inventory/reports/on-hand/export",
+			WebPath:    "/app/inventory/reports/on-hand", Tier: "R4",
+			Description: "Company-wide on-hand quantity with safety-stock filter.",
+		},
+		{
+			Key: "inv_book", Label: "Inv. Book", Module: "inventory",
+			APIPath:    "/api/v1/inventory/reports/inv-book",
+			ExportPath: "/api/v1/inventory/reports/inv-book/export",
+			WebPath:    "/app/inventory/reports/inv-book", Tier: "R4",
+			Description: "Opening, receipt, issue, and closing qty by item.",
 		},
 		{
 			Key: "stock_ledger", Label: "Stock Ledger", Module: "inventory",
@@ -94,6 +115,13 @@ func Catalog() []ReportDef {
 			ExportPath: "/api/v1/finance/ap-aging/export",
 			WebPath:    "/app/finance/reports/ap-aging", Tier: "R5",
 			Description: "Payables balances bucketed by aging days.",
+		},
+		{
+			Key: "ar_ap_status", Label: "AR/AP Status", Module: "finance",
+			APIPath:    "/api/v1/finance/reports/ar-ap-status",
+			ExportPath: "/api/v1/finance/reports/ar-ap-status/export",
+			WebPath:    "/app/finance/reports/ar-ap-status", Tier: "R5",
+			Description: "Combined receivable and payable position as-of date.",
 		},
 		{
 			Key: "trial_balance", Label: "Trial Balance", Module: "finance",

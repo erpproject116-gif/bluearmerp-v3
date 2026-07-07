@@ -137,6 +137,24 @@ func SyncEntityProgress(ctx context.Context, tx pgx.Tx, tenantID int64, entityTy
 			update public.sa_collective_invoices set status = $1, updated_at = now()
 			where id = $2 and tenant_id = $3`, progressStatus, entityID, tenantID)
 		return err
+	case "sa_sales":
+		ps := progressStatus
+		if ps == "confirmed" {
+			ps = "completed"
+		}
+		_, err := tx.Exec(ctx, `
+			update public.sa_sales set progress_status = $1, updated_at = now()
+			where id = $2 and tenant_id = $3 and deleted_at is null`, ps, entityID, tenantID)
+		return err
+	case "fin_supplier_invoice":
+		ps := progressStatus
+		if ps == "confirmed" {
+			ps = "completed"
+		}
+		_, err := tx.Exec(ctx, `
+			update public.fin_supplier_invoices set progress_status = $1, updated_at = now()
+			where id = $2 and tenant_id = $3 and deleted_at is null`, ps, entityID, tenantID)
+		return err
 	default:
 		return nil
 	}

@@ -20,7 +20,6 @@ import { SalesLayout } from "../SalesLayout";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesModal, type SalesDetail } from "./SalesModal";
 import { formatMoney, openSalesPrint } from "./salesPrint";
-import { progressStatusLabel } from "./progressStatus";
 import type { SalesTemplateCode } from "./SalesLineGrid";
 
 type PageOptions = {
@@ -163,6 +162,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
               <ProgressStatusMenu
                 class="rounded border border-stroke bg-white px-2 py-1 text-sm text-brand-600"
                 value={r.progress_status}
+                disabled={r.progress_status === "e_approval"}
                 onChange={(status) => void onProgressChange(r, status)}
               />
             ),
@@ -263,11 +263,12 @@ export function SalesListPageInner(props: PageOptions = {}) {
         searchPlaceholder="Search sales no., customer, SI/DR, item…"
         status={statusFilter()}
         onStatusChange={setStatusFilter}
-        statusLabel="Progress"
+        statusLabel="Status"
         statusOptions={[
-          { value: "unconfirmed", label: progressStatusLabel("unconfirmed") },
-          { value: "completed", label: progressStatusLabel("completed") },
           { value: "", label: "All" },
+          { value: "e_approval", label: "E-Approval" },
+          { value: "unconfirmed", label: "Unconfirmed" },
+          { value: "completed", label: "Confirm" },
         ]}
         onRefresh={invalidate}
         settingsHref={SALES_SETTINGS_HREF.sales}
