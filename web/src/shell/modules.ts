@@ -109,14 +109,14 @@ export const appModules: AppModule[] = [
     basePath: "/app/buying",
     features: [
       { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying" },
-      { label: "Purchase Status", href: "/app/buying/reports/purchase-status", settingsHref: "/app/finance/supplier-invoices/settings" },
+      { label: "Purchase Status", href: "/app/buying/reports/purchase-status", settingsHref: "/app/purchases/purchases/settings" },
     ],
     subBranches: [
       {
         label: "Review Purchases",
         prefix: REVIEW_PURCHASES_SUB_BRANCH,
-        href: "/app/finance/supplier-invoices",
-        settingsHref: "/app/finance/supplier-invoices/settings",
+        href: "/app/finance/payment-vouchers",
+        settingsHref: "/app/finance/official-receipts/settings",
       },
     ],
   },
@@ -287,6 +287,19 @@ export const appModules: AppModule[] = [
       { label: "Receiving", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/goods-receipt/settings" },
       { label: "PO Analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Items to Receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+    ],
+  },
+  {
+    id: "purchases",
+    label: "Purchases",
+    href: "/app/purchases/purchases",
+    basePath: "/app/purchases",
+    features: [
+      { label: "New Purchase", href: "/app/purchases/purchases/new", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Purchase List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Payment Status", href: "/app/finance/reports/supplier-payment-status", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "A/P Aging", href: "/app/finance/reports/ap-aging", settingsHref: "/app/purchases/purchases/settings" },
     ],
   },
   {
@@ -497,6 +510,9 @@ export const appModules: AppModule[] = [
 ];
 
 export function resolveModule(pathname: string): AppModule | undefined {
+  if (pathname === "/app/purchases" || pathname.startsWith("/app/purchases/")) {
+    return appModules.find((m) => m.id === "purchases");
+  }
   // Review Purchases screens live under /app/finance/* but use Buying header context.
   if (isReviewPurchasesPath(pathname)) {
     return appModules.find((m) => m.id === "buying");

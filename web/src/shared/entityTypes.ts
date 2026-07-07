@@ -53,10 +53,20 @@ export const PURCHASE_REQUEST_SETTINGS_HREF = {
   purchaseRequest: "/app/purchase-request/purchase-requests/settings",
   purchaseOrder: "/app/purchase-order/purchase-orders/settings",
   goodsReceipt: "/app/purchase-order/goods-receipt/settings",
-  supplierInvoice: "/app/finance/supplier-invoices/settings",
+  supplierInvoice: "/app/purchases/purchases/settings",
 } as const;
 
 export type PurchaseRequestFeature = keyof typeof PURCHASE_REQUEST_ENTITY;
+
+export const PURCHASES_ENTITY = {
+  purchases: "fin_supplier_invoice",
+} as const;
+
+export const PURCHASES_SETTINGS_HREF = {
+  purchases: "/app/purchases/purchases/settings",
+} as const;
+
+export type PurchasesFeature = keyof typeof PURCHASES_ENTITY;
 
 export const SALES_ENTITY = {
   sales: "sa_sales",

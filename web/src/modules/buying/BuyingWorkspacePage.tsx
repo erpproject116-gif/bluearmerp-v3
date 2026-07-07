@@ -14,7 +14,7 @@ const tiles: KpiTile[] = [
   { label: "Open purchase orders", value: (s) => s.open_purchase_orders, href: "/app/purchase-order/purchase-orders" },
   { label: "Open RFQ", value: (s) => s.open_rfq, href: "/app/purchase-order/rfq" },
   { label: "Pending receipt rows", value: (s) => s.pending_receipt_rows, href: "/app/purchase-order/reports/items-to-receive", accent: "text-amber-600" },
-  { label: "Unpaid supplier invoices", value: (s) => s.unpaid_invoices, href: "/app/finance/supplier-invoices", accent: "text-red-600" },
+  { label: "Unpaid supplier invoices", value: (s) => s.unpaid_invoices, href: "/app/purchases/purchases", accent: "text-red-600" },
 ];
 
 const reportLinks = [

@@ -12,20 +12,40 @@ export type SupplierInvoiceRow = {
   vendor_invoice_no?: string | null;
   grand_total: number;
   progress_status: string;
+  created_by_name?: string;
 };
 
 export type SupplierInvoiceLine = {
   id?: number;
   line_no: number;
   goods_receipt_line_id?: number | null;
+  item_id?: number | null;
   item_code?: string;
   item_name?: string;
+  description?: string | null;
   qty: number;
+  unit_non_vat: number;
+  non_vat_total: number;
+  tax_amount: number;
+  unit_vat_inc: number;
   line_total: number;
+  remark?: string | null;
+  track_serial?: boolean;
 };
 
 export type SupplierInvoiceDetail = SupplierInvoiceRow & {
+  tax_type_id?: number | null;
+  tax_type_name?: string;
   currency_id: number;
+  pic_user_id?: number | null;
+  pic_name?: string;
+  location_id?: number | null;
+  location_name?: string;
+  project_id?: number | null;
+  project_name?: string | null;
+  due_date?: string | null;
+  terms_of_payment?: string | null;
+  payment_terms?: string | null;
   reference?: string | null;
   notes?: string | null;
   subtotal: number;
@@ -36,7 +56,9 @@ export type SupplierInvoiceDetail = SupplierInvoiceRow & {
 export type OpenGRLine = {
   goods_receipt_line_id: number;
   goods_receipt_id: number;
+  purchase_order_line_id?: number;
   purchase_order_no: string;
+  item_id?: number;
   item_code: string;
   item_name: string;
   balance_qty: number;

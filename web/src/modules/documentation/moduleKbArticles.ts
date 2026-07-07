@@ -124,7 +124,7 @@ export const moduleKbArticles: KbArticle[] = [
         text: "Process policies can require a posted GR before supplier invoices are allowed.",
       },
     ],
-    primaryHref: "/app/finance/supplier-invoices/new",
+    primaryHref: "/app/purchases/purchases/new",
     primaryLabel: "New supplier invoice",
   },
   {

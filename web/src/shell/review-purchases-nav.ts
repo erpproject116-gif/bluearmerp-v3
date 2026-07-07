@@ -7,9 +7,8 @@ export type ReviewPurchasesNavLink = {
 /** Virtual marker for sub-branch detection (not a real URL path). */
 export const REVIEW_PURCHASES_SUB_BRANCH = "__buying_review_purchases__";
 
-/** Finance URLs that belong to the buying "Review Purchases" workflow (not core Accounts tabs). */
+/** Finance URLs for the buying "Review Purchases" AP workflow (payments & reports — not the Purchases document). */
 export const REVIEW_PURCHASES_PREFIXES = [
-  "/app/finance/supplier-invoices",
   "/app/finance/payment-vouchers",
   "/app/finance/reports/supplier-payment-status",
   "/app/finance/reports/ap-by-vendor",
@@ -17,8 +16,6 @@ export const REVIEW_PURCHASES_PREFIXES = [
 ] as const;
 
 export const reviewPurchasesNavLinks: ReviewPurchasesNavLink[] = [
-  { label: "Invoice List", href: "/app/finance/supplier-invoices", permissionCode: "finance.supplier_invoices" },
-  { label: "New Invoice", href: "/app/finance/supplier-invoices/new", permissionCode: "finance.supplier_invoices_new" },
   { label: "Payment Vouchers", href: "/app/finance/payment-vouchers", permissionCode: "finance.payment_vouchers" },
   { label: "New Payment", href: "/app/finance/payment-vouchers/new", permissionCode: "finance.payment_vouchers_new" },
   { label: "Payment Status", href: "/app/finance/reports/supplier-payment-status", permissionCode: "finance.reports_supplier_payment_status" },
@@ -31,9 +28,6 @@ export function isReviewPurchasesPath(pathname: string): boolean {
 }
 
 export function isReviewPurchasesNavLinkActive(pathname: string, link: ReviewPurchasesNavLink): boolean {
-  if (link.href === "/app/finance/supplier-invoices") {
-    return pathname === link.href;
-  }
   if (link.href === "/app/finance/payment-vouchers") {
     return (
       pathname === link.href ||
@@ -46,13 +40,12 @@ export function isReviewPurchasesNavLinkActive(pathname: string, link: ReviewPur
 export function reviewPurchasesHeaderTitle(pathname: string): string {
   if (pathname.includes("/new")) {
     if (pathname.includes("payment-vouchers")) return "New payment voucher";
-    return "New supplier invoice";
+    return "New payment";
   }
   if (pathname.includes("payment-vouchers")) return "Payment vouchers";
   if (pathname.includes("reports/")) {
     const link = reviewPurchasesNavLinks.find((l) => isReviewPurchasesNavLinkActive(pathname, l));
     return link?.label ?? "Review Purchases report";
   }
-  if (pathname.includes("supplier-invoices")) return "Supplier invoices";
   return "Review Purchases";
 }

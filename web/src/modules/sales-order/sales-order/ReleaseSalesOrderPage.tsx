@@ -187,6 +187,8 @@ export default function ReleaseSalesOrderPage() {
                         <SerialLineCell
                           mode="units"
                           itemId={row.item_id}
+                          itemCode={row.item_code}
+                          itemName={row.item_name}
                           locationId={row.location_id}
                           qty={releaseQtyFor(row)}
                           serialUnitIds={serialIds()[row.sales_order_line_id] ?? []}

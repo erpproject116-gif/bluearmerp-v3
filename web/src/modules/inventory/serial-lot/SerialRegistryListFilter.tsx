@@ -61,7 +61,7 @@ export function SerialRegistryListFilter(props: Props) {
             class={inputClass}
             value={props.value().q ?? ""}
             onInput={(e) => patch({ q: e.currentTarget.value })}
-            placeholder="Serial, item code, item name…"
+            placeholder="Serial, item code, item name, manufacturer, partner…"
           />
         </Field>
         <Field label="Serial no.">

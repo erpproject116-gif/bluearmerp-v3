@@ -27,7 +27,7 @@ export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
   [WMS_PREFIX]: "inventory.wms",
   [TAX_MNGT_PREFIX]: "quotation.tax_mngt",
   [COLLECTIVE_INVOICING_PREFIX]: "sales.collective_invoicing",
-  [REVIEW_PURCHASES_SUB_BRANCH]: "finance.supplier_invoices",
+  [REVIEW_PURCHASES_SUB_BRANCH]: "finance.payment_vouchers",
 };
 
 export const navGroups: NavGroup[] = [
@@ -67,10 +67,11 @@ export const navGroups: NavGroup[] = [
       { kind: "module", moduleId: "buying" },
       { kind: "module", moduleId: "purchase_request" },
       { kind: "module", moduleId: "purchase_order" },
+      { kind: "module", moduleId: "purchases" },
       {
         kind: "subBranch",
         moduleId: "buying",
-        featureCode: "finance.supplier_invoices",
+        featureCode: "finance.payment_vouchers",
         branchLabel: "Review Purchases",
       },
     ],

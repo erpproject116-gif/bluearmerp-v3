@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { invalidateAfterMutation } from "./queryInvalidation";
 import { getGlobalToast } from "./toast";
 import { getActiveTenantId, getActiveBranchIdCurrent } from "./activeContext";
 
@@ -131,6 +132,9 @@ export async function apiFetch<T>(
     getGlobalToast()?.success(
       defaultSuccessMessage(init.method, body.message, options?.successMessage),
     );
+  }
+  if (body.success) {
+    invalidateAfterMutation(path, init.method);
   }
   return result;
 }

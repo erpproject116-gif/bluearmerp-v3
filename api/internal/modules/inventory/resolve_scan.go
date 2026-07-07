@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -14,6 +15,7 @@ import (
 type resolveScanBody struct {
 	SerialNo   string `json:"serial_no"`
 	LocationID *int64 `json:"location_id,omitempty"`
+	ItemID     *int64 `json:"item_id,omitempty"`
 	Context    string `json:"context"`
 }
 
@@ -35,48 +37,39 @@ func resolveSerialScan(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		where := `su.tenant_id = $1 and su.serial_no = $2 and su.status <> 'void'`
-		args := []any{tu.TenantID, serialNo}
-		argN := 3
-		if body.LocationID != nil && *body.LocationID > 0 {
-			where += ` and su.location_id = $3`
-			args = append(args, *body.LocationID)
-			argN++
-		}
-		_ = argN
-
 		ctx := r.Context()
-		var unitID, itemID int64
-		var itemCode, itemName, status string
-		var locationID *int64
-		err := pool.QueryRow(ctx, `
-			select su.id, su.item_id, i.item_code, i.item_name, su.status, su.location_id
-			from public.inv_serial_units su
-			join public.inv_items i on i.id = su.item_id
-			where `+where+`
-			order by su.id desc limit 1`, args...).Scan(&unitID, &itemID, &itemCode, &itemName, &status, &locationID)
-		if err != nil {
-			response.Err(w, http.StatusNotFound, "Serial not found.", "ERR_NOT_FOUND")
+		seen := map[string]bool{}
+		res := resolveOneSerial(ctx, pool, tu.TenantID, serialNo, body.LocationID, body.ItemID, body.Context, seen)
+		switch res.Status {
+		case resolveScanEmpty:
+			response.Validation(w, map[string]string{"serial_no": "Serial number is required."})
 			return
-		}
-
-		allowed := map[string]bool{"in_stock": true, "reserved": true}
-		if body.Context == "release" {
-			allowed["reserved"] = true
-		}
-		if !allowed[status] {
-			response.Err(w, http.StatusConflict, "Serial is not available for sale.", "ERR_SERIAL_UNAVAILABLE")
+		case resolveScanNotFound:
+			response.Err(w, http.StatusNotFound, res.Message, "ERR_NOT_FOUND")
 			return
+		case resolveScanWrongLocation:
+			response.Err(w, http.StatusConflict, res.Message, "ERR_SERIAL_WRONG_LOCATION")
+			return
+		case resolveScanUnavailable:
+			response.Err(w, http.StatusConflict, res.Message, "ERR_SERIAL_UNAVAILABLE")
+			return
+		case resolveScanWrongItem:
+			response.Err(w, http.StatusConflict, res.Message, "ERR_SERIAL_WRONG_ITEM")
+			return
+		case resolveScanAccepted:
+			if res.Unit != nil {
+				enrichResolvedUnits(ctx, pool, tu.TenantID, []*resolvedSerialUnit{res.Unit})
+				response.OK(w, res.Unit, "OK")
+				return
+			}
 		}
-
-		response.OK(w, map[string]any{
-			"serial_unit_id": unitID,
-			"serial_no":      serialNo,
-			"item_id":        itemID,
-			"item_code":      itemCode,
-			"item_name":      itemName,
-			"status":         status,
-			"location_id":    locationID,
-		}, "OK")
+		if res.Unit == nil {
+			_, err := lookupResolvedSerial(ctx, pool, tu.TenantID, normalizeResolveSerialNo(serialNo), body.LocationID)
+			if err == pgx.ErrNoRows {
+				response.Err(w, http.StatusNotFound, "Serial not found.", "ERR_NOT_FOUND")
+				return
+			}
+		}
+		response.Err(w, http.StatusConflict, res.Message, "ERR_SERIAL_UNAVAILABLE")
 	}
 }

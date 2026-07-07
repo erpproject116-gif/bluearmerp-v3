@@ -27,6 +27,26 @@ func datePtrToStr(t *time.Time) *string {
 	return &s
 }
 
+func parseOptionalDate(s *string) (*time.Time, error) {
+	if s == nil || strings.TrimSpace(*s) == "" {
+		return nil, nil
+	}
+	t, err := parseDate(*s)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func defaultSupplierInvoiceProgress(s string) string {
+	switch strings.TrimSpace(s) {
+	case "e_approval", "completed":
+		return strings.TrimSpace(s)
+	default:
+		return "unconfirmed"
+	}
+}
+
 func orderSQL(order string) string {
 	if order == "desc" {
 		return "desc"

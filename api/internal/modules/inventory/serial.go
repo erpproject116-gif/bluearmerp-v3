@@ -77,6 +77,7 @@ func registerSerialRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/serial-units/available", listAvailableSerialUnits(pool))
 	r.Get("/serial-units/trace", traceSerialUnit(pool))
 	r.Post("/serial-units/resolve-scan", resolveSerialScan(pool))
+	r.Post("/serial-units/resolve-scan/batch", resolveSerialScanBatch(pool))
 	r.Post("/serial-units/transfer", transferSerialUnits(pool))
 	r.Post("/serial-units/register", registerSerialUnits(pool))
 	r.Get("/serial-units/adjustment-candidates", listSerialAdjustmentCandidates(pool))
@@ -104,7 +105,15 @@ func listSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 		argN := 2
 
 		if p.Q != "" {
-			where += fmt.Sprintf(" and (su.serial_no ilike $%d or i.item_code ilike $%d or i.item_name ilike $%d)", argN, argN, argN)
+			where += fmt.Sprintf(` and (
+			  su.serial_no ilike $%d or i.item_code ilike $%d or i.item_name ilike $%d
+			  or coalesce(cat.name, '') ilike $%d or coalesce(p.company_name, '') ilike $%d
+			  or exists (
+			    select 1 from public.tenant_custom_field_values cv
+			    where cv.tenant_id = su.tenant_id and cv.entity_type = 'inv_item' and cv.entity_id = i.id
+			      and cv.value_json::text ilike $%d
+			  )
+			)`, argN, argN, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
@@ -157,6 +166,7 @@ func listSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			  su.created_at, count(*) over()
 			from public.inv_serial_units su
 			join public.inv_items i on i.id = su.item_id
+			left join public.inv_item_categories cat on cat.id = i.item_category_id
 			left join public.inv_locations loc on loc.id = su.location_id
 			left join public.inv_partners p on p.id = su.partner_id
 			left join public.po_purchase_order_lines pol on pol.id = su.purchase_order_line_id

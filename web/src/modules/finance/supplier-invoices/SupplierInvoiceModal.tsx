@@ -1,30 +1,37 @@
-import { createEffect, createSignal, For, Index, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
-import { DecimalInput } from "../../../shared/DecimalInput";
-import { parseNum, roundMoney } from "../../../shared/money";
+import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
+import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { InvoicePanel } from "../../../shared/InvoicePanel";
+import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
+import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
+import { ProgressStatusMenu } from "../../sales/sales/ProgressStatusMenu";
 import type { OpenGRLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
 import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
-import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import {
+  PurchaseRequestLineGrid,
+  emptyPurchaseRequestLine,
+  recalculatePurchaseRequestLines,
+  type PurchaseRequestLineRow,
+} from "../../purchase-request/purchase-request/PurchaseRequestLineGrid";
+import { SupplierInvoiceApprovalPanel } from "./SupplierInvoiceApprovalPanel";
 
-type LineRow = {
-  goods_receipt_line_id: number | null;
-  label: string;
-  qty: string;
-  unit_vat_inc: number;
-  line_total: string;
-};
+export type { SupplierInvoiceDetail as PurchaseDetail };
 
 type Props = {
   open: boolean;
+  editing: SupplierInvoiceDetail | null;
   onClose: () => void;
   onSaved: () => void;
-  editingId?: number | null;
 };
 
 function todayISO() {
@@ -40,22 +47,100 @@ async function fetchVendors(q: string): Promise<LookupOption[]> {
     .map((p) => ({ id: p.id, label: p.company_name }));
 }
 
+async function fetchLocations(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
+  return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
+}
+
+async function fetchProjects(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; project_name: string }[]>(`/api/v1/inventory/projects?${qs}`);
+  return (res.data ?? []).map((p) => ({ id: p.id, label: p.project_name }));
+}
+
+async function fetchUsers(q: string): Promise<LookupOption[]> {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+  const res = await apiFetch<{ id: number; full_name: string; email: string }[]>(`/api/v1/inventory/after-sales/users${qs}`);
+  return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
+}
+
+async function fetchTaxTypes(): Promise<TaxTypeRow[]> {
+  const res = await apiFetch<TaxTypeRow[]>(
+    "/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc",
+  );
+  return res.data ?? [];
+}
+
+async function fetchCurrencies(): Promise<{ id: number; currency_code: string; name: string; is_default: boolean }[]> {
+  const res = await apiFetch<{ id: number; currency_code: string; name: string; is_default: boolean; status: string }[]>(
+    "/api/v1/quotation/currencies?page=1&pageSize=100&status=active&sort=name&order=asc",
+  );
+  return res.data ?? [];
+}
+
+function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseRequestLineRow[] {
+  if (!lines?.length) return [emptyPurchaseRequestLine(1)];
+  return lines.map((ln) => ({
+    line_no: ln.line_no,
+    partner_id: null,
+    partner_code: "",
+    partner_name: "",
+    item_id: ln.item_id,
+    item_code: ln.item_code ?? "",
+    item_name: ln.item_name ?? "",
+    spec_name: "",
+    description: ln.description ?? "",
+    qty: ln.qty != null ? String(ln.qty) : "1",
+    unit_price: String(ln.unit_vat_inc ?? 0),
+    input_basis: "vat_inc_unit" as const,
+    unit_non_vat: String(ln.unit_non_vat ?? 0),
+    non_vat_total: String(ln.non_vat_total ?? 0),
+    tax_amount: String(ln.tax_amount ?? 0),
+    unit_vat_inc: String(ln.unit_vat_inc ?? 0),
+    line_total: String(ln.line_total ?? 0),
+    remark: ln.remark ?? "",
+    goods_receipt_line_id: ln.goods_receipt_line_id ?? null,
+    track_serial: Boolean(ln.track_serial),
+    planned_serial_nos: [],
+  }));
+}
+
 export function SupplierInvoiceModal(props: Props) {
+  const queryClient = useQueryClient();
   const toast = useToast();
   const [saving, setSaving] = createSignal(false);
+  const [grPickerOpen, setGrPickerOpen] = createSignal(false);
+  const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
   const [invoiceDate, setInvoiceDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [invoiceNo, setInvoiceNo] = createSignal("");
+  const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
+  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
+  const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
+  const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
   const [vendorLabel, setVendorLabel] = createSignal("");
-  const [currencyId, setCurrencyId] = createSignal<number | null>(null);
-  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; is_default: boolean }[]>([]);
+  const [picUserId, setPicUserId] = createSignal<number | null>(null);
+  const [picName, setPicName] = createSignal("");
+  const [locationId, setLocationId] = createSignal<number | null>(null);
+  const [locationLabel, setLocationLabel] = createSignal("");
+  const [projectId, setProjectId] = createSignal<number | null>(null);
+  const [projectLabel, setProjectLabel] = createSignal("");
+  const [projectName, setProjectName] = createSignal("");
+  const [dueDate, setDueDate] = createSignal("");
+  const [termsOfPayment, setTermsOfPayment] = createSignal("");
+  const [paymentTerms, setPaymentTerms] = createSignal("");
   const [vendorInvoiceNo, setVendorInvoiceNo] = createSignal("");
+  const [reference, setReference] = createSignal("");
   const [notes, setNotes] = createSignal("");
-  const [openLines, setOpenLines] = createSignal<OpenGRLine[]>([]);
-  const [lines, setLines] = createSignal<LineRow[]>([]);
-  const [grPickerOpen, setGrPickerOpen] = createSignal(false);
-  const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [progressStatus, setProgressStatus] = createSignal("unconfirmed");
+  const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
+
+  const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
 
   const loadPreview = async (date: string) => {
     const res = await apiFetch<{ date_no_display: string; invoice_no: string }>(
@@ -67,226 +152,407 @@ export function SupplierInvoiceModal(props: Props) {
     }
   };
 
-  const loadOpenLines = async (pid: number) => {
-    const res = await apiFetch<OpenGRLine[]>(`/api/v1/finance/supplier-invoices/open-gr-lines?partner_id=${pid}`);
-    setOpenLines(res.data ?? []);
-  };
-
-  const reset = () => {
-    setInvoiceDate(todayISO());
-    setPartnerId(null);
-    setVendorLabel("");
-    setVendorInvoiceNo("");
-    setNotes("");
-    setLines([]);
-    setOpenLines([]);
-    void loadPreview(todayISO());
-    void apiFetch<{ id: number; currency_code: string; is_default: boolean }[]>(
-      "/api/v1/quotation/currencies?page=1&pageSize=100&status=active",
-    ).then((res) => {
-      const rows = res.data ?? [];
-      setCurrencies(rows);
-      const def = rows.find((c) => c.is_default) ?? rows[0];
-      if (def) setCurrencyId(def.id);
-    });
+  const loadLookups = async () => {
+    const [tt, cc] = await Promise.all([fetchTaxTypes(), fetchCurrencies()]);
+    setTaxTypes(tt);
+    setCurrencies(cc);
+    if (!props.editing) {
+      if (tt.length && !taxTypeId()) {
+        const first = tt[0];
+        setTaxTypeId(first.id);
+        const basis = defaultInputBasis(first.tax_mode);
+        setLines([emptyPurchaseRequestLine(1, "", basis)]);
+      }
+      const def = cc.find((c) => c.is_default) ?? cc[0];
+      if (def && !currencyId()) setCurrencyId(def.id);
+    }
   };
 
   createEffect(() => {
     if (!props.open) return;
-    reset();
+    void loadLookups();
+    const ed = props.editing;
+    if (ed) {
+      setInvoiceDate(ed.invoice_date);
+      setDateNoDisplay(ed.date_no_display);
+      setInvoiceNo(ed.invoice_no);
+      setTaxTypeId(ed.tax_type_id ?? null);
+      setCurrencyId(ed.currency_id);
+      setPartnerId(ed.partner_id);
+      setVendorLabel(ed.vendor_name);
+      setPicUserId(ed.pic_user_id ?? null);
+      setPicName(ed.pic_name ?? "");
+      setLocationId(ed.location_id ?? null);
+      setLocationLabel(ed.location_name ?? "");
+      setProjectId(ed.project_id ?? null);
+      setProjectLabel(ed.project_name ?? "");
+      setProjectName(ed.project_name ?? "");
+      setDueDate(ed.due_date ?? "");
+      setTermsOfPayment(ed.terms_of_payment ?? "");
+      setPaymentTerms(ed.payment_terms ?? "");
+      setVendorInvoiceNo(ed.vendor_invoice_no ?? "");
+      setReference(ed.reference ?? "");
+      setNotes(ed.notes ?? "");
+      setProgressStatus(ed.progress_status);
+      setLines(linesFromDetail(ed.lines));
+      setActiveTab("details");
+    } else {
+      setInvoiceDate(todayISO());
+      setPartnerId(null);
+      setVendorLabel("");
+      setPicUserId(null);
+      setPicName("");
+      setLocationId(null);
+      setLocationLabel("");
+      setProjectId(null);
+      setProjectLabel("");
+      setProjectName("");
+      setDueDate("");
+      setTermsOfPayment("");
+      setPaymentTerms("");
+      setVendorInvoiceNo("");
+      setReference("");
+      setNotes("");
+      setProgressStatus("unconfirmed");
+      setLines([emptyPurchaseRequestLine(1)]);
+      setActiveTab("details");
+      void loadPreview(todayISO());
+    }
   });
 
   createEffect(() => {
-    if (!props.open) return;
+    if (!props.open || props.editing) return;
     void loadPreview(invoiceDate());
   });
 
-  createEffect(() => {
-    const pid = partnerId();
-    if (pid) void loadOpenLines(pid);
-  });
-
-  const addLinesFromGR = (grLines: OpenGRLine[]) => {
-    setLines((rows) => {
-      const existing = new Set(rows.map((r) => r.goods_receipt_line_id));
-      const added = grLines
-        .filter((gr) => !existing.has(gr.goods_receipt_line_id))
-        .map((gr) => {
-          const qty = gr.balance_qty;
-          const total = qty * gr.unit_vat_inc;
-          return {
-            goods_receipt_line_id: gr.goods_receipt_line_id,
-            label: `${gr.purchase_order_no} — ${gr.item_code} ${gr.item_name}`,
-            qty: String(qty),
-            unit_vat_inc: gr.unit_vat_inc,
-            line_total: total.toFixed(4),
-          };
-        });
-      return [...rows, ...added];
-    });
+  const onTaxTypeChange = async (newId: number | null) => {
+    setTaxTypeId(newId);
+    const meta = taxTypes().find((t) => t.id === newId);
+    if (!newId || !meta) return;
+    const recalc = await recalculatePurchaseRequestLines(lines(), newId, meta);
+    setLines(recalc);
   };
 
-  const addLineFromGR = (gr: OpenGRLine) => addLinesFromGR([gr]);
+  const applyGRLines = async (picked: OpenGRLine[]) => {
+    if (picked.length === 0) return;
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const start = lines().length;
+    const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
+      ...emptyPurchaseRequestLine(start + i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      goods_receipt_line_id: row.goods_receipt_line_id,
+    }));
+    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...newLines].map((ln, i) => ({ ...ln, line_no: i + 1 }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculatePurchaseRequestLines(merged.length ? merged : newLines, taxTypeId()!, meta));
+    } else {
+      setLines(merged.length ? merged : newLines);
+    }
+  };
 
   const save = async () => {
-    if (!partnerId() || !currencyId()) {
-      toast.warning("Select a vendor and currency.");
+    if (!taxTypeId()) {
+      toast.warning("Please select a transaction type.");
       return;
     }
-    const bodyLines = lines()
-      .filter((l) => l.goods_receipt_line_id && Number(l.qty) > 0)
-      .map((l) => {
-        const qty = Number(l.qty);
-        const lineTotal = Number(l.line_total);
-        const nonVat = lineTotal / 1.12;
-        const tax = lineTotal - nonVat;
-        return {
-          goods_receipt_line_id: l.goods_receipt_line_id,
-          qty,
-          unit_non_vat: nonVat / qty,
-          non_vat_total: nonVat,
-          tax_amount: tax,
-          unit_vat_inc: l.unit_vat_inc,
-          line_total: lineTotal,
-        };
-      });
-    if (bodyLines.length === 0) {
-      toast.warning("Add at least one goods receipt line.");
+    if (!currencyId()) {
+      toast.warning("Please select a currency.");
+      return;
+    }
+    if (!partnerId()) {
+      toast.warning("Please select a vendor.");
+      return;
+    }
+    if (!locationId()) {
+      toast.warning("Please select a location.");
+      return;
+    }
+
+    const body = {
+      invoice_date: invoiceDate(),
+      tax_type_id: taxTypeId(),
+      partner_id: partnerId(),
+      currency_id: currencyId(),
+      pic_user_id: picUserId(),
+      pic_name: picName(),
+      location_id: locationId(),
+      project_id: projectId(),
+      project_name: projectName() || null,
+      due_date: dueDate() || null,
+      terms_of_payment: termsOfPayment() || null,
+      payment_terms: paymentTerms() || null,
+      vendor_invoice_no: vendorInvoiceNo() || null,
+      reference: reference() || null,
+      notes: notes() || null,
+      progress_status: progressStatus(),
+      lines: lines()
+        .filter((ln) => ln.item_id || ln.item_code || ln.goods_receipt_line_id)
+        .map((ln, i) => ({
+          line_no: i + 1,
+          goods_receipt_line_id: ln.goods_receipt_line_id ?? null,
+          item_id: ln.item_id || null,
+          item_code: ln.item_code,
+          item_name: ln.item_name,
+          description: ln.description || null,
+          qty: ln.qty === "" ? 0 : Number(ln.qty),
+          unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
+          input_basis: ln.input_basis,
+          unit_non_vat: ln.unit_non_vat === "" ? 0 : Number(ln.unit_non_vat),
+          non_vat_total: ln.non_vat_total === "" ? 0 : Number(ln.non_vat_total),
+          tax_amount: ln.tax_amount === "" ? 0 : Number(ln.tax_amount),
+          unit_vat_inc: ln.unit_vat_inc === "" ? 0 : Number(ln.unit_vat_inc),
+          line_total: ln.line_total === "" ? 0 : Number(ln.line_total),
+          remark: ln.remark || null,
+        })),
+    };
+
+    if (body.lines.length === 0) {
+      toast.warning("Add at least one line item.");
       return;
     }
 
     setSaving(true);
+    const ed = props.editing;
     const ok = await submitEntity(
       () =>
-        apiFetch<SupplierInvoiceDetail>(
-          "/api/v1/finance/supplier-invoices",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              invoice_date: invoiceDate(),
-              partner_id: partnerId(),
-              currency_id: currencyId(),
-              vendor_invoice_no: vendorInvoiceNo().trim() || null,
-              notes: notes().trim() || null,
-              lines: bodyLines,
-            }),
-          },
-          { silent: true },
-        ),
+        ed
+          ? apiFetch(`/api/v1/finance/supplier-invoices/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+          : apiFetch("/api/v1/finance/supplier-invoices", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
-      "Supplier invoice created.",
+      ed ? "Purchase updated." : "Purchase created.",
     );
     setSaving(false);
-    if (ok) props.onSaved();
+    if (!ok) return;
+    if (ed) invalidateRecordHistory(queryClient, "fin_supplier_invoice", ed.id);
+    props.onSaved();
+    props.onClose();
   };
 
   return (
     <>
-    <WideEntityModal
-      open={props.open}
-      title="New Supplier Invoice"
-      onClose={props.onClose}
-      onSave={() => void save()}
-      saving={saving()}
-      headerActions={
-        <Show when={props.editingId}>
-          <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => setHistoryOpen(true)}>
-            History
-          </button>
-        </Show>
-      }
-    >
-      <Field label="Invoice date">
-        <DateInput value={invoiceDate()} onInput={(e) => setInvoiceDate(e.currentTarget.value)} />
-      </Field>
-      <Field label="Date-no / Invoice no">
-        <input class={inputClass} readOnly value={`${dateNoDisplay()} / ${invoiceNo()}`} />
-      </Field>
-      <Field label="Vendor">
-        <LookupCombo
-          label=""
-          value={vendorLabel}
-          selectedId={() => partnerId()}
-          onInput={setVendorLabel}
-          onSelect={(o) => {
-            setPartnerId(o.id);
-            setVendorLabel(o.label);
-            setLines([]);
-          }}
-          onClear={() => {
-            setPartnerId(null);
-            setVendorLabel("");
-            setLines([]);
-          }}
-          fetchOptions={fetchVendors}
-        />
-      </Field>
-      <Field label="Currency">
-        <select class={inputClass} value={currencyId() ?? ""} onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}>
-          <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code}</option>}</For>
-        </select>
-      </Field>
-      <Field label="Vendor invoice no">
-        <input class={inputClass} value={vendorInvoiceNo()} onInput={(e) => setVendorInvoiceNo(e.currentTarget.value)} />
-      </Field>
-      <div class="col-span-full">
-        <Show when={partnerId()}>
-          <div class="mb-2 flex flex-wrap items-center gap-2">
-            <p class="text-sm font-medium text-slate-700">Goods receipt lines</p>
+      <WideEntityModal
+        open={props.open}
+        title={props.editing ? "Edit Purchase (actual purchase)" : "New Purchase (actual purchase)"}
+        onClose={props.onClose}
+        onSave={activeTab() === "details" ? () => void save() : undefined}
+        saving={saving()}
+        tabs={props.editing ? [{ id: "details", label: "Details" }, { id: "invoice", label: "Invoice" }] : undefined}
+        activeTab={activeTab()}
+        onTabChange={(id) => setActiveTab(id as "details" | "invoice")}
+        headerActions={
+          <Show when={props.editing}>
             <button
               type="button"
-              class="rounded border border-stroke px-3 py-1 text-xs text-brand-600 hover:bg-brand-50"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => setHistoryOpen(true)}
+            >
+              History
+            </button>
+          </Show>
+        }
+      >
+        <Show when={activeTab() === "invoice"}>
+          <InvoicePanel
+            kind="purchase"
+            docId={props.editing?.id}
+            attachmentsScope="finance/supplier-invoices"
+            onPrint={() =>
+              props.editing &&
+              window.open(`/app/purchases/purchases/${props.editing.id}/print`, "_blank", "noopener,noreferrer")
+            }
+          />
+        </Show>
+        <Show when={activeTab() === "details"}>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Date-no">
+              <input class={inputClass} value={dateNoDisplay()} readOnly />
+            </Field>
+            <Field label="Purchase No.">
+              <input class={inputClass} value={invoiceNo()} readOnly />
+            </Field>
+            <Field label="Date *">
+              <DateInput value={invoiceDate()} onInput={(e) => setInvoiceDate(e.currentTarget.value)} />
+            </Field>
+            <Field label="Due date">
+              <DateInput value={dueDate()} onInput={(e) => setDueDate(e.currentTarget.value)} />
+            </Field>
+            <Field label="Transaction type *">
+              <select
+                class={inputClass}
+                value={taxTypeId() ?? ""}
+                onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
+              >
+                <option value="">Select…</option>
+                <For each={taxTypes()}>
+                  {(t) => <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>}
+                </For>
+              </select>
+              <Show when={selectedTaxType()}>
+                {(t) => <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>}
+              </Show>
+            </Field>
+            <Field label="Currency *">
+              <select class={inputClass} value={currencyId() ?? ""} onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}>
+                <option value="">Select…</option>
+                <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
+              </select>
+            </Field>
+            <LookupCombo
+              label="Vendor *"
+              required
+              value={vendorLabel}
+              selectedId={partnerId}
+              onInput={setVendorLabel}
+              onSelect={(o) => {
+                setPartnerId(o.id);
+                setVendorLabel(o.label);
+              }}
+              onClear={() => {
+                setPartnerId(null);
+                setVendorLabel("");
+              }}
+              fetchOptions={fetchVendors}
+            />
+            <LookupCombo
+              label="PIC"
+              value={picName}
+              selectedId={picUserId}
+              onInput={setPicName}
+              onSelect={(o) => {
+                setPicUserId(o.id);
+                setPicName(o.label);
+              }}
+              onClear={() => {
+                setPicUserId(null);
+                setPicName("");
+              }}
+              fetchOptions={fetchUsers}
+            />
+            <LookupCombo
+              label="Location *"
+              required
+              value={locationLabel}
+              selectedId={locationId}
+              onInput={setLocationLabel}
+              onSelect={(o) => {
+                setLocationId(o.id);
+                setLocationLabel(o.label);
+              }}
+              onClear={() => {
+                setLocationId(null);
+                setLocationLabel("");
+              }}
+              fetchOptions={fetchLocations}
+            />
+            <Field label="Progress status">
+              <ProgressStatusMenu
+                value={progressStatus()}
+                onChange={setProgressStatus}
+                disabled={progressStatus() === "e_approval"}
+              />
+            </Field>
+            <Field label="SI/DR No.">
+              <input class={inputClass} value={vendorInvoiceNo()} onInput={(e) => setVendorInvoiceNo(e.currentTarget.value)} />
+            </Field>
+            <Field label="Terms of payment">
+              <select class={inputClass} value={termsOfPayment()} onChange={(e) => setTermsOfPayment(e.currentTarget.value)}>
+                <option value="">—</option>
+                <option value="30_days_terms">30 Days Terms</option>
+                <option value="cash">Cash</option>
+              </select>
+            </Field>
+            <Field label="Payment terms">
+              <input class={inputClass} value={paymentTerms()} onInput={(e) => setPaymentTerms(e.currentTarget.value)} />
+            </Field>
+            <Field label="PO Number">
+              <input class={inputClass} value={reference()} onInput={(e) => setReference(e.currentTarget.value)} />
+            </Field>
+            <AttachmentsField
+              scope="finance/supplier-invoices"
+              docId={props.editing?.id}
+              label="Attachments (carried from Purchase Order/Receiving)"
+              emptyUnsavedHint="Save the purchase first to attach files (max 25 MB each)."
+            />
+            <Field label="Notes" span="full">
+              <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
+            </Field>
+            <LookupCombo
+              label="Project"
+              value={projectLabel}
+              selectedId={projectId}
+              onInput={setProjectLabel}
+              onSelect={(o) => {
+                setProjectId(o.id);
+                setProjectLabel(o.label);
+                setProjectName(o.label);
+              }}
+              onClear={() => {
+                setProjectId(null);
+                setProjectLabel("");
+              }}
+              fetchOptions={fetchProjects}
+            />
+            <Field label="Project name">
+              <input class={inputClass} value={projectName()} onInput={(e) => setProjectName(e.currentTarget.value)} />
+            </Field>
+            <Show when={props.editing}>
+              <Field label="Created by">
+                <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
+              </Field>
+            </Show>
+          </div>
+          <div class="col-span-full mb-2 mt-2">
+            <button
+              type="button"
+              class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50 disabled:opacity-50"
+              disabled={!partnerId()}
               onClick={() => setGrPickerOpen(true)}
             >
-              Load Slip (from Goods Receipt)
+              Load Slip (from Receiving)
             </button>
           </div>
-          <div class="max-h-32 space-y-1 overflow-y-auto rounded border border-slate-200 p-2">
-            <For each={openLines()}>
-              {(gr) => (
-                <button type="button" class="block w-full rounded px-2 py-1 text-left text-sm hover:bg-slate-100" onClick={() => addLineFromGR(gr)}>
-                  {gr.purchase_order_no} — {gr.item_code} (balance {gr.balance_qty})
-                </button>
-              )}
-            </For>
-          </div>
+          <PurchaseRequestLineGrid
+            lines={lines}
+            onChange={setLines}
+            taxTypeId={() => taxTypeId()}
+            taxTypeMeta={selectedTaxType}
+            locationId={() => locationId()}
+            hidePartnerColumns
+          />
+          <Show when={props.editing}>
+            <SupplierInvoiceApprovalPanel
+              supplierInvoiceId={props.editing!.id}
+              progressStatus={progressStatus()}
+              onChanged={() => {
+                void apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${props.editing!.id}`).then((res) => {
+                  if (res.success && res.data) setProgressStatus(res.data.progress_status);
+                });
+              }}
+            />
+            <ChangeLogPanel targetType="fin_supplier_invoice" targetId={props.editing!.id} />
+          </Show>
         </Show>
-      </div>
-      <div class="col-span-full">
-        <Index each={lines()}>
-          {(ln, i) => (
-            <div class="mb-2 grid grid-cols-3 gap-2 text-sm">
-              <span class="col-span-2 truncate">{ln().label}</span>
-              <DecimalInput
-                mode="qty"
-                class={inputClass}
-                value={ln().qty}
-                onValue={(qty) => {
-                  const total = String(roundMoney(parseNum(qty) * ln().unit_vat_inc));
-                  setLines((rows) => rows.map((r, idx) => (idx === i ? { ...r, qty, line_total: total } : r)));
-                }}
-              />
-            </div>
-          )}
-        </Index>
-      </div>
-      <Field label="Notes">
-        <textarea class={`${inputClass} min-h-[60px]`} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
-      </Field>
-    </WideEntityModal>
-    <OpenGRLinePickerModal
-      open={grPickerOpen()}
-      partnerId={partnerId()}
-      onClose={() => setGrPickerOpen(false)}
-      onConfirm={(picked) => addLinesFromGR(picked)}
-    />
-    <HistoryLogModal
-      open={historyOpen}
-      onClose={() => setHistoryOpen(false)}
-      targetType="fin_supplier_invoice"
-      targetId={props.editingId}
-      title="History — Supplier Invoice"
-    />
+      </WideEntityModal>
+
+      <OpenGRLinePickerModal
+        open={grPickerOpen()}
+        partnerId={partnerId()}
+        onClose={() => setGrPickerOpen(false)}
+        onConfirm={(picked) => void applyGRLines(picked)}
+      />
+
+      <HistoryLogModal
+        open={historyOpen()}
+        onClose={() => setHistoryOpen(false)}
+        targetType="fin_supplier_invoice"
+        targetId={props.editing?.id}
+        title="History — Purchase"
+      />
     </>
   );
 }

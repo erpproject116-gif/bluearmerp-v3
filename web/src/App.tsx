@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
-import { focusManager } from "@tanstack/query-core";
-import { onMount } from "solid-js";
+import { QueryClientProvider } from "@tanstack/solid-query";
 import { Route, Router, type RouteSectionProps, Navigate, useLocation } from "@solidjs/router";
 import { AppShell } from "./shell/AppShell";
 import { AuthProvider } from "./shared/auth-context";
@@ -233,16 +231,7 @@ import NotesPage from "./modules/finance/acct-ii/NotesPage";
 import LandedCostPage from "./modules/finance/acct-ii/LandedCostPage";
 import ContractsPage from "./modules/finance/acct-ii/ContractsPage";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      gcTime: 300_000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    },
-  },
-});
+import { queryClient } from "./shared/queryClient";
 
 function LegacyInventoryAfterSalesRedirect() {
   const loc = useLocation();
@@ -261,10 +250,6 @@ function AppLayout(props: RouteSectionProps) {
 }
 
 export default function App() {
-  onMount(() => {
-    focusManager.setEventListener(() => () => {});
-  });
-
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
@@ -295,6 +280,7 @@ export default function App() {
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
         <Route path="/app/sales/sales/:id/invoice/print" component={SalesInvoicePrintPage} />
         <Route path="/app/finance/supplier-invoices/:id/print" component={PurchaseInvoicePrintPage} />
+        <Route path="/app/purchases/purchases/:id/print" component={PurchaseInvoicePrintPage} />
         <Route path="/app/finance/payment-vouchers/:id/2307" component={Bir2307PrintPage} />
         <Route path="/app/sales/reports/discount-status/print" component={SalesDiscountStatusPrintPage} />
         <Route path="/app/sales/collective-invoicing/status/print" component={CollectiveInvoiceStatusPrintPage} />
@@ -443,9 +429,12 @@ export default function App() {
           <Route path="/finance/acct-i/fiscal-years" component={FiscalYearsPage} />
           <Route path="/finance/acct-i/chart-of-accounts" component={ChartOfAccountsPage} />
           <Route path="/finance/acct-i/journal-entries" component={JournalEntriesPage} />
-          <Route path="/finance/supplier-invoices/new" component={SupplierInvoiceNewPage} />
-          <Route path="/finance/supplier-invoices/settings" component={SupplierInvoiceSettingsPage} />
-          <Route path="/finance/supplier-invoices" component={SupplierInvoiceListPage} />
+          <Route path="/purchases/purchases/new" component={SupplierInvoiceNewPage} />
+          <Route path="/purchases/purchases/settings" component={SupplierInvoiceSettingsPage} />
+          <Route path="/purchases/purchases" component={SupplierInvoiceListPage} />
+          <Route path="/finance/supplier-invoices/new" component={() => <Navigate href="/app/purchases/purchases/new" />} />
+          <Route path="/finance/supplier-invoices/settings" component={() => <Navigate href="/app/purchases/purchases/settings" />} />
+          <Route path="/finance/supplier-invoices" component={() => <Navigate href="/app/purchases/purchases" />} />
           <Route path="/finance/payment-vouchers/new" component={PaymentVoucherNewPage} />
           <Route path="/finance/payment-vouchers" component={PaymentVoucherListPage} />
           <Route path="/finance/chart-of-accounts" component={ChartOfAccountsPage} />

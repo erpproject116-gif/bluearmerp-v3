@@ -49,7 +49,7 @@ const redFlagLinks: Record<string, string> = {
   so_release_gap: "/app/sales-order/sales-orders/release",
   reserve_without_dr: "/app/sales-order/delivery-receipts/new",
   dr_without_invoice: "/app/sales/sales/new",
-  gr_without_supplier_invoice: "/app/finance/supplier-invoices/new",
+  gr_without_supplier_invoice: "/app/purchases/purchases/new",
   ap_over_application: "/app/finance/payment-vouchers",
   budget_overrun: "/app/finance/reports/budget-vs-actual",
 };

@@ -1,29 +1,31 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
-import { FINANCE_SETTINGS_HREF } from "../../../shared/entityTypes";
+import { PURCHASES_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
 import {
   useInvalidateSupplierInvoices,
   useSupplierInvoiceList,
+  type SupplierInvoiceDetail,
   type SupplierInvoiceRow,
 } from "../../../shared/useSupplierInvoiceList";
-import { FinanceLayout } from "../FinanceLayout";
+import { PurchasesLayout } from "../../purchases/PurchasesLayout";
 import { SupplierInvoiceModal } from "./SupplierInvoiceModal";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
-import { Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 
-
-
 type PageOptions = { openNewOnMount?: boolean };
+
+function listBasePath(pathname: string) {
+  return pathname.startsWith("/app/purchases") ? "/app/purchases/purchases" : "/app/finance/supplier-invoices";
+}
 
 export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   const auth = useAuth();
@@ -32,12 +34,14 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
   const invalidate = useInvalidateSupplierInvoices();
+  const basePath = () => listBasePath(loc.pathname);
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("invoice_date", 25, {
     defaultOrder: "desc",
     defaultStatus: "",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [editing, setEditing] = createSignal<SupplierInvoiceDetail | null>(null);
   const [viewRow, setViewRow] = createSignal<SupplierInvoiceRow | null>(null);
   const [qcCreatingId, setQcCreatingId] = createSignal<number | null>(null);
 
@@ -64,11 +68,21 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
     progressStatus: statusFilter() || undefined,
   }));
 
-  const openNew = () => setModalOpen(true);
+  const openNew = () => {
+    setEditing(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = async (row: SupplierInvoiceRow) => {
+    const res = await apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${row.id}`);
+    if (!res.success || !res.data) return;
+    setEditing(res.data);
+    setModalOpen(true);
+  };
 
   const closeModal = () => {
     setModalOpen(false);
-    if (loc.pathname.endsWith("/new")) navigate("/app/finance/supplier-invoices", { replace: true });
+    if (loc.pathname.endsWith("/new")) navigate(basePath(), { replace: true });
   };
 
   onMount(() => {
@@ -76,13 +90,13 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   });
 
   return (
-    <FinanceLayout>
+    <PurchasesLayout>
       <SpreadsheetGrid<SupplierInvoiceRow>
         columns={[
           { key: "date_no_display", header: "Date-no", clickable: true },
-          { key: "invoice_no", header: "Invoice No.", clickable: true },
+          { key: "invoice_no", header: "Purchase No.", clickable: true },
           { key: "vendor_name", header: "Vendor" },
-          { key: "vendor_invoice_no", header: "Vendor ref", render: (r) => r.vendor_invoice_no ?? "" },
+          { key: "vendor_invoice_no", header: "SI/DR No.", render: (r) => r.vendor_invoice_no ?? "" },
           {
             key: "progress_status",
             header: "Progress",
@@ -100,7 +114,10 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
                   type="button"
                   class="text-xs text-brand-600 hover:underline disabled:opacity-50"
                   disabled={qcCreatingId() === r.id}
-                  onClick={(e) => { e.stopPropagation(); void createQcRequest(r); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void createQcRequest(r);
+                  }}
                 >
                   {qcCreatingId() === r.id ? "Creating…" : "Create QC Request"}
                 </button>
@@ -113,7 +130,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
             sortable: false,
             render: (r) => (
               <ActivityHistoryLink
-                module="finance"
+                module={loc.pathname.startsWith("/app/purchases") ? "purchases" : "finance"}
                 targetType="fin_supplier_invoice"
                 targetId={r.id}
                 title={`History — ${r.invoice_no}`}
@@ -125,7 +142,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onEdit={(row) => setViewRow(row)}
+        onEdit={(row) => void openEdit(row)}
         onNew={openNew}
         codeKey="invoice_no"
         nameKey="date_no_display"
@@ -146,9 +163,17 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         statusLabel="Progress"
         statusOptions={[...DOC_PROGRESS_STATUS_TABS]}
         onRefresh={invalidate}
-        settingsHref={FINANCE_SETTINGS_HREF.officialReceipt}
+        settingsHref={PURCHASES_SETTINGS_HREF.purchases}
       />
-      <SupplierInvoiceModal open={modalOpen()} onClose={closeModal} onSaved={() => { invalidate(); closeModal(); }} />
+      <SupplierInvoiceModal
+        open={modalOpen()}
+        editing={editing()}
+        onClose={closeModal}
+        onSaved={() => {
+          invalidate();
+          closeModal();
+        }}
+      />
       <WideEntityModal
         open={viewRow() != null}
         title={viewRow() ? `Purchase ${viewRow()!.invoice_no} — Invoice` : "Invoice"}
@@ -168,12 +193,14 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
             kind="purchase"
             docId={viewRow()!.id}
             attachmentsScope="finance/supplier-invoices"
-            onPrint={() => window.open(`/app/finance/supplier-invoices/${viewRow()!.id}/print`, "_blank", "noopener,noreferrer")}
+            onPrint={() =>
+              window.open(`${basePath()}/${viewRow()!.id}/print`, "_blank", "noopener,noreferrer")
+            }
             onSaved={invalidate}
           />
         </Show>
       </WideEntityModal>
-    </FinanceLayout>
+    </PurchasesLayout>
   );
 }
 

@@ -390,6 +390,8 @@ export function SalesLineGrid(props: Props) {
                       <SerialLineCell
                         mode="units"
                         itemId={line().item_id}
+                        itemCode={line().item_code}
+                        itemName={line().item_name}
                         locationId={props.locationId()}
                         qty={parseNum(line().qty)}
                         serialUnitIds={line().serial_unit_ids ?? []}
