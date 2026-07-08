@@ -466,6 +466,10 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, vErrs)
 			return
 		}
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSalesOrder, defaultProgress(body.ProgressStatus), 0); v != nil {
+			response.Validation(w, v)
+			return
+		}
 
 		orderDate, err := parseDate(body.OrderDate)
 		if err != nil {
@@ -649,6 +653,10 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		newProgress := defaultProgress(body.ProgressStatus)
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSalesOrder, newProgress, id); v != nil {
+			response.Validation(w, v)
+			return
+		}
 		if newProgress == "in_progress" && before.ProgressStatus != "in_progress" {
 			if clErrs, err := creditlimit.ValidateFromPolicy(r.Context(), pool, tu.TenantID, body.PartnerID, grandTotal); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to validate credit limit.", "ERR_INTERNAL")

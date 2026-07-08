@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -7,12 +8,21 @@ import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
-import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
+import {
+  ACTIVE_CURRENCIES_KEY,
+  ACTIVE_TAX_TYPES_KEY,
+  loadActiveCurrencies,
+  loadActiveTaxTypes,
+  useActiveCurrencies,
+  useActiveTaxTypes,
+} from "../../../shared/useDocumentLookups";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
 import { TermHint } from "../../../shared/TermHint";
+import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -20,6 +30,10 @@ import {
   type PurchaseRequestLineRow,
 } from "../purchase-request/PurchaseRequestLineGrid";
 import { PurchaseRequestLinePickerModal, type PickedPurchaseRequestLine } from "./PurchaseRequestLinePickerModal";
+import {
+  SupplierQuotationLinePickerModal,
+  type PickedSupplierQuotationLine,
+} from "./SupplierQuotationLinePickerModal";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 
 export type PurchaseOrderDetail = {
@@ -99,20 +113,6 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
 }
 
-async function fetchTaxTypes(): Promise<TaxTypeRow[]> {
-  const res = await apiFetch<TaxTypeRow[]>(
-    "/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc",
-  );
-  return res.data ?? [];
-}
-
-async function fetchCurrencies(): Promise<{ id: number; currency_code: string; name: string; is_default: boolean }[]> {
-  const res = await apiFetch<{ id: number; currency_code: string; name: string; is_default: boolean; status: string }[]>(
-    "/api/v1/quotation/currencies?page=1&pageSize=100&status=active&sort=name&order=asc",
-  );
-  return res.data ?? [];
-}
-
 async function fetchPartners(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
   if (q) qs.set("q", q);
@@ -164,14 +164,19 @@ function statusLabel(status: string): string {
 }
 
 export function PurchaseOrderModal(props: Props) {
+  const queryClient = useQueryClient();
   const toast = useToast();
+  const processPolicy = useProcessPolicy(() => props.open);
+  const taxTypesQuery = useActiveTaxTypes(() => props.open);
+  const currenciesQuery = useActiveCurrencies(() => props.open);
+  const taxTypes = () => taxTypesQuery.data ?? [];
+  const currencies = () => currenciesQuery.data ?? [];
   const [loading, setLoading] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [prPickerOpen, setPrPickerOpen] = createSignal(false);
+  const [sqPickerOpen, setSqPickerOpen] = createSignal(false);
   const [detail, setDetail] = createSignal<PurchaseOrderDetail | null>(null);
-  const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
-  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
 
   const [orderDate, setOrderDate] = createSignal("");
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
@@ -217,13 +222,11 @@ export function PurchaseOrderModal(props: Props) {
 
   const loadDetail = async (id: number) => {
     setLoading(true);
-    const [poRes, tt, cc] = await Promise.all([
+    const [poRes] = await Promise.all([
       apiFetch<PurchaseOrderDetail>(`/api/v1/purchase-order/purchase-orders/${id}`),
-      fetchTaxTypes(),
-      fetchCurrencies(),
+      queryClient.ensureQueryData({ queryKey: ACTIVE_TAX_TYPES_KEY, queryFn: loadActiveTaxTypes }),
+      queryClient.ensureQueryData({ queryKey: ACTIVE_CURRENCIES_KEY, queryFn: loadActiveCurrencies }),
     ]);
-    setTaxTypes(tt);
-    setCurrencies(cc);
     setLoading(false);
     if (!poRes.success || !poRes.data) {
       toast.warning(poRes.message ?? "Failed to load purchase order.");
@@ -236,9 +239,10 @@ export function PurchaseOrderModal(props: Props) {
   const initNew = async () => {
     setLoading(true);
     setDetail(null);
-    const [tt, cc] = await Promise.all([fetchTaxTypes(), fetchCurrencies()]);
-    setTaxTypes(tt);
-    setCurrencies(cc);
+    const [tt, cc] = await Promise.all([
+      queryClient.ensureQueryData({ queryKey: ACTIVE_TAX_TYPES_KEY, queryFn: loadActiveTaxTypes }),
+      queryClient.ensureQueryData({ queryKey: ACTIVE_CURRENCIES_KEY, queryFn: loadActiveCurrencies }),
+    ]);
     setOrderDate(todayISO());
     setPicUserId(null);
     setPicName("");
@@ -319,6 +323,40 @@ export function PurchaseOrderModal(props: Props) {
     }
   };
 
+  const applySupplierQuotationLines = async (picked: PickedSupplierQuotationLine[]) => {
+    if (picked.length === 0) return;
+    const first = picked[0];
+    if (first.tax_type_id) setTaxTypeId(first.tax_type_id);
+    if (first.currency_id) setCurrencyId(first.currency_id);
+    if (first.location_id) {
+      setLocationId(first.location_id);
+      setLocationLabel(first.location_name);
+    }
+    if (first.pic_name) setPicName(first.pic_name);
+    setPartnerId(first.partner_id);
+    setPartnerLabel(first.partner_name);
+    setPartnerCode("");
+
+    const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
+      ...emptyPurchaseRequestLine(i + 1, String(row.unit_price), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_price),
+      supplier_quotation_line_id: row.source_supplier_quotation_line_id,
+      rfq_request_line_id: row.rfq_request_line_id ?? null,
+    }));
+    if (meta && first.tax_type_id) {
+      const recalc = await recalculatePurchaseRequestLines(newLines, first.tax_type_id, meta);
+      setLines(recalc);
+    } else {
+      setLines(newLines);
+    }
+  };
+
   const save = async () => {
     if (!isDraft()) return;
     if (!taxTypeId() || !currencyId() || !locationId()) {
@@ -348,6 +386,8 @@ export function PurchaseOrderModal(props: Props) {
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
         purchase_request_line_id: ln.purchase_request_line_id ?? null,
+        supplier_quotation_line_id: ln.supplier_quotation_line_id ?? null,
+        rfq_request_line_id: ln.rfq_request_line_id ?? null,
         partner_id: vendorId,
         partner_code: vendorCode,
         partner_name: vendorName,
@@ -623,13 +663,14 @@ export function PurchaseOrderModal(props: Props) {
               }
             >
               <div class="mb-2">
-                <button
-                  type="button"
-                  class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
-                  onClick={() => setPrPickerOpen(true)}
-                >
-                  Load Slip (from Purchase Request)
-                </button>
+                <LoadSlipMenu
+                  disabled={readOnly()}
+                  options={PURCHASE_ORDER_LOAD_SLIP_OPTIONS}
+                  onSelect={(id) => {
+                    if (id === "pr") setPrPickerOpen(true);
+                    if (id === "rfq") setSqPickerOpen(true);
+                  }}
+                />
               </div>
               <PurchaseRequestLineGrid
                 lines={lines}
@@ -649,7 +690,8 @@ export function PurchaseOrderModal(props: Props) {
         scope="purchase-order/purchase-orders"
         docId={props.purchaseOrderId ?? undefined}
         label="Attachments (carried to Purchases)"
-        emptyUnsavedHint="Save the purchase order first to attach files (max 25 MB each)."
+        required={policyRequiresAttachment(processPolicy.data, "purchase_order")}
+        emptyUnsavedHint="Save the purchase order first to attach files (max 25 MB each). Confirm on the list only after uploading."
       />
       <ChangeLogPanel targetType="po_purchase_order" targetId={props.purchaseOrderId} />
     </WideEntityModal>
@@ -658,6 +700,11 @@ export function PurchaseOrderModal(props: Props) {
       open={prPickerOpen()}
       onClose={() => setPrPickerOpen(false)}
       onConfirm={(picked) => void applyPurchaseRequestLines(picked)}
+    />
+    <SupplierQuotationLinePickerModal
+      open={sqPickerOpen()}
+      onClose={() => setSqPickerOpen(false)}
+      onConfirm={(picked) => void applySupplierQuotationLines(picked)}
     />
     </>
   );

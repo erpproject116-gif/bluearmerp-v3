@@ -14,6 +14,8 @@ Official receipts (OR) applied against Sales invoices (SI). Supplier invoices an
 | Payment Voucher List | `/app/finance/payment-vouchers` | `GET /api/v1/finance/payment-vouchers` |
 | A/R by Customer | `/app/finance/reports/ar-by-customer` | `GET /api/v1/finance/ar-by-customer` |
 | A/P by Vendor | `/app/finance/reports/ap-by-vendor` | `GET /api/v1/finance/ap-by-vendor` |
+| Customer/Vendor Book I (AR) | `/app/finance/reports/customer-vendor-book-ar` | `GET /api/v1/finance/customer-vendor-book?book_type=ar` |
+| Customer/Vendor Book I (AP) | `/app/finance/reports/customer-vendor-book-ap` | `GET /api/v1/finance/customer-vendor-book?book_type=ap` |
 | SI Receipt Status | `/app/finance/reports/receipt-status` | `GET /api/v1/finance/receipt-status` |
 | Supplier Payment Status | `/app/finance/reports/supplier-payment-status` | `GET /api/v1/finance/supplier-payment-status` |
 | Official Receipt Status | `/app/finance/reports/official-receipt-status` | `GET /api/v1/finance/official-receipt-status` |
@@ -62,6 +64,7 @@ Supplier Invoice → Payment Voucher → fin_payment_applications
 - **Supplier Payment Status** — supplier invoices with paid/balance and status `none` / `partial` / `full`.
 - **A/R by Customer** — customer balances with optional filters.
 - **A/P by Vendor** — vendor billed/paid/balance totals.
+- **Customer/Vendor Book I (AR/AP)** — slip-level debit/credit book with running balance for a date range.
 - **Official Receipt Status** — OR header list; opens Receipt Journal on Date-No.
 
 ## Manual test checklist

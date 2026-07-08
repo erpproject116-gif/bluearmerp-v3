@@ -110,6 +110,7 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying" },
       { label: "Purchase Status", href: "/app/buying/reports/purchase-status", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Pre-Invoicing (Purchases)", href: "/app/buying/reports/pre-invoicing", settingsHref: "/app/purchases/purchases/settings" },
     ],
     subBranches: [
       {

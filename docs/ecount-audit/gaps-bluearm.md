@@ -43,7 +43,8 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Purchases module (peer to Sales) | New Purchases `E040303` under Inv. I Purchases | `/app/purchases` + `SupplierInvoiceModal` parity | **Done** (migration 133) |
 | Load Slip from Receiving | GR line picker on New Purchases | `OpenGRLinePickerModal` + `GET .../open-gr-lines` | **Done** |
 | Load Slip from Purchase Order | PO line picker (direct bill without GR) | `OpenPOLinePickerModal` + `GET .../open-po-lines` + `billed_qty` sync | **Done** |
-| Load Slip slip-type menu | ECount multi-type picker (21 slip types) | `LoadSlipMenu` on Sales/Purchases | Partial — PO/GR/SO enabled; others catalogued |
+| Load Slip from RFQ (PO + SI) | Quote-sourced PO lines | `SupplierQuotationLinePickerModal` on PO; `OpenSupplierQuotationLinePickerModal` on SI | **Done** |
+| Load Slip slip-type menu | ECount multi-type picker (21 slip types) | `LoadSlipMenu` on Sales/Purchases/PO | **Done** — SO, Quotation, Shipping, PO, GR, PR, RFQ (SI shows PO/GR/RFQ) |
 | Bulk serial barcode scan | Scan many serials into lines | `POST .../resolve-scan/batch` + `ScannedSerialTable` | **Done** |
 | Live list refresh (no manual F5) | Real-time slip updates | Query invalidation + 30s polling | **Done** (not WebSocket) |
 
@@ -56,6 +57,7 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Cash In on save | Inline receipt modal (Cash In - From Customer) | Receipt vouchers | **Done** — post-save dialog + `CashInFromCustomerModal` |
 | Link with Accounting Vouchers | E010301 accounting block + confirm dialog | GL posting panel on sales save | **Done** — Invoice tab + post-save prompt; auto-post via process policies |
 | SO pull on invoice | Sales Order toolbar | SO → sales line picker | **Done** — Load Slip → Sales Order |
+| Quotation / Shipping load slip | Pull quote or shipped SO lines on invoice | Load Slip → Quotation / Shipping Order | **Done** |
 | Create Shipping Order from line | Shipping integration | Shipping module |
 
 ## P1 — Serial/Lot (Inv. II — pass 17)
@@ -102,8 +104,8 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Outstanding Quote/S/O backlog | As-of + outstanding qty filters | Open quote/SO reports — **crawled pass 7** |
 | Shipment Status | Status/Summary + line inquiry | Shipping module reports partial — **crawled pass 7** |
 | Pending Shipment + Shipping Order Status | As-of backlog + SO line inquiry | Shipping trio — **crawled pass 8** |
-| Sales Discount + Pre-Invoicing (Sales) | Discount voucher + uninvoiced backlog | **crawled pass 9** |
-| Customer/Vendor Book I (AR) | Sub-ledger statement + Email | AR statement report — **crawled pass 9** |
+| Sales Discount + Pre-Invoicing (Sales) | Discount voucher + uninvoiced backlog | **crawled pass 9** | Sales pre-invoicing **Done** |
+| Customer/Vendor Book I (AR) | Sub-ledger statement + Email | AR statement report — **crawled pass 9** | **Done** — `/app/finance/reports/customer-vendor-book-ar` |
 | Sales Invoice Status (Inv.) + Monthly Receivable Change | Tax slip inquiry + AR fluctuation | **crawled pass 10** |
 
 ## P1 — Purchase reports (Inv. I → Reports → Purchases)
@@ -115,8 +117,8 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Purchase Order Status | PO line inquiry mirror of SO | `/app/buying/reports` — **crawled pass 7** |
 | Outstanding P/O + Payment Status | Open PO backlog + payment inquiry | PO fulfillment + PV list dimensions — **crawled pass 7** |
 | Payable Status | As-of open payable (`E040722`) mirror of Receivable | AP aging uses period range only — **crawled pass 8** | **Done** — `/app/buying/reports/payable-status` |
-| Purchase Discount + Pre-Invoicing + PR/Plan Status | Buying analytics subtree | **crawled pass 9** |
-| Customer/Vendor Book I (AP) | AP sub-ledger statement | **crawled pass 9** |
+| Purchase Discount + Pre-Invoicing + PR/Plan Status | Buying analytics subtree | **crawled pass 9** | Purchase pre-invoicing **Done** — `/app/buying/reports/pre-invoicing` |
+| Customer/Vendor Book I (AP) | AP sub-ledger statement | **crawled pass 9** | **Done** — `/app/finance/reports/customer-vendor-book-ap` |
 | Purchase Invoice Status (Inv.) + Monthly Payable Fluctuation | Tax slip + AP fluctuation | **crawled pass 10** |
 
 ## P1 — Others reports (Inv. I → Reports → Others)

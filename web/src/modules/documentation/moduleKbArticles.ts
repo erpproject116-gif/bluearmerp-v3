@@ -7,27 +7,94 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Onboarding playbook (ERP + POS)",
     scenario: "You want a guided path through every module after initial setup.",
     intro:
-      "The onboarding playbook tracks progress across foundation, selling, buying, serials, POS, finance, CRM, and dashboard health. Steps auto-complete when you create real documents.",
+      "The onboarding playbook tracks progress across foundation, selling, buying, serials, POS, finance, CRM, and dashboard health. Steps auto-complete when you create real documents. Each step links to a Knowledge base article when you need more detail.",
     blocks: [
       {
         type: "steps",
         items: [
           "Finish required workspace setup at /app/setup (confirm seeds + partners + products).",
           "Open /app/onboarding — the Dashboard also shows a Start here checklist until foundation is done.",
-          "Week 1: admin — process policies, modules, Mapping Center, team.",
-          "Week 2: selling + serials — quote, SO, pick list, delivery note, invoice, official receipt.",
-          "Week 3: buying + finance — PR, PO, GR, supplier invoice, payment voucher, trial balance.",
+          "Week 1: admin — process policies (including attachment rules), modules, Mapping Center, team.",
+          "Week 2: selling — quote, SO, pick list, delivery note, invoice (Load Slip), official receipt.",
+          "Week 3: buying + finance — PR, RFQ, PO, GR, supplier invoice, pre-invoicing report, payment voucher.",
           "Week 4: POS + operations — configure POS, shift, checkout, CRM, support.",
         ],
       },
       {
         type: "tip",
-        text: "Use Mark reviewed on review-only steps such as process policies and POS Manage. Dismiss or snooze the playbook banner if you prefer the header setup reminder only.",
+        text: "Click How to — step-by-step guide under any playbook step for plain-language instructions. Use Mark reviewed on review-only steps such as process policies and reports.",
       },
     ],
     primaryHref: "/app/onboarding",
     primaryLabel: "Open onboarding playbook",
-    relatedGuideIds: ["setup-wizard", "pos-checkout-guide"],
+    relatedGuideIds: ["setup-wizard", "first-week", "process-policies"],
+  },
+  {
+    id: "load-slip-overview",
+    title: "What is Load Slip? (copy lines between documents)",
+    scenario: "You want to avoid retyping items when moving from one document to the next.",
+    intro:
+      "Load Slip is a menu on many New document screens. It lists open lines from an earlier step (for example a sales order or goods receipt) and copies quantity, item, and price into your current form.",
+    blocks: [
+      {
+        type: "heading",
+        text: "Selling — sales invoice",
+      },
+      {
+        type: "steps",
+        items: [
+          "Sales Order — invoice released or deliverable SO lines.",
+          "Quotation — invoice open quote lines without creating an SO first.",
+          "Shipping Order — invoice SO lines already on an outbound shipping order.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Selling — sales order",
+      },
+      {
+        type: "steps",
+        items: ["Quotation — copy open quotation lines onto a new sales order."],
+      },
+      {
+        type: "heading",
+        text: "Buying — purchase order",
+      },
+      {
+        type: "steps",
+        items: [
+          "Purchase Request — copy approved PR lines with balance quantity.",
+          "Supplier Quotation (RFQ) — copy accepted vendor quote lines not yet on a PO.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Buying — purchase request",
+      },
+      {
+        type: "steps",
+        items: ["Sales Order — copy open SO lines to plan what stock to buy (demand)."],
+      },
+      {
+        type: "heading",
+        text: "Buying — supplier invoice",
+      },
+      {
+        type: "steps",
+        items: [
+          "Goods Receipt — bill posted GR lines (most common when GR is required).",
+          "Purchase Order — bill open PO balance without GR when policy allows.",
+          "Supplier Quotation (RFQ) — same as PO load slip but grouped by vendor quote number.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Select the customer or vendor on the form first — Load Slip only shows lines for that partner. Save as Unconfirmed, upload attachments if your store requires them, then Confirm.",
+      },
+    ],
+    primaryHref: "/app/sales/sales/new",
+    primaryLabel: "Try Load Slip on New Sale",
+    relatedGuideIds: ["sales", "purchase-request", "process-policies"],
   },
   {
     id: "sales-order-release",
@@ -67,10 +134,10 @@ export const moduleKbArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Create a quotation under Quotation → New Quotation. Use Load Slip to pull lines from an open quotation when converting.",
-          "Convert to a sales order from the quotation list or Mapping Center.",
+          "Create a quotation under Quotation → New Quotation. On sales orders use Load Slip → Quotation for open quote lines.",
+          "Convert to a sales order from the quotation list or Mapping Center, or use Load Slip on New Sales Order.",
           "Release stock on the Pick List (Sales Order → Pick List) — scan serials when items track serial numbers.",
-          "Create a sales invoice from the sales order (docflow carries reserved serials when configured).",
+          "Create a sales invoice from the sales order (Load Slip → Sales Order) or directly from quotation when policy allows.",
           "Record customer payment under Accounts → Payment Receipt.",
         ],
       },
@@ -93,16 +160,16 @@ export const moduleKbArticles: KbArticle[] = [
         type: "steps",
         items: [
           "Create a purchase request (optional Load Slip from sales order demand).",
-          "Create a purchase order and use Load Slip (from Purchase Request) for open PR lines.",
+          "Request vendor quotes (RFQ) or create a purchase order with Load Slip (from Purchase Request or Supplier Quotation).",
           "Receive goods: create a GR from the PO, scan serials on the GR list or Serial Receive page, then post.",
-          "Create a supplier invoice under Buying → Supplier Invoices. Use Load Slip (from Goods Receipt) to pull open GR lines.",
+          "Create a supplier invoice under Buying → Supplier Invoices. Use Load Slip (from Goods Receipt) to pull open GR lines, or PO / RFQ when GR is not required.",
           "Pay the vendor with a payment voucher under Accounts.",
         ],
       },
     ],
     primaryHref: "/app/purchase-request/purchase-requests/new",
     primaryLabel: "New purchase request",
-    relatedGuideIds: ["serial-barcode-scanning"],
+    relatedGuideIds: ["serial-barcode-scanning", "load-slip-overview", "rfq-workflow"],
   },
   {
     id: "goods-receipt-load-slip",
@@ -151,6 +218,277 @@ export const moduleKbArticles: KbArticle[] = [
     primaryHref: "/app/purchases/purchases/new",
     primaryLabel: "New supplier invoice",
     relatedGuideIds: ["goods-receipt-load-slip", "purchase-request-to-ap-flow"],
+  },
+  {
+    id: "sales-load-slip-quotation",
+    title: "Load Slip: sales invoice from quotation",
+    scenario: "You want to invoice open quotation lines without creating a sales order first.",
+    intro:
+      "On a new sales invoice, Load Slip → Quotation lists open quotation lines. Selected lines populate the invoice header and line grid with residual quantities.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Selling → Sales → New Sales (or your sales template).",
+          "Select the customer, then click Load Slip → Quotation.",
+          "Tick lines and confirm — customer, location, tax type, currency, and lines are filled in.",
+          "Review pricing, save as Unconfirmed, upload attachments if required, then complete.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "For full quote-to-cash tracking (reservations, delivery, quotation balance), convert the quotation to a sales order first, then invoice from the SO using Load Slip → Sales Order.",
+      },
+    ],
+    primaryHref: "/app/selling/sales/new",
+    primaryLabel: "New sales invoice",
+    relatedGuideIds: ["quotation-to-sales-flow", "sales-order-release"],
+  },
+  {
+    id: "purchase-order-load-slip-pr",
+    title: "Load Slip: purchase order from purchase request",
+    scenario: "Approved purchase requests have open lines you want to order from a vendor.",
+    intro: "On a new purchase order, Load Slip → Purchase Request lists PR lines with balance quantity.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Purchase Request → Purchase Orders → New.",
+          "Select the vendor (when lines include a vendor), then click Load Slip → Purchase Request.",
+          "Tick PR lines and confirm — tax type, currency, location, and lines populate the PO.",
+          "Save the draft PO, attach files if required, then Confirm on the list.",
+        ],
+      },
+    ],
+    primaryHref: "/app/purchase-request/purchase-orders/new",
+    primaryLabel: "New purchase order",
+    relatedGuideIds: ["purchase-request-to-ap-flow"],
+  },
+  {
+    id: "purchase-order-load-slip-rfq",
+    title: "Load Slip: purchase order from supplier quotation (RFQ)",
+    scenario: "A vendor submitted an accepted quote and you want to order without retyping lines.",
+    intro: "On a new purchase order, Load Slip → Supplier Quotation lists accepted RFQ quote lines with balance quantity not yet on a PO.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Create an RFQ and record supplier quotations under Purchase Order → RFQ.",
+          "Accept the winning vendor quote, then open Purchase Order → New.",
+          "Click Load Slip → Supplier Quotation, tick lines, and confirm.",
+          "Save the PO, attach files if required, then Confirm.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "You can also convert an entire accepted quotation to a PO from the RFQ detail screen.",
+      },
+    ],
+    primaryHref: "/app/purchase-order/rfq",
+    primaryLabel: "RFQ list",
+    relatedGuideIds: ["purchase-request-to-ap-flow", "supplier-invoice-load-slip-rfq"],
+  },
+  {
+    id: "supplier-invoice-load-slip-rfq",
+    title: "Load Slip: supplier invoice from RFQ-sourced PO lines",
+    scenario: "You ordered from an accepted vendor quote and need to bill open PO balance grouped by quote.",
+    intro:
+      "On a supplier invoice, Load Slip → Supplier Quotation lists open purchase order lines that trace back to an accepted supplier quotation — same residual qty as Load Slip → Purchase Order, with quote context.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Accounts → Supplier Invoices → New and select the vendor.",
+          "Click Load Slip → Supplier Quotation (RFQ).",
+          "Tick lines (quote no. and PO no. are shown), then apply residual qty.",
+          "If process policy requires goods receipt first, use Load Slip → Goods Receipt instead.",
+        ],
+      },
+    ],
+    primaryHref: "/app/finance/supplier-invoices/new",
+    primaryLabel: "New supplier invoice",
+    relatedGuideIds: ["goods-receipt-load-slip", "purchasing-load-slip-po", "purchase-order-load-slip-rfq"],
+  },
+  {
+    id: "sales-load-slip-shipping",
+    title: "Load Slip: sales invoice from shipping order",
+    scenario: "You shipped sales order lines on a shipping order and want to invoice them.",
+    intro:
+      "Load Slip → Shipping Order on a new sales invoice lists SO lines linked to non-cancelled shipping orders with invoiceable balance.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Create shipping orders under Sales Order → Shipping and link them to sales orders.",
+          "Open Sales → New Sale, select the customer, then Load Slip → Shipping Order.",
+          "Tick lines and confirm — header and line grid populate from the linked SO.",
+          "Save, upload attachments if required, then confirm the invoice.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "For full SO release and delivery tracking, prefer Load Slip → Sales Order when lines are released but not yet on a shipping order.",
+      },
+    ],
+    primaryHref: "/app/sales/sales/new",
+    primaryLabel: "New sales invoice",
+    relatedGuideIds: ["sales-order-release", "wms-and-shipping", "quotation-to-sales-flow"],
+  },
+  {
+    id: "customer-vendor-book-report",
+    title: "Customer/Vendor Book I (AR and AP)",
+    scenario: "You need a slip-level ledger of receivables or payables for a date range.",
+    intro:
+      "Customer/Vendor Book I shows debits and credits by slip: AR lists sales (debit) and official receipts (credit); AP lists supplier invoices (credit) and payment vouchers (debit). Running balance is computed in date order.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Finance → Acct. II → Customer/Vendor Book I (AR) or (AP).",
+          "Set date from / date to and optional partner ID, then Search (F8).",
+          "Export CSV with Excel when results are displayed.",
+        ],
+      },
+    ],
+    primaryHref: "/app/finance/reports/customer-vendor-book-ar",
+    primaryLabel: "Customer/Vendor Book (AR)",
+    relatedGuideIds: ["receivable-payable-status", "finance-accounts-overview"],
+  },
+  {
+    id: "purchase-pre-invoicing-report",
+    title: "Pre-Invoicing Status (Purchases)",
+    scenario: "Goods were received but not yet on a supplier invoice.",
+    intro:
+      "This report lists posted goods receipt lines with balance quantity and amount not yet billed — the buy-side mirror of Sales → Pre-Invoicing Status.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Buying → Pre-Invoicing (Purchases) or Buying workspace → Reports.",
+          "Set a date range or as-of date, then Search (F8).",
+          "Create supplier invoices from open lines using Load Slip → Goods Receipt.",
+        ],
+      },
+    ],
+    primaryHref: "/app/buying/reports/pre-invoicing",
+    primaryLabel: "Purchase pre-invoicing",
+    relatedGuideIds: ["goods-receipt-load-slip", "purchase-request-to-ap-flow"],
+  },
+  {
+    id: "sales-load-slip-so",
+    title: "Load Slip: sales invoice from sales order",
+    scenario: "You released or delivered a sales order and need to bill the customer.",
+    intro:
+      "This is the standard path when process policy requires a sales order before invoicing. Load Slip → Sales Order lists open SO lines with invoiceable balance for the selected customer.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Release stock on Sales Order → Pick List (and post a delivery note if your store uses split release).",
+          "Open Sales → New Sale and select the customer.",
+          "Click Load Slip → Sales Order, tick the lines to bill, and confirm.",
+          "Review quantities and prices, save as Unconfirmed, upload attachments if required, then Confirm.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "If Load Slip shows no lines, check that the SO is confirmed and enough quantity was released or delivered. See Sales → Pre-Invoicing Status for a backlog view.",
+      },
+    ],
+    primaryHref: "/app/sales/sales/new",
+    primaryLabel: "New sales invoice",
+    relatedGuideIds: ["sales-order-release", "sales-pre-invoicing-report", "load-slip-overview"],
+  },
+  {
+    id: "sales-order-load-slip-quotation",
+    title: "Load Slip: sales order from quotation",
+    scenario: "The customer accepted your quote and you want a sales order without retyping lines.",
+    intro: "On New Sales Order, Load Slip → Quotation lists open quotation lines with balance quantity.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Sales Order → New Sales Order.",
+          "Select the customer, then click Load Slip → Quotation.",
+          "Tick quote lines and confirm — lines, tax type, and pricing copy to the order.",
+          "Save, attach supporting files if required, then Confirm the sales order.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "You can also convert from the quotation list or Mapping Center. Load Slip is fastest when you already have the order form open.",
+      },
+    ],
+    primaryHref: "/app/sales-order/sales-orders/new",
+    primaryLabel: "New sales order",
+    relatedGuideIds: ["quotation-to-sales-flow", "sales-load-slip-quotation"],
+  },
+  {
+    id: "purchase-request-load-slip-so",
+    title: "Load Slip: purchase request from sales order demand",
+    scenario: "You need to buy stock to fulfill customer orders.",
+    intro:
+      "On a new purchase request, Load Slip (from Sales Order) copies open SO lines so purchasing can see what customers are waiting for.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Purchase Request → New Purchase Request.",
+          "Click Load Slip (from Sales Order) above the line grid.",
+          "Tick SO lines and confirm — items and quantities populate the PR.",
+          "Assign vendors per line if needed, save, and submit for approval when required.",
+        ],
+      },
+    ],
+    primaryHref: "/app/purchase-request/purchase-requests/new",
+    primaryLabel: "New purchase request",
+    relatedGuideIds: ["purchase-request-to-ap-flow", "quotation-to-sales-flow"],
+  },
+  {
+    id: "rfq-workflow",
+    title: "RFQ: request quotes and order from a supplier",
+    scenario: "You want competitive pricing before placing a purchase order.",
+    intro:
+      "Request for Quotation (RFQ) lets you ask one or more vendors for prices, record their supplier quotations, accept the winner, then create a PO.",
+    blocks: [
+      {
+        type: "flow",
+        items: ["Purchase Request (optional)", "RFQ", "Supplier quotations", "Accept quote", "Purchase Order", "Goods Receipt"],
+      },
+      {
+        type: "steps",
+        items: [
+          "Open Purchase Order → RFQ and create a request linked to a purchase request when applicable.",
+          "Add supplier quotations with line items and prices for each vendor.",
+          "Accept the winning quotation.",
+          "Create a PO from the RFQ detail screen, or use Load Slip → Supplier Quotation on New Purchase Order.",
+          "Receive goods and bill the vendor per your process policy.",
+        ],
+      },
+    ],
+    primaryHref: "/app/purchase-order/rfq",
+    primaryLabel: "Open RFQ list",
+    relatedGuideIds: ["purchase-order-load-slip-rfq", "purchase-request-to-ap-flow"],
+  },
+  {
+    id: "sales-pre-invoicing-report",
+    title: "Pre-Invoicing Status (Sales)",
+    scenario: "You want to see which delivered or released orders are not yet invoiced.",
+    intro:
+      "Sales → Pre-Invoicing Status lists sales order lines with balance not yet on a sales invoice — use it before month-end billing.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Sales → Pre-Invoicing Status.",
+          "Set filters and press Search (F8).",
+          "Open Sales → New Sale and use Load Slip → Sales Order to bill the listed lines.",
+        ],
+      },
+    ],
+    primaryHref: "/app/sales/sales/pre-invoicing",
+    primaryLabel: "Sales pre-invoicing",
+    relatedGuideIds: ["sales-load-slip-so", "purchase-pre-invoicing-report"],
   },
   {
     id: "sales-cash-in-after-save",
@@ -376,6 +714,7 @@ export const moduleKbArticles: KbArticle[] = [
           "Release stock on Sales Order → Pick List.",
           "Create delivery notes for shipped quantities.",
           "Use Sales Order → Shipping for shipping orders, rules, and trips when the shipping module is enabled.",
+          "On a sales invoice, Load Slip → Shipping Order pulls SO lines linked to outbound shipping orders with invoiceable balance.",
           "WMS features (pick waves, putaway) live under the WMS sub-branch when licensed.",
         ],
       },
@@ -412,7 +751,7 @@ export const moduleKbArticles: KbArticle[] = [
         items: [
           "Invite users under User Management → Users.",
           "Assign roles or fine-tune permissions per user.",
-          "Set process policies: quotation before SO, GR before supplier invoice, SO release mode, etc.",
+          "Set process policies: quotation before SO, GR before supplier invoice, SO release mode, required attachments, etc.",
           "Use Mapping Center for document conversion rules between modules.",
         ],
       },
@@ -432,6 +771,8 @@ export const moduleKbArticles: KbArticle[] = [
         items: [
           "Open Dashboard for sales, stock, and finance alerts — Start here checklist until setup is complete.",
           "Selling → Receivable Status and Buying → Payable Status for as-of AR/AP.",
+          "Sales → Pre-Invoicing and Buying → Pre-Invoicing (Purchases) for unbilled backlog.",
+          "Finance → Customer/Vendor Book I (AR/AP) for slip-level ledgers.",
           "Finance → Accounting vs Inventory for GL vs stock valuation.",
           "Stock → Stock Reconciliation lists serial qty mismatches, GR gaps, SO release gaps, and more.",
           "Report Catalogue (/app/reports) runs saved analytics across modules.",

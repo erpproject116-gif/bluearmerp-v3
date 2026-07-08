@@ -80,12 +80,21 @@ export function LoadSlipMenu(props: Props) {
 export const PURCHASE_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "po", label: "Purchase Order", group: "Purchases", hint: "Open PO lines with residual qty" },
   { id: "gr", label: "Goods Receipt (Receiving)", group: "Purchases", hint: "Posted GR lines not yet invoiced" },
-  { id: "pr", label: "Purchase Request", group: "Purchases", disabled: true, hint: "Coming soon" },
-  { id: "rfq", label: "RFQ", group: "Purchases", disabled: true, hint: "Coming soon" },
+  { id: "pr", label: "Purchase Request", group: "Purchases", hint: "Open PR lines (use on new PO)", disabled: true },
+  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Purchases", hint: "PO lines sourced from accepted vendor quotes" },
+];
+
+export const PURCHASE_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
+  { id: "pr", label: "Purchase Request", group: "Purchases", hint: "Open PR lines with balance qty" },
+  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Purchases", hint: "Accepted vendor quotes not yet on a PO" },
 ];
 
 export const SALES_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "so", label: "Sales Order", group: "Sales", hint: "Open SO lines for invoicing" },
-  { id: "quotation", label: "Quotation", group: "Sales", disabled: true, hint: "Coming soon" },
-  { id: "shipping", label: "Shipping Order", group: "Sales", disabled: true, hint: "Coming soon" },
+  { id: "quotation", label: "Quotation", group: "Sales", hint: "Open quotation lines (populate invoice)" },
+  { id: "shipping", label: "Shipping Order", group: "Sales", hint: "SO lines linked to a shipping order" },
+];
+
+export const SALES_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
+  { id: "quotation", label: "Quotation", group: "Sales", hint: "Open quotation lines with balance qty" },
 ];

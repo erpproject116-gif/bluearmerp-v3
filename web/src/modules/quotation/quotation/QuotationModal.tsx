@@ -15,6 +15,7 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import {
@@ -24,7 +25,7 @@ import {
   type QuotationLineRow,
 } from "./QuotationLineGrid";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
-import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
+import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 
 export type QuotationDetail = {
   id: number;
@@ -114,20 +115,6 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
 }
 
-async function fetchTaxTypes(): Promise<TaxTypeRow[]> {
-  const res = await apiFetch<TaxTypeRow[]>(
-    "/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc",
-  );
-  return res.data ?? [];
-}
-
-async function fetchCurrencies(): Promise<{ id: number; currency_code: string; name: string; is_default: boolean }[]> {
-  const res = await apiFetch<{ id: number; currency_code: string; name: string; is_default: boolean; status: string }[]>(
-    "/api/v1/quotation/currencies?page=1&pageSize=100&status=active&sort=name&order=asc",
-  );
-  return res.data ?? [];
-}
-
 function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
   if (!lines?.length) return [emptyQuotationLine(1)];
   return lines.map((ln) => ({
@@ -152,14 +139,18 @@ function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
 
 export function QuotationModal(props: Props) {
   const toast = useToast();
+  const processPolicy = useProcessPolicy(() => props.open);
+  const [attachmentCount, setAttachmentCount] = createSignal(0);
+  const taxTypesQuery = useActiveTaxTypes(() => props.open);
+  const currenciesQuery = useActiveCurrencies(() => props.open);
+  const taxTypes = () => taxTypesQuery.data ?? [];
+  const currencies = () => currenciesQuery.data ?? [];
   const { fields, activeCustomFields } = useFormFieldSettings(QUOTATION_ENTITY.quotation);
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const [saving, setSaving] = createSignal(false);
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [referenceNo, setReferenceNo] = createSignal("");
-  const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
-  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
@@ -251,22 +242,6 @@ export function QuotationModal(props: Props) {
     }
   };
 
-  const loadLookups = async () => {
-    const [tt, cc] = await Promise.all([fetchTaxTypes(), fetchCurrencies()]);
-    setTaxTypes(tt);
-    setCurrencies(cc);
-    if (!props.editing) {
-      if (tt.length && !taxTypeId()) {
-        const first = tt[0];
-        setTaxTypeId(first.id);
-        const basis = defaultInputBasis(first.tax_mode);
-        setLines([emptyQuotationLine(1, "", basis)]);
-      }
-      const def = cc.find((c) => c.is_default) ?? cc[0];
-      if (def && !currencyId()) setCurrencyId(def.id);
-    }
-  };
-
   let initializedKey: string | null = null;
 
   createEffect(() => {
@@ -278,7 +253,6 @@ export function QuotationModal(props: Props) {
     if (initializedKey === key) return;
     initializedKey = key;
 
-    void loadLookups();
     const ed = props.editing;
     if (ed) {
       setOrderDate(ed.order_date);
@@ -326,6 +300,23 @@ export function QuotationModal(props: Props) {
   });
 
   createEffect(() => {
+    if (!props.open || props.editing) return;
+    const tt = taxTypes();
+    const cc = currencies();
+    if (!tt.length || !cc.length) return;
+    if (!taxTypeId()) {
+      const first = tt[0];
+      setTaxTypeId(first.id);
+      const basis = defaultInputBasis(first.tax_mode);
+      setLines([emptyQuotationLine(1, "", basis)]);
+    }
+    if (!currencyId()) {
+      const def = cc.find((c) => c.is_default) ?? cc[0];
+      if (def) setCurrencyId(def.id);
+    }
+  });
+
+  createEffect(() => {
     if (props.open && !props.editing) void loadPreview(orderDate());
   });
 
@@ -357,6 +348,17 @@ export function QuotationModal(props: Props) {
       validateCustomFields(customValues(), activeCustomFields());
     if (clientError) {
       toast.warning(clientError);
+      return;
+    }
+    const attachmentErr = validateAttachmentBeforeConfirm(
+      processPolicy.data,
+      "quotation",
+      progressStatus(),
+      attachmentCount(),
+      props.editing?.id,
+    );
+    if (attachmentErr) {
+      toast.warning(attachmentErr);
       return;
     }
 
@@ -524,6 +526,8 @@ export function QuotationModal(props: Props) {
         scope="quotation/quotations"
         docId={props.editing?.id}
         label="Attachments (carried to Sales Order & Sales)"
+        required={policyRequiresAttachment(processPolicy.data, "quotation")}
+        onCountChange={setAttachmentCount}
         emptyUnsavedHint="Save the quotation first to attach files (max 25 MB each)."
       />
       <Field label="Note for PIC only" span="full">

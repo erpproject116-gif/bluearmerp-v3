@@ -185,6 +185,14 @@ export function OnboardingTrackPanel(props: { track: OnboardingTrack; defaultOpe
                     <Show when={step.description}>
                       <p class="mt-1 text-xs text-text-secondary">{step.description}</p>
                     </Show>
+                    <Show when={step.kb_article_id}>
+                      <A
+                        href={`/app/documentation/kb/${step.kb_article_id}`}
+                        class="mt-1 inline-block text-xs font-medium text-brand-600 hover:underline"
+                      >
+                        How to — step-by-step guide
+                      </A>
+                    </Show>
                   </div>
                 </li>
               )}

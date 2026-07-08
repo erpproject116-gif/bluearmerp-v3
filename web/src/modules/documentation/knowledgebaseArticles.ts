@@ -331,6 +331,31 @@ export const knowledgebaseArticles: KbArticle[] = [
     relatedGuideIds: ["process-policies", "setup-wizard"],
   },
   {
+    id: "attachment-requirements",
+    title: "Why do I need an attachment before confirming?",
+    scenario: "Save works but In Progress, Completed, or Confirm is blocked until you upload a file.",
+    intro:
+      "Your store may require a supporting file (scan of a quote, signed PO, delivery receipt, etc.) before you can confirm a document. This is turned on by default and is controlled under Process Policies.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Click Save first — the document must be Unconfirmed with a number before attachments work.",
+          "Scroll to the Attachments area on the form and upload at least one file (PDF, image, or scan).",
+          "Then change progress to In Progress / Completed, Confirm on a list, or Submit for approval.",
+          "If you do not need this rule, an administrator can turn it off per document type under User Management → Process Policies.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "This applies to quotations, sales orders, sales invoices, purchase orders, and supplier invoices. Files can carry forward when you use Load Slip or convert to the next document.",
+      },
+    ],
+    primaryHref: "/app/user-management/process-policies",
+    primaryLabel: "Process policies",
+    relatedGuideIds: ["process-policies-foundation", "process-policies"],
+  },
+  {
     id: "invited-during-setup",
     title: "I was invited but setup is still in progress",
     scenario: "You joined a company workspace that has not finished foundation setup.",

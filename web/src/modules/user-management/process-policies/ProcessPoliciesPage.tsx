@@ -21,6 +21,11 @@ type ProcessPolicy = {
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
   budget_control_mode: string;
+  quotation_require_attachment: boolean;
+  sales_order_require_attachment: boolean;
+  sales_require_attachment: boolean;
+  purchase_order_require_attachment: boolean;
+  supplier_invoice_require_attachment: boolean;
 };
 
 type PolicyField = {
@@ -111,6 +116,31 @@ const BOOLEAN_FIELDS: PolicyField[] = [
     key: "finance_require_je_approval",
     label: "Require journal entry approval",
     help: "When on, journal entries must be approved before posting.",
+  },
+  {
+    key: "quotation_require_attachment",
+    label: "Require attachment on quotation confirm",
+    help: "When on, quotations must have at least one uploaded file before In Progress or Completed.",
+  },
+  {
+    key: "sales_order_require_attachment",
+    label: "Require attachment on sales order confirm",
+    help: "When on, sales orders must have at least one uploaded file before In Progress or Completed.",
+  },
+  {
+    key: "sales_require_attachment",
+    label: "Require attachment on sales invoice confirm",
+    help: "When on, sales invoices must have at least one uploaded file before Completed or approval submit.",
+  },
+  {
+    key: "purchase_order_require_attachment",
+    label: "Require attachment on purchase order confirm",
+    help: "When on, purchase orders must have at least one uploaded file before Confirm on the list.",
+  },
+  {
+    key: "supplier_invoice_require_attachment",
+    label: "Require attachment on purchase (supplier invoice) confirm",
+    help: "When on, purchases must have at least one uploaded file before Completed or approval submit.",
   },
 ];
 

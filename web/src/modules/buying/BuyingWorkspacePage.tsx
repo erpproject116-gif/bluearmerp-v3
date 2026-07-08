@@ -19,6 +19,7 @@ const tiles: KpiTile[] = [
 
 const reportLinks = [
   { label: "Purchase Status", href: "/app/buying/reports/purchase-status" },
+  { label: "Pre-Invoicing (Purchases)", href: "/app/buying/reports/pre-invoicing" },
   { label: "Payable Status", href: "/app/buying/reports/payable-status" },
   { label: "PO Analysis", href: "/app/purchase-order/reports/po-analysis" },
   { label: "Items to Receive", href: "/app/purchase-order/reports/items-to-receive" },

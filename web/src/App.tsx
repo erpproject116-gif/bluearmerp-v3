@@ -1,10 +1,12 @@
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Route, Router, type RouteSectionProps, Navigate, useLocation } from "@solidjs/router";
+import { Suspense } from "solid-js";
 import { AppShell } from "./shell/AppShell";
 import { AuthProvider } from "./shared/auth-context";
 import { ToastProvider } from "./shared/toast";
 import { AuthEntryRedirect } from "./shared/AuthRedirect";
 import { ProtectedRoute } from "./shared/ProtectedRoute";
+import { PageLoader } from "./shared/PageLoader";
 import SignInPage from "./modules/auth/SignInPage";
 import SignUpPage from "./modules/auth/SignUpPage";
 import ForgotPasswordPage from "./modules/auth/ForgotPasswordPage";
@@ -12,127 +14,214 @@ import ResetPasswordPage from "./modules/auth/ResetPasswordPage";
 import DemoSignupPage from "./modules/auth/DemoSignupPage";
 import WelcomePage from "./modules/auth/WelcomePage";
 import AuthCallbackPage from "./modules/auth/AuthCallbackPage";
-import PartnersPage from "./modules/inventory/PartnersPage";
-import LocationsPage from "./modules/inventory/LocationsPage";
-import ProjectsPage from "./modules/inventory/ProjectsPage";
-import DepartmentsPage from "./modules/inventory/DepartmentsPage";
-import ItemsPage from "./modules/inventory/ItemsPage";
-import PartnersSettingsPage from "./modules/inventory/PartnersSettingsPage";
-import LocationsSettingsPage from "./modules/inventory/LocationsSettingsPage";
-import ProjectsSettingsPage from "./modules/inventory/ProjectsSettingsPage";
-import DepartmentsSettingsPage from "./modules/inventory/DepartmentsSettingsPage";
-import ItemsSettingsPage from "./modules/inventory/ItemsSettingsPage";
-import RepairOrderListPage from "./modules/inventory/after-sales/RepairOrderListPage";
-import RepairOrderNewPage from "./modules/inventory/after-sales/RepairOrderNewPage";
-import RepairOrderStatusPage from "./modules/inventory/after-sales/RepairOrderStatusPage";
-import RepairOrderSettingsPage from "./modules/inventory/after-sales/RepairOrderSettingsPage";
-import RegisterRepairListPage from "./modules/inventory/after-sales/RegisterRepairListPage";
-import RegisterRepairNewPage from "./modules/inventory/after-sales/RegisterRepairNewPage";
-import RegisterRepairStatusPage from "./modules/inventory/after-sales/RegisterRepairStatusPage";
-import RegisterRepairConsumptionPage from "./modules/inventory/after-sales/RegisterRepairConsumptionPage";
-import StockMovementsPage from "./modules/inventory/StockMovementsPage";
-import StockEntriesPage from "./modules/inventory/StockEntriesPage";
-import StockReconciliationPage from "./modules/inventory/StockReconciliationPage";
-import PriceListsPage from "./modules/inventory/PriceListsPage";
-import StockWorkspacePage from "./modules/inventory/StockWorkspacePage";
-import ProductBundlesPage from "./modules/inventory/ProductBundlesPage";
-import SerialRegistryListPage from "./modules/inventory/serial-lot/SerialRegistryListPage";
-import SerialAdjustmentPage from "./modules/inventory/serial-lot/SerialAdjustmentPage";
-import LotBatchesListPage from "./modules/inventory/serial-lot/LotBatchesListPage";
-import SerialMovementsListPage from "./modules/inventory/serial-lot/SerialMovementsListPage";
-import SerialTracePage from "./modules/inventory/serial-lot/SerialTracePage";
-import SerialReceivePage from "./modules/inventory/serial-lot/SerialReceivePage";
-import SerialLotSettingsPage from "./modules/inventory/serial-lot/SerialLotSettingsPage";
-import SerialStatusReportPage from "./modules/inventory/serial-lot/SerialStatusReportPage";
-import SerialBookReportPage from "./modules/inventory/serial-lot/SerialBookReportPage";
-import SerialBalanceReportPage from "./modules/inventory/serial-lot/SerialBalanceReportPage";
-import SerialReconciliationReportPage from "./modules/inventory/serial-lot/SerialReconciliationReportPage";
 import {
   RepairOrderReceiptPrintPage,
   RepairOrderWarrantyPrintPage,
-} from "./modules/inventory/after-sales/RepairOrderPrintPage";
-import RepairOrderStatusPrintPage from "./modules/inventory/after-sales/RepairOrderStatusPrintPage";
-import TaxTypeListPage from "./modules/quotation/tax-mngt/TaxTypeListPage";
-import TaxTypeSettingsPage from "./modules/quotation/tax-mngt/TaxTypeSettingsPage";
-import CurrencyListPage from "./modules/quotation/tax-mngt/CurrencyListPage";
-import CurrencySettingsPage from "./modules/quotation/tax-mngt/CurrencySettingsPage";
-import QuotationListPage from "./modules/quotation/quotation/QuotationListPage";
-import QuotationNewPage from "./modules/quotation/quotation/QuotationNewPage";
-import QuotationSettingsPage from "./modules/quotation/quotation/QuotationSettingsPage";
-import QuotationStatusPage from "./modules/quotation/quotation/QuotationStatusPage";
-import OutstandingQuoteStatusPage from "./modules/quotation/quotation/OutstandingQuoteStatusPage";
-import QuotationPrintPage from "./modules/quotation/quotation/QuotationPrintPage";
-import QuotationStatusPrintPage from "./modules/quotation/quotation/QuotationStatusPrintPage";
-import SalesOrderListPage from "./modules/sales-order/sales-order/SalesOrderListPage";
-import SalesOrderNewPage from "./modules/sales-order/sales-order/SalesOrderNewPage";
-import SalesOrderSettingsPage from "./modules/sales-order/sales-order/SalesOrderSettingsPage";
-import SalesOrderStatusPage from "./modules/sales-order/sales-order/SalesOrderStatusPage";
-import OutstandingSOStatusPage from "./modules/sales-order/sales-order/OutstandingSOStatusPage";
-import ReleaseSalesOrderPage from "./modules/sales-order/sales-order/ReleaseSalesOrderPage";
-import DeliveryReceiptListPage from "./modules/sales-order/delivery-receipt/DeliveryReceiptListPage";
-import DeliveryReceiptNewPage from "./modules/sales-order/delivery-receipt/DeliveryReceiptNewPage";
-import SalesOrderPrintPage from "./modules/sales-order/sales-order/SalesOrderPrintPage";
-import SalesOrderStatusPrintPage from "./modules/sales-order/sales-order/SalesOrderStatusPrintPage";
-import PurchaseRequestListPage from "./modules/purchase-request/purchase-request/PurchaseRequestListPage";
-import PurchaseRequestNewPage from "./modules/purchase-request/purchase-request/PurchaseRequestNewPage";
-import PurchaseRequestSettingsPage from "./modules/purchase-request/purchase-request/PurchaseRequestSettingsPage";
-import PurchaseOrderSettingsPage from "./modules/purchase-request/purchase-order/PurchaseOrderSettingsPage";
-import GoodsReceiptSettingsPage from "./modules/purchase-request/goods-receipt/GoodsReceiptSettingsPage";
-import SupplierInvoiceSettingsPage from "./modules/finance/supplier-invoices/SupplierInvoiceSettingsPage";
-import PurchaseRequestStatusPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPage";
-import PurchaseRequestPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestPrintPage";
-import PurchaseRequestStatusPrintPage from "./modules/purchase-request/purchase-request/PurchaseRequestStatusPrintPage";
-import PurchaseOrderListPage from "./modules/purchase-request/purchase-order/PurchaseOrderListPage";
-import PurchaseReturnsPage from "./modules/purchase-request/purchase-order/PurchaseReturnsPage";
-import RfqListPage from "./modules/purchase-request/purchase-order/RfqListPage";
-import RfqDetailPage from "./modules/purchase-request/purchase-order/RfqDetailPage";
-import GoodsReceiptListPage from "./modules/purchase-request/goods-receipt/GoodsReceiptListPage";
-import SalesListPage from "./modules/sales/sales/SalesListPage";
-import SalesNewPage from "./modules/sales/sales/SalesNewPage";
-import SalesSettingsPage from "./modules/sales/sales/SalesSettingsPage";
-import SalesStatusPage from "./modules/sales/sales/SalesStatusPage";
-import PreInvoicingStatusPage from "./modules/sales/sales/PreInvoicingStatusPage";
-import ChangeSalesPriceBatchPage from "./modules/sales/sales/ChangeSalesPriceBatchPage";
-import SalesReturnsPage from "./modules/sales/SalesReturnsPage";
-import PackingSlipPrintPage from "./modules/sales/sales/PackingSlipPrintPage";
-import Bir2307PrintPage from "./modules/finance/payment-vouchers/Bir2307PrintPage";
-import JournalEntriesPage from "./modules/finance/JournalEntriesPage";
-import OfficialReceiptListPage from "./modules/finance/official-receipts/OfficialReceiptListPage";
-import OfficialReceiptNewPage from "./modules/finance/official-receipts/OfficialReceiptNewPage";
-import OfficialReceiptSettingsPage from "./modules/finance/official-receipts/OfficialReceiptSettingsPage";
-import ArByCustomerPage from "./modules/finance/reports/ArByCustomerPage";
-import ApByVendorPage from "./modules/finance/reports/ApByVendorPage";
-import SupplierPaymentStatusPage from "./modules/finance/reports/SupplierPaymentStatusPage";
-import ReceiptStatusPage from "./modules/finance/reports/ReceiptStatusPage";
-import OfficialReceiptStatusPage from "./modules/finance/reports/OfficialReceiptStatusPage";
-import SupplierInvoiceListPage from "./modules/finance/supplier-invoices/SupplierInvoiceListPage";
-import SupplierInvoiceNewPage from "./modules/finance/supplier-invoices/SupplierInvoiceNewPage";
-import PaymentVoucherListPage from "./modules/finance/payment-vouchers/PaymentVoucherListPage";
-import PaymentVoucherNewPage from "./modules/finance/payment-vouchers/PaymentVoucherNewPage";
-import SalesOfficialReceiptStatusPage from "./modules/sales/reports/SalesOfficialReceiptStatusPage";
-import SalesSiReceiptStatusPage from "./modules/sales/reports/SalesSiReceiptStatusPage";
-import SalesArByCustomerPage from "./modules/sales/reports/SalesArByCustomerPage";
-import CustomerCreditBalancePage from "./modules/sales/reports/CustomerCreditBalancePage";
-import SalesDiscountStatusPage from "./modules/sales/reports/SalesDiscountStatusPage";
-import SalesDiscountStatusPrintPage from "./modules/sales/reports/SalesDiscountStatusPrintPage";
-import SalesPrintSlipsLauncherPage from "./modules/sales/reports/SalesPrintSlipsLauncherPage";
-import SalesSlipsPrintPage from "./modules/sales/reports/SalesSlipsPrintPage";
-import CollectiveInvoiceListPage from "./modules/sales/collective-invoicing/CollectiveInvoiceListPage";
-import CollectiveInvoiceStatusPage from "./modules/sales/collective-invoicing/CollectiveInvoiceStatusPage";
-import CollectiveInvoiceSlipPrintPage from "./modules/sales/collective-invoicing/CollectiveInvoiceSlipPrintPage";
-import CollectiveInvoicePrintPage from "./modules/sales/collective-invoicing/CollectiveInvoicePrintPage";
-import CollectiveInvoiceStatusPrintPage from "./modules/sales/collective-invoicing/CollectiveInvoiceStatusPrintPage";
-import { SalesInvoicePrintPage, PurchaseInvoicePrintPage } from "./shared/InvoiceVoucherPrintPage";
-import UsersPage from "./modules/user-management/users/UsersPage";
-import UserGroupsPage from "./modules/user-management/groups/UserGroupsPage";
-import RolesPage from "./modules/user-management/roles/RolesPage";
-import UserPermissionsPage from "./modules/user-management/user-permissions/UserPermissionsPage";
-import ProcessPoliciesPage from "./modules/user-management/process-policies/ProcessPoliciesPage";
-import MappingCenterPage from "./modules/user-management/mapping-center/MappingCenterPage";
-import ModuleFeaturesPage from "./modules/user-management/tenant-modules/ModuleFeaturesPage";
-import DemoDataPage from "./modules/user-management/demo-data/DemoDataPage";
-import ActivityLogListPage from "./modules/activity-logs/ActivityLogListPage";
-import ChangeLogListPage from "./modules/activity-logs/ChangeLogListPage";
+  SalesInvoicePrintPage,
+  PurchaseInvoicePrintPage,
+  PartnersPage,
+  LocationsPage,
+  ProjectsPage,
+  DepartmentsPage,
+  ItemsPage,
+  PartnersSettingsPage,
+  LocationsSettingsPage,
+  ProjectsSettingsPage,
+  DepartmentsSettingsPage,
+  ItemsSettingsPage,
+  RepairOrderListPage,
+  RepairOrderNewPage,
+  RepairOrderStatusPage,
+  RepairOrderSettingsPage,
+  RegisterRepairListPage,
+  RegisterRepairNewPage,
+  RegisterRepairStatusPage,
+  RegisterRepairConsumptionPage,
+  StockMovementsPage,
+  StockEntriesPage,
+  StockReconciliationPage,
+  PriceListsPage,
+  StockWorkspacePage,
+  ProductBundlesPage,
+  SerialRegistryListPage,
+  SerialAdjustmentPage,
+  LotBatchesListPage,
+  SerialMovementsListPage,
+  SerialTracePage,
+  SerialReceivePage,
+  SerialLotSettingsPage,
+  SerialStatusReportPage,
+  SerialBookReportPage,
+  SerialBalanceReportPage,
+  SerialReconciliationReportPage,
+  RepairOrderStatusPrintPage,
+  TaxTypeListPage,
+  TaxTypeSettingsPage,
+  CurrencyListPage,
+  CurrencySettingsPage,
+  QuotationListPage,
+  QuotationNewPage,
+  QuotationSettingsPage,
+  QuotationStatusPage,
+  OutstandingQuoteStatusPage,
+  QuotationPrintPage,
+  QuotationStatusPrintPage,
+  SalesOrderListPage,
+  SalesOrderNewPage,
+  SalesOrderSettingsPage,
+  SalesOrderStatusPage,
+  OutstandingSOStatusPage,
+  ReleaseSalesOrderPage,
+  DeliveryReceiptListPage,
+  DeliveryReceiptNewPage,
+  SalesOrderPrintPage,
+  SalesOrderStatusPrintPage,
+  PurchaseRequestListPage,
+  PurchaseRequestNewPage,
+  PurchaseRequestSettingsPage,
+  PurchaseOrderSettingsPage,
+  GoodsReceiptSettingsPage,
+  SupplierInvoiceSettingsPage,
+  PurchaseRequestStatusPage,
+  PurchaseRequestPrintPage,
+  PurchaseRequestStatusPrintPage,
+  PurchaseOrderListPage,
+  PurchaseReturnsPage,
+  RfqListPage,
+  RfqDetailPage,
+  GoodsReceiptListPage,
+  SalesListPage,
+  SalesNewPage,
+  SalesSettingsPage,
+  SalesStatusPage,
+  PreInvoicingStatusPage,
+  ChangeSalesPriceBatchPage,
+  SalesReturnsPage,
+  PackingSlipPrintPage,
+  Bir2307PrintPage,
+  JournalEntriesPage,
+  OfficialReceiptListPage,
+  OfficialReceiptNewPage,
+  OfficialReceiptSettingsPage,
+  ArByCustomerPage,
+  ApByVendorPage,
+  CustomerVendorBookArPage,
+  CustomerVendorBookApPage,
+  SupplierPaymentStatusPage,
+  ReceiptStatusPage,
+  OfficialReceiptStatusPage,
+  SupplierInvoiceListPage,
+  SupplierInvoiceNewPage,
+  PaymentVoucherListPage,
+  PaymentVoucherNewPage,
+  SalesOfficialReceiptStatusPage,
+  SalesSiReceiptStatusPage,
+  SalesArByCustomerPage,
+  CustomerCreditBalancePage,
+  SalesDiscountStatusPage,
+  SalesDiscountStatusPrintPage,
+  SalesPrintSlipsLauncherPage,
+  SalesSlipsPrintPage,
+  CollectiveInvoiceListPage,
+  CollectiveInvoiceStatusPage,
+  CollectiveInvoiceSlipPrintPage,
+  CollectiveInvoicePrintPage,
+  CollectiveInvoiceStatusPrintPage,
+  UsersPage,
+  UserGroupsPage,
+  RolesPage,
+  UserPermissionsPage,
+  ProcessPoliciesPage,
+  MappingCenterPage,
+  ModuleFeaturesPage,
+  DemoDataPage,
+  ActivityLogListPage,
+  ChangeLogListPage,
+  CrmDashboardPage,
+  CrmNotificationsPage,
+  FollowUpTasksPage,
+  QuotationPipelinePage,
+  WarrantyAssetsPage,
+  AlertRulesSettingsPage,
+  CustomerQuotationsReportPage,
+  ItemDemandReportPage,
+  ConversionFunnelReportPage,
+  BrandingSettingsPage,
+  BillingPage,
+  OnboardingPage,
+  SetupWizardPage,
+  PlatformCustomersPage,
+  PlatformCustomerDetailPage,
+  PlatformPlansPage,
+  PlatformPlanEditPage,
+  LowStockReportPage,
+  ExpiredQuotationsReportPage,
+  LeadsPage,
+  OpportunitiesPage,
+  TicketsPage,
+  TicketDetailPage,
+  PosPage,
+  PosSettingsPage,
+  HrEmployeesPage,
+  PayrollRunsPage,
+  FixedAssetsPage,
+  JobCostingPage,
+  BomsPage,
+  WorkOrdersPage,
+  NcrsPage,
+  CapaPage,
+  QcRequestsPage,
+  CommissionRulesPage,
+  SOAnalysisReportPage,
+  POAnalysisReportPage,
+  ItemsToReceiveReportPage,
+  StockBalanceReportPage,
+  StockLedgerReportPage,
+  StockAgeingReportPage,
+  OnHandReportPage,
+  InvBookReportPage,
+  TrialBalanceReportPage,
+  GeneralLedgerReportPage,
+  ProfitAndLossReportPage,
+  BalanceSheetReportPage,
+  ArAgingReportPage,
+  ApAgingReportPage,
+  ArApStatusReportPage,
+  ReceivableStatusReportPage,
+  AcctInventoryReconciliationPage,
+  PaymentEntriesPage,
+  ChartOfAccountsPage,
+  BankReconciliationPage,
+  FiscalYearsPage,
+  SellingWorkspacePage,
+  BuyingWorkspacePage,
+  PurchaseStatusPage,
+  PurchasePreInvoicingPage,
+  PayableStatusReportPage,
+  SellingReportsPage,
+  FinanceWorkspacePage,
+  PortalLoginPage,
+  PortalDashboardPage,
+  ReportsIndexPage,
+  SavedViewsPage,
+  DashboardPage,
+  ApprovalsQueuePage,
+  DocumentationPage,
+  BudgetListPage,
+  BudgetDetailPage,
+  BudgetVsActualReportPage,
+  IngestionRulesPage,
+  InboxPage,
+  ScheduledReceiptsPage,
+  ShippingOrdersPage,
+  ShippingRulesPage,
+  DeliveryTripsPage,
+  WithholdingCodesPage,
+  CheckRegisterPage,
+  NotesPage,
+  LandedCostPage,
+  ContractsPage,
+} from "./routes/lazyPages";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
 import { ActivityLogRoute } from "./shared/ActivityLogRoute";
 import { ChangeLogRoute } from "./shared/ChangeLogRoute";
@@ -146,92 +235,9 @@ import { ManufacturingRoute } from "./shared/ManufacturingRoute";
 import { QualityRoute } from "./shared/QualityRoute";
 import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
 import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
-import CrmDashboardPage from "./modules/crm/CrmDashboardPage";
-import CrmNotificationsPage from "./modules/crm/CrmNotificationsPage";
-import FollowUpTasksPage from "./modules/crm/FollowUpTasksPage";
-import QuotationPipelinePage from "./modules/crm/QuotationPipelinePage";
-import WarrantyAssetsPage from "./modules/crm/WarrantyAssetsPage";
-import AlertRulesSettingsPage from "./modules/crm/AlertRulesSettingsPage";
-import CustomerQuotationsReportPage from "./modules/crm/reports/CustomerQuotationsReportPage";
-import ItemDemandReportPage from "./modules/crm/reports/ItemDemandReportPage";
-import ConversionFunnelReportPage from "./modules/crm/reports/ConversionFunnelReportPage";
-import BrandingSettingsPage from "./modules/settings/BrandingSettingsPage";
-import BillingPage from "./modules/settings/BillingPage";
-import OnboardingPage from "./modules/onboarding/OnboardingPage";
-import SetupWizardPage from "./modules/setup/SetupWizardPage";
-import { SetupGate } from "./shared/SetupGate";
-import PlatformCustomersPage from "./modules/platform/PlatformCustomersPage";
-import PlatformCustomerDetailPage from "./modules/platform/PlatformCustomerDetailPage";
-import PlatformPlansPage from "./modules/platform/PlatformPlansPage";
-import PlatformPlanEditPage from "./modules/platform/PlatformPlanEditPage";
 import { PlatformRoute } from "./shared/PlatformRoute";
 import { BrandingProvider } from "./shared/branding/BrandingProvider";
-import LowStockReportPage from "./modules/crm/reports/LowStockReportPage";
-import ExpiredQuotationsReportPage from "./modules/crm/reports/ExpiredQuotationsReportPage";
-import LeadsPage from "./modules/crm/LeadsPage";
-import OpportunitiesPage from "./modules/crm/OpportunitiesPage";
-import TicketsPage from "./modules/support/TicketsPage";
-import TicketDetailPage from "./modules/support/TicketDetailPage";
-import PosPage from "./modules/pos/PosPage";
-import PosSettingsPage from "./modules/pos/PosSettingsPage";
-import HrEmployeesPage from "./modules/hr/HrEmployeesPage";
-import PayrollRunsPage from "./modules/hr/PayrollRunsPage";
-import FixedAssetsPage from "./modules/fixedassets/FixedAssetsPage";
-import JobCostingPage from "./modules/jobcosting/JobCostingPage";
-import BomsPage from "./modules/manufacturing/BomsPage";
-import WorkOrdersPage from "./modules/manufacturing/WorkOrdersPage";
-import NcrsPage from "./modules/quality/NcrsPage";
-import CapaPage from "./modules/quality/CapaPage";
-import QcRequestsPage from "./modules/quality/QcRequestsPage";
-import CommissionRulesPage from "./modules/sales/CommissionRulesPage";
-import SOAnalysisReportPage from "./modules/sales-order/reports/SOAnalysisReportPage";
-import POAnalysisReportPage from "./modules/purchase-order/reports/POAnalysisReportPage";
-import ItemsToReceiveReportPage from "./modules/purchase-order/reports/ItemsToReceiveReportPage";
-import StockBalanceReportPage from "./modules/inventory/reports/StockBalanceReportPage";
-import StockLedgerReportPage from "./modules/inventory/reports/StockLedgerReportPage";
-import StockAgeingReportPage from "./modules/inventory/reports/StockAgeingReportPage";
-import OnHandReportPage from "./modules/inventory/reports/OnHandReportPage";
-import InvBookReportPage from "./modules/inventory/reports/InvBookReportPage";
-import TrialBalanceReportPage from "./modules/finance/reports/TrialBalanceReportPage";
-import GeneralLedgerReportPage from "./modules/finance/reports/GeneralLedgerReportPage";
-import ProfitAndLossReportPage from "./modules/finance/reports/ProfitAndLossReportPage";
-import BalanceSheetReportPage from "./modules/finance/reports/BalanceSheetReportPage";
-import ArAgingReportPage from "./modules/finance/reports/ArAgingReportPage";
-import ApAgingReportPage from "./modules/finance/reports/ApAgingReportPage";
-import ArApStatusReportPage from "./modules/finance/reports/ArApStatusReportPage";
-import ReceivableStatusReportPage from "./modules/selling/reports/ReceivableStatusReportPage";
-import AcctInventoryReconciliationPage from "./modules/finance/reports/AcctInventoryReconciliationPage";
-import PaymentEntriesPage from "./modules/finance/PaymentEntriesPage";
-import ChartOfAccountsPage from "./modules/finance/ChartOfAccountsPage";
-import BankReconciliationPage from "./modules/finance/BankReconciliationPage";
-import FiscalYearsPage from "./modules/finance/FiscalYearsPage";
-import SellingWorkspacePage from "./modules/selling/SellingWorkspacePage";
-import BuyingWorkspacePage from "./modules/buying/BuyingWorkspacePage";
-import PurchaseStatusPage from "./modules/buying/reports/PurchaseStatusPage";
-import PayableStatusReportPage from "./modules/buying/reports/PayableStatusReportPage";
-import SellingReportsPage from "./modules/selling/reports/SellingReportsPage";
-import FinanceWorkspacePage from "./modules/finance/FinanceWorkspacePage";
-import PortalLoginPage from "./modules/portal/PortalLoginPage";
-import PortalDashboardPage from "./modules/portal/PortalDashboardPage";
-import ReportsIndexPage from "./modules/reports/ReportsIndexPage";
-import SavedViewsPage from "./modules/reports/SavedViewsPage";
-import DashboardPage from "./modules/dashboard/DashboardPage";
-import ApprovalsQueuePage from "./modules/dashboard/ApprovalsQueuePage";
-import DocumentationPage from "./modules/documentation/DocumentationPage";
-import BudgetListPage from "./modules/company-budget/BudgetListPage";
-import BudgetDetailPage from "./modules/company-budget/BudgetDetailPage";
-import BudgetVsActualReportPage from "./modules/finance/reports/BudgetVsActualReportPage";
-import IngestionRulesPage from "./modules/data-center/IngestionRulesPage";
-import InboxPage from "./modules/data-center/InboxPage";
-import ScheduledReceiptsPage from "./modules/wms/ScheduledReceiptsPage";
-import ShippingOrdersPage from "./modules/shipping/ShippingOrdersPage";
-import ShippingRulesPage from "./modules/shipping/ShippingRulesPage";
-import DeliveryTripsPage from "./modules/shipping/DeliveryTripsPage";
-import WithholdingCodesPage from "./modules/finance/acct-ii/WithholdingCodesPage";
-import CheckRegisterPage from "./modules/finance/acct-ii/CheckRegisterPage";
-import NotesPage from "./modules/finance/acct-ii/NotesPage";
-import LandedCostPage from "./modules/finance/acct-ii/LandedCostPage";
-import ContractsPage from "./modules/finance/acct-ii/ContractsPage";
+import { SetupGate } from "./shared/SetupGate";
 
 import { queryClient } from "./shared/queryClient";
 
@@ -258,7 +264,7 @@ export default function App() {
       <AuthProvider>
         <BrandingProvider>
         <CrmTaskModalProvider>
-        <Router>
+        <Router root={(props) => <Suspense fallback={<PageLoader />}>{props.children}</Suspense>}>
         <Route path="/signin" component={SignInPage} />
         <Route path="/signup" component={SignUpPage} />
         <Route path="/forgot-password" component={ForgotPasswordPage} />
@@ -371,6 +377,7 @@ export default function App() {
           <Route path="/selling" component={SellingWorkspacePage} />
           <Route path="/buying/reports/payable-status" component={PayableStatusReportPage} />
           <Route path="/buying/reports/purchase-status" component={PurchaseStatusPage} />
+          <Route path="/buying/reports/pre-invoicing" component={PurchasePreInvoicingPage} />
           <Route path="/buying" component={BuyingWorkspacePage} />
           <Route path="/sales-order/reports/so-analysis" component={SOAnalysisReportPage} />
           <Route path="/sales-order/sales-orders/new" component={SalesOrderNewPage} />
@@ -463,6 +470,8 @@ export default function App() {
           <Route path="/finance/reports/ap-by-vendor" component={ApByVendorPage} />
           <Route path="/finance/reports/supplier-payment-status" component={SupplierPaymentStatusPage} />
           <Route path="/finance/reports/ar-by-customer" component={ArByCustomerPage} />
+          <Route path="/finance/reports/customer-vendor-book-ar" component={CustomerVendorBookArPage} />
+          <Route path="/finance/reports/customer-vendor-book-ap" component={CustomerVendorBookApPage} />
           <Route path="/finance/reports/receipt-status" component={ReceiptStatusPage} />
           <Route path="/finance/reports/official-receipt-status" component={OfficialReceiptStatusPage} />
           <Route path="/finance" component={FinanceWorkspacePage} />

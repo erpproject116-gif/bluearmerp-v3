@@ -30,6 +30,11 @@ type Policy struct {
 	PurchaseRequirePOApproval           bool   `json:"purchase_require_po_approval"`
 	FinanceRequireJEApproval            bool   `json:"finance_require_je_approval"`
 	BudgetControlMode                   string `json:"budget_control_mode"`
+	QuotationRequireAttachment          bool   `json:"quotation_require_attachment"`
+	SalesOrderRequireAttachment         bool   `json:"sales_order_require_attachment"`
+	SalesRequireAttachment              bool   `json:"sales_require_attachment"`
+	PurchaseOrderRequireAttachment      bool   `json:"purchase_order_require_attachment"`
+	SupplierInvoiceRequireAttachment    bool   `json:"supplier_invoice_require_attachment"`
 }
 
 // Patch is the writable subset for PATCH/PUT requests.
@@ -51,6 +56,11 @@ type Patch struct {
 	PurchaseRequirePOApproval          *bool   `json:"purchase_require_po_approval,omitempty"`
 	FinanceRequireJEApproval           *bool   `json:"finance_require_je_approval,omitempty"`
 	BudgetControlMode                  *string `json:"budget_control_mode,omitempty"`
+	QuotationRequireAttachment         *bool   `json:"quotation_require_attachment,omitempty"`
+	SalesOrderRequireAttachment        *bool   `json:"sales_order_require_attachment,omitempty"`
+	SalesRequireAttachment             *bool   `json:"sales_require_attachment,omitempty"`
+	PurchaseOrderRequireAttachment     *bool   `json:"purchase_order_require_attachment,omitempty"`
+	SupplierInvoiceRequireAttachment   *bool   `json:"supplier_invoice_require_attachment,omitempty"`
 }
 
 var ErrNotFound = errors.New("process policy not found")
@@ -73,7 +83,12 @@ const selectCols = `
   coalesce(sales_require_so_approval, false),
   coalesce(purchase_require_po_approval, false),
   coalesce(finance_require_je_approval, false),
-  coalesce(budget_control_mode, 'off')
+  coalesce(budget_control_mode, 'off'),
+  coalesce(quotation_require_attachment, true),
+  coalesce(sales_order_require_attachment, true),
+  coalesce(sales_require_attachment, true),
+  coalesce(purchase_order_require_attachment, true),
+  coalesce(supplier_invoice_require_attachment, true)
 `
 
 // Load returns the tenant policy, inserting skip-friendly defaults when missing.
@@ -109,6 +124,11 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, erro
 		&p.PurchaseRequirePOApproval,
 		&p.FinanceRequireJEApproval,
 		&p.BudgetControlMode,
+		&p.QuotationRequireAttachment,
+		&p.SalesOrderRequireAttachment,
+		&p.SalesRequireAttachment,
+		&p.PurchaseOrderRequireAttachment,
+		&p.SupplierInvoiceRequireAttachment,
 	)
 	return p, err
 }
@@ -177,6 +197,21 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 			next.BudgetControlMode = "off"
 		}
 	}
+	if patch.QuotationRequireAttachment != nil {
+		next.QuotationRequireAttachment = *patch.QuotationRequireAttachment
+	}
+	if patch.SalesOrderRequireAttachment != nil {
+		next.SalesOrderRequireAttachment = *patch.SalesOrderRequireAttachment
+	}
+	if patch.SalesRequireAttachment != nil {
+		next.SalesRequireAttachment = *patch.SalesRequireAttachment
+	}
+	if patch.PurchaseOrderRequireAttachment != nil {
+		next.PurchaseOrderRequireAttachment = *patch.PurchaseOrderRequireAttachment
+	}
+	if patch.SupplierInvoiceRequireAttachment != nil {
+		next.SupplierInvoiceRequireAttachment = *patch.SupplierInvoiceRequireAttachment
+	}
 
 	_, err = pool.Exec(ctx, `
 		update public.tenant_process_policies set
@@ -197,7 +232,12 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		  purchase_require_po_approval = $16,
 		  finance_require_je_approval = $17,
 		  budget_control_mode = $18,
-		  updated_by_user_id = $19,
+		  quotation_require_attachment = $19,
+		  sales_order_require_attachment = $20,
+		  sales_require_attachment = $21,
+		  purchase_order_require_attachment = $22,
+		  supplier_invoice_require_attachment = $23,
+		  updated_by_user_id = $24,
 		  updated_at = now()
 		where tenant_id = $1`,
 		tenantID,
@@ -218,6 +258,11 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		next.PurchaseRequirePOApproval,
 		next.FinanceRequireJEApproval,
 		next.BudgetControlMode,
+		next.QuotationRequireAttachment,
+		next.SalesOrderRequireAttachment,
+		next.SalesRequireAttachment,
+		next.PurchaseOrderRequireAttachment,
+		next.SupplierInvoiceRequireAttachment,
 		userID,
 	)
 	if err != nil {
@@ -269,6 +314,11 @@ func LoadTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error) {
 		&p.PurchaseRequirePOApproval,
 		&p.FinanceRequireJEApproval,
 		&p.BudgetControlMode,
+		&p.QuotationRequireAttachment,
+		&p.SalesOrderRequireAttachment,
+		&p.SalesRequireAttachment,
+		&p.PurchaseOrderRequireAttachment,
+		&p.SupplierInvoiceRequireAttachment,
 	)
 	return p, err
 }

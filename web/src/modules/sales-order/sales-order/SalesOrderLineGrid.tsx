@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Index, Show } from "solid-js";
+import { createMemo, createSignal, Index, onCleanup, Show } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { DecimalInput } from "../../../shared/DecimalInput";
@@ -159,13 +159,34 @@ export function SalesOrderLineGrid(props: Props) {
     return previewSalesOrderLineAmounts(taxId, line);
   };
 
-  const updateLine = async (idx: number, patch: Partial<SalesOrderLineRow>) => {
+  const previewTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  const schedulePreview = (idx: number) => {
+    const prev = previewTimers.get(idx);
+    if (prev) clearTimeout(prev);
+    previewTimers.set(
+      idx,
+      setTimeout(() => {
+        previewTimers.delete(idx);
+        const line = props.lines()[idx];
+        if (!line) return;
+        void previewLine(line).then((amounts) => {
+          props.onChange((prevLines) => prevLines.map((ln, i) => (i === idx ? { ...ln, ...amounts } : ln)));
+        });
+      }, 300),
+    );
+  };
+
+  onCleanup(() => {
+    for (const timer of previewTimers.values()) clearTimeout(timer);
+    previewTimers.clear();
+  });
+
+  const updateLine = (idx: number, patch: Partial<SalesOrderLineRow>) => {
     const next = props.lines().map((ln, i) => (i === idx ? { ...ln, ...patch } : ln));
     props.onChange(next);
-    const merged = next[idx];
     if (patch.qty !== undefined || patch.unit_price !== undefined || patch.input_basis !== undefined) {
-      const amounts = await previewLine(merged);
-      props.onChange(next.map((ln, i) => (i === idx ? { ...ln, ...amounts } : ln)));
+      schedulePreview(idx);
     }
   };
 

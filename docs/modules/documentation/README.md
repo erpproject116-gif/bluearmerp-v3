@@ -7,6 +7,8 @@ End-user help lives in the web app at `/app/documentation`, not in this folder�
 | What | Where |
 |------|--------|
 | User-facing copy | `web/src/modules/documentation/documentationSections.ts` |
+| Knowledge base articles | `web/src/modules/documentation/knowledgebaseArticles.ts`, `moduleKbArticles.ts`, `knowledgebaseGroups.ts` |
+| Onboarding playbook steps | `api/internal/platform/onboarding/tracks.go` (descriptions + `kb_article_id` links) |
 | Page layout | `web/src/modules/documentation/DocumentationPage.tsx`, `DocumentationLayout.tsx` |
 | Sidebar entry | `web/src/shell/modules.ts` (`id: documentation`) |
 | Account menu link | `web/src/shell/UserAccountMenu.tsx` |
@@ -17,8 +19,9 @@ No API, migration, or permission row is required. Help & guides is visible to ev
 
 1. Update routes in `web/src/App.tsx` and labels in `web/src/shell/modules.ts`.
 2. Add or edit a section in `documentationSections.ts` (or extend an existing one).
-3. Set `primaryHref` to a real app path that exists in `App.tsx`.
-4. Re-read the copy aloud—if it sounds like a developer doc, rewrite it.
+3. Add a Knowledge base scenario in `moduleKbArticles.ts` when users need step-by-step help (Load Slip, reports, attachments).
+4. Set `primaryHref` to a real app path that exists in `App.tsx`.
+5. Re-read the copy aloud—if it sounds like a developer doc, rewrite it.
 
 ## Tone checklist
 

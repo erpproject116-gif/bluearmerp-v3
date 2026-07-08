@@ -54,6 +54,13 @@ func Catalog() []ReportDef {
 			Description: "Supplier invoice line inquiry with Details/Summary/by Line.",
 		},
 		{
+			Key: "purchase_pre_invoicing", Label: "Pre-Invoicing Status (Purchases)", Module: "buying",
+			APIPath:    "/api/v1/buying/reports/pre-invoicing",
+			ExportPath: "/api/v1/buying/reports/pre-invoicing/export",
+			WebPath:    "/app/buying/reports/pre-invoicing", Tier: "R3",
+			Description: "Posted goods receipt lines with quantity not yet on a supplier invoice.",
+		},
+		{
 			Key: "stock_balance", Label: "Stock Balance", Module: "inventory",
 			APIPath:    "/api/v1/inventory/reports/stock-balance",
 			ExportPath: "/api/v1/inventory/reports/stock-balance/export",
@@ -101,6 +108,20 @@ func Catalog() []ReportDef {
 			ExportPath: "/api/v1/finance/ap-by-vendor/export",
 			WebPath:    "/app/finance/reports/ap-by-vendor", Tier: "R5",
 			Description: "Open payables grouped by vendor.",
+		},
+		{
+			Key: "customer_vendor_book_ar", Label: "Customer/Vendor Book I (AR)", Module: "finance",
+			APIPath:    "/api/v1/finance/customer-vendor-book",
+			ExportPath: "/api/v1/finance/customer-vendor-book/export",
+			WebPath:    "/app/finance/reports/customer-vendor-book-ar", Tier: "R5",
+			Description: "Slip-level receivable book: sales debits and official receipt credits.",
+		},
+		{
+			Key: "customer_vendor_book_ap", Label: "Customer/Vendor Book I (AP)", Module: "finance",
+			APIPath:    "/api/v1/finance/customer-vendor-book",
+			ExportPath: "/api/v1/finance/customer-vendor-book/export",
+			WebPath:    "/app/finance/reports/customer-vendor-book-ap", Tier: "R5",
+			Description: "Slip-level payable book: supplier invoice credits and payment voucher debits.",
 		},
 		{
 			Key: "ar_aging", Label: "A/R Aging", Module: "finance",

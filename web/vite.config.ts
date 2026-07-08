@@ -34,6 +34,30 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [solid(), tailwindcss()],
     envDir: ".",
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) {
+              if (id.includes("/modules/finance/")) return "module-finance";
+              if (id.includes("/modules/inventory/")) return "module-inventory";
+              if (id.includes("/modules/sales/")) return "module-sales";
+              if (id.includes("/modules/sales-order/")) return "module-sales-order";
+              if (id.includes("/modules/purchase-request/") || id.includes("/modules/purchase-order/") || id.includes("/modules/buying/")) {
+                return "module-purchasing";
+              }
+              if (id.includes("/modules/quotation/")) return "module-quotation";
+              if (id.includes("/modules/crm/")) return "module-crm";
+              if (id.includes("/modules/documentation/")) return "module-docs";
+              return undefined;
+            }
+            if (id.includes("@supabase")) return "vendor-supabase";
+            if (id.includes("@tanstack")) return "vendor-query";
+            return "vendor";
+          },
+        },
+      },
+    },
     define: {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
       "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabaseAnon),

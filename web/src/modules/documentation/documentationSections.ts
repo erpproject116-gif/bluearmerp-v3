@@ -31,7 +31,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "New to Bluearm? After a trial, you land on the workspace setup wizard. The Dashboard shows a Start here checklist until foundation is complete. Then open /app/onboarding for the full ERP + POS playbook.",
+        text: "New to Bluearm? After a trial, you land on the workspace setup wizard. The Dashboard shows a Start here checklist until foundation is complete. Then open /app/onboarding for the full ERP + POS playbook — each step links to Knowledge base articles for plain-language help.",
       },
     ],
   },
@@ -49,9 +49,10 @@ export const documentationSections: DocSection[] = [
           "Complete workspace setup at /app/setup — confirm seeded company, COA, tax, process policies, and location; add partners and products.",
           "Open /app/onboarding for the full ERP + POS playbook with tracked progress.",
           "Week 1: Review process policies again if needed and enable modules (POS, WMS, Quality).",
-          "Week 2: First selling flow — quotation, sales order, pick list, invoice.",
-          "Week 3: First buying flow — purchase request, PO, goods receipt, supplier invoice.",
+          "Week 2: First selling flow — quotation, sales order, pick list, invoice (Load Slip), customer payment.",
+          "Week 3: First buying flow — purchase request, RFQ, PO, goods receipt, supplier invoice, pre-invoicing report.",
           "Week 4: POS — configure Manage, open shift, checkout, close shift.",
+          "Review reports: Receivable/Payable Status, pre-invoicing, Customer/Vendor Book.",
           "Invite teammates and open the Business Dashboard for alerts and reconciliation.",
         ],
       },
@@ -221,8 +222,12 @@ export const documentationSections: DocSection[] = [
           "Choose the customer, location, and tax type.",
           "Add line items from your item list and adjust quantities and prices.",
           "Save and print or send the quotation to the customer.",
-          "When ready, convert open quote lines to a sales order from the quotation screen.",
+          "When ready, convert open quote lines to a sales order from the quotation screen, or use Load Slip → Quotation on New Sales Order.",
         ],
+      },
+      {
+        type: "paragraph",
+        text: "You can also invoice directly from an open quotation using Load Slip → Quotation on New Sale when your process policy allows skipping the sales order step.",
       },
       {
         type: "paragraph",
@@ -286,6 +291,10 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
+        text: "On New Sales Order, use Load Slip → Quotation to copy open quote lines without retyping. This is the fastest way to turn an accepted quote into a confirmed order.",
+      },
+      {
+        type: "paragraph",
         text: "Outstanding S/O Status shows orders that still have balance quantity not yet released, delivered, or invoiced.",
       },
     ],
@@ -308,6 +317,7 @@ export const documentationSections: DocSection[] = [
           "Maintain Shipping Rules with zone, carrier, and flat freight amount.",
           "Create a Shipping Order — freight fills in when rules match.",
           "Use Delivery Trips to group outbound deliveries for drivers or couriers.",
+          "On New Sale, Load Slip → Shipping Order invoices SO lines already linked to a shipping order.",
         ],
       },
     ],
@@ -328,14 +338,15 @@ export const documentationSections: DocSection[] = [
         type: "steps",
         items: [
           "Click New Sales to create an invoice.",
-          "Add lines manually or pull from released sales order lines.",
+          "Select the customer, then use Load Slip to pull lines from Sales Order, Quotation, or Shipping Order — or enter lines manually.",
           "For serial-tracked items, pick the serial numbers that match the quantity.",
-          "Save and print packing slips or sales documents as needed.",
+          "Save as Unconfirmed first. Upload attachments in the Attachments section if your store requires files before Confirm.",
+          "Confirm when ready and print packing slips or sales documents as needed.",
         ],
       },
       {
         type: "paragraph",
-        text: "Sales Status and Pre-invoicing Status help you see which orders are ready to bill. Reports such as A/R by Customer show who still owes money on open invoices.",
+        text: "Sales Status and Pre-Invoicing Status help you see which orders are ready to bill. Pre-Invoicing lists SO lines with balance not yet invoiced. Reports such as A/R by Customer show who still owes money on open invoices.",
       },
       { type: "heading", text: "Sales commission" },
       {
@@ -386,9 +397,9 @@ export const documentationSections: DocSection[] = [
       {
         type: "steps",
         items: [
-          "Create a Purchase Request with supplier and line items.",
+          "Create a Purchase Request with supplier and line items — optional Load Slip (from Sales Order) for customer demand.",
           "Submit for approval when your store requires it; approvers confirm the request before PO creation.",
-          "From the request, create a Purchase Order when you are ready to order.",
+          "Create a Purchase Order — use Load Slip from Purchase Request or Supplier Quotation (RFQ).",
           "Confirm the purchase order.",
           "When shipment arrives, open Goods Receipt List or Serial & Lot → Receive / Scan to receive against the order.",
           "If Quality is enabled, set inspection to Released on draft receipts before posting; Held receipts block stock posting until released.",
@@ -396,7 +407,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "Buying workspace and RFQ help you request quotes from suppliers and convert accepted supplier quotations into purchase orders. Vendor rates can resolve from buying price lists when PO lines have no unit price.",
+        text: "Buying workspace lists Purchase Status, Pre-Invoicing (Purchases), and Payable Status reports. RFQ under Purchase Order lets you collect vendor quotes before ordering.",
       },
       {
         type: "tip",
@@ -460,6 +471,16 @@ export const documentationSections: DocSection[] = [
           "Notes, Company Budgets, and Contracts for extended A/R and A/P tracking.",
         ],
       },
+      { type: "heading", text: "AR / AP reports" },
+      {
+        type: "steps",
+        items: [
+          "A/R by Customer and A/P by Vendor — open balances by partner.",
+          "Receivable Status (Selling) and Payable Status (Buying) — as-of balances.",
+          "Customer/Vendor Book I (AR/AP) — slip-level debit/credit ledger with running balance.",
+          "SI Receipt Status and Supplier Payment Status — line-level collection and payment progress.",
+        ],
+      },
       { type: "heading", text: "Budget control" },
       {
         type: "paragraph",
@@ -487,13 +508,16 @@ export const documentationSections: DocSection[] = [
         type: "steps",
         items: [
           "Open Reports → Catalog to browse by module.",
-          "Open a report, set filters, and export if needed.",
+          "Selling: Receivable Status · Sales pre-invoicing (unbilled SO lines).",
+          "Buying: Purchase Status · Payable Status · Purchase pre-invoicing (unbilled GR lines).",
+          "Finance: Customer/Vendor Book I (AR/AP) · Trial Balance · AR/AP Status.",
+          "Open a report, set filters, press Search (F8), and export CSV when available.",
           "Open Saved Views to store named filter sets on catalog reports (Ad-hoc BI).",
         ],
       },
       {
         type: "tip",
-        text: "Scheduled report email is a stub in this release—exports run on demand from each report or saved view.",
+        text: "For step-by-step help on Load Slip, attachments, or RFQ, open Documentation → Knowledge base.",
       },
     ],
   },
@@ -855,7 +879,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Process policies let administrators enforce commercial flow gates: quotation before sales order, sales order before invoice, PR approval before PO, goods receipt before supplier invoice, and whether SO release combines reservation with stock deduction (legacy) or uses delivery receipts to issue stock. Review and confirm policies during workspace setup (/app/setup/process-policies) before your first transactions.",
+        text: "Process policies let administrators enforce commercial flow gates: quotation before sales order, sales order before invoice, PR approval before PO, goods receipt before supplier invoice, and whether SO release combines reservation with stock deduction (legacy) or uses delivery receipts to issue stock. Attachment requirements (quotation, SO, sales, PO, supplier invoice) default on — save the document, upload at least one file, then confirm. Review and confirm policies during workspace setup (/app/setup/process-policies) before your first transactions.",
       },
       {
         type: "paragraph",

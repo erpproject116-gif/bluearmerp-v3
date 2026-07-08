@@ -123,6 +123,7 @@ export type OnboardingTrackStep = {
   required?: boolean;
   description?: string;
   ack_step?: boolean;
+  kb_article_id?: string;
 };
 
 export type OnboardingTrack = {

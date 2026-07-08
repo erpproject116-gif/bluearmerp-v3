@@ -13,7 +13,7 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
-import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
+import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { PurchaseRequestApprovalPanel } from "./PurchaseRequestApprovalPanel";
 import { SalesOrderLinePickerModal, type PickedSalesOrderLine } from "./SalesOrderLinePickerModal";
@@ -114,20 +114,6 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
 }
 
-async function fetchTaxTypes(): Promise<TaxTypeRow[]> {
-  const res = await apiFetch<TaxTypeRow[]>(
-    "/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc",
-  );
-  return res.data ?? [];
-}
-
-async function fetchCurrencies(): Promise<{ id: number; currency_code: string; name: string; is_default: boolean }[]> {
-  const res = await apiFetch<{ id: number; currency_code: string; name: string; is_default: boolean; status: string }[]>(
-    "/api/v1/quotation/currencies?page=1&pageSize=100&status=active&sort=name&order=asc",
-  );
-  return res.data ?? [];
-}
-
 function linesFromDetail(lines?: PurchaseRequestDetail["lines"]): PurchaseRequestLineRow[] {
   if (!lines?.length) return [emptyPurchaseRequestLine(1)];
   return lines.map((ln) => ({
@@ -156,6 +142,10 @@ function linesFromDetail(lines?: PurchaseRequestDetail["lines"]): PurchaseReques
 
 export function PurchaseRequestModal(props: Props) {
   const toast = useToast();
+  const taxTypesQuery = useActiveTaxTypes(() => props.open);
+  const currenciesQuery = useActiveCurrencies(() => props.open);
+  const taxTypes = () => taxTypesQuery.data ?? [];
+  const currencies = () => currenciesQuery.data ?? [];
   const { fields } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseRequest);
   const [saving, setSaving] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
@@ -164,8 +154,6 @@ export function PurchaseRequestModal(props: Props) {
   const [dateSeq, setDateSeq] = createSignal(1);
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [purchaseRequestNo, setPurchaseRequestNo] = createSignal("");
-  const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
-  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
@@ -290,25 +278,8 @@ export function PurchaseRequestModal(props: Props) {
     }
   };
 
-  const loadLookups = async () => {
-    const [tt, cc] = await Promise.all([fetchTaxTypes(), fetchCurrencies()]);
-    setTaxTypes(tt);
-    setCurrencies(cc);
-    if (!props.editing) {
-      if (tt.length && !taxTypeId()) {
-        const first = tt[0];
-        setTaxTypeId(first.id);
-        const basis = defaultInputBasis(first.tax_mode);
-        setLines([emptyPurchaseRequestLine(1, "", basis)]);
-      }
-      const def = cc.find((c) => c.is_default) ?? cc[0];
-      if (def && !currencyId()) setCurrencyId(def.id);
-    }
-  };
-
   createEffect(() => {
     if (!props.open) return;
-    void loadLookups();
     const ed = props.editing;
     if (ed) {
       setRequestDate(ed.request_date);
@@ -351,6 +322,23 @@ export function PurchaseRequestModal(props: Props) {
       setProgressStatus("unconfirmed");
       setLines([emptyPurchaseRequestLine(1)]);
       void loadPreview(todayISO());
+    }
+  });
+
+  createEffect(() => {
+    if (!props.open || props.editing) return;
+    const tt = taxTypes();
+    const cc = currencies();
+    if (!tt.length || !cc.length) return;
+    if (!taxTypeId()) {
+      const first = tt[0];
+      setTaxTypeId(first.id);
+      const basis = defaultInputBasis(first.tax_mode);
+      setLines([emptyPurchaseRequestLine(1, "", basis)]);
+    }
+    if (!currencyId()) {
+      const def = cc.find((c) => c.is_default) ?? cc[0];
+      if (def) setCurrencyId(def.id);
     }
   });
 

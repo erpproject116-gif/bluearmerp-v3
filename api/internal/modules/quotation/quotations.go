@@ -17,6 +17,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
@@ -446,6 +447,16 @@ func createQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		validityDays := resolveValidityDays(body)
 		validUntil := computeValidUntil(orderDate, validityDays)
 
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocQuotation, defaultProgress(body.ProgressStatus), 0); v != nil {
+			response.Validation(w, v)
+			return
+		}
+
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
@@ -544,6 +555,16 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		validUntil := computeValidUntil(orderDate, validityDays)
 
 		before, _ := loadQuotation(r.Context(), pool, tu.TenantID, id)
+
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocQuotation, defaultProgress(body.ProgressStatus), id); v != nil {
+			response.Validation(w, v)
+			return
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {

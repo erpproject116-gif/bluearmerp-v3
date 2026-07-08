@@ -14,6 +14,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -49,6 +50,16 @@ func submitSaleForApproval(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			response.Validation(w, map[string]string{"progress_status": "Only unconfirmed sales can be submitted for approval."})
+			return
+		}
+
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, "e_approval", id); v != nil {
+			response.Validation(w, v)
 			return
 		}
 

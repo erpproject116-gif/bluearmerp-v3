@@ -14,12 +14,21 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
+import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import {
+  QuotationLinePickerModal,
+  type PickedQuotationLine,
+} from "../../sales-order/sales-order/QuotationLinePickerModal";
+import {
+  ShippingOrderLinePickerModal,
+  type PickedShippingSlipLine,
+} from "../../shipping/ShippingOrderLinePickerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
-import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesApprovalPanel } from "./SalesApprovalPanel";
 import {
@@ -129,20 +138,6 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
 }
 
-async function fetchTaxTypes(): Promise<TaxTypeRow[]> {
-  const res = await apiFetch<TaxTypeRow[]>(
-    "/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc",
-  );
-  return res.data ?? [];
-}
-
-async function fetchCurrencies(): Promise<{ id: number; currency_code: string; name: string; is_default: boolean }[]> {
-  const res = await apiFetch<{ id: number; currency_code: string; name: string; is_default: boolean; status: string }[]>(
-    "/api/v1/quotation/currencies?page=1&pageSize=100&status=active&sort=name&order=asc",
-  );
-  return res.data ?? [];
-}
-
 function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
   if (!lines?.length) return [emptySalesLine(1)];
   return lines.map((ln) => ({
@@ -171,9 +166,17 @@ function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
 export function SalesModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const processPolicy = useProcessPolicy(() => props.open);
+  const [attachmentCount, setAttachmentCount] = createSignal(0);
+  const taxTypesQuery = useActiveTaxTypes(() => props.open);
+  const currenciesQuery = useActiveCurrencies(() => props.open);
+  const taxTypes = () => taxTypesQuery.data ?? [];
+  const currencies = () => currenciesQuery.data ?? [];
   const { fields } = useFormFieldSettings(SALES_ENTITY.sales);
   const [saving, setSaving] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
+  const [shippingPickerOpen, setShippingPickerOpen] = createSignal(false);
   const [createdSale, setCreatedSale] = createSignal<SalesDetail | null>(null);
   const [postSaveOpen, setPostSaveOpen] = createSignal(false);
   const [cashInOpen, setCashInOpen] = createSignal(false);
@@ -185,8 +188,6 @@ export function SalesModal(props: Props) {
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [salesNo, setSalesNo] = createSignal("");
-  const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
-  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
@@ -288,22 +289,6 @@ export function SalesModal(props: Props) {
     }
   };
 
-  const loadLookups = async () => {
-    const [tt, cc] = await Promise.all([fetchTaxTypes(), fetchCurrencies()]);
-    setTaxTypes(tt);
-    setCurrencies(cc);
-    if (!props.editing) {
-      if (tt.length && !taxTypeId()) {
-        const first = tt[0];
-        setTaxTypeId(first.id);
-        const basis = defaultInputBasis(first.tax_mode);
-        setLines([emptySalesLine(1, "", basis)]);
-      }
-      const def = cc.find((c) => c.is_default) ?? cc[0];
-      if (def && !currencyId()) setCurrencyId(def.id);
-    }
-  };
-
   createEffect(() => {
     if (!props.open) {
       setCreatedSale(null);
@@ -311,7 +296,6 @@ export function SalesModal(props: Props) {
       setCashInOpen(false);
       return;
     }
-    void loadLookups();
     const ed = props.editing;
     if (ed) {
       setOrderDate(ed.order_date);
@@ -363,10 +347,92 @@ export function SalesModal(props: Props) {
   });
 
   createEffect(() => {
+    if (!props.open || props.editing) return;
+    const tt = taxTypes();
+    const cc = currencies();
+    if (!tt.length || !cc.length) return;
+    if (!taxTypeId()) {
+      const first = tt[0];
+      setTaxTypeId(first.id);
+      const basis = defaultInputBasis(first.tax_mode);
+      setLines([emptySalesLine(1, "", basis)]);
+    }
+    if (!currencyId()) {
+      const def = cc.find((c) => c.is_default) ?? cc[0];
+      if (def) setCurrencyId(def.id);
+    }
+  });
+
+  createEffect(() => {
     if (props.open && !props.editing) void loadPreview(orderDate());
   });
 
   const applySalesOrderLines = async (picked: PickedSalesOrderLine[]) => {
+    if (picked.length === 0) return;
+    const first = picked[0];
+    setPartnerId(first.partner_id);
+    setCustomerLabel(first.customer_name);
+    setLocationId(first.location_id);
+    setLocationLabel(first.location_name);
+    setTaxTypeId(first.tax_type_id);
+    setCurrencyId(first.currency_id);
+    setPicName(first.pic_name);
+    setSourceSalesOrderId(first.sales_order_id);
+
+    const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const newLines: SalesLineRow[] = picked.map((row, i) => ({
+      ...emptySalesLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      description: row.description ?? "",
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      remark: row.remark ?? "",
+      source_sales_order_line_id: row.source_sales_order_line_id,
+      track_serial: Boolean(row.track_serial),
+    }));
+    if (meta && first.tax_type_id) {
+      const recalc = await recalculateSalesLines(newLines, first.tax_type_id, meta, templateCode());
+      setLines(recalc);
+    } else {
+      setLines(newLines);
+    }
+  };
+
+  const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
+    if (picked.length === 0) return;
+    const first = picked[0];
+    setPartnerId(first.partner_id);
+    setCustomerLabel(first.customer_name);
+    setLocationId(first.location_id);
+    setLocationLabel(first.location_name);
+    setTaxTypeId(first.tax_type_id);
+    setCurrencyId(first.currency_id);
+    setPicName(first.pic_name);
+
+    const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const newLines: SalesLineRow[] = picked.map((row, i) => ({
+      ...emptySalesLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      description: row.description ?? "",
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      remark: row.remark ?? "",
+    }));
+    if (meta && first.tax_type_id) {
+      const recalc = await recalculateSalesLines(newLines, first.tax_type_id, meta, templateCode());
+      setLines(recalc);
+    } else {
+      setLines(newLines);
+    }
+  };
+
+  const applyShippingLines = async (picked: PickedShippingSlipLine[]) => {
     if (picked.length === 0) return;
     const first = picked[0];
     setPartnerId(first.partner_id);
@@ -426,6 +492,17 @@ export function SalesModal(props: Props) {
     const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
     if (clientError) {
       toast.warning(clientError);
+      return;
+    }
+    const attachmentErr = validateAttachmentBeforeConfirm(
+      processPolicy.data,
+      "sales",
+      progressStatus(),
+      attachmentCount(),
+      props.editing?.id ?? createdSale()?.id,
+    );
+    if (attachmentErr) {
+      toast.warning(attachmentErr);
       return;
     }
 
@@ -639,8 +716,10 @@ export function SalesModal(props: Props) {
         </Field>
         <AttachmentsField
           scope="sales"
-          docId={props.editing?.id}
+          docId={props.editing?.id ?? createdSale()?.id}
           label="Attachments (carried from Quotation/Sales Order)"
+          required={policyRequiresAttachment(processPolicy.data, "sales")}
+          onCountChange={setAttachmentCount}
           emptyUnsavedHint="Save the sale first to attach files (max 25 MB each)."
         />
         <Field label="Sales category">
@@ -684,6 +763,8 @@ export function SalesModal(props: Props) {
             options={SALES_LOAD_SLIP_OPTIONS}
             onSelect={(id) => {
               if (id === "so") setSoPickerOpen(true);
+              if (id === "quotation") setQuotationPickerOpen(true);
+              if (id === "shipping") setShippingPickerOpen(true);
             }}
           />
         </div>
@@ -764,6 +845,19 @@ export function SalesModal(props: Props) {
         open={soPickerOpen()}
         onClose={() => setSoPickerOpen(false)}
         onConfirm={(picked) => void applySalesOrderLines(picked)}
+      />
+
+      <QuotationLinePickerModal
+        open={quotationPickerOpen()}
+        onClose={() => setQuotationPickerOpen(false)}
+        onConfirm={(picked) => void applyQuotationLines(picked)}
+      />
+
+      <ShippingOrderLinePickerModal
+        open={shippingPickerOpen()}
+        partnerId={partnerId()}
+        onClose={() => setShippingPickerOpen(false)}
+        onConfirm={(picked) => void applyShippingLines(picked)}
       />
 
       <QuickCustomerModal

@@ -62,6 +62,7 @@ export function useDashboardSummary(enabled = true) {
       return res.data ?? ({} as DashboardSummary);
     },
     staleTime: 30_000,
+    refetchInterval: enabled ? 60_000 : false,
   }));
 }
 
@@ -144,6 +145,7 @@ export function useDashboardRedFlags(enabled = true) {
       return res.data ?? { total_count: 0, categories: [] };
     },
     staleTime: 30_000,
+    refetchInterval: enabled ? 60_000 : false,
   }));
 }
 

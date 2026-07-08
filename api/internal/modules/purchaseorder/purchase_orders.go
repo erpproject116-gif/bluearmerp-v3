@@ -171,6 +171,7 @@ func registerPurchaseOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/purchase-orders/preview-sequences", previewPurchaseOrderSequences(pool))
 	r.Get("/purchase-orders", listPurchaseOrders(pool))
 	r.Get("/purchase-orders/purchase-request-lines/open", listOpenPurchaseRequestSlipLines(pool))
+	r.Get("/purchase-orders/supplier-quotation-lines/open", listOpenSupplierQuotationSlipLines(pool))
 	r.Post("/purchase-orders", createPurchaseOrder(pool))
 	r.Post("/purchase-orders/from-purchase-request/{prId}", createFromPurchaseRequest(pool))
 	r.With(auth.RequirePermission("purchase_order.purchase_orders_from_quote", auth.AccessWrite)).Post("/purchase-orders/from-supplier-quotation/{sqId}", createFromSupplierQuotation(pool))
@@ -1056,6 +1057,10 @@ func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		budgetCheck, _ := processpolicy.CheckPurchaseBudget(r.Context(), pool, policy, tu.TenantID, before.ProjectID, orderDate, before.GrandTotal)
 		if v := processpolicy.ValidateBudgetControl(policy, budgetCheck); v != nil {
+			response.Validation(w, v)
+			return
+		}
+		if v := processpolicy.ValidatePurchaseOrderConfirm(r.Context(), pool, policy, id); v != nil {
 			response.Validation(w, v)
 			return
 		}

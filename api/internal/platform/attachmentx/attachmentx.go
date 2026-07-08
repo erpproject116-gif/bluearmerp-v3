@@ -150,3 +150,15 @@ func copyFile(src, dst string) error {
 	}
 	return out.Close()
 }
+
+// Count returns how many attachment rows exist for a document.
+// table and fkCol are internal constants (never user input).
+func Count(ctx context.Context, pool *pgxpool.Pool, table, fkCol string, docID int64) (int, error) {
+	if docID <= 0 {
+		return 0, nil
+	}
+	q := fmt.Sprintf(`select count(*)::int from %s where %s = $1`, table, fkCol)
+	var n int
+	err := pool.QueryRow(ctx, q, docID).Scan(&n)
+	return n, err
+}

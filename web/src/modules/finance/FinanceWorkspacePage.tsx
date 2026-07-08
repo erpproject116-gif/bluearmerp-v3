@@ -25,7 +25,9 @@ const operationalLinks = [
   { label: "Payment Vouchers", href: "/app/finance/payment-vouchers" },
   { label: "Purchases", href: "/app/purchases/purchases" },
   { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer" },
+  { label: "Customer/Vendor Book I (AR)", href: "/app/finance/reports/customer-vendor-book-ar" },
   { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor" },
+  { label: "Customer/Vendor Book I (AP)", href: "/app/finance/reports/customer-vendor-book-ap" },
   { label: "A/R Aging", href: "/app/finance/reports/ar-aging" },
   { label: "A/P Aging", href: "/app/finance/reports/ap-aging" },
 ];

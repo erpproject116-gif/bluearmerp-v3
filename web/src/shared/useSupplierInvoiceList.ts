@@ -82,6 +82,13 @@ export type OpenPOLine = {
   track_serial?: boolean;
 };
 
+export type OpenSupplierQuotationInvoiceLine = OpenPOLine & {
+  supplier_quotation_id: number;
+  supplier_quotation_line_id: number;
+  quote_no: string;
+  rfq_id: number;
+};
+
 export function useSupplierInvoiceList(params: () => {
   page: number;
   pageSize: number;

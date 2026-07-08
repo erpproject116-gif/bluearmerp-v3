@@ -8,24 +8,35 @@ import { useOnboarding } from "../../shared/usePlatform";
 const PLAYBOOK_WEEKS = [
   {
     title: "Week 1 — Foundation & admin",
-    body: "Complete workspace setup, review process policies, enable modules (POS, WMS, Quality), and invite your team.",
+    body: "Complete workspace setup, review process policies (including attachment rules), enable modules, and invite your team.",
     tracks: ["foundation", "admin"],
   },
   {
     title: "Week 2 — Selling & stock",
-    body: "Run quotation → sales order → pick list → invoice. If you track serials, complete the serial track. Check stock reconciliation on the dashboard.",
+    body: "Quotation → sales order (Load Slip) → pick list → invoice (Load Slip) → customer payment. Check pre-invoicing and stock reconciliation.",
     tracks: ["selling", "serials", "insights"],
   },
   {
     title: "Week 3 — Buying & accounts",
-    body: "Purchase request through goods receipt, supplier invoice, and payment voucher. Review trial balance and bank reconciliation.",
+    body: "PR → RFQ → PO → goods receipt → supplier invoice (Load Slip) → payment. Review purchase pre-invoicing and Customer/Vendor Book.",
     tracks: ["buying", "finance"],
   },
   {
     title: "Week 4 — POS & operations",
-    body: "Configure POS Manage, organize categories, open a shift, checkout (with serial scan if needed), and close the shift. Explore CRM, after-sales, and support.",
+    body: "Configure POS Manage, open a shift, checkout (with serial scan if needed), and close the shift. Explore CRM, after-sales, and support.",
     tracks: ["pos", "operations"],
   },
+];
+
+const KB_QUICK_LINKS: { label: string; articleId: string }[] = [
+  { label: "What is Load Slip?", articleId: "load-slip-overview" },
+  { label: "Attachment before Confirm", articleId: "attachment-requirements" },
+  { label: "Quote to cash", articleId: "quotation-to-sales-flow" },
+  { label: "Buy to pay", articleId: "purchase-request-to-ap-flow" },
+  { label: "RFQ and vendor quotes", articleId: "rfq-workflow" },
+  { label: "Pre-invoicing (sales)", articleId: "sales-pre-invoicing-report" },
+  { label: "Pre-invoicing (purchases)", articleId: "purchase-pre-invoicing-report" },
+  { label: "Customer/Vendor Book", articleId: "customer-vendor-book-report" },
 ];
 
 export default function OnboardingPage() {
@@ -131,12 +142,24 @@ export default function OnboardingPage() {
             <A href="/app/documentation" class="text-brand-600 hover:underline">
               Help & guides
             </A>{" "}
-            for module reference docs, or{" "}
+            for module reference, or{" "}
             <A href="/app/documentation/kb" class="text-brand-600 hover:underline">
               Knowledge base
             </A>{" "}
-            for step-by-step scenarios including POS checkout and serial scanning.
+            for step-by-step scenarios.
           </p>
+          <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">Common questions</p>
+          <ul class="mt-2 grid gap-1 sm:grid-cols-2">
+            <For each={KB_QUICK_LINKS}>
+              {(link) => (
+                <li>
+                  <A href={`/app/documentation/kb/${link.articleId}`} class="text-brand-600 hover:underline">
+                    {link.label}
+                  </A>
+                </li>
+              )}
+            </For>
+          </ul>
         </div>
       </Show>
 

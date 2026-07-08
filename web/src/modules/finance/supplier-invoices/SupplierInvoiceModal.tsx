@@ -10,15 +10,17 @@ import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
-import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
+import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { ProgressStatusMenu } from "../../sales/sales/ProgressStatusMenu";
-import type { OpenGRLine, OpenPOLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
+import type { OpenGRLine, OpenPOLine, OpenSupplierQuotationInvoiceLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
 import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
 import { OpenPOLinePickerModal } from "./OpenPOLinePickerModal";
+import { OpenSupplierQuotationLinePickerModal } from "./OpenSupplierQuotationLinePickerModal";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -69,20 +71,6 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
 }
 
-async function fetchTaxTypes(): Promise<TaxTypeRow[]> {
-  const res = await apiFetch<TaxTypeRow[]>(
-    "/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc",
-  );
-  return res.data ?? [];
-}
-
-async function fetchCurrencies(): Promise<{ id: number; currency_code: string; name: string; is_default: boolean }[]> {
-  const res = await apiFetch<{ id: number; currency_code: string; name: string; is_default: boolean; status: string }[]>(
-    "/api/v1/quotation/currencies?page=1&pageSize=100&status=active&sort=name&order=asc",
-  );
-  return res.data ?? [];
-}
-
 function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseRequestLineRow[] {
   if (!lines?.length) return [emptyPurchaseRequestLine(1)];
   return lines.map((ln) => ({
@@ -114,16 +102,21 @@ function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseReques
 export function SupplierInvoiceModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const processPolicy = useProcessPolicy(() => props.open);
+  const [attachmentCount, setAttachmentCount] = createSignal(0);
+  const taxTypesQuery = useActiveTaxTypes(() => props.open);
+  const currenciesQuery = useActiveCurrencies(() => props.open);
+  const taxTypes = () => taxTypesQuery.data ?? [];
+  const currencies = () => currenciesQuery.data ?? [];
   const [saving, setSaving] = createSignal(false);
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
+  const [rfqPickerOpen, setRfqPickerOpen] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
   const [invoiceDate, setInvoiceDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [invoiceNo, setInvoiceNo] = createSignal("");
-  const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
-  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
@@ -156,25 +149,8 @@ export function SupplierInvoiceModal(props: Props) {
     }
   };
 
-  const loadLookups = async () => {
-    const [tt, cc] = await Promise.all([fetchTaxTypes(), fetchCurrencies()]);
-    setTaxTypes(tt);
-    setCurrencies(cc);
-    if (!props.editing) {
-      if (tt.length && !taxTypeId()) {
-        const first = tt[0];
-        setTaxTypeId(first.id);
-        const basis = defaultInputBasis(first.tax_mode);
-        setLines([emptyPurchaseRequestLine(1, "", basis)]);
-      }
-      const def = cc.find((c) => c.is_default) ?? cc[0];
-      if (def && !currencyId()) setCurrencyId(def.id);
-    }
-  };
-
   createEffect(() => {
     if (!props.open) return;
-    void loadLookups();
     const ed = props.editing;
     if (ed) {
       setInvoiceDate(ed.invoice_date);
@@ -221,6 +197,23 @@ export function SupplierInvoiceModal(props: Props) {
       setLines([emptyPurchaseRequestLine(1)]);
       setActiveTab("details");
       void loadPreview(todayISO());
+    }
+  });
+
+  createEffect(() => {
+    if (!props.open || props.editing) return;
+    const tt = taxTypes();
+    const cc = currencies();
+    if (!tt.length || !cc.length) return;
+    if (!taxTypeId()) {
+      const first = tt[0];
+      setTaxTypeId(first.id);
+      const basis = defaultInputBasis(first.tax_mode);
+      setLines([emptyPurchaseRequestLine(1, "", basis)]);
+    }
+    if (!currencyId()) {
+      const def = cc.find((c) => c.is_default) ?? cc[0];
+      if (def) setCurrencyId(def.id);
     }
   });
 
@@ -282,6 +275,10 @@ export function SupplierInvoiceModal(props: Props) {
     }
   };
 
+  const applySupplierQuotationLines = async (picked: OpenSupplierQuotationInvoiceLine[]) => {
+    await applyPOLines(picked);
+  };
+
   const save = async () => {
     if (!taxTypeId()) {
       toast.warning("Please select a transaction type.");
@@ -297,6 +294,17 @@ export function SupplierInvoiceModal(props: Props) {
     }
     if (!locationId()) {
       toast.warning("Please select a location.");
+      return;
+    }
+    const attachmentErr = validateAttachmentBeforeConfirm(
+      processPolicy.data,
+      "supplier_invoice",
+      progressStatus(),
+      attachmentCount(),
+      props.editing?.id,
+    );
+    if (attachmentErr) {
+      toast.warning(attachmentErr);
       return;
     }
 
@@ -504,6 +512,8 @@ export function SupplierInvoiceModal(props: Props) {
               scope="finance/supplier-invoices"
               docId={props.editing?.id}
               label="Attachments (carried from Purchase Order/Receiving)"
+              required={policyRequiresAttachment(processPolicy.data, "supplier_invoice")}
+              onCountChange={setAttachmentCount}
               emptyUnsavedHint="Save the purchase first to attach files (max 25 MB each)."
             />
             <Field label="Notes" span="full">
@@ -541,6 +551,7 @@ export function SupplierInvoiceModal(props: Props) {
               onSelect={(id) => {
                 if (id === "po") setPoPickerOpen(true);
                 if (id === "gr") setGrPickerOpen(true);
+                if (id === "rfq") setRfqPickerOpen(true);
               }}
             />
           </div>
@@ -579,6 +590,13 @@ export function SupplierInvoiceModal(props: Props) {
         partnerId={partnerId()}
         onClose={() => setPoPickerOpen(false)}
         onConfirm={(picked) => void applyPOLines(picked)}
+      />
+
+      <OpenSupplierQuotationLinePickerModal
+        open={rfqPickerOpen()}
+        partnerId={partnerId()}
+        onClose={() => setRfqPickerOpen(false)}
+        onConfirm={(picked) => void applySupplierQuotationLines(picked)}
       />
 
       <HistoryLogModal

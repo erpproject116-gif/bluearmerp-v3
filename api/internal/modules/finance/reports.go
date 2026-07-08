@@ -64,6 +64,8 @@ func registerReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerAgingReportRoutes(r, pool)
 	r.Get("/reports/ar-ap-status/export", exportArApStatusReport(pool))
 	r.Get("/reports/ar-ap-status", listArApStatusReport(pool))
+	r.Get("/customer-vendor-book/export", exportCustomerVendorBook(pool))
+	r.Get("/customer-vendor-book", listCustomerVendorBook(pool))
 }
 
 func parseOptionalDateRange(r *http.Request) (*time.Time, *time.Time, map[string]string) {

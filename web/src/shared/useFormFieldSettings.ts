@@ -85,9 +85,9 @@ export function useFormFieldSettings(entityType: string) {
   const query = createQuery(() => ({
     queryKey: settingsQueryKey(entityType),
     queryFn: () => fetchFormFieldSettings(entityType),
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: "always",
+    staleTime: 300_000,
+    gcTime: 600_000,
+    refetchOnMount: false,
   }));
 
   const fields = createMemo(() => query.data?.fields ?? []);

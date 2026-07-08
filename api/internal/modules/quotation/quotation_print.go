@@ -10,6 +10,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -93,6 +94,16 @@ func patchQuotationProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		status := defaultProgress(body.ProgressStatus)
+
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocQuotation, status, id); v != nil {
+			response.Validation(w, v)
+			return
+		}
 
 		tag, err := pool.Exec(r.Context(), `
 			update public.quo_quotations

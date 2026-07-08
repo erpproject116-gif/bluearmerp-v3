@@ -13,10 +13,12 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
-import type { TaxTypeRow } from "../../../shared/useTaxTypeList";
+import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
+import { LoadSlipMenu, SALES_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import {
   QuotationLinePickerModal,
   type PickedQuotationLine,
@@ -120,20 +122,6 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
 }
 
-async function fetchTaxTypes(): Promise<TaxTypeRow[]> {
-  const res = await apiFetch<TaxTypeRow[]>(
-    "/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc",
-  );
-  return res.data ?? [];
-}
-
-async function fetchCurrencies(): Promise<{ id: number; currency_code: string; name: string; is_default: boolean }[]> {
-  const res = await apiFetch<{ id: number; currency_code: string; name: string; is_default: boolean; status: string }[]>(
-    "/api/v1/quotation/currencies?page=1&pageSize=100&status=active&sort=name&order=asc",
-  );
-  return res.data ?? [];
-}
-
 function linesFromDetail(lines?: SalesOrderDetail["lines"]): SalesOrderLineRow[] {
   if (!lines?.length) return [emptySalesOrderLine(1)];
   return lines.map((ln) => ({
@@ -159,6 +147,12 @@ function linesFromDetail(lines?: SalesOrderDetail["lines"]): SalesOrderLineRow[]
 
 export function SalesOrderModal(props: Props) {
   const toast = useToast();
+  const processPolicy = useProcessPolicy(() => props.open);
+  const [attachmentCount, setAttachmentCount] = createSignal(0);
+  const taxTypesQuery = useActiveTaxTypes(() => props.open);
+  const currenciesQuery = useActiveCurrencies(() => props.open);
+  const taxTypes = () => taxTypesQuery.data ?? [];
+  const currencies = () => currenciesQuery.data ?? [];
   const { fields } = useFormFieldSettings(SALES_ORDER_ENTITY.salesOrder);
   const [saving, setSaving] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
@@ -168,8 +162,6 @@ export function SalesOrderModal(props: Props) {
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [salesOrderNo, setSalesOrderNo] = createSignal("");
-  const [taxTypes, setTaxTypes] = createSignal<TaxTypeRow[]>([]);
-  const [currencies, setCurrencies] = createSignal<{ id: number; currency_code: string; name: string; is_default: boolean }[]>([]);
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
@@ -276,25 +268,8 @@ export function SalesOrderModal(props: Props) {
     }
   };
 
-  const loadLookups = async () => {
-    const [tt, cc] = await Promise.all([fetchTaxTypes(), fetchCurrencies()]);
-    setTaxTypes(tt);
-    setCurrencies(cc);
-    if (!props.editing) {
-      if (tt.length && !taxTypeId()) {
-        const first = tt[0];
-        setTaxTypeId(first.id);
-        const basis = defaultInputBasis(first.tax_mode);
-        setLines([emptySalesOrderLine(1, "", basis)]);
-      }
-      const def = cc.find((c) => c.is_default) ?? cc[0];
-      if (def && !currencyId()) setCurrencyId(def.id);
-    }
-  };
-
   createEffect(() => {
     if (!props.open) return;
-    void loadLookups();
     const ed = props.editing;
     if (ed) {
       setOrderDate(ed.order_date);
@@ -348,6 +323,23 @@ export function SalesOrderModal(props: Props) {
       setSourceQuotationId(null);
       setLines([emptySalesOrderLine(1)]);
       void loadPreview(todayISO());
+    }
+  });
+
+  createEffect(() => {
+    if (!props.open || props.editing) return;
+    const tt = taxTypes();
+    const cc = currencies();
+    if (!tt.length || !cc.length) return;
+    if (!taxTypeId()) {
+      const first = tt[0];
+      setTaxTypeId(first.id);
+      const basis = defaultInputBasis(first.tax_mode);
+      setLines([emptySalesOrderLine(1, "", basis)]);
+    }
+    if (!currencyId()) {
+      const def = cc.find((c) => c.is_default) ?? cc[0];
+      if (def) setCurrencyId(def.id);
     }
   });
 
@@ -414,6 +406,17 @@ export function SalesOrderModal(props: Props) {
     const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
     if (clientError) {
       toast.warning(clientError);
+      return;
+    }
+    const attachmentErr = validateAttachmentBeforeConfirm(
+      processPolicy.data,
+      "sales_order",
+      progressStatus(),
+      attachmentCount(),
+      props.editing?.id,
+    );
+    if (attachmentErr) {
+      toast.warning(attachmentErr);
       return;
     }
 
@@ -610,6 +613,8 @@ export function SalesOrderModal(props: Props) {
           scope="sales-order/sales-orders"
           docId={props.editing?.id}
           label="Attachments (carried from Quotation, on to Sales)"
+          required={policyRequiresAttachment(processPolicy.data, "sales_order")}
+          onCountChange={setAttachmentCount}
           emptyUnsavedHint="Save the sales order first to attach files (max 25 MB each)."
         />
         <Field label="Delivery remarks" span="full">
@@ -644,13 +649,12 @@ export function SalesOrderModal(props: Props) {
         </Show>
         </div>
         <div class="col-span-full mb-2">
-          <button
-            type="button"
-            class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
-            onClick={() => setQuotationPickerOpen(true)}
-          >
-            Load Slip (from Quotation)
-          </button>
+          <LoadSlipMenu
+            options={SALES_ORDER_LOAD_SLIP_OPTIONS}
+            onSelect={(id) => {
+              if (id === "quotation") setQuotationPickerOpen(true);
+            }}
+          />
         </div>
         <SalesOrderLineGrid
           lines={lines}

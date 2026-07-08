@@ -186,6 +186,85 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+type openSupplierQuotationInvoiceLineRow struct {
+	PurchaseOrderLineID     int64   `json:"purchase_order_line_id"`
+	PurchaseOrderID         int64   `json:"purchase_order_id"`
+	PurchaseOrderNo         string  `json:"purchase_order_no"`
+	SupplierQuotationID     int64   `json:"supplier_quotation_id"`
+	SupplierQuotationLineID int64   `json:"supplier_quotation_line_id"`
+	QuoteNo                 string  `json:"quote_no"`
+	RFQID                   int64   `json:"rfq_id"`
+	ItemID                  int64   `json:"item_id"`
+	ItemCode                string  `json:"item_code"`
+	ItemName                string  `json:"item_name"`
+	OrderedQty              float64 `json:"ordered_qty"`
+	BilledQty               float64 `json:"billed_qty"`
+	BalanceQty              float64 `json:"balance_qty"`
+	UnitNonVat              float64 `json:"unit_non_vat"`
+	UnitVatInc              float64 `json:"unit_vat_inc"`
+	TrackSerial             bool    `json:"track_serial,omitempty"`
+}
+
+func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		where := `po.tenant_id = $1 and po.deleted_at is null
+			and po.status in ('confirmed', 'partially_received', 'received')
+			and pol.supplier_quotation_line_id is not null`
+		args := []any{tu.TenantID}
+		argN := 2
+		if pid, ok := optionalInt64Query(r, "partner_id"); ok {
+			where += fmt.Sprintf(" and po.partner_id = $%d", argN)
+			args = append(args, *pid)
+			argN++
+		}
+
+		q := fmt.Sprintf(`
+			select pol.id, po.id, po.purchase_order_no,
+			  sq.id, ln.id, sq.quote_no, sq.rfq_id,
+			  pol.item_id, pol.item_code, pol.item_name,
+			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
+			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
+			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8,
+			  coalesce(i.track_serial, false)
+			from public.po_purchase_order_lines pol
+			join public.po_purchase_orders po on po.id = pol.purchase_order_id
+			join public.rfq_supplier_quotation_lines ln on ln.id = pol.supplier_quotation_line_id
+			join public.rfq_supplier_quotations sq on sq.id = ln.supplier_quotation_id
+			left join public.inv_items i on i.id = pol.item_id
+			where %s
+			  and (pol.qty - coalesce(pol.billed_qty, 0)) > 0.0001
+			order by sq.quote_date desc, po.order_date desc, pol.line_no`, where)
+
+		rows, err := pool.Query(r.Context(), q, args...)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list open supplier quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		var out []openSupplierQuotationInvoiceLineRow
+		for rows.Next() {
+			var row openSupplierQuotationInvoiceLineRow
+			if err := rows.Scan(
+				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo,
+				&row.SupplierQuotationID, &row.SupplierQuotationLineID, &row.QuoteNo, &row.RFQID,
+				&row.ItemID, &row.ItemCode, &row.ItemName,
+				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
+				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read supplier quotation lines.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, row)
+		}
+		if out == nil {
+			out = []openSupplierQuotationInvoiceLineRow{}
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
 type openGRLineRow struct {
 	GoodsReceiptLineID  int64   `json:"goods_receipt_line_id"`
 	GoodsReceiptID      int64   `json:"goods_receipt_id"`
@@ -205,6 +284,7 @@ func registerSupplierInvoiceRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/supplier-invoices/preview-sequences", previewSupplierInvoiceSequences(pool))
 	r.Get("/supplier-invoices/open-gr-lines", listOpenGRLines(pool))
 	r.Get("/supplier-invoices/open-po-lines", listOpenPOLines(pool))
+	r.Get("/supplier-invoices/open-supplier-quotation-lines", listOpenSupplierQuotationInvoiceLines(pool))
 	r.Get("/supplier-invoices", listSupplierInvoices(pool))
 	r.Post("/supplier-invoices", createSupplierInvoice(pool))
 	r.Get("/supplier-invoices/{id}/invoice", getPurchaseInvoice(pool))
@@ -700,6 +780,10 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		progress := defaultSupplierInvoiceProgress(body.ProgressStatus)
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, progress, 0); v != nil {
+			response.Validation(w, v)
+			return
+		}
 
 		var dateSeq int
 		var invoiceNo string
@@ -923,6 +1007,10 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 
 		subtotal, taxTotal, grandTotal := sumSupplierInvoiceTotals(body.Lines)
 		progress := defaultSupplierInvoiceProgress(body.ProgressStatus)
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, progress, id); v != nil {
+			response.Validation(w, v)
+			return
+		}
 
 		tag, err := tx.Exec(r.Context(), `
 			update public.fin_supplier_invoices set

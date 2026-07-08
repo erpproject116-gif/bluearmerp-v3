@@ -10,6 +10,9 @@ Commercial sales invoices (SI) converted from released Sales Order lines. **Sale
 | Sales List | `/app/sales/sales` | `GET /api/v1/sales` |
 | Sales Status | `/app/sales/sales/status` | `GET /api/v1/sales/status-report` |
 | Pre-invoicing Status | `/app/sales/sales/pre-invoicing` | `GET /api/v1/sales/pre-invoicing-report` |
+
+Sales invoices support **Load Slip** from Sales Order, Quotation, or Shipping Order. See in-app Knowledge base articles `load-slip-overview`, `sales-load-slip-so`, and `sales-load-slip-shipping`.
+
 | Packing Slip Print | `/app/sales/sales/:id/print` | `GET /api/v1/sales/{id}/print` |
 | Form settings | `/app/sales/sales/settings` | `sa_sales` entity |
 

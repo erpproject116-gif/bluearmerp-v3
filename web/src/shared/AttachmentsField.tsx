@@ -16,6 +16,10 @@ type Props = {
   label?: string;
   /** Hint shown when the document is not yet saved. */
   emptyUnsavedHint?: string;
+  /** When true, shows required styling and messaging. */
+  required?: boolean;
+  /** Called whenever the attachment list is loaded or changes. */
+  onCountChange?: (count: number) => void;
 };
 
 /**
@@ -29,14 +33,21 @@ export function AttachmentsField(props: Props) {
   const [uploading, setUploading] = createSignal(false);
   const [busyId, setBusyId] = createSignal<number | null>(null);
 
+  const notifyCount = (count: number) => {
+    props.onCountChange?.(count);
+  };
+
   const load = async () => {
     const id = props.docId;
     if (!id) {
       setItems([]);
+      notifyCount(0);
       return;
     }
     const res = await listAttachments(props.scope, id);
-    setItems(res.success && res.data ? res.data : []);
+    const list = res.success && res.data ? res.data : [];
+    setItems(list);
+    notifyCount(list.length);
   };
 
   // Reload whenever the target document id changes (modal reused across records).
@@ -72,10 +83,22 @@ export function AttachmentsField(props: Props) {
     });
   };
 
+  const showRequiredWarning = () =>
+    Boolean(props.required && props.docId && items().length === 0);
+
   return (
-    <div class="rounded-lg border border-stroke bg-slate-50 px-4 py-3">
+    <div
+      class={`rounded-lg border px-4 py-3 ${
+        showRequiredWarning() ? "border-amber-400 bg-amber-50" : "border-stroke bg-slate-50"
+      }`}
+    >
       <div class="mb-2 flex items-center justify-between">
-        <span class="text-sm font-medium text-text-primary">{props.label ?? "Attachments"}</span>
+        <span class="text-sm font-medium text-text-primary">
+          {props.label ?? "Attachments"}
+          <Show when={props.required}>
+            <span class="text-red-600"> *</span>
+          </Show>
+        </span>
         <Show when={props.docId}>
           <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
             {uploading() ? "Uploading…" : "Upload file"}
@@ -87,7 +110,10 @@ export function AttachmentsField(props: Props) {
         when={props.docId}
         fallback={
           <p class="text-sm text-text-secondary">
-            {props.emptyUnsavedHint ?? "Save first to attach files (max 25 MB each)."}
+            {props.emptyUnsavedHint ??
+              (props.required
+                ? "Save as Unconfirmed first, then upload at least one file before confirming."
+                : "Save first to attach files (max 25 MB each).")}
           </p>
         }
       >
@@ -110,6 +136,9 @@ export function AttachmentsField(props: Props) {
               )}
             </For>
           </ul>
+        </Show>
+        <Show when={showRequiredWarning()}>
+          <p class="mt-2 text-sm text-amber-800">Upload at least one file before confirming this document.</p>
         </Show>
       </Show>
     </div>

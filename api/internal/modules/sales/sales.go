@@ -499,6 +499,10 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, vErrs)
 			return
 		}
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), 0); v != nil {
+			response.Validation(w, v)
+			return
+		}
 
 		if convErrs := validateSalesOrderConversion(r.Context(), pool, tu.TenantID, computed); convErrs != nil {
 			response.Validation(w, convErrs)
@@ -659,6 +663,16 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		before, errBefore := loadSale(r.Context(), pool, tu.TenantID, id)
 		if errBefore == nil && before.ProgressStatus == "e_approval" {
 			response.Validation(w, map[string]string{"progress_status": "Cannot edit a sale pending approval."})
+			return
+		}
+
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), id); v != nil {
+			response.Validation(w, v)
 			return
 		}
 

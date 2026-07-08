@@ -12,9 +12,6 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
     "collective-invoices",
     "sales-price-batch",
     "selling-workspace",
-    "crm-sales-team",
-    "crm-task-summaries",
-    "crm-warranty",
   ],
   salesOrder: [
     "sales-orders",
@@ -59,12 +56,13 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
   ],
   quotation: ["quotations", "quotation-status-report"],
   pos: ["pos-current-session", "pos-catalog-items", "pos-catalog-categories"],
-  dashboard: ["dashboard", "reconciliation-summary"],
+  dashboard: ["dashboard-summary", "dashboard-sales-trend", "dashboard-inventory-trend", "dashboard-red-flags", "dashboard-top-customers", "dashboard-top-vendors", "dashboard-top-items", "reconciliation-summary"],
   shipping: ["shipping-orders", "shipping-rules", "delivery-trips"],
   quality: ["qc-requests", "capa-records", "qms-ncrs"],
   manufacturing: ["mfg-boms", "mfg-work-orders"],
   hr: ["hr-employees", "hr-pay-periods", "hr-payslips"],
   platform: ["onboarding", "setup-readiness"],
+  crm: ["crm-warranty", "crm-task-summaries", "crm-sales-team"],
 };
 
 type MutationRule = {
@@ -72,29 +70,45 @@ type MutationRule = {
   domains: string[];
 };
 
+/** Invalidate only the primary list/workspace domain per API area (no cross-module fan-out). */
 const MUTATION_RULES: MutationRule[] = [
-  { test: (p) => p.startsWith("/api/v1/sales"), domains: ["sales", "salesOrder", "inventory", "finance", "dashboard"] },
-  { test: (p) => p.startsWith("/api/v1/sales-order"), domains: ["salesOrder", "sales", "inventory", "dashboard"] },
-  { test: (p) => p.startsWith("/api/v1/purchase-request"), domains: ["purchaseRequest", "purchaseOrder"] },
-  { test: (p) => p.startsWith("/api/v1/purchase-order"), domains: ["purchaseOrder", "goodsReceipt", "inventory", "dashboard"] },
-  {
-    test: (p) => p.startsWith("/api/v1/goods-receipt"),
-    domains: ["goodsReceipt", "purchaseOrder", "inventory", "finance", "dashboard"],
-  },
-  { test: (p) => p.startsWith("/api/v1/finance"), domains: ["finance", "purchaseOrder", "dashboard"] },
-  {
-    test: (p) => p.startsWith("/api/v1/inventory"),
-    domains: ["inventory", "sales", "salesOrder", "purchaseOrder", "dashboard"],
-  },
-  { test: (p) => p.startsWith("/api/v1/quotation"), domains: ["quotation", "sales", "dashboard"] },
+  { test: (p) => p.startsWith("/api/v1/sales"), domains: ["sales"] },
+  { test: (p) => p.startsWith("/api/v1/sales-order"), domains: ["salesOrder"] },
+  { test: (p) => p.startsWith("/api/v1/purchase-request"), domains: ["purchaseRequest"] },
+  { test: (p) => p.startsWith("/api/v1/purchase-order"), domains: ["purchaseOrder", "goodsReceipt"] },
+  { test: (p) => p.startsWith("/api/v1/goods-receipt"), domains: ["goodsReceipt", "purchaseOrder"] },
+  { test: (p) => p.startsWith("/api/v1/finance"), domains: ["finance"] },
+  { test: (p) => p.startsWith("/api/v1/inventory"), domains: ["inventory"] },
+  { test: (p) => p.startsWith("/api/v1/quotation"), domains: ["quotation"] },
   { test: (p) => p.startsWith("/api/v1/pos"), domains: ["pos", "sales", "inventory"] },
-  { test: (p) => p.startsWith("/api/v1/shipping"), domains: ["shipping", "salesOrder", "inventory"] },
-  { test: (p) => p.startsWith("/api/v1/quality"), domains: ["quality", "inventory"] },
-  { test: (p) => p.startsWith("/api/v1/manufacturing"), domains: ["manufacturing", "inventory"] },
-  { test: (p) => p.startsWith("/api/v1/crm"), domains: ["crm-warranty", "crm-task-summaries", "crm-sales-team", "sales"] },
+  { test: (p) => p.startsWith("/api/v1/shipping"), domains: ["shipping", "salesOrder"] },
+  { test: (p) => p.startsWith("/api/v1/quality"), domains: ["quality"] },
+  { test: (p) => p.startsWith("/api/v1/manufacturing"), domains: ["manufacturing"] },
+  { test: (p) => p.startsWith("/api/v1/crm"), domains: ["crm"] },
   { test: (p) => p.startsWith("/api/v1/hr"), domains: ["hr"] },
   { test: (p) => p.startsWith("/api/v1/platform/onboarding"), domains: ["platform"] },
   { test: (p) => p.startsWith("/api/v1/platform/setup"), domains: ["platform"] },
+];
+
+/** Stock-moving or approval flows that should refresh dashboard KPIs. */
+const DASHBOARD_MUTATION_RULES: MutationRule[] = [
+  {
+    test: (p, m) =>
+      m === "POST" &&
+      (p.startsWith("/api/v1/sales") ||
+        p.startsWith("/api/v1/sales-order") ||
+        p.startsWith("/api/v1/purchase-order") ||
+        p.startsWith("/api/v1/goods-receipt") ||
+        p.startsWith("/api/v1/finance/supplier-invoices") ||
+        p.startsWith("/api/v1/quotation")),
+    domains: ["dashboard"],
+  },
+  {
+    test: (p, m) =>
+      m === "PATCH" &&
+      (/\/progress-status$/.test(p) || /\/confirm$/.test(p) || /\/approve$/.test(p) || /\/reject$/.test(p)),
+    domains: ["dashboard"],
+  },
 ];
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -106,10 +120,15 @@ function skipInvalidation(path: string, method: string): boolean {
   if (/\/search(\?|$)/.test(path)) return true;
   if (path.includes("/import-template")) return true;
   if (path.includes("/preview")) return true;
+  if (path.includes("/preview-sequences")) return true;
+  if (path.includes("/drafts")) return true;
   if (/\/export(\?|$)/.test(path)) return true;
   if (/\/print(\?|$)/.test(path)) return true;
   if (path.includes("/auth/")) return true;
   if (path.includes("/presence/")) return true;
+  if (path.includes("/attachments")) return true;
+  if (path.startsWith("/api/v1/settings/")) return true;
+  if (path.startsWith("/api/v1/form-field-settings")) return true;
   return false;
 }
 
@@ -130,6 +149,7 @@ function matchesPrefix(queryKey: unknown, prefix: string): boolean {
   if (head.startsWith(`${prefix}-`)) return true;
   if (prefix.startsWith("serial-report") && head.startsWith("serial-report")) return true;
   if (prefix.startsWith("report-") && head.startsWith("report-")) return true;
+  if (prefix.startsWith("dashboard") && head.startsWith("dashboard")) return true;
   return false;
 }
 
@@ -151,6 +171,9 @@ export function invalidateAfterMutation(path: string, method?: string) {
 
   const domains = new Set<string>();
   for (const rule of MUTATION_RULES) {
+    if (rule.test(path, m)) for (const d of rule.domains) domains.add(d);
+  }
+  for (const rule of DASHBOARD_MUTATION_RULES) {
     if (rule.test(path, m)) for (const d of rule.domains) domains.add(d);
   }
   if (domains.size === 0) return;

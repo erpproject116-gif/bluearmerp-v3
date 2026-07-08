@@ -14,6 +14,7 @@ type trackStepDef struct {
 	Label       string
 	Href        string
 	Description string
+	KbArticleID string
 	Required    bool
 }
 
@@ -37,10 +38,10 @@ var onboardingTracks = []trackDef{
 		Title:       "Administration",
 		Description: "Process policies, optional modules, and team access.",
 		Steps: []trackStepDef{
-			{ID: "process_policies", Label: "Review process policies", Href: "/app/user-management/process-policies", Description: "Set quotation-before-SO, GR-before-invoice, and release mode gates.", Required: false},
+			{ID: "process_policies", Label: "Review process policies", Href: "/app/user-management/process-policies", Description: "Set quotation-before-SO, GR-before-invoice, attachment requirements, and release mode gates.", KbArticleID: "process-policies-foundation", Required: false},
 			{ID: "tenant_modules", Label: "Review modules & features", Href: "/app/user-management/tenant-modules", Description: "Enable POS, WMS, Data Center, Quality, and other optional modules.", Required: false},
 			{ID: "mapping_center", Label: "Review Mapping Center", Href: "/app/user-management/mapping-center", Description: "Configure Generate Other Slips rules between documents.", Required: false},
-			{ID: "invite_team", Label: "Invite your team", Href: "/app/user-management/users", Description: "Add colleagues with roles and permissions.", Required: false},
+			{ID: "invite_team", Label: "Invite your team", Href: "/app/user-management/users", Description: "Add colleagues with roles and permissions.", KbArticleID: "user-management-admin", Required: false},
 		},
 	},
 	{
@@ -48,12 +49,12 @@ var onboardingTracks = []trackDef{
 		Title:       "Selling",
 		Description: "Quotation through sales invoice and customer payment.",
 		Steps: []trackStepDef{
-			{ID: "quotation", Label: "Create a quotation", Href: "/app/quotation/quotations/new", Description: "Send a formal price offer to a customer.", Required: false},
-			{ID: "sales_order", Label: "Create a sales order", Href: "/app/sales-order/sales-orders/new", Description: "Confirm the customer order before shipping.", Required: false},
-			{ID: "so_release", Label: "Release stock (Pick List)", Href: "/app/sales-order/sales-orders/release", Description: "Allocate quantities and serial numbers for fulfillment.", Required: false},
-			{ID: "delivery_note", Label: "Post a delivery note", Href: "/app/sales-order/delivery-receipts/new", Description: "Record outbound shipment when using split release mode.", Required: false},
-			{ID: "sales_invoice", Label: "Create a sales invoice", Href: "/app/sales/sales/new", Description: "Bill the customer and reduce stock (if not already issued).", Required: false},
-			{ID: "official_receipt", Label: "Record customer payment", Href: "/app/finance/official-receipts/new", Description: "Apply cash or check to open sales invoices.", Required: false},
+			{ID: "quotation", Label: "Create a quotation", Href: "/app/quotation/quotations/new", Description: "Send a formal price offer to a customer.", KbArticleID: "quotation-to-sales-flow", Required: false},
+			{ID: "sales_order", Label: "Create a sales order", Href: "/app/sales-order/sales-orders/new", Description: "Confirm the order — use Load Slip → Quotation to copy open quote lines.", KbArticleID: "sales-order-load-slip-quotation", Required: false},
+			{ID: "so_release", Label: "Release stock (Pick List)", Href: "/app/sales-order/sales-orders/release", Description: "Allocate quantities and serial numbers for fulfillment.", KbArticleID: "sales-order-release", Required: false},
+			{ID: "delivery_note", Label: "Post a delivery note", Href: "/app/sales-order/delivery-receipts/new", Description: "Record outbound shipment when using split release mode.", KbArticleID: "sales-order-release", Required: false},
+			{ID: "sales_invoice", Label: "Create a sales invoice", Href: "/app/sales/sales/new", Description: "Use Load Slip to pull lines from sales order, quotation, or shipping order.", KbArticleID: "load-slip-overview", Required: false},
+			{ID: "official_receipt", Label: "Record customer payment", Href: "/app/finance/official-receipts/new", Description: "Apply cash or check to open sales invoices.", KbArticleID: "sales-cash-in-after-save", Required: false},
 		},
 	},
 	{
@@ -61,12 +62,14 @@ var onboardingTracks = []trackDef{
 		Title:       "Buying",
 		Description: "Purchase request through goods receipt and supplier invoice.",
 		Steps: []trackStepDef{
-			{ID: "purchase_request", Label: "Create a purchase request", Href: "/app/purchase-request/purchase-requests/new", Description: "Internal list of what to buy from a supplier.", Required: false},
-			{ID: "purchase_order", Label: "Create a purchase order", Href: "/app/purchase-order/purchase-orders/new", Description: "Send the order to your vendor.", Required: false},
-			{ID: "goods_receipt", Label: "Receive goods (GR)", Href: "/app/purchase-order/goods-receipt", Description: "Post a goods receipt to increase stock.", Required: false},
-			{ID: "gr_serial_scan", Label: "Scan serials on receive", Href: "/app/purchase-order/goods-receipt", Description: "Scan item codes and serial numbers on draft GR lines.", Required: false},
-			{ID: "supplier_invoice", Label: "Create a supplier invoice", Href: "/app/finance/supplier-invoices/new", Description: "Bill from open GR lines with Load Slip.", Required: false},
-			{ID: "payment_voucher", Label: "Pay the supplier", Href: "/app/finance/payment-vouchers/new", Description: "Apply a payment voucher to supplier invoices.", Required: false},
+			{ID: "purchase_request", Label: "Create a purchase request", Href: "/app/purchase-request/purchase-requests/new", Description: "List what to buy — optional Load Slip from Sales Order for demand.", KbArticleID: "purchase-request-load-slip-so", Required: false},
+			{ID: "rfq_quotes", Label: "Request vendor quotes (RFQ)", Href: "/app/purchase-order/rfq", Description: "Optional: collect supplier quotations before ordering.", KbArticleID: "rfq-workflow", Required: false},
+			{ID: "purchase_order", Label: "Create a purchase order", Href: "/app/purchase-order/purchase-orders/new", Description: "Load Slip from Purchase Request or Supplier Quotation.", KbArticleID: "purchase-order-load-slip-pr", Required: false},
+			{ID: "goods_receipt", Label: "Receive goods (GR)", Href: "/app/purchase-order/goods-receipt", Description: "Post a goods receipt to increase stock.", KbArticleID: "purchase-request-to-ap-flow", Required: false},
+			{ID: "gr_serial_scan", Label: "Scan serials on receive", Href: "/app/purchase-order/goods-receipt", Description: "Scan item codes and serial numbers on draft GR lines.", KbArticleID: "serial-barcode-scanning", Required: false},
+			{ID: "supplier_invoice", Label: "Create a supplier invoice", Href: "/app/finance/supplier-invoices/new", Description: "Load Slip from GR, PO, or RFQ-sourced PO lines.", KbArticleID: "load-slip-overview", Required: false},
+			{ID: "purchase_pre_invoicing", Label: "Review purchase pre-invoicing", Href: "/app/buying/reports/pre-invoicing", Description: "See received stock not yet on a supplier invoice.", KbArticleID: "purchase-pre-invoicing-report", Required: false},
+			{ID: "payment_voucher", Label: "Pay the supplier", Href: "/app/finance/payment-vouchers/new", Description: "Apply a payment voucher to supplier invoices.", KbArticleID: "finance-accounts-overview", Required: false},
 		},
 	},
 	{
@@ -100,6 +103,8 @@ var onboardingTracks = []trackDef{
 		Title:       "Accounts & reporting",
 		Description: "General ledger, bank reconciliation, and financial statements.",
 		Steps: []trackStepDef{
+			{ID: "receivable_payable", Label: "Receivable / Payable status", Href: "/app/selling/reports/receivable-status", Description: "Open customer or vendor balances as-of a date.", KbArticleID: "receivable-payable-status", Required: false},
+			{ID: "customer_vendor_book", Label: "Customer/Vendor Book", Href: "/app/finance/reports/customer-vendor-book-ar", Description: "Slip-level AR or AP ledger for a date range.", KbArticleID: "customer-vendor-book-report", Required: false},
 			{ID: "journal_entry", Label: "Post a journal entry", Href: "/app/finance/journal-entries", Description: "Manual GL adjustments when needed.", Required: false},
 			{ID: "trial_balance", Label: "Review trial balance", Href: "/app/finance/reports/trial-balance", Description: "Confirm accounts balance before month-end.", Required: false},
 			{ID: "bank_recon", Label: "Bank reconciliation", Href: "/app/finance/bank-reconciliation", Description: "Match bank statement lines to receipts and vouchers.", Required: false},
@@ -136,8 +141,9 @@ type extendedAck struct {
 	BusinessDashboardAck bool `json:"business_dashboard_ack"`
 	PosManageAck       bool `json:"pos_manage_ack"`
 	StockReconAck      bool `json:"stock_reconciliation_ack"`
-	ReportCatalogAck   bool `json:"report_catalog_ack"`
-	TrialBalanceAck    bool `json:"trial_balance_ack"`
+	ReportCatalogAck     bool `json:"report_catalog_ack"`
+	ReportsPracticeAck   bool `json:"reports_practice_ack"`
+	TrialBalanceAck      bool `json:"trial_balance_ack"`
 }
 
 type detectionSnapshot struct {
@@ -148,6 +154,7 @@ type detectionSnapshot struct {
 	SalesInvoice       bool
 	OfficialReceipt    bool
 	PurchaseRequest    bool
+	RFQ                bool
 	PurchaseOrder      bool
 	GoodsReceipt       bool
 	GRSerial           bool
@@ -209,6 +216,9 @@ func buildTracks(ctx context.Context, pool *pgxpool.Pool, tenantID int64, readin
 			}
 			if s.Description != "" {
 				m["description"] = s.Description
+			}
+			if s.KbArticleID != "" {
+				m["kb_article_id"] = s.KbArticleID
 			}
 			if isAckStep(s.ID) {
 				m["ack_step"] = true
@@ -280,6 +290,8 @@ func stepDone(trackID, stepID string, readiness setupreadiness.Payload, ack exte
 		return snap.OfficialReceipt
 	case "purchase_request":
 		return snap.PurchaseRequest
+	case "rfq_quotes":
+		return snap.RFQ
 	case "purchase_order":
 		return snap.PurchaseOrder
 	case "goods_receipt":
@@ -288,6 +300,8 @@ func stepDone(trackID, stepID string, readiness setupreadiness.Payload, ack exte
 		return snap.GRSerial
 	case "supplier_invoice":
 		return snap.SupplierInvoice
+	case "purchase_pre_invoicing", "receivable_payable", "customer_vendor_book":
+		return ack.ReportsPracticeAck
 	case "payment_voucher":
 		return snap.PaymentVoucher
 	case "serial_item":
@@ -342,7 +356,8 @@ func stepDone(trackID, stepID string, readiness setupreadiness.Payload, ack exte
 func isAckStep(stepID string) bool {
 	switch stepID {
 	case "process_policies", "tenant_modules", "mapping_center", "pos_manage",
-		"business_dashboard", "stock_reconciliation", "report_catalog", "trial_balance":
+		"business_dashboard", "stock_reconciliation", "report_catalog", "trial_balance",
+		"purchase_pre_invoicing", "receivable_payable", "customer_vendor_book":
 		return true
 	default:
 		return false
@@ -357,6 +372,10 @@ var ackStepKeys = map[string]string{
 	"business_dashboard":    "business_dashboard_ack",
 	"stock_reconciliation":  "stock_reconciliation_ack",
 	"report_catalog":        "report_catalog_ack",
+	"reports_practice":      "reports_practice_ack",
+	"purchase_pre_invoicing": "reports_practice_ack",
+	"receivable_payable":    "reports_practice_ack",
+	"customer_vendor_book":  "reports_practice_ack",
 	"trial_balance":         "trial_balance_ack",
 }
 
@@ -427,6 +446,7 @@ func detectSnapshot(ctx context.Context, pool *pgxpool.Pool, tenantID int64) det
 	s.SalesInvoice = exists(`select count(*)::int from public.sa_sales where tenant_id=$1 and deleted_at is null`, tenantID)
 	s.OfficialReceipt = exists(`select count(*)::int from public.fin_official_receipts where tenant_id=$1 and deleted_at is null`, tenantID)
 	s.PurchaseRequest = exists(`select count(*)::int from public.pr_purchase_requests where tenant_id=$1 and deleted_at is null`, tenantID)
+	s.RFQ = exists(`select count(*)::int from public.rfq_requests where tenant_id=$1`, tenantID)
 	s.PurchaseOrder = exists(`select count(*)::int from public.po_purchase_orders where tenant_id=$1 and deleted_at is null`, tenantID)
 	s.GoodsReceipt = exists(`
 		select count(*)::int from public.gr_goods_receipts

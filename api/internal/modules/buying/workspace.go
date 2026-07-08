@@ -23,6 +23,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		br.Route("/reports", func(rr chi.Router) {
 			rr.With(auth.RequirePermission("buying.purchase_status", auth.AccessRead)).Get("/purchase-status/export", exportPurchaseStatusReport(pool))
 			rr.With(auth.RequirePermission("buying.purchase_status", auth.AccessRead)).Get("/purchase-status", listPurchaseStatusReport(pool))
+			rr.With(auth.RequirePermission("buying.purchase_status", auth.AccessRead)).Get("/pre-invoicing/export", exportPreInvoicingPurchaseReport(pool))
+			rr.With(auth.RequirePermission("buying.purchase_status", auth.AccessRead)).Get("/pre-invoicing", listPreInvoicingPurchaseReport(pool))
 		})
 	})
 }
