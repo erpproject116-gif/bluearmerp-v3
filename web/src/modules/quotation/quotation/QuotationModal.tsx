@@ -5,7 +5,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
-import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
@@ -148,6 +148,8 @@ export function QuotationModal(props: Props) {
   const { fields, activeCustomFields } = useFormFieldSettings(QUOTATION_ENTITY.quotation);
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const [saving, setSaving] = createSignal(false);
+  const [createdQuotation, setCreatedQuotation] = createSignal<QuotationDetail | null>(null);
+  const effectiveEditing = () => props.editing ?? createdQuotation();
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [referenceNo, setReferenceNo] = createSignal("");
@@ -221,7 +223,7 @@ export function QuotationModal(props: Props) {
     draftKey: props.editing ? `edit-${props.editing.id}` : "new",
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
-    enabled: () => props.open && !props.editing,
+    enabled: () => props.open && !effectiveEditing(),
   });
 
   const onTaxTypeChange = async (newId: number | null) => {
@@ -247,6 +249,7 @@ export function QuotationModal(props: Props) {
   createEffect(() => {
     if (!props.open) {
       initializedKey = null;
+      setCreatedQuotation(null);
       return;
     }
     const key = props.editing ? `edit-${props.editing.id}` : "new";
@@ -355,7 +358,7 @@ export function QuotationModal(props: Props) {
       "quotation",
       progressStatus(),
       attachmentCount(),
-      props.editing?.id,
+      effectiveEditing()?.id,
     );
     if (attachmentErr) {
       toast.warning(attachmentErr);
@@ -393,32 +396,35 @@ export function QuotationModal(props: Props) {
     };
 
     setSaving(true);
-    const ed = props.editing;
-    const ok = await submitEntity(
-      () =>
-        ed
-          ? apiFetch(`/api/v1/quotation/quotations/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
-          : apiFetch("/api/v1/quotation/quotations", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
-      toast,
-      ed ? "Quotation updated." : "Quotation created.",
-    );
+    const ed = effectiveEditing();
+    const res = await (ed
+      ? apiFetch<QuotationDetail>(`/api/v1/quotation/quotations/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+      : apiFetch<QuotationDetail>("/api/v1/quotation/quotations", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
-    if (!ok) return;
+    if (!res.success || !res.data) {
+      handleSaveResult(res, toast, props.editing ? "Quotation updated." : "Quotation created.");
+      return;
+    }
+    toast.success(props.editing ? "Quotation updated." : "Quotation created.");
     await draft.clearOnSave();
     props.onSaved();
-    props.onClose();
+    if (props.editing) {
+      props.onClose();
+      return;
+    }
+    setCreatedQuotation(res.data);
   };
 
   return (
     <>
     <WideEntityModal
       open={props.open}
-      title={props.editing ? "Edit Quotation" : "New Quotation"}
+      title={effectiveEditing() ? "Edit Quotation" : "New Quotation"}
       onClose={() => props.onClose()}
       onSave={() => void save()}
       saving={saving()}
       headerActions={
-        <Show when={props.editing}>
+        <Show when={effectiveEditing()}>
           <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
             History
           </button>
@@ -524,7 +530,7 @@ export function QuotationModal(props: Props) {
       </Field>
       <AttachmentsField
         scope="quotation/quotations"
-        docId={props.editing?.id}
+        docId={effectiveEditing()?.id}
         label="Attachments (carried to Sales Order & Sales)"
         required={policyRequiresAttachment(processPolicy.data, "quotation")}
         onCountChange={setAttachmentCount}
@@ -555,9 +561,9 @@ export function QuotationModal(props: Props) {
       <Field label="Project name">
         <input class={inputClass} value={projectName()} onInput={(e) => setProjectName(e.currentTarget.value)} />
       </Field>
-      <Show when={props.editing}>
+      <Show when={effectiveEditing()}>
         <Field label="Created by">
-          <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
+          <input class={inputClass} value={effectiveEditing()?.created_by_name ?? ""} readOnly />
         </Field>
       </Show>
       <CustomFieldsSection
@@ -577,10 +583,10 @@ export function QuotationModal(props: Props) {
         locationId={locationId}
         partnerId={partnerId}
       />
-      <ChangeLogPanel targetType="quo_quotation" targetId={props.editing?.id} />
+      <ChangeLogPanel targetType="quo_quotation" targetId={effectiveEditing()?.id} />
     </WideEntityModal>
 
-    <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={props.editing?.id} title="History — Quotation" />
+    <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={effectiveEditing()?.id} title="History — Quotation" />
 
     <QuickCustomerModal
       open={showNewCustomer()}

@@ -5,7 +5,7 @@ import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
-import { submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
 import {
@@ -177,6 +177,8 @@ export function PurchaseOrderModal(props: Props) {
   const [prPickerOpen, setPrPickerOpen] = createSignal(false);
   const [sqPickerOpen, setSqPickerOpen] = createSignal(false);
   const [detail, setDetail] = createSignal<PurchaseOrderDetail | null>(null);
+  const [savedPoId, setSavedPoId] = createSignal<number | null>(null);
+  const effectivePoId = () => props.purchaseOrderId ?? savedPoId();
 
   const [orderDate, setOrderDate] = createSignal("");
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
@@ -195,7 +197,7 @@ export function PurchaseOrderModal(props: Props) {
   const [partnerCode, setPartnerCode] = createSignal("");
   const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
 
-  const isCreate = () => props.open && props.purchaseOrderId == null;
+  const isCreate = () => props.open && effectivePoId() == null;
   const isDraft = () => isCreate() || detail()?.status === "draft";
   const readOnly = () => !isDraft();
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
@@ -271,9 +273,12 @@ export function PurchaseOrderModal(props: Props) {
   };
 
   createEffect(() => {
-    if (!props.open) return;
+    if (!props.open) {
+      setSavedPoId(null);
+      return;
+    }
     if (props.purchaseOrderId) void loadDetail(props.purchaseOrderId);
-    else void initNew();
+    else if (!savedPoId()) void initNew();
   });
 
   const onTaxTypeChange = async (newId: number | null) => {
@@ -405,25 +410,31 @@ export function PurchaseOrderModal(props: Props) {
     };
 
     setSaving(true);
-    const po = detail();
-    const ok = await submitEntity(
-      () =>
-        isCreate()
-          ? apiFetch<PurchaseOrderDetail>("/api/v1/purchase-order/purchase-orders", {
-              method: "POST",
-              body: JSON.stringify(body),
-            }, { silent: true })
-          : apiFetch(`/api/v1/purchase-order/purchase-orders/${po!.id}`, {
-              method: "PATCH",
-              body: JSON.stringify(body),
-            }, { silent: true }),
-      toast,
-      isCreate() ? "Purchase order created." : "Purchase order updated.",
-    );
+    const poId = effectivePoId();
+    const res = await (isCreate()
+      ? apiFetch<PurchaseOrderDetail>("/api/v1/purchase-order/purchase-orders", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }, { silent: true })
+      : apiFetch<PurchaseOrderDetail>(`/api/v1/purchase-order/purchase-orders/${poId}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        }, { silent: true }));
     setSaving(false);
-    if (!ok) return;
+    if (!res.success || !res.data) {
+      handleSaveResult(res, toast, isCreate() ? "Purchase order created." : "Purchase order updated.");
+      return;
+    }
+    toast.success(isCreate() ? "Purchase order created." : "Purchase order updated.");
+    applyDetail(res.data);
     props.onSaved();
-    props.onClose();
+    if (props.purchaseOrderId) {
+      props.onClose();
+      return;
+    }
+    if (!savedPoId()) {
+      setSavedPoId(res.data.id);
+    }
   };
 
   const po = () => detail();
@@ -438,7 +449,7 @@ export function PurchaseOrderModal(props: Props) {
       readOnly={readOnly()}
       saving={saving()}
       headerActions={
-        <Show when={props.purchaseOrderId}>
+        <Show when={effectivePoId()}>
           <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
             History
           </button>
@@ -688,14 +699,14 @@ export function PurchaseOrderModal(props: Props) {
       </Show>
       <AttachmentsField
         scope="purchase-order/purchase-orders"
-        docId={props.purchaseOrderId ?? undefined}
+        docId={effectivePoId() ?? undefined}
         label="Attachments (carried to Purchases)"
         required={policyRequiresAttachment(processPolicy.data, "purchase_order")}
         emptyUnsavedHint="Save the purchase order first to attach files (max 25 MB each). Confirm on the list only after uploading."
       />
-      <ChangeLogPanel targetType="po_purchase_order" targetId={props.purchaseOrderId} />
+      <ChangeLogPanel targetType="po_purchase_order" targetId={effectivePoId()} />
     </WideEntityModal>
-    <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="po_purchase_order" targetId={props.purchaseOrderId} title="History — Purchase Order" />
+    <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="po_purchase_order" targetId={effectivePoId()} title="History — Purchase Order" />
     <PurchaseRequestLinePickerModal
       open={prPickerOpen()}
       onClose={() => setPrPickerOpen(false)}

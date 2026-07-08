@@ -5,7 +5,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_ENTITY } from "../../../shared/entityTypes";
-import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
@@ -155,6 +155,8 @@ export function SalesOrderModal(props: Props) {
   const currencies = () => currenciesQuery.data ?? [];
   const { fields } = useFormFieldSettings(SALES_ORDER_ENTITY.salesOrder);
   const [saving, setSaving] = createSignal(false);
+  const [createdSalesOrder, setCreatedSalesOrder] = createSignal<SalesOrderDetail | null>(null);
+  const effectiveEditing = () => props.editing ?? createdSalesOrder();
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
@@ -247,7 +249,7 @@ export function SalesOrderModal(props: Props) {
     draftKey: props.editing ? `edit-${props.editing.id}` : "new",
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
-    enabled: () => props.open && !props.editing,
+    enabled: () => props.open && !effectiveEditing(),
   });
 
   const onTaxTypeChange = async (newId: number | null) => {
@@ -269,7 +271,10 @@ export function SalesOrderModal(props: Props) {
   };
 
   createEffect(() => {
-    if (!props.open) return;
+    if (!props.open) {
+      setCreatedSalesOrder(null);
+      return;
+    }
     const ed = props.editing;
     if (ed) {
       setOrderDate(ed.order_date);
@@ -413,7 +418,7 @@ export function SalesOrderModal(props: Props) {
       "sales_order",
       progressStatus(),
       attachmentCount(),
-      props.editing?.id,
+      effectiveEditing()?.id,
     );
     if (attachmentErr) {
       toast.warning(attachmentErr);
@@ -456,32 +461,35 @@ export function SalesOrderModal(props: Props) {
     };
 
     setSaving(true);
-    const ed = props.editing;
-    const ok = await submitEntity(
-      () =>
-        ed
-          ? apiFetch(`/api/v1/sales-order/sales-orders/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
-          : apiFetch("/api/v1/sales-order/sales-orders", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
-      toast,
-      ed ? "Sales order updated." : "Sales order created.",
-    );
+    const ed = effectiveEditing();
+    const res = await (ed
+      ? apiFetch<SalesOrderDetail>(`/api/v1/sales-order/sales-orders/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+      : apiFetch<SalesOrderDetail>("/api/v1/sales-order/sales-orders", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
-    if (!ok) return;
+    if (!res.success || !res.data) {
+      handleSaveResult(res, toast, props.editing ? "Sales order updated." : "Sales order created.");
+      return;
+    }
+    toast.success(props.editing ? "Sales order updated." : "Sales order created.");
     await draft.clearOnSave();
     props.onSaved();
-    props.onClose();
+    if (props.editing) {
+      props.onClose();
+      return;
+    }
+    setCreatedSalesOrder(res.data);
   };
 
   return (
     <>
       <WideEntityModal
         open={props.open}
-        title={props.editing ? "Edit Sales Order (upcoming sale)" : "New Sales Order (upcoming sale)"}
+        title={effectiveEditing() ? "Edit Sales Order (upcoming sale)" : "New Sales Order (upcoming sale)"}
         onClose={() => props.onClose()}
         onSave={() => void save()}
         saving={saving()}
         headerActions={
-          <Show when={props.editing}>
+          <Show when={effectiveEditing()}>
             <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
               History
             </button>
@@ -611,7 +619,7 @@ export function SalesOrderModal(props: Props) {
         </Field>
         <AttachmentsField
           scope="sales-order/sales-orders"
-          docId={props.editing?.id}
+          docId={effectiveEditing()?.id}
           label="Attachments (carried from Quotation, on to Sales)"
           required={policyRequiresAttachment(processPolicy.data, "sales_order")}
           onCountChange={setAttachmentCount}
@@ -642,9 +650,9 @@ export function SalesOrderModal(props: Props) {
         <Field label="Project name">
           <input class={inputClass} value={projectName()} onInput={(e) => setProjectName(e.currentTarget.value)} />
         </Field>
-        <Show when={props.editing}>
+        <Show when={effectiveEditing()}>
           <Field label="Created by">
-            <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
+            <input class={inputClass} value={effectiveEditing()?.created_by_name ?? ""} readOnly />
           </Field>
         </Show>
         </div>
@@ -667,10 +675,10 @@ export function SalesOrderModal(props: Props) {
           locationId={locationId}
           partnerId={partnerId}
         />
-        <ChangeLogPanel targetType="so_sales_order" targetId={props.editing?.id} />
+        <ChangeLogPanel targetType="so_sales_order" targetId={effectiveEditing()?.id} />
       </WideEntityModal>
 
-      <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="so_sales_order" targetId={props.editing?.id} title="History — Sales Order" />
+      <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="so_sales_order" targetId={effectiveEditing()?.id} title="History — Sales Order" />
 
       <QuotationLinePickerModal
         open={quotationPickerOpen()}

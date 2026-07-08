@@ -1,4 +1,16 @@
 import { apiBase, getAccessToken, type ApiResult } from "./api";
+import { getActiveTenantId, getActiveBranchIdCurrent } from "./activeContext";
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const tenantId = getActiveTenantId();
+  if (tenantId) headers["X-Tenant-ID"] = String(tenantId);
+  const branchId = getActiveBranchIdCurrent();
+  if (branchId) headers["X-Branch-ID"] = String(branchId);
+  return headers;
+}
 
 export type RepairOrderAttachment = {
   id: number;
@@ -11,19 +23,18 @@ export type RepairOrderAttachment = {
 
 export async function listRepairOrderAttachments(orderId: number): Promise<ApiResult<RepairOrderAttachment[]>> {
   const res = await fetch(`${apiBase}/api/v1/inventory/repair-orders/${orderId}/attachments`, {
-    headers: { Authorization: `Bearer ${(await getAccessToken()) ?? ""}` },
+    headers: await authHeaders(),
   });
   const body = (await res.json()) as ApiResult<RepairOrderAttachment[]>;
   return { ...body, status: res.status, ok: res.ok };
 }
 
 export async function uploadRepairOrderAttachment(orderId: number, file: File): Promise<ApiResult<RepairOrderAttachment>> {
-  const token = await getAccessToken();
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch(`${apiBase}/api/v1/inventory/repair-orders/${orderId}/attachments`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: await authHeaders(),
     body: fd,
   });
   const body = (await res.json()) as ApiResult<RepairOrderAttachment>;

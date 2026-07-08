@@ -5,7 +5,7 @@ import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
-import { submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
@@ -109,6 +109,8 @@ export function SupplierInvoiceModal(props: Props) {
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
   const [saving, setSaving] = createSignal(false);
+  const [createdInvoice, setCreatedInvoice] = createSignal<SupplierInvoiceDetail | null>(null);
+  const effectiveEditing = () => props.editing ?? createdInvoice();
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [rfqPickerOpen, setRfqPickerOpen] = createSignal(false);
@@ -150,7 +152,10 @@ export function SupplierInvoiceModal(props: Props) {
   };
 
   createEffect(() => {
-    if (!props.open) return;
+    if (!props.open) {
+      setCreatedInvoice(null);
+      return;
+    }
     const ed = props.editing;
     if (ed) {
       setInvoiceDate(ed.invoice_date);
@@ -201,7 +206,7 @@ export function SupplierInvoiceModal(props: Props) {
   });
 
   createEffect(() => {
-    if (!props.open || props.editing) return;
+    if (!props.open || effectiveEditing()) return;
     const tt = taxTypes();
     const cc = currencies();
     if (!tt.length || !cc.length) return;
@@ -218,7 +223,7 @@ export function SupplierInvoiceModal(props: Props) {
   });
 
   createEffect(() => {
-    if (!props.open || props.editing) return;
+    if (!props.open || effectiveEditing()) return;
     void loadPreview(invoiceDate());
   });
 
@@ -301,7 +306,7 @@ export function SupplierInvoiceModal(props: Props) {
       "supplier_invoice",
       progressStatus(),
       attachmentCount(),
-      props.editing?.id,
+      effectiveEditing()?.id,
     );
     if (attachmentErr) {
       toast.warning(attachmentErr);
@@ -353,35 +358,38 @@ export function SupplierInvoiceModal(props: Props) {
     }
 
     setSaving(true);
-    const ed = props.editing;
-    const ok = await submitEntity(
-      () =>
-        ed
-          ? apiFetch(`/api/v1/finance/supplier-invoices/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
-          : apiFetch("/api/v1/finance/supplier-invoices", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
-      toast,
-      ed ? "Purchase updated." : "Purchase created.",
-    );
+    const ed = effectiveEditing();
+    const res = await (ed
+      ? apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+      : apiFetch<SupplierInvoiceDetail>("/api/v1/finance/supplier-invoices", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
-    if (!ok) return;
-    if (ed) invalidateRecordHistory(queryClient, "fin_supplier_invoice", ed.id);
+    if (!res.success || !res.data) {
+      handleSaveResult(res, toast, props.editing ? "Purchase updated." : "Purchase created.");
+      return;
+    }
+    toast.success(props.editing ? "Purchase updated." : "Purchase created.");
+    if (props.editing) invalidateRecordHistory(queryClient, "fin_supplier_invoice", props.editing.id);
     props.onSaved();
-    props.onClose();
+    if (props.editing) {
+      props.onClose();
+      return;
+    }
+    setCreatedInvoice(res.data);
   };
 
   return (
     <>
       <WideEntityModal
         open={props.open}
-        title={props.editing ? "Edit Purchase (actual purchase)" : "New Purchase (actual purchase)"}
+        title={effectiveEditing() ? "Edit Purchase (actual purchase)" : "New Purchase (actual purchase)"}
         onClose={props.onClose}
         onSave={activeTab() === "details" ? () => void save() : undefined}
         saving={saving()}
-        tabs={props.editing ? [{ id: "details", label: "Details" }, { id: "invoice", label: "Invoice" }] : undefined}
+        tabs={effectiveEditing() ? [{ id: "details", label: "Details" }, { id: "invoice", label: "Invoice" }] : undefined}
         activeTab={activeTab()}
         onTabChange={(id) => setActiveTab(id as "details" | "invoice")}
         headerActions={
-          <Show when={props.editing}>
+          <Show when={effectiveEditing()}>
             <button
               type="button"
               class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
@@ -395,12 +403,12 @@ export function SupplierInvoiceModal(props: Props) {
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
             kind="purchase"
-            docId={props.editing?.id}
+            docId={effectiveEditing()?.id}
             attachmentsScope="finance/supplier-invoices"
-            onPrint={() =>
-              props.editing &&
-              window.open(`/app/purchases/purchases/${props.editing.id}/print`, "_blank", "noopener,noreferrer")
-            }
+            onPrint={() => {
+              const id = effectiveEditing()?.id;
+              if (id) window.open(`/app/purchases/purchases/${id}/print`, "_blank", "noopener,noreferrer");
+            }}
           />
         </Show>
         <Show when={activeTab() === "details"}>
@@ -510,7 +518,7 @@ export function SupplierInvoiceModal(props: Props) {
             </Field>
             <AttachmentsField
               scope="finance/supplier-invoices"
-              docId={props.editing?.id}
+              docId={effectiveEditing()?.id}
               label="Attachments (carried from Purchase Order/Receiving)"
               required={policyRequiresAttachment(processPolicy.data, "supplier_invoice")}
               onCountChange={setAttachmentCount}
@@ -538,9 +546,9 @@ export function SupplierInvoiceModal(props: Props) {
             <Field label="Project name">
               <input class={inputClass} value={projectName()} onInput={(e) => setProjectName(e.currentTarget.value)} />
             </Field>
-            <Show when={props.editing}>
+            <Show when={effectiveEditing()}>
               <Field label="Created by">
-                <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
+                <input class={inputClass} value={effectiveEditing()?.created_by_name ?? ""} readOnly />
               </Field>
             </Show>
           </div>
@@ -563,17 +571,17 @@ export function SupplierInvoiceModal(props: Props) {
             locationId={() => locationId()}
             hidePartnerColumns
           />
-          <Show when={props.editing}>
+          <Show when={effectiveEditing()}>
             <SupplierInvoiceApprovalPanel
-              supplierInvoiceId={props.editing!.id}
+              supplierInvoiceId={effectiveEditing()!.id}
               progressStatus={progressStatus()}
               onChanged={() => {
-                void apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${props.editing!.id}`).then((res) => {
+                void apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${effectiveEditing()!.id}`).then((res) => {
                   if (res.success && res.data) setProgressStatus(res.data.progress_status);
                 });
               }}
             />
-            <ChangeLogPanel targetType="fin_supplier_invoice" targetId={props.editing!.id} />
+            <ChangeLogPanel targetType="fin_supplier_invoice" targetId={effectiveEditing()!.id} />
           </Show>
         </Show>
       </WideEntityModal>
@@ -603,7 +611,7 @@ export function SupplierInvoiceModal(props: Props) {
         open={historyOpen()}
         onClose={() => setHistoryOpen(false)}
         targetType="fin_supplier_invoice"
-        targetId={props.editing?.id}
+        targetId={effectiveEditing()?.id}
         title="History — Purchase"
       />
     </>

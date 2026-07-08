@@ -3,7 +3,7 @@ import { apiFetch } from "../../../shared/api";
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { EditableLineGrid, emptyLine, type RepairLineRow } from "../../../shared/EditableLineGrid";
 import { INVENTORY_ENTITY } from "../../../shared/entityTypes";
-import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import {
   formatFileSize,
@@ -116,6 +116,8 @@ export function RepairOrderModal(props: Props) {
   const { fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.repairOrder);
 
   const [saving, setSaving] = createSignal(false);
+  const [createdOrder, setCreatedOrder] = createSignal<RepairOrderDetail | null>(null);
+  const effectiveEditing = () => props.editing ?? createdOrder();
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [repairOrderNo, setRepairOrderNo] = createSignal("");
@@ -154,7 +156,11 @@ export function RepairOrderModal(props: Props) {
   };
 
   createEffect(() => {
-    if (!props.open) return;
+    if (!props.open) {
+      setCreatedOrder(null);
+      setAttachments([]);
+      return;
+    }
     const ed = props.editing;
     if (ed) {
       setOrderDate(ed.order_date);
@@ -282,25 +288,29 @@ export function RepairOrderModal(props: Props) {
     };
 
     setSaving(true);
-    const ed = props.editing;
-    const ok = await submitEntity(
-      () =>
-        ed
-          ? apiFetch(`/api/v1/inventory/repair-orders/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
-          : apiFetch("/api/v1/inventory/repair-orders", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
-      toast,
-      ed ? "Repair order updated." : "Repair order created.",
-    );
+    const ed = effectiveEditing();
+    const res = await (ed
+      ? apiFetch<RepairOrderDetail>(`/api/v1/inventory/repair-orders/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+      : apiFetch<RepairOrderDetail>("/api/v1/inventory/repair-orders", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
-    if (!ok) return;
+    if (!res.success || !res.data) {
+      handleSaveResult(res, toast, props.editing ? "Repair order updated." : "Repair order created.");
+      return;
+    }
+    toast.success(props.editing ? "Repair order updated." : "Repair order created.");
     props.onSaved();
-    props.onClose();
+    if (props.editing) {
+      props.onClose();
+      return;
+    }
+    setCreatedOrder(res.data);
+    void loadAttachments(res.data.id);
   };
 
   return (
     <WideEntityModal
       open={props.open}
-      title={props.editing ? "Edit Repair Order" : "New Repair Order"}
+      title={effectiveEditing() ? "Edit Repair Order" : "New Repair Order"}
       onClose={() => props.onClose()}
       onSave={() => void save()}
       saving={saving()}
@@ -382,7 +392,7 @@ export function RepairOrderModal(props: Props) {
       <div class="rounded-lg border border-stroke bg-slate-50 px-4 py-3">
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm font-medium text-text-primary">Attachments</span>
-          <Show when={props.editing}>
+          <Show when={effectiveEditing()}>
             <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
               {uploading() ? "Uploading…" : "Upload file"}
               <input
@@ -392,7 +402,7 @@ export function RepairOrderModal(props: Props) {
                 onChange={(e) => {
                   const file = e.currentTarget.files?.[0];
                   e.currentTarget.value = "";
-                  const orderId = props.editing?.id;
+                  const orderId = effectiveEditing()?.id;
                   if (!file || !orderId) return;
                   setUploading(true);
                   void uploadRepairOrderAttachment(orderId, file).then((res) => {
@@ -410,7 +420,7 @@ export function RepairOrderModal(props: Props) {
           </Show>
         </div>
         <Show
-          when={props.editing}
+          when={effectiveEditing()}
           fallback={<p class="text-sm text-text-secondary">Save the repair order first to attach files (max 25 MB each).</p>}
         >
           <Show when={attachments().length > 0} fallback={<p class="text-sm text-text-secondary">No attachments yet.</p>}>
