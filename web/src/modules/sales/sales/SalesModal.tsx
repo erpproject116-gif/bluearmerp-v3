@@ -615,8 +615,15 @@ export function SalesModal(props: Props) {
             kind="sales"
             docId={effectiveEditing()?.id}
             formOpen={props.open}
+            progressStatus={progressStatus()}
             attachmentsScope="sales"
             onPrint={() => effectiveEditing() && openSalesInvoicePrint(effectiveEditing()!.id)}
+            onApprovalChanged={() => {
+              void (async () => {
+                const res = await apiFetch<SalesDetail>(`/api/v1/sales/${effectiveEditing()!.id}`);
+                if (res.success && res.data) setProgressStatus(res.data.progress_status);
+              })();
+            }}
           />
         </Show>
         <Show when={activeTab() === "details"}>

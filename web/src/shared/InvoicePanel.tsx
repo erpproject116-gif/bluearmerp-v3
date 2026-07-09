@@ -15,6 +15,9 @@ import {
   type SalesInvoice,
 } from "./invoiceApi";
 import { loadInvoiceDocumentPrint, type InvoiceDocumentKind } from "./invoiceDocumentPrint";
+import { docProgressStatusLabel } from "./docProgressStatusTabs";
+import { SalesApprovalPanel } from "../modules/sales/sales/SalesApprovalPanel";
+import { SupplierInvoiceApprovalPanel } from "../modules/finance/supplier-invoices/SupplierInvoiceApprovalPanel";
 
 type Kind = InvoiceDocumentKind;
 
@@ -22,10 +25,13 @@ type Props = {
   kind: Kind;
   docId?: number;
   attachmentsScope: AttachmentScope;
+  /** Document progress (unconfirmed / e_approval / completed) for review on this tab. */
+  progressStatus?: string;
   /** Pass modal open so staged attachments reset correctly. */
   formOpen?: boolean;
   onPrint?: () => void;
   onSaved?: () => void;
+  onApprovalChanged?: () => void;
 };
 
 const CONFIG: Record<Kind, { acctIType: string; acctILabel: string; acctIILabel: string; defaultAcctI: string; defaultAcctII: string; partyLabel: string }> = {
@@ -75,7 +81,11 @@ export function InvoicePanel(props: Props) {
   const [remark, setRemark] = createSignal("");
   const [jeNo, setJeNo] = createSignal("");
   const [jeStatus, setJeStatus] = createSignal("");
+  const [jeId, setJeId] = createSignal<number | null>(null);
   const [saving, setSaving] = createSignal(false);
+
+  const accountsLocked = () => jeStatus() === "posted";
+  const invoiceSaved = () => Boolean(acctIId() && acctIIId());
 
   const applyVoucher = (kind: Kind, voucher: SalesInvoice | PurchaseInvoice) => {
     setPretax(voucher.pretax_amount);
@@ -85,6 +95,7 @@ export function InvoicePanel(props: Props) {
     setRemark(voucher.remark ?? "");
     setJeNo(voucher.journal_entry_no ?? "");
     setJeStatus(voucher.journal_status ?? "");
+    setJeId(voucher.journal_entry_id ?? null);
     if (kind === "sales") {
       const v = voucher as SalesInvoice;
       setPartner(v.partner_name);
@@ -179,6 +190,59 @@ export function InvoicePanel(props: Props) {
           <p class="text-sm text-text-secondary">Loading invoice…</p>
         </Show>
 
+        <div class="flex flex-wrap items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-3 text-sm">
+          <Show when={props.progressStatus}>
+            <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-text-secondary">
+              Document: {docProgressStatusLabel(props.progressStatus!)}
+            </span>
+          </Show>
+          <Show when={invoiceSaved()} fallback={<span class="text-xs text-amber-700">Accounting invoice not saved yet — choose accounts and save.</span>}>
+            <span class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Accounting invoice saved</span>
+          </Show>
+          <Show when={jeNo()}>
+            <span class="text-text-secondary">
+              Journal: <span class="font-medium text-text-primary">{jeNo()}</span>
+              <Show when={jeStatus()}>
+                <span class={`ml-2 rounded px-2 py-0.5 text-xs ${jeStatus() === "posted" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                  {jeStatus()}
+                </span>
+              </Show>
+            </span>
+          </Show>
+        </div>
+
+        <Show when={accountsLocked()}>
+          <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            The linked journal entry is posted. You can still update fees and remark here; to change accounts, adjust the entry under Finance → Journal entries
+            <Show when={jeId()}> (entry #{jeId()})</Show>.
+          </p>
+        </Show>
+
+        <Show when={props.docId && props.progressStatus}>
+          <Show when={props.kind === "sales"}>
+            <SalesApprovalPanel
+              salesId={props.docId!}
+              progressStatus={props.progressStatus!}
+              compact
+              onChanged={() => {
+                props.onApprovalChanged?.();
+                void load();
+              }}
+            />
+          </Show>
+          <Show when={props.kind === "purchase"}>
+            <SupplierInvoiceApprovalPanel
+              supplierInvoiceId={props.docId!}
+              progressStatus={props.progressStatus!}
+              compact
+              onChanged={() => {
+                props.onApprovalChanged?.();
+                void load();
+              }}
+            />
+          </Show>
+        </Show>
+
         <div class="grid grid-cols-2 gap-3 rounded-lg border border-stroke bg-slate-50 p-4 text-sm md:grid-cols-3">
           <div><div class="text-text-secondary">Date</div><div class="font-medium">{docDate()}</div></div>
           <div><div class="text-text-secondary">No.</div><div class="font-medium">{docNo()}</div></div>
@@ -206,6 +270,7 @@ export function InvoicePanel(props: Props) {
             fetchOptions={(q) => fetchAccountOptions(q, cfg().acctIType)}
             placeholder="Search account…"
             required
+            disabled={accountsLocked()}
           />
           <LookupCombo
             label={cfg().acctIILabel}
@@ -217,6 +282,7 @@ export function InvoicePanel(props: Props) {
             fetchOptions={(q) => fetchAccountOptions(q)}
             placeholder="Search account…"
             required
+            disabled={accountsLocked()}
           />
           <Field label="Fees">
             <input class={inputClass} inputmode="decimal" value={fees()} onInput={(e) => bindDecimalInput(e.currentTarget, setFees)} />
@@ -226,7 +292,13 @@ export function InvoicePanel(props: Props) {
           </Field>
         </div>
 
-        <Show when={jeNo()}>
+        <Show when={jeNo() && !accountsLocked()}>
+          <div class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm">
+            Draft journal entry ready for review in Finance after you save.
+          </div>
+        </Show>
+
+        <Show when={jeNo() && accountsLocked()}>
           <div class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm">
             Journal entry: <span class="font-medium">{jeNo()}</span>
             <span class={`ml-2 rounded px-2 py-0.5 text-xs ${jeStatus() === "posted" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{jeStatus()}</span>

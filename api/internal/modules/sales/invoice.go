@@ -150,6 +150,34 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 
 		before, _ := loadSalesInvoiceAudit(r.Context(), pool, tu.TenantID, id)
 
+		jeStatus, err := invoicejournal.EntryStatus(r.Context(), pool, tu.TenantID, existingJE)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load journal entry.", "ERR_INTERNAL")
+			return
+		}
+		if jeStatus == "posted" {
+			accountsChanged := before.SalesAccountID == nil || before.DepositAccountID == nil ||
+				*before.SalesAccountID != body.SalesAccountID || *before.DepositAccountID != body.DepositAccountID
+			if accountsChanged {
+				response.Validation(w, map[string]string{
+					"journal_entry": "Accounts cannot be changed after the journal entry is posted. Update fees or remark only, or adjust the entry in Finance.",
+				})
+				return
+			}
+			if _, err := pool.Exec(r.Context(), `
+				update public.sa_sales
+				set invoice_fees = $2, invoice_remark = $3, updated_at = now()
+				where id = $1 and tenant_id = $4 and deleted_at is null`,
+				id, body.Fees, nullIfEmpty(body.Remark), tu.TenantID); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to save invoice.", "ERR_INTERNAL")
+				return
+			}
+			after, _ := loadSalesInvoiceAudit(r.Context(), pool, tu.TenantID, id)
+			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.invoice.update", "sa_sales", &id, before, after)
+			response.OK(w, map[string]any{"journal_entry_id": existingJE}, "Invoice saved.")
+			return
+		}
+
 		lines := []invoicejournal.Line{
 			{AccountID: body.DepositAccountID, Debit: grandTotal, PartyID: &partnerID, Remark: "A/R - " + salesNo},
 			{AccountID: body.SalesAccountID, Credit: subtotal, Remark: "Sales - " + salesNo},

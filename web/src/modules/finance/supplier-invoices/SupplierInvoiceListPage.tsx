@@ -194,9 +194,17 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
             kind="purchase"
             docId={viewRow()!.id}
             formOpen={viewRow() != null}
+            progressStatus={viewRow()!.progress_status}
             attachmentsScope="finance/supplier-invoices"
             onPrint={() => openPurchaseInvoicePrint(viewRow()!.id)}
             onSaved={invalidate}
+            onApprovalChanged={() => {
+              void apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${viewRow()!.id}`).then((res) => {
+                if (res.success && res.data) {
+                  setViewRow((prev) => (prev ? { ...prev, progress_status: res.data!.progress_status } : prev));
+                }
+              });
+            }}
           />
         </Show>
       </WideEntityModal>

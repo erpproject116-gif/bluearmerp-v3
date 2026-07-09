@@ -13,6 +13,7 @@ type Props = {
   fetchOptions: (q: string) => Promise<LookupOption[]>;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
   /** When provided, shows a create row in the dropdown with the current typed text. */
   onCreate?: (query: string) => void;
   createLabel?: string;
@@ -51,18 +52,21 @@ export function LookupCombo(props: Props) {
           class={inputClass}
           value={props.value()}
           placeholder={props.placeholder ?? "Search…"}
+          disabled={props.disabled}
           onFocus={() => {
+            if (props.disabled) return;
             setOpen(true);
             void search(props.value());
           }}
           onInput={(e) => {
+            if (props.disabled) return;
             props.onInput(e.currentTarget.value);
             setOpen(true);
             search(e.currentTarget.value);
           }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
         />
-        <Show when={props.selectedId()}>
+        <Show when={props.selectedId() && !props.disabled}>
           <button
             type="button"
             class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-secondary hover:text-red-600"

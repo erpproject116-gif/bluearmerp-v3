@@ -22,6 +22,21 @@ type Line struct {
 	Remark    string
 }
 
+// EntryStatus returns the journal entry status, or "" when id is nil/zero or missing.
+func EntryStatus(ctx context.Context, pool *pgxpool.Pool, tenantID int64, jeID *int64) (string, error) {
+	if jeID == nil || *jeID <= 0 {
+		return "", nil
+	}
+	var status string
+	err := pool.QueryRow(ctx,
+		`select status from public.fin_journal_entries where id = $1 and tenant_id = $2`,
+		*jeID, tenantID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return status, err
+}
+
 // ResolveAccountID looks up a tenant account id by its code (e.g. "2559").
 func ResolveAccountID(ctx context.Context, pool *pgxpool.Pool, tenantID int64, code string) (int64, error) {
 	var id int64
