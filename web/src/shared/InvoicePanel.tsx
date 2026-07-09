@@ -133,7 +133,7 @@ export function InvoicePanel(props: Props) {
     if (!id) return;
     setLoading(true);
     try {
-      const data = await loadInvoiceDocumentPrint(props.kind, id);
+      const data = await loadInvoiceDocumentPrint(props.kind, id, { includeAttachments: false });
       setLines(data.lines);
       setCurrencyCode(data.currencyCode);
       applyVoucher(props.kind, data.voucher);

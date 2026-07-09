@@ -1,8 +1,10 @@
 package finance
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
@@ -122,6 +125,11 @@ func uploadSIAttachment(pool *pgxpool.Pool) http.HandlerFunc {
 			Scan(&id, &createdAt)
 		if err != nil {
 			_ = os.Remove(absPath)
+			log.Printf("supplier_invoice attachment insert: supplier_invoice_id=%d: %v", siID, err)
+			if isMissingAttachmentTable(err) {
+				response.Err(w, http.StatusServiceUnavailable, "Purchase attachments are not available until database migration 142 is applied.", "ERR_SCHEMA")
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to save attachment.", "ERR_INTERNAL")
 			return
 		}
@@ -167,6 +175,11 @@ func listSIAttachments(pool *pgxpool.Pool) http.HandlerFunc {
 			where a.supplier_invoice_id = $1 and si.tenant_id = $2
 			order by a.created_at desc`, siID, tu.TenantID)
 		if err != nil {
+			log.Printf("supplier_invoice attachments list: supplier_invoice_id=%d tenant_id=%d: %v", siID, tu.TenantID, err)
+			if isMissingAttachmentTable(err) {
+				response.Err(w, http.StatusServiceUnavailable, "Purchase attachments are not available until database migration 142 is applied.", "ERR_SCHEMA")
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to list attachments.", "ERR_INTERNAL")
 			return
 		}
@@ -182,6 +195,11 @@ func listSIAttachments(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			row.CreatedAt = createdAt.Format(time.RFC3339)
 			out = append(out, row)
+		}
+		if err := rows.Err(); err != nil {
+			log.Printf("supplier_invoice attachments list rows: supplier_invoice_id=%d: %v", siID, err)
+			response.Err(w, http.StatusInternalServerError, "Failed to read attachments.", "ERR_INTERNAL")
+			return
 		}
 		if out == nil {
 			out = []SupplierInvoiceAttachment{}
@@ -228,4 +246,9 @@ func siNullIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func isMissingAttachmentTable(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
 }

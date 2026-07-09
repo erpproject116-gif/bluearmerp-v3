@@ -60,11 +60,17 @@ function partyContactLine(p: { phone?: string | null; mobile?: string | null; em
   return [p.phone, p.mobile, p.email].filter(Boolean).join(" · ");
 }
 
-async function loadSalesInvoiceDocument(id: number): Promise<InvoiceDocumentPrintData> {
+export type InvoiceDocumentPrintOptions = {
+  /** Skip attachment fetch when another component already loads them (e.g. Invoice tab). */
+  includeAttachments?: boolean;
+};
+
+async function loadSalesInvoiceDocument(id: number, opts?: InvoiceDocumentPrintOptions): Promise<InvoiceDocumentPrintData> {
+  const includeAttachments = opts?.includeAttachments !== false;
   const [printRes, voucherRes, attRes] = await Promise.all([
     fetchSalesPrint(id),
     getSalesInvoice(id),
-    listAttachments("sales", id),
+    includeAttachments ? listAttachments("sales", id) : Promise.resolve({ success: true, data: [] as Attachment[] }),
   ]);
   if (!printRes.success || !printRes.data) {
     throw new Error(printRes.message ?? "Failed to load document print data.");
@@ -96,11 +102,14 @@ async function loadSalesInvoiceDocument(id: number): Promise<InvoiceDocumentPrin
   };
 }
 
-async function loadPurchaseInvoiceDocument(id: number): Promise<InvoiceDocumentPrintData> {
+async function loadPurchaseInvoiceDocument(id: number, opts?: InvoiceDocumentPrintOptions): Promise<InvoiceDocumentPrintData> {
+  const includeAttachments = opts?.includeAttachments !== false;
   const [printRes, voucherRes, attRes] = await Promise.all([
     fetchSupplierInvoicePrint(id),
     getPurchaseInvoice(id),
-    listAttachments("finance/supplier-invoices", id),
+    includeAttachments
+      ? listAttachments("finance/supplier-invoices", id)
+      : Promise.resolve({ success: true, data: [] as Attachment[] }),
   ]);
   if (!printRes.success || !printRes.data) {
     throw new Error(printRes.message ?? "Failed to load document print data.");
@@ -135,8 +144,9 @@ async function loadPurchaseInvoiceDocument(id: number): Promise<InvoiceDocumentP
 export async function loadInvoiceDocumentPrint(
   kind: InvoiceDocumentKind,
   id: number,
+  opts?: InvoiceDocumentPrintOptions,
 ): Promise<InvoiceDocumentPrintData> {
-  return kind === "sales" ? loadSalesInvoiceDocument(id) : loadPurchaseInvoiceDocument(id);
+  return kind === "sales" ? loadSalesInvoiceDocument(id, opts) : loadPurchaseInvoiceDocument(id, opts);
 }
 
 export function openSalesInvoicePrint(id: number) {

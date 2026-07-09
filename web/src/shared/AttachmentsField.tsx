@@ -40,6 +40,7 @@ export function AttachmentsField(props: Props) {
   const [pending, setPending] = createSignal<PendingFile[]>([]);
   const [uploading, setUploading] = createSignal(false);
   const [busyId, setBusyId] = createSignal<number | null>(null);
+  const [loadError, setLoadError] = createSignal<string | null>(null);
 
   const totalCount = () => items().length + pending().length;
 
@@ -51,11 +52,19 @@ export function AttachmentsField(props: Props) {
     const id = props.docId;
     if (!id) {
       setItems([]);
+      setLoadError(null);
       notifyCount();
       return;
     }
     const res = await listAttachments(props.scope, id);
-    const list = res.success && res.data ? res.data : [];
+    if (!res.success) {
+      setItems([]);
+      setLoadError(res.message ?? "Could not load attachments.");
+      notifyCount();
+      return;
+    }
+    setLoadError(null);
+    const list = res.data ?? [];
     setItems(list);
     notifyCount();
   };
@@ -216,6 +225,9 @@ export function AttachmentsField(props: Props) {
             )}
           </For>
         </ul>
+      </Show>
+      <Show when={loadError()}>
+        <p class="mt-2 text-sm text-amber-800">{loadError()}</p>
       </Show>
       <Show when={showRequiredWarning()}>
         <p class="mt-2 text-sm text-amber-800">Add at least one file before confirming this document.</p>
