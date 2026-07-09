@@ -75,11 +75,11 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 **Started:**
 - [x] Lot batch pick on sales lines (`LotLineCell`, `lot_batch_id` on save)
 - [x] Serial registry origin filter (linked vs manual)
-- [x] Item master **Serial / Lot** tab + **Price B–J** + per-doc safety stock (migration 144)
+- [x] Item master **Serial / Lot** tab + **Price B–J** + per-doc safety stock (migrations 144–145)
 - [x] Serial/Lot status + inv book reports (slip-type filter, VIP on item inv book)
 - [x] Lot adjustment UI + manual lot registration API
 - [x] On-hand as-of from stock movements; safety stock alerts on stock workspace
-- [ ] Serial/lot policy optional/required enforcement on transactions
+- [x] Serial/lot policy optional/required enforcement on transactions (migration 145)
 - [ ] Full ECount 7-tab item form parity
 
 | Track | Ecount reference | Deliverable |

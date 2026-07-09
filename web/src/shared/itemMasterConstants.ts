@@ -25,6 +25,15 @@ export const SERIAL_SLIP_TYPE_OPTIONS = [
   { value: "purchase_order", label: "Purchase Order" },
 ];
 
+export const TRACKING_POLICY_OPTIONS = [
+  { value: "required", label: "Required on transactions" },
+  { value: "optional", label: "Optional on transactions" },
+] as const;
+
+export function trackingPolicyLabel(policy?: string): string {
+  return policy === "optional" ? "Optional" : "Required";
+}
+
 export function emptyPriceLevels(): Record<string, number> {
   return Object.fromEntries(PRICE_LEVEL_KEYS.map((k) => [k, 0]));
 }

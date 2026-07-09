@@ -39,6 +39,7 @@ type QuotationLine struct {
 	Remark            *string  `json:"remark,omitempty"`
 	PlannedSerialNos  []string `json:"planned_serial_nos,omitempty"`
 	TrackSerial       bool     `json:"track_serial,omitempty"`
+	SerialPolicy      string   `json:"serial_policy,omitempty"`
 }
 
 type Quotation struct {
@@ -388,7 +389,8 @@ func loadQuotationLines(ctx context.Context, pool *pgxpool.Pool, quotationID int
 		  ln.qty::float8, ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
 		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark,
 		  coalesce(ln.planned_serial_nos, '{}'),
-		  coalesce(i.track_serial, false)
+		  coalesce(i.track_serial, false),
+		  coalesce(i.serial_policy, 'required')
 		from public.quo_quotation_lines ln
 		left join public.inv_items i on i.id = ln.item_id
 		where ln.quotation_id = $1
@@ -403,7 +405,7 @@ func loadQuotationLines(ctx context.Context, pool *pgxpool.Pool, quotationID int
 		var ln QuotationLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial, &ln.SerialPolicy); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -656,7 +658,7 @@ func computeQuotationLines(ctx context.Context, pool *pgxpool.Pool, tenantID int
 			continue
 		}
 		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
-		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.ItemID, ln.Qty, planned); err != nil {
+		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.LineNo, ln.ItemID, ln.Qty, planned); err != nil {
 			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}

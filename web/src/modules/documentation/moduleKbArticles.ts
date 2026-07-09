@@ -1177,7 +1177,7 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Item master: Serial / Lot tab",
     scenario: "You are setting up an item for serial or lot tracking.",
     intro:
-      "Items → edit item → **Serial / Lot** tab. Choose serial or lot tracking (mutually exclusive). After save, open Serial registry or Lot batches filtered by item.",
+      "Items → edit item → **Serial / Lot** tab. Choose serial or lot tracking (mutually exclusive). Set whether serial/lot capture is **Required** or **Optional** on transactions. After save, open Serial registry or Lot batches filtered by item.",
     blocks: [
       {
         type: "steps",
@@ -1185,8 +1185,13 @@ export const moduleKbArticles: KbArticle[] = [
           "Open Inventory → Items and edit or create an item.",
           "Switch to the Serial / Lot tab.",
           "Enable Track serial numbers or Track lot numbers — only one mode per item.",
+          "Choose Required on transactions (default) or Optional to allow saving quotes, orders, sales, and GR without serial/lot when not yet known.",
           "Save, then use the links to Serial registry or Lot batches for that SKU.",
         ],
+      },
+      {
+        type: "tip",
+        text: "When policy is Required, the server blocks save/post until serials or a lot batch are captured. Optional still validates counts when you do enter serials or lots.",
       },
     ],
     primaryHref: "/app/inventory/items",

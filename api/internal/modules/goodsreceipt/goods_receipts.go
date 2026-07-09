@@ -924,6 +924,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			  pol.qty::float8, pol.received_qty::float8,
 			  pol.item_id, pol.partner_id, pol.item_code, pol.item_name,
 			  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
+			  coalesce(i.serial_policy, 'required'), coalesce(i.lot_policy, 'required'),
 			  coalesce(i.track_inventory_qty, false),
 			  coalesce(i.warranty_duration_months, 0)
 			from public.gr_goods_receipt_lines grl
@@ -949,6 +950,8 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			ItemName            string
 			TrackSerial         bool
 			TrackLot            bool
+			SerialPolicy        string
+			LotPolicy           string
 			TrackInventory      bool
 			WarrantyMonths      int
 		}
@@ -960,7 +963,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				&ln.ID, &ln.PurchaseOrderLineID, &ln.ReceivedQty,
 				&ln.POQty, &ln.POReceivedQty,
 				&ln.ItemID, &ln.PartnerID, &ln.ItemCode, &ln.ItemName,
-				&ln.TrackSerial, &ln.TrackLot, &ln.TrackInventory, &ln.WarrantyMonths,
+				&ln.TrackSerial, &ln.TrackLot, &ln.SerialPolicy, &ln.LotPolicy, &ln.TrackInventory, &ln.WarrantyMonths,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
 				return
@@ -984,10 +987,8 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Err(w, http.StatusInternalServerError, "Failed to count serials.", "ERR_INTERNAL")
 					return
 				}
-				if float64(serialCount)+0.0001 < ln.ReceivedQty {
-					response.Validation(w, map[string]string{
-						"serials": fmt.Sprintf("Line %d requires %d serial(s); only %d scanned.", ln.ID, int(ln.ReceivedQty+0.5), serialCount),
-					})
+				if err := inventory.ValidateGRSerialCapture(ln.ID, ln.SerialPolicy, serialCount, ln.ReceivedQty); err != nil {
+					response.Validation(w, map[string]string{"serials": err.Error()})
 					return
 				}
 			}
@@ -1000,10 +1001,8 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Err(w, http.StatusInternalServerError, "Failed to sum lots.", "ERR_INTERNAL")
 					return
 				}
-				if lotQty+0.0001 < ln.ReceivedQty {
-					response.Validation(w, map[string]string{
-						"lots": fmt.Sprintf("Line %d requires lot entries totaling %.4f; only %.4f recorded.", ln.ID, ln.ReceivedQty, lotQty),
-					})
+				if err := inventory.ValidateGRLotCapture(ln.ID, ln.LotPolicy, lotQty, ln.ReceivedQty); err != nil {
+					response.Validation(w, map[string]string{"lots": err.Error()})
 					return
 				}
 			}

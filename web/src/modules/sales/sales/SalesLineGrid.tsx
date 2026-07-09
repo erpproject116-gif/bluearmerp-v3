@@ -5,6 +5,7 @@ import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { LotLineCell } from "../../../shared/LotLineCell";
+import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
@@ -36,6 +37,8 @@ export type SalesLineRow = {
   serial_unit_ids?: number[];
   track_serial?: boolean;
   track_lot?: boolean;
+  serial_policy?: string;
+  lot_policy?: string;
   lot_batch_id?: number | null;
   lot_no?: string;
   source_sales_order_line_id?: number | null;
@@ -283,6 +286,8 @@ export function SalesLineGrid(props: Props) {
       input_basis: basis,
       track_serial: Boolean(first.track_serial),
       track_lot: Boolean(first.track_lot),
+      serial_policy: first.serial_policy ?? "required",
+      lot_policy: first.lot_policy ?? "required",
       serial_unit_ids: [],
       serial_lot_no: "",
       lot_batch_id: null,
@@ -300,6 +305,8 @@ export function SalesLineGrid(props: Props) {
         item_name: it.item_name,
         track_serial: Boolean(it.track_serial),
         track_lot: Boolean(it.track_lot),
+        serial_policy: it.serial_policy ?? "required",
+        lot_policy: it.lot_policy ?? "required",
       };
     }
     const numbered = current.map((ln, i) => ({ ...ln, line_no: i + 1 }));
@@ -417,7 +424,11 @@ export function SalesLineGrid(props: Props) {
                   </Show>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
                     <Show when={line().item_id && line().track_serial}>
-                      <SerialLineCell
+                      <div class="space-y-1">
+                        <p class="text-[10px] uppercase tracking-wide text-text-secondary">
+                          Serial · {trackingPolicyLabel(line().serial_policy)}
+                        </p>
+                        <SerialLineCell
                         mode="units"
                         itemId={line().item_id}
                         itemCode={line().item_code}
@@ -435,9 +446,14 @@ export function SalesLineGrid(props: Props) {
                           });
                         }}
                       />
+                      </div>
                     </Show>
                     <Show when={line().item_id && line().track_lot && !line().track_serial}>
-                      <LotLineCell
+                      <div class="space-y-1">
+                        <p class="text-[10px] uppercase tracking-wide text-text-secondary">
+                          Lot · {trackingPolicyLabel(line().lot_policy)}
+                        </p>
+                        <LotLineCell
                         itemId={line().item_id!}
                         locationId={props.locationId()}
                         lotBatchId={line().lot_batch_id}
@@ -446,6 +462,7 @@ export function SalesLineGrid(props: Props) {
                           void updateLine(idx, { lot_batch_id: lotBatchId, lot_no: lotNo, serial_lot_no: lotNo });
                         }}
                       />
+                      </div>
                     </Show>
                     <Show when={!line().item_id || (!line().track_serial && !line().track_lot)}>
                       <span class="text-xs text-text-secondary">—</span>

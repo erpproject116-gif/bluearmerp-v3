@@ -34,29 +34,21 @@ func ApplySaleSerialUnitsForCheckout(ctx context.Context, tx pgx.Tx, tenantID, s
 	return applySaleSerialUnits(ctx, tx, tenantID, salesID, partnerID, bodies)
 }
 
-// validateSaleSerialRequirements enforces serial_unit_ids for track_serial items before save.
+// validateSaleSerialRequirements enforces serial_unit_ids per item serial_policy before save.
 func validateSaleSerialRequirements(ctx context.Context, q pgx.Tx, tenantID int64, lines []saleLineBody) error {
 	for _, ln := range lines {
 		if ln.ItemID == nil || ln.Qty <= 0 {
 			continue
 		}
-		var trackSerial bool
-		if err := q.QueryRow(ctx, `
-			select track_serial from public.inv_items
-			where id = $1 and tenant_id = $2`, *ln.ItemID, tenantID).Scan(&trackSerial); err != nil || !trackSerial {
+		settings, err := inventory.LoadItemTrackingSettings(ctx, q, tenantID, *ln.ItemID)
+		if err != nil || !settings.TrackSerial {
 			if ln.SerialLotNo != nil && strings.TrimSpace(*ln.SerialLotNo) != "" && len(ln.SerialUnitIDs) == 0 {
 				return fmt.Errorf("line %d: serial_lot_no requires serial_unit_ids for tracked items", ln.LineNo)
 			}
 			continue
 		}
-		if len(ln.SerialUnitIDs) == 0 {
-			return fmt.Errorf("line %d: serial numbers are required for this item", ln.LineNo)
-		}
-		if ln.Qty != float64(int64(ln.Qty)) {
-			return fmt.Errorf("line %d: quantity must be a whole number for serial-tracked items", ln.LineNo)
-		}
-		if len(ln.SerialUnitIDs) != int(ln.Qty) {
-			return fmt.Errorf("line %d: serial count must match quantity (%.0f)", ln.LineNo, ln.Qty)
+		if err := inventory.ValidateSerialUnitCapture(ln.LineNo, settings.SerialPolicy, len(ln.SerialUnitIDs), ln.Qty); err != nil {
+			return err
 		}
 		if ln.SerialLotNo != nil && strings.TrimSpace(*ln.SerialLotNo) != "" && len(ln.SerialUnitIDs) == 0 {
 			return fmt.Errorf("line %d: serial_lot_no without serial_unit_ids is not allowed", ln.LineNo)
@@ -139,15 +131,18 @@ func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, par
 			}
 			continue
 		}
-		var trackSerial bool
-		if err := tx.QueryRow(ctx, `select track_serial from public.inv_items where id = $1`, *dbLn.itemID).Scan(&trackSerial); err != nil || !trackSerial {
+		settings, err := inventory.LoadItemTrackingSettings(ctx, tx, tenantID, *dbLn.itemID)
+		if err != nil || !settings.TrackSerial {
 			continue
 		}
 		if len(body.SerialUnitIDs) == 0 {
-			return fmt.Errorf("line %d: serial numbers are required for this item", dbLn.lineNo)
+			if inventory.IsTrackingPolicyRequired(settings.SerialPolicy) {
+				return fmt.Errorf("line %d: serial numbers are required for this item", dbLn.lineNo)
+			}
+			continue
 		}
-		if float64(len(body.SerialUnitIDs)) != dbLn.qty {
-			return fmt.Errorf("line %d: serial count must match quantity (%.0f)", dbLn.lineNo, dbLn.qty)
+		if err := inventory.ValidateSerialUnitCapture(dbLn.lineNo, settings.SerialPolicy, len(body.SerialUnitIDs), dbLn.qty); err != nil {
+			return err
 		}
 		serials := make([]string, 0, len(body.SerialUnitIDs))
 		for _, unitID := range body.SerialUnitIDs {
@@ -184,7 +179,7 @@ func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, par
 			serials = append(serials, serialNo)
 		}
 		serialText := strings.Join(serials, ", ")
-		_, err := tx.Exec(ctx, `update public.sa_sales_lines set serial_lot_no = $1 where id = $2`, serialText, dbLn.id)
+		_, err = tx.Exec(ctx, `update public.sa_sales_lines set serial_lot_no = $1 where id = $2`, serialText, dbLn.id)
 		if err != nil {
 			return err
 		}

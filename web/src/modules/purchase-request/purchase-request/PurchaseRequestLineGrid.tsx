@@ -11,6 +11,7 @@ import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
 import { PartnerSearchModal, type PartnerSearchRow } from "./PartnerSearchModal";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
+import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
 
 export type PurchaseRequestLineRow = {
   line_no: number;
@@ -38,6 +39,7 @@ export type PurchaseRequestLineRow = {
   goods_receipt_line_id?: number | null;
   purchase_order_line_id?: number | null;
   track_serial?: boolean;
+  serial_policy?: string;
   planned_serial_nos?: string[];
 };
 
@@ -227,6 +229,7 @@ export function PurchaseRequestLineGrid(props: Props) {
             unit_price: String(item.sales_price ?? 0),
             input_basis: basis,
             track_serial: Boolean(item.track_serial),
+            serial_policy: item.serial_policy ?? "required",
             planned_serial_nos: [],
           }
         : ln,
@@ -384,12 +387,17 @@ export function PurchaseRequestLineGrid(props: Props) {
                   <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().line_total))}</ResizableTd>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
                     <Show when={line().item_id && line().track_serial} fallback={<span class="text-xs text-text-secondary">—</span>}>
-                      <SerialLineCell
-                        mode="planned"
-                        qty={parseNum(line().qty)}
-                        plannedSerials={line().planned_serial_nos ?? []}
-                        onChange={(serials) => void updateLine(idx, { planned_serial_nos: serials })}
-                      />
+                      <div class="space-y-1">
+                        <p class="text-[10px] uppercase tracking-wide text-text-secondary">
+                          Planned · {trackingPolicyLabel(line().serial_policy)}
+                        </p>
+                        <SerialLineCell
+                          mode="planned"
+                          qty={parseNum(line().qty)}
+                          plannedSerials={line().planned_serial_nos ?? []}
+                          onChange={(serials) => void updateLine(idx, { planned_serial_nos: serials })}
+                        />
+                      </div>
                     </Show>
                   </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">

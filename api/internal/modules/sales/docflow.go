@@ -220,6 +220,9 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 	if err := validateSaleSerialRequirements(ctx, tx, tu.TenantID, lineBodies); err != nil {
 		return 0, docflowValidation(map[string]string{"lines": err.Error()})
 	}
+	if err := validateSaleLotRequirements(ctx, tx, tu.TenantID, lineBodies); err != nil {
+		return 0, docflowValidation(map[string]string{"lines": err.Error()})
+	}
 
 	if err := applySaleSerialUnits(ctx, tx, tu.TenantID, id, partnerID, lineBodies); err != nil {
 		return 0, docflowValidation(map[string]string{"lines": err.Error()})

@@ -31,25 +31,33 @@ func NormalizePlannedSerialNos(raw []string) []string {
 	return out
 }
 
-// ValidatePlannedSerialNos checks planned serial count against line qty for serial-tracked items.
-func ValidatePlannedSerialNos(ctx context.Context, pool *pgxpool.Pool, tenantID int64, itemID *int64, qty float64, planned []string) error {
+// ValidatePlannedSerialNos checks planned serial count against line qty and item serial policy.
+func ValidatePlannedSerialNos(ctx context.Context, pool *pgxpool.Pool, tenantID int64, lineNo int, itemID *int64, qty float64, planned []string) error {
 	planned = NormalizePlannedSerialNos(planned)
-	if len(planned) == 0 {
+	if itemID == nil || *itemID <= 0 {
+		if len(planned) > 0 {
+			return fmt.Errorf("planned serials require an item")
+		}
 		return nil
 	}
-	if itemID == nil || *itemID <= 0 {
-		return fmt.Errorf("planned serials require an item")
-	}
-	var trackSerial bool
-	err := pool.QueryRow(ctx, `
-		select coalesce(track_serial, false)
-		from public.inv_items
-		where id = $1 and tenant_id = $2`, *itemID, tenantID).Scan(&trackSerial)
+	settings, err := LoadItemTrackingSettings(ctx, pool, tenantID, *itemID)
 	if err != nil {
 		return fmt.Errorf("item not found for planned serials")
 	}
-	if !trackSerial {
-		return fmt.Errorf("item does not track serial numbers")
+	if !settings.TrackSerial {
+		if len(planned) > 0 {
+			return fmt.Errorf("item does not track serial numbers")
+		}
+		return nil
+	}
+	if lineNo <= 0 {
+		lineNo = 1
+	}
+	if err := ValidatePlannedSerialCapture(lineNo, settings.SerialPolicy, len(planned), qty); err != nil {
+		return err
+	}
+	if len(planned) == 0 {
+		return nil
 	}
 	maxQty := int(math.Floor(qty + 0.0001))
 	if maxQty < 1 {

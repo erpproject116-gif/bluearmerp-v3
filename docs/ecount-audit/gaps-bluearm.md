@@ -18,7 +18,7 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Option filter pills mirror form | Same 7 sections in search Option | Advanced search drawer with sections |
 | Module L0 tabs switch menu tree | Setup vs Purchases vs Sales | Already similar; ensure each tab's programs cataloged |
 | Safety stock per document type | Qty pill — 7 doc types | **Done** — `safety_stock_by_doc` on item + on-hand filter |
-| Serial/Lot policy radios | Management pill | `track_serial` + optional/required policy |
+| Serial/Lot policy radios | Management pill | **Done** — `serial_policy` / `lot_policy` on item + API enforcement |
 
 ## P1 — Item master (C000029)
 

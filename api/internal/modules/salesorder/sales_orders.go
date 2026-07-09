@@ -43,6 +43,7 @@ type SalesOrderLine struct {
 	SourceQuotationLineID  *int64   `json:"source_quotation_line_id,omitempty"`
 	PlannedSerialNos       []string `json:"planned_serial_nos,omitempty"`
 	TrackSerial            bool     `json:"track_serial,omitempty"`
+	SerialPolicy           string   `json:"serial_policy,omitempty"`
 }
 
 type SalesOrder struct {
@@ -420,7 +421,8 @@ func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID i
 		  ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
 		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark, ln.source_quotation_line_id,
 		  coalesce(ln.planned_serial_nos, '{}'),
-		  coalesce(i.track_serial, false)
+		  coalesce(i.track_serial, false),
+		  coalesce(i.serial_policy, 'required')
 		from public.so_sales_order_lines ln
 		left join public.inv_items i on i.id = ln.item_id
 		where ln.sales_order_id = $1
@@ -435,7 +437,7 @@ func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID i
 		var ln SalesOrderLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.DeliveredQty, &ln.BilledQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.SourceQuotationLineID, &ln.PlannedSerialNos, &ln.TrackSerial); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.SourceQuotationLineID, &ln.PlannedSerialNos, &ln.TrackSerial, &ln.SerialPolicy); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -799,7 +801,7 @@ func computeSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID in
 			continue
 		}
 		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
-		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.ItemID, ln.Qty, planned); err != nil {
+		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.LineNo, ln.ItemID, ln.Qty, planned); err != nil {
 			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}

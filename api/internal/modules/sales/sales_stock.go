@@ -5,7 +5,26 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 )
+
+// validateSaleLotRequirements enforces lot_batch_id per item lot_policy before save.
+func validateSaleLotRequirements(ctx context.Context, q pgx.Tx, tenantID int64, lines []saleLineBody) error {
+	for _, ln := range lines {
+		if ln.ItemID == nil || ln.Qty <= 0 {
+			continue
+		}
+		settings, err := inventory.LoadItemTrackingSettings(ctx, q, tenantID, *ln.ItemID)
+		if err != nil || !settings.TrackLot {
+			continue
+		}
+		if err := inventory.ValidateLotBatchCapture(ln.LineNo, settings.LotPolicy, ln.LotBatchID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // applySaleStock deducts inventory for direct (non-SO) lines with track_inventory_qty.
 // SO-linked lines rely on prior SO release for qty deduction.

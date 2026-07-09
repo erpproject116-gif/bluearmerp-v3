@@ -1,10 +1,10 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { apiFetch } from "../../shared/api";
-import { Modal } from "../../shared/Modal";
-import { inputClass } from "../../shared/SpreadsheetGrid";
-import { formatPeso } from "../../shared/money";
-import { useToast } from "../../shared/toast";
-import type { SalesLineRow } from "./SalesLineGrid";
+import { apiFetch } from "../../../shared/api";
+import { Modal } from "../../../shared/Modal";
+import { inputClass } from "../../../shared/SpreadsheetGrid";
+import { formatPeso } from "../../../shared/money";
+import { useToast } from "../../../shared/toast";
+import type { SalesLineRow, SalesTemplateCode } from "./SalesLineGrid";
 
 export type SalesHoldPayload = {
   order_date: string;
@@ -25,7 +25,7 @@ export type SalesHoldPayload = {
   si_dr_no: string;
   notes: string;
   progress_status: string;
-  template_code: string;
+  template_code: SalesTemplateCode;
   sales_category: string;
   source_sales_order_id: number | null;
   lines: SalesLineRow[];

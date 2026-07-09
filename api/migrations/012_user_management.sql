@@ -51,6 +51,8 @@ set
   sort_order = excluded.sort_order,
   updated_at = now();
 
+alter table public.users drop constraint if exists users_tenant_role_fkey;
+
 alter table public.users
   add constraint users_tenant_role_fkey
   foreign key (tenant_id, tenant_role)

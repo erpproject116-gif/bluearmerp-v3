@@ -81,6 +81,7 @@ export type SalesOrderDetail = {
     source_quotation_line_id?: number | null;
     planned_serial_nos?: string[];
     track_serial?: boolean;
+    serial_policy?: string;
   }>;
 };
 
@@ -144,6 +145,7 @@ function linesFromDetail(lines?: SalesOrderDetail["lines"]): SalesOrderLineRow[]
     source_quotation_line_id: ln.source_quotation_line_id ?? null,
     planned_serial_nos: ln.planned_serial_nos ?? [],
     track_serial: Boolean(ln.track_serial),
+    serial_policy: ln.serial_policy ?? "required",
   }));
 }
 

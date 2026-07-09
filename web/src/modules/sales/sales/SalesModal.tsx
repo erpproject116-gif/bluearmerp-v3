@@ -164,6 +164,8 @@ function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
     serial_unit_ids: ln.serial_unit_ids ?? [],
     track_serial: Boolean(ln.track_serial),
     track_lot: Boolean((ln as { track_lot?: boolean }).track_lot),
+    serial_policy: (ln as { serial_policy?: string }).serial_policy ?? "required",
+    lot_policy: (ln as { lot_policy?: string }).lot_policy ?? "required",
     lot_batch_id: (ln as { lot_batch_id?: number | null }).lot_batch_id ?? null,
     lot_no: (ln as { serial_lot_no?: string | null }).serial_lot_no ?? "",
     source_sales_order_line_id: ln.source_sales_order_line_id ?? null,

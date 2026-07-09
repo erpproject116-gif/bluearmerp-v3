@@ -8,6 +8,7 @@ import {
   emptySafetyStockByDoc,
   PRICE_LEVEL_KEYS,
   SAFETY_DOC_TYPES,
+  TRACKING_POLICY_OPTIONS,
 } from "../../shared/itemMasterConstants";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
@@ -33,6 +34,8 @@ type Item = {
   reorder_level?: number | null;
   track_serial?: boolean;
   track_lot?: boolean;
+  serial_policy?: string;
+  lot_policy?: string;
   track_inventory_qty?: boolean;
   status: string;
   custom_values?: Record<string, unknown>;
@@ -56,6 +59,8 @@ export default function ItemsPage() {
     reorder_level: null as number | null,
     track_serial: false,
     track_lot: false,
+    serial_policy: "required",
+    lot_policy: "required",
     track_inventory_qty: false,
     status: "active",
   });
@@ -89,6 +94,8 @@ export default function ItemsPage() {
       reorder_level: null,
       track_serial: false,
       track_lot: false,
+      serial_policy: "required",
+      lot_policy: "required",
       track_inventory_qty: false,
       status: "active",
     });
@@ -115,6 +122,8 @@ export default function ItemsPage() {
       reorder_level: row.reorder_level ?? null,
       track_serial: row.track_serial ?? false,
       track_lot: row.track_lot ?? false,
+      serial_policy: row.serial_policy ?? "required",
+      lot_policy: row.lot_policy ?? "required",
       track_inventory_qty: row.track_inventory_qty ?? false,
       status: row.status,
     });
@@ -136,7 +145,7 @@ export default function ItemsPage() {
     const payload = {
       ...form(),
       price_levels: Object.fromEntries(
-        PRICE_LEVEL_KEYS.map((k) => [k, form().price_levels[k] || 0]).filter(([, v]) => v > 0),
+        PRICE_LEVEL_KEYS.map((k): [string, number] => [k, Number(form().price_levels[k]) || 0]).filter(([, v]) => v > 0),
       ),
       safety_stock_by_doc: Object.fromEntries(
         SAFETY_DOC_TYPES.map((d) => {
@@ -357,6 +366,32 @@ export default function ItemsPage() {
             </label>
           </div>
         </Field>
+        <Show when={form().track_serial}>
+          <Field label="Serial capture policy">
+            <select
+              class={inputClass}
+              value={form().serial_policy}
+              onChange={(e) => setForm((f) => ({ ...f, serial_policy: e.currentTarget.value }))}
+            >
+              {TRACKING_POLICY_OPTIONS.map((o) => (
+                <option value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+        </Show>
+        <Show when={form().track_lot}>
+          <Field label="Lot capture policy">
+            <select
+              class={inputClass}
+              value={form().lot_policy}
+              onChange={(e) => setForm((f) => ({ ...f, lot_policy: e.currentTarget.value }))}
+            >
+              {TRACKING_POLICY_OPTIONS.map((o) => (
+                <option value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+        </Show>
         <p class="col-span-full text-xs text-text-secondary">
           After save, open{" "}
           <A href="/app/inventory/serial-lot/registry" class="text-brand-600 hover:underline">Serial registry</A>

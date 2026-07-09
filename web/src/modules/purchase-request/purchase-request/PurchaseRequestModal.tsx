@@ -74,6 +74,7 @@ export type PurchaseRequestDetail = {
     remark?: string | null;
     planned_serial_nos?: string[];
     track_serial?: boolean;
+    serial_policy?: string;
   }>;
 };
 
@@ -137,6 +138,7 @@ function linesFromDetail(lines?: PurchaseRequestDetail["lines"]): PurchaseReques
     remark: ln.remark ?? "",
     planned_serial_nos: ln.planned_serial_nos ?? [],
     track_serial: Boolean(ln.track_serial),
+    serial_policy: ln.serial_policy ?? "required",
   }));
 }
 

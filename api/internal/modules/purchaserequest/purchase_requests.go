@@ -43,6 +43,7 @@ type PurchaseRequestLine struct {
 	Remark             *string  `json:"remark,omitempty"`
 	PlannedSerialNos   []string `json:"planned_serial_nos,omitempty"`
 	TrackSerial        bool     `json:"track_serial,omitempty"`
+	SerialPolicy       string   `json:"serial_policy,omitempty"`
 }
 
 type PurchaseRequest struct {
@@ -495,7 +496,8 @@ func loadPurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, purchaseR
 		  ln.qty::float8, ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
 		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark,
 		  coalesce(ln.planned_serial_nos, '{}'),
-		  coalesce(i.track_serial, false)
+		  coalesce(i.track_serial, false),
+		  coalesce(i.serial_policy, 'required')
 		from public.pr_purchase_request_lines ln
 		left join public.inv_items i on i.id = ln.item_id
 		where ln.purchase_request_id = $1
@@ -511,7 +513,7 @@ func loadPurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, purchaseR
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.PartnerID, &ln.PartnerCode, &ln.PartnerName,
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.SpecName, &ln.Description,
 			&ln.Qty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial, &ln.SerialPolicy); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -858,7 +860,7 @@ func computePurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, tenant
 			continue
 		}
 		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
-		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.ItemID, ln.Qty, planned); err != nil {
+		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.LineNo, ln.ItemID, ln.Qty, planned); err != nil {
 			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}

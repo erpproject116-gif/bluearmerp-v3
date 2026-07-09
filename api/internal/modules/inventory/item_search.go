@@ -47,6 +47,8 @@ type itemSearchResult struct {
 	TrackInventoryQty   bool     `json:"track_inventory_qty"`
 	TrackSerial         bool     `json:"track_serial"`
 	TrackLot            bool     `json:"track_lot"`
+	SerialPolicy        string   `json:"serial_policy"`
+	LotPolicy           string   `json:"lot_policy"`
 	DefaultLocationQty  *float64 `json:"default_location_qty,omitempty"`
 	TotalInvQty         *float64 `json:"total_inv_qty,omitempty"`
 }
@@ -238,6 +240,7 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 		q := fmt.Sprintf(`
 			select i.id, i.item_code, i.item_name, i.spec_name, i.sales_price::float8, i.status,
 			       i.track_inventory_qty, coalesce(i.track_serial, false), coalesce(i.track_lot, false),
+			       coalesce(i.serial_policy, 'required'), coalesce(i.lot_policy, 'required'),
 			       def_bal.qty_on_hand::float8 as default_location_qty,
 			       coalesce(tot_bal.qty_on_hand, 0)::float8 as total_inv_qty,
 			       count(*) over()
@@ -277,7 +280,7 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 			var row itemSearchResult
 			var defQty, totQty *float64
 			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.SalesPrice, &row.Status,
-				&row.TrackInventoryQty, &row.TrackSerial, &row.TrackLot, &defQty, &totQty, &total); err != nil {
+				&row.TrackInventoryQty, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &defQty, &totQty, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read items.", "ERR_INTERNAL")
 				return
 			}
@@ -285,6 +288,8 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 				row.DefaultLocationQty = defQty
 				row.TotalInvQty = totQty
 			}
+			row.SerialPolicy = NormalizeTrackingPolicy(row.SerialPolicy)
+			row.LotPolicy = NormalizeTrackingPolicy(row.LotPolicy)
 			out = append(out, row)
 		}
 		if out == nil {

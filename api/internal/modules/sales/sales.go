@@ -46,6 +46,10 @@ type SaleLine struct {
 	SerialLotNo            *string `json:"serial_lot_no,omitempty"`
 	SerialUnitIDs          []int64 `json:"serial_unit_ids,omitempty"`
 	TrackSerial            bool    `json:"track_serial,omitempty"`
+	TrackLot               bool    `json:"track_lot,omitempty"`
+	LotBatchID             *int64  `json:"lot_batch_id,omitempty"`
+	SerialPolicy           string  `json:"serial_policy,omitempty"`
+	LotPolicy              string  `json:"lot_policy,omitempty"`
 	SourceSalesOrderLineID *int64  `json:"source_sales_order_line_id,omitempty"`
 }
 
@@ -409,8 +413,9 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 		  sl.unit_non_vat::float8, sl.non_vat_total::float8, sl.tax_amount::float8,
 		  sl.unit_vat_inc::float8, sl.line_total::float8,
 		  sl.discount_amount::float8, sl.discounted_unit_non_vat::float8, sl.discounted_unit_vat_inc::float8,
-		  sl.remark, sl.serial_lot_no, sl.source_sales_order_line_id,
-		  coalesce(i.track_serial, false),
+		  sl.remark, sl.serial_lot_no, sl.lot_batch_id, sl.source_sales_order_line_id,
+		  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
+		  coalesce(i.serial_policy, 'required'), coalesce(i.lot_policy, 'required'),
 		  coalesce((
 		    select array_agg(j.serial_unit_id order by su.serial_no)
 		    from public.inv_serial_unit_sales_lines j
@@ -433,7 +438,8 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 			&ln.Qty, &ln.ReturnedQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal,
 			&ln.DiscountAmount, &ln.DiscountedUnitNonVat, &ln.DiscountedUnitVatInc,
-			&ln.Remark, &ln.SerialLotNo, &ln.SourceSalesOrderLineID, &ln.TrackSerial, &ln.SerialUnitIDs); err != nil {
+			&ln.Remark, &ln.SerialLotNo, &ln.LotBatchID, &ln.SourceSalesOrderLineID,
+			&ln.TrackSerial, &ln.TrackLot, &ln.SerialPolicy, &ln.LotPolicy, &ln.SerialUnitIDs); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -568,6 +574,10 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if err := validateSaleSerialRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+		if err := validateSaleLotRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
 			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
 		}
@@ -725,6 +735,10 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if err := validateSaleSerialRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+		if err := validateSaleLotRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
 			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
 		}
