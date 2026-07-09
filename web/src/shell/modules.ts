@@ -570,6 +570,7 @@ export function resolveFeature(module: AppModule, pathname: string): ModuleFeatu
 }
 
 export function isFeatureSettings(pathname: string, feature: ModuleFeature): boolean {
+  if (feature.settingsHref === feature.href) return false;
   return pathname === feature.settingsHref;
 }
 

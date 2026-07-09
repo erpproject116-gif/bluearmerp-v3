@@ -1,8 +1,14 @@
 import { createContext, createEffect, createSignal, useContext, type ParentComponent } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { useSearchParams } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { inputClass } from "../../shared/SpreadsheetGrid";
-import { useOperationsWorkspaces } from "../../shared/useOperations";
+import {
+  boardWorkItemsQueryKey,
+  fetchOperationsBoardWorkItems,
+  fetchOperationsColumns,
+  useOperationsWorkspaces,
+} from "../../shared/useOperations";
 
 const STORAGE_KEY = "operations-active-workspace-id";
 
@@ -26,6 +32,7 @@ function readStoredWorkspaceId(): number | null {
 
 export const OperationsWorkspaceProvider: ParentComponent = (props) => {
   const [searchParams] = useSearchParams();
+  const qc = useQueryClient();
   const [workspaceId, setWorkspaceIdSignal] = createSignal<number | null>(readStoredWorkspaceId());
 
   const setWorkspaceId = (id: number | null) => {
@@ -53,6 +60,22 @@ export const OperationsWorkspaceProvider: ParentComponent = (props) => {
     const rows = workspaces.data?.rows;
     if (!id || !rows) return;
     if (!rows.some((w) => w.id === id)) setWorkspaceId(null);
+  });
+
+  // Warm board + column caches when workspace changes.
+  createEffect(() => {
+    const id = workspaceId();
+    if (!id) return;
+    void qc.prefetchQuery({
+      queryKey: boardWorkItemsQueryKey(id),
+      queryFn: () => fetchOperationsBoardWorkItems(id),
+      staleTime: 60_000,
+    });
+    void qc.prefetchQuery({
+      queryKey: ["operations-columns", id],
+      queryFn: () => fetchOperationsColumns(id),
+      staleTime: 60_000,
+    });
   });
 
   return (

@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from "solid-js";
-import { useOperationsWorkItems } from "../../shared/useOperations";
+import { useOperationsBoardWorkItems } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
 import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 
@@ -10,10 +10,7 @@ function weekLabel(dateStr: string) {
 
 export default function OperationsCalendarPage() {
   const { workspaceId } = useOperationsWorkspace();
-  const items = useOperationsWorkItems(() => ({
-    workspace_id: workspaceId() ?? undefined,
-    view: "calendar",
-  }));
+  const items = useOperationsBoardWorkItems(workspaceId);
 
   const grouped = createMemo(() => {
     const map = new Map<string, NonNullable<typeof items.data>["rows"]>();
@@ -37,9 +34,6 @@ export default function OperationsCalendarPage() {
           <p class="mb-3 text-sm text-red-600">
             {(items.error as Error)?.message ?? "Failed to load work items."}
           </p>
-        </Show>
-        <Show when={items.isFetching && !items.data}>
-          <p class="text-sm text-text-secondary">Loading…</p>
         </Show>
         <div class="space-y-4">
           <For each={grouped()}>

@@ -14,14 +14,14 @@ import {
   createWorkItem,
   createWorkspace,
   patchWorkItem,
+  boardWorkItemsQueryKey,
   useIndustryPacks,
   useInvalidateWorkItems,
   useInvalidateWorkspaces,
+  useOperationsBoardWorkItems,
   useOperationsColumns,
-  useOperationsWorkItems,
   useOperationsWorkspaces,
   type WorkItem,
-  type WorkItemsQueryParams,
   type Workspace,
 } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
@@ -52,6 +52,16 @@ function itemDetails(item: WorkItem): KanbanDetailRow[] {
   if (item.blocked_by_title) rows.push({ label: "Blocked by", value: item.blocked_by_title });
   if (item.quotation_reference) rows.push({ label: "Quote", value: item.quotation_reference });
   return rows;
+}
+
+function compareRows(a: WorkItem, b: WorkItem, key: string, ord: "asc" | "desc"): number {
+  const dir = ord === "asc" ? 1 : -1;
+  const av = (a as Record<string, unknown>)[key];
+  const bv = (b as Record<string, unknown>)[key];
+  if (av == null && bv == null) return 0;
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  return String(av).localeCompare(String(bv), undefined, { numeric: true }) * dir;
 }
 
 export default function OperationsHubPage() {
@@ -101,17 +111,20 @@ export default function OperationsHubPage() {
 
   const hasValidWorkspace = createMemo(() => activeWorkspace() != null);
 
-  const itemsParams = createMemo((): WorkItemsQueryParams => ({
-    workspace_id: hasValidWorkspace() ? (activeWorkspaceId() ?? undefined) : undefined,
-    board: viewMode() === "board",
-    q: debouncedQ() || undefined,
-    page: viewMode() === "board" ? 1 : page(),
-    pageSize: viewMode() === "board" ? 200 : pageSize,
-    sort: viewMode() === "table" ? sort() : undefined,
-    order: viewMode() === "table" ? order() : undefined,
+  const boardQ = createMemo(() => debouncedQ().trim() || undefined);
+  const items = useOperationsBoardWorkItems(activeWorkspaceId, () => ({
+    q: boardQ(),
+    enabled: hasValidWorkspace(),
   }));
 
-  const items = useOperationsWorkItems(() => itemsParams());
+  const tableRows = createMemo(() => {
+    const rows = [...(items.data?.rows ?? [])];
+    rows.sort((a, b) => compareRows(a, b, sort(), order()));
+    const start = (page() - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  });
+
+  const tableTotal = createMemo(() => items.data?.rows.length ?? 0);
 
   const boardColumns = createMemo(() => {
     const cols = columns.data ?? [];
@@ -149,7 +162,7 @@ export default function OperationsHubPage() {
     const colId = Number(toColumnId);
     if (!Number.isFinite(colId) || colId === item.column_id) return;
     const col = columns.data?.find((c) => c.id === colId);
-    const queryKey = ["operations-work-items", itemsParams()];
+    const queryKey = boardWorkItemsQueryKey(activeWorkspaceId()!, boardQ());
     type WorkItemsCache = { rows: WorkItem[]; total: number };
     const previous = qc.getQueryData<WorkItemsCache>(queryKey);
     qc.setQueryData<WorkItemsCache>(queryKey, (old) => {
@@ -422,7 +435,7 @@ export default function OperationsHubPage() {
                 ),
               },
             ]}
-            rows={items.data?.rows ?? []}
+            rows={tableRows()}
             loading={items.isFetching && !items.data}
             selectedId={selectedId()}
             onSelect={setSelectedId}
@@ -436,7 +449,7 @@ export default function OperationsHubPage() {
             onSort={toggleSort}
             page={page()}
             pageSize={pageSize}
-            total={items.data?.total ?? 0}
+            total={tableTotal()}
             onPageChange={setPage}
             search={q()}
             onSearchChange={setQ}

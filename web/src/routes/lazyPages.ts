@@ -163,11 +163,11 @@ export const OpportunitiesPage = lazy(() => import("../modules/crm/Opportunities
 export const TicketsPage = lazy(() => import("../modules/support/TicketsPage"));
 export const TicketDetailPage = lazy(() => import("../modules/support/TicketDetailPage"));
 export const SentDocumentsPage = lazy(() => import("../modules/comms/SentDocumentsPage"));
-export const OperationsHubPage = lazy(() => import("../modules/operations/OperationsHubPage"));
-export const OperationsCalendarPage = lazy(() => import("../modules/operations/OperationsCalendarPage"));
-export const OperationsTimelinePage = lazy(() => import("../modules/operations/OperationsTimelinePage"));
-export const OperationsDashboardPage = lazy(() => import("../modules/operations/OperationsDashboardPage"));
-export const OperationsAutomationPage = lazy(() => import("../modules/operations/OperationsAutomationPage"));
+export { default as OperationsHubPage } from "../modules/operations/OperationsHubPage";
+export { default as OperationsCalendarPage } from "../modules/operations/OperationsCalendarPage";
+export { default as OperationsTimelinePage } from "../modules/operations/OperationsTimelinePage";
+export { default as OperationsDashboardPage } from "../modules/operations/OperationsDashboardPage";
+export { default as OperationsAutomationPage } from "../modules/operations/OperationsAutomationPage";
 export const CommsInboxPage = lazy(() => import("../modules/comms/InboxPage"));
 export const CommsSettingsPage = lazy(() => import("../modules/comms/CommsSettingsPage"));
 export const PosPage = lazy(() => import("../modules/pos/PosPage"));

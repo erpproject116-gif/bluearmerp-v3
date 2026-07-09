@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from "solid-js";
-import { useOperationsWorkItems } from "../../shared/useOperations";
+import { useOperationsBoardWorkItems } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
 import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 
@@ -17,10 +17,7 @@ function formatRange(start?: string | null, end?: string | null) {
 
 export default function OperationsTimelinePage() {
   const { workspaceId } = useOperationsWorkspace();
-  const items = useOperationsWorkItems(() => ({
-    workspace_id: workspaceId() ?? undefined,
-    view: "timeline",
-  }));
+  const items = useOperationsBoardWorkItems(workspaceId);
 
   const timeline = createMemo(() => {
     const rows = items.data?.rows ?? [];
@@ -51,9 +48,6 @@ export default function OperationsTimelinePage() {
             <p class="mb-3 text-sm text-red-600">
               {(items.error as Error)?.message ?? "Failed to load work items."}
             </p>
-          </Show>
-          <Show when={items.isFetching && !items.data}>
-            <p class="text-sm text-text-secondary">Loading…</p>
           </Show>
           <div class="space-y-3">
             <For each={timeline()}>

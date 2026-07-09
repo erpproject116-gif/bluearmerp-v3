@@ -73,6 +73,8 @@ export type IndustryPack = {
   pack_name: string;
 };
 
+const OPS_STALE_MS = 60_000;
+
 export function useOperationsWorkspaces(params: () => { page: number; pageSize: number; q?: string }) {
   return createQuery(() => {
     const p = params();
@@ -85,9 +87,16 @@ export function useOperationsWorkspaces(params: () => { page: number; pageSize: 
         if (!res.success) throw new Error(res.message ?? "Failed to load workspaces");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 15_000,
+      staleTime: OPS_STALE_MS,
+      gcTime: 5 * OPS_STALE_MS,
     };
   });
+}
+
+export async function fetchOperationsColumns(workspaceId: number): Promise<Column[]> {
+  const res = await apiFetch<Column[]>(`/api/v1/operations/workspaces/${workspaceId}/columns`);
+  if (!res.success) throw new Error(res.message ?? "Failed to load columns");
+  return res.data ?? [];
 }
 
 export function useOperationsColumns(workspaceId: () => number | null) {
@@ -96,12 +105,10 @@ export function useOperationsColumns(workspaceId: () => number | null) {
     return {
       queryKey: ["operations-columns", id],
       enabled: id != null && id > 0,
-      queryFn: async () => {
-        const res = await apiFetch<Column[]>(`/api/v1/operations/workspaces/${id}/columns`);
-        if (!res.success) throw new Error(res.message ?? "Failed to load columns");
-        return res.data ?? [];
-      },
-      staleTime: 15_000,
+      queryFn: () => fetchOperationsColumns(id!),
+      staleTime: OPS_STALE_MS,
+      gcTime: 5 * OPS_STALE_MS,
+      placeholderData: (prev: Column[] | undefined) => prev,
     };
   });
 }
@@ -117,6 +124,45 @@ export type WorkItemsQueryParams = {
   order?: "asc" | "desc";
   enabled?: boolean;
 };
+
+type WorkItemsResult = { rows: WorkItem[]; total: number };
+
+export async function fetchOperationsBoardWorkItems(workspaceId: number, q?: string): Promise<WorkItemsResult> {
+  const qs = new URLSearchParams({
+    workspace_id: String(workspaceId),
+    board: "1",
+    page: "1",
+    pageSize: "200",
+  });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<WorkItem[]>(`/api/v1/operations/work-items?${qs}`);
+  if (!res.success) throw new Error(res.message ?? "Failed to load work items");
+  return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+}
+
+export function boardWorkItemsQueryKey(workspaceId: number, q?: string) {
+  return ["operations-work-items", "board", workspaceId, q?.trim() || null] as const;
+}
+
+/** Shared board fetch for Hub, Calendar, and Timeline — one cache entry per workspace. */
+export function useOperationsBoardWorkItems(
+  workspaceId: () => number | null,
+  opts?: () => { q?: string; enabled?: boolean },
+) {
+  return createQuery(() => {
+    const id = workspaceId() ?? 0;
+    const o = opts?.() ?? {};
+    const q = o.q?.trim() || undefined;
+    return {
+      queryKey: boardWorkItemsQueryKey(id, q),
+      enabled: o.enabled !== false && id > 0,
+      queryFn: () => fetchOperationsBoardWorkItems(id, q),
+      staleTime: OPS_STALE_MS,
+      gcTime: 5 * OPS_STALE_MS,
+      placeholderData: (prev: WorkItemsResult | undefined) => prev,
+    };
+  });
+}
 
 export function useOperationsWorkItems(params: () => WorkItemsQueryParams) {
   return createQuery(() => {
@@ -139,7 +185,8 @@ export function useOperationsWorkItems(params: () => WorkItemsQueryParams) {
         if (!res.success) throw new Error(res.message ?? "Failed to load work items");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 10_000,
+      staleTime: OPS_STALE_MS,
+      placeholderData: (prev: WorkItemsResult | undefined) => prev,
     };
   });
 }
@@ -163,7 +210,8 @@ export function useOperationsAutomationRules(params: () => {
         if (!res.success) throw new Error(res.message ?? "Failed to load rules");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 15_000,
+      staleTime: OPS_STALE_MS,
+      placeholderData: (prev: { rows: AutomationRule[]; total: number } | undefined) => prev,
     };
   });
 }
@@ -180,7 +228,8 @@ export function useOperationsDashboards(workspaceId: () => number | null) {
         if (!res.success) throw new Error(res.message ?? "Failed to load dashboards");
         return res.data ?? [];
       },
-      staleTime: 15_000,
+      staleTime: OPS_STALE_MS,
+      placeholderData: (prev: Dashboard[] | undefined) => prev,
     };
   });
 }
@@ -196,7 +245,8 @@ export function useOperationsWidgetData(dashboardId: () => number | null) {
         if (!res.success) throw new Error(res.message ?? "Failed to load widget data");
         return res.data ?? [];
       },
-      staleTime: 15_000,
+      staleTime: OPS_STALE_MS,
+      placeholderData: (prev: WidgetData[] | undefined) => prev,
     };
   });
 }
