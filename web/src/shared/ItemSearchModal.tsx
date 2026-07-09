@@ -1,8 +1,9 @@
 import { For, Show, createSignal } from "solid-js";
-import { apiFetch } from "./api";
 import { DecimalInput } from "./DecimalInput";
+import { inventoryItemSearchErrorMessage, postInventoryItemSearch } from "./inventoryItemSearch";
 import { Field, inputClass } from "./SpreadsheetGrid";
 import { modalDismissClass } from "./Modal";
+import { useToast } from "./toast";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
 
@@ -69,6 +70,7 @@ const ITEM_SEARCH_COLUMNS = [
 ] as const;
 
 export function ItemSearchModal(props: Props) {
+  const toast = useToast();
   const [tab, setTab] = createSignal<"filters" | "results">("filters");
   const [filters, setFilters] = createSignal(defaultFilters());
   const [results, setResults] = createSignal<ItemSearchRow[]>([]);
@@ -79,38 +81,43 @@ export function ItemSearchModal(props: Props) {
 
   const runSearch = async (p = 1) => {
     setSearching(true);
-    const f = filters();
-    const body: Record<string, unknown> = {
-      item_code: f.item_code,
-      item_name: f.item_name,
-      spec_name: f.spec_name,
-      unit: f.unit,
-      item_categories: f.item_categories,
-      production_process: f.production_process || undefined,
-      track_inventory_qty: f.track_inventory_qty,
-      keyword: f.keyword,
-      item_types: f.item_types,
-      sort_by_modified: f.sort_by_modified,
-      usage_status: f.usage_status,
-      page: p,
-      page_size: pageSize,
-    };
-    if (props.contextLocationId) body.context_location_id = props.contextLocationId;
-    if (f.purchase_price_min !== "") body.purchase_price_min = Number(f.purchase_price_min);
-    if (f.purchase_price_max !== "") body.purchase_price_max = Number(f.purchase_price_max);
-    if (f.sales_price_min !== "") body.sales_price_min = Number(f.sales_price_min);
-    if (f.sales_price_max !== "") body.sales_price_max = Number(f.sales_price_max);
+    try {
+      const f = filters();
+      const body: Record<string, unknown> = {
+        item_code: f.item_code,
+        item_name: f.item_name,
+        spec_name: f.spec_name,
+        unit: f.unit,
+        item_categories: f.item_categories,
+        production_process: f.production_process || undefined,
+        track_inventory_qty: f.track_inventory_qty,
+        keyword: f.keyword,
+        item_types: f.item_types,
+        sort_by_modified: f.sort_by_modified,
+        usage_status: f.usage_status,
+        page: p,
+        page_size: pageSize,
+      };
+      if (props.contextLocationId) body.context_location_id = props.contextLocationId;
+      if (f.purchase_price_min !== "") body.purchase_price_min = Number(f.purchase_price_min);
+      if (f.purchase_price_max !== "") body.purchase_price_max = Number(f.purchase_price_max);
+      if (f.sales_price_min !== "") body.sales_price_min = Number(f.sales_price_min);
+      if (f.sales_price_max !== "") body.sales_price_max = Number(f.sales_price_max);
 
-    const res = await apiFetch<ItemSearchRow[]>("/api/v1/inventory/items/search", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    setSearching(false);
-    if (!res.success) return;
-    setResults(res.data ?? []);
-    setTotal(res.meta?.total ?? 0);
-    setPage(p);
-    setTab("results");
+      const res = await postInventoryItemSearch(body);
+      if (!res.success) {
+        toast.error(inventoryItemSearchErrorMessage(res));
+        return;
+      }
+      setResults(res.data ?? []);
+      setTotal(res.meta?.total ?? 0);
+      setPage(p);
+      setTab("results");
+    } catch {
+      toast.error("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setSearching(false);
+    }
   };
 
   const reset = () => {

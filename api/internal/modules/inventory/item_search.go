@@ -3,6 +3,7 @@ package inventory
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -54,8 +55,57 @@ var validItemCategories = map[string]bool{
 	"semi_finished_goods": true, "merchandise": true, "intangible_merchandise": true,
 }
 
+var allItemCategoryCodes = []string{
+	"raw_material", "sub_material", "finished_goods",
+	"semi_finished_goods", "merchandise", "intangible_merchandise",
+}
+
 var validItemTypes = map[string]bool{
 	"item": true, "multiple_process_item": true, "multi_spec_item": true,
+}
+
+var allItemTypeCodes = []string{"item", "multiple_process_item", "multi_spec_item"}
+
+func filterKnownCodes(codes []string, valid map[string]bool) []string {
+	out := make([]string, 0, len(codes))
+	for _, c := range codes {
+		if valid[c] {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func isFullCategorySelection(cats []string) bool {
+	if len(cats) != len(allItemCategoryCodes) {
+		return false
+	}
+	set := make(map[string]bool, len(cats))
+	for _, c := range cats {
+		set[c] = true
+	}
+	for _, c := range allItemCategoryCodes {
+		if !set[c] {
+			return false
+		}
+	}
+	return true
+}
+
+func isFullTypeSelection(types []string) bool {
+	if len(types) != len(allItemTypeCodes) {
+		return false
+	}
+	set := make(map[string]bool, len(types))
+	for _, t := range types {
+		set[t] = true
+	}
+	for _, t := range allItemTypeCodes {
+		if !set[t] {
+			return false
+		}
+	}
+	return true
 }
 
 func registerItemSearchRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -107,18 +157,10 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, "%"+s+"%")
 			argN++
 		}
-		if len(f.ItemCategories) > 0 {
-			var cats []string
-			for _, c := range f.ItemCategories {
-				if validItemCategories[c] {
-					cats = append(cats, c)
-				}
-			}
-			if len(cats) > 0 {
-				where += fmt.Sprintf(" and i.item_category = any($%d)", argN)
-				args = append(args, cats)
-				argN++
-			}
+		if cats := filterKnownCodes(f.ItemCategories, validItemCategories); len(cats) > 0 && !isFullCategorySelection(cats) {
+			where += fmt.Sprintf(" and coalesce(cat.code, i.item_category, 'merchandise') = any($%d)", argN)
+			args = append(args, cats)
+			argN++
 		}
 		if s := strings.TrimSpace(f.ProductionProcess); s == "bundle" || s == "service" {
 			where += fmt.Sprintf(" and i.production_process = $%d", argN)
@@ -156,18 +198,10 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, "%"+s+"%")
 			argN++
 		}
-		if len(f.ItemTypes) > 0 {
-			var types []string
-			for _, t := range f.ItemTypes {
-				if validItemTypes[t] {
-					types = append(types, t)
-				}
-			}
-			if len(types) > 0 {
-				where += fmt.Sprintf(" and i.item_type = any($%d)", argN)
-				args = append(args, types)
-				argN++
-			}
+		if types := filterKnownCodes(f.ItemTypes, validItemTypes); len(types) > 0 && !isFullTypeSelection(types) {
+			where += fmt.Sprintf(" and i.item_type = any($%d)", argN)
+			args = append(args, types)
+			argN++
 		}
 		switch f.UsageStatus {
 		case "active":
@@ -180,22 +214,13 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 		args = append(args, contextLocID)
 		argN++
 
-		having := ""
 		if f.MinTotalInvQty != nil {
-			having = fmt.Sprintf(" having coalesce(sum(tot.qty_on_hand), 0) >= $%d", argN)
+			where += fmt.Sprintf(` and coalesce(tot_bal.qty_on_hand, 0) >= $%d`, argN)
 			args = append(args, *f.MinTotalInvQty)
 			argN++
 		}
 		if f.MinDefaultLocationQty != nil {
-			if having == "" {
-				having = " having "
-			} else {
-				having += " and "
-			}
-			having += fmt.Sprintf(`coalesce(max(case
-				when $%d::bigint > 0 and defloc.location_id = $%d::bigint then defloc.qty_on_hand
-				when $%d::bigint = 0 and i.default_location_id is not null and defloc.location_id = i.default_location_id then defloc.qty_on_hand
-				else null end), 0) >= $%d`, contextLocArg, contextLocArg, contextLocArg, argN)
+			where += fmt.Sprintf(` and coalesce(def_bal.qty_on_hand, 0) >= $%d`, argN)
 			args = append(args, *f.MinDefaultLocationQty)
 			argN++
 		}
@@ -212,25 +237,34 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 		q := fmt.Sprintf(`
 			select i.id, i.item_code, i.item_name, i.spec_name, i.sales_price::float8, i.status,
 			       i.track_inventory_qty, coalesce(i.track_serial, false),
-			       max(case
-			         when $%d::bigint > 0 and defloc.location_id = $%d::bigint then defloc.qty_on_hand
-			         when $%d::bigint = 0 and i.default_location_id is not null and defloc.location_id = i.default_location_id then defloc.qty_on_hand
-			         else null end)::float8 as default_location_qty,
-			       coalesce(sum(tot.qty_on_hand), 0)::float8 as total_inv_qty,
+			       def_bal.qty_on_hand::float8 as default_location_qty,
+			       coalesce(tot_bal.qty_on_hand, 0)::float8 as total_inv_qty,
 			       count(*) over()
 			from public.inv_items i
-			left join public.inv_item_location_balances defloc
-			  on defloc.tenant_id = i.tenant_id and defloc.item_id = i.id
-			left join public.inv_item_location_balances tot
-			  on tot.tenant_id = i.tenant_id and tot.item_id = i.id
+			left join public.inv_item_categories cat
+			  on cat.id = i.item_category_id and cat.tenant_id = i.tenant_id
+			left join lateral (
+			  select b.qty_on_hand
+			  from public.inv_item_location_balances b
+			  where b.tenant_id = i.tenant_id and b.item_id = i.id
+			    and (
+			      ($%[1]d::bigint > 0 and b.location_id = $%[1]d::bigint)
+			      or ($%[1]d::bigint = 0 and i.default_location_id is not null and b.location_id = i.default_location_id)
+			    )
+			  limit 1
+			) def_bal on true
+			left join lateral (
+			  select coalesce(sum(b.qty_on_hand), 0) as qty_on_hand
+			  from public.inv_item_location_balances b
+			  where b.tenant_id = i.tenant_id and b.item_id = i.id
+			) tot_bal on true
 			where %s
-			group by i.id
-			%s
 			order by %s
-			limit $%d offset $%d`, contextLocArg, contextLocArg, contextLocArg, where, having, orderBy, limitArg, offsetArg)
+			limit $%d offset $%d`, contextLocArg, where, orderBy, limitArg, offsetArg)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
+			log.Printf("inventory item search: %v", err)
 			response.Err(w, http.StatusInternalServerError, "Item search failed.", "ERR_INTERNAL")
 			return
 		}
