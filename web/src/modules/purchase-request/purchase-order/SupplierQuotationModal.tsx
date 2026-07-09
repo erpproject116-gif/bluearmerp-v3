@@ -1,5 +1,7 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
@@ -192,6 +194,11 @@ export function SupplierQuotationModal(props: Props) {
             </h2>
             <div class="flex items-center gap-2">
               <Show when={isEdit()}>
+                <DocumentEmailToolbar
+                  docId={props.quotationId}
+                  sendUrl="/api/v1/purchase-order/supplier-quotations/{id}/send-email"
+                  title="Email supplier quotation"
+                />
                 <RecordHistoryButton
                   variant="button"
                   targetType="rfq_supplier_quotation"
@@ -251,6 +258,10 @@ export function SupplierQuotationModal(props: Props) {
                 />
               </label>
             </div>
+
+            <Show when={isEdit()}>
+              <EmailHistoryPanel docType="supplier_quotation" docId={props.quotationId} />
+            </Show>
 
             <div class="mt-4 overflow-x-auto rounded border border-stroke">
               <table class="min-w-full text-sm">

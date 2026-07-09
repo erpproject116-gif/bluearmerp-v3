@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/operations"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
@@ -344,6 +345,7 @@ func createFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "crm.task.create", "crm_follow_up_task", &id, nil, body)
 		row, _ := scanFollowUpTask(pool.QueryRow(r.Context(), followUpTaskByIDQuery(), id))
+		_ = operations.MirrorCRMFollowUpTask(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Created.")
 	}
 }
@@ -406,6 +408,7 @@ func patchFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "crm.task.update", "crm_follow_up_task", &id, nil, body)
 		row, _ := scanFollowUpTask(pool.QueryRow(r.Context(), followUpTaskByIDQuery(), id))
+		_ = operations.MirrorCRMFollowUpTask(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Updated.")
 	}
 }
@@ -446,6 +449,7 @@ func patchFollowUpTaskStage(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "crm.task.stage", "crm_follow_up_task", &id, nil, body)
 		row, _ := scanFollowUpTask(pool.QueryRow(r.Context(), followUpTaskByIDQuery(), id))
+		_ = operations.MirrorCRMFollowUpTask(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Updated.")
 	}
 }

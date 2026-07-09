@@ -9,8 +9,19 @@
     { "key": "complete", "name": "Complete", "sort_order": 40, "color": "#34d399" }
   ],
   "sample_work_items": [
-    { "title": "Site survey & measurements", "column_key": "backlog", "priority": "high", "start_date_offset_days": 0, "end_date_offset_days": 3 },
-    { "title": "Permit application", "column_key": "planning", "priority": "normal", "start_date_offset_days": 2, "end_date_offset_days": 14 }
+    { "title": "Site survey & as-built measurements", "column_key": "backlog", "priority": "high", "start_date_offset_days": 0, "end_date_offset_days": 2 },
+    { "title": "Geotechnical soil test coordination", "column_key": "backlog", "priority": "normal", "start_date_offset_days": 1, "end_date_offset_days": 5 },
+    { "title": "Building permit application (LG U)", "column_key": "planning", "priority": "high", "start_date_offset_days": 3, "end_date_offset_days": 21 },
+    { "title": "Structural drawings — architect review", "column_key": "planning", "priority": "normal", "start_date_offset_days": 5, "end_date_offset_days": 12 },
+    { "title": "Electrical & plumbing layout approval", "column_key": "planning", "priority": "normal", "start_date_offset_days": 7, "end_date_offset_days": 14 },
+    { "title": "Procure rebar & formwork — Level 2 slab", "column_key": "planning", "priority": "urgent", "start_date_offset_days": 10, "end_date_offset_days": 16 },
+    { "title": "Formwork & rebar — Level 2 slab pour", "column_key": "in_progress", "priority": "high", "start_date_offset_days": 14, "end_date_offset_days": 20 },
+    { "title": "MEP rough-in — electrical conduit", "column_key": "in_progress", "priority": "normal", "start_date_offset_days": 16, "end_date_offset_days": 24 },
+    { "title": "Waterproofing — basement retaining wall", "column_key": "in_progress", "priority": "high", "start_date_offset_days": 18, "end_date_offset_days": 22 },
+    { "title": "Fire protection inspection prep", "column_key": "inspection", "priority": "normal", "start_date_offset_days": 22, "end_date_offset_days": 25 },
+    { "title": "Final punch list — lobby & common areas", "column_key": "inspection", "priority": "high", "start_date_offset_days": 24, "end_date_offset_days": 28 },
+    { "title": "Client walkthrough & snag list sign-off", "column_key": "complete", "priority": "normal", "start_date_offset_days": 28, "end_date_offset_days": 30 },
+    { "title": "As-built drawings & turnover binder", "column_key": "complete", "priority": "low", "start_date_offset_days": 29, "end_date_offset_days": 35 }
   ],
   "automation_rules": [
     {

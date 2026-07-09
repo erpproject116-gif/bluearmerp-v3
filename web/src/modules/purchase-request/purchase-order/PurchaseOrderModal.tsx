@@ -20,6 +20,7 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
 import { TermHint } from "../../../shared/TermHint";
 import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
@@ -712,6 +713,7 @@ export function PurchaseOrderModal(props: Props) {
         onCountChange={setAttachmentCount}
         emptyUnsavedHint="Save the purchase order first to attach files (max 25 MB each). Confirm on the list only after uploading."
       />
+      <EmailHistoryPanel docType="purchase_order" docId={effectivePoId()} />
       <ChangeLogPanel targetType="po_purchase_order" targetId={effectivePoId()} />
     </WideEntityModal>
     <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="po_purchase_order" targetId={effectivePoId()} title="History — Purchase Order" />

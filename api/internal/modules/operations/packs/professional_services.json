@@ -1,0 +1,42 @@
+{
+  "pack_code": "professional_services",
+  "pack_name": "Professional Services",
+  "columns": [
+    { "key": "lead", "name": "Lead / Qualify", "sort_order": 0, "color": "#94a3b8" },
+    { "key": "proposal", "name": "Proposal", "sort_order": 10, "color": "#60a5fa" },
+    { "key": "delivery", "name": "Delivery", "sort_order": 20, "color": "#fbbf24" },
+    { "key": "invoice", "name": "Invoice", "sort_order": 30, "color": "#a78bfa" },
+    { "key": "closed", "name": "Closed", "sort_order": 40, "color": "#34d399" }
+  ],
+  "sample_work_items": [
+    { "title": "Discovery call — Acme Corp ERP rollout", "column_key": "lead", "priority": "high", "start_date_offset_days": 0, "end_date_offset_days": 2 },
+    { "title": "Qualify scope: inventory + job costing", "column_key": "lead", "priority": "normal", "start_date_offset_days": 1, "end_date_offset_days": 4 },
+    { "title": "Draft SOW & fixed-fee proposal", "column_key": "proposal", "priority": "high", "start_date_offset_days": 3, "end_date_offset_days": 10 },
+    { "title": "Legal review — MSA redlines", "column_key": "proposal", "priority": "normal", "start_date_offset_days": 8, "end_date_offset_days": 12 },
+    { "title": "Phase 1 — chart of accounts setup", "column_key": "delivery", "priority": "normal", "start_date_offset_days": 14, "end_date_offset_days": 21 },
+    { "title": "Phase 1 — user training (store admins)", "column_key": "delivery", "priority": "high", "start_date_offset_days": 20, "end_date_offset_days": 24 },
+    { "title": "Milestone 1 invoice — 50% deposit", "column_key": "invoice", "priority": "urgent", "start_date_offset_days": 12, "end_date_offset_days": 14 },
+    { "title": "Project retrospective & case study", "column_key": "closed", "priority": "low", "start_date_offset_days": 30, "end_date_offset_days": 32 }
+  ],
+  "automation_rules": [
+    {
+      "rule_name": "Notify on proposal stage",
+      "trigger_event": "work_item.column_changed",
+      "trigger_config": { "column_key": "proposal" },
+      "action_type": "notify",
+      "action_config": { "message": "Work item moved to Proposal." }
+    }
+  ],
+  "dashboard_widgets": [
+    {
+      "widget_type": "work_item_summary",
+      "title": "Pipeline by Stage",
+      "grid_x": 0,
+      "grid_y": 0,
+      "grid_w": 12,
+      "grid_h": 3,
+      "sort_order": 0,
+      "config": {}
+    }
+  ]
+}

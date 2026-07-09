@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { KanbanBoard } from "../../shared/KanbanBoard";
 import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
 import { useCrmTaskModal } from "../../shared/CrmTaskModal";
@@ -108,13 +108,21 @@ export default function FollowUpTasksPage() {
     <CrmLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <ViewModeToggle value={viewMode()} onChange={setViewMode} storageKey={STORAGE_KEY} />
-        <button
+        <div class="flex flex-wrap items-center gap-2">
+          <A
+            href="/app/operations?ws=crm-follow-up"
+            class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-brand-600 hover:bg-slate-50"
+          >
+            View in Operations Hub
+          </A>
+          <button
           type="button"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           onClick={() => crmTask.openCreate()}
         >
           + New task
         </button>
+        </div>
       </div>
 
       <Show when={viewMode() === "table"}>

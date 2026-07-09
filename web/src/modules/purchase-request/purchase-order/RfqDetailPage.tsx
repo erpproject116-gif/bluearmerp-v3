@@ -5,6 +5,7 @@ import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { SupplierQuotationModal } from "./SupplierQuotationModal";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { openRfqPrint } from "./rfqPrint";
 
 type RfqLine = {
@@ -184,6 +185,8 @@ export default function RfqDetailPage() {
               <Show when={x.notes}>
                 <p class="mt-2 text-sm text-text-secondary">{x.notes}</p>
               </Show>
+
+              <EmailHistoryPanel docType="rfq" docId={x.id} />
 
               <div class="mt-4 overflow-x-auto rounded border border-stroke">
                 <table class="min-w-full text-sm">

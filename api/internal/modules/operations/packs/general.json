@@ -1,0 +1,30 @@
+{
+  "pack_code": "general",
+  "pack_name": "General SME",
+  "columns": [
+    { "key": "todo", "name": "To Do", "sort_order": 0, "color": "#94a3b8" },
+    { "key": "doing", "name": "In Progress", "sort_order": 10, "color": "#60a5fa" },
+    { "key": "done", "name": "Done", "sort_order": 20, "color": "#34d399" }
+  ],
+  "sample_work_items": [
+    { "title": "Weekly team stand-up agenda", "column_key": "todo", "priority": "normal", "start_date_offset_days": 0, "end_date_offset_days": 1 },
+    { "title": "Review open customer quotes", "column_key": "todo", "priority": "high", "start_date_offset_days": 0, "end_date_offset_days": 2 },
+    { "title": "Update supplier price list — Q2", "column_key": "doing", "priority": "normal", "start_date_offset_days": 1, "end_date_offset_days": 5 },
+    { "title": "Reconcile petty cash float", "column_key": "doing", "priority": "low", "start_date_offset_days": 2, "end_date_offset_days": 4 },
+    { "title": "Prepare month-end inventory count", "column_key": "todo", "priority": "high", "start_date_offset_days": 5, "end_date_offset_days": 8 },
+    { "title": "File BIR 2550Q draft", "column_key": "done", "priority": "urgent", "start_date_offset_days": -7, "end_date_offset_days": -3 }
+  ],
+  "automation_rules": [],
+  "dashboard_widgets": [
+    {
+      "widget_type": "work_item_summary",
+      "title": "Work Items by Status",
+      "grid_x": 0,
+      "grid_y": 0,
+      "grid_w": 12,
+      "grid_h": 3,
+      "sort_order": 0,
+      "config": {}
+    }
+  ]
+}

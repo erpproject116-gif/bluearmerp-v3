@@ -1,0 +1,33 @@
+{
+  "pack_code": "warehouse",
+  "pack_name": "Warehouse / Logistics",
+  "columns": [
+    { "key": "receive", "name": "Receive", "sort_order": 0, "color": "#60a5fa" },
+    { "key": "pick", "name": "Pick", "sort_order": 10, "color": "#fbbf24" },
+    { "key": "ship", "name": "Ship", "sort_order": 20, "color": "#a78bfa" },
+    { "key": "reconcile", "name": "Reconcile", "sort_order": 30, "color": "#34d399" }
+  ],
+  "sample_work_items": [
+    { "title": "Inbound GR — PO-2026-0142 (12 pallets)", "column_key": "receive", "priority": "high", "start_date_offset_days": 0, "end_date_offset_days": 1 },
+    { "title": "QC sample — lot expiry check", "column_key": "receive", "priority": "normal", "start_date_offset_days": 0, "end_date_offset_days": 2 },
+    { "title": "Pick list — SO-8841 (Metro Manila)", "column_key": "pick", "priority": "urgent", "start_date_offset_days": 1, "end_date_offset_days": 2 },
+    { "title": "Pick list — SO-8845 (Cebu hub transfer)", "column_key": "pick", "priority": "high", "start_date_offset_days": 1, "end_date_offset_days": 3 },
+    { "title": "Pack & label — outbound SO-8841", "column_key": "ship", "priority": "high", "start_date_offset_days": 2, "end_date_offset_days": 3 },
+    { "title": "Book courier — J&T bulk shipment", "column_key": "ship", "priority": "normal", "start_date_offset_days": 2, "end_date_offset_days": 4 },
+    { "title": "Cycle count — aisle B fast movers", "column_key": "reconcile", "priority": "normal", "start_date_offset_days": 4, "end_date_offset_days": 6 },
+    { "title": "Investigate variance — SKU-WDG-014", "column_key": "reconcile", "priority": "high", "start_date_offset_days": 5, "end_date_offset_days": 7 }
+  ],
+  "automation_rules": [],
+  "dashboard_widgets": [
+    {
+      "widget_type": "work_item_summary",
+      "title": "Warehouse Tasks",
+      "grid_x": 0,
+      "grid_y": 0,
+      "grid_w": 12,
+      "grid_h": 3,
+      "sort_order": 0,
+      "config": {}
+    }
+  ]
+}

@@ -1,5 +1,5 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
-import { A, useNavigate } from "@solidjs/router";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { KanbanBoard } from "../../shared/KanbanBoard";
 import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
@@ -24,6 +24,14 @@ import { OperationsLayout } from "./OperationsLayout";
 
 const STORAGE_KEY = "operations-hub-view";
 
+const SAMPLE_PRESETS = [
+  { code: "riverside-reno", name: "Riverside Office Renovation", pack: "construction" },
+  { code: "acme-erp-rollout", name: "Acme Corp ERP Rollout", pack: "professional_services" },
+  { code: "metro-hub-w12", name: "Metro Hub — Week 12 Ops", pack: "warehouse" },
+  { code: "wo-4412-rail", name: "WO-4412 Guard Rail Job", pack: "job_shop" },
+  { code: "sme-ops", name: "SME Weekly Operations", pack: "general" },
+] as const;
+
 const PRIORITY_LABELS: Record<string, string> = {
   low: "Low",
   normal: "Normal",
@@ -44,6 +52,7 @@ function itemDetails(item: WorkItem): KanbanDetailRow[] {
 export default function OperationsHubPage() {
   const auth = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const toast = useToast();
   const invalidate = useInvalidateOperations();
   const canCreateWorkspace = () => hasPermission(auth.me, "operations.workspaces_new", "write");
@@ -56,7 +65,7 @@ export default function OperationsHubPage() {
   const [itemModalOpen, setItemModalOpen] = createSignal(false);
   const [wsCode, setWsCode] = createSignal("");
   const [wsName, setWsName] = createSignal("");
-  const [wsPack, setWsPack] = createSignal("construction");
+  const [wsPack, setWsPack] = createSignal("general");
   const [itemTitle, setItemTitle] = createSignal("");
   const [itemColumnId, setItemColumnId] = createSignal<number | null>(null);
   const [itemStartDate, setItemStartDate] = createSignal("");
@@ -69,6 +78,14 @@ export default function OperationsHubPage() {
   const workspaces = useOperationsWorkspaces(() => ({ page: 1, pageSize: 50 }));
   const packs = useIndustryPacks();
   const columns = useOperationsColumns(activeWorkspaceId);
+
+  createEffect(() => {
+    const code = typeof searchParams.ws === "string" ? searchParams.ws.trim() : "";
+    if (!code || activeWorkspaceId()) return;
+    const match = workspaces.data?.rows.find((w) => w.workspace_code === code);
+    if (match) setActiveWorkspaceId(match.id);
+  });
+
   const items = useOperationsWorkItems(() => ({
     workspace_id: activeWorkspaceId() ?? undefined,
     board: viewMode() === "board",
@@ -125,6 +142,35 @@ export default function OperationsHubPage() {
     invalidate();
     if (res.data?.id) setActiveWorkspaceId(res.data.id);
     toast.success("Workspace created.");
+  };
+
+  const loadSampleWorkspace = async (preset: (typeof SAMPLE_PRESETS)[number]) => {
+    setSaving(true);
+    let code: string = preset.code;
+    let res = await createWorkspace({
+      workspace_code: code,
+      workspace_name: preset.name,
+      industry_pack: preset.pack,
+    });
+    if (!res.success) {
+      code = `${preset.code}-${Date.now().toString(36).slice(-4)}`;
+      res = await createWorkspace({
+        workspace_code: code,
+        workspace_name: preset.name,
+        industry_pack: preset.pack,
+      });
+    }
+    setSaving(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not load sample workspace.");
+      return;
+    }
+    invalidate();
+    if (res.data?.id) {
+      setActiveWorkspaceId(res.data.id);
+      setViewMode("board");
+    }
+    toast.success(`Sample project loaded: ${preset.name}`);
   };
 
   const openNewItem = () => {
@@ -224,9 +270,33 @@ export default function OperationsHubPage() {
 
       <Show when={!activeWorkspaceId()} fallback={null}>
         <div class="rounded-xl border border-dashed border-stroke bg-slate-50 p-8 text-center text-sm text-text-secondary">
-          Select or create a workspace to manage work items.
+          <p>Select a workspace below, create your own, or load a sample project with realistic tasks.</p>
+          <Show when={canCreateWorkspace()}>
+            <div class="mt-4">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                Load sample data (industry pack)
+              </p>
+              <div class="flex flex-wrap justify-center gap-2">
+                <For each={SAMPLE_PRESETS}>
+                  {(preset) => (
+                    <button
+                      type="button"
+                      class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                      disabled={saving()}
+                      onClick={() => void loadSampleWorkspace(preset)}
+                    >
+                      {preset.name}
+                    </button>
+                  )}
+                </For>
+              </div>
+              <p class="mt-2 text-xs">
+                Each sample creates a workspace with Kanban columns, dated work items, and a dashboard.
+              </p>
+            </div>
+          </Show>
           <Show when={workspaces.data?.rows.length}>
-            <div class="mt-4 flex flex-wrap justify-center gap-2">
+            <div class="mt-6 flex flex-wrap justify-center gap-2">
               <For each={workspaces.data?.rows ?? []}>
                 {(ws) => (
                   <button

@@ -109,6 +109,7 @@ func main() {
 
 	r.Route("/api/v1", func(api chi.Router) {
 		crm.RegisterJobRoutes(api, pool)
+		operations.RegisterJobRoutes(api, pool)
 		finance.RegisterJobRoutes(api, pool)
 		platformreports.RegisterJobRoutes(api, pool)
 		retention.RegisterJobRoutes(api, pool, cfg)

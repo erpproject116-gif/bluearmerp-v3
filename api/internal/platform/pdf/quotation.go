@@ -43,9 +43,10 @@ type QuotationDoc struct {
 }
 
 type QuotationPrintInput struct {
-	Tenant    Party
-	Partner   Party
-	Quotation QuotationDoc
+	Tenant      Party
+	Partner     Party
+	Quotation   QuotationDoc
+	GeneratedAt *time.Time
 }
 
 func formatMoney(amount float64, currencyCode string) string {
@@ -164,6 +165,10 @@ func RenderQuotationPDF(in QuotationPrintInput) ([]byte, error) {
 		d.RenderTextBlock("Notes", q.Notes)
 	}
 
-	d.RenderFooter(fmt.Sprintf("Generated from BluearmERP · %s", time.Now().Format("2006-01-02 15:04")))
+	generatedAt := time.Now()
+	if in.GeneratedAt != nil {
+		generatedAt = *in.GeneratedAt
+	}
+	d.RenderFooter(fmt.Sprintf("Generated from BluearmERP · %s", generatedAt.Format("2006-01-02 15:04")))
 	return d.Bytes()
 }

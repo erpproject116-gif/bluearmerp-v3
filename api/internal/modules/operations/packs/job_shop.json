@@ -1,0 +1,43 @@
+{
+  "pack_code": "job_shop",
+  "pack_name": "Engineering / Job Shop",
+  "columns": [
+    { "key": "design", "name": "Design", "sort_order": 0, "color": "#60a5fa" },
+    { "key": "fabrication", "name": "Fabrication", "sort_order": 10, "color": "#fbbf24" },
+    { "key": "install", "name": "Install", "sort_order": 20, "color": "#a78bfa" },
+    { "key": "billing", "name": "Billing", "sort_order": 30, "color": "#34d399" }
+  ],
+  "sample_work_items": [
+    { "title": "CAD — stainless guard rail WO-4412", "column_key": "design", "priority": "high", "start_date_offset_days": 0, "end_date_offset_days": 4 },
+    { "title": "Client approval — fabrication drawing rev B", "column_key": "design", "priority": "normal", "start_date_offset_days": 3, "end_date_offset_days": 6 },
+    { "title": "CNC nest & cut — 6mm SS sheets", "column_key": "fabrication", "priority": "high", "start_date_offset_days": 5, "end_date_offset_days": 8 },
+    { "title": "Weld & grind — guard rail sections", "column_key": "fabrication", "priority": "normal", "start_date_offset_days": 7, "end_date_offset_days": 12 },
+    { "title": "Powder coat — RAL 9003 batch", "column_key": "fabrication", "priority": "normal", "start_date_offset_days": 10, "end_date_offset_days": 14 },
+    { "title": "Site install — Plant 3 mezzanine", "column_key": "install", "priority": "urgent", "start_date_offset_days": 14, "end_date_offset_days": 16 },
+    { "title": "Final inspection & handover photos", "column_key": "install", "priority": "normal", "start_date_offset_days": 15, "end_date_offset_days": 17 },
+    { "title": "Progress billing — 70% fabrication milestone", "column_key": "billing", "priority": "high", "start_date_offset_days": 12, "end_date_offset_days": 14 }
+  ],
+  "automation_rules": [],
+  "dashboard_widgets": [
+    {
+      "widget_type": "job_cost_bva",
+      "title": "Budget vs Actual",
+      "grid_x": 0,
+      "grid_y": 0,
+      "grid_w": 6,
+      "grid_h": 3,
+      "sort_order": 0,
+      "config": {}
+    },
+    {
+      "widget_type": "work_item_summary",
+      "title": "Shop Floor Status",
+      "grid_x": 6,
+      "grid_y": 0,
+      "grid_w": 6,
+      "grid_h": 3,
+      "sort_order": 10,
+      "config": {}
+    }
+  ]
+}

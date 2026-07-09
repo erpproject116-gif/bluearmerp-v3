@@ -10,6 +10,18 @@ import (
 //go:embed packs/construction.json
 var constructionPackJSON []byte
 
+//go:embed packs/general.json
+var generalPackJSON []byte
+
+//go:embed packs/professional_services.json
+var professionalServicesPackJSON []byte
+
+//go:embed packs/warehouse.json
+var warehousePackJSON []byte
+
+//go:embed packs/job_shop.json
+var jobShopPackJSON []byte
+
 type IndustryColumn struct {
 	Key       string `json:"key"`
 	Name      string `json:"name"`
@@ -54,21 +66,35 @@ type IndustryPack struct {
 }
 
 func loadIndustryPack(code string) (IndustryPack, error) {
+	var raw []byte
 	switch code {
 	case "construction":
-		var pack IndustryPack
-		if err := json.Unmarshal(constructionPackJSON, &pack); err != nil {
-			return IndustryPack{}, err
-		}
-		return pack, nil
+		raw = constructionPackJSON
+	case "general":
+		raw = generalPackJSON
+	case "professional_services":
+		raw = professionalServicesPackJSON
+	case "warehouse":
+		raw = warehousePackJSON
+	case "job_shop":
+		raw = jobShopPackJSON
 	default:
 		return IndustryPack{}, fmt.Errorf("unknown industry pack: %s", code)
 	}
+	var pack IndustryPack
+	if err := json.Unmarshal(raw, &pack); err != nil {
+		return IndustryPack{}, err
+	}
+	return pack, nil
 }
 
 func listIndustryPacks() []map[string]string {
 	return []map[string]string{
+		{"pack_code": "general", "pack_name": "General SME"},
 		{"pack_code": "construction", "pack_name": "Construction"},
+		{"pack_code": "professional_services", "pack_name": "Professional Services"},
+		{"pack_code": "warehouse", "pack_name": "Warehouse / Logistics"},
+		{"pack_code": "job_shop", "pack_name": "Engineering / Job Shop"},
 	}
 }
 

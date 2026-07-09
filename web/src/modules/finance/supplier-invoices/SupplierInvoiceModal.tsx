@@ -22,6 +22,7 @@ import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
 import { OpenPOLinePickerModal } from "./OpenPOLinePickerModal";
 import { OpenSupplierQuotationLinePickerModal } from "./OpenSupplierQuotationLinePickerModal";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -587,6 +588,7 @@ export function SupplierInvoiceModal(props: Props) {
                 });
               }}
             />
+            <EmailHistoryPanel docType="supplier_invoice" docId={effectiveEditing()?.id} />
             <ChangeLogPanel targetType="fin_supplier_invoice" targetId={effectiveEditing()!.id} />
           </Show>
         </Show>

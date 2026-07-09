@@ -101,8 +101,8 @@ export const moduleKbArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Operations → Work Hub and create a workspace (pick an industry pack such as Construction to pre-seed columns).",
-          "Add work items, assign owners, set due dates, and drag cards across columns.",
+          "Open Operations → Work Hub from the sidebar (or /app/operations). Load a sample project from the empty state, or create a workspace and pick an industry pack to pre-seed columns and tasks.",
+          "Add work items, assign owners, set due dates, and drag cards across columns on the Kanban board.",
           "Use Calendar or Timeline for planning views; Dashboard shows job costing budget vs actual when linked to a job cost project.",
           "From a work item, use Create Quotation to start a sales document with project context pre-filled.",
         ],
