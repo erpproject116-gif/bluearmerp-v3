@@ -5,7 +5,9 @@ import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
-import { handleSaveResult } from "../../../shared/handleSaveResult";
+import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
+import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { PURCHASES_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
@@ -105,6 +107,7 @@ export function SupplierInvoiceModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
+  const { fields } = useFormFieldSettings(PURCHASES_ENTITY.purchases);
   const [attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
@@ -301,6 +304,20 @@ export function SupplierInvoiceModal(props: Props) {
     }
     if (!locationId()) {
       toast.warning("Please select a location.");
+      return;
+    }
+    const formValues = {
+      invoice_date: invoiceDate(),
+      partner_id: partnerId(),
+      tax_type_id: taxTypeId(),
+      currency_id: currencyId(),
+      location_id: locationId(),
+      vendor_invoice_no: vendorInvoiceNo(),
+      notes: notes(),
+    };
+    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    if (clientError) {
+      toast.warning(clientError);
       return;
     }
     const attachmentErr = validateAttachmentBeforeConfirm(

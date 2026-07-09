@@ -156,6 +156,8 @@ This runbook covers the **DEMO000** demo tenant. For platform superadmins (`itsj
 | Search `q` | `Makati` → location 00001; `Sofa` → item 00001 |
 | Demo sign-in | **Try free demo** → `/app/inventory/partners` with seeded rows |
 | Quotation list | Sidebar **Quotation** → 5 demo quotes (SM, Seda, Ayala, Robinsons, Vista) |
+| Operations Hub | **Operations → Work Hub** → workspace `demo-riverside-reno` after Demo Data populate |
+| Communications | **Communications → Sent Documents** → `DEMO-COMMS-*` samples after Demo Data populate |
 | Quotation Status | F8 search → line-level rows across seeded quotes |
 | Outstanding | Quote D (Robinsons) has balance qty 2 on oak panel with stock at HQ |
 

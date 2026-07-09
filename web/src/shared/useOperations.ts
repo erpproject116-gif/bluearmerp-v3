@@ -75,6 +75,13 @@ export type IndustryPack = {
 
 const OPS_STALE_MS = 60_000;
 
+const OPS_QUERY_OPTS = {
+  staleTime: OPS_STALE_MS,
+  gcTime: 5 * OPS_STALE_MS,
+  retry: false as const,
+  refetchOnWindowFocus: false as const,
+};
+
 export function useOperationsWorkspaces(params: () => { page: number; pageSize: number; q?: string }) {
   return createQuery(() => {
     const p = params();
@@ -106,8 +113,7 @@ export function useOperationsColumns(workspaceId: () => number | null) {
       queryKey: ["operations-columns", id],
       enabled: id != null && id > 0,
       queryFn: () => fetchOperationsColumns(id!),
-      staleTime: OPS_STALE_MS,
-      gcTime: 5 * OPS_STALE_MS,
+      ...OPS_QUERY_OPTS,
       placeholderData: (prev: Column[] | undefined) => prev,
     };
   });
@@ -157,8 +163,7 @@ export function useOperationsBoardWorkItems(
       queryKey: boardWorkItemsQueryKey(id, q),
       enabled: o.enabled !== false && id > 0,
       queryFn: () => fetchOperationsBoardWorkItems(id, q),
-      staleTime: OPS_STALE_MS,
-      gcTime: 5 * OPS_STALE_MS,
+      ...OPS_QUERY_OPTS,
       placeholderData: (prev: WorkItemsResult | undefined) => prev,
     };
   });

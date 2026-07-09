@@ -107,3 +107,15 @@ Run order: see [sql-run-order.md](../../runbooks/sql-run-order.md).
 | Follow-up tasks | 6 tasks across scheduled / due_soon / overdue / completed |
 | Notifications | 4 unread + 1 read (bell badge shows 4) |
 | Low stock | Printer 00001 qty 3 vs reorder 8 |
+
+## Operations Hub mirror
+
+When the **operations** module is enabled (migration `140`), CRM follow-up tasks are mirrored to `wm_work_items` via `legacy_crm_task_id` (migration `141`). Dragging a card in Operations or updating a task in CRM updates both surfaces.
+
+- In-app help: Knowledge base → `crm-operations-tasks-sync`
+- Developer doc: [docs/modules/operations/README.md](../operations/README.md)
+
+## Related modules
+
+- [Operations Hub](../operations/README.md)
+- [Communications](../comms/README.md)

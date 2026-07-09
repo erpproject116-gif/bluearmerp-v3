@@ -1,6 +1,7 @@
 import { For, Show } from "solid-js";
 import { DateInput } from "./DateInput";
 import { Field, inputClass } from "./SpreadsheetGrid";
+import { InlineCustomFieldAdder } from "./InlineCustomFieldAdder";
 import { useFormFieldSettings } from "./useFormFieldSettings";
 
 export const FIELD_TYPES = [
@@ -22,15 +23,19 @@ type Props = {
 };
 
 export function CustomFieldsSection(props: Props) {
-  const { activeCustomFields } = useFormFieldSettings(props.entityType);
+  const { activeCustomFields, canManage } = useFormFieldSettings(props.entityType);
   const defs = () => activeCustomFields();
 
   return (
-    <Show when={defs().length > 0}>
+    <Show when={defs().length > 0 || canManage()}>
       <div class="col-span-full mt-2 border-t border-stroke pt-4">
         <div class="mb-3">
           <h3 class="text-sm font-semibold text-text-primary">Custom fields</h3>
-          <p class="text-xs text-text-secondary">Configured in Settings for this feature.</p>
+          <p class="text-xs text-text-secondary">
+            {canManage()
+              ? "Add fields here or manage all form settings from Settings."
+              : "Configured in Settings for this feature."}
+          </p>
         </div>
         <For each={defs()}>
           {(def) => (
@@ -41,6 +46,7 @@ export function CustomFieldsSection(props: Props) {
             />
           )}
         </For>
+        <InlineCustomFieldAdder entityType={props.entityType} />
       </div>
     </Show>
   );

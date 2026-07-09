@@ -5,7 +5,9 @@ import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
-import { handleSaveResult } from "../../../shared/handleSaveResult";
+import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
+import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
 import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
 import {
@@ -169,6 +171,7 @@ export function PurchaseOrderModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
+  const { fields } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseOrder);
   const [_attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
@@ -374,6 +377,23 @@ export function PurchaseOrderModal(props: Props) {
     const vendorId = partnerId();
     if (!vendorId) {
       toast.warning("Vendor is required.");
+      return;
+    }
+
+    const formValues = {
+      order_date: orderDate(),
+      partner_id: vendorId,
+      location_id: locationId(),
+      tax_type_id: taxTypeId(),
+      currency_id: currencyId(),
+      pic_name: picName(),
+      reference: reference(),
+      notes: notes(),
+      project_id: projectId(),
+    };
+    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    if (clientError) {
+      toast.warning(clientError);
       return;
     }
 

@@ -151,7 +151,9 @@ var standardRegistry = map[string][]StandardField{
 	"fin_supplier_invoice": {
 		{FieldKey: "invoice_date", Label: "Invoice date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
 		{FieldKey: "partner_id", Label: "Vendor", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "tax_type_id", Label: "Transaction type", FieldType: "select", DefaultRequired: true, SortOrder: 25},
 		{FieldKey: "currency_id", Label: "Currency", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "location_id", Label: "Location", FieldType: "select", DefaultRequired: true, SortOrder: 35},
 		{FieldKey: "vendor_invoice_no", Label: "Vendor invoice no.", FieldType: "text", SortOrder: 40},
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 50},
 	},

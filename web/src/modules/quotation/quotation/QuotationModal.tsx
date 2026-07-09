@@ -352,7 +352,14 @@ export function QuotationModal(props: Props) {
       order_date: orderDate(),
       partner_id: partnerId(),
       location_id: locationId(),
-      progress_status: progressStatus(),
+      tax_type_id: taxTypeId(),
+      currency_id: currencyId(),
+      pic_name: picName(),
+      quotation_validity_text: validityText(),
+      payment_terms: paymentTerms(),
+      note_for_pic_only: noteForPic(),
+      notes: notes(),
+      project_id: projectId(),
     };
     const clientError =
       requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields())) ??

@@ -133,7 +133,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 		baseSelect := `
 			select wi.id, wi.workspace_id, wi.column_id, c.column_key, c.column_name,
 			  wi.item_code, wi.title, wi.description, wi.status, wi.priority,
-			  wi.assignee_user_id, coalesce(u.display_name, ''),
+			  wi.assignee_user_id, coalesce(u.full_name, ''),
 			  wi.partner_id, coalesce(pt.company_name, ''),
 			  wi.start_date::text, wi.end_date::text,
 			  wi.blocked_by_item_id, coalesce(blocker.title, ''),
@@ -395,7 +395,7 @@ func loadWorkItem(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 	err := pool.QueryRow(ctx, `
 		select wi.id, wi.workspace_id, wi.column_id, c.column_key, c.column_name,
 		  wi.item_code, wi.title, wi.description, wi.status, wi.priority,
-		  wi.assignee_user_id, coalesce(u.display_name, ''),
+		  wi.assignee_user_id, coalesce(u.full_name, ''),
 		  wi.partner_id, coalesce(pt.company_name, ''),
 		  wi.start_date::text, wi.end_date::text,
 		  wi.blocked_by_item_id, coalesce(blocker.title, ''),

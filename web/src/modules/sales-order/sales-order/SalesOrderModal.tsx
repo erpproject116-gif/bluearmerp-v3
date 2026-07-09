@@ -408,6 +408,17 @@ export function SalesOrderModal(props: Props) {
       order_date: orderDate(),
       partner_id: partnerId(),
       location_id: locationId(),
+      tax_type_id: taxTypeId(),
+      currency_id: currencyId(),
+      due_date: dueDate(),
+      delivery_date: deliveryDate(),
+      pic_name: picName(),
+      reference: reference(),
+      notes: notes(),
+      delivery_remarks: deliveryRemarks(),
+      payment_terms: paymentTerms(),
+      mop: mop(),
+      project_id: projectId(),
       progress_status: progressStatus(),
     };
     const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));

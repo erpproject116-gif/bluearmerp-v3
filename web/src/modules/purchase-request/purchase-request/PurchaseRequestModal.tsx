@@ -367,6 +367,12 @@ export function PurchaseRequestModal(props: Props) {
     const formValues = {
       request_date: requestDate(),
       location_id: locationId(),
+      tax_type_id: taxTypeId(),
+      currency_id: currencyId(),
+      pic_name: picName(),
+      reference_no: reference(),
+      notes: notes(),
+      project_id: projectId(),
       progress_status: progressStatus(),
     };
     const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));

@@ -36,7 +36,7 @@ export const documentationGroups: DocGroup[] = [
     id: "service",
     title: "CRM & service",
     description: "Follow-ups, support tickets, repairs, HR, and portal.",
-    sectionIds: ["crm", "support", "after-sales", "hr", "portal"],
+    sectionIds: ["crm", "operations", "comms", "support", "after-sales", "hr", "portal"],
   },
   {
     id: "retail",

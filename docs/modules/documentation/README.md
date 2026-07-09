@@ -48,6 +48,8 @@ No API, migration, or permission row is required. Help & guides is visible to ev
 | `purchase-request` | PR → PO → goods receipt |
 | `finance` | Official receipts and A/R |
 | `crm` | CRM dashboard and follow-ups |
+| `operations` | Operations Hub (workspaces, Kanban, calendar) |
+| `comms` | Document email and sent history |
 | `after-sales` | Repair orders |
 | `admin` | Users, logs, branding |
 

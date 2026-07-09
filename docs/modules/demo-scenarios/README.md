@@ -15,6 +15,8 @@ See `scripts/fixtures/demo-scenarios.yaml` for stable document numbers.
 | S8 | AP partial pay | `DEMO-S8-AP`, `DEMO-S8-PV` against S3 GR |
 | S9 | Reserve → DR → SI | `DEMO-S9-SO` → `DEMO-S9-DR` → `DEMO-S9-SI` |
 | S10 | PR approval | `DEMO-S10-PR`, `DEMO-S10-PR-OK` → `DEMO-S10-PO` |
+| S11 | Operations Hub demo | Workspace `demo-riverside-reno` (Construction pack) |
+| S12 | Communications demo | Sent messages `DEMO-COMMS-*` + stub inbox threads |
 
 ## Run order
 
@@ -52,7 +54,9 @@ After `db reset`:
 4. **S8** — Supplier invoice against S3 GR; partial payment ₱30,000.
 5. **S9** — Delivery receipt posted; SI linked to SO line.
 6. **S10** — Pending PR in `e_approval`; approved PR has PO.
-7. Dashboard red flags — serial mismatch from `seed-demo-dashboard.sql`; S2 may show “released, not delivered” until DR posted in legacy tenants.
+7. **S11** — Operations → Work Hub shows `demo-riverside-reno` workspace with Kanban cards after demo populate.
+8. **S12** — Communications → Sent Documents shows `DEMO-COMMS-*` sample emails.
+9. Dashboard red flags — serial mismatch from `seed-demo-dashboard.sql`; S2 may show “released, not delivered” until DR posted in legacy tenants.
 
 ## Process policies
 

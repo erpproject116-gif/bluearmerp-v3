@@ -111,12 +111,32 @@ var onboardingTracks = []trackDef{
 		},
 	},
 	{
+		ID:          "operations_hub",
+		Title:       "Operations Hub",
+		Description: "Project workspaces, Kanban boards, and ERP-linked work items.",
+		ModuleCode:  "operations",
+		Steps: []trackStepDef{
+			{ID: "operations_workspace", Label: "Open Work Hub", Href: "/app/operations", Description: "Pick a workspace and review the Kanban or table view.", KbArticleID: "operations-hub-intro", Required: false},
+			{ID: "operations_work_item", Label: "Create or move a work item", Href: "/app/operations", Description: "Add a card or drag one across columns.", KbArticleID: "operations-hub-intro", Required: false},
+		},
+	},
+	{
+		ID:          "communications",
+		Title:       "Communications",
+		Description: "Email documents with PDF attachments and review sent history.",
+		ModuleCode:  "comms",
+		Steps: []trackStepDef{
+			{ID: "comms_sent_log", Label: "Review sent documents", Href: "/app/comms/sent-documents", Description: "See delivery status for outbound document emails.", KbArticleID: "communications-overview", Required: false},
+			{ID: "comms_send_document", Label: "Email a saved document", Href: "/app/quotation/quotations", Description: "Use Email on a quotation, order, or invoice after save.", KbArticleID: "document-email-workflow", Required: false},
+		},
+	},
+	{
 		ID:          "operations",
 		Title:       "CRM, after-sales & quality",
 		Description: "Customer follow-up, repairs, and optional quality workflows.",
 		Steps: []trackStepDef{
 			{ID: "crm_dashboard", Label: "Open CRM dashboard", Href: "/app/crm/dashboard", Description: "Personal pipeline, tasks, and warranty alerts.", Required: false},
-			{ID: "follow_up_task", Label: "Create a follow-up task", Href: "/app/crm/follow-up-tasks", Description: "Schedule a call or visit for a customer.", Required: false},
+			{ID: "follow_up_task", Label: "Create a follow-up task", Href: "/app/crm/follow-up-tasks", Description: "Schedule a call or visit for a customer.", KbArticleID: "crm-operations-tasks-sync", Required: false},
 			{ID: "repair_order", Label: "Log a repair order", Href: "/app/after-sales/repair-orders/new", Description: "Track after-sales service and parts consumption.", Required: false},
 			{ID: "support_ticket", Label: "Create a support ticket", Href: "/app/support/tickets", Description: "Log a customer issue linked to warranty assets.", Required: false},
 			{ID: "quality_ncr", Label: "Record a quality NCR", Href: "/app/quality/ncrs", Description: "Document non-conformance on received goods.", Required: false},
@@ -177,6 +197,9 @@ type detectionSnapshot struct {
 	SupportTicket      bool
 	QualityNCR         bool
 	TeamInvited        bool
+	OperationsWorkspace bool
+	OperationsWorkItem  bool
+	CommsSent          bool
 }
 
 func buildTracks(ctx context.Context, pool *pgxpool.Pool, tenantID int64, readiness setupreadiness.Payload) ([]map[string]any, int, map[string]any) {
@@ -336,6 +359,14 @@ func stepDone(trackID, stepID string, readiness setupreadiness.Payload, ack exte
 		return ack.BusinessDashboardAck || snap.FollowUpTask
 	case "follow_up_task":
 		return snap.FollowUpTask
+	case "operations_workspace":
+		return snap.OperationsWorkspace
+	case "operations_work_item":
+		return snap.OperationsWorkItem
+	case "comms_sent_log":
+		return snap.CommsSent
+	case "comms_send_document":
+		return snap.CommsSent
 	case "repair_order":
 		return snap.RepairOrder
 	case "support_ticket":
@@ -500,6 +531,11 @@ func detectSnapshot(ctx context.Context, pool *pgxpool.Pool, tenantID int64) det
 		select count(*)::int from public.fin_bank_statement_lines
 		where tenant_id=$1 and matched_payment_id is not null`, tenantID)
 	s.FollowUpTask = exists(`select count(*)::int from public.crm_follow_up_tasks where tenant_id=$1`, tenantID)
+	s.OperationsWorkspace = exists(`select count(*)::int from public.wm_workspaces where tenant_id=$1`, tenantID)
+	s.OperationsWorkItem = exists(`select count(*)::int from public.wm_work_items where tenant_id=$1`, tenantID)
+	s.CommsSent = exists(`
+		select count(*)::int from public.com_sent_messages
+		where tenant_id=$1 and status in ('sent', 'pending')`, tenantID)
 	s.RepairOrder = exists(`select count(*)::int from public.inv_repair_orders where tenant_id=$1 and deleted_at is null`, tenantID)
 	s.SupportTicket = exists(`select count(*)::int from public.support_tickets where tenant_id=$1`, tenantID)
 	s.QualityNCR = exists(`select count(*)::int from public.qms_ncrs where tenant_id=$1`, tenantID)

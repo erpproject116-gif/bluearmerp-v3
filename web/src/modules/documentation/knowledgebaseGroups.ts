@@ -27,6 +27,7 @@ export const knowledgebaseGroups: KbGroup[] = [
       "inventory-master-data",
       "user-management-admin",
       "form-field-settings",
+      "inline-custom-fields",
       "tax-and-currency",
       "demo-data-training",
     ],
@@ -101,8 +102,12 @@ export const knowledgebaseGroups: KbGroup[] = [
   {
     id: "operations",
     title: "Operations & CRM",
-    description: "CRM, after-sales, shipping, quality, support, and HR.",
+    description: "Work Hub, CRM follow-ups, communications, after-sales, and support.",
     articleIds: [
+      "operations-hub-intro",
+      "crm-operations-tasks-sync",
+      "communications-overview",
+      "document-email-workflow",
       "crm-follow-ups",
       "after-sales-repair",
       "support-tickets",

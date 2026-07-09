@@ -96,7 +96,7 @@ Your project ref from local config should match Render `SUPABASE_URL`: `https://
 curl https://YOUR-SERVICE.onrender.com/health/db
 ```
 
-After deploying the latest API, expect:
+After deploying the latest API, expect migrations through **141** applied on the hosted database before using Operations Hub or Communications. Run `go run ./cmd/migrate -check -from 130` locally against the same `DATABASE_URL` Render uses.
 
 | Field | Healthy |
 |-------|---------|

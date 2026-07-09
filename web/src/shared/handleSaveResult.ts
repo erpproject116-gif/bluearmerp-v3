@@ -6,14 +6,16 @@ export function formatApiErrors(errors?: Record<string, string>): string {
   return messages.join(" · ");
 }
 
+export function isFieldValueMissing(v: unknown): boolean {
+  if (v == null) return true;
+  if (typeof v === "string") return !v.trim();
+  if (typeof v === "number") return !Number.isFinite(v) || v <= 0;
+  return false;
+}
+
 export function requireFields(values: Record<string, unknown>, fields: { key: string; label: string }[]): string | null {
   const missing = fields
-    .filter((f) => {
-      const v = values[f.key];
-      if (v == null) return true;
-      if (typeof v === "string") return !v.trim();
-      return false;
-    })
+    .filter((f) => isFieldValueMissing(values[f.key]))
     .map((f) => f.label);
   if (missing.length === 0) return null;
   return `Please fill in required fields: ${missing.join(", ")}.`;

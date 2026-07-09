@@ -70,11 +70,13 @@ export const OperationsWorkspaceProvider: ParentComponent = (props) => {
       queryKey: boardWorkItemsQueryKey(id),
       queryFn: () => fetchOperationsBoardWorkItems(id),
       staleTime: 60_000,
+      retry: false,
     });
     void qc.prefetchQuery({
       queryKey: ["operations-columns", id],
       queryFn: () => fetchOperationsColumns(id),
       staleTime: 60_000,
+      retry: false,
     });
   });
 

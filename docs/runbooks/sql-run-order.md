@@ -127,12 +127,33 @@ Applied in filename order after `055` (or via `go run ./cmd/migrate -from 060` o
 | `071_finance_operational.sql` | Fiscal years, bank statements, payment entries |
 | `072_crm_leads_opportunities.sql` | CRM leads and opportunities |
 
-**Hosted apply (no `psql` required):**
+### Phase 4 — Communications, billing, Operations Hub (130–141)
+
+Applied in filename order (required for Operations, Communications, and attachment policy features on hosted DB):
+
+| File | Purpose |
+|------|---------|
+| `130_serial_phase2c.sql` | Serial phase 2c extensions |
+| `131_po_si_e_approval.sql` | PO / SI e-approval hooks |
+| `132_phase4_reports_qc.sql` | Phase 4 reports and QC registry |
+| `133_purchases_sales_parity.sql` | Purchase/sales form parity |
+| `134_onboarding_foundation_acks.sql` | Onboarding acknowledgment fields |
+| `135_attachment_requirement_policies.sql` | Per-doc-type attachment requirements |
+| `136_comms_foundation.sql` | Sent messages, email templates, `comms` module |
+| `137_platform_billing_paymongo.sql` | PayMongo checkout, payment history |
+| `138_contract_billing.sql` | Contract billing fields |
+| `139_gmail_comms.sql` | Gmail OAuth, inbox messages, `comms.inbox` |
+| `140_operations_hub.sql` | Workspaces, columns, work items, `operations` module |
+| `141_operations_crm_mirror.sql` | `wm_work_items.legacy_crm_task_id` CRM dual-read |
+
+Demo populate (in-app or API) also runs `seed-demo-operations.sql` and `seed-demo-comms.sql` after golden scenarios — see [docs/modules/operations/README.md](../modules/operations/README.md) and [docs/modules/comms/README.md](../modules/comms/README.md).
+
+**Hosted apply:**
 
 ```bash
 cd api
-go run ./cmd/migrate -check -from 060   # list pending
-go run ./cmd/migrate -from 060          # apply pending
+go run ./cmd/migrate -check -from 130
+go run ./cmd/migrate -from 130
 ```
 
 See [docs/modules/inventory/serial-lot/README.md](../modules/inventory/serial-lot/README.md) and [docs/modules/dashboard/README.md](../modules/dashboard/README.md).
@@ -263,6 +284,7 @@ psql "$DATABASE_URL" -f scripts/verify-demo-inventory.sql
 | Link my Google account | `scripts/link-platform-owners.sql` |
 | Load demo inventory data | `scripts/seed-demo-inventory.sql` |
 | Load full demo document chain | User Management → **Demo Data** in app, or `scripts/seed-demo-full-chain.sql` (psql only) |
+| Load Operations + Communications demos | Included in **Demo Data → Populate** (`seed-demo-operations.sql`, `seed-demo-comms.sql`) |
 | Purge demo documents only | User Management → **Demo Data** → Purge, or `scripts/purge-demo-data.sql` |
 | Link demo password user | `scripts/link-demo-auth-user.sql` |
 | Check superadmin setup | `scripts/verify-platform-owners.sql` |

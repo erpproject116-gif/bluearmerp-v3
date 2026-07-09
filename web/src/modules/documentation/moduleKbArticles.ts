@@ -17,7 +17,7 @@ export const moduleKbArticles: KbArticle[] = [
           "Week 1: admin — process policies (including attachment rules), modules, Mapping Center, team.",
           "Week 2: selling — quote, SO, pick list, delivery note, invoice (Load Slip), official receipt.",
           "Week 3: buying + finance — PR, RFQ, PO, GR, supplier invoice, pre-invoicing report, payment voucher.",
-          "Week 4: POS + operations — configure POS, shift, checkout, CRM, support.",
+          "Week 4: POS + operations — configure POS, shift, checkout, Operations Hub, CRM, Communications, support.",
         ],
       },
       {
@@ -84,7 +84,7 @@ export const moduleKbArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Quotation, Sales Order, and Sale modals show an Email history panel with sent log entries. After connecting Gmail (Settings), synced thread messages appear there too.",
+        text: "Quotation, Sales Order, Sale, Purchase Order, RFQ, and Purchase (supplier invoice) modals show an Email history panel with sent log entries. After connecting Gmail (Communications → Settings), synced thread messages appear there too.",
       },
     ],
     primaryHref: "/app/comms/sent-documents",
@@ -96,21 +96,72 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Operations Hub — workspaces, Kanban, and ERP links",
     scenario: "You want monday-style work boards tied to projects, job costing, and ERP documents.",
     intro:
-      "Operations Hub lives at /app/operations. Create a workspace (optionally from the Construction industry pack), manage work items on Kanban or table views, and link items to quotations, POs, and job cost projects.",
+      "Operations Hub lives under Operations in the sidebar. Create a workspace (optionally from an industry pack), manage work items on Kanban or table views, and link items to quotations, POs, and job cost projects.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Operations → Work Hub from the sidebar (or /app/operations). Load a sample project from the empty state, or create a workspace and pick an industry pack to pre-seed columns and tasks.",
-          "Add work items, assign owners, set due dates, and drag cards across columns on the Kanban board.",
-          "Use Calendar or Timeline for planning views; Dashboard shows job costing budget vs actual when linked to a job cost project.",
+          "Open Operations → Work Hub. Use the workspace selector at the top — your choice is saved for the next visit.",
+          "Load a sample project from the empty state, or create a workspace and pick an industry pack (Construction, Retail, Services, and more) to pre-seed columns and starter tasks.",
+          "Add work items, assign owners, set due dates, and drag cards across columns on the Kanban board. Switch to table view for sorting and bulk review.",
+          "Use Calendar or Timeline tabs for planning views; Dashboard shows job costing budget vs actual when linked to a job cost project.",
           "From a work item, use Create Quotation to start a sales document with project context pre-filled.",
         ],
+      },
+      {
+        type: "tip",
+        text: "On demo tenants, populate demo data to load the Riverside Office Renovation workspace (demo-riverside-reno) with sample cards and a linked quotation.",
       },
     ],
     primaryHref: "/app/operations",
     primaryLabel: "Open Operations Hub",
-    relatedGuideIds: ["onboarding-playbook"],
+    relatedGuideIds: ["crm-operations-tasks-sync", "onboarding-playbook"],
+  },
+  {
+    id: "crm-operations-tasks-sync",
+    title: "CRM follow-up tasks on the Operations board",
+    scenario: "You use CRM follow-ups and want the same tasks visible on a project Kanban board.",
+    intro:
+      "When Operations Hub is enabled, CRM follow-up tasks are mirrored as work items. Updates in either CRM or Operations stay in sync.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Create a follow-up task under CRM → Follow-up Tasks as usual.",
+          "Open Operations → Work Hub and pick the workspace that holds CRM-linked items.",
+          "Drag the mirrored card to change status or column — the CRM task updates too.",
+          "Use Operations for team-wide planning; use CRM for salesperson-focused lists and notifications.",
+        ],
+      },
+    ],
+    primaryHref: "/app/crm/follow-up-tasks",
+    primaryLabel: "Follow-up tasks",
+    relatedGuideIds: ["operations-hub-intro", "crm-follow-ups"],
+  },
+  {
+    id: "communications-overview",
+    title: "Communications — sent log, inbox, and Gmail",
+    scenario: "You want one place to see every document email and optionally sync Gmail threads.",
+    intro:
+      "Communications records outbound document emails and, when Gmail is connected, shows related threads in Inbox.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Send email from any supported document modal (Email button after save).",
+          "Open Communications → Sent Documents for delivery status across all document types.",
+          "Open Communications → Settings → Connect Gmail to sync inbox threads (admin permission).",
+          "Open Communications → Inbox to read synced messages linked to quotations, orders, and invoices.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Server SMTP (SMTP_HOST, SMTP_FROM) works without Gmail. Gmail adds two-way thread sync on document modals.",
+      },
+    ],
+    primaryHref: "/app/comms/sent-documents",
+    primaryLabel: "Sent Documents",
+    relatedGuideIds: ["document-email-workflow"],
   },
   {
     id: "load-slip-overview",
@@ -925,20 +976,50 @@ export const moduleKbArticles: KbArticle[] = [
     id: "form-field-settings",
     title: "Customize form fields per document",
     scenario: "You want to hide, require, or relabel fields on transaction screens.",
-    intro: "Each major document type has a Settings page for standard and custom fields.",
+    intro: "Each major document type has a Settings page for standard and custom fields. Store admins can also add custom fields directly on open forms.",
     blocks: [
       {
         type: "steps",
         items: [
           "Open the list screen for the document (e.g. Sales → Sales List → settings gear).",
           "Toggle visibility, required, and disabled flags per field.",
-          "Add custom fields (text, select, date, etc.) where enabled.",
-          "Purchase Request, PO, Goods Receipt, and Supplier Invoice now support the same pattern as Sales.",
+          "Add custom fields (text, select, date, etc.) on the settings page or click + Add custom field on any form that shows the Custom fields section.",
+          "Quotation, Sales Order, Sale, Purchase Request, PO, Goods Receipt, and Supplier Invoice support the same pattern.",
         ],
+      },
+      {
+        type: "tip",
+        text: "Required custom fields are validated on save. Dropdown and radio fields need at least one choice when you create them.",
       },
     ],
     primaryHref: "/app/sales/sales/settings",
     primaryLabel: "Sales form settings",
+    relatedGuideIds: ["inline-custom-fields"],
+  },
+  {
+    id: "inline-custom-fields",
+    title: "Add a custom field while filling in a form",
+    scenario: "You need a new field on a quotation or item form without opening Settings.",
+    intro:
+      "Store admins and owners see + Add custom field at the bottom of the Custom fields section on supported forms. The new field appears immediately for everyone after you save it.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open a new or existing document modal (quotation, repair order, item, partner, etc.).",
+          "Scroll to Custom fields. Click + Add custom field.",
+          "Enter a label, optional field key, field type, and choices (for dropdown or radio).",
+          "Click Add field — the field is saved tenant-wide and appears on the form right away.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Use Settings → form fields when you need to hide, relabel, or disable standard fields. Inline add is fastest for new custom fields only.",
+      },
+    ],
+    primaryHref: "/app/quotation/quotations/new",
+    primaryLabel: "Try on New Quotation",
+    relatedGuideIds: ["form-field-settings"],
   },
   {
     id: "serial-lot-registry",
@@ -1148,7 +1229,7 @@ export const moduleKbArticles: KbArticle[] = [
           "Open User Management → Demo Data (admin on demo tenant).",
           "Purge demo data to reset transactions while keeping master data.",
           "Populate with purge-first for a clean golden scenario set.",
-          "Review status for serial GR→SI, lot sales, and open PO receive checks.",
+          "Review status for serial GR→SI, lot sales, open PO receive, Operations workspace (demo-riverside-reno), and Communications samples (DEMO-COMMS-* subjects).",
         ],
       },
     ],

@@ -56,4 +56,14 @@ scenarios:
       purchase_order: DEMO-S10-PO
     item_code: "00003"
 
+  S11_operations_hub:
+    description: Construction-pack workspace with linked quotation and work items
+    workspace_code: demo-riverside-reno
+    sql: api/internal/modules/demodata/sql/seed-demo-operations.sql
+
+  S12_comms_demo:
+    description: Sample sent document emails and stub Gmail threads
+    subject_prefix: DEMO-COMMS-
+    sql: api/internal/modules/demodata/sql/seed-demo-comms.sql
+
 verify_script: scripts/verify-demo-full-chain.sql

@@ -10,7 +10,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "After you sign in, you land inside your company workspace. The left sidebar lists the main areas of the app—Inventory, Sales, Quotations, and so on. Click a name to open that area.",
+        text: "After you sign in, you land inside your company workspace. The left sidebar lists the main areas of the app—Inventory, Sales, Quotations, Operations, Communications, and so on. Click a name to open that area.",
       },
       {
         type: "paragraph",
@@ -544,7 +544,67 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "tip",
+        text: "When Operations Hub is enabled, follow-up tasks also appear as work items on the Operations board. Drag a card in either place to update status.",
+      },
+      {
+        type: "tip",
         text: "The bell icon at the top of the screen shows CRM alerts when you have new notifications.",
+      },
+    ],
+  },
+  {
+    id: "operations",
+    title: "Operations Hub",
+    iconId: "crm",
+    intro: "Plan projects on Kanban boards, calendars, and timelines linked to ERP documents.",
+    primaryHref: "/app/operations",
+    primaryLabel: "Open Work Hub",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Operations Hub is for project and task management inside Bluearm. Each workspace is a board with columns (for example Backlog, In progress, Done). Work items can link to customers, quotations, purchase orders, and job cost projects.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open Operations from the sidebar. Pick a workspace from the selector at the top (your choice is remembered).",
+          "On Work Hub, switch between Kanban and table views. Drag cards to change column or status.",
+          "Use Calendar or Timeline for date-based planning; Dashboard shows budget vs actual when a job cost project is linked.",
+          "Create a workspace from scratch or load a sample project from the empty state. Industry packs (Construction, Retail, Services, and others) pre-seed columns and starter tasks.",
+          "From a work item, use Create Quotation to start a sales quote with project context filled in.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "On demo tenants, run User Management → Demo Data → Populate to load the Riverside Office Renovation sample workspace with linked quotation and work items.",
+      },
+    ],
+  },
+  {
+    id: "comms",
+    title: "Communications",
+    iconId: "crm",
+    intro: "Email documents with PDF attachments and review what was sent.",
+    primaryHref: "/app/comms/sent-documents",
+    primaryLabel: "Open Sent Documents",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Communications logs every document email your team sends. Use the Email button on saved quotations, sales orders, sales invoices, purchase orders, RFQs, and supplier invoices (purchases). Each send queues a PDF attachment through the server.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Save the document first, then click Email in the document header (requires Send permission).",
+          "Enter recipients and optional subject or message, then send.",
+          "Open Communications → Sent Documents to see delivery status for all outbound messages.",
+          "Open Communications → Settings to connect Gmail (optional) or confirm SMTP is configured on the server.",
+          "When Gmail is connected, Communications → Inbox shows synced threads. Document modals also show an Email history panel—including purchase orders, RFQs, and purchases on the buying side.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Selling documents (quotation, sales order, sale) and buying documents (PO, RFQ, purchase) all share the same sent-log and history pattern.",
       },
     ],
   },
@@ -824,7 +884,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "The Demo Data screen is for store administrators on DEMO000 or BLUEARM. It runs the same idempotent seed scripts used in development: quotations, purchase and sales chains, golden scenarios (serial GR→SI, lot sales, delivery receipt flow, PR approval, accounts payable), CRM fixtures, and dashboard red-flag samples.",
+        text: "The Demo Data screen is for store administrators on DEMO000 or BLUEARM. It runs the same idempotent seed scripts used in development: quotations, purchase and sales chains, golden scenarios (serial GR→SI, lot sales, delivery receipt flow, PR approval, accounts payable), CRM fixtures, Operations Hub sample workspace (Riverside Office Renovation), Communications sent-message samples, and dashboard red-flag samples.",
       },
       {
         type: "steps",
@@ -832,7 +892,7 @@ export const documentationSections: DocSection[] = [
           "Open User Management → Demo Data.",
           "Choose Purge demo data to remove transactional documents and reset stock balances (partners, items, and locations stay).",
           "Choose Populate demo data with “Purge before populate” checked for a clean start.",
-          "Review the status panel for golden scenario checks (S2, S8, S9, open PO receive).",
+          "Review the status panel for golden scenario checks (S2, S8, S9, open PO receive), Operations workspace (demo-riverside-reno), and Communications sent samples (DEMO-COMMS-*).",
         ],
       },
       {
