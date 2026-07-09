@@ -14,6 +14,7 @@ import { PurchasesLayout } from "../../purchases/PurchasesLayout";
 import { SupplierInvoiceModal } from "./SupplierInvoiceModal";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
+import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
@@ -193,9 +194,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
             kind="purchase"
             docId={viewRow()!.id}
             attachmentsScope="finance/supplier-invoices"
-            onPrint={() =>
-              window.open(`${basePath()}/${viewRow()!.id}/print`, "_blank", "noopener,noreferrer")
-            }
+            onPrint={() => openPurchaseInvoicePrint(viewRow()!.id)}
             onSaved={invalidate}
           />
         </Show>

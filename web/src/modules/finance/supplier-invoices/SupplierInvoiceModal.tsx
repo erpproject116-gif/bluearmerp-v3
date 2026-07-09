@@ -14,6 +14,7 @@ import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
+import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
@@ -431,7 +432,7 @@ export function SupplierInvoiceModal(props: Props) {
             attachmentsScope="finance/supplier-invoices"
             onPrint={() => {
               const id = effectiveEditing()?.id;
-              if (id) window.open(`/app/purchases/purchases/${id}/print`, "_blank", "noopener,noreferrer");
+              if (id) openPurchaseInvoicePrint(id);
             }}
           />
         </Show>

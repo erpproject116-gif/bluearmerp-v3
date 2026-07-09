@@ -17,6 +17,7 @@ import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
+import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
@@ -614,7 +615,7 @@ export function SalesModal(props: Props) {
             kind="sales"
             docId={effectiveEditing()?.id}
             attachmentsScope="sales"
-            onPrint={() => effectiveEditing() && window.open(`/app/sales/sales/${effectiveEditing()!.id}/invoice/print`, "_blank", "noopener,noreferrer")}
+            onPrint={() => effectiveEditing() && openSalesInvoicePrint(effectiveEditing()!.id)}
           />
         </Show>
         <Show when={activeTab() === "details"}>

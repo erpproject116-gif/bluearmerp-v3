@@ -86,7 +86,9 @@ export const PurchaseRequestStatusPrintPage = lazy(() => import("../modules/purc
 export const PurchaseOrderPrintPage = lazy(() => import("../modules/purchase-request/purchase-order/PurchaseOrderPrintPage"));
 export const RfqPrintPage = lazy(() => import("../modules/purchase-request/purchase-order/RfqPrintPage"));
 export const SupplierQuotationPrintPage = lazy(() => import("../modules/purchase-request/purchase-order/SupplierQuotationPrintPage"));
-export const SupplierInvoiceDocPrintPage = lazy(() => import("../modules/finance/supplier-invoices/SupplierInvoicePrintPage"));
+export const SupplierInvoiceDocPrintPage = lazy(() =>
+  import("../shared/InvoiceVoucherPrintPage").then((m) => ({ default: m.PurchaseInvoiceDocPrintPage })),
+);
 export const PurchaseOrderListPage = lazy(() => import("../modules/purchase-request/purchase-order/PurchaseOrderListPage"));
 export const PurchaseReturnsPage = lazy(() => import("../modules/purchase-request/purchase-order/PurchaseReturnsPage"));
 export const RfqListPage = lazy(() => import("../modules/purchase-request/purchase-order/RfqListPage"));

@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal, Show } from "solid-js";
+import { createEffect, createResource, createSignal, For, Show } from "solid-js";
 import { useParams, useSearchParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import { apiFetch } from "../../../shared/api";
@@ -32,21 +32,58 @@ type InvoicePrintPayload = {
   };
 };
 
+type SlipPayload = {
+  sales: {
+    date_no_display: string;
+    sales_no: string;
+    pic_name: string;
+    lines: {
+      line_no?: number;
+      item_code?: string;
+      item_name: string;
+      description?: string;
+      qty: number;
+      serial_lot_no?: string;
+      unit_vat_inc: number;
+      unit_non_vat?: number;
+      non_vat_total?: number;
+      tax_amount?: number;
+      line_total?: number;
+    }[];
+  }[];
+};
+
+type CombinedPrintPayload = InvoicePrintPayload & { slip?: SlipPayload };
+
+async function loadCollectiveInvoicePrint(id: number, mode: "voucher" | "ar_statement"): Promise<CombinedPrintPayload> {
+  const invoiceRes = await apiFetch<InvoicePrintPayload>(
+    `/api/v1/sales/collective-invoices/${id}/print-invoice?mode=${mode}`,
+  );
+  if (!invoiceRes.success || !invoiceRes.data) {
+    throw new Error(invoiceRes.message ?? "Failed to load invoice.");
+  }
+  if (mode !== "voucher") {
+    return invoiceRes.data;
+  }
+  const slipRes = await apiFetch<SlipPayload>(`/api/v1/sales/collective-invoices/${id}/print-slip`);
+  if (!slipRes.success || !slipRes.data) {
+    return invoiceRes.data;
+  }
+  return { ...invoiceRes.data, slip: slipRes.data };
+}
+
 function PrintView() {
   const params = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const [settingsOpen, setSettingsOpen] = createSignal(false);
-  const mode = () => (searchParams.mode === "ar_statement" ? "ar_statement" : "voucher");
+  const mode = (): "voucher" | "ar_statement" =>
+    searchParams.mode === "ar_statement" ? "ar_statement" : "voucher";
 
   const [data] = createResource(
     () => ({ id: Number(params.id), mode: mode() }),
     async ({ id, mode: m }) => {
       if (!Number.isFinite(id) || id <= 0) throw new Error("Invalid invoice id.");
-      const res = await apiFetch<InvoicePrintPayload>(
-        `/api/v1/sales/collective-invoices/${id}/print-invoice?mode=${m}`,
-      );
-      if (!res.success || !res.data) throw new Error(res.message ?? "Failed to load invoice.");
-      return res.data;
+      return loadCollectiveInvoicePrint(id, m);
     },
   );
 
@@ -93,6 +130,54 @@ function PrintView() {
                 </dl>
               </div>
             </section>
+            <Show when={p().mode === "voucher" && p().slip}>
+              {(slip) => (
+                <section class="my-6">
+                  <h3 class="quotation-print__section mb-3">Item breakdown</h3>
+                  <For each={slip().sales}>
+                    {(sale) => (
+                      <div class="mb-4">
+                        <h4 class="mb-2 text-sm font-semibold">
+                          {sale.date_no_display} · {sale.sales_no} · PIC: {sale.pic_name}
+                        </h4>
+                        <table class="quotation-print__table w-full text-sm">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Item</th>
+                              <th class="text-right">Qty</th>
+                              <th>Serial/Lot</th>
+                              <th class="text-right">Non-VAT</th>
+                              <th class="text-right">Tax</th>
+                              <th class="text-right">Line total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <For each={sale.lines}>
+                              {(ln, idx) => (
+                                <tr>
+                                  <td>{ln.line_no ?? idx() + 1}</td>
+                                  <td>
+                                    {ln.item_code ? `${ln.item_code} — ` : ""}
+                                    {ln.item_name}
+                                    {ln.description ? ` — ${ln.description}` : ""}
+                                  </td>
+                                  <td class="text-right">{ln.qty}</td>
+                                  <td>{ln.serial_lot_no ?? "—"}</td>
+                                  <td class="text-right">{formatMoney(ln.non_vat_total ?? ln.unit_non_vat ?? 0)}</td>
+                                  <td class="text-right">{formatMoney(ln.tax_amount ?? 0)}</td>
+                                  <td class="text-right">{formatMoney(ln.line_total ?? ln.unit_vat_inc * ln.qty)}</td>
+                                </tr>
+                              )}
+                            </For>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </For>
+                </section>
+              )}
+            </Show>
             <Show when={p().mode === "voucher"}>
               <div class="quotation-print__totals my-6">
                 <div class="quotation-print__totals-row"><span>Pretax Amount</span><span>{formatMoney(p().invoice.subtotal)}</span></div>
