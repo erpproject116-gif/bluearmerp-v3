@@ -264,6 +264,11 @@ function LegacyInventoryAfterSalesRedirect() {
   return <Navigate href={target} />;
 }
 
+function AuthLoginRedirect() {
+  const loc = useLocation();
+  return <Navigate href={`/signin${loc.search}`} />;
+}
+
 function AppLayout(props: RouteSectionProps) {
   return (
     <ProtectedRoute>
@@ -283,6 +288,7 @@ export default function App() {
         <CrmTaskModalProvider>
         <Router root={(props) => <Suspense fallback={<PageLoader />}>{props.children}</Suspense>}>
         <Route path="/signin" component={SignInPage} />
+        <Route path="/auth/login" component={AuthLoginRedirect} />
         <Route path="/signup" component={SignUpPage} />
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/auth/reset-password" component={ResetPasswordPage} />

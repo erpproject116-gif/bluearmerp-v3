@@ -67,7 +67,7 @@ export function useIdleLogout() {
     clearTimers();
     setShowWarning(false);
     await signOutApp();
-    window.location.href = "/auth/login?reason=idle";
+    window.location.href = "/signin?reason=idle";
   };
 
   const stayLoggedIn = () => bump();

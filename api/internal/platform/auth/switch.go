@@ -15,7 +15,20 @@ import (
 // and the active-branch picker. Mounted inside the authenticated (protected) group.
 func RegisterAuthRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/auth/switch-tenant", switchTenantHandler(pool))
+	r.Post("/auth/session-ended", sessionEndedHandler(pool))
 	r.Get("/auth/branches", branchesHandler(pool))
+}
+
+func sessionEndedHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		ClearSessionActivity(r.Context(), pool, tu.AuthUserID)
+		response.OK(w, map[string]any{"cleared": true}, "Session activity cleared.")
+	}
 }
 
 type switchTenantBody struct {

@@ -16,7 +16,7 @@ export async function handleServerSessionIdle() {
   try {
     await signOutApp();
   } finally {
-    window.location.href = "/auth/login?reason=idle";
+    window.location.href = "/signin?reason=idle";
   }
 }
 

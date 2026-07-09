@@ -8,7 +8,7 @@ async function fetchMeWithRetry(maxAttempts = 4): Promise<Awaited<ReturnType<typ
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await apiFetch<MeData>("/api/v1/auth/me", {}, { silent: true });
+      return await apiFetch<MeData>("/api/v1/auth/me");
     } catch (err) {
       lastErr = err;
       if (attempt < maxAttempts) {

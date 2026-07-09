@@ -278,7 +278,9 @@ export const AuthProvider: ParentComponent = (props) => {
       const bootstrapError: BootstrapError =
         res.status === 403 || res.code === "ERR_FORBIDDEN"
           ? "forbidden"
-          : res.status === 401 || res.code === "ERR_UNAUTHORIZED"
+          : res.status === 401 ||
+              res.code === "ERR_UNAUTHORIZED" ||
+              res.code === "ERR_SESSION_IDLE"
             ? "unauthorized"
             : "network";
       setState({

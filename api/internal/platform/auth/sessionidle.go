@@ -28,6 +28,9 @@ func sessionIdleTimeout() time.Duration {
 }
 
 func isSessionIdleExemptPath(path string) bool {
+	if path == "/api/v1/auth/session-ended" {
+		return true
+	}
 	if strings.HasPrefix(path, "/api/v1/presence/") {
 		return true
 	}
@@ -71,6 +74,15 @@ func enforceSessionActivity(ctx context.Context, pool *pgxpool.Pool, authUserID 
 	}
 
 	if time.Since(lastActivity) > timeout {
+		if bump {
+			_, err = pool.Exec(ctx, `
+				insert into public.auth_session_activity (auth_user_id, last_activity_at)
+				values ($1::uuid, now())
+				on conflict (auth_user_id) do update set last_activity_at = now()`,
+				authUserID,
+			)
+			return err
+		}
 		return ErrSessionIdle
 	}
 

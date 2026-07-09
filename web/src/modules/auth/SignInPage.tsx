@@ -16,7 +16,11 @@ export default function SignInPage() {
   const [loading, setLoading] = createSignal(false);
 
   onMount(() => {
-    const msg = new URLSearchParams(window.location.search).get("error");
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reason") === "idle") {
+      setError("Your session ended after 20 minutes of inactivity. Please sign in again.");
+    }
+    const msg = params.get("error");
     if (msg) setError(decodeURIComponent(msg));
   });
 

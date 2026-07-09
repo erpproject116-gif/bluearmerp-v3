@@ -134,8 +134,12 @@ export async function apiFetch<T>(
   const body = (await res.json()) as ApiEnvelope<T>;
   const result = { ...body, status: res.status, ok: res.ok };
   if (body.code === "ERR_SESSION_IDLE" && !options?.background) {
-    const { handleServerSessionIdle } = await import("./sessionIdleClient");
-    void handleServerSessionIdle();
+    const path = window.location.pathname;
+    const onAuthFlow = path.startsWith("/signin") || path.startsWith("/auth/callback");
+    if (!onAuthFlow) {
+      const { handleServerSessionIdle } = await import("./sessionIdleClient");
+      void handleServerSessionIdle();
+    }
     return result;
   }
   if (body.success && shouldAutoSuccessToast(path, init.method, options)) {
