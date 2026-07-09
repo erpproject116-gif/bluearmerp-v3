@@ -30,6 +30,89 @@ export const moduleKbArticles: KbArticle[] = [
     relatedGuideIds: ["setup-wizard", "first-week", "process-policies"],
   },
   {
+    id: "document-attachments-workflow",
+    title: "Document attachments — save, upload, then confirm",
+    scenario: "Your store requires a file before confirming a quotation, sales order, sale, purchase order, or purchase.",
+    intro:
+      "When attachment rules are ON (default), you must upload at least one file before confirming. New documents do not have an upload button until you save once — the form stays open so you can attach files immediately after the first save.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Create or open the document and fill in required fields.",
+          "Save as Unconfirmed (or Save for purchase orders in draft). The record gets an ID and the Attachments panel enables Upload file.",
+          "Upload one or more files (max 25 MB each). Supported on Quotation, Sales Order, Sale, Purchase Order, and Purchase (supplier invoice).",
+          "Change progress to Confirm / Completed / e-Approval only after at least one file is attached — the form will warn you if attachments are missing.",
+          "Purchase orders: save in the modal, upload here, then use Confirm on the Purchase Order list.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Managers can turn attachment rules off per document type under Settings → Process policies. Attachments on purchase orders are copied forward to Purchases when configured.",
+      },
+      {
+        type: "heading",
+        text: "Repair orders",
+      },
+      {
+        type: "steps",
+        items: [
+          "Save the repair order first, then use the Attachments section on the same form to upload files.",
+        ],
+      },
+    ],
+    primaryHref: "/app/settings/process-policies",
+    primaryLabel: "Process policies (attachment rules)",
+    relatedGuideIds: ["process-policies", "load-slip-overview"],
+  },
+  {
+    id: "document-email-workflow",
+    title: "Send documents by email (PDF attachment)",
+    scenario: "You want to email a quotation, sales order, sale, purchase order, RFQ, or purchase to a customer or vendor with a PDF attached.",
+    intro:
+      "Use the Email button on saved documents. Messages are logged under Communications → Sent Documents. Configure SMTP on the server (SMTP_HOST, SMTP_FROM) for delivery; optional Gmail connect is under Communications → Settings.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Save the document first so it has an ID.",
+          "Click Email in the document header (requires Communications → Send permission).",
+          "Enter recipient addresses, optional subject and message (or leave blank to use the default template).",
+          "Send — a PDF is generated server-side and queued via the transactional outbox.",
+          "Review delivery status under /app/comms/sent-documents.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Quotation, Sales Order, and Sale modals show an Email history panel with sent log entries. After connecting Gmail (Settings), synced thread messages appear there too.",
+      },
+    ],
+    primaryHref: "/app/comms/sent-documents",
+    primaryLabel: "Sent document history",
+    relatedGuideIds: ["document-attachments-workflow", "load-slip-overview"],
+  },
+  {
+    id: "operations-hub-intro",
+    title: "Operations Hub — workspaces, Kanban, and ERP links",
+    scenario: "You want monday-style work boards tied to projects, job costing, and ERP documents.",
+    intro:
+      "Operations Hub lives at /app/operations. Create a workspace (optionally from the Construction industry pack), manage work items on Kanban or table views, and link items to quotations, POs, and job cost projects.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Operations → Work Hub and create a workspace (pick an industry pack such as Construction to pre-seed columns).",
+          "Add work items, assign owners, set due dates, and drag cards across columns.",
+          "Use Calendar or Timeline for planning views; Dashboard shows job costing budget vs actual when linked to a job cost project.",
+          "From a work item, use Create Quotation to start a sales document with project context pre-filled.",
+        ],
+      },
+    ],
+    primaryHref: "/app/operations",
+    primaryLabel: "Open Operations Hub",
+    relatedGuideIds: ["onboarding-playbook"],
+  },
+  {
     id: "load-slip-overview",
     title: "What is Load Slip? (copy lines between documents)",
     scenario: "You want to avoid retyping items when moving from one document to the next.",

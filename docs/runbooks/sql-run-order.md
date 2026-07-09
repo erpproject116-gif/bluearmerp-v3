@@ -271,6 +271,7 @@ psql "$DATABASE_URL" -f scripts/verify-demo-inventory.sql
 
 | `119_platform_subscriptions.sql` | Platform customers, subscriptions, manual billing, CRM retention task types |
 | `120_platform_plan_catalog.sql` | Configurable plan tiers, regular/promo pricing, inclusions |
+| `137_platform_billing_paymongo.sql` | PayMongo checkout fields, payment history table |
 
 ### Scheduled jobs (production)
 
@@ -279,8 +280,9 @@ psql "$DATABASE_URL" -f scripts/verify-demo-inventory.sql
 | Demo cleanup | `POST /api/v1/demo/jobs/cleanup` | `X-Demo-Job-Secret` | Daily |
 | CRM alerts | `POST /api/v1/crm/jobs/evaluate` | `X-CRM-Job-Secret` | Daily |
 | Platform retention | `POST /api/v1/platform/jobs/retention` | `X-Platform-Job-Secret` | Daily |
+| Platform billing | `POST /api/v1/platform/jobs/billing` | `X-Platform-Job-Secret` | Daily |
 
-Set `PLATFORM_JOB_SECRET` on the API (Render) alongside existing `DEMO_JOB_SECRET` and `CRM_JOB_SECRET`.
+Set `PLATFORM_JOB_SECRET`, `PAYMONGO_SECRET_KEY`, and `PAYMONGO_WEBHOOK_SECRET` on the API (Render) alongside existing `DEMO_JOB_SECRET` and `CRM_JOB_SECRET`.
 
 ---
 

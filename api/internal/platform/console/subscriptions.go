@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/billing"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -197,6 +198,7 @@ func (s *service) createInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var invID int64
+	var tenantID int64
 	err = s.pool.QueryRow(r.Context(), `
 		insert into public.platform_subscription_invoices
 		  (subscription_id, invoice_no, period_start, period_end, amount, due_date, status, notes)
@@ -205,6 +207,15 @@ func (s *service) createInvoice(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to create invoice.", "ERR_INTERNAL")
 		return
+	}
+	_ = s.pool.QueryRow(r.Context(), `select tenant_id from public.platform_subscriptions where id = $1`, subID).Scan(&tenantID)
+	if tenantID > 0 {
+		tx, txErr := s.pool.Begin(r.Context())
+		if txErr == nil {
+			key := fmt.Sprintf("platform.billing.invoice_issued:%d", invID)
+			_ = billing.EnqueueInvoiceIssuedTx(r.Context(), tx, tenantID, key, invID)
+			_ = tx.Commit(r.Context())
+		}
 	}
 	response.OK(w, map[string]any{"invoice_id": invID, "invoice_no": invNo}, "Invoice issued.")
 }
@@ -220,23 +231,28 @@ func (s *service) markInvoicePaid(w http.ResponseWriter, r *http.Request) {
 	if tu.AuthUserID != "" {
 		markedBy = &tu.AuthUserID
 	}
-	tag, err := s.pool.Exec(r.Context(), `
-		update public.platform_subscription_invoices
-		set status = 'paid', paid_at = now(), marked_paid_by = $2::uuid, updated_at = now()
-		where id = $1 and status = 'issued'`, invID, markedBy)
-	if err != nil || tag.RowsAffected() == 0 {
+
+	tx, err := s.pool.Begin(r.Context())
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to mark paid.", "ERR_INTERNAL")
+		return
+	}
+	result, err := billing.MarkInvoicePaidTx(r.Context(), tx, billing.MarkPaidParams{
+		InvoiceID: invID,
+		Provider:  "manual",
+		MarkedBy:  markedBy,
+	})
+	if err != nil {
+		_ = tx.Rollback(r.Context())
 		response.Err(w, http.StatusBadRequest, "Invoice not found or not issuable.", "ERR_BAD_REQUEST")
 		return
 	}
-	var customerID int64
-	_ = s.pool.QueryRow(r.Context(), `
-		select s.customer_id from public.platform_subscription_invoices i
-		join public.platform_subscriptions s on s.id = i.subscription_id
-		where i.id = $1`, invID).Scan(&customerID)
-	if customerID > 0 {
-		_, _ = customerregistry.UpdateCustomerUrgency(r.Context(), s.pool, customerID, time.Now())
+	if err := tx.Commit(r.Context()); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to mark paid.", "ERR_INTERNAL")
+		return
 	}
-	response.OK(w, map[string]any{"invoice_id": invID}, "Marked paid.")
+	billing.FinalizePaidInvoice(r.Context(), s.pool, result.CustomerID)
+	response.OK(w, map[string]any{"invoice_id": invID, "already_paid": result.AlreadyPaid}, "Marked paid.")
 }
 
 func parseDates(ps, pe, dd string) (time.Time, time.Time, time.Time, error) {

@@ -29,6 +29,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/hr"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/manufacturing"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/operations"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quality"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/jobcosting"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaseorder"
@@ -46,7 +47,9 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/billing"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/console"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
@@ -106,8 +109,13 @@ func main() {
 
 	r.Route("/api/v1", func(api chi.Router) {
 		crm.RegisterJobRoutes(api, pool)
+		finance.RegisterJobRoutes(api, pool)
 		platformreports.RegisterJobRoutes(api, pool)
 		retention.RegisterJobRoutes(api, pool, cfg)
+		billing.RegisterJobRoutes(api, pool, cfg)
+		billing.RegisterWebhookRoutes(api, pool)
+		comms.RegisterPublicRoutes(api, pool, cfg)
+		comms.RegisterJobRoutes(api, pool, cfg)
 		portal.RegisterRoutes(api, pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret)
 		demoonboard.RegisterRoutes(api, pool, cfg)
 		onboard.RegisterRoutes(api, pool, cfg)
@@ -120,6 +128,7 @@ func main() {
 			protected.Get("/auth/me", auth.MeHandler(pool, cfg))
 			auth.RegisterAuthRoutes(protected, pool)
 			onboarding.RegisterRoutes(protected, pool)
+			billing.RegisterRoutes(protected, pool, cfg)
 			setupreadiness.RegisterRoutes(protected, pool)
 			console.RegisterRoutes(protected, pool, cfg)
 			presence.RegisterRoutes(protected, pool)
@@ -129,6 +138,7 @@ func main() {
 			reporttemplates.RegisterRoutes(protected, pool)
 			platformreports.RegisterRoutes(protected)
 			branding.RegisterRoutes(protected, pool)
+			comms.RegisterRoutes(protected, pool)
 			processpolicy.RegisterRoutes(protected, pool)
 			approval.RegisterRoutes(protected, pool)
 			docgen.RegisterRoutes(protected, pool)
@@ -154,6 +164,7 @@ func main() {
 			bi.RegisterRoutes(protected, pool, api)
 			fixedassets.RegisterRoutes(protected, pool)
 			jobcosting.RegisterRoutes(protected, pool)
+			operations.RegisterRoutes(protected, pool)
 			manufacturing.RegisterRoutes(protected, pool)
 			quality.RegisterRoutes(protected, pool)
 			pos.RegisterRoutes(protected, pool)

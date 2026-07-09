@@ -1,18 +1,68 @@
-import { For, Show } from "solid-js";
+import { For, Show, createSignal, onMount } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
-import { useBilling, usePublicPlans } from "../../shared/usePlatform";
-
-
+import { apiAbsoluteUrl, apiFetch, getAccessToken } from "../../shared/api";
+import { useToast } from "../../shared/toast";
+import {
+  useBilling,
+  useBillingPayments,
+  usePublicPlans,
+  type BillingInvoice,
+} from "../../shared/usePlatform";
 
 export default function BillingPage() {
   const q = useBilling();
+  const paymentsQ = useBillingPayments();
   const catalog = usePublicPlans();
+  const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const [payingId, setPayingId] = createSignal<number | null>(null);
+
+  onMount(() => {
+    if (searchParams.paid === "1") {
+      toast.success("Payment received. Your subscription will update shortly.");
+    }
+  });
+
+  const payInvoice = async (inv: BillingInvoice) => {
+    const id = inv.id;
+    if (!id || payingId() !== null) return;
+    setPayingId(id);
+    const res = await apiFetch<{ checkout_url?: string }>(
+      `/api/v1/platform/billing/invoices/${id}/checkout`,
+      { method: "POST" },
+      { silent: true },
+    );
+    setPayingId(null);
+    if (!res.ok || !res.data?.checkout_url) {
+      toast.error(res.message ?? "Could not start checkout.");
+      return;
+    }
+    window.location.href = res.data.checkout_url;
+  };
+
+  const openPdf = async (inv: BillingInvoice) => {
+    const id = inv.id;
+    if (!id) return;
+    const token = await getAccessToken();
+    const url = apiAbsoluteUrl(`/api/v1/platform/billing/invoices/${id}/pdf`);
+    const resp = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) {
+      toast.error("Could not download invoice PDF.");
+      return;
+    }
+    const blob = await resp.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div class="mx-auto max-w-3xl p-6">
       <h1 class="text-xl font-semibold text-text-primary">Billing & subscription</h1>
       <p class="mt-1 text-sm text-text-secondary">
-        View your current plan, available packages, and invoices. Contact sales to upgrade or renew.
+        View your current plan, pay invoices online, and download PDF copies.
       </p>
 
       <Show when={q.isPending && catalog.isPending} fallback={
@@ -100,6 +150,7 @@ export default function BillingPage() {
                     <th class="pb-2">Due</th>
                     <th class="pb-2">Amount</th>
                     <th class="pb-2">Status</th>
+                    <th class="pb-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -108,8 +159,31 @@ export default function BillingPage() {
                       <tr class="border-t border-stroke">
                         <td class="py-2">{String(inv.invoice_no)}</td>
                         <td class="py-2">{String(inv.due_date).slice(0, 10)}</td>
-                        <td class="py-2">₱{Number(inv.amount).toLocaleString()}</td>
+                        <td class="py-2">{formatPeso(Number(inv.amount))}</td>
                         <td class="py-2">{String(inv.status)}</td>
+                        <td class="py-2 text-right">
+                          <div class="flex justify-end gap-2">
+                            <Show when={inv.id}>
+                              <button
+                                type="button"
+                                class="text-xs text-brand-600 hover:underline"
+                                onClick={() => void openPdf(inv)}
+                              >
+                                PDF
+                              </button>
+                            </Show>
+                            <Show when={inv.status === "issued" && inv.id}>
+                              <button
+                                type="button"
+                                class="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-60"
+                                disabled={payingId() === inv.id}
+                                onClick={() => void payInvoice(inv)}
+                              >
+                                {payingId() === inv.id ? "Redirecting…" : "Pay now"}
+                              </button>
+                            </Show>
+                          </div>
+                        </td>
                       </tr>
                     )}
                   </For>
@@ -118,12 +192,46 @@ export default function BillingPage() {
             </Show>
           </div>
 
+          <div class="rounded-xl border border-stroke bg-white p-5">
+            <h2 class="text-sm font-semibold">Payment history</h2>
+            <Show when={paymentsQ.isPending} fallback={
+              <Show when={(paymentsQ.data?.length ?? 0) > 0} fallback={
+                <p class="mt-2 text-sm text-text-secondary">No payments recorded yet.</p>
+              }>
+                <table class="mt-3 w-full text-left text-sm">
+                  <thead class="text-xs text-text-secondary">
+                    <tr>
+                      <th class="pb-2">Date</th>
+                      <th class="pb-2">Invoice</th>
+                      <th class="pb-2">Amount</th>
+                      <th class="pb-2">Method</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={paymentsQ.data ?? []}>
+                      {(p) => (
+                        <tr class="border-t border-stroke">
+                          <td class="py-2">{String(p.paid_at ?? "").slice(0, 10)}</td>
+                          <td class="py-2">{String(p.invoice_no ?? p.invoice_id)}</td>
+                          <td class="py-2">{formatPeso(Number(p.amount))}</td>
+                          <td class="py-2 capitalize">{String(p.provider ?? "—")}</td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </Show>
+            }>
+              <p class="mt-2 text-sm text-text-secondary">Loading payments…</p>
+            </Show>
+          </div>
+
           <p class="text-xs text-text-secondary">
-            To subscribe or renew at a listed price, email{" "}
+            Questions about billing? Email{" "}
             <a href="mailto:sales@bluearm.ph" class="text-brand-600 hover:underline">
               sales@bluearm.ph
-            </a>{" "}
-            with your company name and preferred plan.
+            </a>
+            .
           </p>
         </div>
       }>

@@ -69,6 +69,9 @@ type rfqLineRef struct {
 func registerSupplierQuotationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("purchase_order.supplier_quotations", auth.AccessRead)).Get("/supplier-quotations", listSupplierQuotations(pool))
 	r.With(auth.RequirePermission("purchase_order.supplier_quotations", auth.AccessRead)).Get("/supplier-quotations/{id}", getSupplierQuotation(pool))
+	r.With(auth.RequirePermission("purchase_order.supplier_quotations", auth.AccessRead)).Get("/supplier-quotations/{id}/print", getSupplierQuotationPrint(pool))
+	r.With(auth.RequirePermission("purchase_order.supplier_quotations", auth.AccessRead)).Get("/supplier-quotations/{id}/pdf", getSupplierQuotationPDF(pool))
+	r.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/supplier-quotations/{id}/send-email", postSupplierQuotationSendEmail(pool))
 	r.With(auth.RequirePermission("purchase_order.supplier_quotations_create", auth.AccessWrite)).Post("/supplier-quotations", createSupplierQuotation(pool))
 	r.With(auth.RequirePermission("purchase_order.supplier_quotations_create", auth.AccessWrite)).Patch("/supplier-quotations/{id}", updateSupplierQuotation(pool))
 	r.With(auth.RequirePermission("purchase_order.supplier_quotations_create", auth.AccessWrite)).Delete("/supplier-quotations/{id}", deleteSupplierQuotation(pool))

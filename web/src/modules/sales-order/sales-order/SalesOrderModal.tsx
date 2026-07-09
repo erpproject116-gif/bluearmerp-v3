@@ -18,6 +18,8 @@ import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
+import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { LoadSlipMenu, SALES_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import {
   QuotationLinePickerModal,
@@ -490,6 +492,11 @@ export function SalesOrderModal(props: Props) {
         saving={saving()}
         headerActions={
           <Show when={effectiveEditing()}>
+            <DocumentEmailToolbar
+              docId={effectiveEditing()?.id}
+              sendUrl="/api/v1/sales-order/sales-orders/{id}/send-email"
+              title="Email sales order"
+            />
             <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
               History
             </button>
@@ -676,6 +683,7 @@ export function SalesOrderModal(props: Props) {
           partnerId={partnerId}
         />
         <ChangeLogPanel targetType="so_sales_order" targetId={effectiveEditing()?.id} />
+        <EmailHistoryPanel docType="sales_order" docId={effectiveEditing()?.id} />
       </WideEntityModal>
 
       <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="so_sales_order" targetId={effectiveEditing()?.id} title="History — Sales Order" />

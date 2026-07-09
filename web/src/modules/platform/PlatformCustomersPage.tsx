@@ -1,9 +1,10 @@
 import { A } from "@solidjs/router";
+import { formatPeso } from "../../shared/money";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
-import { usePlatformCustomers, usePlatformPlansAdmin, type PlatformPlan } from "../../shared/usePlatform";
+import { usePlatformCustomers, usePlatformPlansAdmin, usePlatformBillingSummary, type PlatformPlan } from "../../shared/usePlatform";
 
 const urgencyBadge: Record<string, string> = {
   trial_critical: "bg-red-100 text-red-800",
@@ -41,6 +42,7 @@ export default function PlatformCustomersPage() {
   const [form, setForm] = createSignal<ProvisionForm>(emptyForm());
   const [busy, setBusy] = createSignal(false);
   const q = usePlatformCustomers(search);
+  const summaryQ = usePlatformBillingSummary();
   const plansQ = usePlatformPlansAdmin();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -155,6 +157,31 @@ export default function PlatformCustomersPage() {
           />
         </div>
       </div>
+
+      <Show when={summaryQ.data}>
+        {(s) => (
+          <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-xl border border-stroke bg-white p-4">
+              <p class="text-xs uppercase text-text-secondary">MRR</p>
+              <p class="mt-1 text-2xl font-semibold text-text-primary">{formatPeso(s().mrr)}</p>
+              <p class="text-xs text-text-secondary">Active paid subscriptions</p>
+            </div>
+            <div class="rounded-xl border border-stroke bg-white p-4">
+              <p class="text-xs uppercase text-text-secondary">Expiring ≤ 7 days</p>
+              <p class="mt-1 text-2xl font-semibold text-amber-700">{s().expiring_7_days}</p>
+            </div>
+            <div class="rounded-xl border border-stroke bg-white p-4">
+              <p class="text-xs uppercase text-text-secondary">Expiring ≤ 30 days</p>
+              <p class="mt-1 text-2xl font-semibold text-text-primary">{s().expiring_30_days}</p>
+            </div>
+            <div class="rounded-xl border border-stroke bg-white p-4">
+              <p class="text-xs uppercase text-text-secondary">Overdue invoices</p>
+              <p class="mt-1 text-2xl font-semibold text-red-700">{s().overdue_invoices}</p>
+              <p class="text-xs text-text-secondary">{formatPeso(s().overdue_amount)} outstanding</p>
+            </div>
+          </div>
+        )}
+      </Show>
 
       <Show when={showModal()}>
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

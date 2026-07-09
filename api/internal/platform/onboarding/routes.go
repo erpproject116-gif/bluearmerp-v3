@@ -130,7 +130,7 @@ func (s *service) getBilling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, _ := s.pool.Query(r.Context(), `
-		select i.invoice_no, i.period_start, i.period_end, i.amount, i.due_date, i.paid_at, i.status
+		select i.id, i.invoice_no, i.period_start, i.period_end, i.amount, i.due_date, i.paid_at, i.status
 		from public.platform_subscription_invoices i
 		join public.platform_subscriptions s on s.id = i.subscription_id
 		where s.customer_id = $1
@@ -139,13 +139,14 @@ func (s *service) getBilling(w http.ResponseWriter, r *http.Request) {
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
+			var id int64
 			var invNo, st *string
 			var ps, pe, due interface{}
 			var amount float64
 			var paidAt interface{}
-			if err := rows.Scan(&invNo, &ps, &pe, &amount, &due, &paidAt, &st); err == nil {
+			if err := rows.Scan(&id, &invNo, &ps, &pe, &amount, &due, &paidAt, &st); err == nil {
 				invoices = append(invoices, map[string]any{
-					"invoice_no": invNo, "period_start": ps, "period_end": pe,
+					"id": id, "invoice_no": invNo, "period_start": ps, "period_end": pe,
 					"amount": amount, "due_date": due, "paid_at": paidAt, "status": st,
 				})
 			}

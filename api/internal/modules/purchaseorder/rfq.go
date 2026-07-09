@@ -41,6 +41,9 @@ type RFQLine struct {
 func registerRFQRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("purchase_order.rfq", auth.AccessRead)).Get("/rfq", listRFQs(pool))
 	r.With(auth.RequirePermission("purchase_order.rfq", auth.AccessRead)).Get("/rfq/{id}", getRFQ(pool))
+	r.With(auth.RequirePermission("purchase_order.rfq", auth.AccessRead)).Get("/rfq/{id}/print", getRFQPrint(pool))
+	r.With(auth.RequirePermission("purchase_order.rfq", auth.AccessRead)).Get("/rfq/{id}/pdf", getRFQPDF(pool))
+	r.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/rfq/{id}/send-email", postRFQSendEmail(pool))
 	r.With(auth.RequirePermission("purchase_order.rfq_create", auth.AccessWrite)).Post("/rfq", createRFQ(pool))
 	r.With(auth.RequirePermission("purchase_order.rfq_create", auth.AccessWrite)).Post("/rfq/from-purchase-request/{prId}", createRFQFromPurchaseRequest(pool))
 	r.With(auth.RequirePermission("purchase_order.rfq_create", auth.AccessWrite)).Patch("/rfq/{id}/status", patchRFQStatus(pool))

@@ -21,6 +21,7 @@ import type { OpenGRLine, OpenPOLine, OpenSupplierQuotationInvoiceLine, Supplier
 import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
 import { OpenPOLinePickerModal } from "./OpenPOLinePickerModal";
 import { OpenSupplierQuotationLinePickerModal } from "./OpenSupplierQuotationLinePickerModal";
+import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -390,6 +391,11 @@ export function SupplierInvoiceModal(props: Props) {
         onTabChange={(id) => setActiveTab(id as "details" | "invoice")}
         headerActions={
           <Show when={effectiveEditing()}>
+            <DocumentEmailToolbar
+              docId={effectiveEditing()?.id}
+              sendUrl="/api/v1/finance/supplier-invoices/{id}/send-email"
+              title="Email purchase"
+            />
             <button
               type="button"
               class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"

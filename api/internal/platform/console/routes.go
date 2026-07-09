@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/billing"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -27,6 +28,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.Post("/platform/console/subscriptions/{id}/invoices", svc.createInvoice)
 		cr.Post("/platform/console/invoices/{id}/mark-paid", svc.markInvoicePaid)
 		cr.Get("/platform/console/plans", svc.listPlans)
+		billing.RegisterConsoleRoutes(cr, pool, cfg)
 		cr.Get("/platform/console/plans/{id}", svc.getPlan)
 		cr.Post("/platform/console/plans", svc.createPlan)
 		cr.Patch("/platform/console/plans/{id}", svc.patchPlan)

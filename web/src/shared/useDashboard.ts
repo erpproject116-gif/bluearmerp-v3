@@ -10,6 +10,7 @@ export type DashboardSummary = {
   warranty_due: number;
   expired_quotes: number;
   quotes_expiring_7d: number;
+  unbilled_due_milestones: number;
 };
 
 export type DashboardTrendPoint = {

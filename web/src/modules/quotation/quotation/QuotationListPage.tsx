@@ -19,8 +19,10 @@ import { QuotationLayout } from "../QuotationLayout";
 import { CreatedSlipModal } from "./CreatedSlipModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { QuotationModal, type QuotationDetail } from "./QuotationModal";
-import { formatMoney, openQuotationPrint } from "./quotationPrint";
+import { formatMoney, fetchQuotationPrint, openQuotationPrint } from "./quotationPrint";
 import { progressStatusLabel, voucherStatusLabel } from "./progressStatus";
+import { SendEmailModal } from "../../comms/SendEmailModal";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 
 type PageOptions = {
   openNewOnMount?: boolean;
@@ -39,6 +41,8 @@ export function QuotationListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
+  const auth = useAuth();
+  const canSendEmail = () => hasPermission(auth.me, "comms.send", "write");
   const invalidate = useInvalidateQuotations();
 
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -51,6 +55,9 @@ export function QuotationListPageInner(props: PageOptions = {}) {
   const [editing, setEditing] = createSignal<QuotationDetail | null>(null);
   const [slipOpen, setSlipOpen] = createSignal(false);
   const [slipQuotationId, setSlipQuotationId] = createSignal<number | null>(null);
+  const [emailOpen, setEmailOpen] = createSignal(false);
+  const [emailQuotationId, setEmailQuotationId] = createSignal<number | null>(null);
+  const [emailDefaultTo, setEmailDefaultTo] = createSignal("");
 
   const list = useQuotationList(() => ({
     page: page(),
@@ -95,6 +102,13 @@ export function QuotationListPageInner(props: PageOptions = {}) {
       return;
     }
     invalidate();
+  };
+
+  const openEmail = async (row: QuotationRow) => {
+    const res = await fetchQuotationPrint(row.id);
+    setEmailDefaultTo(res.data?.partner.email ?? "");
+    setEmailQuotationId(row.id);
+    setEmailOpen(true);
   };
 
   onMount(() => {
@@ -176,6 +190,26 @@ export function QuotationListPageInner(props: PageOptions = {}) {
             ),
           },
           {
+            key: "email",
+            header: "Email",
+            sortable: false,
+            render: (r) =>
+              canSendEmail() ? (
+                <button
+                  type="button"
+                  class="text-brand-600 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void openEmail(r);
+                  }}
+                >
+                  Email
+                </button>
+              ) : (
+                ""
+              ),
+          },
+          {
             key: "crm_task",
             header: "CRM",
             sortable: false,
@@ -243,6 +277,14 @@ export function QuotationListPageInner(props: PageOptions = {}) {
 
       <QuotationModal open={modalOpen()} editing={editing()} onClose={closeModal} onSaved={invalidate} />
       <CreatedSlipModal open={slipOpen()} quotationId={slipQuotationId()} onClose={() => setSlipOpen(false)} />
+      <SendEmailModal
+        open={emailOpen()}
+        onClose={() => setEmailOpen(false)}
+        title="Email quotation"
+        sendUrl={`/api/v1/quotation/quotations/${emailQuotationId() ?? 0}/send-email`}
+        defaultTo={emailDefaultTo()}
+        onSent={invalidate}
+      />
     </QuotationLayout>
   );
 }

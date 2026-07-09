@@ -19,6 +19,8 @@ import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocum
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
+import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import {
   QuotationLinePickerModal,
@@ -584,6 +586,11 @@ export function SalesModal(props: Props) {
         onTabChange={(id) => setActiveTab(id as "details" | "invoice")}
         headerActions={
           <Show when={effectiveEditing()}>
+            <DocumentEmailToolbar
+              docId={effectiveEditing()?.id}
+              sendUrl="/api/v1/sales/{id}/send-email"
+              title="Email sales invoice"
+            />
             <button
               type="button"
               class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
@@ -796,6 +803,7 @@ export function SalesModal(props: Props) {
           />
         </Show>
         <ChangeLogPanel targetType="sa_sales" targetId={effectiveEditing()?.id} />
+        <EmailHistoryPanel docType="sales" docId={effectiveEditing()?.id} />
         </Show>
       </WideEntityModal>
 

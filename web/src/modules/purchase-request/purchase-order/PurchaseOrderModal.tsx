@@ -23,6 +23,7 @@ import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
 import { TermHint } from "../../../shared/TermHint";
 import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
+import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -167,6 +168,7 @@ export function PurchaseOrderModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
+  const [_attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
@@ -450,6 +452,11 @@ export function PurchaseOrderModal(props: Props) {
       saving={saving()}
       headerActions={
         <Show when={effectivePoId()}>
+          <DocumentEmailToolbar
+            docId={effectivePoId()}
+            sendUrl="/api/v1/purchase-order/purchase-orders/{id}/send-email"
+            title="Email purchase order"
+          />
           <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
             History
           </button>
@@ -702,6 +709,7 @@ export function PurchaseOrderModal(props: Props) {
         docId={effectivePoId() ?? undefined}
         label="Attachments (carried to Purchases)"
         required={policyRequiresAttachment(processPolicy.data, "purchase_order")}
+        onCountChange={setAttachmentCount}
         emptyUnsavedHint="Save the purchase order first to attach files (max 25 MB each). Confirm on the list only after uploading."
       />
       <ChangeLogPanel targetType="po_purchase_order" targetId={effectivePoId()} />

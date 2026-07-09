@@ -27,6 +27,14 @@ export type PlatformCustomer = {
   crm_lead_id?: number | null;
 };
 
+export type PlatformBillingSummary = {
+  mrr: number;
+  expiring_7_days: number;
+  expiring_30_days: number;
+  overdue_invoices: number;
+  overdue_amount: number;
+};
+
 export type PlatformPlan = {
   id: number;
   plan_code: string;
@@ -47,6 +55,29 @@ export type PlatformPlan = {
   is_active: boolean;
   is_public: boolean;
   sort_order: number;
+};
+
+export type BillingInvoice = {
+  id?: number;
+  invoice_no?: string;
+  period_start?: string;
+  period_end?: string;
+  amount?: number;
+  due_date?: string;
+  paid_at?: string | null;
+  status?: string;
+};
+
+export type BillingPayment = {
+  id: number;
+  invoice_id: number;
+  invoice_no?: string;
+  amount: number;
+  currency?: string;
+  provider?: string;
+  provider_payment_id?: string | null;
+  paid_at?: string;
+  status?: string;
 };
 
 export function usePlatformPlansAdmin() {
@@ -83,6 +114,19 @@ export function usePublicPlans() {
       const res = await apiFetch<{ plans: PlatformPlan[] }>("/api/v1/platform/plans");
       if (!res.ok) throw new Error(res.message ?? "Failed to load plans");
       return res.data?.plans ?? [];
+    },
+  }));
+}
+
+export function usePlatformBillingSummary() {
+  return createQuery(() => ({
+    queryKey: ["platform-billing-summary"],
+    queryFn: async () => {
+      const res = await apiFetch<PlatformBillingSummary>(
+        "/api/v1/platform/console/billing/summary",
+      );
+      if (!res.ok) throw new Error(res.message ?? "Failed to load billing summary");
+      return res.data!;
     },
   }));
 }
@@ -196,11 +240,24 @@ export function useBilling() {
     queryFn: async () => {
       const res = await apiFetch<{
         subscription: Record<string, unknown> | null;
-        invoices: Record<string, unknown>[];
+        invoices: BillingInvoice[];
         message?: string;
       }>("/api/v1/platform/billing");
       if (!res.ok) throw new Error(res.message ?? "Failed to load billing");
       return res.data!;
+    },
+  }));
+}
+
+export function useBillingPayments() {
+  return createQuery(() => ({
+    queryKey: ["billing-payments"],
+    queryFn: async () => {
+      const res = await apiFetch<{ payments: BillingPayment[] }>(
+        "/api/v1/platform/billing/payments",
+      );
+      if (!res.ok) throw new Error(res.message ?? "Failed to load payment history");
+      return res.data?.payments ?? [];
     },
   }));
 }

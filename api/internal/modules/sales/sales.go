@@ -164,6 +164,8 @@ func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/", createSale(pool))
 	r.Get("/print-batch", getSalesPrintBatch(pool))
 	r.Get("/{id}/print", getSalesPrint(pool))
+	r.Get("/{id}/pdf", getSalesPDF(pool))
+	r.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/{id}/send-email", postSalesSendEmail(pool))
 	r.Patch("/{id}/progress-status", patchSalesProgressStatus(pool))
 	r.Patch("/{id}/invoicing-status", patchSalesInvoicingStatus(pool))
 	r.Get("/{id}/invoice", getSalesInvoice(pool))

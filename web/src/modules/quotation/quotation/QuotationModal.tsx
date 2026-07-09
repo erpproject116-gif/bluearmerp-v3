@@ -15,6 +15,10 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { SendEmailModal } from "../../comms/SendEmailModal";
+import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
+import { fetchQuotationPrint } from "./quotationPrint";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -139,6 +143,8 @@ function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
 
 export function QuotationModal(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
+  const canSendEmail = () => hasPermission(auth.me, "comms.send", "write");
   const processPolicy = useProcessPolicy(() => props.open);
   const [attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
@@ -159,6 +165,8 @@ export function QuotationModal(props: Props) {
   const [customerLabel, setCustomerLabel] = createSignal("");
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [emailOpen, setEmailOpen] = createSignal(false);
+  const [emailDefaultTo, setEmailDefaultTo] = createSignal("");
   const [newCustomerName, setNewCustomerName] = createSignal("");
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
   const [picName, setPicName] = createSignal("");
@@ -415,6 +423,14 @@ export function QuotationModal(props: Props) {
     setCreatedQuotation(res.data);
   };
 
+  const openEmail = async () => {
+    const ed = effectiveEditing();
+    if (!ed?.id) return;
+    const res = await fetchQuotationPrint(ed.id);
+    setEmailDefaultTo(res.data?.partner.email ?? "");
+    setEmailOpen(true);
+  };
+
   return (
     <>
     <WideEntityModal
@@ -425,6 +441,15 @@ export function QuotationModal(props: Props) {
       saving={saving()}
       headerActions={
         <Show when={effectiveEditing()}>
+          <Show when={canSendEmail()}>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-slate-50"
+              onClick={() => void openEmail()}
+            >
+              Email
+            </button>
+          </Show>
           <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
             History
           </button>
@@ -584,6 +609,7 @@ export function QuotationModal(props: Props) {
         partnerId={partnerId}
       />
       <ChangeLogPanel targetType="quo_quotation" targetId={effectiveEditing()?.id} />
+      <EmailHistoryPanel docType="quotation" docId={effectiveEditing()?.id} />
     </WideEntityModal>
 
     <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={effectiveEditing()?.id} title="History — Quotation" />
@@ -596,6 +622,14 @@ export function QuotationModal(props: Props) {
         setPartnerId(p.id);
         setCustomerLabel(p.company_name);
       }}
+    />
+
+    <SendEmailModal
+      open={emailOpen()}
+      onClose={() => setEmailOpen(false)}
+      title="Email quotation"
+      sendUrl={`/api/v1/quotation/quotations/${effectiveEditing()?.id ?? 0}/send-email`}
+      defaultTo={emailDefaultTo()}
     />
     </>
   );

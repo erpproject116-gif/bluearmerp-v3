@@ -150,6 +150,8 @@ func registerQuotationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/quotations", listQuotations(pool))
 	r.Post("/quotations", createQuotation(pool))
 	r.Get("/quotations/{id}/print", getQuotationPrint(pool))
+	r.Get("/quotations/{id}/pdf", getQuotationPDF(pool))
+	r.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/quotations/{id}/send-email", postQuotationSendEmail(pool))
 	r.Get("/quotations/{id}/created-slips", getCreatedSlips(pool))
 	r.Patch("/quotations/{id}/progress-status", patchQuotationProgressStatus(pool))
 	r.Get("/quotations/{id}", getQuotation(pool))

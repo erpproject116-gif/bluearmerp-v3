@@ -5,20 +5,22 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
 type summaryResponse struct {
-	SalesMTD         float64 `json:"sales_mtd"`
-	SalesYTD         float64 `json:"sales_ytd"`
-	LowStockCount    int64   `json:"low_stock_count"`
-	ArCustomers      int64   `json:"ar_customers"`
-	OpenPOLines      int64   `json:"open_po_lines"`
-	WarrantyDue      int64   `json:"warranty_due"`
-	ExpiredQuotes    int64   `json:"expired_quotes"`
-	QuotesExpiring7d int64   `json:"quotes_expiring_7d"`
+	SalesMTD              float64 `json:"sales_mtd"`
+	SalesYTD              float64 `json:"sales_ytd"`
+	LowStockCount         int64   `json:"low_stock_count"`
+	ArCustomers           int64   `json:"ar_customers"`
+	OpenPOLines           int64   `json:"open_po_lines"`
+	WarrantyDue           int64   `json:"warranty_due"`
+	ExpiredQuotes         int64   `json:"expired_quotes"`
+	QuotesExpiring7d      int64   `json:"quotes_expiring_7d"`
+	UnbilledDueMilestones int64   `json:"unbilled_due_milestones"`
 }
 
 type trendPoint struct {
@@ -139,6 +141,8 @@ func summaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			  and q.valid_until >= $2::date
 			  and q.valid_until <= ($2::date + interval '7 days')::date`,
 			tu.TenantID, today).Scan(&out.QuotesExpiring7d)
+
+		out.UnbilledDueMilestones, _ = finance.CountUnbilledDueMilestones(ctx, pool, tu.TenantID)
 
 		w.Header().Set("Cache-Control", "private, max-age=30")
 		response.OK(w, out, "OK")

@@ -85,6 +85,10 @@ import {
   PurchaseRequestStatusPage,
   PurchaseRequestPrintPage,
   PurchaseRequestStatusPrintPage,
+  PurchaseOrderPrintPage,
+  RfqPrintPage,
+  SupplierQuotationPrintPage,
+  SupplierInvoiceDocPrintPage,
   PurchaseOrderListPage,
   PurchaseReturnsPage,
   RfqListPage,
@@ -160,6 +164,14 @@ import {
   OpportunitiesPage,
   TicketsPage,
   TicketDetailPage,
+  SentDocumentsPage,
+  CommsInboxPage,
+  CommsSettingsPage,
+  OperationsHubPage,
+  OperationsCalendarPage,
+  OperationsTimelinePage,
+  OperationsDashboardPage,
+  OperationsAutomationPage,
   PosPage,
   PosSettingsPage,
   HrEmployeesPage,
@@ -211,7 +223,7 @@ import {
   BudgetDetailPage,
   BudgetVsActualReportPage,
   IngestionRulesPage,
-  InboxPage,
+  DataCenterInboxPage,
   ScheduledReceiptsPage,
   ShippingOrdersPage,
   ShippingRulesPage,
@@ -227,6 +239,8 @@ import { ActivityLogRoute } from "./shared/ActivityLogRoute";
 import { ChangeLogRoute } from "./shared/ChangeLogRoute";
 import { CrmRoute } from "./shared/CrmRoute";
 import { SupportRoute } from "./shared/SupportRoute";
+import { CommsRoute } from "./shared/CommsRoute";
+import { OperationsRoute } from "./shared/OperationsRoute";
 import { PosRoute } from "./shared/PosRoute";
 import { HrRoute } from "./shared/HrRoute";
 import { FixedAssetsRoute } from "./shared/FixedAssetsRoute";
@@ -285,6 +299,10 @@ export default function App() {
         <Route path="/app/sales-order/sales-orders/status/print" component={SalesOrderStatusPrintPage} />
         <Route path="/app/purchase-request/purchase-requests/:purchaseRequestId/print" component={PurchaseRequestPrintPage} />
         <Route path="/app/purchase-request/purchase-requests/status/print" component={PurchaseRequestStatusPrintPage} />
+        <Route path="/app/purchase-order/purchase-orders/:purchaseOrderId/print" component={PurchaseOrderPrintPage} />
+        <Route path="/app/purchase-order/rfq/:rfqId/print" component={RfqPrintPage} />
+        <Route path="/app/purchase-order/supplier-quotations/:sqId/print" component={SupplierQuotationPrintPage} />
+        <Route path="/app/purchases/purchases/:purchaseId/print-doc" component={SupplierInvoiceDocPrintPage} />
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
         <Route path="/app/sales/sales/:id/invoice/print" component={SalesInvoicePrintPage} />
         <Route path="/app/finance/supplier-invoices/:id/print" component={PurchaseInvoicePrintPage} />
@@ -520,6 +538,30 @@ export default function App() {
           <Route path="/support/tickets/:id" component={() => (
             <SupportRoute><TicketDetailPage /></SupportRoute>
           )} />
+          <Route path="/comms/inbox" component={() => (
+            <CommsRoute><CommsInboxPage /></CommsRoute>
+          )} />
+          <Route path="/comms/sent-documents" component={() => (
+            <CommsRoute><SentDocumentsPage /></CommsRoute>
+          )} />
+          <Route path="/comms/settings" component={() => (
+            <CommsRoute><CommsSettingsPage /></CommsRoute>
+          )} />
+          <Route path="/operations/calendar" component={() => (
+            <OperationsRoute><OperationsCalendarPage /></OperationsRoute>
+          )} />
+          <Route path="/operations/timeline" component={() => (
+            <OperationsRoute><OperationsTimelinePage /></OperationsRoute>
+          )} />
+          <Route path="/operations/dashboard" component={() => (
+            <OperationsRoute><OperationsDashboardPage /></OperationsRoute>
+          )} />
+          <Route path="/operations/automation" component={() => (
+            <OperationsRoute><OperationsAutomationPage /></OperationsRoute>
+          )} />
+          <Route path="/operations" component={() => (
+            <OperationsRoute><OperationsHubPage /></OperationsRoute>
+          )} />
           <Route path="/hr/employees" component={() => (
             <HrRoute><HrEmployeesPage /></HrRoute>
           )} />
@@ -543,7 +585,7 @@ export default function App() {
             <QualityRoute><NcrsPage /></QualityRoute>
           )} />
           <Route path="/data-center/ingestion-rules" component={IngestionRulesPage} />
-          <Route path="/data-center/inbox" component={InboxPage} />
+          <Route path="/data-center/inbox" component={DataCenterInboxPage} />
           <Route path="/activity-logs/changes" component={() => (
             <ChangeLogRoute>
               <ChangeLogListPage />

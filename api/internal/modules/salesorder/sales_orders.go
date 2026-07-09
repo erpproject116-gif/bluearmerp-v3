@@ -169,6 +169,8 @@ func registerSalesOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/sales-orders", listSalesOrders(pool))
 	r.Post("/sales-orders", createSalesOrder(pool))
 	r.Get("/sales-orders/{id}/print", getSalesOrderPrint(pool))
+	r.Get("/sales-orders/{id}/pdf", getSalesOrderPDF(pool))
+	r.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/sales-orders/{id}/send-email", postSalesOrderSendEmail(pool))
 	r.Get("/sales-orders/{id}/created-slips", getCreatedSlips(pool))
 	r.Patch("/sales-orders/{id}/progress-status", patchSalesOrderProgressStatus(pool))
 	r.Post("/sales-orders/{id}/attachments", uploadSalesOrderAttachment(pool))

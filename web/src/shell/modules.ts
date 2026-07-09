@@ -354,6 +354,29 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "comms",
+    label: "Communications",
+    href: "/app/comms/sent-documents",
+    basePath: "/app/comms",
+    features: [
+      { label: "Inbox", href: "/app/comms/inbox", settingsHref: "/app/comms/settings" },
+      { label: "Sent Documents", href: "/app/comms/sent-documents", settingsHref: "/app/comms/settings" },
+    ],
+  },
+  {
+    id: "operations",
+    label: "Operations",
+    href: "/app/operations",
+    basePath: "/app/operations",
+    features: [
+      { label: "Work Hub", href: "/app/operations", settingsHref: "/app/operations" },
+      { label: "Calendar", href: "/app/operations/calendar", settingsHref: "/app/operations/calendar" },
+      { label: "Timeline", href: "/app/operations/timeline", settingsHref: "/app/operations/timeline" },
+      { label: "Dashboard", href: "/app/operations/dashboard", settingsHref: "/app/operations/dashboard" },
+      { label: "Automation", href: "/app/operations/automation", settingsHref: "/app/operations/automation" },
+    ],
+  },
+  {
     id: "pos",
     label: "POS",
     href: "/app/pos",

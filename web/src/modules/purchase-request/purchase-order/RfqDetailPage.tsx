@@ -4,6 +4,8 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { SupplierQuotationModal } from "./SupplierQuotationModal";
+import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { openRfqPrint } from "./rfqPrint";
 
 type RfqLine = {
   id: number;
@@ -126,6 +128,18 @@ export default function RfqDetailPage() {
           Back to RFQ list
         </A>
         <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
+            onClick={() => openRfqPrint(rfqId())}
+          >
+            Print
+          </button>
+          <DocumentEmailToolbar
+            docId={rfqId()}
+            sendUrl="/api/v1/purchase-order/rfq/{id}/send-email"
+            title="Email RFQ"
+          />
           <button
             type="button"
             class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"

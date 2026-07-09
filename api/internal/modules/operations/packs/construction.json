@@ -1,0 +1,46 @@
+{
+  "pack_code": "construction",
+  "pack_name": "Construction",
+  "columns": [
+    { "key": "backlog", "name": "Backlog", "sort_order": 0, "color": "#94a3b8" },
+    { "key": "planning", "name": "Planning", "sort_order": 10, "color": "#60a5fa" },
+    { "key": "in_progress", "name": "In Progress", "sort_order": 20, "color": "#fbbf24" },
+    { "key": "inspection", "name": "Inspection", "sort_order": 30, "color": "#a78bfa" },
+    { "key": "complete", "name": "Complete", "sort_order": 40, "color": "#34d399" }
+  ],
+  "sample_work_items": [
+    { "title": "Site survey & measurements", "column_key": "backlog", "priority": "high", "start_date_offset_days": 0, "end_date_offset_days": 3 },
+    { "title": "Permit application", "column_key": "planning", "priority": "normal", "start_date_offset_days": 2, "end_date_offset_days": 14 }
+  ],
+  "automation_rules": [
+    {
+      "rule_name": "Notify on new work item",
+      "trigger_event": "work_item.created",
+      "trigger_config": {},
+      "action_type": "notify",
+      "action_config": { "message": "A new construction work item was created." }
+    }
+  ],
+  "dashboard_widgets": [
+    {
+      "widget_type": "job_cost_bva",
+      "title": "Budget vs Actual",
+      "grid_x": 0,
+      "grid_y": 0,
+      "grid_w": 6,
+      "grid_h": 3,
+      "sort_order": 0,
+      "config": {}
+    },
+    {
+      "widget_type": "work_item_summary",
+      "title": "Work Items by Status",
+      "grid_x": 6,
+      "grid_y": 0,
+      "grid_w": 6,
+      "grid_h": 3,
+      "sort_order": 10,
+      "config": {}
+    }
+  ]
+}

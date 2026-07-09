@@ -39,6 +39,7 @@ const kpiTiles: KpiTile[] = [
   { label: "Warranty follow-ups", value: (s) => s?.warranty_due ?? 0, href: "/app/crm/follow-up-tasks" },
   { label: "Expired quotes", value: (s) => s?.expired_quotes ?? 0, href: "/app/quotation/quotations/outstanding", accent: "text-red-600" },
   { label: "Quotes expiring (7d)", value: (s) => s?.quotes_expiring_7d ?? 0, href: "/app/quotation/quotations/outstanding", accent: "text-amber-600" },
+  { label: "Unbilled milestones", value: (s) => s?.unbilled_due_milestones ?? 0, href: "/app/finance/acct-ii/contracts", accent: "text-amber-600" },
 ];
 
 const redFlagLinks: Record<string, string> = {
