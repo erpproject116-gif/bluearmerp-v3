@@ -79,6 +79,8 @@ Requires running API + web + seeded demo user.
 
 | Doc | Purpose |
 |-----|---------|
+| [docs/roadmap.md](docs/roadmap.md) | **Phases 0–4** product roadmap |
+| [docs/runbooks/deploy-checklist.md](docs/runbooks/deploy-checklist.md) | Production deploy checklist |
 | [docs/runbooks/environment-variables.md](docs/runbooks/environment-variables.md) | **Supabase-only env (no manual DATABASE_URL)** |
 | [docs/runbooks/sql-run-order.md](docs/runbooks/sql-run-order.md) | Which SQL script to run first |
 | [docs/runbooks/supabase-setup.md](docs/runbooks/supabase-setup.md) | New Supabase project |

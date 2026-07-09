@@ -1,0 +1,73 @@
+name: API golden path smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "api/**"
+      - "scripts/golden-path-smoke.mjs"
+      - "scripts/perf/routes.golden.json"
+      - "scripts/mint-bench-jwt.mjs"
+      - "scripts/seed-ci-bench-auth.sql"
+      - "scripts/seed-demo-*.sql"
+      - "supabase/seed.sql"
+      - ".github/workflows/api-golden-smoke.yml"
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Start Postgres
+        run: |
+          docker run -d --name pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:15
+          sleep 5
+
+      - name: Apply migrations and demo seed
+        run: |
+          sudo apt-get install -y postgresql-client
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+          for f in api/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
+          psql "$DATABASE_URL" -f supabase/seed.sql
+          psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
+          psql "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
+          psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql || true
+          psql "$DATABASE_URL" -f scripts/seed-demo-finance-ap.sql || true
+
+      - name: Build and start API
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
+          CORS_ORIGIN: http://localhost:5173
+          PORT: "8080"
+          MIGRATIONS_DIR: api/migrations
+        run: |
+          cd api
+          go build -o /tmp/migrate ./cmd/migrate
+          /tmp/migrate
+          go build -o /tmp/server ./cmd/server
+          /tmp/server &
+          sleep 3
+
+      - name: Schema health
+        run: |
+          curl -sf http://localhost:8080/health/schema | tee /tmp/schema.json
+          node -e "const j=require('/tmp/schema.json'); if(!j.data?.healthy) { console.error(j); process.exit(1); }"
+
+      - name: Golden path smoke
+        env:
+          API_BASE: http://localhost:8080
+          SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
+        run: |
+          export BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs)
+          node scripts/golden-path-smoke.mjs

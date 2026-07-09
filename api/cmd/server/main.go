@@ -106,6 +106,7 @@ func main() {
 		response.OK(w, map[string]string{"status": "ok"}, "OK")
 	})
 	r.Get("/health/db", health.DBHandler(pool, cfg))
+	r.Get("/health/schema", health.SchemaHandler(pool))
 
 	r.Route("/api/v1", func(api chi.Router) {
 		crm.RegisterJobRoutes(api, pool)

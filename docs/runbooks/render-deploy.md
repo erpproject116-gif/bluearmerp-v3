@@ -61,7 +61,8 @@ Expected: `"success":true` with `"auth_me_query_john":1` — not `"DB unreachabl
 |---------|--------|
 | Root Directory | `api` |
 | Runtime | Docker |
-| Health Check Path | `/health` |
+| Health Check Path | `/health/schema` (fails if migrations pending) |
+| `MIGRATE_ON_START` | `true` — runs `/migrate` before server in Docker |
 
 ## Verify
 
@@ -96,7 +97,19 @@ Your project ref from local config should match Render `SUPABASE_URL`: `https://
 curl https://YOUR-SERVICE.onrender.com/health/db
 ```
 
-After deploying the latest API, expect migrations through **141** applied on the hosted database before using Operations Hub or Communications. Run `go run ./cmd/migrate -check -from 130` locally against the same `DATABASE_URL` Render uses.
+After deploying the latest API, expect migrations through **142** applied on the hosted database before using purchase attachments or Communications. `MIGRATE_ON_START=true` applies pending migrations on container start; verify with:
+
+```bash
+curl https://YOUR-SERVICE.onrender.com/health/schema
+```
+
+Expect `"healthy": true`. If not, see [`deploy-checklist.md`](deploy-checklist.md).
+
+Legacy check:
+
+```bash
+curl https://YOUR-SERVICE.onrender.com/health/db
+```
 
 | Field | Healthy |
 |-------|---------|

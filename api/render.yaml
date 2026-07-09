@@ -8,8 +8,10 @@ services:
     name: bluearm-api
     runtime: docker
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /health
+    healthCheckPath: /health/schema
     envVars:
+      - key: MIGRATE_ON_START
+        value: "true"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_JWT_SECRET

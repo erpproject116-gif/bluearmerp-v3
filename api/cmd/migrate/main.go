@@ -6,10 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/migrate"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -25,9 +24,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	migDir := findMigrationsDir()
-	if migDir == "" {
-		fmt.Fprintln(os.Stderr, "api/migrations directory not found")
+	if migrate.Dir() == "" {
+		fmt.Fprintln(os.Stderr, "api/migrations directory not found (set MIGRATIONS_DIR if running in Docker)")
 		os.Exit(1)
 	}
 
@@ -39,22 +37,12 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
-	if _, err := conn.Exec(ctx, `create table if not exists public.schema_migrations (
-		version text primary key,
-		applied_at timestamptz not null default now()
-	)`); err != nil {
-		fmt.Fprintf(os.Stderr, "schema_migrations: %v\n", err)
-		os.Exit(1)
-	}
-
-	files, err := filepath.Glob(filepath.Join(migDir, "*.sql"))
+	pending, err := migrate.Pending(ctx, conn, *from)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "glob: %v\n", err)
+		fmt.Fprintf(os.Stderr, "pending: %v\n", err)
 		os.Exit(1)
 	}
-	sort.Strings(files)
 
-	pending := filterPending(ctx, conn, files, *from)
 	if *check || *dry {
 		for _, v := range pending {
 			if *dry {
@@ -66,71 +54,21 @@ func main() {
 		if len(pending) == 0 {
 			fmt.Println("no pending migrations")
 		}
+		if *check && len(pending) > 0 {
+			os.Exit(2)
+		}
 		return
 	}
 
-	for _, v := range pending {
-		path := filepath.Join(migDir, v)
-		sql, err := os.ReadFile(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "read %s: %v\n", v, err)
-			os.Exit(1)
-		}
-		fmt.Println("applying:", v)
-		tx, err := conn.Begin(ctx)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "begin: %v\n", err)
-			os.Exit(1)
-		}
-		if _, err := tx.Exec(ctx, string(sql)); err != nil {
-			_ = tx.Rollback(ctx)
-			fmt.Fprintf(os.Stderr, "exec %s: %v\n", v, err)
-			os.Exit(1)
-		}
-		if _, err := tx.Exec(ctx, `insert into public.schema_migrations(version) values($1)`, v); err != nil {
-			_ = tx.Rollback(ctx)
-			fmt.Fprintf(os.Stderr, "record %s: %v\n", v, err)
-			os.Exit(1)
-		}
-		if err := tx.Commit(ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "commit %s: %v\n", v, err)
-			os.Exit(1)
-		}
+	applied, err := migrate.Apply(ctx, conn, *from)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+	for _, v := range applied {
 		fmt.Println("applied:", v)
 	}
-}
-
-func filterPending(ctx context.Context, conn *pgx.Conn, files []string, from string) []string {
-	var out []string
-	for _, f := range files {
-		v := filepath.Base(f)
-		if from != "" && v < from {
-			continue
-		}
-		var applied bool
-		_ = conn.QueryRow(ctx, `select exists(select 1 from public.schema_migrations where version=$1)`, v).Scan(&applied)
-		if !applied {
-			out = append(out, v)
-		}
+	if len(applied) == 0 {
+		fmt.Println("no pending migrations")
 	}
-	return out
-}
-
-func findMigrationsDir() string {
-	wd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	for {
-		p := filepath.Join(wd, "api", "migrations")
-		if st, err := os.Stat(p); err == nil && st.IsDir() {
-			return p
-		}
-		parent := filepath.Dir(wd)
-		if parent == wd {
-			break
-		}
-		wd = parent
-	}
-	return ""
 }

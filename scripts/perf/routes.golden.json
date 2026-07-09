@@ -1,0 +1,13 @@
+[
+  { "id": "health.schema", "path": "/health/schema", "expectedStatuses": [200], "auth": false },
+  { "id": "auth.me", "path": "/api/v1/auth/me", "expectedStatuses": [200] },
+  { "id": "quotation.list", "path": "/api/v1/quotation/quotations?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "sales_order.list", "path": "/api/v1/sales-order/sales-orders?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "sales.list", "path": "/api/v1/sales?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "purchase_order.list", "path": "/api/v1/purchase-order/purchase-orders?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "goods_receipt.list", "path": "/api/v1/goods-receipt/goods-receipts?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "supplier_invoice.list", "path": "/api/v1/finance/supplier-invoices?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "official_receipt.list", "path": "/api/v1/finance/official-receipts?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "payment_voucher.list", "path": "/api/v1/finance/payment-vouchers?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "process_policies", "path": "/api/v1/settings/process-policies", "expectedStatuses": [200] }
+]
