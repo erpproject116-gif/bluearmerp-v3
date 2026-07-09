@@ -5,7 +5,8 @@ import { useAuth } from "./auth-context";
 import { describePresencePath } from "./presenceLabels";
 import { clearPresence, sendPresenceHeartbeat } from "./usePresence";
 
-const HEARTBEAT_MS = 30_000;
+const HEARTBEAT_MS = 45_000;
+const ROUTE_DEBOUNCE_MS = 750;
 
 async function resolveAvatarUrl(meAvatar?: string | null): Promise<string | undefined> {
   if (meAvatar?.trim()) return meAvatar.trim();
@@ -25,6 +26,7 @@ export function PresenceHeartbeat() {
   const [avatarUrl, setAvatarUrl] = createSignal<string | undefined>();
 
   let timer: ReturnType<typeof setInterval> | undefined;
+  let routeTimer: ReturnType<typeof setTimeout> | undefined;
 
   const pulse = async () => {
     if (!auth.me) return;
@@ -49,6 +51,7 @@ export function PresenceHeartbeat() {
     onCleanup(() => {
       document.removeEventListener("visibilitychange", onVis);
       if (timer) clearInterval(timer);
+      if (routeTimer) clearTimeout(routeTimer);
       void clearPresence();
     });
   });
@@ -56,7 +59,8 @@ export function PresenceHeartbeat() {
   createEffect(() => {
     if (!auth.me) return;
     loc.pathname;
-    void pulse();
+    if (routeTimer) clearTimeout(routeTimer);
+    routeTimer = setTimeout(() => void pulse(), ROUTE_DEBOUNCE_MS);
   });
 
   createEffect(() => {

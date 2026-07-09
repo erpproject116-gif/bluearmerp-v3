@@ -44,6 +44,8 @@ func TestTierForPath(t *testing.T) {
 		{"POST", "/api/v1/demo/provision", TierPublicProvision},
 		{"POST", "/api/v1/inventory/serial-units/resolve-scan", TierExpensive},
 		{"GET", "/api/v1/sales/sales", TierAuthenticated},
+		{"POST", "/api/v1/presence/heartbeat", TierExempt},
+		{"GET", "/api/v1/presence/online", TierExempt},
 	}
 	for _, tc := range cases {
 		if got := TierForPath(tc.method, tc.path); got != tc.want {

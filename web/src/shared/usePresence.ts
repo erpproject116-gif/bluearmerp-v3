@@ -1,5 +1,6 @@
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
+import { queryErrorFromApi, shouldRetryQuery } from "./queryRetry";
 
 export type PresenceUser = {
   user_id: number;
@@ -42,10 +43,12 @@ export function useOnlinePresence(enabled: () => boolean) {
     enabled: enabled(),
     queryFn: async () => {
       const res = await apiFetch<PresenceUser[]>("/api/v1/presence/online?stale_seconds=120");
-      if (!res.success) throw new Error(res.message ?? "Failed to load presence");
+      if (!res.success) throw queryErrorFromApi(res.status, res.message ?? "Failed to load presence");
       return res.data ?? [];
     },
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+    refetchInterval: 60_000,
+    staleTime: 45_000,
+    refetchOnWindowFocus: false,
+    retry: shouldRetryQuery,
   }));
 }

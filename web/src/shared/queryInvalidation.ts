@@ -126,6 +126,7 @@ function skipInvalidation(path: string, method: string): boolean {
   if (/\/print(\?|$)/.test(path)) return true;
   if (path.includes("/auth/")) return true;
   if (path.includes("/presence/")) return true;
+  if (path.includes("/follow-up-tasks/summaries")) return true;
   if (path.includes("/attachments")) return true;
   if (path.startsWith("/api/v1/settings/")) return true;
   if (path.startsWith("/api/v1/form-field-settings")) return true;

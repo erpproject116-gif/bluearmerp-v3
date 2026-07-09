@@ -1,5 +1,6 @@
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
+import { queryErrorFromApi, shouldRetryQuery } from "./queryRetry";
 
 export type SalesTeamMember = {
   id: number;
@@ -14,9 +15,11 @@ export function useSalesTeamMembers(enabled: () => boolean = () => true) {
     enabled: enabled(),
     queryFn: async () => {
       const res = await apiFetch<SalesTeamMember[]>("/api/v1/crm/sales-team/members");
-      if (!res.success) throw new Error(res.message ?? "Failed to load sales team");
+      if (!res.success) throw queryErrorFromApi(res.status, res.message ?? "Failed to load sales team");
       return res.data ?? [];
     },
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    retry: shouldRetryQuery,
   }));
 }

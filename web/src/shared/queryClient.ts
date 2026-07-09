@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/solid-query";
+import { shouldRetryQuery } from "./queryRetry";
 
 /** Shared QueryClient instance (used by App and mutation invalidation bridge). */
 export const queryClient = new QueryClient({
@@ -10,6 +11,7 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       refetchOnMount: true,
+      retry: shouldRetryQuery,
     },
   },
 });
