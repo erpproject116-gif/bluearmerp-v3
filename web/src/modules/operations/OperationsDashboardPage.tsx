@@ -1,11 +1,10 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, For, Show } from "solid-js";
 import {
   useOperationsDashboards,
   useOperationsWidgetData,
-  useOperationsWorkspaces,
 } from "../../shared/useOperations";
-import { inputClass } from "../../shared/SpreadsheetGrid";
 import { OperationsLayout } from "./OperationsLayout";
+import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 
 type BVAData = {
   project_code?: string;
@@ -28,35 +27,24 @@ function formatMoney(n?: number) {
 }
 
 export default function OperationsDashboardPage() {
-  const [workspaceId, setWorkspaceId] = createSignal<number | null>(null);
-  const workspaces = useOperationsWorkspaces(() => ({ page: 1, pageSize: 50 }));
+  const { workspaceId } = useOperationsWorkspace();
   const dashboards = useOperationsDashboards(workspaceId);
   const activeDashboardId = createMemo(() => dashboards.data?.find((d) => d.is_default)?.id ?? dashboards.data?.[0]?.id ?? null);
   const widgetData = useOperationsWidgetData(activeDashboardId);
 
   return (
     <OperationsLayout>
-      <div class="mb-4 flex flex-wrap items-center gap-2">
-        <label class="text-sm text-text-secondary">Workspace</label>
-        <select
-          class={inputClass}
-          value={workspaceId() ?? ""}
-          onChange={(e) => {
-            const id = Number(e.currentTarget.value);
-            setWorkspaceId(Number.isFinite(id) && id > 0 ? id : null);
-          }}
-        >
-          <option value="">Select workspace…</option>
-          <For each={workspaces.data?.rows ?? []}>
-            {(ws) => <option value={ws.id}>{ws.workspace_name}</option>}
-          </For>
-        </select>
-      </div>
+      <OperationsWorkspaceSelector class="mb-4" />
 
       <Show when={workspaceId()} fallback={
         <p class="text-sm text-text-secondary">Select a workspace to view dashboards.</p>
       }>
-        <Show when={widgetData.isFetching}>
+        <Show when={dashboards.isError || widgetData.isError}>
+          <p class="mb-3 text-sm text-red-600">
+            {((dashboards.error ?? widgetData.error) as Error)?.message ?? "Failed to load dashboard."}
+          </p>
+        </Show>
+        <Show when={(dashboards.isFetching || widgetData.isFetching) && !widgetData.data}>
           <p class="text-sm text-text-secondary">Loading widgets…</p>
         </Show>
         <div class="grid gap-4 md:grid-cols-2">
@@ -125,7 +113,7 @@ export default function OperationsDashboardPage() {
             )}
           </For>
         </div>
-        <Show when={!widgetData.isFetching && (widgetData.data?.length ?? 0) === 0}>
+        <Show when={!widgetData.isFetching && widgetData.data && widgetData.data.length === 0}>
           <p class="text-sm text-text-secondary">No dashboard widgets yet. Create a workspace with the Construction industry pack.</p>
         </Show>
       </Show>

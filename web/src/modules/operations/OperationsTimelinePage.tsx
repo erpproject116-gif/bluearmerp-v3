@@ -1,7 +1,7 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
-import { inputClass } from "../../shared/SpreadsheetGrid";
-import { useOperationsWorkItems, useOperationsWorkspaces } from "../../shared/useOperations";
+import { createMemo, For, Show } from "solid-js";
+import { useOperationsWorkItems } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
+import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 
 function parseDate(s?: string | null) {
   if (!s) return null;
@@ -16,8 +16,7 @@ function formatRange(start?: string | null, end?: string | null) {
 }
 
 export default function OperationsTimelinePage() {
-  const [workspaceId, setWorkspaceId] = createSignal<number | null>(null);
-  const workspaces = useOperationsWorkspaces(() => ({ page: 1, pageSize: 50 }));
+  const { workspaceId } = useOperationsWorkspace();
   const items = useOperationsWorkItems(() => ({
     workspace_id: workspaceId() ?? undefined,
     view: "timeline",
@@ -25,10 +24,10 @@ export default function OperationsTimelinePage() {
 
   const timeline = createMemo(() => {
     const rows = items.data?.rows ?? [];
-    const starts = rows.map((r) => parseDate(r.start_date)).filter((d): d is number => d != null);
-    const ends = rows.map((r) => parseDate(r.end_date)).filter((d): d is number => d != null);
-    const min = starts.length ? Math.min(...starts) : Date.now();
-    const max = ends.length ? Math.max(...ends) : min + 7 * 86400000;
+    const datedStarts = rows.map((r) => parseDate(r.start_date)).filter((d): d is number => d != null);
+    const datedEnds = rows.map((r) => parseDate(r.end_date)).filter((d): d is number => d != null);
+    const min = datedStarts.length ? Math.min(...datedStarts) : Date.now();
+    const max = datedEnds.length ? Math.max(...datedEnds) : min + 7 * 86400000;
     const span = Math.max(max - min, 86400000);
     return rows.map((row) => {
       const s = parseDate(row.start_date) ?? min;
@@ -41,29 +40,19 @@ export default function OperationsTimelinePage() {
 
   return (
     <OperationsLayout>
-      <div class="mb-4 flex flex-wrap items-center gap-2">
-        <label class="text-sm text-text-secondary">Workspace</label>
-        <select
-          class={inputClass}
-          value={workspaceId() ?? ""}
-          onChange={(e) => {
-            const id = Number(e.currentTarget.value);
-            setWorkspaceId(Number.isFinite(id) && id > 0 ? id : null);
-          }}
-        >
-          <option value="">Select workspace…</option>
-          <For each={workspaces.data?.rows ?? []}>
-            {(ws) => <option value={ws.id}>{ws.workspace_name}</option>}
-          </For>
-        </select>
-      </div>
+      <OperationsWorkspaceSelector class="mb-4" />
 
       <Show when={workspaceId()} fallback={
         <p class="text-sm text-text-secondary">Select a workspace to view the timeline.</p>
       }>
         <div class="rounded-xl border border-stroke bg-white p-4">
           <p class="mb-4 text-xs text-text-secondary">Gantt-style timeline based on start and end dates.</p>
-          <Show when={items.isFetching}>
+          <Show when={items.isError}>
+            <p class="mb-3 text-sm text-red-600">
+              {(items.error as Error)?.message ?? "Failed to load work items."}
+            </p>
+          </Show>
+          <Show when={items.isFetching && !items.data}>
             <p class="text-sm text-text-secondary">Loading…</p>
           </Show>
           <div class="space-y-3">

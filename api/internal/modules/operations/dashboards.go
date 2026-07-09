@@ -185,10 +185,42 @@ func dashboardWidgetData(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var out []WidgetData
+		var bvaCache any
+		var bvaLoaded bool
+		var summaryCache any
+		var summaryLoaded bool
 		for _, widget := range widgets {
-			data, err := resolveWidgetData(r.Context(), pool, tu.TenantID, widget, dash.WorkspaceID, jobCostProjectID)
-			if err != nil {
-				continue
+			var data any
+			var err error
+			switch widget.WidgetType {
+			case "job_cost_bva":
+				if !bvaLoaded {
+					bvaLoaded = true
+					if jobCostProjectID == nil || *jobCostProjectID <= 0 {
+						bvaCache = JobCostBVAData{}
+					} else {
+						bvaCache, err = loadJobCostBVA(r.Context(), pool, tu.TenantID, *jobCostProjectID)
+						if err != nil {
+							continue
+						}
+					}
+				}
+				data = bvaCache
+			case "work_item_summary":
+				if !summaryLoaded {
+					summaryLoaded = true
+					if dash.WorkspaceID == nil {
+						summaryCache = WorkItemSummaryData{}
+					} else {
+						summaryCache, err = loadWorkItemSummary(r.Context(), pool, tu.TenantID, *dash.WorkspaceID)
+						if err != nil {
+							continue
+						}
+					}
+				}
+				data = summaryCache
+			default:
+				data = map[string]any{}
 			}
 			out = append(out, WidgetData{
 				WidgetID: widget.ID, WidgetType: widget.WidgetType, Title: widget.Title, Data: data,

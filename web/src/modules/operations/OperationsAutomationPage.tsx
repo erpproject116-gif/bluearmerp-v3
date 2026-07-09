@@ -1,32 +1,37 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useToast } from "../../shared/toast";
+import { useListState } from "../../shared/useListState";
 import {
   createAutomationRule,
   deleteAutomationRule,
   patchAutomationRule,
-  useInvalidateOperations,
+  useInvalidateAutomationRules,
   useOperationsAutomationRules,
-  useOperationsWorkspaces,
   type AutomationRule,
 } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
+import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 
 export default function OperationsAutomationPage() {
   const auth = useAuth();
   const toast = useToast();
-  const invalidate = useInvalidateOperations();
+  const invalidateRules = useInvalidateAutomationRules();
+  const { workspaceId } = useOperationsWorkspace();
   const canWrite = () => hasPermission(auth.me, "operations.automation", "write");
-  const [workspaceId, setWorkspaceId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [ruleName, setRuleName] = createSignal("");
   const [triggerEvent, setTriggerEvent] = createSignal("work_item.created");
   const [actionType, setActionType] = createSignal("notify");
   const [saving, setSaving] = createSignal(false);
 
-  const workspaces = useOperationsWorkspaces(() => ({ page: 1, pageSize: 50 }));
-  const rules = useOperationsAutomationRules(workspaceId);
+  const { page, setPage, pageSize } = useListState("rule_name", 25);
+  const rules = useOperationsAutomationRules(() => ({
+    workspace_id: workspaceId() ?? undefined,
+    page: page(),
+    pageSize,
+  }));
 
   const openNew = () => {
     setRuleName("");
@@ -54,7 +59,7 @@ export default function OperationsAutomationPage() {
       return;
     }
     setModalOpen(false);
-    invalidate();
+    invalidateRules();
     toast.success("Rule created.");
   };
 
@@ -64,7 +69,7 @@ export default function OperationsAutomationPage() {
       toast.warning(res.message ?? "Could not update rule.");
       return;
     }
-    invalidate();
+    invalidateRules();
   };
 
   const removeRule = async (rule: AutomationRule) => {
@@ -74,29 +79,14 @@ export default function OperationsAutomationPage() {
       toast.warning(res.message ?? "Could not delete rule.");
       return;
     }
-    invalidate();
+    invalidateRules();
     toast.success("Rule deleted.");
   };
 
   return (
     <OperationsLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <label class="text-sm text-text-secondary">Workspace</label>
-          <select
-            class={inputClass}
-            value={workspaceId() ?? ""}
-            onChange={(e) => {
-              const id = Number(e.currentTarget.value);
-              setWorkspaceId(Number.isFinite(id) && id > 0 ? id : null);
-            }}
-          >
-            <option value="">All workspaces</option>
-            <For each={workspaces.data?.rows ?? []}>
-              {(ws) => <option value={ws.id}>{ws.workspace_name}</option>}
-            </For>
-          </select>
-        </div>
+        <OperationsWorkspaceSelector allowAll />
         <Show when={canWrite()}>
           <button
             type="button"
@@ -107,6 +97,12 @@ export default function OperationsAutomationPage() {
           </button>
         </Show>
       </div>
+
+      <Show when={rules.isError}>
+        <p class="mb-3 text-sm text-red-600">
+          {(rules.error as Error)?.message ?? "Failed to load automation rules."}
+        </p>
+      </Show>
 
       <SpreadsheetGrid
         columns={[
@@ -136,7 +132,7 @@ export default function OperationsAutomationPage() {
           },
         ]}
         rows={rules.data?.rows ?? []}
-        loading={rules.isFetching}
+        loading={rules.isFetching && !rules.data}
         selectedId={null}
         onSelect={() => {}}
         onEdit={() => {}}
@@ -144,9 +140,10 @@ export default function OperationsAutomationPage() {
         showNew={canWrite()}
         codeKey="rule_name"
         nameKey="rule_name"
-        page={1}
-        pageSize={rules.data?.rows.length || 1}
+        page={page()}
+        pageSize={pageSize}
         total={rules.data?.total ?? 0}
+        onPageChange={setPage}
       />
 
       <EntityModal

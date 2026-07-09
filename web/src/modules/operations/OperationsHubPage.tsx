@@ -1,9 +1,11 @@
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
-import { A, useNavigate, useSearchParams } from "@solidjs/router";
+import { useQueryClient } from "@tanstack/solid-query";
+import { createMemo, createSignal, For, Show } from "solid-js";
+import { A, useNavigate } from "@solidjs/router";
 import { KanbanBoard } from "../../shared/KanbanBoard";
 import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../shared/ViewModeToggle";
+import { useDebouncedSignal } from "../../shared/useDebouncedSignal";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
@@ -13,14 +15,17 @@ import {
   createWorkspace,
   patchWorkItem,
   useIndustryPacks,
-  useInvalidateOperations,
+  useInvalidateWorkItems,
+  useInvalidateWorkspaces,
   useOperationsColumns,
   useOperationsWorkItems,
   useOperationsWorkspaces,
   type WorkItem,
+  type WorkItemsQueryParams,
   type Workspace,
 } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
+import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 
 const STORAGE_KEY = "operations-hub-view";
 
@@ -52,17 +57,20 @@ function itemDetails(item: WorkItem): KanbanDetailRow[] {
 export default function OperationsHubPage() {
   const auth = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const toast = useToast();
-  const invalidate = useInvalidateOperations();
+  const qc = useQueryClient();
+  const invalidateWorkspaces = useInvalidateWorkspaces();
+  const invalidateWorkItems = useInvalidateWorkItems();
+  const { workspaceId, setWorkspaceId } = useOperationsWorkspace();
   const canCreateWorkspace = () => hasPermission(auth.me, "operations.workspaces_new", "write");
   const canCreateItem = () => hasPermission(auth.me, "operations.work_items_new", "write");
   const canCreateQuote = () => hasPermission(auth.me, "operations.create_quotation", "write");
+  const canEditItem = () => hasPermission(auth.me, "operations.work_items", "write");
 
   const [viewMode, setViewMode] = createSignal<ViewMode>(loadViewMode(STORAGE_KEY));
-  const [activeWorkspaceId, setActiveWorkspaceId] = createSignal<number | null>(null);
   const [workspaceModalOpen, setWorkspaceModalOpen] = createSignal(false);
   const [itemModalOpen, setItemModalOpen] = createSignal(false);
+  const [editItem, setEditItem] = createSignal<WorkItem | null>(null);
   const [wsCode, setWsCode] = createSignal("");
   const [wsName, setWsName] = createSignal("");
   const [wsPack, setWsPack] = createSignal("general");
@@ -70,56 +78,96 @@ export default function OperationsHubPage() {
   const [itemColumnId, setItemColumnId] = createSignal<number | null>(null);
   const [itemStartDate, setItemStartDate] = createSignal("");
   const [itemEndDate, setItemEndDate] = createSignal("");
+  const [editTitle, setEditTitle] = createSignal("");
+  const [editColumnId, setEditColumnId] = createSignal<number | null>(null);
+  const [editPriority, setEditPriority] = createSignal("normal");
+  const [editStatus, setEditStatus] = createSignal("open");
+  const [editStartDate, setEditStartDate] = createSignal("");
+  const [editEndDate, setEditEndDate] = createSignal("");
   const [saving, setSaving] = createSignal(false);
 
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("title");
+  const debouncedQ = useDebouncedSignal(q);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
 
-  const workspaces = useOperationsWorkspaces(() => ({ page: 1, pageSize: 50 }));
+  const workspaces = useOperationsWorkspaces(() => ({ page: 1, pageSize: 100 }));
   const packs = useIndustryPacks();
+  const activeWorkspaceId = workspaceId;
   const columns = useOperationsColumns(activeWorkspaceId);
 
-  createEffect(() => {
-    const code = typeof searchParams.ws === "string" ? searchParams.ws.trim() : "";
-    if (!code || activeWorkspaceId()) return;
-    const match = workspaces.data?.rows.find((w) => w.workspace_code === code);
-    if (match) setActiveWorkspaceId(match.id);
-  });
-
-  const items = useOperationsWorkItems(() => ({
+  const itemsParams = createMemo((): WorkItemsQueryParams => ({
     workspace_id: activeWorkspaceId() ?? undefined,
     board: viewMode() === "board",
-    q: q() || undefined,
+    q: debouncedQ() || undefined,
     page: viewMode() === "board" ? 1 : page(),
-    pageSize: viewMode() === "board" ? 500 : pageSize,
+    pageSize: viewMode() === "board" ? 200 : pageSize,
+    sort: viewMode() === "table" ? sort() : undefined,
+    order: viewMode() === "table" ? order() : undefined,
   }));
+
+  const items = useOperationsWorkItems(() => itemsParams());
 
   const activeWorkspace = createMemo(() =>
     workspaces.data?.rows.find((w) => w.id === activeWorkspaceId()) ?? null,
   );
 
-  const boardColumns = createMemo(() =>
-    (columns.data ?? []).map((col) => ({
+  const boardColumns = createMemo(() => {
+    const cols = columns.data ?? [];
+    const rows = items.data?.rows ?? [];
+    const byColumn = new Map<number, WorkItem[]>();
+    for (const item of rows) {
+      const list = byColumn.get(item.column_id) ?? [];
+      list.push(item);
+      byColumn.set(item.column_id, list);
+    }
+    return cols.map((col) => ({
       id: String(col.id),
       label: col.column_name,
-      items: (items.data?.rows ?? []).filter((i) => i.column_id === col.id),
-    })),
-  );
+      items: byColumn.get(col.id) ?? [],
+    }));
+  });
 
   const selectWorkspace = (ws: Workspace) => {
-    setActiveWorkspaceId(ws.id);
+    setWorkspaceId(ws.id);
     setPage(1);
+  };
+
+  const openEditItem = (item: WorkItem) => {
+    setEditItem(item);
+    setEditTitle(item.title);
+    setEditColumnId(item.column_id);
+    setEditPriority(item.priority);
+    setEditStatus(item.status);
+    setEditStartDate(item.start_date ?? "");
+    setEditEndDate(item.end_date ?? "");
+    setSelectedId(item.id);
   };
 
   const onDrop = async (item: WorkItem, _from: string, toColumnId: string) => {
     const colId = Number(toColumnId);
-    if (!Number.isFinite(colId)) return;
+    if (!Number.isFinite(colId) || colId === item.column_id) return;
+    const col = columns.data?.find((c) => c.id === colId);
+    const queryKey = ["operations-work-items", itemsParams()];
+    type WorkItemsCache = { rows: WorkItem[]; total: number };
+    const previous = qc.getQueryData<WorkItemsCache>(queryKey);
+    qc.setQueryData<WorkItemsCache>(queryKey, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        rows: old.rows.map((row: WorkItem) =>
+          row.id === item.id
+            ? { ...row, column_id: colId, column_name: col?.column_name ?? row.column_name }
+            : row,
+        ),
+      };
+    });
     const res = await patchWorkItem(item.id, { column_id: colId });
     if (!res.success) {
+      if (previous) qc.setQueryData(queryKey, previous);
       toast.warning(res.message ?? "Could not move item.");
       return;
     }
-    invalidate();
+    void qc.invalidateQueries({ queryKey: ["operations-work-items"] });
   };
 
   const saveWorkspace = async () => {
@@ -139,8 +187,8 @@ export default function OperationsHubPage() {
       return;
     }
     setWorkspaceModalOpen(false);
-    invalidate();
-    if (res.data?.id) setActiveWorkspaceId(res.data.id);
+    invalidateWorkspaces();
+    if (res.data?.id) setWorkspaceId(res.data.id);
     toast.success("Workspace created.");
   };
 
@@ -165,9 +213,9 @@ export default function OperationsHubPage() {
       toast.warning(res.message ?? "Could not load sample workspace.");
       return;
     }
-    invalidate();
+    invalidateWorkspaces();
     if (res.data?.id) {
-      setActiveWorkspaceId(res.data.id);
+      setWorkspaceId(res.data.id);
       setViewMode("board");
     }
     toast.success(`Sample project loaded: ${preset.name}`);
@@ -203,8 +251,34 @@ export default function OperationsHubPage() {
       return;
     }
     setItemModalOpen(false);
-    invalidate();
+    invalidateWorkItems();
     toast.success("Work item created.");
+  };
+
+  const saveEditItem = async () => {
+    const item = editItem();
+    const colId = editColumnId();
+    if (!item || !colId || !editTitle().trim()) {
+      toast.warning("Title and column are required.");
+      return;
+    }
+    setSaving(true);
+    const res = await patchWorkItem(item.id, {
+      title: editTitle().trim(),
+      column_id: colId,
+      priority: editPriority(),
+      status: editStatus(),
+      start_date: editStartDate() || null,
+      end_date: editEndDate() || null,
+    });
+    setSaving(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not update work item.");
+      return;
+    }
+    setEditItem(null);
+    invalidateWorkItems();
+    toast.success("Work item updated.");
   };
 
   const handleCreateQuotation = async (item: WorkItem) => {
@@ -213,7 +287,7 @@ export default function OperationsHubPage() {
       toast.warning(res.message ?? "Could not create quotation.");
       return;
     }
-    invalidate();
+    invalidateWorkItems();
     toast.success(`Quotation ${res.data?.reference_no ?? ""} created.`);
     if (res.data?.edit_url) navigate(res.data.edit_url);
   };
@@ -222,20 +296,7 @@ export default function OperationsHubPage() {
     <OperationsLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-2">
-          <label class="text-sm text-text-secondary">Workspace</label>
-          <select
-            class={inputClass}
-            value={activeWorkspaceId() ?? ""}
-            onChange={(e) => {
-              const id = Number(e.currentTarget.value);
-              setActiveWorkspaceId(Number.isFinite(id) && id > 0 ? id : null);
-            }}
-          >
-            <option value="">Select workspace…</option>
-            <For each={workspaces.data?.rows ?? []}>
-              {(ws) => <option value={ws.id}>{ws.workspace_name}</option>}
-            </For>
-          </select>
+          <OperationsWorkspaceSelector />
           <Show when={activeWorkspace()}>
             {(ws) => (
               <span class="text-xs text-text-secondary">
@@ -314,6 +375,12 @@ export default function OperationsHubPage() {
       </Show>
 
       <Show when={activeWorkspaceId()}>
+        <Show when={items.isError}>
+          <p class="mb-3 text-sm text-red-600">
+            {(items.error as Error)?.message ?? "Failed to load work items."}
+          </p>
+        </Show>
+
         <Show when={viewMode() === "table"}>
           <SpreadsheetGrid
             columns={[
@@ -354,10 +421,10 @@ export default function OperationsHubPage() {
               },
             ]}
             rows={items.data?.rows ?? []}
-            loading={items.isFetching}
+            loading={items.isFetching && !items.data}
             selectedId={selectedId()}
             onSelect={setSelectedId}
-            onEdit={(row) => setSelectedId(row.id)}
+            onEdit={openEditItem}
             onNew={openNewItem}
             showNew={canCreateItem()}
             codeKey="title"
@@ -380,14 +447,14 @@ export default function OperationsHubPage() {
             columns={boardColumns()}
             getCardId={(i) => i.id}
             onDrop={(item, from, to) => void onDrop(item, from, to)}
-            loading={items.isFetching || columns.isFetching}
+            loading={items.isFetching && !items.data}
             renderCard={(item) => (
               <KanbanCard
                 title={item.title}
                 subtitle={PRIORITY_LABELS[item.priority] ?? item.priority}
                 badge={item.column_name}
                 details={itemDetails(item)}
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => openEditItem(item)}
               />
             )}
           />
@@ -446,6 +513,52 @@ export default function OperationsHubPage() {
         </Field>
         <Field label="End date">
           <input type="date" class={inputClass} value={itemEndDate()} onInput={(e) => setItemEndDate(e.currentTarget.value)} />
+        </Field>
+      </EntityModal>
+
+      <EntityModal
+        open={editItem() != null}
+        title="Edit work item"
+        onClose={() => setEditItem(null)}
+        onSave={() => (canEditItem() ? void saveEditItem() : setEditItem(null))}
+        saving={saving()}
+      >
+        <Field label="Title">
+          <input class={inputClass} value={editTitle()} onInput={(e) => setEditTitle(e.currentTarget.value)} disabled={!canEditItem()} />
+        </Field>
+        <Field label="Column">
+          <select
+            class={inputClass}
+            value={editColumnId() ?? ""}
+            onChange={(e) => setEditColumnId(Number(e.currentTarget.value) || null)}
+            disabled={!canEditItem()}
+          >
+            <For each={columns.data ?? []}>
+              {(col) => <option value={col.id}>{col.column_name}</option>}
+            </For>
+          </select>
+        </Field>
+        <Field label="Status">
+          <select class={inputClass} value={editStatus()} onChange={(e) => setEditStatus(e.currentTarget.value)} disabled={!canEditItem()}>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="done">Done</option>
+            <option value="blocked">Blocked</option>
+          </select>
+        </Field>
+        <Field label="Priority">
+          <select class={inputClass} value={editPriority()} onChange={(e) => setEditPriority(e.currentTarget.value)} disabled={!canEditItem()}>
+            <option value="low">Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </Field>
+        <Field label="Start date">
+          <input type="date" class={inputClass} value={editStartDate()} onInput={(e) => setEditStartDate(e.currentTarget.value)} disabled={!canEditItem()} />
+        </Field>
+        <Field label="End date">
+          <input type="date" class={inputClass} value={editEndDate()} onInput={(e) => setEditEndDate(e.currentTarget.value)} disabled={!canEditItem()} />
         </Field>
       </EntityModal>
     </OperationsLayout>

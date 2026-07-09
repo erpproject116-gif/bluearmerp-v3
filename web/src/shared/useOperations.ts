@@ -106,25 +106,34 @@ export function useOperationsColumns(workspaceId: () => number | null) {
   });
 }
 
-export function useOperationsWorkItems(params: () => {
+export type WorkItemsQueryParams = {
   workspace_id?: number;
   board?: boolean;
   view?: "calendar" | "timeline";
   q?: string;
   page?: number;
   pageSize?: number;
-}) {
+  sort?: string;
+  order?: "asc" | "desc";
+  enabled?: boolean;
+};
+
+export function useOperationsWorkItems(params: () => WorkItemsQueryParams) {
   return createQuery(() => {
     const p = params();
+    const wsId = p.workspace_id ?? 0;
     const qs = new URLSearchParams();
-    if (p.workspace_id) qs.set("workspace_id", String(p.workspace_id));
+    if (wsId > 0) qs.set("workspace_id", String(wsId));
     if (p.board) qs.set("board", "1");
     if (p.view) qs.set("view", p.view);
     if (p.q) qs.set("q", p.q);
     if (p.page) qs.set("page", String(p.page));
     if (p.pageSize) qs.set("pageSize", String(p.pageSize));
+    if (p.sort) qs.set("sort", p.sort);
+    if (p.order) qs.set("order", p.order);
     return {
       queryKey: ["operations-work-items", p],
+      enabled: p.enabled !== false && wsId > 0,
       queryFn: async () => {
         const res = await apiFetch<WorkItem[]>(`/api/v1/operations/work-items?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load work items");
@@ -135,14 +144,22 @@ export function useOperationsWorkItems(params: () => {
   });
 }
 
-export function useOperationsAutomationRules(workspaceId: () => number | null) {
+export function useOperationsAutomationRules(params: () => {
+  workspace_id?: number | null;
+  page?: number;
+  pageSize?: number;
+}) {
   return createQuery(() => {
-    const id = workspaceId();
-    const qs = id ? `?workspace_id=${id}` : "";
+    const p = params();
+    const qs = new URLSearchParams();
+    if (p.workspace_id) qs.set("workspace_id", String(p.workspace_id));
+    if (p.page) qs.set("page", String(p.page));
+    if (p.pageSize) qs.set("pageSize", String(p.pageSize));
+    const suffix = qs.toString() ? `?${qs}` : "";
     return {
-      queryKey: ["operations-automation", id],
+      queryKey: ["operations-automation", p],
       queryFn: async () => {
-        const res = await apiFetch<AutomationRule[]>(`/api/v1/operations/automation-rules${qs}`);
+        const res = await apiFetch<AutomationRule[]>(`/api/v1/operations/automation-rules${suffix}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load rules");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
@@ -157,6 +174,7 @@ export function useOperationsDashboards(workspaceId: () => number | null) {
     const qs = id ? `?workspace_id=${id}` : "";
     return {
       queryKey: ["operations-dashboards", id],
+      enabled: id != null && id > 0,
       queryFn: async () => {
         const res = await apiFetch<Dashboard[]>(`/api/v1/operations/dashboards${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load dashboards");
@@ -195,15 +213,42 @@ export function useIndustryPacks() {
   }));
 }
 
-export function useInvalidateOperations() {
+export function useInvalidateWorkspaces() {
+  const qc = useQueryClient();
+  return () => void qc.invalidateQueries({ queryKey: ["operations-workspaces"] });
+}
+
+export function useInvalidateWorkItems() {
+  const qc = useQueryClient();
+  return () => void qc.invalidateQueries({ queryKey: ["operations-work-items"] });
+}
+
+export function useInvalidateAutomationRules() {
+  const qc = useQueryClient();
+  return () => void qc.invalidateQueries({ queryKey: ["operations-automation"] });
+}
+
+export function useInvalidateDashboards() {
   const qc = useQueryClient();
   return () => {
-    void qc.invalidateQueries({ queryKey: ["operations-workspaces"] });
-    void qc.invalidateQueries({ queryKey: ["operations-columns"] });
-    void qc.invalidateQueries({ queryKey: ["operations-work-items"] });
-    void qc.invalidateQueries({ queryKey: ["operations-automation"] });
     void qc.invalidateQueries({ queryKey: ["operations-dashboards"] });
     void qc.invalidateQueries({ queryKey: ["operations-widget-data"] });
+  };
+}
+
+/** Broad invalidation — prefer targeted helpers when possible. */
+export function useInvalidateOperations() {
+  const invalidateWorkspaces = useInvalidateWorkspaces();
+  const invalidateWorkItems = useInvalidateWorkItems();
+  const invalidateAutomation = useInvalidateAutomationRules();
+  const invalidateDashboards = useInvalidateDashboards();
+  const qc = useQueryClient();
+  return () => {
+    invalidateWorkspaces();
+    void qc.invalidateQueries({ queryKey: ["operations-columns"] });
+    invalidateWorkItems();
+    invalidateAutomation();
+    invalidateDashboards();
   };
 }
 

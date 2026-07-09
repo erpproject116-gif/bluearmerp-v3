@@ -91,9 +91,17 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 		board := r.URL.Query().Get("board") == "1" || r.URL.Query().Get("board") == "true"
 		calendar := r.URL.Query().Get("view") == "calendar"
 		timeline := r.URL.Query().Get("view") == "timeline"
-		if board || calendar || timeline {
+		boardView := board || calendar || timeline
+		if boardView {
+			wsID, err := strconv.ParseInt(r.URL.Query().Get("workspace_id"), 10, 64)
+			if err != nil || wsID <= 0 {
+				response.Validation(w, map[string]string{"workspace_id": "Workspace is required for board, calendar, and timeline views."})
+				return
+			}
 			p.Page = 1
-			p.PageSize = 500
+			if p.PageSize <= 0 || p.PageSize > 200 {
+				p.PageSize = 200
+			}
 		}
 		offset := httputil.Offset(p)
 		where := "wi.tenant_id = $1"
@@ -122,7 +130,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 				sortCol = "wi.sort_order"
 			}
 		}
-		q := fmt.Sprintf(`
+		baseSelect := `
 			select wi.id, wi.workspace_id, wi.column_id, c.column_key, c.column_name,
 			  wi.item_code, wi.title, wi.description, wi.status, wi.priority,
 			  wi.assignee_user_id, coalesce(u.display_name, ''),
@@ -130,7 +138,9 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 			  wi.start_date::text, wi.end_date::text,
 			  wi.blocked_by_item_id, coalesce(blocker.title, ''),
 			  wi.quotation_id, coalesce(q.reference_no, ''),
-			  wi.sort_order, count(*) over()
+			  wi.sort_order`
+		if boardView {
+			q := fmt.Sprintf(`%s
 			from public.wm_work_items wi
 			join public.wm_columns c on c.id = wi.column_id
 			left join public.users u on u.id = wi.assignee_user_id
@@ -139,7 +149,50 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 			left join public.quo_quotations q on q.id = wi.quotation_id
 			where %s
 			order by %s %s, wi.id
-			limit $%d offset $%d`, where, sortCol, orderSQL(p.Order), n, n+1)
+			limit $%d offset $%d`, baseSelect, where, sortCol, orderSQL(p.Order), n, n+1)
+			args = append(args, p.PageSize, offset)
+
+			rows, err := pool.Query(r.Context(), q, args...)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to list work items.", "ERR_INTERNAL")
+				return
+			}
+			defer rows.Close()
+			var out []WorkItem
+			for rows.Next() {
+				var row WorkItem
+				if err := rows.Scan(
+					&row.ID, &row.WorkspaceID, &row.ColumnID, &row.ColumnKey, &row.ColumnName,
+					&row.ItemCode, &row.Title, &row.Description, &row.Status, &row.Priority,
+					&row.AssigneeUserID, &row.AssigneeName,
+					&row.PartnerID, &row.PartnerName,
+					&row.StartDate, &row.EndDate,
+					&row.BlockedByItemID, &row.BlockedByTitle,
+					&row.QuotationID, &row.QuotationRef,
+					&row.SortOrder,
+				); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to read work items.", "ERR_INTERNAL")
+					return
+				}
+				out = append(out, row)
+			}
+			if out == nil {
+				out = []WorkItem{}
+			}
+			response.OKList(w, out, p.Page, p.PageSize, int64(len(out)))
+			return
+		}
+
+		q := fmt.Sprintf(`%s, count(*) over()
+			from public.wm_work_items wi
+			join public.wm_columns c on c.id = wi.column_id
+			left join public.users u on u.id = wi.assignee_user_id
+			left join public.inv_partners pt on pt.id = wi.partner_id
+			left join public.wm_work_items blocker on blocker.id = wi.blocked_by_item_id
+			left join public.quo_quotations q on q.id = wi.quotation_id
+			where %s
+			order by %s %s, wi.id
+			limit $%d offset $%d`, baseSelect, where, sortCol, orderSQL(p.Order), n, n+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)

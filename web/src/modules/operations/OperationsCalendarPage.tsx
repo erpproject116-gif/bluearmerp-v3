@@ -1,7 +1,7 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
-import { inputClass } from "../../shared/SpreadsheetGrid";
-import { useOperationsWorkItems, useOperationsWorkspaces } from "../../shared/useOperations";
+import { createMemo, For, Show } from "solid-js";
+import { useOperationsWorkItems } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
+import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 
 function weekLabel(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
@@ -9,8 +9,7 @@ function weekLabel(dateStr: string) {
 }
 
 export default function OperationsCalendarPage() {
-  const [workspaceId, setWorkspaceId] = createSignal<number | null>(null);
-  const workspaces = useOperationsWorkspaces(() => ({ page: 1, pageSize: 50 }));
+  const { workspaceId } = useOperationsWorkspace();
   const items = useOperationsWorkItems(() => ({
     workspace_id: workspaceId() ?? undefined,
     view: "calendar",
@@ -29,26 +28,19 @@ export default function OperationsCalendarPage() {
 
   return (
     <OperationsLayout>
-      <div class="mb-4 flex flex-wrap items-center gap-2">
-        <label class="text-sm text-text-secondary">Workspace</label>
-        <select
-          class={inputClass}
-          value={workspaceId() ?? ""}
-          onChange={(e) => {
-            const id = Number(e.currentTarget.value);
-            setWorkspaceId(Number.isFinite(id) && id > 0 ? id : null);
-          }}
-        >
-          <option value="">Select workspace…</option>
-          <For each={workspaces.data?.rows ?? []}>
-            {(ws) => <option value={ws.id}>{ws.workspace_name}</option>}
-          </For>
-        </select>
-      </div>
+      <OperationsWorkspaceSelector class="mb-4" />
 
       <Show when={workspaceId()} fallback={
         <p class="text-sm text-text-secondary">Select a workspace to view the calendar.</p>
       }>
+        <Show when={items.isError}>
+          <p class="mb-3 text-sm text-red-600">
+            {(items.error as Error)?.message ?? "Failed to load work items."}
+          </p>
+        </Show>
+        <Show when={items.isFetching && !items.data}>
+          <p class="text-sm text-text-secondary">Loading…</p>
+        </Show>
         <div class="space-y-4">
           <For each={grouped()}>
             {([dateKey, rows]) => (
