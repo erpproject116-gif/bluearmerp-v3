@@ -1,68 +1,51 @@
-import { createMemo, createSignal, Show } from "solid-js";
-import { formatPeso } from "../../../shared/money";
-import { createQuery } from "@tanstack/solid-query";
-import { apiFetch } from "../../../shared/api";
-import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
-import { FINANCE_SETTINGS_HREF } from "../../../shared/entityTypes";
+import { createSignal, Show } from "solid-js";
+import { useApByVendorReport } from "../../../shared/useApByVendorReport";
 import { FinanceLayout } from "../FinanceLayout";
-
-type ApRow = {
-  partner_id: number;
-  vendor_name: string;
-  total_billed: number;
-  total_paid: number;
-  balance: number;
-};
-
-type ApGridRow = ApRow & { id: number };
-
-
+import { ApByVendorFilter } from "./ApByVendorFilter";
+import { ApByVendorReport } from "./ApByVendorReport";
+import { defaultApFilters, type ApByVendorFilters } from "./apByVendorFilters";
 
 export default function ApByVendorPage() {
-  const [searched, setSearched] = createSignal(false);
+  const [draftFilters, setDraftFilters] = createSignal<ApByVendorFilters>(defaultApFilters());
+  const [submittedFilters, setSubmittedFilters] = createSignal<ApByVendorFilters | null>(null);
+  const [page, setPage] = createSignal(1);
+  const [generatedAt, setGeneratedAt] = createSignal(new Date());
+  const pageSize = 50;
 
-  const report = createQuery(() => ({
-    queryKey: ["ap-by-vendor"],
-    enabled: searched(),
-    queryFn: async () => {
-      const res = await apiFetch<ApRow[]>("/api/v1/finance/ap-by-vendor?page=1&pageSize=100&sort=vendor_name&order=asc");
-      if (!res.success) throw new Error(res.message ?? "Failed");
-      return res.data ?? [];
-    },
+  const report = useApByVendorReport(() => ({
+    filters: submittedFilters() ?? defaultApFilters(),
+    page: page(),
+    pageSize,
+    sort: "vendor_name",
+    order: "asc",
+    enabled: submittedFilters() !== null,
   }));
 
-  const rows = createMemo<ApGridRow[]>(() =>
-    (report.data ?? []).map((r) => ({ ...r, id: r.partner_id })),
-  );
+  const search = () => {
+    setSubmittedFilters({ ...draftFilters() });
+    setPage(1);
+    setGeneratedAt(new Date());
+  };
+
+  const reset = () => {
+    setDraftFilters(defaultApFilters());
+    setSubmittedFilters(null);
+    setPage(1);
+  };
 
   return (
     <FinanceLayout>
-      <div class="mb-4 flex gap-2">
-        <button type="button" class="rounded bg-slate-900 px-4 py-2 text-sm text-white" onClick={() => setSearched(true)}>
-          Run report (F8)
-        </button>
-      </div>
-      <Show when={searched()}>
-        <SpreadsheetGrid<ApGridRow>
-          columns={[
-            { key: "vendor_name", header: "Vendor" },
-            { key: "total_billed", header: "Total billed", render: (r) => formatPeso(r.total_billed) },
-            { key: "total_paid", header: "Total paid", render: (r) => formatPeso(r.total_paid) },
-            { key: "balance", header: "Balance", render: (r) => formatPeso(r.balance) },
-          ]}
-          rows={rows()}
+      <ApByVendorFilter value={draftFilters} onChange={setDraftFilters} onSearch={search} onReset={reset} />
+      <Show when={submittedFilters()}>
+        <ApByVendorReport
+          filters={submittedFilters()!}
+          rows={report.data?.rows ?? []}
+          totalRows={report.data?.total ?? 0}
+          page={page()}
+          pageSize={pageSize}
           loading={report.isFetching}
-          selectedId={null}
-          onSelect={() => {}}
-          onEdit={() => {}}
-          onNew={() => setSearched(true)}
-          codeKey="vendor_name"
-          nameKey="vendor_name"
-          total={rows().length}
-          page={1}
-          pageSize={100}
-          onPageChange={() => {}}
-          settingsHref={FINANCE_SETTINGS_HREF.officialReceipt}
+          generatedAt={generatedAt}
+          onPageChange={setPage}
         />
       </Show>
     </FinanceLayout>

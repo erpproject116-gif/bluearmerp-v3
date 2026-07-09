@@ -2,6 +2,7 @@ import { createResource, Show } from "solid-js";
 import { useParams } from "@solidjs/router";
 import { ProtectedRoute } from "../../../shared/ProtectedRoute";
 import {
+  DOCUMENT_LINE_COLUMN_META,
   DocumentLinePrintTable,
   useDocumentLinePrintLayout,
   type DocumentLineRow,
@@ -100,7 +101,15 @@ function PrintDocument(props: { payload: SupplierInvoicePrintPayload }) {
         </div>
         <PrintBrandingFooter />
       </article>
-      <PrintToolbar onPrint={() => window.print()} />
+      <PrintToolbar
+        layout={{
+          columns: DOCUMENT_LINE_COLUMN_META,
+          hiddenColumns: layout.hiddenColumns,
+          onToggleColumn: layout.toggleColumn,
+          onShowAll: layout.showAll,
+        }}
+        onPrint={() => window.print()}
+      />
     </>
   );
 }

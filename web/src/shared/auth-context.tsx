@@ -43,7 +43,7 @@ export type MeData = {
   active_tenant_id?: number;
   memberships?: TenantMembership[];
   enabled_module_codes: string[];
-  modules?: { module_code: string; is_enabled: boolean }[];
+  modules?: { module_code: string; module_name: string; is_enabled: boolean }[];
   entitlement?: {
     plan_kind?: string;
     status?: string;

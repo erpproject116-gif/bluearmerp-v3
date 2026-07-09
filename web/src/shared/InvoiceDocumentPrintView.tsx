@@ -1,5 +1,6 @@
 import { For, Show, createResource } from "solid-js";
 import {
+  DOCUMENT_LINE_COLUMN_META,
   DocumentLinePrintTable,
   useDocumentLinePrintLayout,
 } from "./documentLinePrint";
@@ -86,6 +87,7 @@ function InvoiceDocumentArticle(props: { data: InvoiceDocumentPrintData }) {
   const money = (amount: number) => formatAmount(d().kind, amount, d().currencyCode);
 
   return (
+    <>
     <article class="quotation-print__page">
       <PrintBrandingHeader docTitle={d().title} docSubtitle={d().docNo} />
       <section class="quotation-print__grid">
@@ -140,6 +142,17 @@ function InvoiceDocumentArticle(props: { data: InvoiceDocumentPrintData }) {
       <AccountingBlock data={d()} />
       <PrintBrandingFooter />
     </article>
+    <PrintToolbar
+      layout={{
+        columns: DOCUMENT_LINE_COLUMN_META,
+        hiddenColumns: layout.hiddenColumns,
+        onToggleColumn: layout.toggleColumn,
+        onShowAll: layout.showAll,
+      }}
+      onPrint={() => window.print()}
+      onClose={() => window.close()}
+    />
+    </>
   );
 }
 
@@ -161,7 +174,6 @@ export function InvoiceDocumentPrintView(props: { kind: InvoiceDocumentKind; doc
         <p class="quotation-print__error">{String(data.error)}</p>
       </Show>
       <Show when={data()}>{(payload) => <InvoiceDocumentArticle data={payload()} />}</Show>
-      <PrintToolbar onPrint={() => window.print()} onClose={() => window.close()} />
     </div>
   );
 }

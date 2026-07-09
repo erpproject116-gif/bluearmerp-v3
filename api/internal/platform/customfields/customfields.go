@@ -48,11 +48,14 @@ var allowedTypes = map[string]bool{
 }
 
 // Keep in sync with formfields/registry.go standardRegistry keys.
+// Keep in sync with formfields/registry.go standardRegistry keys.
 var formEntityTypes = map[string]bool{
 	"inv_partner": true, "inv_location": true, "inv_project": true, "inv_department": true,
 	"inv_item": true, "inv_repair_order": true,
 	"quo_tax_type": true, "quo_currency": true, "quo_quotation": true,
-	"sa_sales": true, "so_sales_order": true, "fin_official_receipt": true,
+	"sa_sales": true, "so_sales_order": true,
+	"pr_purchase_request": true, "po_purchase_order": true, "gr_goods_receipt": true,
+	"fin_official_receipt": true, "fin_supplier_invoice": true,
 }
 
 type querier interface {

@@ -1,12 +1,10 @@
-export type ReceiptStatusFilters = {
+export type ApByVendorFilters = {
   date_from?: string;
   date_to?: string;
   partner_id?: number | null;
   location_id?: number | null;
-  department_id?: number | null;
   project_id?: number | null;
   pic_user_id?: number | null;
-  receipt_status?: string;
 };
 
 export function todayISO(): string {
@@ -19,7 +17,7 @@ export function thisMonthRange(): { from: string; to: string } {
   return { from: from.toISOString().slice(0, 10), to: todayISO() };
 }
 
-export function defaultReceiptStatusFilters(): ReceiptStatusFilters {
+export function defaultApFilters(): ApByVendorFilters {
   const { from, to } = thisMonthRange();
   return { date_from: from, date_to: to };
 }
@@ -29,11 +27,4 @@ export function formatDisplayDate(iso?: string): string {
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return iso;
   return `${m}/${d}/${y}`;
-}
-
-export function receiptStatusLabel(status: string): string {
-  if (status === "full") return "Full";
-  if (status === "partial") return "Partial";
-  if (status === "none") return "None";
-  return status;
 }

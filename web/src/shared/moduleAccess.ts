@@ -30,6 +30,16 @@ export function isTenantFeatureEnabled(
   return row.is_enabled;
 }
 
+export function moduleDisplayLabel(
+  me: MeData | null | undefined,
+  moduleId: string,
+  fallback: string,
+): string {
+  const row = me?.modules?.find((m) => m.module_code === moduleId);
+  const name = row?.module_name?.trim();
+  return name || fallback;
+}
+
 export type TenantModuleRow = {
   module_code: string;
   module_name: string;

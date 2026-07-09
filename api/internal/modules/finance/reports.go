@@ -21,6 +21,8 @@ const reportExportMaxRows = 5000
 type arByCustomerRow struct {
 	PartnerID     int64   `json:"partner_id"`
 	CustomerName  string  `json:"customer_name"`
+	InvSales      float64 `json:"inv_sales"`
+	AcctSales     float64 `json:"acct_sales"`
 	TotalSales    float64 `json:"total_sales"`
 	TotalReceived float64 `json:"total_received"`
 	Balance       float64 `json:"balance"`
@@ -139,21 +141,48 @@ func arByCustomerBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID,
 	}
 
 	q := fmt.Sprintf(`
-		select s.partner_id, p.company_name,
-		  coalesce(sum(s.grand_total), 0)::float8 as total_sales,
-		  coalesce(sum(recv.received), 0)::float8 as total_received,
-		  coalesce(sum(s.grand_total), 0)::float8 - coalesce(sum(recv.received), 0)::float8 as balance
-		from public.sa_sales s
-		join public.inv_partners p on p.id = s.partner_id
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as received
-		  from public.fin_receipt_applications a
-		  join public.fin_official_receipts r on r.id = a.official_receipt_id
-		  where a.sales_id = s.id and r.deleted_at is null
-		) recv on true
-		where s.tenant_id = $1 and s.deleted_at is null%s%s
-		group by s.partner_id, p.company_name
-		having coalesce(sum(s.grand_total), 0) > 0`,
+		with inv_sales as (
+		  select s.partner_id,
+		    coalesce(sum(s.grand_total), 0)::float8 as inv_sales,
+		    coalesce(sum(recv.received), 0)::float8 as total_received
+		  from public.sa_sales s
+		  left join lateral (
+		    select coalesce(sum(a.applied_amount), 0)::float8 as received
+		    from public.fin_receipt_applications a
+		    join public.fin_official_receipts r on r.id = a.official_receipt_id
+		    where a.sales_id = s.id and r.deleted_at is null
+		  ) recv on true
+		  where s.tenant_id = $1 and s.deleted_at is null%s%s
+		  group by s.partner_id
+		),
+		acct_sales as (
+		  select jel.party_id as partner_id,
+		    coalesce(sum(jel.credit - jel.debit), 0)::float8 as acct_sales
+		  from public.fin_journal_entry_lines jel
+		  join public.fin_journal_entries je on je.id = jel.journal_entry_id and je.status = 'posted'
+		  join public.fin_accounts fa on fa.id = jel.account_id and fa.account_type = 'income'
+		  where je.tenant_id = $1 and jel.party_id is not null
+		    and not exists (
+		      select 1 from public.fin_posting_log pl
+		      where pl.journal_entry_id = je.id and pl.source_type = 'sa_sales'
+		    )
+		  group by jel.party_id
+		),
+		partners as (
+		  select p.id as partner_id, p.company_name as customer_name
+		  from public.inv_partners p
+		  where p.tenant_id = $1 and p.partner_kind in ('customer', 'both')
+		)
+		select p.partner_id, p.customer_name,
+		  coalesce(i.inv_sales, 0)::float8,
+		  coalesce(a.acct_sales, 0)::float8,
+		  coalesce(i.inv_sales, 0)::float8 + coalesce(a.acct_sales, 0)::float8,
+		  coalesce(i.total_received, 0)::float8,
+		  coalesce(i.inv_sales, 0)::float8 + coalesce(a.acct_sales, 0)::float8 - coalesce(i.total_received, 0)::float8
+		from partners p
+		left join inv_sales i on i.partner_id = p.partner_id
+		left join acct_sales a on a.partner_id = p.partner_id
+		where coalesce(i.inv_sales, 0) + coalesce(a.acct_sales, 0) > 0`,
 		dateFilter, partnerFilter)
 	return q, args
 }
@@ -202,7 +231,7 @@ func listArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 		var out []arByCustomerRow
 		for rows.Next() {
 			var row arByCustomerRow
-			if err := rows.Scan(&row.PartnerID, &row.CustomerName, &row.TotalSales, &row.TotalReceived, &row.Balance); err != nil {
+			if err := rows.Scan(&row.PartnerID, &row.CustomerName, &row.InvSales, &row.AcctSales, &row.TotalSales, &row.TotalReceived, &row.Balance); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read A/R report.", "ERR_INTERNAL")
 				return
 			}
@@ -241,14 +270,16 @@ func exportArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", `attachment; filename="ar-by-customer.csv"`)
 		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"Customer", "Total Sales", "Total Received", "Balance"})
+		_ = cw.Write([]string{"Customer", "Inv. Sales", "Acct. Sales", "Total Sales", "Total Received", "Balance"})
 		for rows.Next() {
 			var row arByCustomerRow
-			if err := rows.Scan(&row.PartnerID, &row.CustomerName, &row.TotalSales, &row.TotalReceived, &row.Balance); err != nil {
+			if err := rows.Scan(&row.PartnerID, &row.CustomerName, &row.InvSales, &row.AcctSales, &row.TotalSales, &row.TotalReceived, &row.Balance); err != nil {
 				return
 			}
 			_ = cw.Write([]string{
 				row.CustomerName,
+				fmt.Sprintf("%.4f", row.InvSales),
+				fmt.Sprintf("%.4f", row.AcctSales),
 				fmt.Sprintf("%.4f", row.TotalSales),
 				fmt.Sprintf("%.4f", row.TotalReceived),
 				fmt.Sprintf("%.4f", row.Balance),
@@ -262,6 +293,10 @@ type receiptStatusFilters struct {
 	DateFrom      *time.Time
 	DateTo        *time.Time
 	PartnerID     *int64
+	LocationID    *int64
+	DepartmentID  *int64
+	ProjectID     *int64
+	PicUserID     *int64
 	ReceiptStatus string
 }
 
@@ -275,6 +310,18 @@ func parseReceiptStatusFilters(r *http.Request) (receiptStatusFilters, map[strin
 	f.DateTo = dateTo
 	if id, ok := optionalInt64Query(r, "partner_id"); ok {
 		f.PartnerID = id
+	}
+	if id, ok := optionalInt64Query(r, "location_id"); ok {
+		f.LocationID = id
+	}
+	if id, ok := optionalInt64Query(r, "department_id"); ok {
+		f.DepartmentID = id
+	}
+	if id, ok := optionalInt64Query(r, "project_id"); ok {
+		f.ProjectID = id
+	}
+	if id, ok := optionalInt64Query(r, "pic_user_id"); ok {
+		f.PicUserID = id
 	}
 	status := strings.TrimSpace(r.URL.Query().Get("receipt_status"))
 	if status == "none" || status == "partial" || status == "full" {
@@ -308,6 +355,26 @@ func buildReceiptStatusWhere(f receiptStatusFilters, tenantID int64) (string, []
 	if f.PartnerID != nil {
 		where += fmt.Sprintf(" and s.partner_id = $%d", argN)
 		args = append(args, *f.PartnerID)
+		argN++
+	}
+	if f.LocationID != nil {
+		where += fmt.Sprintf(" and s.location_id = $%d", argN)
+		args = append(args, *f.LocationID)
+		argN++
+	}
+	if f.DepartmentID != nil {
+		where += fmt.Sprintf(" and s.department_id = $%d", argN)
+		args = append(args, *f.DepartmentID)
+		argN++
+	}
+	if f.ProjectID != nil {
+		where += fmt.Sprintf(" and s.project_id = $%d", argN)
+		args = append(args, *f.ProjectID)
+		argN++
+	}
+	if f.PicUserID != nil {
+		where += fmt.Sprintf(" and s.pic_user_id = $%d", argN)
+		args = append(args, *f.PicUserID)
 		argN++
 	}
 	switch f.ReceiptStatus {

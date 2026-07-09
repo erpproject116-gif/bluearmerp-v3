@@ -18,6 +18,8 @@ import (
 type apByVendorRow struct {
 	PartnerID    int64   `json:"partner_id"`
 	VendorName   string  `json:"vendor_name"`
+	InvPurchases float64 `json:"inv_purchases"`
+	AcctPurchases float64 `json:"acct_purchases"`
 	TotalBilled  float64 `json:"total_billed"`
 	TotalPaid    float64 `json:"total_paid"`
 	Balance      float64 `json:"balance"`
@@ -42,7 +44,7 @@ func registerAPReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/supplier-payment-status", listSupplierPaymentStatus(pool))
 }
 
-func apByVendorBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID *int64) (string, []any) {
+func apByVendorBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID, locationID, projectID, picUserID *int64) (string, []any) {
 	args := []any{tenantID}
 	argN := 2
 	dateFilter := ""
@@ -51,29 +53,72 @@ func apByVendorBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID *i
 		args = append(args, *dateFrom, *dateTo)
 		argN += 2
 	}
-	partnerFilter := ""
+	invFilter := ""
 	if partnerID != nil {
-		partnerFilter = fmt.Sprintf(" and si.partner_id = $%d", argN)
+		invFilter = fmt.Sprintf(" and si.partner_id = $%d", argN)
 		args = append(args, *partnerID)
+		argN++
+	}
+	if locationID != nil {
+		invFilter += fmt.Sprintf(" and si.location_id = $%d", argN)
+		args = append(args, *locationID)
+		argN++
+	}
+	if projectID != nil {
+		invFilter += fmt.Sprintf(" and si.project_id = $%d", argN)
+		args = append(args, *projectID)
+		argN++
+	}
+	if picUserID != nil {
+		invFilter += fmt.Sprintf(" and si.pic_user_id = $%d", argN)
+		args = append(args, *picUserID)
+		argN++
 	}
 
 	q := fmt.Sprintf(`
-		select si.partner_id, p.company_name,
-		  coalesce(sum(si.grand_total), 0)::float8 as total_billed,
-		  coalesce(sum(paid.paid), 0)::float8 as total_paid,
-		  coalesce(sum(si.grand_total), 0)::float8 - coalesce(sum(paid.paid), 0)::float8 as balance
-		from public.fin_supplier_invoices si
-		join public.inv_partners p on p.id = si.partner_id
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as paid
-		  from public.fin_payment_applications a
-		  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		  where a.supplier_invoice_id = si.id and pv.deleted_at is null
-		) paid on true
-		where si.tenant_id = $1 and si.deleted_at is null%s%s
-		group by si.partner_id, p.company_name
-		having coalesce(sum(si.grand_total), 0) > 0`,
-		dateFilter, partnerFilter)
+		with inv_purchases as (
+		  select si.partner_id,
+		    coalesce(sum(si.grand_total), 0)::float8 as inv_purchases,
+		    coalesce(sum(paid.paid), 0)::float8 as total_paid
+		  from public.fin_supplier_invoices si
+		  left join lateral (
+		    select coalesce(sum(a.applied_amount), 0)::float8 as paid
+		    from public.fin_payment_applications a
+		    join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
+		    where a.supplier_invoice_id = si.id and pv.deleted_at is null
+		  ) paid on true
+		  where si.tenant_id = $1 and si.deleted_at is null%s%s
+		  group by si.partner_id
+		),
+		acct_purchases as (
+		  select jel.party_id as partner_id,
+		    coalesce(sum(jel.debit - jel.credit), 0)::float8 as acct_purchases
+		  from public.fin_journal_entry_lines jel
+		  join public.fin_journal_entries je on je.id = jel.journal_entry_id and je.status = 'posted'
+		  join public.fin_accounts fa on fa.id = jel.account_id and fa.account_type = 'expense'
+		  where je.tenant_id = $1 and jel.party_id is not null
+		    and not exists (
+		      select 1 from public.fin_posting_log pl
+		      where pl.journal_entry_id = je.id and pl.source_type = 'fin_supplier_invoice'
+		    )
+		  group by jel.party_id
+		),
+		partners as (
+		  select p.id as partner_id, p.company_name as vendor_name
+		  from public.inv_partners p
+		  where p.tenant_id = $1 and p.partner_kind in ('supplier', 'both')
+		)
+		select p.partner_id, p.vendor_name,
+		  coalesce(i.inv_purchases, 0)::float8,
+		  coalesce(a.acct_purchases, 0)::float8,
+		  coalesce(i.inv_purchases, 0)::float8 + coalesce(a.acct_purchases, 0)::float8,
+		  coalesce(i.total_paid, 0)::float8,
+		  coalesce(i.inv_purchases, 0)::float8 + coalesce(a.acct_purchases, 0)::float8 - coalesce(i.total_paid, 0)::float8
+		from partners p
+		left join inv_purchases i on i.partner_id = p.partner_id
+		left join acct_purchases a on a.partner_id = p.partner_id
+		where coalesce(i.inv_purchases, 0) + coalesce(a.acct_purchases, 0) > 0`,
+		dateFilter, invFilter)
 	return q, args
 }
 
@@ -86,6 +131,9 @@ func listApByVendor(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		partnerID, _ := optionalInt64Query(r, "partner_id")
+		locationID, _ := optionalInt64Query(r, "location_id")
+		projectID, _ := optionalInt64Query(r, "project_id")
+		picUserID, _ := optionalInt64Query(r, "pic_user_id")
 		p := httputil.ParseListParams(r, "vendor_name", map[string]string{
 			"vendor_name":  "p.company_name",
 			"total_billed": "total_billed",
@@ -94,9 +142,9 @@ func listApByVendor(pool *pgxpool.Pool) http.HandlerFunc {
 		})
 		offset := httputil.Offset(p)
 
-		base, args := apByVendorBaseSQL(tu.TenantID, from, to, partnerID)
+		base, args := apByVendorBaseSQL(tu.TenantID, from, to, partnerID, locationID, projectID, picUserID)
 		q := fmt.Sprintf(`
-			select partner_id, company_name, total_billed, total_paid, balance, count(*) over()
+			select partner_id, vendor_name, inv_purchases, acct_purchases, total_billed, total_paid, balance, count(*) over()
 			from (%s) sub
 			order by %s %s
 			limit $%d offset $%d`, base, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
@@ -113,7 +161,7 @@ func listApByVendor(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		for rows.Next() {
 			var row apByVendorRow
-			if err := rows.Scan(&row.PartnerID, &row.VendorName, &row.TotalBilled, &row.TotalPaid, &row.Balance, &total); err != nil {
+			if err := rows.Scan(&row.PartnerID, &row.VendorName, &row.InvPurchases, &row.AcctPurchases, &row.TotalBilled, &row.TotalPaid, &row.Balance, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read A/P report.", "ERR_INTERNAL")
 				return
 			}
@@ -135,8 +183,11 @@ func exportApByVendor(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		partnerID, _ := optionalInt64Query(r, "partner_id")
-		base, args := apByVendorBaseSQL(tu.TenantID, from, to, partnerID)
-		q := fmt.Sprintf(`select partner_id, company_name, total_billed, total_paid, balance from (%s) sub order by company_name asc limit %d`, base, reportExportMaxRows)
+		locationID, _ := optionalInt64Query(r, "location_id")
+		projectID, _ := optionalInt64Query(r, "project_id")
+		picUserID, _ := optionalInt64Query(r, "pic_user_id")
+		base, args := apByVendorBaseSQL(tu.TenantID, from, to, partnerID, locationID, projectID, picUserID)
+		q := fmt.Sprintf(`select partner_id, vendor_name, inv_purchases, acct_purchases, total_billed, total_paid, balance from (%s) sub order by vendor_name asc limit %d`, base, reportExportMaxRows)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -148,14 +199,16 @@ func exportApByVendor(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", `attachment; filename="ap-by-vendor.csv"`)
 		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"Vendor", "Total Billed", "Total Paid", "Balance"})
+		_ = cw.Write([]string{"Vendor", "Inv. Purchases", "Acct. Purchases", "Total Billed", "Total Paid", "Balance"})
 		for rows.Next() {
 			var row apByVendorRow
-			if err := rows.Scan(&row.PartnerID, &row.VendorName, &row.TotalBilled, &row.TotalPaid, &row.Balance); err != nil {
+			if err := rows.Scan(&row.PartnerID, &row.VendorName, &row.InvPurchases, &row.AcctPurchases, &row.TotalBilled, &row.TotalPaid, &row.Balance); err != nil {
 				return
 			}
 			_ = cw.Write([]string{
 				row.VendorName,
+				fmt.Sprintf("%.4f", row.InvPurchases),
+				fmt.Sprintf("%.4f", row.AcctPurchases),
 				fmt.Sprintf("%.4f", row.TotalBilled),
 				fmt.Sprintf("%.4f", row.TotalPaid),
 				fmt.Sprintf("%.4f", row.Balance),

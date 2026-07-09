@@ -186,7 +186,12 @@ import {
   QcRequestsPage,
   CommissionRulesPage,
   SOAnalysisReportPage,
+  ShipmentStatusPage,
+  PendingShipmentPage,
+  ShippingOrderStatusPage,
   POAnalysisReportPage,
+  PurchaseOrderStatusPage,
+  OutstandingPOStatusPage,
   ItemsToReceiveReportPage,
   StockBalanceReportPage,
   StockLedgerReportPage,
@@ -400,6 +405,9 @@ export default function App() {
           <Route path="/buying/reports/pre-invoicing" component={PurchasePreInvoicingPage} />
           <Route path="/buying" component={BuyingWorkspacePage} />
           <Route path="/sales-order/reports/so-analysis" component={SOAnalysisReportPage} />
+          <Route path="/sales-order/reports/shipment-status" component={ShipmentStatusPage} />
+          <Route path="/sales-order/reports/pending-shipment" component={PendingShipmentPage} />
+          <Route path="/sales-order/reports/shipping-order-status" component={ShippingOrderStatusPage} />
           <Route path="/sales-order/sales-orders/new" component={SalesOrderNewPage} />
           <Route path="/sales-order/sales-orders/status" component={SalesOrderStatusPage} />
           <Route path="/sales-order/sales-orders/outstanding" component={OutstandingSOStatusPage} />
@@ -412,6 +420,8 @@ export default function App() {
           <Route path="/sales-order/shipping/orders" component={ShippingOrdersPage} />
           <Route path="/sales-order/shipping/trips" component={DeliveryTripsPage} />
           <Route path="/purchase-order/reports/po-analysis" component={POAnalysisReportPage} />
+          <Route path="/purchase-order/purchase-orders/status" component={PurchaseOrderStatusPage} />
+          <Route path="/purchase-order/purchase-orders/outstanding" component={OutstandingPOStatusPage} />
           <Route path="/purchase-order/reports/items-to-receive" component={ItemsToReceiveReportPage} />
           <Route path="/purchase-order/purchase-orders" component={PurchaseOrderListPage} />
           <Route path="/purchase-order/rfq" component={RfqListPage} />

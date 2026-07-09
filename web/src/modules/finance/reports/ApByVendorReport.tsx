@@ -2,13 +2,13 @@ import { For, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
 import { getAccessToken } from "../../../shared/api";
-import { arByCustomerExportUrl } from "../../../shared/useArByCustomerReport";
-import type { ArByCustomerRow } from "../../../shared/useArByCustomerReport";
-import { formatDisplayDate, type ArByCustomerFilters } from "./arByCustomerFilters";
+import { apByVendorExportUrl } from "../../../shared/useApByVendorReport";
+import type { ApByVendorRow } from "../../../shared/useApByVendorReport";
+import { formatDisplayDate, type ApByVendorFilters } from "./apByVendorFilters";
 
 type Props = {
-  filters: ArByCustomerFilters;
-  rows: ArByCustomerRow[];
+  filters: ApByVendorFilters;
+  rows: ApByVendorRow[];
   totalRows: number;
   page: number;
   pageSize: number;
@@ -17,16 +17,14 @@ type Props = {
   onPageChange: (page: number) => void;
 };
 
-
-
-export function ArByCustomerReport(props: Props) {
+export function ApByVendorReport(props: Props) {
   const auth = useAuth();
   const companyName = () => auth.me?.tenant.company_name ?? "Company";
   const totalPages = () => Math.max(1, Math.ceil(props.totalRows / props.pageSize));
 
   const downloadCsv = async () => {
     const token = await getAccessToken();
-    const res = await fetch(arByCustomerExportUrl(props.filters), {
+    const res = await fetch(apByVendorExportUrl(props.filters), {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) return;
@@ -34,7 +32,7 @@ export function ArByCustomerReport(props: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "ar-by-customer.csv";
+    a.download = "ap-by-vendor.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -49,19 +47,19 @@ export function ArByCustomerReport(props: Props) {
   const totals = () =>
     props.rows.reduce(
       (acc, r) => ({
-        inv: acc.inv + r.inv_sales,
-        acct: acc.acct + r.acct_sales,
-        sales: acc.sales + r.total_sales,
-        received: acc.received + r.total_received,
+        inv: acc.inv + r.inv_purchases,
+        acct: acc.acct + r.acct_purchases,
+        billed: acc.billed + r.total_billed,
+        paid: acc.paid + r.total_paid,
         balance: acc.balance + r.balance,
       }),
-      { inv: 0, acct: 0, sales: 0, received: 0, balance: 0 },
+      { inv: 0, acct: 0, billed: 0, paid: 0, balance: 0 },
     );
 
   return (
     <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
       <div class="border-b border-stroke px-5 py-4 text-center">
-        <h2 class="text-xl font-bold text-text-primary">A/R by Customer</h2>
+        <h2 class="text-xl font-bold text-text-primary">A/P by Vendor</h2>
         <div class="mt-2 flex flex-wrap justify-between gap-2 text-sm text-text-secondary">
           <span>Company Name : {companyName()}</span>
           <span>{dateRange()}</span>
@@ -72,11 +70,11 @@ export function ArByCustomerReport(props: Props) {
         <table class="erp-grid min-w-full text-left text-sm">
           <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
             <tr>
-              <th class="px-3 py-2">Customer</th>
-              <th class="px-3 py-2 text-right">Inv Sales</th>
-              <th class="px-3 py-2 text-right">Acct Sales</th>
-              <th class="px-3 py-2 text-right">Total Sales</th>
-              <th class="px-3 py-2 text-right">Total Received</th>
+              <th class="px-3 py-2">Vendor</th>
+              <th class="px-3 py-2 text-right">Inv Purchases</th>
+              <th class="px-3 py-2 text-right">Acct Purchases</th>
+              <th class="px-3 py-2 text-right">Total Billed</th>
+              <th class="px-3 py-2 text-right">Total Paid</th>
               <th class="px-3 py-2 text-right">Balance</th>
             </tr>
           </thead>
@@ -98,11 +96,11 @@ export function ArByCustomerReport(props: Props) {
             <For each={props.rows}>
               {(row) => (
                 <tr class="border-t border-stroke/60 hover:bg-slate-50/50">
-                  <td class="px-3 py-2">{row.customer_name}</td>
-                  <td class="px-3 py-2 text-right">{formatPeso(row.inv_sales)}</td>
-                  <td class="px-3 py-2 text-right">{formatPeso(row.acct_sales)}</td>
-                  <td class="px-3 py-2 text-right">{formatPeso(row.total_sales)}</td>
-                  <td class="px-3 py-2 text-right">{formatPeso(row.total_received)}</td>
+                  <td class="px-3 py-2">{row.vendor_name}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.inv_purchases)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.acct_purchases)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.total_billed)}</td>
+                  <td class="px-3 py-2 text-right">{formatPeso(row.total_paid)}</td>
                   <td class="px-3 py-2 text-right font-medium">{formatPeso(row.balance)}</td>
                 </tr>
               )}
@@ -114,8 +112,8 @@ export function ArByCustomerReport(props: Props) {
                 <td class="px-3 py-2">Page totals</td>
                 <td class="px-3 py-2 text-right">{formatPeso(totals().inv)}</td>
                 <td class="px-3 py-2 text-right">{formatPeso(totals().acct)}</td>
-                <td class="px-3 py-2 text-right">{formatPeso(totals().sales)}</td>
-                <td class="px-3 py-2 text-right">{formatPeso(totals().received)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(totals().billed)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(totals().paid)}</td>
                 <td class="px-3 py-2 text-right">{formatPeso(totals().balance)}</td>
               </tr>
             </tfoot>

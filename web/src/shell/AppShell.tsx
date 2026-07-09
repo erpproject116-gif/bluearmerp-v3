@@ -2,6 +2,7 @@ import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import { Show } from "solid-js";
 import { useAuth, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
+import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
 import { CrmNotificationPoller } from "../shared/CrmNotificationPoller";
@@ -59,6 +60,8 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const appTagline = () => brandingLabel("app.tagline", "ERP v3");
 
   const activeModule = () => resolveModule(loc.pathname);
+  const moduleLabel = (mod: NonNullable<ReturnType<typeof resolveModule>>) =>
+    moduleDisplayLabel(auth.me, mod.id, mod.label);
   const activeFeature = () => {
     const mod = activeModule();
     return mod ? resolveFeature(mod, loc.pathname) : undefined;
@@ -170,13 +173,13 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                         fallback={
                           <>
                             <SetupBreadcrumbHint />
-                            <span>{mod().label}</span>
+                            <span>{moduleLabel(mod())}</span>
                           </>
                         }
                       >
                         {(branch) => (
                           <>
-                            <span>{mod().label}</span>
+                            <span>{moduleLabel(mod())}</span>
                             <span class="mx-1.5 text-text-secondary/50" aria-hidden="true">
                               ›
                             </span>
@@ -192,7 +195,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                           ? subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix)
                           : activeFeature()
                             ? featureHeaderTitle(activeFeature()!, loc.pathname)
-                            : mod().label}
+                            : moduleLabel(mod())}
                     </h1>
                   </>
                 )}

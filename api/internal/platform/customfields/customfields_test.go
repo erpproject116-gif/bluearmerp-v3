@@ -29,4 +29,8 @@ func TestValidateDefinitionInputEntityType(t *testing.T) {
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %#v", errs)
 	}
+	errs = ValidateDefinitionInput("fin_supplier_invoice", "vendor_ref", "Vendor ref", "select", true)
+	if len(errs) != 0 {
+		t.Fatalf("expected fin_supplier_invoice to be valid, got %#v", errs)
+	}
 }

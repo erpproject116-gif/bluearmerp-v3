@@ -14,6 +14,7 @@ import (
 
 type ModuleRow struct {
 	ModuleCode string `json:"module_code"`
+	ModuleName string `json:"module_name"`
 	IsEnabled  bool   `json:"is_enabled"`
 }
 
@@ -69,7 +70,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 	tu.AutoEnableAllModules = autoEnableAll
 
 	rows, err := pool.Query(ctx, `
-		select mr.module_code, coalesce(tm.is_enabled, false)
+		select mr.module_code, mr.module_name, coalesce(tm.is_enabled, false)
 		from public.module_registry mr
 		left join public.tenant_modules tm
 		  on tm.module_code = mr.module_code and tm.tenant_id = $1
@@ -84,7 +85,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 	allAccess := fullModuleAccess(tu)
 	for rows.Next() {
 		var m ModuleRow
-		if err := rows.Scan(&m.ModuleCode, &m.IsEnabled); err != nil {
+		if err := rows.Scan(&m.ModuleCode, &m.ModuleName, &m.IsEnabled); err != nil {
 			return MePayload{}, err
 		}
 		if allAccess {

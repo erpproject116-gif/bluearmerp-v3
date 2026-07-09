@@ -1,23 +1,23 @@
 import { createSignal, onMount } from "solid-js";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
-import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { Field } from "../../../shared/SpreadsheetGrid";
 import { apiFetch } from "../../../shared/api";
-import type { ReceiptStatusFilters } from "./receiptStatusFilters";
+import type { ApByVendorFilters } from "./apByVendorFilters";
 
 type Props = {
-  value: () => ReceiptStatusFilters;
-  onChange: (next: ReceiptStatusFilters) => void;
+  value: () => ApByVendorFilters;
+  onChange: (next: ApByVendorFilters) => void;
   onSearch: () => void;
   onReset: () => void;
 };
 
-async function fetchPartners(q: string): Promise<LookupOption[]> {
+async function fetchVendors(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
   if (q) qs.set("q", q);
   const res = await apiFetch<{ id: number; company_name: string; partner_kind: string }[]>(`/api/v1/inventory/partners?${qs}`);
   return (res.data ?? [])
-    .filter((p) => p.partner_kind === "customer" || p.partner_kind === "both")
+    .filter((p) => p.partner_kind === "vendor" || p.partner_kind === "both")
     .map((p) => ({ id: p.id, label: p.company_name }));
 }
 
@@ -26,13 +26,6 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
   if (q) qs.set("q", q);
   const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
   return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
-}
-
-async function fetchDepartments(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; name: string }[]>(`/api/v1/inventory/departments?${qs}`);
-  return (res.data ?? []).map((d) => ({ id: d.id, label: d.name }));
 }
 
 async function fetchProjects(q: string): Promise<LookupOption[]> {
@@ -48,13 +41,12 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name }));
 }
 
-export function ReceiptStatusFilter(props: Props) {
-  const [customerLabel, setCustomerLabel] = createSignal("");
+export function ApByVendorFilter(props: Props) {
+  const [vendorLabel, setVendorLabel] = createSignal("");
   const [locationLabel, setLocationLabel] = createSignal("");
-  const [departmentLabel, setDepartmentLabel] = createSignal("");
   const [projectLabel, setProjectLabel] = createSignal("");
   const [picLabel, setPicLabel] = createSignal("");
-  const patch = (p: Partial<ReceiptStatusFilters>) => props.onChange({ ...props.value(), ...p });
+  const patch = (p: Partial<ApByVendorFilters>) => props.onChange({ ...props.value(), ...p });
 
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -70,8 +62,8 @@ export function ReceiptStatusFilter(props: Props) {
   return (
     <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
       <div class="mb-4">
-        <h2 class="text-lg font-semibold text-text-primary">SI Receipt Status</h2>
-        <p class="text-sm text-text-secondary">Sales invoice line receipt application status — Search (F8).</p>
+        <h2 class="text-lg font-semibold text-text-primary">A/P by Vendor</h2>
+        <p class="text-sm text-text-secondary">Outstanding balances per vendor — Search (F8).</p>
       </div>
       <div class="grid gap-4 md:grid-cols-2">
         <Field label="Date from (optional)">
@@ -87,36 +79,23 @@ export function ReceiptStatusFilter(props: Props) {
           />
         </Field>
         <LookupCombo
-          label="Customer"
-          value={customerLabel}
+          label="Vendor"
+          value={vendorLabel}
           selectedId={() => props.value().partner_id ?? null}
-          onInput={setCustomerLabel}
+          onInput={setVendorLabel}
           onSelect={(o) => {
             patch({ partner_id: o.id });
-            setCustomerLabel(o.label);
+            setVendorLabel(o.label);
           }}
           onClear={() => {
             patch({ partner_id: null });
-            setCustomerLabel("");
+            setVendorLabel("");
           }}
-          fetchOptions={fetchPartners}
+          fetchOptions={fetchVendors}
         />
         <LookupCombo label="Location" value={locationLabel} selectedId={() => props.value().location_id ?? null} onInput={setLocationLabel} onSelect={(o) => { patch({ location_id: o.id }); setLocationLabel(o.label); }} onClear={() => { patch({ location_id: null }); setLocationLabel(""); }} fetchOptions={fetchLocations} />
-        <LookupCombo label="Department" value={departmentLabel} selectedId={() => props.value().department_id ?? null} onInput={setDepartmentLabel} onSelect={(o) => { patch({ department_id: o.id }); setDepartmentLabel(o.label); }} onClear={() => { patch({ department_id: null }); setDepartmentLabel(""); }} fetchOptions={fetchDepartments} />
         <LookupCombo label="Project" value={projectLabel} selectedId={() => props.value().project_id ?? null} onInput={setProjectLabel} onSelect={(o) => { patch({ project_id: o.id }); setProjectLabel(o.label); }} onClear={() => { patch({ project_id: null }); setProjectLabel(""); }} fetchOptions={fetchProjects} />
         <LookupCombo label="PIC" value={picLabel} selectedId={() => props.value().pic_user_id ?? null} onInput={setPicLabel} onSelect={(o) => { patch({ pic_user_id: o.id }); setPicLabel(o.label); }} onClear={() => { patch({ pic_user_id: null }); setPicLabel(""); }} fetchOptions={fetchUsers} />
-        <Field label="Receipt status">
-          <select
-            class={inputClass}
-            value={props.value().receipt_status ?? ""}
-            onChange={(e) => patch({ receipt_status: e.currentTarget.value || undefined })}
-          >
-            <option value="">All</option>
-            <option value="none">None</option>
-            <option value="partial">Partial</option>
-            <option value="full">Full</option>
-          </select>
-        </Field>
       </div>
       <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => props.onSearch()}>

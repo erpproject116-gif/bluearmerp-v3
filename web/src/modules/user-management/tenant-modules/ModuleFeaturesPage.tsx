@@ -19,6 +19,7 @@ const GROUP_LABELS: Record<string, string> = {
   crm: "CRM",
   finance: "Finance",
   activity_logs: "Activity Logs",
+  operations: "Project Management",
   documentation: "Help & guides",
   user_management: "User Management",
 };

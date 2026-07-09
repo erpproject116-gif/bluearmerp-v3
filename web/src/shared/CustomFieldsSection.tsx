@@ -16,6 +16,12 @@ export const FIELD_TYPES = [
   { value: "number_range", label: "Number range" },
 ] as const;
 
+export type CustomFieldType = (typeof FIELD_TYPES)[number]["value"];
+
+export function isCustomFieldType(value: string): value is CustomFieldType {
+  return FIELD_TYPES.some((t) => t.value === value);
+}
+
 type Props = {
   entityType: string;
   values: () => Record<string, unknown>;

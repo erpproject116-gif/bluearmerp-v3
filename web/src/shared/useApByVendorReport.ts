@@ -1,28 +1,27 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 
-export type ArByCustomerFilters = {
+export type ApByVendorFilters = {
   date_from?: string;
   date_to?: string;
   partner_id?: number | null;
   location_id?: number | null;
-  department_id?: number | null;
   project_id?: number | null;
   pic_user_id?: number | null;
 };
 
-export type ArByCustomerRow = {
+export type ApByVendorRow = {
   partner_id: number;
-  customer_name: string;
-  inv_sales: number;
-  acct_sales: number;
-  total_sales: number;
-  total_received: number;
+  vendor_name: string;
+  inv_purchases: number;
+  acct_purchases: number;
+  total_billed: number;
+  total_paid: number;
   balance: number;
 };
 
-export type ArByCustomerParams = {
-  filters: ArByCustomerFilters;
+export type ApByVendorParams = {
+  filters: ApByVendorFilters;
   page: number;
   pageSize: number;
   sort: string;
@@ -30,8 +29,8 @@ export type ArByCustomerParams = {
   enabled: boolean;
 };
 
-export function arFiltersToSearchParams(
-  filters: ArByCustomerFilters,
+export function apFiltersToSearchParams(
+  filters: ApByVendorFilters,
   extra?: { page?: number; pageSize?: number; sort?: string; order?: string },
 ): URLSearchParams {
   const qs = new URLSearchParams();
@@ -39,7 +38,6 @@ export function arFiltersToSearchParams(
   if (filters.date_to) qs.set("date_to", filters.date_to);
   if (filters.partner_id) qs.set("partner_id", String(filters.partner_id));
   if (filters.location_id) qs.set("location_id", String(filters.location_id));
-  if (filters.department_id) qs.set("department_id", String(filters.department_id));
   if (filters.project_id) qs.set("project_id", String(filters.project_id));
   if (filters.pic_user_id) qs.set("pic_user_id", String(filters.pic_user_id));
   if (extra?.page) qs.set("page", String(extra.page));
@@ -49,25 +47,25 @@ export function arFiltersToSearchParams(
   return qs;
 }
 
-export function arByCustomerExportUrl(filters: ArByCustomerFilters): string {
-  return `/api/v1/finance/ar-by-customer/export?${arFiltersToSearchParams(filters).toString()}`;
+export function apByVendorExportUrl(filters: ApByVendorFilters): string {
+  return `/api/v1/finance/ap-by-vendor/export?${apFiltersToSearchParams(filters).toString()}`;
 }
 
-export function useArByCustomerReport(params: () => ArByCustomerParams) {
+export function useApByVendorReport(params: () => ApByVendorParams) {
   return createQuery(() => {
     const p = params();
-    const qs = arFiltersToSearchParams(p.filters, {
+    const qs = apFiltersToSearchParams(p.filters, {
       page: p.page,
       pageSize: p.pageSize,
       sort: p.sort,
       order: p.order,
     });
     return {
-      queryKey: ["ar-by-customer", p],
+      queryKey: ["ap-by-vendor", p],
       enabled: p.enabled,
       queryFn: async () => {
-        const res = await apiFetch<ArByCustomerRow[]>(`/api/v1/finance/ar-by-customer?${qs}`);
-        if (!res.success) throw new Error(res.message ?? "Failed to load A/R report");
+        const res = await apiFetch<ApByVendorRow[]>(`/api/v1/finance/ap-by-vendor?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load A/P report");
         return {
           rows: res.data ?? [],
           total: res.meta?.total ?? 0,
@@ -80,7 +78,7 @@ export function useArByCustomerReport(params: () => ArByCustomerParams) {
   });
 }
 
-export function useInvalidateArByCustomerReport() {
+export function useInvalidateApByVendorReport() {
   const client = useQueryClient();
-  return () => void client.invalidateQueries({ queryKey: ["ar-by-customer"] });
+  return () => void client.invalidateQueries({ queryKey: ["ap-by-vendor"] });
 }

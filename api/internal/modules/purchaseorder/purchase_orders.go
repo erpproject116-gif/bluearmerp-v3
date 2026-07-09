@@ -170,6 +170,10 @@ left join public.inv_partners hp on hp.id = po.partner_id`
 
 func registerPurchaseOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/purchase-orders/preview-sequences", previewPurchaseOrderSequences(pool))
+	r.Get("/purchase-orders/status-report/export", exportPurchaseOrderStatusReport(pool))
+	r.Get("/purchase-orders/status-report", listPurchaseOrderStatusReport(pool))
+	r.Get("/purchase-orders/outstanding-report/export", exportPurchaseOrderOutstandingReport(pool))
+	r.Get("/purchase-orders/outstanding-report", listPurchaseOrderOutstandingReport(pool))
 	r.Get("/purchase-orders", listPurchaseOrders(pool))
 	r.Get("/purchase-orders/purchase-request-lines/open", listOpenPurchaseRequestSlipLines(pool))
 	r.Get("/purchase-orders/supplier-quotation-lines/open", listOpenSupplierQuotationSlipLines(pool))

@@ -110,6 +110,8 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying" },
       { label: "Purchase Status", href: "/app/buying/reports/purchase-status", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "PO Status", href: "/app/purchase-order/purchase-orders/status", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "Outstanding PO", href: "/app/purchase-order/purchase-orders/outstanding", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Pre-Invoicing (Purchases)", href: "/app/buying/reports/pre-invoicing", settingsHref: "/app/purchases/purchases/settings" },
     ],
     subBranches: [
@@ -255,6 +257,9 @@ export const appModules: AppModule[] = [
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       { label: "SO Analysis", href: "/app/sales-order/reports/so-analysis", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Shipment Status", href: "/app/sales-order/reports/shipment-status", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Pending Shipment", href: "/app/sales-order/reports/pending-shipment", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Shipping Order Status", href: "/app/sales-order/reports/shipping-order-status", settingsHref: "/app/sales-order/sales-orders/settings" },
       { label: "Shipping Orders", href: "/app/sales-order/shipping/orders", settingsHref: "/app/sales-order/shipping/orders" },
       { label: "Shipping Rules", href: "/app/sales-order/shipping/rules", settingsHref: "/app/sales-order/shipping/rules" },
       { label: "Delivery Trips", href: "/app/sales-order/shipping/trips", settingsHref: "/app/sales-order/shipping/trips" },
@@ -287,6 +292,8 @@ export const appModules: AppModule[] = [
       { label: "Purchase Returns", href: "/app/purchase-order/purchase-returns", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Receiving", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/goods-receipt/settings" },
       { label: "PO Analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "PO Status", href: "/app/purchase-order/purchase-orders/status", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "Outstanding PO", href: "/app/purchase-order/purchase-orders/outstanding", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Items to Receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
     ],
   },
@@ -320,16 +327,6 @@ export const appModules: AppModule[] = [
         settingsHref: "/app/crm/settings/alert-rules",
       },
       { label: "Warranty Registry", href: "/app/crm/warranty-assets", settingsHref: "/app/crm/settings/alert-rules" },
-      {
-        label: "Customer × Item",
-        href: "/app/crm/reports/customer-quotations",
-        settingsHref: "/app/crm/settings/alert-rules",
-        analyticsOnly: true,
-      },
-      { label: "Item Demand", href: "/app/crm/reports/item-demand", settingsHref: "/app/crm/settings/alert-rules", analyticsOnly: true },
-      { label: "Conversion Funnel", href: "/app/crm/reports/conversion", settingsHref: "/app/crm/settings/alert-rules", analyticsOnly: true },
-      { label: "Low Stock", href: "/app/crm/reports/low-stock", settingsHref: "/app/crm/settings/alert-rules", analyticsOnly: true },
-      { label: "Expired Quotations", href: "/app/crm/reports/expired-quotations", settingsHref: "/app/crm/settings/alert-rules", analyticsOnly: true },
       { label: "Alert Rules", href: "/app/crm/settings/alert-rules", settingsHref: "/app/crm/settings/alert-rules", managersOnly: true },
     ],
   },
@@ -365,7 +362,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "operations",
-    label: "Operations",
+    label: "Project Management",
     href: "/app/operations",
     basePath: "/app/operations",
     features: [

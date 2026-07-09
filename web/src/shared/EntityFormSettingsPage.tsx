@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { apiFetch } from "./api";
-import { FIELD_TYPES } from "./CustomFieldsSection";
+import { FIELD_TYPES, isCustomFieldType, type CustomFieldType } from "./CustomFieldsSection";
 import { Field, inputClass } from "./SpreadsheetGrid";
 import { useAuth, canManageFormSettings } from "./auth-context";
 import { useToast } from "./toast";
@@ -51,7 +51,7 @@ export function EntityFormSettingsPage(props: Props) {
 
   const [newLabel, setNewLabel] = createSignal("");
   const [newKey, setNewKey] = createSignal("");
-  const [newType, setNewType] = createSignal("text");
+  const [newType, setNewType] = createSignal<CustomFieldType>("text");
   const [newRequired, setNewRequired] = createSignal(false);
   const [newChoices, setNewChoices] = createSignal("");
   const [adding, setAdding] = createSignal(false);
@@ -98,6 +98,11 @@ export function EntityFormSettingsPage(props: Props) {
       toast.warning("Add at least one choice for dropdown or radio fields.");
       return;
     }
+    const fieldType = newType();
+    if (!isCustomFieldType(fieldType)) {
+      toast.warning("Unsupported field type.");
+      return;
+    }
     setAdding(true);
     const key = slugKey(newKey().trim() || newLabel());
     const label = newLabel().trim();
@@ -109,7 +114,7 @@ export function EntityFormSettingsPage(props: Props) {
           entity_type: props.entityType,
           field_key: key,
           label,
-          field_type: newType(),
+          field_type: fieldType,
           is_required: newRequired(),
           sort_order: fields().filter((f) => f.kind === "custom").length,
           options: needsChoices ? { choices: parseChoices(newChoices()), is_visible: true } : { is_visible: true },
@@ -314,7 +319,14 @@ export function EntityFormSettingsPage(props: Props) {
               />
             </Field>
             <Field label="Field type">
-              <select class={inputClass} value={newType()} onChange={(e) => setNewType(e.currentTarget.value)}>
+              <select
+                class={inputClass}
+                value={newType()}
+                onInput={(e) => {
+                  const value = e.currentTarget.value;
+                  if (isCustomFieldType(value)) setNewType(value);
+                }}
+              >
                 <For each={FIELD_TYPES}>{(t) => <option value={t.value}>{t.label}</option>}</For>
               </select>
             </Field>

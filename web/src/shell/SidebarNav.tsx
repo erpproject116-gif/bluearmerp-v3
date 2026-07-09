@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import { useAuth } from "../shared/auth-context";
-import { isTenantFeatureEnabled, isTenantModuleEnabled } from "../shared/moduleAccess";
+import { isTenantFeatureEnabled, isTenantModuleEnabled, moduleDisplayLabel } from "../shared/moduleAccess";
 import { ModuleIcon } from "./ModuleIcon";
 import { useShell } from "./shell-context";
 import {
@@ -34,6 +34,8 @@ function readExpanded(groupId: string, defaultExpanded: boolean): boolean {
 function NavModuleLink(props: { module: AppModule }) {
   const loc = useLocation();
   const shell = useShell();
+  const auth = useAuth();
+  const label = () => moduleDisplayLabel(auth.me, props.module.id, props.module.label);
   const inModule = () => {
     if (props.module.id === "finance" && isReviewPurchasesPath(loc.pathname)) return false;
     if (props.module.id === "buying" && isReviewPurchasesPath(loc.pathname)) return true;
@@ -46,7 +48,7 @@ function NavModuleLink(props: { module: AppModule }) {
   return (
     <A
       href={props.module.href}
-      title={shell.collapsed() ? props.module.label : undefined}
+      title={shell.collapsed() ? label() : undefined}
       class="flex items-center rounded-lg text-sm font-medium transition-colors"
       classList={{
         "justify-center px-2 py-2.5": shell.collapsed(),
@@ -67,7 +69,7 @@ function NavModuleLink(props: { module: AppModule }) {
         <ModuleIcon id={props.module.id} />
       </span>
       <Show when={!shell.collapsed()}>
-        <span class="truncate">{props.module.label}</span>
+        <span class="truncate">{label()}</span>
       </Show>
     </A>
   );
