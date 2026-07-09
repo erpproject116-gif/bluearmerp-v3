@@ -1,8 +1,11 @@
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { createWorker } from "tesseract.js";
+import { createWorker, OEM, type Worker } from "tesseract.js";
+import tessWorkerUrl from "tesseract.js/dist/worker.min.js?url";
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
+
+const TESS_CORE_VERSION = "7.0.0";
 
 export type RfqOcrPage = {
   page: number;
@@ -18,12 +21,34 @@ export type RfqOcrProgress = {
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
 
+let ocrWorkerPromise: Promise<Worker> | null = null;
+
 function isPdf(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
 
 function isImage(file: File) {
   return IMAGE_TYPES.has(file.type) || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+}
+
+async function getOcrWorker(): Promise<Worker> {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = createWorker("eng", OEM.LSTM_ONLY, {
+      workerPath: tessWorkerUrl,
+      workerBlobURL: false,
+      corePath: `https://cdn.jsdelivr.net/npm/tesseract.js-core@v${TESS_CORE_VERSION}`,
+      langPath: "https://tessdata.projectnaptha.com/4.0.0",
+    });
+  }
+  return ocrWorkerPromise;
+}
+
+async function shutdownOcrWorker() {
+  if (ocrWorkerPromise) {
+    const worker = await ocrWorkerPromise;
+    await worker.terminate();
+    ocrWorkerPromise = null;
+  }
 }
 
 async function renderPdfPageToCanvas(page: import("pdfjs-dist").PDFPageProxy): Promise<HTMLCanvasElement> {
@@ -37,18 +62,11 @@ async function renderPdfPageToCanvas(page: import("pdfjs-dist").PDFPageProxy): P
   return canvas;
 }
 
-async function ocrCanvas(
-  canvas: HTMLCanvasElement,
-  onStatus?: (msg: string) => void,
-): Promise<string> {
-  const worker = await createWorker("eng");
-  try {
-    onStatus?.("Recognizing text…");
-    const { data } = await worker.recognize(canvas);
-    return data.text ?? "";
-  } finally {
-    await worker.terminate();
-  }
+async function ocrCanvas(canvas: HTMLCanvasElement, onStatus?: (msg: string) => void): Promise<string> {
+  const worker = await getOcrWorker();
+  onStatus?.("Recognizing text…");
+  const { data } = await worker.recognize(canvas);
+  return data.text ?? "";
 }
 
 async function ocrImageFile(file: File, onStatus?: (msg: string) => void): Promise<string> {
@@ -113,30 +131,35 @@ export async function extractRfqDocumentPages(
   files: File[],
   onProgress?: (p: RfqOcrProgress) => void,
 ): Promise<RfqOcrPage[]> {
-  const pages: RfqOcrPage[] = [];
-  let pageOffset = 0;
-  for (const file of files) {
-    if (isPdf(file)) {
-      const pdfPages = await extractPdfPages(file, onProgress, pageOffset);
-      pages.push(...pdfPages);
-      pageOffset += pdfPages.length;
-      continue;
+  onProgress?.({ phase: "ocr", page: 0, totalPages: 0, message: "Preparing document reader…" });
+  try {
+    const pages: RfqOcrPage[] = [];
+    let pageOffset = 0;
+    for (const file of files) {
+      if (isPdf(file)) {
+        const pdfPages = await extractPdfPages(file, onProgress, pageOffset);
+        pages.push(...pdfPages);
+        pageOffset += pdfPages.length;
+        continue;
+      }
+      if (isImage(file)) {
+        pageOffset += 1;
+        onProgress?.({
+          phase: "ocr",
+          page: pageOffset,
+          totalPages: pageOffset,
+          message: `OCR image ${file.name}…`,
+        });
+        const text = await ocrImageFile(file, (msg) =>
+          onProgress?.({ phase: "ocr", page: pageOffset, totalPages: pageOffset, message: msg }),
+        );
+        pages.push({ page: pageOffset, text });
+        continue;
+      }
+      throw new Error(`Unsupported file type: ${file.name}. Use PDF or image files.`);
     }
-    if (isImage(file)) {
-      pageOffset += 1;
-      onProgress?.({
-        phase: "ocr",
-        page: pageOffset,
-        totalPages: pageOffset,
-        message: `OCR image ${file.name}…`,
-      });
-      const text = await ocrImageFile(file, (msg) =>
-        onProgress?.({ phase: "ocr", page: pageOffset, totalPages: pageOffset, message: msg }),
-      );
-      pages.push({ page: pageOffset, text });
-      continue;
-    }
-    throw new Error(`Unsupported file type: ${file.name}. Use PDF or image files.`);
+    return pages;
+  } finally {
+    await shutdownOcrWorker();
   }
-  return pages;
 }

@@ -10,12 +10,16 @@ type Props = {
   onClose: () => void;
   children: JSX.Element;
   wide?: boolean;
+  /** Use above other modals (e.g. RFQ import inside quotation). */
+  stacked?: boolean;
 };
 
 export function Modal(props: Props) {
   return (
     <Show when={props.open}>
-      <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6">
+      <div
+        class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6 ${props.stacked ? "z-[60]" : "z-50"}`}
+      >
         <div class={`my-4 w-full rounded-2xl border border-stroke bg-white p-6 shadow-xl ${props.wide ? "max-w-5xl" : "max-w-lg"}`}>
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>

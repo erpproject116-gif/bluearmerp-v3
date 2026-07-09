@@ -4,7 +4,7 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
 import { LoadingText } from "../../../shared/LoadingText";
 import { useToast } from "../../../shared/toast";
-import { extractRfqDocumentPages, type RfqOcrProgress } from "./rfqDocumentOcr";
+import type { RfqOcrProgress } from "./rfqDocumentOcr";
 import type { QuotationLineRow } from "./QuotationLineGrid";
 import { emptyQuotationLine } from "./QuotationLineGrid";
 
@@ -33,24 +33,43 @@ export function RfqImportModal(props: Props) {
   const toast = useToast();
   const [busy, setBusy] = createSignal(false);
   const [progress, setProgress] = createSignal<RfqOcrProgress | null>(null);
+  const [error, setError] = createSignal<string | null>(null);
   const [lines, setLines] = createSignal<RfqParsedLine[]>([]);
   const [pageCount, setPageCount] = createSignal(0);
+  let fileInputRef: HTMLInputElement | undefined;
 
   const reset = () => {
     setLines([]);
     setPageCount(0);
     setProgress(null);
+    setError(null);
+    if (fileInputRef) fileInputRef.value = "";
   };
 
   const onFiles = async (fileList: FileList | null) => {
-    if (!fileList?.length) return;
-    const files = Array.from(fileList);
+    if (!fileList?.length || busy()) return;
+    const files = Array.from(fileList).filter((f) => f.size > 0);
+    if (!files.length) {
+      setError("Selected file(s) are empty.");
+      return;
+    }
+
     setBusy(true);
-    reset();
+    setError(null);
+    setLines([]);
+    setPageCount(0);
+    setProgress({ phase: "ocr", page: 0, totalPages: 0, message: "Loading document tools…" });
+
     try {
+      const { extractRfqDocumentPages } = await import("./rfqDocumentOcr");
       const pages = await extractRfqDocumentPages(files, setProgress);
+      if (!pages.length) {
+        setError("No pages could be read from the uploaded file(s).");
+        return;
+      }
       setPageCount(pages.length);
       setProgress({ phase: "parse", page: pages.length, totalPages: pages.length, message: "Parsing line items…" });
+
       const res = await apiFetch<{
         lines: Array<Omit<RfqParsedLine, "include">>;
         line_count: number;
@@ -59,14 +78,19 @@ export function RfqImportModal(props: Props) {
         body: JSON.stringify({ pages }),
       });
       if (!res.success || !res.data?.lines) {
-        toast.error(res.message ?? "Failed to parse RFQ.");
+        const msg = res.message ?? "Failed to parse RFQ.";
+        setError(msg);
+        toast.error(msg);
         return;
       }
       if (!res.data.lines.length) {
-        toast.warning("No line items detected. Try a clearer scan or add lines manually.");
+        const msg = "No line items detected. Try a clearer scan or add lines manually.";
+        setError(msg);
+        toast.warning(msg);
         setLines([]);
         return;
       }
+
       const matchRes = await apiFetch<{ lines: RfqParsedLine[] }>("/api/v1/quotation/rfq-import/match-items", {
         method: "POST",
         body: JSON.stringify({ lines: res.data.lines }),
@@ -85,11 +109,25 @@ export function RfqImportModal(props: Props) {
       );
       toast.success(`Found ${matched.length} line item(s) across ${pages.length} page(s).`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "RFQ import failed.");
+      const msg = e instanceof Error ? e.message : "RFQ import failed.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
       setProgress(null);
+      if (fileInputRef) fileInputRef.value = "";
     }
+  };
+
+  const onDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void onFiles(e.dataTransfer?.files ?? null);
   };
 
   const updateLine = (lineNo: number, patch: Partial<RfqParsedLine>) => {
@@ -125,6 +163,7 @@ export function RfqImportModal(props: Props) {
     <Modal
       open={props.open}
       title="Smart RFQ import"
+      stacked
       onClose={() => {
         if (!busy()) {
           props.onClose();
@@ -138,10 +177,30 @@ export function RfqImportModal(props: Props) {
         Inventory matching is optional — unmatched lines import as free-text rows you can edit before saving the quotation.
       </p>
 
-      <label class="mb-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-brand-200 bg-brand-50/40 px-6 py-8 text-center hover:bg-brand-50">
+      <div
+        role="button"
+        tabindex={busy() ? -1 : 0}
+        class={`mb-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors ${
+          busy()
+            ? "cursor-wait border-stroke bg-slate-50 opacity-70"
+            : "border-brand-200 bg-brand-50/40 hover:bg-brand-50"
+        }`}
+        onClick={() => {
+          if (!busy()) fileInputRef?.click();
+        }}
+        onKeyDown={(e) => {
+          if (!busy() && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            fileInputRef?.click();
+          }
+        }}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
         <span class="text-sm font-medium text-brand-700">Drop RFQ files here or click to browse</span>
         <span class="mt-1 text-xs text-text-secondary">PDF, PNG, JPG, WEBP — multiple files OK</span>
         <input
+          ref={fileInputRef}
           type="file"
           class="hidden"
           accept=".pdf,image/*"
@@ -149,18 +208,25 @@ export function RfqImportModal(props: Props) {
           disabled={busy()}
           onChange={(e) => void onFiles(e.currentTarget.files)}
         />
-      </label>
+      </div>
 
       <Show when={busy()}>
         <div class="mb-4 rounded-lg border border-stroke bg-slate-50 px-4 py-3 text-sm text-text-secondary">
           <Show when={progress()} fallback={<LoadingText />}>
             {(p) => (
               <span>
-                {p().message} ({p().page}/{p().totalPages || "?"})
+                {p().message}
+                <Show when={p().totalPages > 0}>
+                  <span> ({p().page}/{p().totalPages})</span>
+                </Show>
               </span>
             )}
           </Show>
         </div>
+      </Show>
+
+      <Show when={error()}>
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error()}</div>
       </Show>
 
       <Show when={lines().length > 0}>
