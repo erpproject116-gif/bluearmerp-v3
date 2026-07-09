@@ -47,6 +47,14 @@ export const OperationsWorkspaceProvider: ParentComponent = (props) => {
     if (match) setWorkspaceId(match.id);
   });
 
+  // Drop stale IDs left in localStorage after purge or workspace delete.
+  createEffect(() => {
+    const id = workspaceId();
+    const rows = workspaces.data?.rows;
+    if (!id || !rows) return;
+    if (!rows.some((w) => w.id === id)) setWorkspaceId(null);
+  });
+
   return (
     <OperationsWorkspaceContext.Provider value={{ workspaceId, setWorkspaceId }}>
       {props.children}

@@ -95,8 +95,14 @@ export default function OperationsHubPage() {
   const activeWorkspaceId = workspaceId;
   const columns = useOperationsColumns(activeWorkspaceId);
 
+  const activeWorkspace = createMemo(() =>
+    workspaces.data?.rows.find((w) => w.id === activeWorkspaceId()) ?? null,
+  );
+
+  const hasValidWorkspace = createMemo(() => activeWorkspace() != null);
+
   const itemsParams = createMemo((): WorkItemsQueryParams => ({
-    workspace_id: activeWorkspaceId() ?? undefined,
+    workspace_id: hasValidWorkspace() ? (activeWorkspaceId() ?? undefined) : undefined,
     board: viewMode() === "board",
     q: debouncedQ() || undefined,
     page: viewMode() === "board" ? 1 : page(),
@@ -106,10 +112,6 @@ export default function OperationsHubPage() {
   }));
 
   const items = useOperationsWorkItems(() => itemsParams());
-
-  const activeWorkspace = createMemo(() =>
-    workspaces.data?.rows.find((w) => w.id === activeWorkspaceId()) ?? null,
-  );
 
   const boardColumns = createMemo(() => {
     const cols = columns.data ?? [];
@@ -329,7 +331,7 @@ export default function OperationsHubPage() {
         </div>
       </div>
 
-      <Show when={!activeWorkspaceId()} fallback={null}>
+      <Show when={!hasValidWorkspace()} fallback={null}>
         <div class="rounded-xl border border-dashed border-stroke bg-slate-50 p-8 text-center text-sm text-text-secondary">
           <p>Select a workspace below, create your own, or load a sample project with realistic tasks.</p>
           <Show when={canCreateWorkspace()}>
@@ -374,7 +376,7 @@ export default function OperationsHubPage() {
         </div>
       </Show>
 
-      <Show when={activeWorkspaceId()}>
+      <Show when={hasValidWorkspace()}>
         <Show when={items.isError}>
           <p class="mb-3 text-sm text-red-600">
             {(items.error as Error)?.message ?? "Failed to load work items."}

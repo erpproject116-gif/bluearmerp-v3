@@ -1,7 +1,6 @@
 import { A, useLocation } from "@solidjs/router";
 import type { ParentComponent } from "solid-js";
 import { For } from "solid-js";
-import { OperationsWorkspaceProvider } from "./operationsWorkspace";
 
 const TABS = [
   { label: "Work Hub", href: "/app/operations" },
@@ -42,7 +41,5 @@ function OperationsLayoutInner(props: { children: import("solid-js").JSX.Element
 }
 
 export const OperationsLayout: ParentComponent = (props) => (
-  <OperationsWorkspaceProvider>
-    <OperationsLayoutInner>{props.children}</OperationsLayoutInner>
-  </OperationsWorkspaceProvider>
+  <OperationsLayoutInner>{props.children}</OperationsLayoutInner>
 );
