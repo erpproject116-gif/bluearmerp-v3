@@ -26,6 +26,7 @@ type invBookRow struct {
 	ClosingQty    float64 `json:"closing_qty"`
 	PurchasePrice float64 `json:"purchase_price"`
 	SalesPrice    float64 `json:"sales_price"`
+	VipPrice      float64 `json:"vip_price"`
 }
 
 func invBookSQL(tenantID int64, dateFrom, dateTo time.Time) (string, []any) {
@@ -49,7 +50,8 @@ func invBookSQL(tenantID int64, dateFrom, dateTo time.Time) (string, []any) {
 		select i.id, i.item_code, i.item_name, l.id, l.location_name,
 		  m.opening_qty, m.receipt_qty, m.issue_qty,
 		  (m.opening_qty + m.receipt_qty - m.issue_qty)::float8 as closing_qty,
-		  coalesce(i.purchase_price, 0)::float8, coalesce(i.sales_price, 0)::float8
+		  coalesce(i.purchase_price, 0)::float8, coalesce(i.sales_price, 0)::float8,
+		  coalesce(i.vip_price, 0)::float8
 		from movements m
 		join public.inv_items i on i.id = m.item_id
 		join public.inv_locations l on l.id = m.location_id
@@ -86,7 +88,7 @@ func listInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row invBookRow
 			if err := rows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.LocationID, &row.LocationName,
-				&row.OpeningQty, &row.ReceiptQty, &row.IssueQty, &row.ClosingQty, &row.PurchasePrice, &row.SalesPrice); err != nil {
+				&row.OpeningQty, &row.ReceiptQty, &row.IssueQty, &row.ClosingQty, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read inv. book.", "ERR_INTERNAL")
 				return
 			}
@@ -117,11 +119,11 @@ func exportInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", `attachment; filename="inv-book.csv"`)
 		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"Item Code", "Item Name", "Location", "Opening", "Receipt", "Issue", "Closing", "Purchase Price", "Sales Price"})
+		_ = cw.Write([]string{"Item Code", "Item Name", "Location", "Opening", "Receipt", "Issue", "Closing", "Purchase Price", "Sales Price", "VIP Price"})
 		for rows.Next() {
 			var row invBookRow
 			if err := rows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.LocationID, &row.LocationName,
-				&row.OpeningQty, &row.ReceiptQty, &row.IssueQty, &row.ClosingQty, &row.PurchasePrice, &row.SalesPrice); err != nil {
+				&row.OpeningQty, &row.ReceiptQty, &row.IssueQty, &row.ClosingQty, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice); err != nil {
 				return
 			}
 			_ = cw.Write([]string{
@@ -129,6 +131,7 @@ func exportInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 				fmt.Sprintf("%.4f", row.OpeningQty), fmt.Sprintf("%.4f", row.ReceiptQty),
 				fmt.Sprintf("%.4f", row.IssueQty), fmt.Sprintf("%.4f", row.ClosingQty),
 				fmt.Sprintf("%.4f", row.PurchasePrice), fmt.Sprintf("%.4f", row.SalesPrice),
+				fmt.Sprintf("%.4f", row.VipPrice),
 			})
 		}
 		cw.Flush()

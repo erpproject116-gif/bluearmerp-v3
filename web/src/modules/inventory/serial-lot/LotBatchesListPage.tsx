@@ -1,7 +1,14 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { DateInput } from "../../../shared/DateInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { Modal } from "../../../shared/Modal";
+import { DecimalInput } from "../../../shared/DecimalInput";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
+import { submitEntity } from "../../../shared/handleSaveResult";
+import { parseNum } from "../../../shared/money";
+import { useToast } from "../../../shared/toast";
+import { registerLotBatch } from "../../../shared/useLotAdjustment";
 import {
   useInvalidateSerialLotLists,
   useLotBatchList,
@@ -34,7 +41,18 @@ async function fetchItems(q: string): Promise<LookupOption[]> {
 }
 
 export default function LotBatchesListPage() {
+  const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
+
+  const [registerOpen, setRegisterOpen] = createSignal(false);
+  const [regLotNo, setRegLotNo] = createSignal("");
+  const [regQty, setRegQty] = createSignal("");
+  const [regExpiry, setRegExpiry] = createSignal("");
+  const [regItemId, setRegItemId] = createSignal<number | null>(null);
+  const [regItemLabel, setRegItemLabel] = createSignal("");
+  const [regLocationId, setRegLocationId] = createSignal<number | null>(null);
+  const [regLocationLabel, setRegLocationLabel] = createSignal("");
+  const [regSaving, setRegSaving] = createSignal(false);
 
   const [draftFilters, setDraftFilters] = createSignal<LotFilters>(defaultLotFilters());
   const [submittedFilters, setSubmittedFilters] = createSignal<LotFilters | null>(null);
@@ -90,10 +108,47 @@ export default function LotBatchesListPage() {
         e.preventDefault();
         search();
       }
+      if (e.key === "F2") {
+        e.preventDefault();
+        setRegisterOpen(true);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  const saveRegister = async () => {
+    if (!regItemId() || !regLocationId() || !regLotNo().trim()) {
+      toast.warning("Item, location, and lot number are required.");
+      return;
+    }
+    const qty = parseNum(regQty());
+    if (qty <= 0) {
+      toast.warning("Enter a positive quantity.");
+      return;
+    }
+    setRegSaving(true);
+    const ok = await submitEntity(
+      () =>
+        registerLotBatch({
+          item_id: regItemId()!,
+          location_id: regLocationId()!,
+          lot_no: regLotNo().trim(),
+          qty,
+          expiry_date: regExpiry() || null,
+        }),
+      toast,
+      "Lot registered.",
+    );
+    setRegSaving(false);
+    if (!ok) return;
+    setRegisterOpen(false);
+    setRegLotNo("");
+    setRegQty("");
+    setRegExpiry("");
+    invalidate();
+    search();
+  };
 
   return (
     <SerialLotLayout>
@@ -157,6 +212,13 @@ export default function LotBatchesListPage() {
           >
             Reset
           </button>
+          <button
+            type="button"
+            class="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
+            onClick={() => setRegisterOpen(true)}
+          >
+            Register lot (F2)
+          </button>
         </div>
       </section>
 
@@ -195,6 +257,63 @@ export default function LotBatchesListPage() {
           />
         </div>
       </Show>
+
+      <Modal open={registerOpen()} title="Register lot batch" onClose={() => setRegisterOpen(false)}>
+        <div class="grid gap-4">
+          <LookupCombo
+            label="Item (lot-tracked)"
+            value={regItemLabel}
+            selectedId={regItemId}
+            onInput={setRegItemLabel}
+            onSelect={(o) => {
+              setRegItemId(o.id);
+              setRegItemLabel(o.label);
+            }}
+            onClear={() => {
+              setRegItemId(null);
+              setRegItemLabel("");
+            }}
+            fetchOptions={fetchItems}
+          />
+          <LookupCombo
+            label="Location"
+            value={regLocationLabel}
+            selectedId={regLocationId}
+            onInput={setRegLocationLabel}
+            onSelect={(o) => {
+              setRegLocationId(o.id);
+              setRegLocationLabel(o.label);
+            }}
+            onClear={() => {
+              setRegLocationId(null);
+              setRegLocationLabel("");
+            }}
+            fetchOptions={fetchLocations}
+          />
+          <Field label="Lot number">
+            <input class={inputClass} value={regLotNo()} onInput={(e) => setRegLotNo(e.currentTarget.value)} />
+          </Field>
+          <Field label="Quantity">
+            <DecimalInput mode="qty" class={inputClass} value={regQty()} onValue={setRegQty} />
+          </Field>
+          <Field label="Expiry date">
+            <DateInput value={regExpiry()} onInput={(e) => setRegExpiry(e.currentTarget.value)} />
+          </Field>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => setRegisterOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              disabled={regSaving()}
+              onClick={() => void saveRegister()}
+            >
+              {regSaving() ? "Saving…" : "Register"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </SerialLotLayout>
   );
 }

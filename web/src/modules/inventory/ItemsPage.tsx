@@ -1,8 +1,14 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { DecimalInput } from "../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../shared/money";
+import {
+  emptyPriceLevels,
+  emptySafetyStockByDoc,
+  PRICE_LEVEL_KEYS,
+  SAFETY_DOC_TYPES,
+} from "../../shared/itemMasterConstants";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
 import { INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
@@ -21,6 +27,8 @@ type Item = {
   purchase_price: number;
   sales_price: number;
   vip_price: number;
+  price_levels?: Record<string, number>;
+  safety_stock_by_doc?: Record<string, number>;
   warranty_duration_months?: number | null;
   reorder_level?: number | null;
   track_serial?: boolean;
@@ -34,7 +42,7 @@ export default function ItemsPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("item_code");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
-  const [itemTab, setItemTab] = createSignal<"default" | "prices" | "management">("default");
+  const [itemTab, setItemTab] = createSignal<"default" | "prices" | "serial_lot" | "management">("default");
   const [editing, setEditing] = createSignal<Item | null>(null);
   const [nextCode, setNextCode] = createSignal("");
   const [form, setForm] = createSignal({
@@ -42,6 +50,8 @@ export default function ItemsPage() {
     purchase_price: 0,
     sales_price: 0,
     vip_price: 0,
+    price_levels: emptyPriceLevels(),
+    safety_stock_by_doc: emptySafetyStockByDoc(),
     warranty_duration_months: null as number | null,
     reorder_level: null as number | null,
     track_serial: false,
@@ -73,6 +83,8 @@ export default function ItemsPage() {
       purchase_price: 0,
       sales_price: 0,
       vip_price: 0,
+      price_levels: emptyPriceLevels(),
+      safety_stock_by_doc: emptySafetyStockByDoc(),
       warranty_duration_months: null,
       reorder_level: null,
       track_serial: false,
@@ -92,6 +104,13 @@ export default function ItemsPage() {
       purchase_price: row.purchase_price,
       sales_price: row.sales_price,
       vip_price: row.vip_price,
+      price_levels: { ...emptyPriceLevels(), ...(row.price_levels ?? {}) },
+      safety_stock_by_doc: {
+        ...emptySafetyStockByDoc(),
+        ...Object.fromEntries(
+          Object.entries(row.safety_stock_by_doc ?? {}).map(([k, v]) => [k, v ?? null]),
+        ),
+      },
       warranty_duration_months: row.warranty_duration_months ?? null,
       reorder_level: row.reorder_level ?? null,
       track_serial: row.track_serial ?? false,
@@ -114,7 +133,19 @@ export default function ItemsPage() {
     }
 
     setSaving(true);
-    const payload = { ...form(), custom_values: customValues() };
+    const payload = {
+      ...form(),
+      price_levels: Object.fromEntries(
+        PRICE_LEVEL_KEYS.map((k) => [k, form().price_levels[k] || 0]).filter(([, v]) => v > 0),
+      ),
+      safety_stock_by_doc: Object.fromEntries(
+        SAFETY_DOC_TYPES.map((d) => {
+          const v = form().safety_stock_by_doc[d.key];
+          return v != null && v > 0 ? [d.key, v] : null;
+        }).filter(Boolean) as [string, number][],
+      ),
+      custom_values: customValues(),
+    };
     const ok = await submitEntity(
       () =>
         ed
@@ -170,13 +201,13 @@ export default function ItemsPage() {
       />
       <EntityModal open={modalOpen()} title={editing() ? "Edit item" : "New item"} onClose={() => { setModalOpen(false); setItemTab("default"); }} onSave={() => void save()} saving={saving()}>
         <div class="col-span-full mb-3 flex flex-wrap gap-2 border-b border-stroke pb-3">
-          {(["default", "prices", "management"] as const).map((tab) => (
+          {(["default", "prices", "serial_lot", "management"] as const).map((tab) => (
             <button
               type="button"
               class={`rounded-lg px-3 py-1.5 text-sm ${itemTab() === tab ? "bg-brand-600 text-white" : "border border-stroke text-text-secondary"}`}
               onClick={() => setItemTab(tab)}
             >
-              {tab === "default" ? "Default" : tab === "prices" ? "Qty / Price" : "Management"}
+              {tab === "default" ? "Default" : tab === "prices" ? "Qty / Price" : tab === "serial_lot" ? "Serial / Lot" : "Management"}
             </button>
           ))}
         </div>
@@ -224,10 +255,27 @@ export default function ItemsPage() {
             />
           )}
         </ModalField>
+        <p class="col-span-full text-sm font-medium text-text-primary">Price levels B–J</p>
+        <For each={PRICE_LEVEL_KEYS}>
+          {(level) => (
+            <Field label={`Price ${level}`}>
+              <DecimalInput
+                class={inputClass}
+                value={form().price_levels[level] ? String(form().price_levels[level]) : ""}
+                onValue={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    price_levels: { ...f.price_levels, [level]: v === "" ? 0 : parseNum(v) },
+                  }))
+                }
+              />
+            </Field>
+          )}
+        </For>
         <p class="col-span-full text-xs text-text-secondary">
           Partner-specific rates use <A href="/app/inventory/price-lists" class="text-brand-600 hover:underline">Price lists</A> assigned on the customer or vendor master.
         </p>
-        <ModalField settings={byKey} fieldKey="reorder_level" fallbackLabel="Reorder level">
+        <ModalField settings={byKey} fieldKey="reorder_level" fallbackLabel="Default reorder level">
           {(m) => (
             <DecimalInput
               mode="qty"
@@ -244,26 +292,38 @@ export default function ItemsPage() {
             />
           )}
         </ModalField>
-        </Show>
-        <Show when={itemTab() === "management"}>
-        <ModalField settings={byKey} fieldKey="warranty_duration_months" fallbackLabel="Warranty (months)">
-          {(m) => (
-            <DecimalInput
-              mode="integer"
-              class={inputClass}
-              placeholder="No warranty"
-              disabled={m.disabled}
-              value={form().warranty_duration_months == null ? "" : String(form().warranty_duration_months)}
-              onValue={(v) =>
-                setForm((f) => ({
-                  ...f,
-                  warranty_duration_months: v === "" ? null : parseNum(v),
-                }))
-              }
-            />
+        <p class="col-span-full mt-2 text-sm font-medium text-text-primary">Safety stock by document type</p>
+        <p class="col-span-full text-xs text-text-secondary">
+          Optional thresholds per doc type; falls back to default reorder level when blank.
+        </p>
+        <For each={SAFETY_DOC_TYPES}>
+          {(doc) => (
+            <Field label={doc.label}>
+              <DecimalInput
+                mode="qty"
+                class={inputClass}
+                placeholder="Use default"
+                value={
+                  form().safety_stock_by_doc[doc.key] == null
+                    ? ""
+                    : String(form().safety_stock_by_doc[doc.key])
+                }
+                onValue={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    safety_stock_by_doc: {
+                      ...f.safety_stock_by_doc,
+                      [doc.key]: v === "" ? null : parseNum(v),
+                    },
+                  }))
+                }
+              />
+            </Field>
           )}
-        </ModalField>
-        <Field label="Tracking">
+        </For>
+        </Show>
+        <Show when={itemTab() === "serial_lot"}>
+        <Field label="Tracking mode">
           <div class="flex flex-wrap gap-6 text-sm">
             <label class="flex items-center gap-2">
               <input
@@ -295,15 +355,43 @@ export default function ItemsPage() {
               />
               Track lot numbers
             </label>
-            <label class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form().track_inventory_qty}
-                onChange={(e) => setForm((f) => ({ ...f, track_inventory_qty: e.currentTarget.checked }))}
-              />
-              Track inventory quantity
-            </label>
           </div>
+        </Field>
+        <p class="col-span-full text-xs text-text-secondary">
+          After save, open{" "}
+          <A href="/app/inventory/serial-lot/registry" class="text-brand-600 hover:underline">Serial registry</A>
+          {" or "}
+          <A href="/app/inventory/serial-lot/lots" class="text-brand-600 hover:underline">Lot batches</A>
+          {" filtered by this item."}
+        </p>
+        </Show>
+        <Show when={itemTab() === "management"}>
+        <ModalField settings={byKey} fieldKey="warranty_duration_months" fallbackLabel="Warranty (months)">
+          {(m) => (
+            <DecimalInput
+              mode="integer"
+              class={inputClass}
+              placeholder="No warranty"
+              disabled={m.disabled}
+              value={form().warranty_duration_months == null ? "" : String(form().warranty_duration_months)}
+              onValue={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  warranty_duration_months: v === "" ? null : parseNum(v),
+                }))
+              }
+            />
+          )}
+        </ModalField>
+        <Field label="Inventory quantity">
+          <label class="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form().track_inventory_qty}
+              onChange={(e) => setForm((f) => ({ ...f, track_inventory_qty: e.currentTarget.checked }))}
+            />
+            Track inventory quantity
+          </label>
         </Field>
         <ModalField settings={byKey} fieldKey="status" fallbackLabel="Status" fallbackRequired>
           {(m) => (

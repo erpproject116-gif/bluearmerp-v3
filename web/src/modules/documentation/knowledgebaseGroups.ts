@@ -49,6 +49,8 @@ export const knowledgebaseGroups: KbGroup[] = [
       "sales-load-slip-quotation",
       "sales-load-slip-so",
       "sales-load-slip-shipping",
+      "sales-shipping-from-line",
+      "sales-hold-list",
       "sales-pre-invoicing-report",
       "collective-invoicing",
       "sales-cash-in-after-save",
@@ -81,6 +83,8 @@ export const knowledgebaseGroups: KbGroup[] = [
       "issue-stock-from-branch",
       "serial-barcode-scanning",
       "serial-lot-registry",
+      "item-serial-lot-tab",
+      "sales-lot-batch-pick",
     ],
   },
   {

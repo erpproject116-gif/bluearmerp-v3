@@ -76,6 +76,7 @@ export type SerialUnitListParams = {
   order: "asc" | "desc";
   q?: string;
   status?: string;
+  origin?: string;
   item_id?: number;
   location_id?: number;
   serial_no?: string;
@@ -129,6 +130,7 @@ export function useSerialUnitList(params: () => SerialUnitListParams) {
     const qs = listParamsToSearchParams(p, {
       q: p.q,
       status: p.status,
+      origin: p.origin,
       item_id: p.item_id,
       location_id: p.location_id,
       serial_no: p.serial_no,

@@ -36,6 +36,7 @@ export default function SerialRegistryListPage() {
       q: f?.q || undefined,
       serial_no: f?.serial_no || undefined,
       status: f?.status || undefined,
+      origin: f?.origin || undefined,
       item_id: f?.item_id ?? undefined,
       location_id: f?.location_id ?? undefined,
       warranty_end_from: f?.warranty_end_from || undefined,

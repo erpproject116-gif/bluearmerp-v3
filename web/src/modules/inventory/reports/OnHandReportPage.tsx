@@ -3,6 +3,7 @@ import { ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { onHandExportUrl, useOnHandReport, type OnHandFilters } from "../../../shared/reports/useModuleReports";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { SAFETY_DOC_TYPES } from "../../../shared/itemMasterConstants";
 
 function defaultFilters(): OnHandFilters {
   return { as_of: new Date().toISOString().slice(0, 10), below_safety: false };
@@ -62,6 +63,18 @@ export default function OnHandReportPage() {
             <input type="checkbox" checked={draft().below_safety ?? false} onChange={(e) => patch({ below_safety: e.currentTarget.checked })} />
             Below safety / reorder level only
           </label>
+          <Field label="Safety threshold doc type">
+            <select
+              class={inputClass}
+              value={draft().safety_doc_type ?? ""}
+              onChange={(e) => patch({ safety_doc_type: e.currentTarget.value || undefined })}
+            >
+              <option value="">Default reorder level</option>
+              {SAFETY_DOC_TYPES.map((d) => (
+                <option value={d.key}>{d.label}</option>
+              ))}
+            </select>
+          </Field>
         </div>
         <div class="mt-4 flex gap-2">
           <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white" onClick={search}>Search (F8)</button>

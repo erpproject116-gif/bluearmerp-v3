@@ -22,6 +22,8 @@ Operating plan to reach **Ecount-class trading ERP** reliability, then depth in 
 | 0.6 | Deploy checklist runbook | Done — [`runbooks/deploy-checklist.md`](runbooks/deploy-checklist.md) |
 | 0.7 | Rate-limit / query invalidation regression tests | Done (prior work) |
 | 0.8 | Production: apply migration **142** on Render DB | **Operator** — redeploy API with `MIGRATE_ON_START` |
+| 0.9 | Production: migration **143** (`sa_sales_holds`) | **Operator** — same redeploy |
+| 0.10 | Production: migration **144** (item price levels + safety stock) | **Operator** — same redeploy |
 
 **Exit gate:** Demo tenant + pilot complete golden path 2 weeks with zero manual SQL fixes.
 
@@ -32,7 +34,7 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 
 ---
 
-## Phase 1 — Core commercial GA (months 2–5) **← current**
+## Phase 1 — Core commercial GA (months 2–5) **Done**
 
 **Goal:** Daily selling/buying/finance matches Ecount **operations** (not full report tree).
 
@@ -40,8 +42,8 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 - [x] Harden invoice tab = print parity (line breakdown, approval on tab) — largely done
 - [x] Automated tests: SO → sale residual qty, slip lines, fulfillment status
 - [x] Cash In + accounting voucher docs in KB
-- [ ] Sales Hold / reservation (Ecount gap) — if pilot needs it
-- [ ] Shipping order from line — if distribution pilot
+- [x] Sales Hold / reservation (Ecount gap) — draft parking in 5 slots per user (`sa_sales_holds`, Hold list on new sale)
+- [x] Shipping order from line — row action **Ship** + `POST /shipping/orders/from-lines`; picker uses `sh_shipping_order_lines`
 
 ### Buying
 - [x] Purchase attachments end-to-end on prod (migration 142) — CI smoke + `/health/schema`; operator redeploy
@@ -66,9 +68,19 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 
 ---
 
-## Phase 2 — Inventory & item master (months 5–11)
+## Phase 2 — Inventory & item master (months 5–11) **← current**
 
 **Goal:** Serial/lot and item depth for distribution/retail pilots.
+
+**Started:**
+- [x] Lot batch pick on sales lines (`LotLineCell`, `lot_batch_id` on save)
+- [x] Serial registry origin filter (linked vs manual)
+- [x] Item master **Serial / Lot** tab + **Price B–J** + per-doc safety stock (migration 144)
+- [x] Serial/Lot status + inv book reports (slip-type filter, VIP on item inv book)
+- [x] Lot adjustment UI + manual lot registration API
+- [x] On-hand as-of from stock movements; safety stock alerts on stock workspace
+- [ ] Serial/lot policy optional/required enforcement on transactions
+- [ ] Full ECount 7-tab item form parity
 
 | Track | Ecount reference | Deliverable |
 |-------|------------------|-------------|

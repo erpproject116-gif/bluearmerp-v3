@@ -28,6 +28,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/finance/journal-entries": "finance.journal_entries",
   "/app/inventory/serial-lot/registry": "inventory.serial_registry",
   "/app/inventory/serial-lot/adjustment": "inventory.serial_adjustment",
+  "/app/inventory/serial-lot/lot-adjustment": "inventory.serial_adjustment",
   "/app/inventory/serial-lot/lots": "inventory.serial_registry",
   "/app/inventory/serial-lot/movements": "inventory.serial_movements",
   "/app/inventory/serial-lot/reports/status": "inventory.serial_registry",

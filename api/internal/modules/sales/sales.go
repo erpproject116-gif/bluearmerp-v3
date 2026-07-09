@@ -150,6 +150,7 @@ func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerSalesReturnRoutes(r, pool)
 	registerCustomerCreditBalanceRoutes(r, pool)
 	registerSalesApprovalRoutes(r, pool)
+	registerSalesHoldRoutes(r, pool)
 	r.Get("/preview-sequences", previewSalesSequences(pool))
 	r.Get("/sales-order-lines/open", listOpenSalesOrderLines(pool))
 	r.Get("/status-report/export", exportSalesStatusReport(pool))

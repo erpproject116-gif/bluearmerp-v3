@@ -23,8 +23,10 @@ type Item struct {
 	ItemName               string  `json:"item_name"`
 	PurchasePrice          float64 `json:"purchase_price"`
 	SalesPrice             float64 `json:"sales_price"`
-	VipPrice               float64 `json:"vip_price"`
-	WarrantyDurationMonths *int     `json:"warranty_duration_months,omitempty"`
+	VipPrice               float64            `json:"vip_price"`
+	PriceLevels            map[string]float64 `json:"price_levels,omitempty"`
+	SafetyStockByDoc       map[string]float64 `json:"safety_stock_by_doc,omitempty"`
+	WarrantyDurationMonths *int               `json:"warranty_duration_months,omitempty"`
 	ReorderLevel           *float64 `json:"reorder_level,omitempty"`
 	TrackSerial            bool     `json:"track_serial"`
 	TrackLot               bool     `json:"track_lot"`
@@ -38,8 +40,10 @@ type itemBody struct {
 	ItemName               string         `json:"item_name"`
 	PurchasePrice          float64        `json:"purchase_price"`
 	SalesPrice             float64        `json:"sales_price"`
-	VipPrice               float64        `json:"vip_price"`
-	WarrantyDurationMonths *int           `json:"warranty_duration_months"`
+	VipPrice               float64            `json:"vip_price"`
+	PriceLevels            map[string]float64 `json:"price_levels"`
+	SafetyStockByDoc       map[string]float64 `json:"safety_stock_by_doc"`
+	WarrantyDurationMonths *int               `json:"warranty_duration_months"`
 	ReorderLevel           *float64       `json:"reorder_level"`
 	TrackSerial            *bool          `json:"track_serial"`
 	TrackLot               *bool          `json:"track_lot"`
@@ -75,6 +79,7 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 		offset := httputil.Offset(p)
 		where, args := buildWhere(tu.TenantID, p, "item_name", "item_code")
 		q := fmt.Sprintf(`select id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8,
+			price_levels, safety_stock_by_doc,
 			warranty_duration_months, reorder_level::float8, track_serial, track_lot, track_inventory_qty, status, item_category_id, count(*) over()
 			from public.inv_items where %s order by %s %s limit $%d offset $%d`,
 			where, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
@@ -89,11 +94,15 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		for rows.Next() {
 			var row Item
+			var priceLevelsJSON, safetyJSON []byte
 			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice,
+				&priceLevelsJSON, &safetyJSON,
 				&row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read.", "ERR_INTERNAL")
 				return
 			}
+			row.PriceLevels = unmarshalJSONFloatMap(priceLevelsJSON)
+			row.SafetyStockByDoc = unmarshalJSONFloatMap(safetyJSON)
 			out = append(out, row)
 		}
 		if out == nil {
@@ -118,10 +127,16 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		id, row, err := createWithCode(r.Context(), pool, tu, "item", func(ctx context.Context, tx pgxpoolConn, code string) (int64, Item, error) {
 			var row Item
-			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, warranty_duration_months, reorder_level, track_serial, track_lot, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-				returning id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8, warranty_duration_months, reorder_level::float8, track_serial, track_lot, track_inventory_qty, status, item_category_id`,
-				tu.TenantID, code, strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), body.ItemCategoryID).
-				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
+			priceLevels := sanitizePriceLevels(body.PriceLevels)
+			safetyStock := sanitizeSafetyStockByDoc(body.SafetyStockByDoc)
+			priceJSON, _ := marshalJSONMap(priceLevels)
+			safetyJSON, _ := marshalJSONMap(safetyStock)
+			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, warranty_duration_months, reorder_level, track_serial, track_lot, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+				returning id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, warranty_duration_months, reorder_level::float8, track_serial, track_lot, track_inventory_qty, status, item_category_id`,
+				tu.TenantID, code, strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), body.ItemCategoryID).
+				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
+			row.PriceLevels = unmarshalJSONFloatMap(priceJSON)
+			row.SafetyStockByDoc = unmarshalJSONFloatMap(safetyJSON)
 			return row.ID, row, err
 		})
 		if err != nil {
@@ -193,9 +208,14 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, purchase_price=$2, sales_price=$3, vip_price=$4, warranty_duration_months=$5, reorder_level=$6, track_serial=$7, track_lot=$8, track_inventory_qty=$9, status=$10, item_category_id=$13, updated_at=now()
-			where id=$11 and tenant_id=$12 and deleted_at is null`,
-			strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
+		priceLevels := sanitizePriceLevels(body.PriceLevels)
+		safetyStock := sanitizeSafetyStockByDoc(body.SafetyStockByDoc)
+		priceJSON, _ := marshalJSONMap(priceLevels)
+		safetyJSON, _ := marshalJSONMap(safetyStock)
+
+		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, purchase_price=$2, sales_price=$3, vip_price=$4, price_levels=$5, safety_stock_by_doc=$6, warranty_duration_months=$7, reorder_level=$8, track_serial=$9, track_lot=$10, track_inventory_qty=$11, status=$12, item_category_id=$15, updated_at=now()
+			where id=$13 and tenant_id=$14 and deleted_at is null`,
+			strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
 			return
@@ -210,9 +230,11 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.item.update", "inv_item", &id, nil, body)
 		response.OK(w, map[string]any{
-			"id": id,
+			"id":                       id,
 			"warranty_duration_months": body.WarrantyDurationMonths,
 			"reorder_level":            body.ReorderLevel,
+			"price_levels":             priceLevels,
+			"safety_stock_by_doc":      safetyStock,
 			"custom_values":            attachCustom(r.Context(), pool, tu.TenantID, entityItem, id),
 		}, "Updated.")
 	}

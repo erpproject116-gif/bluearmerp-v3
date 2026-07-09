@@ -11,6 +11,7 @@ import {
 } from "../../../shared/useSerialReports";
 import { SerialLotLayout } from "./SerialLotLayout";
 import { SERIAL_STATUS_OPTIONS, serialStatusLabel } from "./serialRegistryFilters";
+import { SERIAL_SLIP_TYPE_OPTIONS } from "../../../shared/itemMasterConstants";
 
 const EVENT_TYPE_OPTIONS = [
   { value: "", label: "All" },
@@ -23,7 +24,7 @@ const EVENT_TYPE_OPTIONS = [
 ];
 
 function defaultFilters(): SerialStatusFilters {
-  return { view: "details", q: "", serial_no: "", status: "", event_type: "", date_from: "", date_to: "", validity_from: "", validity_to: "" };
+  return { view: "details", q: "", serial_no: "", status: "", event_type: "", ref_type: "", date_from: "", date_to: "", validity_from: "", validity_to: "" };
 }
 
 function withRowIds<T extends object>(rows: T[], page: number, pageSize: number): (T & { id: number })[] {
@@ -108,6 +109,23 @@ export default function SerialStatusReportPage() {
           >
             Summary
           </button>
+        </div>
+        <div class="mb-4 flex flex-wrap gap-1.5">
+          <For each={SERIAL_SLIP_TYPE_OPTIONS}>
+            {(opt) => (
+              <button
+                type="button"
+                class={`rounded-full px-2.5 py-1 text-xs ${
+                  (draft().ref_type ?? "") === opt.value
+                    ? "bg-brand-600 text-white"
+                    : "border border-stroke text-text-secondary hover:bg-slate-50"
+                }`}
+                onClick={() => patch({ ref_type: opt.value || undefined })}
+              >
+                {opt.label}
+              </button>
+            )}
+          </For>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <Field label="Keyword">

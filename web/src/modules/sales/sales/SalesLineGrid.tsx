@@ -4,6 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
+import { LotLineCell } from "../../../shared/LotLineCell";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
@@ -34,6 +35,9 @@ export type SalesLineRow = {
   serial_lot_no: string;
   serial_unit_ids?: number[];
   track_serial?: boolean;
+  track_lot?: boolean;
+  lot_batch_id?: number | null;
+  lot_no?: string;
   source_sales_order_line_id?: number | null;
 };
 
@@ -86,7 +90,7 @@ const BASE_COLUMNS: GridColumn[] = [
 
 const DISCOUNT_COLUMNS: GridColumn[] = [{ key: "discount_amount", header: "Discount", width: 100 }];
 
-const SERIAL_COLUMN: GridColumn = { key: "serials", header: "Serials", width: 160 };
+const SERIAL_LOT_COLUMN: GridColumn = { key: "serials", header: "Serial / Lot", width: 160 };
 
 const TAIL_COLUMNS: GridColumn[] = [
   { key: "remark", header: "Remark", width: 120 },
@@ -180,6 +184,7 @@ type Props = {
   locationId: () => number | null;
   templateCode: () => SalesTemplateCode;
   partnerId?: () => number | null;
+  onCreateShippingOrder?: (line: SalesLineRow, idx: number) => void;
 };
 
 export function SalesLineGrid(props: Props) {
@@ -190,7 +195,7 @@ export function SalesLineGrid(props: Props) {
     const taxCols = filterTaxLineColumns(BASE_COLUMNS, props.taxTypeMeta()?.tax_mode);
     const cols = [...taxCols];
     if (hasDiscountTemplate(props.templateCode())) cols.push(...DISCOUNT_COLUMNS);
-    cols.push(SERIAL_COLUMN);
+    cols.push(SERIAL_LOT_COLUMN);
     cols.push(...TAIL_COLUMNS);
     return cols;
   });
@@ -277,8 +282,11 @@ export function SalesLineGrid(props: Props) {
       unit_price: String(rate0),
       input_basis: basis,
       track_serial: Boolean(first.track_serial),
+      track_lot: Boolean(first.track_lot),
       serial_unit_ids: [],
       serial_lot_no: "",
+      lot_batch_id: null,
+      lot_no: "",
     };
     for (let i = 1; i < items.length; i++) {
       const it = items[i];
@@ -291,6 +299,7 @@ export function SalesLineGrid(props: Props) {
         item_code: it.item_code,
         item_name: it.item_name,
         track_serial: Boolean(it.track_serial),
+        track_lot: Boolean(it.track_lot),
       };
     }
     const numbered = current.map((ln, i) => ({ ...ln, line_no: i + 1 }));
@@ -407,7 +416,7 @@ export function SalesLineGrid(props: Props) {
                     </ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
-                    <Show when={line().item_id && line().track_serial} fallback={<span class="text-xs text-text-secondary">—</span>}>
+                    <Show when={line().item_id && line().track_serial}>
                       <SerialLineCell
                         mode="units"
                         itemId={line().item_id}
@@ -427,14 +436,39 @@ export function SalesLineGrid(props: Props) {
                         }}
                       />
                     </Show>
+                    <Show when={line().item_id && line().track_lot && !line().track_serial}>
+                      <LotLineCell
+                        itemId={line().item_id!}
+                        locationId={props.locationId()}
+                        lotBatchId={line().lot_batch_id}
+                        lotNo={line().lot_no}
+                        onChange={(lotBatchId, lotNo) => {
+                          void updateLine(idx, { lot_batch_id: lotBatchId, lot_no: lotNo, serial_lot_no: lotNo });
+                        }}
+                      />
+                    </Show>
+                    <Show when={!line().item_id || (!line().track_serial && !line().track_lot)}>
+                      <span class="text-xs text-text-secondary">—</span>
+                    </Show>
                   </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">
                     <input class={`${inputClass} w-full`} value={line().remark} onInput={(e) => void updateLine(idx, { remark: e.currentTarget.value })} />
                   </ResizableTd>
                   <ResizableTd width={widthFor("actions")} class="px-2 py-1">
-                    <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeLine(idx)}>
-                      Remove
-                    </button>
+                    <div class="flex flex-col gap-0.5">
+                      <Show when={line().source_sales_order_line_id && props.onCreateShippingOrder}>
+                        <button
+                          type="button"
+                          class="text-xs text-brand-700 hover:underline text-left"
+                          onClick={() => props.onCreateShippingOrder!(line(), idx)}
+                        >
+                          Ship
+                        </button>
+                      </Show>
+                      <button type="button" class="text-xs text-red-600 hover:underline text-left" onClick={() => removeLine(idx)}>
+                        Remove
+                      </button>
+                    </div>
                   </ResizableTd>
                 </tr>
               )}

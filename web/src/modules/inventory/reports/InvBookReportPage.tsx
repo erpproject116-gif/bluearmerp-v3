@@ -70,6 +70,7 @@ export default function InvBookReportPage() {
             <th class="px-3 py-2 text-right">Closing</th>
             <th class="px-3 py-2 text-right">Purchase Price</th>
             <th class="px-3 py-2 text-right">Sales Price</th>
+            <th class="px-3 py-2 text-right">VIP Price</th>
           </tr>
         </thead>
         <tbody>
@@ -84,6 +85,7 @@ export default function InvBookReportPage() {
                 <td class="px-3 py-2 text-right">{row.closing_qty}</td>
                 <td class="px-3 py-2 text-right">{formatPeso(row.purchase_price)}</td>
                 <td class="px-3 py-2 text-right">{formatPeso(row.sales_price)}</td>
+                <td class="px-3 py-2 text-right">{formatPeso(row.vip_price)}</td>
               </tr>
             )}
           </For>

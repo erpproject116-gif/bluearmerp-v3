@@ -24,6 +24,11 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     permissionCode: "inventory.serial_adjustment",
   },
   {
+    label: "Lot adjustment",
+    href: "/app/inventory/serial-lot/lot-adjustment",
+    permissionCode: "inventory.serial_adjustment",
+  },
+  {
     label: "Lots",
     href: "/app/inventory/serial-lot/lots",
     permissionCode: "inventory.serial_registry",

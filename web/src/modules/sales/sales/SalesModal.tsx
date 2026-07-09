@@ -47,6 +47,7 @@ import {
 } from "./SalesLineGrid";
 import { CashInFromCustomerModal } from "./CashInFromCustomerModal";
 import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
+import { SalesHoldListModal, type SalesHoldPayload } from "./SalesHoldListModal";
 
 export type SalesDetail = {
   id: number;
@@ -162,6 +163,9 @@ function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
     serial_lot_no: ln.serial_lot_no ?? "",
     serial_unit_ids: ln.serial_unit_ids ?? [],
     track_serial: Boolean(ln.track_serial),
+    track_lot: Boolean((ln as { track_lot?: boolean }).track_lot),
+    lot_batch_id: (ln as { lot_batch_id?: number | null }).lot_batch_id ?? null,
+    lot_no: (ln as { serial_lot_no?: string | null }).serial_lot_no ?? "",
     source_sales_order_line_id: ln.source_sales_order_line_id ?? null,
   }));
 }
@@ -183,6 +187,7 @@ export function SalesModal(props: Props) {
   const [createdSale, setCreatedSale] = createSignal<SalesDetail | null>(null);
   const [postSaveOpen, setPostSaveOpen] = createSignal(false);
   const [cashInOpen, setCashInOpen] = createSignal(false);
+  const [holdOpen, setHoldOpen] = createSignal(false);
   const effectiveEditing = () => props.editing ?? createdSale();
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
@@ -241,6 +246,75 @@ export function SalesModal(props: Props) {
     template_code: templateCode(),
     lines: lines(),
   });
+
+  const buildHoldPayload = (): SalesHoldPayload => {
+    const d = buildDraftPayload();
+    return {
+      order_date: d.order_date,
+      tax_type_id: d.tax_type_id,
+      currency_id: d.currency_id,
+      partner_id: d.partner_id,
+      location_id: d.location_id,
+      location_label: d.location_label,
+      customer_label: d.customer_label,
+      pic_user_id: d.pic_user_id,
+      pic_name: d.pic_name,
+      project_id: d.project_id,
+      project_label: d.project_label,
+      project_name: d.project_name,
+      due_date: d.due_date,
+      terms_of_payment: d.terms_of_payment,
+      payment_terms: d.payment_terms,
+      si_dr_no: d.si_dr_no,
+      notes: d.notes,
+      progress_status: d.progress_status,
+      template_code: d.template_code,
+      sales_category: d.sales_category,
+      source_sales_order_id: d.source_sales_order_id,
+      lines: d.lines,
+    };
+  };
+
+  const holdGrandTotal = () => lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0);
+
+  const loadHoldPayload = (payload: SalesHoldPayload) => {
+    applyDraftPayload({
+      ...payload,
+      customer_label: payload.customer_label,
+      location_label: payload.location_label ?? "",
+      project_label: payload.project_label ?? "",
+    });
+  };
+
+  const createShippingFromLine = async (line: SalesLineRow) => {
+    if (!line.source_sales_order_line_id) {
+      toast.warning("Line must be linked to a sales order.");
+      return;
+    }
+    if (!partnerId() || !locationId()) {
+      toast.warning("Select customer and location first.");
+      return;
+    }
+    const qty = line.qty === "" ? 0 : Number(line.qty);
+    if (qty <= 0) {
+      toast.warning("Enter a quantity before creating a shipping order.");
+      return;
+    }
+    const res = await apiFetch<{ shipping_no: string }>("/api/v1/shipping/orders/from-lines", {
+      method: "POST",
+      body: JSON.stringify({
+        shipping_date: orderDate(),
+        partner_id: partnerId(),
+        location_id: locationId(),
+        lines: [{ sales_order_line_id: line.source_sales_order_line_id, qty }],
+      }),
+    });
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Failed to create shipping order.");
+      return;
+    }
+    toast.success(`Shipping order ${res.data.shipping_no} created.`);
+  };
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
     setOrderDate(payload.order_date);
@@ -549,6 +623,7 @@ export function SalesModal(props: Props) {
         remark: ln.remark || null,
         serial_lot_no: ln.serial_lot_no || null,
         serial_unit_ids: ln.serial_unit_ids?.length ? ln.serial_unit_ids : undefined,
+        lot_batch_id: ln.lot_batch_id ?? null,
         source_sales_order_line_id: ln.source_sales_order_line_id || null,
       })),
     };
@@ -781,7 +856,7 @@ export function SalesModal(props: Props) {
           </Field>
         </Show>
         </div>
-        <div class="col-span-full mb-2">
+        <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">
           <LoadSlipMenu
             disabled={!partnerId()}
             options={SALES_LOAD_SLIP_OPTIONS}
@@ -791,6 +866,15 @@ export function SalesModal(props: Props) {
               if (id === "shipping") setShippingPickerOpen(true);
             }}
           />
+          <Show when={!props.editing}>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
+              onClick={() => setHoldOpen(true)}
+            >
+              Hold list
+            </button>
+          </Show>
         </div>
         <SalesLineGrid
           lines={lines}
@@ -803,6 +887,7 @@ export function SalesModal(props: Props) {
           locationId={locationId}
           templateCode={templateCode}
           partnerId={partnerId}
+          onCreateShippingOrder={(line) => void createShippingFromLine(line)}
         />
         <Show when={effectiveEditing()?.id}>
           <SalesApprovalPanel
@@ -893,6 +978,14 @@ export function SalesModal(props: Props) {
           setPartnerId(p.id);
           setCustomerLabel(p.company_name);
         }}
+      />
+
+      <SalesHoldListModal
+        open={holdOpen()}
+        onClose={() => setHoldOpen(false)}
+        currentPayload={() => buildHoldPayload()}
+        currentAmount={() => holdGrandTotal()}
+        onLoad={loadHoldPayload}
       />
     </>
   );

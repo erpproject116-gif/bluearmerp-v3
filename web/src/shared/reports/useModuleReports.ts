@@ -277,6 +277,7 @@ export type OnHandFilters = {
   min_qty?: number;
   max_qty?: number;
   below_safety?: boolean;
+  safety_doc_type?: string;
   item_id?: number;
   location_id?: number;
 };
@@ -340,6 +341,7 @@ export type InvBookRow = {
   closing_qty: number;
   purchase_price: number;
   sales_price: number;
+  vip_price: number;
 };
 
 export function invBookExportUrl(filters: DateRangeFilters): string {
@@ -725,6 +727,29 @@ export function useInventoryWorkspace() {
       const res = await apiFetch<InventoryWorkspaceSummary>("/api/v1/inventory/workspace");
       if (!res.success) throw new Error(res.message ?? "Failed to load workspace");
       return res.data!;
+    },
+    staleTime: 30_000,
+  }));
+}
+
+export type LowStockAlertRow = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  location_id: number;
+  location_name: string;
+  qty_on_hand: number;
+  reorder_level: number;
+  shortfall: number;
+};
+
+export function useLowStockAlerts() {
+  return createQuery(() => ({
+    queryKey: ["inventory-low-stock-alerts"],
+    queryFn: async () => {
+      const res = await apiFetch<LowStockAlertRow[]>("/api/v1/inventory/workspace/low-stock-alerts?limit=15");
+      if (!res.success) throw new Error(res.message ?? "Failed to load alerts");
+      return res.data ?? [];
     },
     staleTime: 30_000,
   }));

@@ -62,11 +62,12 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		if useDelivery {
 			balanceExpr = `greatest(0, coalesce(dr.delivered, 0) - coalesce(slip.sold, 0))`
 		}
+		shippingBalance := fmt.Sprintf(`greatest(0, least(shl.qty::float8, (%s)::float8) - coalesce(slip.sold, 0))`, balanceExpr)
 
 		where := `sh.tenant_id = $1 and sh.sales_order_id is not null
 			and coalesce(sh.status, 'draft') not in ('cancelled')
 			and so.deleted_at is null`
-		where += fmt.Sprintf(` and (%s) > 0.0001`, balanceExpr)
+		where += fmt.Sprintf(` and (%s) > 0.0001`, shippingBalance)
 
 		args := []any{tu.TenantID}
 		argN := 2
@@ -95,7 +96,7 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		where += dsScope
 
 		q := fmt.Sprintf(`
-			select distinct on (ln.id)
+			select distinct on (sh.id, ln.id)
 			  sh.id, sh.shipping_no, sh.shipping_date, so.id, ln.id,
 			  so.order_date, so.date_seq, so.sales_order_no,
 			  p.company_name, so.location_id, l.location_name, so.partner_id,
@@ -106,10 +107,11 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(i.track_serial, false),
 			  count(*) over()
 			from public.sh_shipping_orders sh
+			join public.sh_shipping_order_lines shl on shl.shipping_order_id = sh.id
 			join public.so_sales_orders so on so.id = sh.sales_order_id
 			join public.inv_partners p on p.id = so.partner_id
 			join public.inv_locations l on l.id = so.location_id
-			join public.so_sales_order_lines ln on ln.sales_order_id = so.id
+			join public.so_sales_order_lines ln on ln.id = shl.sales_order_line_id
 			left join public.inv_items i on i.id = ln.item_id
 			left join (
 			  select sales_order_line_id, sum(release_qty) as released
@@ -129,8 +131,8 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  group by sales_order_line_id
 			) slip on slip.sales_order_line_id = ln.id
 			where %s
-			order by ln.id, sh.shipping_date desc, sh.id desc
-			limit $%d offset $%d`, balanceExpr, where, argN, argN+1)
+			order by sh.id, ln.id, sh.shipping_date desc
+			limit $%d offset $%d`, shippingBalance, where, argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)

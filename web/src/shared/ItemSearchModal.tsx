@@ -16,6 +16,7 @@ export type ItemSearchRow = {
   status: string;
   track_inventory_qty?: boolean;
   track_serial?: boolean;
+  track_lot?: boolean;
   default_location_qty?: number | null;
   total_inv_qty?: number | null;
 };

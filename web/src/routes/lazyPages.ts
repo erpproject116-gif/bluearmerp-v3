@@ -43,6 +43,7 @@ export const StockWorkspacePage = lazy(() => import("../modules/inventory/StockW
 export const ProductBundlesPage = lazy(() => import("../modules/inventory/ProductBundlesPage"));
 export const SerialRegistryListPage = lazy(() => import("../modules/inventory/serial-lot/SerialRegistryListPage"));
 export const SerialAdjustmentPage = lazy(() => import("../modules/inventory/serial-lot/SerialAdjustmentPage"));
+export const LotAdjustmentPage = lazy(() => import("../modules/inventory/serial-lot/LotAdjustmentPage"));
 export const LotBatchesListPage = lazy(() => import("../modules/inventory/serial-lot/LotBatchesListPage"));
 export const SerialMovementsListPage = lazy(() => import("../modules/inventory/serial-lot/SerialMovementsListPage"));
 export const SerialTracePage = lazy(() => import("../modules/inventory/serial-lot/SerialTracePage"));

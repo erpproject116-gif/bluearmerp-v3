@@ -2,6 +2,7 @@ export type SerialRegistryFilters = {
   q?: string;
   serial_no?: string;
   status?: string;
+  origin?: string;
   item_id?: number | null;
   location_id?: number | null;
   warranty_end_from?: string;
@@ -19,6 +20,12 @@ export function defaultSerialRegistryFilters(): SerialRegistryFilters {
     warranty_end_to: "",
   };
 }
+
+export const SERIAL_ORIGIN_OPTIONS = [
+  { value: "", label: "All origins" },
+  { value: "linked", label: "From goods receipt" },
+  { value: "manual", label: "Manual registration" },
+];
 
 export const SERIAL_STATUS_OPTIONS = [
   { value: "", label: "All" },

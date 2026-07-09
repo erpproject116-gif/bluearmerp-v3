@@ -84,6 +84,9 @@ func registerSerialRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/serial-units/adjustments", applySerialAdjustments(pool))
 	r.Get("/serial-events", listSerialEvents(pool))
 	r.Get("/lot-batches", listLotBatches(pool))
+	r.Get("/lot-batches/adjustment-candidates", listLotAdjustmentCandidates(pool))
+	r.Post("/lot-batches/adjustments", applyLotAdjustments(pool))
+	r.Post("/lot-batches/register", registerLotBatch(pool))
 }
 
 func listSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
@@ -150,6 +153,12 @@ func listSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 				args = append(args, to)
 				argN++
 			}
+		}
+		switch strings.TrimSpace(r.URL.Query().Get("origin")) {
+		case "linked":
+			where += " and su.goods_receipt_line_id is not null"
+		case "manual":
+			where += " and su.goods_receipt_line_id is null"
 		}
 
 		sortCol := allowed[p.Sort]
@@ -496,6 +505,9 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 			where += fmt.Sprintf(" and lb.location_id = $%d", argN)
 			args = append(args, *id)
 			argN++
+		}
+		if strings.TrimSpace(r.URL.Query().Get("available_only")) == "true" {
+			where += " and lb.qty_on_hand > 0.0001"
 		}
 
 		sortCol := allowed[p.Sort]

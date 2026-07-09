@@ -20,6 +20,7 @@ func registerShippingOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("shipping_order.read", auth.AccessRead)).Get("/orders", listShippingOrders(pool))
 	r.With(auth.RequirePermission("shipping_order.read", auth.AccessRead)).Get("/orders/{id}", getShippingOrder(pool))
 	r.With(auth.RequirePermission("shipping_order.write", auth.AccessWrite)).Post("/orders", createShippingOrder(pool))
+	r.With(auth.RequirePermission("shipping_order.write", auth.AccessWrite)).Post("/orders/from-lines", createShippingOrderFromLines(pool))
 	r.With(auth.RequirePermission("shipping_order.write", auth.AccessWrite)).Patch("/orders/{id}", patchShippingOrder(pool))
 	r.With(auth.RequirePermission("shipping_order.write", auth.AccessWrite)).Delete("/orders/{id}", deleteShippingOrder(pool))
 }

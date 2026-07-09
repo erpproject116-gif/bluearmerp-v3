@@ -17,7 +17,7 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Form split across 7 pills | Item New form: Default/Qty/Price/Cost/Additional/Management | Item modal — use tab panels not one long form | Partial — 3 tabs on item modal |
 | Option filter pills mirror form | Same 7 sections in search Option | Advanced search drawer with sections |
 | Module L0 tabs switch menu tree | Setup vs Purchases vs Sales | Already similar; ensure each tab's programs cataloged |
-| Safety stock per document type | Qty pill — 7 doc types | Extend reorder / safety stock model |
+| Safety stock per document type | Qty pill — 7 doc types | **Done** — `safety_stock_by_doc` on item + on-hand filter |
 | Serial/Lot policy radios | Management pill | `track_serial` + optional/required policy |
 
 ## P1 — Item master (C000029)
@@ -25,14 +25,14 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Gap | ECount | Bluearm target |
 |-----|--------|----------------|
 | Advanced item search | 7-section Option filter with 50+ fields | Extend item list filters + saved views |
-| Multi price levels | VIP + Price B–J + O/E | Price lists + default prices on item | Partial — VIP + price lists; item **Qty/Price** tab |
-| Item modal tabs | 7-section ECount form | Tab panels on item modal | Partial — Default / Qty·Price / Management tabs |
+| Multi price levels | VIP + Price B–J + O/E | **Done** — VIP + `price_levels` B–J on item; price lists for partners |
+| Item modal tabs | 7-section ECount form | Tab panels on item modal | Partial — Default / Qty·Price / Serial·Lot / Management |
 | Item categories | 6 manufacturing/merchandise categories | Item type / category enum |
 | Bundle & service items | Naming + bundle status column | Product bundles module |
 | Barcode from list toolbar | Barcode button | Item barcode + POS scan |
 | Inv. adjustment from list | Inv. Adj. → Inv. Count I per-location grid | Stock entries shortcut — **Adjust flow crawled pass 7** |
 | Excel on list | Excel import/export | Data Center or item import |
-| Serial/lot on item | Management tab + filter | Serial/lot settings on item |
+| Serial/lot on item | Management tab + filter | **Done** — Serial/Lot tab + registry links |
 
 ## P1 — Buying / Review Purchases
 
@@ -55,24 +55,24 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Gap | ECount | Bluearm target |
 |-----|--------|----------------|
 | Sales list status pills | All / e-Approval / Unconfirmed / Confirm | **Done** — list filter + submit/approve/reject (migration 128) |
-| New Sales Hold | Line-level stock hold | Reservation/hold model |
+| New Sales Hold | Line-level stock hold | Draft parking (5 slots/user) — **Done** (`sa_sales_holds`, Hold list) |
 | Cash In on save | Inline receipt modal (Cash In - From Customer) | Receipt vouchers | **Done** — post-save dialog + `CashInFromCustomerModal` |
 | Link with Accounting Vouchers | E010301 accounting block + confirm dialog | GL posting panel on sales save | **Done** — Invoice tab + post-save prompt; auto-post via process policies |
 | SO pull on invoice | Sales Order toolbar | SO → sales line picker | **Done** — Load Slip → Sales Order |
 | Quotation / Shipping load slip | Pull quote or shipped SO lines on invoice | Load Slip → Quotation / Shipping Order | **Done** |
-| Create Shipping Order from line | Shipping integration | Shipping module |
+| Create Shipping Order from line | Shipping integration | **Done** — line **Ship** action + `POST /shipping/orders/from-lines` |
 
 ## P1 — Serial/Lot (Inv. II — pass 17)
 
 | Gap | ECount | Bluearm target |
 |-----|--------|----------------|
-| Slip type pills All + 1–10 | Filter by doc origin type on C000092 | Serial history filters by source doc |
-| Linked Slip vs Set Manually | Option filter on slip list | Distinguish slip-linked vs manual serial rows |
-| Serial/Lot Status report | E040639 — Details/Summary, Terms of Validity, Slip Type | Serial movement inquiry UI |
-| Serial Inv. Book / Balance | E040620 / E040619 — General/Summary; By Location type | Extend serial unit APIs + ledger views |
-| Item vs. Serial/Lot Balance | E041018 — Compare by Serial/Lot No. or Item | Item qty vs serial-unit count report |
-| Inventory Adj. by Serial/Lot | C000691 / E040634 — same adj workspace | Stock adjustment per serial unit |
-| Reg. Serial/Lot No. | C000690 — New (F2) form; 21 slip types | Manual serial registration form |
+| Slip type pills All + 1–10 | Filter by doc origin type on C000092 | **Done** — slip-type pills on Serial/Lot Status report |
+| Linked Slip vs Set Manually | Option filter on slip list | Origin filter on serial registry — **Done** |
+| Serial/Lot Status report | E040639 — Details/Summary, Terms of Validity, Slip Type | **Done** — `/serial-lot/reports/status` |
+| Serial Inv. Book / Balance | E040620 / E040619 — General/Summary; By Location type | **Done** — book + balance reports |
+| Item vs. Serial/Lot Balance | E041018 — Compare by Serial/Lot No. or Item | **Done** — reconciliation report |
+| Inventory Adj. by Serial/Lot | C000691 / E040634 — same adj workspace | **Done** — serial + lot adjustment pages |
+| Reg. Serial/Lot No. | C000690 — New (F2) form; 21 slip types | **Done** — serial register (F2) + lot register (F2) on Lots |
 
 ## P2 — Quality Control (C000093 / Inv. II)
 

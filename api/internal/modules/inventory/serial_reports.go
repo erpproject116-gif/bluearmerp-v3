@@ -99,6 +99,7 @@ type serialReportFilters struct {
 	SerialNo       string
 	Status         string
 	EventType      string
+	RefType        string
 	ItemID         *int64
 	LocationID     *int64
 	ValidityFrom   *time.Time
@@ -127,6 +128,7 @@ func parseSerialReportFilters(r *http.Request) serialReportFilters {
 		SerialNo:     strings.TrimSpace(r.URL.Query().Get("serial_no")),
 		Status:       strings.TrimSpace(r.URL.Query().Get("status")),
 		EventType:    strings.TrimSpace(r.URL.Query().Get("event_type")),
+		RefType:      strings.TrimSpace(r.URL.Query().Get("ref_type")),
 		InventoryQty: strings.TrimSpace(r.URL.Query().Get("inventory_qty")),
 		IncludeVoid:  strings.TrimSpace(r.URL.Query().Get("include_void")) == "1" || strings.EqualFold(r.URL.Query().Get("include_void"), "true"),
 	}
@@ -336,6 +338,14 @@ func listSerialStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		if f.EventType != "" {
 			where += fmt.Sprintf(" and le.event_type = $%d", argN)
 			args = append(args, f.EventType)
+			argN++
+		}
+		if f.RefType != "" {
+			where += fmt.Sprintf(` and exists (
+				select 1 from public.inv_serial_events e
+				where e.serial_unit_id = su.id and e.ref_type = $%d
+			)`, argN)
+			args = append(args, f.RefType)
 			argN++
 		}
 		eventCountExpr := "(select count(*)::int from public.inv_serial_events e where e.serial_unit_id = su.id)"
@@ -646,6 +656,12 @@ func serialBookDetailSQL(tenantID int64, dateFrom, dateTo time.Time, f serialRep
 	if f.EventType != "" {
 		where += fmt.Sprintf(" and e.event_type = $%d", argN)
 		args = append(args, f.EventType)
+		argN++
+	}
+	if f.RefType != "" {
+		where += fmt.Sprintf(" and e.ref_type = $%d", argN)
+		args = append(args, f.RefType)
+		argN++
 	}
 	q := fmt.Sprintf(`
 		select e.id, e.created_at, su.serial_no, i.item_code, i.item_name,

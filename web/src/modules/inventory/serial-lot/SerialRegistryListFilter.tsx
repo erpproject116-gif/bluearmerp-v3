@@ -6,6 +6,7 @@ import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import {
   defaultSerialRegistryFilters,
   SERIAL_STATUS_OPTIONS,
+  SERIAL_ORIGIN_OPTIONS,
   type SerialRegistryFilters,
 } from "./serialRegistryFilters";
 
@@ -78,6 +79,17 @@ export function SerialRegistryListFilter(props: Props) {
             onChange={(e) => patch({ status: e.currentTarget.value || undefined })}
           >
             {SERIAL_STATUS_OPTIONS.map((o) => (
+              <option value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Origin">
+          <select
+            class={inputClass}
+            value={props.value().origin ?? ""}
+            onChange={(e) => patch({ origin: e.currentTarget.value || undefined })}
+          >
+            {SERIAL_ORIGIN_OPTIONS.map((o) => (
               <option value={o.value}>{o.label}</option>
             ))}
           </select>

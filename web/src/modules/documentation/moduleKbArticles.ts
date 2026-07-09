@@ -454,6 +454,7 @@ export const moduleKbArticles: KbArticle[] = [
         type: "steps",
         items: [
           "Create shipping orders under Sales Order → Shipping and link them to sales orders.",
+          "Or on a new sale with SO lines, use row action **Ship** to create a shipping order for one line.",
           "Open Sales → New Sale, select the customer, then Load Slip → Shipping Order.",
           "Tick lines and confirm — header and line grid populate from the linked SO.",
           "Save, upload attachments if required, then confirm the invoice.",
@@ -466,7 +467,53 @@ export const moduleKbArticles: KbArticle[] = [
     ],
     primaryHref: "/app/sales/sales/new",
     primaryLabel: "New sales invoice",
-    relatedGuideIds: ["sales-order-release", "wms-and-shipping", "quotation-to-sales-flow"],
+    relatedGuideIds: ["sales-order-release", "wms-and-shipping", "quotation-to-sales-flow", "sales-shipping-from-line"],
+  },
+  {
+    id: "sales-shipping-from-line",
+    title: "Create a shipping order from a sales line",
+    scenario: "You want to ship one sales order line without building the whole shipping order manually.",
+    intro:
+      "On a new sales invoice linked to a sales order, use the row action **Ship** to create a shipping order header and line in one step. Then invoice via Load Slip → Shipping Order.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Sales → New Sale and pull SO lines (Load Slip → Sales Order) or enter lines linked to an SO.",
+          "Set customer, location, and quantity on the line you want to ship.",
+          "Click **Ship** on that row — Bluearm creates a shipping order with the SO line qty.",
+          "Later, open a new sale and use Load Slip → Shipping Order to invoice shipped qty only.",
+        ],
+      },
+    ],
+    primaryHref: "/app/sales/sales/new",
+    primaryLabel: "New sale",
+    relatedGuideIds: ["sales-load-slip-shipping", "wms-and-shipping"],
+  },
+  {
+    id: "sales-hold-list",
+    title: "Sales Hold list (park draft invoices)",
+    scenario: "You need to pause a new sales invoice and resume it later — like Ecount's Hold list.",
+    intro:
+      "Hold list stores up to five draft sale payloads per user. Use it only on **new** sales (not when editing an existing invoice).",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Sales → New Sale and fill header and lines.",
+          "Click **Hold list** in the footer.",
+          "Save to slot 1–5 — customer, amount, and full line grid are stored.",
+          "Clear the form or start another sale; return to Hold list and **Load** to restore.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Sales Hold parks draft data only. Stock reservation on sales orders still uses SO release / qty_reserved — not the hold slots.",
+      },
+    ],
+    primaryHref: "/app/sales/sales/new",
+    primaryLabel: "New sale",
+    relatedGuideIds: ["quotation-to-sales-flow"],
   },
   {
     id: "customer-vendor-book-report",
@@ -1113,6 +1160,7 @@ export const moduleKbArticles: KbArticle[] = [
         type: "steps",
         items: [
           "Registry lists every serial unit and its status (in_stock, reserved, sold).",
+          "Use the Origin filter (Linked slip vs Manual) to separate receipt-linked units from manual registration.",
           "Trace searches one serial number across receive, release, and sale events.",
           "Lots tracks batch numbers when items use lot tracking instead of individual serials.",
           "Receive (under Serial & Lot) is an alternate path to scan serials against open PO lines.",
@@ -1122,7 +1170,48 @@ export const moduleKbArticles: KbArticle[] = [
     ],
     primaryHref: "/app/inventory/serial-lot/registry",
     primaryLabel: "Serial registry",
-    relatedGuideIds: ["serial-barcode-scanning"],
+    relatedGuideIds: ["serial-barcode-scanning", "item-serial-lot-tab", "sales-lot-batch-pick"],
+  },
+  {
+    id: "item-serial-lot-tab",
+    title: "Item master: Serial / Lot tab",
+    scenario: "You are setting up an item for serial or lot tracking.",
+    intro:
+      "Items → edit item → **Serial / Lot** tab. Choose serial or lot tracking (mutually exclusive). After save, open Serial registry or Lot batches filtered by item.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Inventory → Items and edit or create an item.",
+          "Switch to the Serial / Lot tab.",
+          "Enable Track serial numbers or Track lot numbers — only one mode per item.",
+          "Save, then use the links to Serial registry or Lot batches for that SKU.",
+        ],
+      },
+    ],
+    primaryHref: "/app/inventory/items",
+    primaryLabel: "Items",
+    relatedGuideIds: ["serial-lot-registry", "sales-lot-batch-pick"],
+  },
+  {
+    id: "sales-lot-batch-pick",
+    title: "Pick a lot batch on a sales line",
+    scenario: "You sell lot-tracked goods and must specify which batch ships.",
+    intro:
+      "When an item has lot tracking, the sales line grid shows a lot picker listing available batches at the sale location.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Ensure the item has Track lot numbers on the Serial / Lot tab.",
+          "On a sales invoice line for that item, open the lot cell and pick a batch.",
+          "Save the sale — lot_batch_id is stored on the line and consumed from stock.",
+        ],
+      },
+    ],
+    primaryHref: "/app/sales/sales/new",
+    primaryLabel: "New sale",
+    relatedGuideIds: ["serial-lot-registry", "item-serial-lot-tab"],
   },
   {
     id: "wms-scheduled-receipts",

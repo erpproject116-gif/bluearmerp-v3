@@ -45,6 +45,7 @@ import {
   ProductBundlesPage,
   SerialRegistryListPage,
   SerialAdjustmentPage,
+  LotAdjustmentPage,
   LotBatchesListPage,
   SerialMovementsListPage,
   SerialTracePage,
@@ -352,6 +353,7 @@ export default function App() {
           <Route path="/inventory/wms/scheduled-receipts" component={ScheduledReceiptsPage} />
           <Route path="/inventory/serial-lot/registry" component={SerialRegistryListPage} />
           <Route path="/inventory/serial-lot/adjustment" component={SerialAdjustmentPage} />
+          <Route path="/inventory/serial-lot/lot-adjustment" component={LotAdjustmentPage} />
           <Route path="/inventory/serial-lot/lots" component={LotBatchesListPage} />
           <Route path="/inventory/serial-lot/movements" component={SerialMovementsListPage} />
           <Route path="/inventory/serial-lot/reports/status" component={SerialStatusReportPage} />

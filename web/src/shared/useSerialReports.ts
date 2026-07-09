@@ -15,6 +15,7 @@ export type SerialStatusFilters = {
   serial_no?: string;
   status?: string;
   event_type?: string;
+  ref_type?: string;
   item_id?: number;
   location_id?: number;
   date_from?: string;
