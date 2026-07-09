@@ -727,11 +727,11 @@ export function PurchaseOrderModal(props: Props) {
       </Show>
       <AttachmentsField
         scope="purchase-order/purchase-orders"
+        formOpen={props.open}
         docId={effectivePoId() ?? undefined}
         label="Attachments (carried to Purchases)"
         required={policyRequiresAttachment(processPolicy.data, "purchase_order")}
         onCountChange={setAttachmentCount}
-        emptyUnsavedHint="Save the purchase order first to attach files (max 25 MB each). Confirm on the list only after uploading."
       />
       <EmailHistoryPanel docType="purchase_order" docId={effectivePoId()} />
       <ChangeLogPanel targetType="po_purchase_order" targetId={effectivePoId()} />

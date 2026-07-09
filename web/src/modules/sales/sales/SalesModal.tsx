@@ -731,11 +731,11 @@ export function SalesModal(props: Props) {
         </Field>
         <AttachmentsField
           scope="sales"
+          formOpen={props.open}
           docId={props.editing?.id ?? createdSale()?.id}
           label="Attachments (carried from Quotation/Sales Order)"
           required={policyRequiresAttachment(processPolicy.data, "sales")}
           onCountChange={setAttachmentCount}
-          emptyUnsavedHint="Save the sale first to attach files (max 25 MB each)."
         />
         <Field label="Sales category">
           <select class={inputClass} value={salesCategory()} onChange={(e) => setSalesCategory(e.currentTarget.value)}>

@@ -71,19 +71,19 @@ export function policyRequiresAttachment(
 }
 
 export const attachmentRequiredMessage =
-  "At least one attachment is required before confirming. Save as Unconfirmed, upload a file, then confirm.";
+  "At least one attachment is required before confirming. Add a file in Attachments, then save.";
 
 export function validateAttachmentBeforeConfirm(
   policy: ProcessPolicy | undefined,
   kind: AttachmentDocKind,
   progressStatus: string,
   attachmentCount: number,
-  docId?: number,
+  _docId?: number,
 ): string | null {
   if (!policyRequiresAttachment(policy, kind) || !isConfirmingProgress(kind, progressStatus)) {
     return null;
   }
-  if (!docId || attachmentCount < 1) {
+  if (attachmentCount < 1) {
     return attachmentRequiredMessage;
   }
   return null;

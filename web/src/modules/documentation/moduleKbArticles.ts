@@ -31,19 +31,19 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "document-attachments-workflow",
-    title: "Document attachments — save, upload, then confirm",
+    title: "Document attachments — add files while filling the form",
     scenario: "Your store requires a file before confirming a quotation, sales order, sale, purchase order, or purchase.",
     intro:
-      "When attachment rules are ON (default), you must upload at least one file before confirming. New documents do not have an upload button until you save once — the form stays open so you can attach files immediately after the first save.",
+      "When attachment rules are ON (default), you must attach at least one file before confirming. You can pick files while filling out a new document — they upload automatically when you save.",
     blocks: [
       {
         type: "steps",
         items: [
           "Create or open the document and fill in required fields.",
-          "Save as Unconfirmed (or Save for purchase orders in draft). The record gets an ID and the Attachments panel enables Upload file.",
-          "Upload one or more files (max 25 MB each). Supported on Quotation, Sales Order, Sale, Purchase Order, and Purchase (supplier invoice).",
+          "Use Upload file in the Attachments section at any time. On a new document, files show as “uploads on save” until you save once.",
+          "Save the document. Staged files upload automatically and the record gets its document number.",
           "Change progress to Confirm / Completed / e-Approval only after at least one file is attached — the form will warn you if attachments are missing.",
-          "Purchase orders: save in the modal, upload here, then use Confirm on the Purchase Order list.",
+          "Purchase orders: save in the modal with attachments, then use Confirm on the Purchase Order list.",
         ],
       },
       {

@@ -542,11 +542,11 @@ export function SupplierInvoiceModal(props: Props) {
             </Field>
             <AttachmentsField
               scope="finance/supplier-invoices"
+              formOpen={props.open}
               docId={effectiveEditing()?.id}
               label="Attachments (carried from Purchase Order/Receiving)"
               required={policyRequiresAttachment(processPolicy.data, "supplier_invoice")}
               onCountChange={setAttachmentCount}
-              emptyUnsavedHint="Save the purchase first to attach files (max 25 MB each)."
             />
             <Field label="Notes" span="full">
               <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />

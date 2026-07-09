@@ -562,11 +562,11 @@ export function QuotationModal(props: Props) {
       </Field>
       <AttachmentsField
         scope="quotation/quotations"
+        formOpen={props.open}
         docId={effectiveEditing()?.id}
         label="Attachments (carried to Sales Order & Sales)"
         required={policyRequiresAttachment(processPolicy.data, "quotation")}
         onCountChange={setAttachmentCount}
-        emptyUnsavedHint="Save the quotation first to attach files (max 25 MB each)."
       />
       <Field label="Note for PIC only" span="full">
         <textarea class={inputClass} rows={2} value={noteForPic()} onInput={(e) => setNoteForPic(e.currentTarget.value)} />

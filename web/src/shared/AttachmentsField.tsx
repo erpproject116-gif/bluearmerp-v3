@@ -9,58 +9,113 @@ import {
   uploadAttachment,
 } from "./attachments";
 
+type PendingFile = {
+  key: string;
+  file: File;
+};
+
 type Props = {
   scope: AttachmentScope;
-  /** The document id. When absent, the document is not saved yet. */
+  /** The document id. When absent, picked files are held until save. */
   docId?: number;
+  /** When false, staged files are cleared (pass the parent modal open flag). */
+  formOpen?: boolean;
   label?: string;
-  /** Hint shown when the document is not yet saved. */
+  /** Hint shown when there are no files yet on an unsaved document. */
   emptyUnsavedHint?: string;
   /** When true, shows required styling and messaging. */
   required?: boolean;
-  /** Called whenever the attachment list is loaded or changes. */
+  /** Called whenever uploaded or pending attachment count changes. */
   onCountChange?: (count: number) => void;
 };
 
 /**
- * Reusable attachments panel: lists files, allows upload once the document is
- * saved, and downloads files with auth. Used across the selling/buying flows so
- * attachments can travel with a document to its downstream documents.
+ * Reusable attachments panel: lists files, allows upload before or after save,
+ * and downloads files with auth. Files picked on a new document upload when the
+ * record is saved and receives an id.
  */
 export function AttachmentsField(props: Props) {
   const toast = useToast();
   const [items, setItems] = createSignal<Attachment[]>([]);
+  const [pending, setPending] = createSignal<PendingFile[]>([]);
   const [uploading, setUploading] = createSignal(false);
   const [busyId, setBusyId] = createSignal<number | null>(null);
 
-  const notifyCount = (count: number) => {
-    props.onCountChange?.(count);
+  const totalCount = () => items().length + pending().length;
+
+  const notifyCount = () => {
+    props.onCountChange?.(totalCount());
   };
 
   const load = async () => {
     const id = props.docId;
     if (!id) {
       setItems([]);
-      notifyCount(0);
+      notifyCount();
       return;
     }
     const res = await listAttachments(props.scope, id);
     const list = res.success && res.data ? res.data : [];
     setItems(list);
-    notifyCount(list.length);
+    notifyCount();
   };
 
-  // Reload whenever the target document id changes (modal reused across records).
+  const flushPendingUploads = async (docId: number): Promise<boolean> => {
+    const queue = pending();
+    if (!queue.length) return true;
+    if (uploading()) return false;
+    setUploading(true);
+    let allOk = true;
+    const remaining: PendingFile[] = [];
+    for (const entry of queue) {
+      const res = await uploadAttachment(props.scope, docId, entry.file);
+      if (res.success) continue;
+      allOk = false;
+      remaining.push(entry);
+      toast.warning(res.message ?? `Failed to upload ${entry.file.name}.`);
+    }
+    setPending(remaining);
+    setUploading(false);
+    await load();
+    if (allOk && queue.length > 0) {
+      toast.success(queue.length === 1 ? "File uploaded." : `${queue.length} files uploaded.`);
+    }
+    return allOk;
+  };
+
   createEffect(() => {
-    void props.docId;
-    void load();
+    if (props.formOpen === false) {
+      setPending([]);
+      setItems([]);
+      notifyCount();
+    }
+  });
+
+  createEffect(() => {
+    const id = props.docId;
+    if (!id) {
+      setItems([]);
+      notifyCount();
+      return;
+    }
+    void (async () => {
+      await flushPendingUploads(id);
+      await load();
+    })();
   });
 
   const onPick = (e: Event & { currentTarget: HTMLInputElement }) => {
     const file = e.currentTarget.files?.[0];
     e.currentTarget.value = "";
+    if (!file) return;
+
     const id = props.docId;
-    if (!file || !id) return;
+    if (!id) {
+      setPending((prev) => [...prev, { key: `${file.name}-${file.size}-${Date.now()}`, file }]);
+      notifyCount();
+      return;
+    }
+
     setUploading(true);
     void uploadAttachment(props.scope, id, file).then((res) => {
       setUploading(false);
@@ -73,6 +128,11 @@ export function AttachmentsField(props: Props) {
     });
   };
 
+  const removePending = (key: string) => {
+    setPending((prev) => prev.filter((p) => p.key !== key));
+    notifyCount();
+  };
+
   const onDownload = (a: Attachment) => {
     const id = props.docId;
     if (!id) return;
@@ -83,8 +143,9 @@ export function AttachmentsField(props: Props) {
     });
   };
 
-  const showRequiredWarning = () =>
-    Boolean(props.required && props.docId && items().length === 0);
+  const showRequiredWarning = () => Boolean(props.required && totalCount() === 0);
+
+  const hasAnyFiles = () => totalCount() > 0;
 
   return (
     <div
@@ -99,47 +160,65 @@ export function AttachmentsField(props: Props) {
             <span class="text-red-600"> *</span>
           </Show>
         </span>
-        <Show when={props.docId}>
-          <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
-            {uploading() ? "Uploading…" : "Upload file"}
-            <input type="file" class="hidden" disabled={uploading()} onChange={onPick} />
-          </label>
-        </Show>
+        <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
+          {uploading() ? "Uploading…" : "Upload file"}
+          <input type="file" class="hidden" disabled={uploading()} onChange={onPick} />
+        </label>
       </div>
       <Show
-        when={props.docId}
+        when={hasAnyFiles()}
         fallback={
           <p class="text-sm text-text-secondary">
             {props.emptyUnsavedHint ??
               (props.required
-                ? "Save as Unconfirmed first, then upload at least one file before confirming."
-                : "Save first to attach files (max 25 MB each).")}
+                ? "Add at least one file (max 25 MB each). Files upload when you save the document."
+                : "No attachments yet (max 25 MB each). Files upload when you save a new document.")}
           </p>
         }
       >
-        <Show when={items().length > 0} fallback={<p class="text-sm text-text-secondary">No attachments yet.</p>}>
-          <ul class="space-y-1 text-sm">
-            <For each={items()}>
-              {(a) => (
-                <li class="flex items-center justify-between gap-2">
+        <ul class="space-y-1 text-sm">
+          <For each={pending()}>
+            {(p) => (
+              <li class="flex items-center justify-between gap-2">
+                <span class="truncate text-text-primary" title={p.file.name}>
+                  {p.file.name}
+                  <span class="ml-1 text-text-secondary">(uploads on save)</span>
+                </span>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span class="text-text-secondary">{formatFileSize(p.file.size)}</span>
                   <button
                     type="button"
-                    class="truncate text-left text-primary hover:underline disabled:opacity-60"
-                    disabled={busyId() === a.id}
-                    onClick={() => onDownload(a)}
-                    title={a.file_name}
+                    class="text-text-secondary hover:text-red-600"
+                    disabled={uploading()}
+                    onClick={() => removePending(p.key)}
+                    title="Remove"
                   >
-                    {busyId() === a.id ? "Downloading…" : a.file_name}
+                    Remove
                   </button>
-                  <span class="shrink-0 text-text-secondary">{formatFileSize(a.size_bytes)}</span>
-                </li>
-              )}
-            </For>
-          </ul>
-        </Show>
-        <Show when={showRequiredWarning()}>
-          <p class="mt-2 text-sm text-amber-800">Upload at least one file before confirming this document.</p>
-        </Show>
+                </div>
+              </li>
+            )}
+          </For>
+          <For each={items()}>
+            {(a) => (
+              <li class="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  class="truncate text-left text-primary hover:underline disabled:opacity-60"
+                  disabled={busyId() === a.id}
+                  onClick={() => onDownload(a)}
+                  title={a.file_name}
+                >
+                  {busyId() === a.id ? "Downloading…" : a.file_name}
+                </button>
+                <span class="shrink-0 text-text-secondary">{formatFileSize(a.size_bytes)}</span>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
+      <Show when={showRequiredWarning()}>
+        <p class="mt-2 text-sm text-amber-800">Add at least one file before confirming this document.</p>
       </Show>
     </div>
   );

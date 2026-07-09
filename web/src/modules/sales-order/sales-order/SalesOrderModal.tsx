@@ -637,11 +637,11 @@ export function SalesOrderModal(props: Props) {
         </Field>
         <AttachmentsField
           scope="sales-order/sales-orders"
+          formOpen={props.open}
           docId={effectiveEditing()?.id}
           label="Attachments (carried from Quotation, on to Sales)"
           required={policyRequiresAttachment(processPolicy.data, "sales_order")}
           onCountChange={setAttachmentCount}
-          emptyUnsavedHint="Save the sales order first to attach files (max 25 MB each)."
         />
         <Field label="Delivery remarks" span="full">
           <textarea class={inputClass} rows={2} value={deliveryRemarks()} onInput={(e) => setDeliveryRemarks(e.currentTarget.value)} />
