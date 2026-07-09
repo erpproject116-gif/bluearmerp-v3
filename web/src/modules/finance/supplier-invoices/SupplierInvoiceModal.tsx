@@ -4,6 +4,8 @@ import { apiFetch } from "../../../shared/api";
 import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
+import { ModalField } from "../../../shared/ModalField";
+import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
@@ -110,7 +112,7 @@ export function SupplierInvoiceModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
-  const { fields } = useFormFieldSettings(PURCHASES_ENTITY.purchases);
+  const { fields, byKey } = useFormFieldSettings(PURCHASES_ENTITY.purchases);
   const [attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
@@ -461,36 +463,52 @@ export function SupplierInvoiceModal(props: Props) {
             <Field label="Purchase No.">
               <input class={inputClass} value={invoiceNo()} readOnly />
             </Field>
-            <Field label="Date *">
-              <DateInput value={invoiceDate()} onInput={(e) => setInvoiceDate(e.currentTarget.value)} />
-            </Field>
+            <ModalField settings={byKey} fieldKey="invoice_date" fallbackLabel="Invoice date" fallbackRequired>
+              {(m) => (
+                <DateInput value={invoiceDate()} disabled={m.disabled} onInput={(e) => setInvoiceDate(e.currentTarget.value)} />
+              )}
+            </ModalField>
             <Field label="Due date">
               <DateInput value={dueDate()} onInput={(e) => setDueDate(e.currentTarget.value)} />
             </Field>
-            <Field label="Transaction type *">
-              <select
-                class={inputClass}
-                value={taxTypeId() ?? ""}
-                onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-              >
-                <option value="">Select…</option>
-                <For each={taxTypes()}>
-                  {(t) => <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>}
-                </For>
-              </select>
-              <Show when={selectedTaxType()}>
-                {(t) => <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>}
-              </Show>
-            </Field>
-            <Field label="Currency *">
-              <select class={inputClass} value={currencyId() ?? ""} onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}>
-                <option value="">Select…</option>
-                <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
-              </select>
-            </Field>
-            <LookupCombo
-              label="Vendor *"
-              required
+            <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
+              {(m) => (
+                <>
+                  <select
+                    class={inputClass}
+                    value={taxTypeId() ?? ""}
+                    disabled={m.disabled}
+                    onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
+                  >
+                    <option value="">Select…</option>
+                    <For each={taxTypes()}>
+                      {(t) => <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>}
+                    </For>
+                  </select>
+                  <Show when={selectedTaxType()}>
+                    {(t) => <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>}
+                  </Show>
+                </>
+              )}
+            </ModalField>
+            <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
+              {(m) => (
+                <select
+                  class={inputClass}
+                  value={currencyId() ?? ""}
+                  disabled={m.disabled}
+                  onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
+                >
+                  <option value="">Select…</option>
+                  <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
+                </select>
+              )}
+            </ModalField>
+            <ModalLookupField
+              settings={byKey}
+              fieldKey="partner_id"
+              fallbackLabel="Vendor"
+              fallbackRequired
               value={vendorLabel}
               selectedId={partnerId}
               onInput={setVendorLabel}
@@ -519,9 +537,11 @@ export function SupplierInvoiceModal(props: Props) {
               }}
               fetchOptions={fetchUsers}
             />
-            <LookupCombo
-              label="Location *"
-              required
+            <ModalLookupField
+              settings={byKey}
+              fieldKey="location_id"
+              fallbackLabel="Location"
+              fallbackRequired
               value={locationLabel}
               selectedId={locationId}
               onInput={setLocationLabel}
@@ -542,9 +562,17 @@ export function SupplierInvoiceModal(props: Props) {
                 disabled={progressStatus() === "e_approval"}
               />
             </Field>
-            <Field label="SI/DR No.">
-              <input class={inputClass} value={vendorInvoiceNo()} onInput={(e) => setVendorInvoiceNo(e.currentTarget.value)} />
-            </Field>
+            <ModalField settings={byKey} fieldKey="vendor_invoice_no" fallbackLabel="Vendor invoice no.">
+              {(m) => (
+                <input
+                  class={inputClass}
+                  value={vendorInvoiceNo()}
+                  placeholder={m.placeholder}
+                  disabled={m.disabled}
+                  onInput={(e) => setVendorInvoiceNo(e.currentTarget.value)}
+                />
+              )}
+            </ModalField>
             <Field label="Terms of payment">
               <select class={inputClass} value={termsOfPayment()} onChange={(e) => setTermsOfPayment(e.currentTarget.value)}>
                 <option value="">—</option>
@@ -566,9 +594,18 @@ export function SupplierInvoiceModal(props: Props) {
               required={policyRequiresAttachment(processPolicy.data, "supplier_invoice")}
               onCountChange={setAttachmentCount}
             />
-            <Field label="Notes" span="full">
-              <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
-            </Field>
+            <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
+              {(m) => (
+                <textarea
+                  class={inputClass}
+                  rows={2}
+                  value={notes()}
+                  placeholder={m.placeholder}
+                  disabled={m.disabled}
+                  onInput={(e) => setNotes(e.currentTarget.value)}
+                />
+              )}
+            </ModalField>
             <LookupCombo
               label="Project"
               value={projectLabel}
@@ -612,6 +649,7 @@ export function SupplierInvoiceModal(props: Props) {
             taxTypeMeta={selectedTaxType}
             locationId={() => locationId()}
             hidePartnerColumns
+            lineViewKey={`${PURCHASES_ENTITY.purchases}.lines`}
           />
           <Show when={effectiveEditing()}>
             <SupplierInvoiceApprovalPanel

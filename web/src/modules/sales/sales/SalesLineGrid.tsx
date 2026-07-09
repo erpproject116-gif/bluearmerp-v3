@@ -14,6 +14,8 @@ import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/Resiz
 import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
 import { SalesItemSearchModal } from "./SalesItemSearchModal";
+import { applyColumnLabels, useColumnLabelSettings } from "../../../shared/useColumnLabelSettings";
+import { SALES_ENTITY } from "../../../shared/entityTypes";
 
 export type SalesTemplateCode = "default" | "non_vat" | "vat_included";
 
@@ -193,6 +195,7 @@ type Props = {
 export function SalesLineGrid(props: Props) {
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchLineIdx, setSearchLineIdx] = createSignal<number | null>(null);
+  const lineLabels = useColumnLabelSettings(`${SALES_ENTITY.sales}.lines`);
   const columns = createMemo(() => {
     props.taxTypeId();
     const taxCols = filterTaxLineColumns(BASE_COLUMNS, props.taxTypeMeta()?.tax_mode);
@@ -200,7 +203,7 @@ export function SalesLineGrid(props: Props) {
     if (hasDiscountTemplate(props.templateCode())) cols.push(...DISCOUNT_COLUMNS);
     cols.push(SERIAL_LOT_COLUMN);
     cols.push(...TAIL_COLUMNS);
-    return cols;
+    return applyColumnLabels(cols, lineLabels.columnLabel);
   });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
 

@@ -10,6 +10,8 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
 import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
+import { applyColumnLabels, useColumnLabelSettings } from "../../../shared/useColumnLabelSettings";
+import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
 import { QuotationItemSearchModal } from "./QuotationItemSearchModal";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
@@ -222,9 +224,12 @@ export function QuotationLineGrid(props: Props) {
     };
   };
 
+  const lineLabels = useColumnLabelSettings(`${QUOTATION_ENTITY.quotation}.lines`);
+
   const columns = createMemo(() => {
     props.taxTypeId();
-    return filterTaxLineColumns(QUOTATION_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+    const base = filterTaxLineColumns(QUOTATION_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+    return applyColumnLabels(base, lineLabels.columnLabel);
   });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
 

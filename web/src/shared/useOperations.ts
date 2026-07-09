@@ -71,7 +71,16 @@ export type WidgetData = {
 export type IndustryPack = {
   pack_code: string;
   pack_name: string;
+  summary?: string;
 };
+
+export const FALLBACK_INDUSTRY_PACKS: IndustryPack[] = [
+  { pack_code: "general", pack_name: "General SME", summary: "3 Kanban columns, starter tasks, dashboard widgets" },
+  { pack_code: "construction", pack_name: "Construction", summary: "Build-phase columns, starter tasks, dashboard widgets" },
+  { pack_code: "professional_services", pack_name: "Professional Services", summary: "Delivery pipeline columns and starter tasks" },
+  { pack_code: "warehouse", pack_name: "Warehouse / Logistics", summary: "Fulfillment workflow columns and starter tasks" },
+  { pack_code: "job_shop", pack_name: "Engineering / Job Shop", summary: "Shop-floor columns and starter tasks" },
+];
 
 const OPS_STALE_MS = 60_000;
 

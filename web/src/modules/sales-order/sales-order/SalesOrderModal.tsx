@@ -3,6 +3,8 @@ import { apiFetch } from "../../../shared/api";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
+import { ModalField } from "../../../shared/ModalField";
+import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
@@ -157,7 +159,7 @@ export function SalesOrderModal(props: Props) {
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
-  const { fields } = useFormFieldSettings(SALES_ORDER_ENTITY.salesOrder);
+  const { fields, byKey } = useFormFieldSettings(SALES_ORDER_ENTITY.salesOrder);
   const [saving, setSaving] = createSignal(false);
   const [createdSalesOrder, setCreatedSalesOrder] = createSignal<SalesOrderDetail | null>(null);
   const effectiveEditing = () => props.editing ?? createdSalesOrder();
@@ -524,43 +526,63 @@ export function SalesOrderModal(props: Props) {
         <Field label="Sales Order No.">
           <input class={inputClass} value={salesOrderNo()} readOnly />
         </Field>
-        <Field label="Date *">
-          <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
-        </Field>
-        <Field label="Due date">
-          <DateInput value={dueDate()} onInput={(e) => setDueDate(e.currentTarget.value)} />
-        </Field>
-        <Field label="Delivery date">
-          <DateInput value={deliveryDate()} onInput={(e) => setDeliveryDate(e.currentTarget.value)} />
-        </Field>
-        <Field label="Transaction type *">
-          <select
-            class={inputClass}
-            value={taxTypeId() ?? ""}
-            onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-          >
-            <option value="">Select…</option>
-            <For each={taxTypes()}>
-              {(t) => (
-                <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
-              )}
-            </For>
-          </select>
-          <Show when={selectedTaxType()}>
-            {(t) => (
-              <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
-            )}
-          </Show>
-        </Field>
-        <Field label="Currency *">
-          <select class={inputClass} value={currencyId() ?? ""} onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}>
-            <option value="">Select…</option>
-            <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
-          </select>
-        </Field>
-        <LookupCombo
-          label="Customer *"
-          required
+        <ModalField settings={byKey} fieldKey="order_date" fallbackLabel="Date" fallbackRequired>
+          {(m) => (
+            <DateInput value={orderDate()} disabled={m.disabled} onInput={(e) => setOrderDate(e.currentTarget.value)} />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="due_date" fallbackLabel="Due date">
+          {(m) => (
+            <DateInput value={dueDate()} disabled={m.disabled} onInput={(e) => setDueDate(e.currentTarget.value)} />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="delivery_date" fallbackLabel="Delivery date">
+          {(m) => (
+            <DateInput value={deliveryDate()} disabled={m.disabled} onInput={(e) => setDeliveryDate(e.currentTarget.value)} />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
+          {(m) => (
+            <>
+              <select
+                class={inputClass}
+                value={taxTypeId() ?? ""}
+                disabled={m.disabled}
+                onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
+              >
+                <option value="">Select…</option>
+                <For each={taxTypes()}>
+                  {(t) => (
+                    <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
+                  )}
+                </For>
+              </select>
+              <Show when={selectedTaxType()}>
+                {(t) => (
+                  <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
+                )}
+              </Show>
+            </>
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
+          {(m) => (
+            <select
+              class={inputClass}
+              value={currencyId() ?? ""}
+              disabled={m.disabled}
+              onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
+            >
+              <option value="">Select…</option>
+              <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
+            </select>
+          )}
+        </ModalField>
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="partner_id"
+          fallbackLabel="Customer"
+          fallbackRequired
           value={customerLabel}
           selectedId={partnerId}
           onInput={setCustomerLabel}
@@ -579,8 +601,10 @@ export function SalesOrderModal(props: Props) {
             setShowNewCustomer(true);
           }}
         />
-        <LookupCombo
-          label="PIC"
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="pic_name"
+          fallbackLabel="PIC"
           value={picName}
           selectedId={picUserId}
           onInput={setPicName}
@@ -609,9 +633,11 @@ export function SalesOrderModal(props: Props) {
           }}
           fetchOptions={fetchUsers}
         />
-        <LookupCombo
-          label="Location *"
-          required
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="location_id"
+          fallbackLabel="Location-Out"
+          fallbackRequired
           value={locationLabel}
           selectedId={locationId}
           onInput={setLocationLabel}
@@ -625,18 +651,42 @@ export function SalesOrderModal(props: Props) {
           }}
           fetchOptions={fetchLocations}
         />
-        <Field label="Progress status">
-          <ProgressStatusMenu value={progressStatus()} onChange={setProgressStatus} />
-        </Field>
-        <Field label="Reference">
-          <input class={inputClass} value={reference()} onInput={(e) => setReference(e.currentTarget.value)} />
-        </Field>
-        <Field label="MOP">
-          <input class={inputClass} value={mop()} onInput={(e) => setMop(e.currentTarget.value)} />
-        </Field>
-        <Field label="Payment terms">
-          <input class={inputClass} value={paymentTerms()} onInput={(e) => setPaymentTerms(e.currentTarget.value)} />
-        </Field>
+        <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status" fallbackRequired>
+          {(m) => <ProgressStatusMenu value={progressStatus()} disabled={m.disabled} onChange={setProgressStatus} />}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="reference" fallbackLabel="Reference">
+          {(m) => (
+            <input
+              class={inputClass}
+              value={reference()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setReference(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="mop" fallbackLabel="MOP">
+          {(m) => (
+            <input
+              class={inputClass}
+              value={mop()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setMop(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="payment_terms" fallbackLabel="Payment terms">
+          {(m) => (
+            <input
+              class={inputClass}
+              value={paymentTerms()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setPaymentTerms(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
         <AttachmentsField
           scope="sales-order/sales-orders"
           formOpen={props.open}
@@ -645,14 +695,34 @@ export function SalesOrderModal(props: Props) {
           required={policyRequiresAttachment(processPolicy.data, "sales_order")}
           onCountChange={setAttachmentCount}
         />
-        <Field label="Delivery remarks" span="full">
-          <textarea class={inputClass} rows={2} value={deliveryRemarks()} onInput={(e) => setDeliveryRemarks(e.currentTarget.value)} />
-        </Field>
-        <Field label="Notes" span="full">
-          <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
-        </Field>
-        <LookupCombo
-          label="Project"
+        <ModalField settings={byKey} fieldKey="delivery_remarks" fallbackLabel="Delivery remarks" span="full">
+          {(m) => (
+            <textarea
+              class={inputClass}
+              rows={2}
+              value={deliveryRemarks()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setDeliveryRemarks(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
+          {(m) => (
+            <textarea
+              class={inputClass}
+              rows={2}
+              value={notes()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setNotes(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="project_id"
+          fallbackLabel="Project"
           value={projectLabel}
           selectedId={projectId}
           onInput={setProjectLabel}

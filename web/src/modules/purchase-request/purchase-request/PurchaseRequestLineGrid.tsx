@@ -9,6 +9,8 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
 import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
+import { applyColumnLabels, lineViewKey, useColumnLabelSettings } from "../../../shared/useColumnLabelSettings";
+import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { PartnerSearchModal, type PartnerSearchRow } from "./PartnerSearchModal";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
@@ -143,6 +145,8 @@ type Props = {
   taxTypeId: () => number | null;
   taxTypeMeta: () => TaxTypeMeta | null;
   locationId: () => number | null;
+  /** Override line column label view (e.g. po_purchase_order, fin_supplier_invoice). */
+  lineViewKey?: string;
   /** Hide per-line partner columns (e.g. purchase order uses header vendor). */
   hidePartnerColumns?: boolean;
 };
@@ -267,11 +271,16 @@ export function PurchaseRequestLineGrid(props: Props) {
     };
   };
 
+  const viewKey = () => props.lineViewKey ?? lineViewKey(PURCHASE_REQUEST_ENTITY.purchaseRequest);
+  const lineLabels = useColumnLabelSettings(viewKey());
+
   const columns = createMemo(() => {
     props.taxTypeId();
     const base = filterTaxLineColumns(LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
-    if (!props.hidePartnerColumns) return base;
-    return base.filter((c) => c.key !== "partner_code" && c.key !== "partner_name");
+    const filtered = !props.hidePartnerColumns
+      ? base
+      : base.filter((c) => c.key !== "partner_code" && c.key !== "partner_name");
+    return applyColumnLabels(filtered, lineLabels.columnLabel);
   });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
   const footerColSpanBeforeQty = () => {

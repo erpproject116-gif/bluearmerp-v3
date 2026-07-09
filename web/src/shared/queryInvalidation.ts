@@ -149,6 +149,7 @@ export function shouldSkipMutationInvalidation(path: string, method: string): bo
   if (path.includes("/attachments")) return true;
   if (path.startsWith("/api/v1/settings/")) return true;
   if (path.startsWith("/api/v1/form-field-settings")) return true;
+  if (path.startsWith("/api/v1/column-label-settings")) return true;
   if (m === "POST") {
     for (const marker of READ_ONLY_POST_PATH_MARKERS) {
       if (path.includes(marker)) return true;

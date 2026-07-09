@@ -2,9 +2,11 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
-import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import type { LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
-import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { ModalField } from "../../../shared/ModalField";
+import { ModalLookupField } from "../../../shared/ModalLookupField";
+import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
@@ -24,7 +26,6 @@ import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
-import { TermHint } from "../../../shared/TermHint";
 import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import {
@@ -173,7 +174,7 @@ export function PurchaseOrderModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
-  const { fields } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseOrder);
+  const { fields, byKey } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseOrder);
   const [_attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
@@ -515,153 +516,192 @@ export function PurchaseOrderModal(props: Props) {
 
         <div class="space-y-4">
             <div class="grid gap-4 md:grid-cols-2">
-              <Field label="Order date">
-                <DateInput
-                  value={orderDate()}
-                  onInput={(e) => setOrderDate(e.currentTarget.value)}
-                  disabled={readOnly()}
+              <ModalField settings={byKey} fieldKey="order_date" fallbackLabel="Date" fallbackRequired>
+                {(m) => (
+                  <DateInput
+                    value={orderDate()}
+                    disabled={m.disabled || readOnly()}
+                    onInput={(e) => setOrderDate(e.currentTarget.value)}
+                  />
+                )}
+              </ModalField>
+              <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
+                {(m) => (
+                  <>
+                    <select
+                      class={inputClass}
+                      value={taxTypeId() ?? ""}
+                      disabled={m.disabled || readOnly()}
+                      onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
+                    >
+                      <option value="">Select…</option>
+                      <For each={taxTypes()}>
+                        {(t) => (
+                          <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
+                        )}
+                      </For>
+                    </select>
+                    <Show when={selectedTaxType()}>
+                      {(t) => (
+                        <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
+                      )}
+                    </Show>
+                  </>
+                )}
+              </ModalField>
+              <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
+                {(m) => (
+                  <select
+                    class={inputClass}
+                    value={currencyId() ?? ""}
+                    disabled={m.disabled || readOnly()}
+                    onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
+                  >
+                    <option value="">Select…</option>
+                    <For each={currencies()}>
+                      {(c) => (
+                        <option value={c.id}>
+                          {c.currency_code} — {c.name}
+                        </option>
+                      )}
+                    </For>
+                  </select>
+                )}
+              </ModalField>
+              <Show
+                when={isDraft()}
+                fallback={
+                  <ModalField settings={byKey} fieldKey="partner_id" fallbackLabel="Supplier" fallbackRequired>
+                    {(m) => <input class={inputClass} value={partnerLabel()} readOnly disabled={m.disabled} />}
+                  </ModalField>
+                }
+              >
+                <ModalLookupField
+                  settings={byKey}
+                  fieldKey="partner_id"
+                  fallbackLabel="Supplier"
+                  fallbackRequired
+                  value={partnerLabel}
+                  selectedId={partnerId}
+                  onInput={setPartnerLabel}
+                  onSelect={(o) => {
+                    setPartnerId(o.id);
+                    setPartnerLabel(o.label);
+                    setPartnerCode(o.sublabel ?? "");
+                  }}
+                  onClear={() => {
+                    setPartnerId(null);
+                    setPartnerLabel("");
+                    setPartnerCode("");
+                  }}
+                  fetchOptions={fetchPartners}
                 />
-              </Field>
-              <Field label={<TermHint term="tax_treatment" />}>
-                <select
-                  class={inputClass}
-                  value={taxTypeId() ?? ""}
-                  disabled={readOnly()}
-                  onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-                >
-                  <option value="">Select…</option>
-                  <For each={taxTypes()}>
-                    {(t) => (
-                      <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
-                    )}
-                  </For>
-                </select>
-                <Show when={selectedTaxType()}>
-                  {(t) => (
-                    <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
-                  )}
-                </Show>
-              </Field>
-              <Field label="Currency">
-                <select
-                  class={inputClass}
-                  value={currencyId() ?? ""}
-                  disabled={readOnly()}
-                  onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
-                >
-                  <option value="">Select…</option>
-                  <For each={currencies()}>
-                    {(c) => (
-                      <option value={c.id}>
-                        {c.currency_code} — {c.name}
-                      </option>
-                    )}
-                  </For>
-                </select>
-              </Field>
-              <Field label="Vendor *">
-                <Show
-                  when={isDraft()}
-                  fallback={<input class={inputClass} value={partnerLabel()} readOnly />}
-                >
-                  <LookupCombo
-                    label=""
-                    required
-                    value={partnerLabel}
-                    selectedId={partnerId}
-                    onInput={setPartnerLabel}
-                    onSelect={(o) => {
-                      setPartnerId(o.id);
-                      setPartnerLabel(o.label);
-                      setPartnerCode(o.sublabel ?? "");
-                    }}
-                    onClear={() => {
-                      setPartnerId(null);
-                      setPartnerLabel("");
-                      setPartnerCode("");
-                    }}
-                    fetchOptions={fetchPartners}
-                  />
-                </Show>
-              </Field>
-              <Field label="Location">
-                <Show
-                  when={isDraft()}
-                  fallback={<input class={inputClass} value={locationLabel()} readOnly />}
-                >
-                  <LookupCombo
-                    label=""
-                    value={locationLabel}
-                    selectedId={locationId}
-                    onInput={setLocationLabel}
-                    onSelect={(o) => {
-                      setLocationId(o.id);
-                      setLocationLabel(o.label);
-                    }}
-                    onClear={() => {
-                      setLocationId(null);
-                      setLocationLabel("");
-                    }}
-                    fetchOptions={fetchLocations}
-                  />
-                </Show>
-              </Field>
-              <Field label="PIC">
-                <Show when={isDraft()} fallback={<input class={inputClass} value={picName()} readOnly />}>
-                  <LookupCombo
-                    label=""
-                    value={picName}
-                    selectedId={picUserId}
-                    onInput={setPicName}
-                    onSelect={(o) => {
-                      setPicUserId(o.id);
-                      setPicName(o.label);
-                    }}
-                    onClear={() => {
-                      setPicUserId(null);
-                      setPicName("");
-                    }}
-                    fetchOptions={fetchUsers}
-                  />
-                </Show>
-              </Field>
-              <Field label="Project">
-                <Show when={isDraft()} fallback={<input class={inputClass} value={projectLabel()} readOnly />}>
-                  <LookupCombo
-                    label=""
-                    value={projectLabel}
-                    selectedId={projectId}
-                    onInput={setProjectLabel}
-                    onSelect={(o) => {
-                      setProjectId(o.id);
-                      setProjectLabel(o.label);
-                      setProjectName(o.label);
-                    }}
-                    onClear={() => {
-                      setProjectId(null);
-                      setProjectLabel("");
-                      setProjectName("");
-                    }}
-                    fetchOptions={fetchProjects}
-                  />
-                </Show>
-              </Field>
-              <Field label="Reference">
-                <input
-                  class={inputClass}
-                  value={reference()}
-                  readOnly={readOnly()}
-                  onInput={(e) => setReference(e.currentTarget.value)}
+              </Show>
+              <Show
+                when={isDraft()}
+                fallback={
+                  <ModalField settings={byKey} fieldKey="location_id" fallbackLabel="Location" fallbackRequired>
+                    {(m) => <input class={inputClass} value={locationLabel()} readOnly disabled={m.disabled} />}
+                  </ModalField>
+                }
+              >
+                <ModalLookupField
+                  settings={byKey}
+                  fieldKey="location_id"
+                  fallbackLabel="Location"
+                  fallbackRequired
+                  value={locationLabel}
+                  selectedId={locationId}
+                  onInput={setLocationLabel}
+                  onSelect={(o) => {
+                    setLocationId(o.id);
+                    setLocationLabel(o.label);
+                  }}
+                  onClear={() => {
+                    setLocationId(null);
+                    setLocationLabel("");
+                  }}
+                  fetchOptions={fetchLocations}
                 />
-              </Field>
-              <Field label="Notes">
-                <input
-                  class={inputClass}
-                  value={notes()}
-                  readOnly={readOnly()}
-                  onInput={(e) => setNotes(e.currentTarget.value)}
+              </Show>
+              <Show
+                when={isDraft()}
+                fallback={
+                  <ModalField settings={byKey} fieldKey="pic_name" fallbackLabel="PIC">
+                    {(m) => <input class={inputClass} value={picName()} readOnly disabled={m.disabled} />}
+                  </ModalField>
+                }
+              >
+                <ModalLookupField
+                  settings={byKey}
+                  fieldKey="pic_name"
+                  fallbackLabel="PIC"
+                  value={picName}
+                  selectedId={picUserId}
+                  onInput={setPicName}
+                  onSelect={(o) => {
+                    setPicUserId(o.id);
+                    setPicName(o.label);
+                  }}
+                  onClear={() => {
+                    setPicUserId(null);
+                    setPicName("");
+                  }}
+                  fetchOptions={fetchUsers}
                 />
-              </Field>
+              </Show>
+              <Show
+                when={isDraft()}
+                fallback={
+                  <ModalField settings={byKey} fieldKey="project_id" fallbackLabel="Project">
+                    {(m) => <input class={inputClass} value={projectLabel()} readOnly disabled={m.disabled} />}
+                  </ModalField>
+                }
+              >
+                <ModalLookupField
+                  settings={byKey}
+                  fieldKey="project_id"
+                  fallbackLabel="Project"
+                  value={projectLabel}
+                  selectedId={projectId}
+                  onInput={setProjectLabel}
+                  onSelect={(o) => {
+                    setProjectId(o.id);
+                    setProjectLabel(o.label);
+                    setProjectName(o.label);
+                  }}
+                  onClear={() => {
+                    setProjectId(null);
+                    setProjectLabel("");
+                    setProjectName("");
+                  }}
+                  fetchOptions={fetchProjects}
+                />
+              </Show>
+              <ModalField settings={byKey} fieldKey="reference" fallbackLabel="Reference">
+                {(m) => (
+                  <input
+                    class={inputClass}
+                    value={reference()}
+                    placeholder={m.placeholder}
+                    readOnly={readOnly()}
+                    disabled={m.disabled}
+                    onInput={(e) => setReference(e.currentTarget.value)}
+                  />
+                )}
+              </ModalField>
+              <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes">
+                {(m) => (
+                  <input
+                    class={inputClass}
+                    value={notes()}
+                    placeholder={m.placeholder}
+                    readOnly={readOnly()}
+                    disabled={m.disabled}
+                    onInput={(e) => setNotes(e.currentTarget.value)}
+                  />
+                )}
+              </ModalField>
             </div>
 
             <Show
@@ -723,6 +763,7 @@ export function PurchaseOrderModal(props: Props) {
                 }}
                 locationId={locationId}
                 hidePartnerColumns
+                lineViewKey={`${PURCHASE_REQUEST_ENTITY.purchaseOrder}.lines`}
               />
             </Show>
           </div>

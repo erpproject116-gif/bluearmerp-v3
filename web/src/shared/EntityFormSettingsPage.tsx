@@ -10,6 +10,12 @@ import {
   type FormFieldSetting,
   useFormFieldSettings,
 } from "./useFormFieldSettings";
+import {
+  hasLineColumnLabels,
+  lineViewKey,
+  type ColumnLabelSetting,
+  useColumnLabelSettings,
+} from "./useColumnLabelSettings";
 
 type Props = {
   entityType: string;
@@ -44,9 +50,13 @@ export function EntityFormSettingsPage(props: Props) {
   const auth = useAuth();
   const toast = useToast();
   const { query, fields, reload, upsertCustomField } = useFormFieldSettings(props.entityType);
+  const lineLabels = useColumnLabelSettings(lineViewKey(props.entityType));
+  const showLineColumns = () => hasLineColumnLabels(props.entityType);
 
   const [draft, setDraft] = createSignal<FormFieldSetting[]>([]);
+  const [columnDraft, setColumnDraft] = createSignal<ColumnLabelSetting[]>([]);
   const [dirty, setDirty] = createSignal(false);
+  const [columnDirty, setColumnDirty] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
 
   const [newLabel, setNewLabel] = createSignal("");
@@ -59,6 +69,30 @@ export function EntityFormSettingsPage(props: Props) {
   const canEdit = () => canManageFormSettings(auth.me);
 
   const rows = () => (dirty() ? draft() : fields());
+  const columnRows = () => (columnDirty() ? columnDraft() : lineLabels.columns());
+
+  const syncColumnDraft = () => {
+    setColumnDraft([...lineLabels.columns()]);
+    setColumnDirty(true);
+  };
+
+  const updateColumnRow = (columnKey: string, label: string) => {
+    if (!columnDirty()) syncColumnDraft();
+    setColumnDraft((list) => list.map((r) => (r.column_key === columnKey ? { ...r, label } : r)));
+  };
+
+  const saveColumnLabels = async () => {
+    if (!canEdit() || !showLineColumns()) return;
+    setSaving(true);
+    try {
+      await lineLabels.save(columnRows());
+      setColumnDirty(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save column labels.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const syncDraft = () => {
     setDraft([...fields()]);
@@ -189,14 +223,26 @@ export function EntityFormSettingsPage(props: Props) {
           </p>
         </div>
         <Show when={canEdit()}>
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-            disabled={saving() || !dirty()}
-            onClick={() => void save()}
-          >
-            Save changes
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              disabled={saving() || !dirty()}
+              onClick={() => void save()}
+            >
+              Save form fields
+            </button>
+            <Show when={showLineColumns()}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-primary hover:bg-slate-50 disabled:opacity-50"
+                disabled={saving() || !columnDirty()}
+                onClick={() => void saveColumnLabels()}
+              >
+                Save line columns
+              </button>
+            </Show>
+          </div>
         </Show>
       </div>
 
@@ -213,6 +259,7 @@ export function EntityFormSettingsPage(props: Props) {
               <th class="px-4 py-3 font-semibold">Field</th>
               <th class="px-4 py-3 font-semibold">Type</th>
               <th class="px-4 py-3 font-semibold">Label</th>
+              <th class="px-4 py-3 font-semibold">Placeholder</th>
               <th class="px-4 py-3 font-semibold">Visible</th>
               <th class="px-4 py-3 font-semibold">Required</th>
               <th class="px-4 py-3 font-semibold">Disabled</th>
@@ -223,7 +270,7 @@ export function EntityFormSettingsPage(props: Props) {
           <tbody>
             <Show when={query.isFetching && !fields().length}>
               <tr>
-                <td colSpan={8} class="px-4 py-8 text-center text-text-secondary">
+                <td colSpan={9} class="px-4 py-8 text-center text-text-secondary">
                   Loading…
                 </td>
               </tr>
@@ -242,6 +289,15 @@ export function EntityFormSettingsPage(props: Props) {
                       value={row.label}
                       disabled={!canEdit()}
                       onInput={(e) => updateRow(row.field_key, { label: e.currentTarget.value })}
+                    />
+                  </td>
+                  <td class="px-4 py-3">
+                    <input
+                      class={inputClass}
+                      value={row.placeholder ?? ""}
+                      disabled={!canEdit()}
+                      placeholder="Optional"
+                      onInput={(e) => updateRow(row.field_key, { placeholder: e.currentTarget.value })}
                     />
                   </td>
                   <td class="px-4 py-3">
@@ -302,6 +358,40 @@ export function EntityFormSettingsPage(props: Props) {
           </tbody>
         </table>
       </div>
+
+      <Show when={showLineColumns()}>
+        <div class="mt-10 overflow-hidden rounded-xl border border-stroke bg-white shadow-sm">
+          <div class="border-b border-stroke px-4 py-3">
+            <h3 class="text-sm font-semibold text-text-primary">Line item column labels</h3>
+            <p class="mt-1 text-xs text-text-secondary">Customize headers shown in the line items grid for this feature.</p>
+          </div>
+          <table class="erp-grid w-full text-left text-sm">
+            <thead class="text-xs uppercase tracking-wide text-text-secondary">
+              <tr>
+                <th class="px-4 py-3 font-semibold">Column</th>
+                <th class="px-4 py-3 font-semibold">Header label</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={columnRows()}>
+                {(row) => (
+                  <tr>
+                    <td class="px-4 py-3 font-medium text-text-primary">{row.column_key}</td>
+                    <td class="px-4 py-3">
+                      <input
+                        class={inputClass}
+                        value={row.label}
+                        disabled={!canEdit()}
+                        onInput={(e) => updateColumnRow(row.column_key, e.currentTarget.value)}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
+      </Show>
 
       <Show when={canEdit()}>
         <div class="mt-8">

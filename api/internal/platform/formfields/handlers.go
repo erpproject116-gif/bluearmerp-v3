@@ -20,6 +20,7 @@ type FieldSetting struct {
 	FieldKey   string          `json:"field_key"`
 	Kind       string          `json:"kind"`
 	Label      string          `json:"label"`
+	Placeholder string          `json:"placeholder,omitempty"`
 	FieldType  string          `json:"field_type"`
 	Options    json.RawMessage `json:"options,omitempty"`
 	IsVisible  bool            `json:"is_visible"`
@@ -108,10 +109,11 @@ func LoadMergedSettings(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 			sortOrder = o.SortOrder
 		}
 		out = append(out, FieldSetting{
-			FieldKey:   sf.FieldKey,
-			Kind:       "standard",
-			Label:      label,
-			FieldType:  sf.FieldType,
+			FieldKey:    sf.FieldKey,
+			Kind:        "standard",
+			Label:       label,
+			Placeholder: placeholderFromOverride(o),
+			FieldType:   sf.FieldType,
 			IsVisible:  isVisible,
 			IsRequired: isRequired,
 			IsDisabled: isDisabled,
@@ -126,11 +128,12 @@ func LoadMergedSettings(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 	for _, c := range customs {
 		id := c.ID
 		out = append(out, FieldSetting{
-			ID:         &id,
-			FieldKey:   c.FieldKey,
-			Kind:       "custom",
-			Label:      c.Label,
-			FieldType:  c.FieldType,
+			ID:          &id,
+			FieldKey:    c.FieldKey,
+			Kind:        "custom",
+			Label:       c.Label,
+			Placeholder: placeholderFromOptions(c.Options),
+			FieldType:   c.FieldType,
 			Options:    c.Options,
 			IsVisible:  customFieldVisible(c.Options, c.IsActive),
 			IsRequired: c.IsRequired,
@@ -143,16 +146,17 @@ func LoadMergedSettings(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 }
 
 type standardOverride struct {
-	LabelOverride *string
-	IsVisible     bool
-	IsRequired    bool
-	IsDisabled    bool
-	SortOrder     int
+	LabelOverride       *string
+	PlaceholderOverride *string
+	IsVisible           bool
+	IsRequired          bool
+	IsDisabled          bool
+	SortOrder           int
 }
 
 func loadStandardOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entityType string) (map[string]*standardOverride, error) {
 	rows, err := pool.Query(ctx, `
-		select field_key, label_override, is_visible, is_required, is_disabled, sort_order
+		select field_key, label_override, placeholder_override, is_visible, is_required, is_disabled, sort_order
 		from public.tenant_standard_field_settings
 		where tenant_id = $1 and entity_type = $2`, tenantID, entityType)
 	if err != nil {
@@ -163,7 +167,7 @@ func loadStandardOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID int
 	for rows.Next() {
 		var o standardOverride
 		var key string
-		if err := rows.Scan(&key, &o.LabelOverride, &o.IsVisible, &o.IsRequired, &o.IsDisabled, &o.SortOrder); err != nil {
+		if err := rows.Scan(&key, &o.LabelOverride, &o.PlaceholderOverride, &o.IsVisible, &o.IsRequired, &o.IsDisabled, &o.SortOrder); err != nil {
 			return nil, err
 		}
 		out[key] = &o
@@ -183,17 +187,18 @@ func SaveSettings(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entit
 		case "standard":
 			_, err := tx.Exec(ctx, `
 				insert into public.tenant_standard_field_settings
-				  (tenant_id, entity_type, field_key, label_override, is_visible, is_required, is_disabled, sort_order, updated_at)
-				values ($1, $2, $3, $4, $5, $6, $7, $8, now())
+				  (tenant_id, entity_type, field_key, label_override, placeholder_override, is_visible, is_required, is_disabled, sort_order, updated_at)
+				values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
 				on conflict (tenant_id, entity_type, field_key)
 				do update set
 				  label_override = excluded.label_override,
+				  placeholder_override = excluded.placeholder_override,
 				  is_visible = excluded.is_visible,
 				  is_required = excluded.is_required,
 				  is_disabled = excluded.is_disabled,
 				  sort_order = excluded.sort_order,
 				  updated_at = now()`,
-				tenantID, entityType, f.FieldKey, nullIfEmpty(f.Label), f.IsVisible, f.IsRequired, f.IsDisabled, f.SortOrder)
+				tenantID, entityType, f.FieldKey, nullIfEmpty(f.Label), nullIfEmpty(f.Placeholder), f.IsVisible, f.IsRequired, f.IsDisabled, f.SortOrder)
 			if err != nil {
 				return err
 			}
@@ -201,7 +206,7 @@ func SaveSettings(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entit
 			if f.ID == nil {
 				continue
 			}
-			opts := mergeCustomFieldOptions(f.Options, f.IsVisible)
+			opts := mergeCustomFieldOptions(f.Options, f.IsVisible, f.Placeholder)
 			_, err := tx.Exec(ctx, `
 				update public.tenant_custom_field_definitions set
 				  label = $1,
@@ -227,4 +232,25 @@ func nullIfEmpty(s string) *string {
 		return nil
 	}
 	return &t
+}
+
+func placeholderFromOverride(o *standardOverride) string {
+	if o == nil || o.PlaceholderOverride == nil {
+		return ""
+	}
+	return strings.TrimSpace(*o.PlaceholderOverride)
+}
+
+func placeholderFromOptions(opts json.RawMessage) string {
+	if len(opts) == 0 {
+		return ""
+	}
+	var o map[string]any
+	if err := json.Unmarshal(opts, &o); err != nil {
+		return ""
+	}
+	if s, ok := o["placeholder"].(string); ok {
+		return strings.TrimSpace(s)
+	}
+	return ""
 }

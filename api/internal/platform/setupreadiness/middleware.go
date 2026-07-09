@@ -50,7 +50,7 @@ func isSetupExempt(method, path string) bool {
 		"/auth/", "/platform/setup-readiness", "/platform/onboarding",
 		"/branding/", "/inventory/", "/finance/", "/quotation/currencies",
 		"/quotation/tax-types", "/user-management/", "/custom-fields",
-		"/form-field-settings", "/process-policies", "/activity-logs",
+		"/form-field-settings", "/column-label-settings", "/process-policies", "/activity-logs",
 		"/console/", "/presence/", "/drafts/", "/report-templates",
 		"/approval/", "/docgen/", "/demodata/", "/datacenter/",
 	}

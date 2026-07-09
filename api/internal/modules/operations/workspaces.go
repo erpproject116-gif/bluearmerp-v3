@@ -164,31 +164,16 @@ func createWorkspace(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		var invProjectCode string
-		if err := tx.QueryRow(r.Context(), `select public.preview_next_tenant_code($1, 'project')`, tu.TenantID).Scan(&invProjectCode); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to allocate project code.", "ERR_INTERNAL")
-			return
-		}
 		var invProjectID int64
-		if err := tx.QueryRow(r.Context(), `
-			insert into public.inv_projects (tenant_id, project_code, project_name, status)
-			values ($1, $2, $3, 'active')
-			returning id`,
-			tu.TenantID, invProjectCode, strings.TrimSpace(body.WorkspaceName),
-		).Scan(&invProjectID); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create inventory project.", "ERR_INTERNAL")
+		invProjectID, _, err = allocateInventoryProject(r.Context(), tx, tu.TenantID, strings.TrimSpace(body.WorkspaceName))
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, inventoryProjectErrorMessage(err), "ERR_INTERNAL")
 			return
 		}
 
 		jcCode := strings.TrimSpace(body.WorkspaceCode)
-		var jobCostProjectID int64
-		if err := tx.QueryRow(r.Context(), `
-			insert into public.job_cost_projects (
-			  tenant_id, project_code, project_name, inv_project_id, status
-			) values ($1, $2, $3, $4, 'active')
-			returning id`,
-			tu.TenantID, jcCode, strings.TrimSpace(body.WorkspaceName), invProjectID,
-		).Scan(&jobCostProjectID); err != nil {
+		jobCostProjectID, err := createJobCostProject(r.Context(), tx, tu.TenantID, jcCode, strings.TrimSpace(body.WorkspaceName), invProjectID)
+		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create job cost project.", "ERR_INTERNAL")
 			return
 		}

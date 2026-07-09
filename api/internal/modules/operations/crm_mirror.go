@@ -181,26 +181,15 @@ func ensureCRMFollowUpWorkspace(ctx context.Context, pool *pgxpool.Pool, tenantI
 	}
 	defer tx.Rollback(ctx)
 
-	var invProjectCode string
-	if err := tx.QueryRow(ctx, `select public.preview_next_tenant_code($1, 'project')`, tenantID).Scan(&invProjectCode); err != nil {
-		return 0, nil, err
-	}
 	var invProjectID int64
-	if err := tx.QueryRow(ctx, `
-		insert into public.inv_projects (tenant_id, project_code, project_name, status)
-		values ($1, $2, 'CRM Follow-up', 'active')
-		returning id`, tenantID, invProjectCode,
-	).Scan(&invProjectID); err != nil {
+	invProjectID, _, err = allocateInventoryProject(ctx, tx, tenantID, "CRM Follow-up")
+	if err != nil {
 		return 0, nil, err
 	}
 
 	var jobCostProjectID int64
-	if err := tx.QueryRow(ctx, `
-		insert into public.job_cost_projects (tenant_id, project_code, project_name, inv_project_id, status)
-		values ($1, $2, 'CRM Follow-up', $3, 'active')
-		returning id`,
-		tenantID, crmFollowUpWorkspaceCode, invProjectID,
-	).Scan(&jobCostProjectID); err != nil {
+	jobCostProjectID, err = createJobCostProject(ctx, tx, tenantID, crmFollowUpWorkspaceCode, "CRM Follow-up", invProjectID)
+	if err != nil {
 		return 0, nil, err
 	}
 

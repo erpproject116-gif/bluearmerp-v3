@@ -54,6 +54,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/console"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/drafts"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/columnlabels"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/formfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/health"
 	platformmw "github.com/bluearm/bluearm-erp-v3/api/internal/platform/middleware"
@@ -137,6 +138,7 @@ func main() {
 			customfields.RegisterRoutes(protected, pool)
 			drafts.RegisterRoutes(protected, pool)
 			formfields.RegisterRoutes(protected, pool)
+			columnlabels.RegisterRoutes(protected, pool)
 			reporttemplates.RegisterRoutes(protected, pool)
 			platformreports.RegisterRoutes(protected)
 			branding.RegisterRoutes(protected, pool)

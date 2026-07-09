@@ -1,6 +1,9 @@
 package formfields
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 func jsonBool(v any) (bool, bool) {
 	switch t := v.(type) {
@@ -31,7 +34,7 @@ func customFieldVisible(opts json.RawMessage, isActive bool) bool {
 	return true
 }
 
-func mergeCustomFieldOptions(opts json.RawMessage, isVisible bool) json.RawMessage {
+func mergeCustomFieldOptions(opts json.RawMessage, isVisible bool, placeholder string) json.RawMessage {
 	var o map[string]any
 	if len(opts) > 0 {
 		_ = json.Unmarshal(opts, &o)
@@ -40,6 +43,12 @@ func mergeCustomFieldOptions(opts json.RawMessage, isVisible bool) json.RawMessa
 		o = map[string]any{}
 	}
 	o["is_visible"] = isVisible
+	ph := strings.TrimSpace(placeholder)
+	if ph != "" {
+		o["placeholder"] = ph
+	} else {
+		delete(o, "placeholder")
+	}
 	raw, _ := json.Marshal(o)
 	return raw
 }

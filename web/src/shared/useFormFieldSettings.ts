@@ -7,8 +7,9 @@ export type FormFieldSetting = {
   field_key: string;
   kind: "standard" | "custom";
   label: string;
+  placeholder?: string;
   field_type: string;
-  options?: { choices?: string[]; is_visible?: boolean };
+  options?: { choices?: string[]; is_visible?: boolean; placeholder?: string };
   is_visible: boolean;
   is_required: boolean;
   is_disabled: boolean;
@@ -27,7 +28,7 @@ export type CustomFieldDefinition = {
   field_key: string;
   label: string;
   field_type: string;
-  options?: { choices?: string[]; is_visible?: boolean };
+  options?: { choices?: string[]; is_visible?: boolean; placeholder?: string };
   is_required: boolean;
   sort_order: number;
   is_active: boolean;
@@ -52,6 +53,7 @@ export function definitionToFormField(def: CustomFieldDefinition): FormFieldSett
     field_key: def.field_key,
     kind: "custom",
     label: def.label,
+    placeholder: def.options?.placeholder,
     field_type: def.field_type,
     options: def.options,
     is_visible: visible === undefined ? true : Boolean(visible),
@@ -132,6 +134,14 @@ export function useFormFieldSettings(entityType: string) {
 
 export function fieldLabel(f: FormFieldSetting | undefined, fallback: string) {
   return f?.label?.trim() || fallback;
+}
+
+export function fieldPlaceholder(f: FormFieldSetting | undefined, fallback?: string) {
+  const direct = f?.placeholder?.trim();
+  if (direct) return direct;
+  const fromOpts = f?.options?.placeholder?.trim();
+  if (fromOpts) return fromOpts;
+  return fallback?.trim() ?? "";
 }
 
 export function fieldVisible(f: FormFieldSetting | undefined, defaultVisible = true) {

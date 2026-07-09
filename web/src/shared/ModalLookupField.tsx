@@ -1,5 +1,5 @@
-import { Show, type JSX } from "solid-js";
-import { Field } from "./SpreadsheetGrid";
+import { Show } from "solid-js";
+import { LookupCombo, type LookupOption } from "./LookupCombo";
 import type { FormFieldSetting } from "./useFormFieldSettings";
 import {
   fieldDisabled,
@@ -8,13 +8,7 @@ import {
   fieldVisible,
   labelWithRequired,
 } from "./useFormFieldSettings";
-
-export type ModalFieldMeta = {
-  label: string;
-  required: boolean;
-  disabled: boolean;
-  placeholder?: string;
-};
+import type { ModalFieldMeta } from "./ModalField";
 
 type Props = {
   settings: () => Record<string, FormFieldSetting>;
@@ -22,11 +16,17 @@ type Props = {
   fallbackLabel: string;
   fallbackRequired?: boolean;
   fallbackPlaceholder?: string;
-  span?: "full";
-  children: (meta: ModalFieldMeta) => JSX.Element;
+  value: () => string;
+  selectedId: () => number | null;
+  onInput: (text: string) => void;
+  onSelect: (opt: LookupOption) => void;
+  onClear: () => void;
+  fetchOptions: (q: string) => Promise<LookupOption[]>;
+  onCreate?: (query: string) => void;
+  createLabel?: string;
 };
 
-export function ModalField(props: Props) {
+export function ModalLookupField(props: Props) {
   const meta = (): ModalFieldMeta | null => {
     const f = props.settings()[props.fieldKey];
     if (!fieldVisible(f, true)) return null;
@@ -45,9 +45,20 @@ export function ModalField(props: Props) {
   return (
     <Show when={meta()}>
       {(m) => (
-        <Field label={m().label} span={props.span}>
-          {props.children(m())}
-        </Field>
+        <LookupCombo
+          label={m().label}
+          required={m().required}
+          disabled={m().disabled}
+          placeholder={m().placeholder}
+          value={props.value}
+          selectedId={props.selectedId}
+          onInput={props.onInput}
+          onSelect={props.onSelect}
+          onClear={props.onClear}
+          fetchOptions={props.fetchOptions}
+          onCreate={props.onCreate}
+          createLabel={props.createLabel}
+        />
       )}
     </Show>
   );

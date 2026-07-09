@@ -3,8 +3,10 @@ import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
-import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import type { LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
+import { ModalField } from "../../../shared/ModalField";
+import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
@@ -181,7 +183,7 @@ export function SalesModal(props: Props) {
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
-  const { fields } = useFormFieldSettings(SALES_ENTITY.sales);
+  const { fields, byKey } = useFormFieldSettings(SALES_ENTITY.sales);
   const [saving, setSaving] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
@@ -712,40 +714,58 @@ export function SalesModal(props: Props) {
         <Field label="Sales No.">
           <input class={inputClass} value={salesNo()} readOnly />
         </Field>
-        <Field label="Date *">
-          <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
-        </Field>
-        <Field label="Due date">
-          <DateInput value={dueDate()} onInput={(e) => setDueDate(e.currentTarget.value)} />
-        </Field>
-        <Field label="Transaction type *">
-          <select
-            class={inputClass}
-            value={taxTypeId() ?? ""}
-            onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-          >
-            <option value="">Select…</option>
-            <For each={taxTypes()}>
-              {(t) => (
-                <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
-              )}
-            </For>
-          </select>
-          <Show when={selectedTaxType()}>
-            {(t) => (
-              <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
-            )}
-          </Show>
-        </Field>
-        <Field label="Currency *">
-          <select class={inputClass} value={currencyId() ?? ""} onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}>
-            <option value="">Select…</option>
-            <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
-          </select>
-        </Field>
-        <LookupCombo
-          label="Customer *"
-          required
+        <ModalField settings={byKey} fieldKey="order_date" fallbackLabel="Date" fallbackRequired>
+          {(m) => (
+            <DateInput value={orderDate()} disabled={m.disabled} onInput={(e) => setOrderDate(e.currentTarget.value)} />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="due_date" fallbackLabel="Due date">
+          {(m) => (
+            <DateInput value={dueDate()} disabled={m.disabled} onInput={(e) => setDueDate(e.currentTarget.value)} />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
+          {(m) => (
+            <>
+              <select
+                class={inputClass}
+                value={taxTypeId() ?? ""}
+                disabled={m.disabled}
+                onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
+              >
+                <option value="">Select…</option>
+                <For each={taxTypes()}>
+                  {(t) => (
+                    <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
+                  )}
+                </For>
+              </select>
+              <Show when={selectedTaxType()}>
+                {(t) => (
+                  <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
+                )}
+              </Show>
+            </>
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
+          {(m) => (
+            <select
+              class={inputClass}
+              value={currencyId() ?? ""}
+              disabled={m.disabled}
+              onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
+            >
+              <option value="">Select…</option>
+              <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
+            </select>
+          )}
+        </ModalField>
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="partner_id"
+          fallbackLabel="Customer"
+          fallbackRequired
           value={customerLabel}
           selectedId={partnerId}
           onInput={setCustomerLabel}
@@ -764,8 +784,10 @@ export function SalesModal(props: Props) {
             setShowNewCustomer(true);
           }}
         />
-        <LookupCombo
-          label="PIC"
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="pic_name"
+          fallbackLabel="PIC"
           value={picName}
           selectedId={picUserId}
           onInput={setPicName}
@@ -779,9 +801,11 @@ export function SalesModal(props: Props) {
           }}
           fetchOptions={fetchUsers}
         />
-        <LookupCombo
-          label="Location *"
-          required
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="location_id"
+          fallbackLabel="Location"
+          fallbackRequired
           value={locationLabel}
           selectedId={locationId}
           onInput={setLocationLabel}
@@ -795,16 +819,26 @@ export function SalesModal(props: Props) {
           }}
           fetchOptions={fetchLocations}
         />
-        <Field label="Progress status">
-          <ProgressStatusMenu
-            value={progressStatus()}
-            onChange={setProgressStatus}
-            disabled={progressStatus() === "e_approval"}
-          />
-        </Field>
-        <Field label="SI/DR No.">
-          <input class={inputClass} value={siDrNo()} onInput={(e) => setSiDrNo(e.currentTarget.value)} />
-        </Field>
+        <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status" fallbackRequired>
+          {(m) => (
+            <ProgressStatusMenu
+              value={progressStatus()}
+              disabled={m.disabled || progressStatus() === "e_approval"}
+              onChange={setProgressStatus}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="si_dr_no" fallbackLabel="SI/DR No.">
+          {(m) => (
+            <input
+              class={inputClass}
+              value={siDrNo()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setSiDrNo(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
         <Field label="Terms of payment">
           <select class={inputClass} value={termsOfPayment()} onChange={(e) => setTermsOfPayment(e.currentTarget.value)}>
             <option value="">—</option>
@@ -812,9 +846,17 @@ export function SalesModal(props: Props) {
             <option value="cash">Cash</option>
           </select>
         </Field>
-        <Field label="Payment terms">
-          <input class={inputClass} value={paymentTerms()} onInput={(e) => setPaymentTerms(e.currentTarget.value)} />
-        </Field>
+        <ModalField settings={byKey} fieldKey="payment_terms" fallbackLabel="Payment terms">
+          {(m) => (
+            <input
+              class={inputClass}
+              value={paymentTerms()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setPaymentTerms(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
         <AttachmentsField
           scope="sales"
           formOpen={props.open}
@@ -830,11 +872,22 @@ export function SalesModal(props: Props) {
             <option value="returns">Returns</option>
           </select>
         </Field>
-        <Field label="Notes" span="full">
-          <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
-        </Field>
-        <LookupCombo
-          label="Project"
+        <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
+          {(m) => (
+            <textarea
+              class={inputClass}
+              rows={2}
+              value={notes()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setNotes(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="project_id"
+          fallbackLabel="Project"
           value={projectLabel}
           selectedId={projectId}
           onInput={setProjectLabel}

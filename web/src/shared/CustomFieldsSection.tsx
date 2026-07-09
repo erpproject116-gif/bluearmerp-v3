@@ -59,21 +59,23 @@ export function CustomFieldsSection(props: Props) {
 }
 
 function CustomFieldInput(props: {
-  def: { field_key: string; label: string; field_type: string; options?: { choices?: string[] }; is_required: boolean };
+  def: { field_key: string; label: string; field_type: string; options?: { choices?: string[]; placeholder?: string }; is_required: boolean };
   value: () => unknown;
   onChange: (key: string, value: unknown) => void;
 }) {
   const choices = () => props.def.options?.choices ?? [];
+  const placeholder = () => props.def.options?.placeholder ?? "";
   const label = () => `${props.def.label}${props.def.is_required ? " *" : ""}`;
 
   return (
-    <SwitchField def={props.def} label={label()} value={props.value()} onChange={props.onChange} choices={choices()} />
+    <SwitchField def={props.def} label={label()} placeholder={placeholder()} value={props.value()} onChange={props.onChange} choices={choices()} />
   );
 }
 
 function SwitchField(props: {
   def: { field_key: string; field_type: string };
   label: string;
+  placeholder?: string;
   value: unknown;
   choices: string[];
   onChange: (key: string, value: unknown) => void;
@@ -188,7 +190,12 @@ function SwitchField(props: {
     default:
       return (
         <Field label={props.label}>
-          <input class={inputClass} value={String(props.value ?? "")} onInput={(e) => set(e.currentTarget.value)} />
+          <input
+            class={inputClass}
+            placeholder={props.placeholder}
+            value={String(props.value ?? "")}
+            onInput={(e) => set(e.currentTarget.value)}
+          />
         </Field>
       );
   }

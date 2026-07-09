@@ -10,6 +10,8 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
 import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
+import { applyColumnLabels, useColumnLabelSettings } from "../../../shared/useColumnLabelSettings";
+import { SALES_ORDER_ENTITY } from "../../../shared/entityTypes";
 import { SalesOrderItemSearchModal } from "./SalesOrderItemSearchModal";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
@@ -319,9 +321,12 @@ export function SalesOrderLineGrid(props: Props) {
     };
   };
 
+  const lineLabels = useColumnLabelSettings(`${SALES_ORDER_ENTITY.salesOrder}.lines`);
+
   const columns = createMemo(() => {
     props.taxTypeId();
-    return filterTaxLineColumns(SALES_ORDER_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+    const base = filterTaxLineColumns(SALES_ORDER_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+    return applyColumnLabels(base, lineLabels.columnLabel);
   });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
 

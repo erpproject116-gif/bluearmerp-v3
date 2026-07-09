@@ -119,6 +119,7 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "note_for_pic_only", Label: "Note for PIC only", FieldType: "textarea", SortOrder: 90},
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 100},
 		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 110},
+		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", DefaultRequired: true, SortOrder: 120},
 	},
 	"pr_purchase_request": {
 		{FieldKey: "request_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},

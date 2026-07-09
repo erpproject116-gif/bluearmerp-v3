@@ -4,7 +4,7 @@ import { CustomFieldsSection, validateCustomFields } from "../../../shared/Custo
 import { EditableLineGrid, emptyLine, type RepairLineRow } from "../../../shared/EditableLineGrid";
 import { INVENTORY_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
-import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import type { LookupOption } from "../../../shared/LookupCombo";
 import {
   formatFileSize,
   listRepairOrderAttachments,
@@ -12,6 +12,8 @@ import {
   type RepairOrderAttachment,
 } from "../../../shared/repairOrderAttachments";
 import { DateInput } from "../../../shared/DateInput";
+import { ModalField } from "../../../shared/ModalField";
+import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useCustomValues } from "../../../shared/useCustomValues";
@@ -113,7 +115,7 @@ function linesFromDetail(lines?: RepairOrderDetail["lines"]): RepairLineRow[] {
 export function RepairOrderModal(props: Props) {
   const toast = useToast();
   const { customValues, setCustom, loadCustom } = useCustomValues();
-  const { fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.repairOrder);
+  const { fields, byKey, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.repairOrder);
 
   const [saving, setSaving] = createSignal(false);
   const [createdOrder, setCreatedOrder] = createSignal<RepairOrderDetail | null>(null);
@@ -323,12 +325,16 @@ export function RepairOrderModal(props: Props) {
         <Field label="Repair Order No.">
           <input class={inputClass} value={repairOrderNo()} readOnly />
         </Field>
-        <Field label="Date *">
-          <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
-        </Field>
-        <LookupCombo
-          label="Customer"
-          required
+        <ModalField settings={byKey} fieldKey="order_date" fallbackLabel="Date" fallbackRequired>
+          {(m) => (
+            <DateInput value={orderDate()} disabled={m.disabled} onInput={(e) => setOrderDate(e.currentTarget.value)} />
+          )}
+        </ModalField>
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="partner_id"
+          fallbackLabel="Customer"
+          fallbackRequired
           value={customerLabel}
           selectedId={partnerId}
           onInput={setCustomerLabel}
@@ -342,8 +348,10 @@ export function RepairOrderModal(props: Props) {
           }}
           fetchOptions={fetchPartners}
         />
-        <LookupCombo
-          label="PIC (Person-In-Charge)"
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="pic_name"
+          fallbackLabel="PIC"
           value={picName}
           selectedId={picUserId}
           onInput={setPicName}
@@ -357,9 +365,11 @@ export function RepairOrderModal(props: Props) {
           }}
           fetchOptions={fetchUsers}
         />
-        <LookupCombo
-          label="Location"
-          required
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="location_id"
+          fallbackLabel="Location"
+          fallbackRequired
           value={locationLabel}
           selectedId={locationId}
           onInput={setLocationLabel}
@@ -373,21 +383,48 @@ export function RepairOrderModal(props: Props) {
           }}
           fetchOptions={fetchLocations}
         />
-        <Field label="Progress status">
-          <select class={inputClass} value={progressStatus()} onChange={(e) => setProgressStatus(e.currentTarget.value)}>
-            <option value="received">Received</option>
-            <option value="finished">Finished</option>
-          </select>
-        </Field>
-        <Field label="Scheduled completion date">
-          <DateInput value={scheduledDate()} onInput={(e) => setScheduledDate(e.currentTarget.value)} />
-        </Field>
-        <Field label="Latest update" span="full">
-          <textarea class={inputClass} rows={2} value={latestUpdate()} onInput={(e) => setLatestUpdate(e.currentTarget.value)} />
-        </Field>
-        <Field label="Repair details" span="full">
-          <textarea class={inputClass} rows={2} value={repairDetails()} onInput={(e) => setRepairDetails(e.currentTarget.value)} />
-        </Field>
+        <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status" fallbackRequired>
+          {(m) => (
+            <select
+              class={inputClass}
+              value={progressStatus()}
+              disabled={m.disabled}
+              onChange={(e) => setProgressStatus(e.currentTarget.value)}
+            >
+              <option value="received">Received</option>
+              <option value="finished">Finished</option>
+            </select>
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="scheduled_completion_date" fallbackLabel="Scheduled completion date">
+          {(m) => (
+            <DateInput value={scheduledDate()} disabled={m.disabled} onInput={(e) => setScheduledDate(e.currentTarget.value)} />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="latest_update" fallbackLabel="Latest update" span="full">
+          {(m) => (
+            <textarea
+              class={inputClass}
+              rows={2}
+              value={latestUpdate()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setLatestUpdate(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="repair_details" fallbackLabel="Repair details" span="full">
+          {(m) => (
+            <textarea
+              class={inputClass}
+              rows={2}
+              value={repairDetails()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setRepairDetails(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
       </div>
       <div class="rounded-lg border border-stroke bg-slate-50 px-4 py-3">
         <div class="mb-2 flex items-center justify-between">
@@ -438,8 +475,10 @@ export function RepairOrderModal(props: Props) {
         </Show>
       </div>
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <LookupCombo
-          label="Project"
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="project_id"
+          fallbackLabel="Project"
           value={projectLabel}
           selectedId={projectId}
           onInput={setProjectLabel}
@@ -454,12 +493,28 @@ export function RepairOrderModal(props: Props) {
           }}
           fetchOptions={fetchProjects}
         />
-        <Field label="Project name">
-          <input class={inputClass} value={projectName()} onInput={(e) => setProjectName(e.currentTarget.value)} />
-        </Field>
-        <Field label="Technician">
-          <input class={inputClass} value={technicianName()} onInput={(e) => setTechnicianName(e.currentTarget.value)} />
-        </Field>
+        <ModalField settings={byKey} fieldKey="project_name" fallbackLabel="Project name">
+          {(m) => (
+            <input
+              class={inputClass}
+              value={projectName()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setProjectName(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="technician_name" fallbackLabel="Technician">
+          {(m) => (
+            <input
+              class={inputClass}
+              value={technicianName()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setTechnicianName(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
       </div>
       <EditableLineGrid lines={lines} onChange={setLines} onSerialLotBlur={onSerialLotBlur} />
       <CustomFieldsSection entityType={INVENTORY_ENTITY.repairOrder} values={customValues} onChange={setCustom} />

@@ -15,6 +15,7 @@ import {
   createWorkspace,
   patchWorkItem,
   boardWorkItemsQueryKey,
+  FALLBACK_INDUSTRY_PACKS,
   useIndustryPacks,
   useInvalidateWorkItems,
   useInvalidateWorkspaces,
@@ -102,6 +103,12 @@ export default function OperationsHubPage() {
 
   const workspaces = useOperationsWorkspaces(() => ({ page: 1, pageSize: 100 }));
   const packs = useIndustryPacks();
+  const packOptions = createMemo(() => {
+    const loaded = packs.data;
+    if (loaded && loaded.length > 0) return loaded;
+    return FALLBACK_INDUSTRY_PACKS;
+  });
+  const selectedPack = createMemo(() => packOptions().find((p) => p.pack_code === wsPack()) ?? null);
   const activeWorkspaceId = workspaceId;
   const columns = useOperationsColumns(activeWorkspaceId);
 
@@ -198,7 +205,8 @@ export default function OperationsHubPage() {
     });
     setSaving(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not create workspace.");
+      const detail = res.errors ? Object.values(res.errors).filter(Boolean).join(" ") : "";
+      toast.warning(detail || res.message || "Could not create workspace.");
       return;
     }
     setWorkspaceModalOpen(false);
@@ -492,10 +500,23 @@ export default function OperationsHubPage() {
         <Field label="Industry pack">
           <select class={inputClass} value={wsPack()} onChange={(e) => setWsPack(e.currentTarget.value)}>
             <option value="">None (default columns)</option>
-            <For each={packs.data ?? []}>
-              {(p) => <option value={p.pack_code}>{p.pack_name}</option>}
+            <For each={packOptions()}>
+              {(p) => (
+                <option value={p.pack_code}>
+                  {p.pack_name}
+                  {p.summary ? ` — ${p.summary}` : ""}
+                </option>
+              )}
             </For>
           </select>
+          <Show when={packs.isError}>
+            <p class="mt-1 text-xs text-amber-700">
+              Could not refresh pack list from server; showing built-in packs.
+            </p>
+          </Show>
+          <Show when={selectedPack()?.summary}>
+            <p class="mt-1 text-xs text-text-secondary">{selectedPack()!.summary}</p>
+          </Show>
         </Field>
         <p class="text-xs text-text-secondary">
           Creating a workspace also provisions linked inventory and job-cost projects.

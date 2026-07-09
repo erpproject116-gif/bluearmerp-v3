@@ -1,8 +1,10 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
-import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import type { LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
+import { ModalField } from "../../../shared/ModalField";
+import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
@@ -153,7 +155,7 @@ export function QuotationModal(props: Props) {
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
-  const { fields, activeCustomFields } = useFormFieldSettings(QUOTATION_ENTITY.quotation);
+  const { fields, byKey, activeCustomFields } = useFormFieldSettings(QUOTATION_ENTITY.quotation);
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const [saving, setSaving] = createSignal(false);
   const [createdQuotation, setCreatedQuotation] = createSignal<QuotationDetail | null>(null);
@@ -473,37 +475,53 @@ export function QuotationModal(props: Props) {
       <Field label="Reference No.">
         <input class={inputClass} value={referenceNo()} readOnly />
       </Field>
-      <Field label="Date *">
-        <DateInput value={orderDate()} onInput={(e) => setOrderDate(e.currentTarget.value)} />
-      </Field>
-      <Field label="Transaction type *">
-        <select
-          class={inputClass}
-          value={taxTypeId() ?? ""}
-          onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-        >
-          <option value="">Select…</option>
-          <For each={taxTypes()}>
-            {(t) => (
-              <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
-            )}
-          </For>
-        </select>
-        <Show when={selectedTaxType()}>
-          {(t) => (
-            <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
-          )}
-        </Show>
-      </Field>
-      <Field label="Currency *">
-        <select class={inputClass} value={currencyId() ?? ""} onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}>
-          <option value="">Select…</option>
-          <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
-        </select>
-      </Field>
-      <LookupCombo
-        label="Customer *"
-        required
+      <ModalField settings={byKey} fieldKey="order_date" fallbackLabel="Date" fallbackRequired>
+        {(m) => (
+          <DateInput value={orderDate()} disabled={m.disabled} onInput={(e) => setOrderDate(e.currentTarget.value)} />
+        )}
+      </ModalField>
+      <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
+        {(m) => (
+          <>
+            <select
+              class={inputClass}
+              value={taxTypeId() ?? ""}
+              disabled={m.disabled}
+              onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
+            >
+              <option value="">Select…</option>
+              <For each={taxTypes()}>
+                {(t) => (
+                  <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
+                )}
+              </For>
+            </select>
+            <Show when={selectedTaxType()}>
+              {(t) => (
+                <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
+              )}
+            </Show>
+          </>
+        )}
+      </ModalField>
+      <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
+        {(m) => (
+          <select
+            class={inputClass}
+            value={currencyId() ?? ""}
+            disabled={m.disabled}
+            onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
+          >
+            <option value="">Select…</option>
+            <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
+          </select>
+        )}
+      </ModalField>
+      <ModalLookupField
+        settings={byKey}
+        fieldKey="partner_id"
+        fallbackLabel="Customer"
+        fallbackRequired
         value={customerLabel}
         selectedId={partnerId}
         onInput={setCustomerLabel}
@@ -522,8 +540,10 @@ export function QuotationModal(props: Props) {
           setShowNewCustomer(true);
         }}
       />
-      <LookupCombo
-        label="PIC"
+      <ModalLookupField
+        settings={byKey}
+        fieldKey="pic_name"
+        fallbackLabel="PIC"
         value={picName}
         selectedId={picUserId}
         onInput={setPicName}
@@ -537,9 +557,11 @@ export function QuotationModal(props: Props) {
         }}
         fetchOptions={fetchUsers}
       />
-      <LookupCombo
-        label="Location *"
-        required
+      <ModalLookupField
+        settings={byKey}
+        fieldKey="location_id"
+        fallbackLabel="Location-Out"
+        fallbackRequired
         value={locationLabel}
         selectedId={locationId}
         onInput={setLocationLabel}
@@ -553,15 +575,31 @@ export function QuotationModal(props: Props) {
         }}
         fetchOptions={fetchLocations}
       />
-      <Field label="Progress status">
-        <ProgressStatusMenu value={progressStatus()} onChange={setProgressStatus} />
-      </Field>
-      <Field label="Quotation validity">
-        <input class={inputClass} value={validityText()} placeholder="e.g. 30 days" onInput={(e) => setValidityText(e.currentTarget.value)} />
-      </Field>
-      <Field label="Payment terms">
-        <input class={inputClass} value={paymentTerms()} onInput={(e) => setPaymentTerms(e.currentTarget.value)} />
-      </Field>
+      <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status" fallbackRequired>
+        {(m) => <ProgressStatusMenu value={progressStatus()} disabled={m.disabled} onChange={setProgressStatus} />}
+      </ModalField>
+      <ModalField settings={byKey} fieldKey="quotation_validity_text" fallbackLabel="Quotation validity">
+        {(m) => (
+          <input
+            class={inputClass}
+            value={validityText()}
+            placeholder={m.placeholder ?? "e.g. 30 days"}
+            disabled={m.disabled}
+            onInput={(e) => setValidityText(e.currentTarget.value)}
+          />
+        )}
+      </ModalField>
+      <ModalField settings={byKey} fieldKey="payment_terms" fallbackLabel="Payment terms">
+        {(m) => (
+          <input
+            class={inputClass}
+            value={paymentTerms()}
+            placeholder={m.placeholder}
+            disabled={m.disabled}
+            onInput={(e) => setPaymentTerms(e.currentTarget.value)}
+          />
+        )}
+      </ModalField>
       <AttachmentsField
         scope="quotation/quotations"
         formOpen={props.open}
@@ -570,14 +608,34 @@ export function QuotationModal(props: Props) {
         required={policyRequiresAttachment(processPolicy.data, "quotation")}
         onCountChange={setAttachmentCount}
       />
-      <Field label="Note for PIC only" span="full">
-        <textarea class={inputClass} rows={2} value={noteForPic()} onInput={(e) => setNoteForPic(e.currentTarget.value)} />
-      </Field>
-      <Field label="Notes" span="full">
-        <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
-      </Field>
-      <LookupCombo
-        label="Project"
+      <ModalField settings={byKey} fieldKey="note_for_pic_only" fallbackLabel="Note for PIC only" span="full">
+        {(m) => (
+          <textarea
+            class={inputClass}
+            rows={2}
+            value={noteForPic()}
+            placeholder={m.placeholder}
+            disabled={m.disabled}
+            onInput={(e) => setNoteForPic(e.currentTarget.value)}
+          />
+        )}
+      </ModalField>
+      <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
+        {(m) => (
+          <textarea
+            class={inputClass}
+            rows={2}
+            value={notes()}
+            placeholder={m.placeholder}
+            disabled={m.disabled}
+            onInput={(e) => setNotes(e.currentTarget.value)}
+          />
+        )}
+      </ModalField>
+      <ModalLookupField
+        settings={byKey}
+        fieldKey="project_id"
+        fallbackLabel="Project"
         value={projectLabel}
         selectedId={projectId}
         onInput={setProjectLabel}

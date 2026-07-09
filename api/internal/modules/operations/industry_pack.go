@@ -89,13 +89,30 @@ func loadIndustryPack(code string) (IndustryPack, error) {
 }
 
 func listIndustryPacks() []map[string]string {
-	return []map[string]string{
-		{"pack_code": "general", "pack_name": "General SME"},
-		{"pack_code": "construction", "pack_name": "Construction"},
-		{"pack_code": "professional_services", "pack_name": "Professional Services"},
-		{"pack_code": "warehouse", "pack_name": "Warehouse / Logistics"},
-		{"pack_code": "job_shop", "pack_name": "Engineering / Job Shop"},
+	codes := []string{"general", "construction", "professional_services", "warehouse", "job_shop"}
+	out := make([]map[string]string, 0, len(codes))
+	for _, code := range codes {
+		pack, err := loadIndustryPack(code)
+		if err != nil {
+			continue
+		}
+		summary := fmt.Sprintf("%d Kanban columns", len(pack.Columns))
+		if n := len(pack.SampleWorkItems); n > 0 {
+			summary += fmt.Sprintf(", %d starter tasks", n)
+		}
+		if len(pack.DashboardWidgets) > 0 {
+			summary += ", dashboard widgets"
+		}
+		if len(pack.AutomationRules) > 0 {
+			summary += ", automation rules"
+		}
+		out = append(out, map[string]string{
+			"pack_code": pack.PackCode,
+			"pack_name": pack.PackName,
+			"summary":   summary,
+		})
 	}
+	return out
 }
 
 func offsetDate(days int) *time.Time {
