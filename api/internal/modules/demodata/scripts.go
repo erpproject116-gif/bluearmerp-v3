@@ -29,6 +29,8 @@ var PopulateScripts = []string{
 	"seed-demo-finance.sql",
 	"seed-demo-finance-ap.sql",
 	"seed-demo-crm.sql",
+	"seed-demo-operations.sql",
+	"seed-demo-comms.sql",
 	"seed-demo-dashboard.sql",
 	// Per-industry transactional copy overlay (base = no-op; industry folders
 	// re-theme printed narrative on seeded documents). Runs last so it can

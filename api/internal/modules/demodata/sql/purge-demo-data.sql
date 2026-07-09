@@ -168,6 +168,37 @@ begin
 
     -- CRM demo records (keep alert rules — seeds use on conflict)
     delete from public.crm_notifications where tenant_id = v_tenant;
+
+    -- Operations Hub (before CRM tasks — wm_work_items may reference legacy_crm_task_id)
+    delete from public.wm_links
+    where work_item_id in (select id from public.wm_work_items where tenant_id = v_tenant);
+
+    update public.wm_work_items set blocked_by_item_id = null where tenant_id = v_tenant;
+
+    delete from public.wm_work_items where tenant_id = v_tenant;
+
+    delete from public.wm_dashboard_widgets
+    where dashboard_id in (select id from public.wm_dashboards where tenant_id = v_tenant);
+
+    delete from public.wm_dashboards where tenant_id = v_tenant;
+    delete from public.wm_automation_rules where tenant_id = v_tenant;
+
+    delete from public.wm_columns
+    where workspace_id in (select id from public.wm_workspaces where tenant_id = v_tenant);
+
+    delete from public.wm_workspaces where tenant_id = v_tenant;
+
+    delete from public.job_cost_projects
+    where tenant_id = v_tenant and project_code in ('demo-riverside-reno', 'crm-follow-up');
+
+    -- Communications demo (keep email templates — re-seeded by migration / seed-demo-comms)
+    delete from public.com_thread_links
+    where sent_message_id in (select id from public.com_sent_messages where tenant_id = v_tenant);
+
+    delete from public.com_mail_messages where tenant_id = v_tenant;
+    delete from public.com_sent_messages where tenant_id = v_tenant;
+    delete from public.com_gmail_connections where tenant_id = v_tenant;
+
     delete from public.crm_follow_up_tasks where tenant_id = v_tenant;
     delete from public.crm_warranty_assets where tenant_id = v_tenant;
 

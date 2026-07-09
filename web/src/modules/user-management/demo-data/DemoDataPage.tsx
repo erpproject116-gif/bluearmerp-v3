@@ -93,6 +93,8 @@ export default function DemoDataPage() {
     golden_s8_ap: "Golden S8 (supplier invoice + payment)",
     open_po_demogr902: "Open PO receive demo (DEMOGR902)",
     golden_s11_standalone_po: "Golden S11 (standalone PO, no PR)",
+    demo_operations_workspace: "Operations Hub demo workspace (Riverside renovation)",
+    demo_comms_sent: "Communications demo sent messages",
     reconciliation_clean: "Reconciliation gaps (should be 0)",
   };
 
@@ -165,7 +167,8 @@ export default function DemoDataPage() {
 
                 <p class="text-xs text-slate-500">
                   Populate runs inventory baseline, quotations, purchase/sales chains, golden scenarios S2–S10,
-                  finance AP, CRM fixtures, dashboard red flags, then verifies the full chain.
+                  finance AP, CRM fixtures, Operations Hub (Riverside renovation), Communications sent/inbox stubs,
+                  dashboard red flags, then verifies the full chain.
                 </p>
               </div>
             </Show>

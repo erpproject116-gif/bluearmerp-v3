@@ -70,6 +70,12 @@ func loadStatus(ctx context.Context, pool *pgxpool.Pool, tenantID int64, canMana
 		{"golden_s11_standalone_po", `select exists(
 			select 1 from public.po_purchase_orders
 			where tenant_id = $1 and purchase_order_no = 'DEMO-S11-PO' and purchase_request_id is null)`},
+		{"demo_operations_workspace", `select exists(
+			select 1 from public.wm_workspaces
+			where tenant_id = $1 and workspace_code = 'demo-riverside-reno')`},
+		{"demo_comms_sent", `select exists(
+			select 1 from public.com_sent_messages
+			where tenant_id = $1 and subject like 'DEMO-COMMS-%')`},
 	}
 
 	for _, c := range checks {
@@ -87,6 +93,10 @@ func loadStatus(ctx context.Context, pool *pgxpool.Pool, tenantID int64, canMana
 		"sales_orders":     `select count(*)::int from public.so_sales_orders where tenant_id = $1 and deleted_at is null`,
 		"sales_invoices":   `select count(*)::int from public.sa_sales where tenant_id = $1 and deleted_at is null`,
 		"delivery_receipts": `select count(*)::int from public.dr_delivery_receipts where tenant_id = $1 and deleted_at is null`,
+		"operations_workspaces": `select count(*)::int from public.wm_workspaces where tenant_id = $1`,
+		"operations_work_items": `select count(*)::int from public.wm_work_items where tenant_id = $1`,
+		"comms_sent_messages": `select count(*)::int from public.com_sent_messages where tenant_id = $1`,
+		"comms_inbox_stub": `select count(*)::int from public.com_mail_messages where tenant_id = $1 and is_stub = true`,
 	}
 
 	for key, q := range countQueries {
