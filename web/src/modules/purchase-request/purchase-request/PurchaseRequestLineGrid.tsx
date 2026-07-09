@@ -10,6 +10,7 @@ import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/Resiz
 import { useResizableColumns } from "../../../shared/useResizableColumns";
 import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
 import { applyColumnLabels, lineViewKey, useColumnLabelSettings } from "../../../shared/useColumnLabelSettings";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { PartnerSearchModal, type PartnerSearchRow } from "./PartnerSearchModal";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
@@ -295,13 +296,13 @@ export function PurchaseRequestLineGrid(props: Props) {
   return (
     <div class="col-span-full">
       <div class="mb-2 flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-text-primary">Line items</h3>
+        <h3 class="text-sm font-semibold text-text-primary">{uiLabel("lines.heading")}</h3>
         <button type="button" class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50" onClick={addLine}>
-          + Line
+          {uiLabel("lines.add_button")}
         </button>
       </div>
       <Show when={!props.taxTypeId()}>
-        <p class="mb-2 text-xs text-amber-700">Select a transaction type to apply tax rates to line amounts.</p>
+        <p class="mb-2 text-xs text-amber-700">{uiLabel("lines.tax_hint")}</p>
       </Show>
       <DataTableScroll class="rounded-lg border border-stroke">
         <table class="erp-grid text-xs" style={{ width: `${tableWidth()}px`, "min-width": "100%" }}>
@@ -332,7 +333,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                         value={line().partner_code}
                         readOnly
                         onDblClick={() => openPartnerSearch(idx)}
-                        title="Double-click to search partner"
+                        title={uiLabel("lines.partner_search_hint")}
                       />
                     </ResizableTd>
                     <ResizableTd width={widthFor("partner_name")} class="px-2 py-1">
@@ -341,7 +342,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                         value={line().partner_name}
                         readOnly
                         onDblClick={() => openPartnerSearch(idx)}
-                        title="Double-click to search partner"
+                        title={uiLabel("lines.partner_search_hint")}
                       />
                     </ResizableTd>
                   </Show>
@@ -351,7 +352,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                       value={line().item_code}
                       readOnly
                       onDblClick={() => openItemSearch(idx)}
-                      title="Double-click to search items"
+                      title={uiLabel("lines.item_search_hint")}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">

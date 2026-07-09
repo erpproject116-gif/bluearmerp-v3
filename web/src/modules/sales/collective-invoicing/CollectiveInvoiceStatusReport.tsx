@@ -11,6 +11,7 @@ import { CollectiveInvoiceTransactionsModal } from "./CollectiveInvoiceTransacti
 import { formatDisplayDate, filtersToSearchParams, type CollectiveInvoiceStatusFilters } from "./collectiveInvoiceStatusFilters";
 import { templateToSearchParams, type CollectiveInvoiceStatusTemplate, type InvoiceSortField } from "./collectiveInvoiceStatusTemplate";
 import { createSignal } from "solid-js";
+import { LoadingText } from "../../../shared/LoadingText";
 
 type Props = {
   filters: CollectiveInvoiceStatusFilters;
@@ -136,7 +137,7 @@ export function CollectiveInvoiceStatusReport(props: Props) {
           </button>
         </div>
       </div>
-      <Show when={props.loading}><p class="text-sm text-text-secondary">Loading…</p></Show>
+      <Show when={props.loading}><LoadingText class="text-sm text-text-secondary" as="p" /></Show>
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead class="border-b border-stroke bg-slate-50 text-left text-text-secondary">

@@ -4,6 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { FinanceLayout } from "./FinanceLayout";
+import { LoadingText } from "../../shared/LoadingText";
 
 type BankAccount = { id: number; bank_account_code: string; bank_account_name: string };
 type UnmatchedPayment = {
@@ -168,7 +169,7 @@ export default function BankReconciliationPage() {
             <div class="text-sm font-semibold">Statement lines (unmatched)</div>
             <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-text-secondary">{statementCount()}</span>
           </div>
-          <Show when={!statements.isLoading} fallback={<p class="p-4 text-sm text-slate-500">Loading…</p>}>
+          <Show when={!statements.isLoading} fallback={<LoadingText class="p-4 text-sm text-slate-500" as="p" />}>
             <Show
               when={(statements.data ?? []).length > 0}
               fallback={<p class="p-4 text-sm text-text-secondary">No unmatched statement lines. Import a bank statement or clear filters.</p>}
@@ -210,7 +211,7 @@ export default function BankReconciliationPage() {
             <div class="text-sm font-semibold">Unmatched payments</div>
             <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-text-secondary">{unmatchedCount()}</span>
           </div>
-          <Show when={!unmatched.isLoading} fallback={<p class="p-4 text-sm text-slate-500">Loading…</p>}>
+          <Show when={!unmatched.isLoading} fallback={<LoadingText class="p-4 text-sm text-slate-500" as="p" />}>
             <Show
               when={sortedUnmatched().length > 0}
               fallback={<p class="p-4 text-sm text-text-secondary">No unmatched official receipts or payment vouchers for this filter.</p>}

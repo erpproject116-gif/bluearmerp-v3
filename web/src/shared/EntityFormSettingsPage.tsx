@@ -16,6 +16,7 @@ import {
   type ColumnLabelSetting,
   useColumnLabelSettings,
 } from "./useColumnLabelSettings";
+import { uiLabel } from "./branding/uiLabel";
 
 type Props = {
   entityType: string;
@@ -215,12 +216,12 @@ export function EntityFormSettingsPage(props: Props) {
             <A href={props.listHref} class="text-brand-600 hover:underline">
               {props.featureLabel}
             </A>
-            {" / "}Form settings
+            {" / "}{uiLabel("form_settings.breadcrumb_suffix")}
           </p>
-          <h2 class="mt-1 text-lg font-semibold text-text-primary">{props.featureLabel} form fields</h2>
-          <p class="mt-1 text-sm text-text-secondary">
-            Configure labels, visibility, required rules, and custom fields for the new-row form.
-          </p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">
+            {props.featureLabel} {uiLabel("form_settings.page_title_suffix")}
+          </h2>
+          <p class="mt-1 text-sm text-text-secondary">{uiLabel("form_settings.description")}</p>
         </div>
         <Show when={canEdit()}>
           <div class="flex flex-wrap gap-2">
@@ -230,7 +231,7 @@ export function EntityFormSettingsPage(props: Props) {
               disabled={saving() || !dirty()}
               onClick={() => void save()}
             >
-              Save form fields
+              {uiLabel("form_settings.save_fields")}
             </button>
             <Show when={showLineColumns()}>
               <button
@@ -239,7 +240,7 @@ export function EntityFormSettingsPage(props: Props) {
                 disabled={saving() || !columnDirty()}
                 onClick={() => void saveColumnLabels()}
               >
-                Save line columns
+                {uiLabel("form_settings.save_line_columns")}
               </button>
             </Show>
           </div>
@@ -271,7 +272,7 @@ export function EntityFormSettingsPage(props: Props) {
             <Show when={query.isFetching && !fields().length}>
               <tr>
                 <td colSpan={9} class="px-4 py-8 text-center text-text-secondary">
-                  Loading…
+                  {uiLabel("common.loading")}
                 </td>
               </tr>
             </Show>
@@ -362,8 +363,8 @@ export function EntityFormSettingsPage(props: Props) {
       <Show when={showLineColumns()}>
         <div class="mt-10 overflow-hidden rounded-xl border border-stroke bg-white shadow-sm">
           <div class="border-b border-stroke px-4 py-3">
-            <h3 class="text-sm font-semibold text-text-primary">Line item column labels</h3>
-            <p class="mt-1 text-xs text-text-secondary">Customize headers shown in the line items grid for this feature.</p>
+            <h3 class="text-sm font-semibold text-text-primary">{uiLabel("form_settings.line_column_heading")}</h3>
+            <p class="mt-1 text-xs text-text-secondary">{uiLabel("form_settings.line_column_description")}</p>
           </div>
           <table class="erp-grid w-full text-left text-sm">
             <thead class="text-xs uppercase tracking-wide text-text-secondary">
@@ -395,7 +396,7 @@ export function EntityFormSettingsPage(props: Props) {
 
       <Show when={canEdit()}>
         <div class="mt-8">
-          <h3 class="mb-3 text-sm font-semibold text-text-primary">Add custom field</h3>
+          <h3 class="mb-3 text-sm font-semibold text-text-primary">{uiLabel("form_settings.add_custom_field")}</h3>
           <div class="grid grid-cols-1 gap-3 rounded-xl border border-dashed border-brand-200 bg-brand-50/40 p-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Field label">
               <input class={inputClass} value={newLabel()} onInput={(e) => setNewLabel(e.currentTarget.value)} placeholder="e.g. Tax ID" />

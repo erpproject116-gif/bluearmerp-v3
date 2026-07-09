@@ -8,6 +8,7 @@ import { CrmNotificationBell } from "../shared/CrmNotificationBell";
 import { CrmNotificationPoller } from "../shared/CrmNotificationPoller";
 import { PresenceAvatars } from "../shared/PresenceAvatars";
 import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
+import { IdleLogoutGuard } from "../shared/IdleLogoutGuard";
 import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ShellProvider, useShell } from "./shell-context";
 import { featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
@@ -203,6 +204,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             </div>
             <div class="flex shrink-0 items-center gap-2">
               <PresenceHeartbeat />
+              <IdleLogoutGuard />
               <PresenceAvatars />
               <CrmNotificationPoller enabled={canViewCrm(auth.me)} />
               <Show when={canViewCrm(auth.me)}>

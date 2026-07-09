@@ -1,6 +1,7 @@
 import { For, Show, createSignal } from "solid-js";
 import { canViewChangeLogs, useAuth } from "./auth-context";
 import { useChangeLogList } from "./useChangeLogList";
+import { LoadingText } from "../shared/LoadingText";
 
 type Props = {
   /** Backend target_type, e.g. "sa_sales", "so_sales_order", "quo_quotation". */
@@ -65,7 +66,7 @@ export function ChangeLogPanel(props: Props) {
         <Show when={open()}>
           <div class="border-t border-stroke px-3 py-2">
             <Show when={list.isLoading}>
-              <p class="py-2 text-sm text-text-secondary">Loading…</p>
+              <LoadingText class="py-2 text-sm text-text-secondary" as="p" />
             </Show>
             <Show when={!list.isLoading && !list.isError}>
               <Show

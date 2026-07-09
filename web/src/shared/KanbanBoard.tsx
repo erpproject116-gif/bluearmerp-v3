@@ -8,6 +8,7 @@ import {
 } from "@thisbeyond/solid-dnd";
 import type { JSX } from "solid-js";
 import { For, Show, onMount } from "solid-js";
+import { LoadingText } from "../shared/LoadingText";
 
 export type KanbanColumn<T> = {
   id: string;
@@ -80,7 +81,7 @@ function KanbanBoardInner<T>(props: BoardInnerProps<T>) {
             <DroppableColumn id={col.id}>
               <div class="space-y-2 p-2">
                 <Show when={props.loading}>
-                  <p class="py-4 text-center text-xs text-text-secondary">Loading…</p>
+                  <LoadingText class="py-4 text-center text-xs text-text-secondary" as="p" />
                 </Show>
                 <For each={col.items}>
                   {(item) => (

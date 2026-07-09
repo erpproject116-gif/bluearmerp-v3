@@ -14,6 +14,7 @@ import {
   type FollowUpTaskStage,
 } from "./useFollowUpTasks";
 import { useToast } from "./toast";
+import { LoadingText } from "../shared/LoadingText";
 
 type Props = {
   taskId: () => number | null;
@@ -150,7 +151,7 @@ export function FollowUpTaskDetailModal(props: Props) {
       singleColumn
     >
       <Show when={loading()}>
-        <p class="text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
       <Show when={loadFailed()}>
         <p class="text-sm text-text-secondary">Task details could not be loaded.</p>

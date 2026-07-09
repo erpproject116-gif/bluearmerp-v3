@@ -14,6 +14,7 @@ import { GoodsReceiptScanPanel } from "../../../shared/GoodsReceiptScanPanel";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 
 const STATUS_TABS = [
   { value: "", label: "All" },
@@ -85,15 +86,15 @@ export default function GoodsReceiptListPage() {
     <PurchaseRequestLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-lg font-semibold text-text-primary">Goods Receipt List</h2>
-          <p class="text-sm text-text-secondary">Goods receipts created from purchase orders.</p>
+          <h2 class="text-lg font-semibold text-text-primary">{uiLabel("goods_receipt.list_title")}</h2>
+          <p class="text-sm text-text-secondary">{uiLabel("goods_receipt.list_description")}</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <A
             href="/app/inventory/serial-lot/receive"
             class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
-            Receive goods
+            {uiLabel("goods_receipt.receive_goods")}
           </A>
           <A
             href="/app/purchase-request/purchase-orders"

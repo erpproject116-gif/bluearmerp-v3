@@ -4,6 +4,7 @@ import { supabase } from "./api";
 import { useAuth } from "./auth-context";
 import { describePresencePath } from "./presenceLabels";
 import { clearPresence, sendPresenceHeartbeat } from "./usePresence";
+import { signOutApp } from "./signOut";
 
 const HEARTBEAT_MS = 45_000;
 const ROUTE_DEBOUNCE_MS = 750;
@@ -74,6 +75,5 @@ export function PresenceHeartbeat() {
 
 /** Clears presence on sign-out (call before supabase.auth.signOut). */
 export async function signOutWithPresenceClear() {
-  await clearPresence();
-  await supabase.auth.signOut();
+  await signOutApp();
 }

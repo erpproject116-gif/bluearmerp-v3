@@ -16,6 +16,7 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
@@ -861,7 +862,7 @@ export function SalesModal(props: Props) {
           scope="sales"
           formOpen={props.open}
           docId={props.editing?.id ?? createdSale()?.id}
-          label="Attachments (carried from Quotation/Sales Order)"
+          label={uiLabel("selling.attachments_sales")}
           required={policyRequiresAttachment(processPolicy.data, "sales")}
           onCountChange={setAttachmentCount}
         />

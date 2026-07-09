@@ -2,6 +2,7 @@ import { createEffect, createSignal, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { getAccessToken } from "../../../shared/api";
 import { Modal } from "../../../shared/Modal";
+import { LoadingText } from "../../../shared/LoadingText";
 import {
   collectiveTransactionsExportUrl,
   fetchCollectiveInvoiceTransactions,
@@ -68,7 +69,7 @@ export function CollectiveInvoiceTransactionsModal(props: Props) {
           Export CSV
         </button>
       </div>
-      <Show when={loading()}><p class="text-sm text-text-secondary">Loading…</p></Show>
+      <Show when={loading()}><LoadingText class="text-sm text-text-secondary" as="p" /></Show>
       <Show when={error()}><p class="text-sm text-red-600">{error()}</p></Show>
       <Show when={!loading() && !error()}>
         <div class="max-h-[60vh] overflow-auto">

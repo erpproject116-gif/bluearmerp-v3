@@ -5,6 +5,7 @@ import { getAccessToken } from "../../../shared/api";
 import { officialReceiptStatusExportUrl } from "../../../shared/useOfficialReceiptStatusReport";
 import type { OfficialReceiptStatusRow } from "../../../shared/useOfficialReceiptStatusReport";
 import { formatDisplayDate, type OfficialReceiptStatusFilters } from "./officialReceiptStatusFilters";
+import { LoadingText } from "../../../shared/LoadingText";
 
 type Props = {
   filters: OfficialReceiptStatusFilters;
@@ -55,7 +56,7 @@ export function OfficialReceiptStatusReport(props: Props) {
         </button>
       </div>
       <Show when={props.loading}>
-        <p class="text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm">

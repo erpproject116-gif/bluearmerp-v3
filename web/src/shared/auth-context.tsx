@@ -261,7 +261,7 @@ export const AuthProvider: ParentComponent = (props) => {
     }
 
     try {
-      const res = await apiFetch<MeData>("/api/v1/auth/me");
+      const res = await apiFetch<MeData>("/api/v1/auth/me", {}, background ? { background: true } : undefined);
       if (res.success && res.data) {
         // Keep the persisted active tenant in sync with what the server resolved, so
         // subsequent requests send a stable X-Tenant-ID header.

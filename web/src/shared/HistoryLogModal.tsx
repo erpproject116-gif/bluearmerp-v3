@@ -1,6 +1,7 @@
 import { For, Show, createMemo } from "solid-js";
 import { Modal } from "./Modal";
 import { useActivityLogList } from "./useActivityLogList";
+import { LoadingText } from "../shared/LoadingText";
 
 type Props = {
   /** Boolean or Solid accessor — accessor form keeps the query in sync when the modal opens. */
@@ -48,7 +49,7 @@ export function HistoryLogModal(props: Props) {
         fallback={<p class="py-4 text-sm text-text-secondary">Save the transaction first to see its history.</p>}
       >
         <Show when={list.isLoading}>
-          <p class="py-4 text-sm text-text-secondary">Loading…</p>
+          <LoadingText class="py-4 text-sm text-text-secondary" as="p" />
         </Show>
         <Show when={list.isError}>
           <p class="py-4 text-sm text-red-600">

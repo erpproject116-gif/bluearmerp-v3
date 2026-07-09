@@ -1,5 +1,6 @@
 import { createResource, createSignal, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
+import { LoadingText } from "../../shared/LoadingText";
 import {
   clearPortalToken,
   fetchPortalSession,
@@ -133,7 +134,7 @@ export default function PortalDashboardPage() {
           </nav>
 
           <Show when={list.loading}>
-            <p class="text-sm text-text-secondary">Loading…</p>
+            <LoadingText class="text-sm text-text-secondary" as="p" />
           </Show>
 
           <Show when={list.error}>

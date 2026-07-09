@@ -4,6 +4,7 @@ import { DecimalInput } from "./DecimalInput";
 import { ItemSearchModal, type ItemSearchRow } from "./ItemSearchModal";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
+import { uiLabel } from "./branding/uiLabel";
 
 export type RepairLineRow = {
   line_no: number;
@@ -96,9 +97,9 @@ export function EditableLineGrid(props: Props) {
   return (
     <div class="col-span-full mt-4">
       <div class="mb-2 flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-text-primary">Line items</h3>
+        <h3 class="text-sm font-semibold text-text-primary">{uiLabel("lines.heading")}</h3>
         <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50" onClick={addRow}>
-          + Add row
+          {uiLabel("lines.add_row")}
         </button>
       </div>
       <DataTableScroll class="rounded-xl border border-stroke">

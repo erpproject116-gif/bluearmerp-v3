@@ -8,6 +8,8 @@ import { formatPeso } from "./money";
 import { PrintToolbar } from "./PrintToolbar";
 import { PrintBrandingHeader } from "./branding/PrintBrandingHeader";
 import { PrintBrandingFooter } from "./branding/PrintBrandingFooter";
+import { uiLabel } from "./branding/uiLabel";
+import { PrintLoading } from "./LoadingText";
 import {
   loadInvoiceDocumentPrint,
   type InvoiceDocumentKind,
@@ -31,7 +33,7 @@ function AccountingBlock(props: { data: InvoiceDocumentPrintData }) {
 
   return (
     <section class="mt-8 border-t border-slate-300 pt-6">
-      <h2 class="quotation-print__section mb-3">Accounting voucher</h2>
+      <h2 class="quotation-print__section mb-3">{uiLabel("print.accounting_voucher")}</h2>
       <div class="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
         <div>
           <span class="text-slate-600">Journal entry: </span>
@@ -71,7 +73,7 @@ function AccountingBlock(props: { data: InvoiceDocumentPrintData }) {
       </div>
       <Show when={d().attachments.length > 0}>
         <div class="mt-4 text-sm">
-          <div class="mb-1 font-semibold">Attachments</div>
+          <div class="mb-1 font-semibold">{uiLabel("common.attachments")}</div>
           <ul class="list-disc pl-5 text-slate-700">
             <For each={d().attachments}>{(a) => <li>{a.file_name}</li>}</For>
           </ul>
@@ -126,15 +128,15 @@ function InvoiceDocumentArticle(props: { data: InvoiceDocumentPrintData }) {
 
       <div class="quotation-print__totals">
         <div class="quotation-print__totals-row">
-          <span>Pretax amount</span>
+          <span>{uiLabel("print.pretax_amount")}</span>
           <span>{money(d().pretax)}</span>
         </div>
         <div class="quotation-print__totals-row">
-          <span>Tax</span>
+          <span>{uiLabel("print.tax")}</span>
           <span>{money(d().tax)}</span>
         </div>
         <div class="quotation-print__totals-row">
-          <span>Grand total</span>
+          <span>{uiLabel("print.grand_total")}</span>
           <span>{money(d().grand)}</span>
         </div>
       </div>
@@ -168,7 +170,7 @@ export function InvoiceDocumentPrintView(props: { kind: InvoiceDocumentKind; doc
   return (
     <div class="quotation-print">
       <Show when={data.loading}>
-        <p class="quotation-print__loading">Loading…</p>
+        <PrintLoading />
       </Show>
       <Show when={data.error}>
         <p class="quotation-print__error">{String(data.error)}</p>

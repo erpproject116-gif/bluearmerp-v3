@@ -8,6 +8,7 @@ import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
 import { useToast } from "./toast";
 import { brandingPlaceholder } from "./branding/brandingStore";
+import { uiLabel } from "./branding/uiLabel";
 
 export type Column<T> = {
   key: string;
@@ -159,16 +160,16 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
         <div class="flex flex-wrap items-end gap-3">
           <Show when={props.onStatusChange}>
             <label class="shrink-0">
-              <span class="mb-1 block text-xs font-medium text-text-primary">{props.statusLabel ?? "Status"}</span>
+              <span class="mb-1 block text-xs font-medium text-text-primary">{props.statusLabel ?? uiLabel("common.status")}</span>
               <select
                 class={toolbarControlClass}
                 value={props.status ?? ""}
                 onChange={(e) => props.onStatusChange?.(e.currentTarget.value)}
               >
                 <For each={props.statusOptions ?? [
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                  { value: "", label: "All" },
+                  { value: "active", label: uiLabel("common.status_active") },
+                  { value: "inactive", label: uiLabel("common.status_inactive") },
+                  { value: "", label: uiLabel("common.status_all") },
                 ]}>
                   {(opt) => <option value={opt.value}>{opt.label}</option>}
                 </For>
@@ -177,7 +178,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           </Show>
           <Show when={props.onSearchChange}>
             <label class="relative min-w-[200px] flex-1 sm:max-w-xs">
-              <span class="mb-1 block text-xs font-medium text-text-primary">Search</span>
+              <span class="mb-1 block text-xs font-medium text-text-primary">{uiLabel("common.search")}</span>
               <div class="relative">
                 <svg
                   class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
@@ -200,7 +201,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               </div>
             </label>
           </Show>
-          <span class="hidden flex-1 pb-2 text-sm text-text-secondary lg:inline">F2 new · ↑↓ navigate · Enter edit · click headers to sort</span>
+          <span class="hidden flex-1 pb-2 text-sm text-text-secondary lg:inline">{uiLabel("common.grid_hint")}</span>
           <div class="ml-auto flex shrink-0 items-center gap-2 pb-0.5">
             {props.toolbarExtra}
             <Show when={props.itemsCsvImport}>
@@ -210,7 +211,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                 disabled={importing()}
                 onClick={() => void downloadItemsImportTemplate()}
               >
-                Download template
+                {uiLabel("common.download_template")}
               </button>
               <button
                 type="button"
@@ -218,7 +219,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                 disabled={importing()}
                 onClick={() => fileInputEl?.click()}
               >
-                {importing() ? "Importing…" : "Import CSV"}
+                {importing() ? uiLabel("common.importing") : uiLabel("common.import_csv")}
               </button>
               <input
                 ref={fileInputEl}
@@ -237,7 +238,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                 class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
                 onClick={() => props.onRefresh?.()}
               >
-                Refresh
+                {uiLabel("common.refresh")}
               </button>
             </Show>
             <Show when={props.settingsHref}>
@@ -263,14 +264,14 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
               onClick={() => props.onNew()}
             >
-              + New row
+              {uiLabel("common.new_row")}
             </button>
             </Show>
           </div>
         </div>
       </div>
       <Show when={props.loading && props.rows.length === 0}>
-        <p class="p-8 text-center text-sm text-text-secondary">Loading…</p>
+        <p class="p-8 text-center text-sm text-text-secondary">{uiLabel("common.loading")}</p>
       </Show>
       <Show when={!props.loading || props.rows.length > 0}>
         <DataTableScroll maxHeight="calc(100vh - 16rem)">
@@ -348,17 +349,17 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             </tbody>
           </table>
           <Show when={props.rows.length === 0 && !props.loading}>
-            <p class="p-8 text-center text-sm text-text-secondary">No rows yet. Press F2 to create one.</p>
+            <p class="p-8 text-center text-sm text-text-secondary">{uiLabel("common.no_rows")}</p>
           </Show>
         </DataTableScroll>
         <Show when={props.total !== undefined && props.page !== undefined && props.pageSize !== undefined}>
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3">
             <span class="text-sm text-text-secondary">
               {props.total === 0
-                ? "No results"
+                ? uiLabel("common.no_results")
                 : `Showing ${rangeStart()}–${rangeEnd()} of ${props.total}`}
               <Show when={props.loading}>
-                <span class="ml-2 text-brand-600">Updating…</span>
+                <span class="ml-2 text-brand-600">{uiLabel("common.updating")}</span>
               </Show>
             </span>
             <div class="flex items-center gap-2">
@@ -368,7 +369,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                 disabled={(props.page ?? 1) <= 1}
                 onClick={() => props.onPageChange?.((props.page ?? 1) - 1)}
               >
-                Previous
+                {uiLabel("common.previous")}
               </button>
               <span class="text-sm text-text-secondary">
                 Page {props.page} of {totalPages()}
@@ -379,7 +380,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                 disabled={(props.page ?? 1) >= totalPages()}
                 onClick={() => props.onPageChange?.((props.page ?? 1) + 1)}
               >
-                Next
+                {uiLabel("common.next")}
               </button>
             </div>
           </div>

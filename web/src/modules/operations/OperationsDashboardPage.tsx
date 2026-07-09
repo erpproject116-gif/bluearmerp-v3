@@ -5,6 +5,7 @@ import {
 } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
 import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
+import { uiLabel } from "../../shared/branding/uiLabel";
 
 type BVAData = {
   project_code?: string;
@@ -45,7 +46,7 @@ export default function OperationsDashboardPage() {
           </p>
         </Show>
         <Show when={(dashboards.isFetching || widgetData.isFetching) && !widgetData.data}>
-          <p class="text-sm text-text-secondary">Loading widgets…</p>
+          <p class="text-sm text-text-secondary">{uiLabel("operations.loading_widgets")}</p>
         </Show>
         <div class="grid gap-4 md:grid-cols-2">
           <For each={widgetData.data ?? []}>
@@ -114,7 +115,7 @@ export default function OperationsDashboardPage() {
           </For>
         </div>
         <Show when={!widgetData.isFetching && widgetData.data && widgetData.data.length === 0}>
-          <p class="text-sm text-text-secondary">No dashboard widgets yet. Create a workspace with the Construction industry pack.</p>
+          <p class="text-sm text-text-secondary">{uiLabel("operations.no_widgets")}</p>
         </Show>
       </Show>
     </OperationsLayout>

@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/solid-query";
 import { useSearchParams } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { inputClass } from "../../shared/SpreadsheetGrid";
+import { LoadingText } from "../../shared/LoadingText";
 import {
   boardWorkItemsQueryKey,
   fetchOperationsBoardWorkItems,
@@ -116,7 +117,7 @@ export function OperationsWorkspaceSelector(props: { class?: string; allowAll?: 
         </For>
       </select>
       <Show when={workspaces.isFetching}>
-        <span class="text-xs text-text-secondary">Loading…</span>
+        <LoadingText class="text-xs text-text-secondary" as="span" />
       </Show>
     </div>
   );

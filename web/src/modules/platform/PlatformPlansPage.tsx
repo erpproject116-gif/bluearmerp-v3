@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
 import { For, Show } from "solid-js";
 import { usePlatformPlansAdmin } from "../../shared/usePlatform";
+import { LoadingText } from "../../shared/LoadingText";
 
 
 
@@ -94,7 +95,7 @@ export default function PlatformPlansPage() {
           <p class="text-sm text-red-600">Failed to load plans.</p>
         </Show>
       }>
-        <p class="text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
     </div>
   );

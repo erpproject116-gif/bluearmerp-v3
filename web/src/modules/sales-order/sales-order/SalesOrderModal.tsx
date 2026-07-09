@@ -15,6 +15,7 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
@@ -691,7 +692,7 @@ export function SalesOrderModal(props: Props) {
           scope="sales-order/sales-orders"
           formOpen={props.open}
           docId={effectiveEditing()?.id}
-          label="Attachments (carried from Quotation, on to Sales)"
+          label={uiLabel("selling.attachments_sales_order")}
           required={policyRequiresAttachment(processPolicy.data, "sales_order")}
           onCountChange={setAttachmentCount}
         />

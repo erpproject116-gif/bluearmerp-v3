@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
+import { LoadingText } from "../../shared/LoadingText";
 
 type ReconciliationCategory = {
   code: string;
@@ -50,7 +51,7 @@ export default function StockReconciliationPage() {
         </p>
       </div>
 
-      <Show when={!summary.isLoading} fallback={<p class="text-sm text-slate-500">Loading…</p>}>
+      <Show when={!summary.isLoading} fallback={<LoadingText class="text-sm text-slate-500" as="p" />}>
         <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p class="text-sm text-slate-700">
             Total gaps: <strong class={summary.data?.total_count ? "text-red-700" : "text-emerald-700"}>{summary.data?.total_count ?? 0}</strong>

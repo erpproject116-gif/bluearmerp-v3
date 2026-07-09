@@ -9,6 +9,7 @@ import {
   PLACEHOLDER_PRESETS,
   STAGE_KEYS,
 } from "../../shared/branding/defaults";
+import { UI_COPY_GROUPS } from "../../shared/branding/uiCopyCatalog";
 import type { BrandingColors, BrandingReceipt, BrandingSettings } from "../../shared/branding/types";
 import { StageBadge } from "../../shared/branding/StageBadge";
 import { progressStatusLabel } from "../../shared/branding/progressStatus";
@@ -238,7 +239,8 @@ export default function BrandingSettingsPage() {
       </section>
 
       <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
-        <h2 class="text-lg font-medium text-text-primary">Custom labels</h2>
+        <h2 class="text-lg font-medium text-text-primary">App &amp; progress labels</h2>
+        <p class="mt-1 text-sm text-text-secondary">Sidebar, sign-out, and workflow stage badge text.</p>
         <div class="mt-4 space-y-3">
           <For each={LABEL_PRESETS}>
             {(p) => (
@@ -251,6 +253,40 @@ export default function BrandingSettingsPage() {
                   onInput={(e) => patchLabel(p.key, e.currentTarget.value)}
                 />
               </Field>
+            )}
+          </For>
+        </div>
+      </section>
+
+      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
+        <h2 class="text-lg font-medium text-text-primary">Screen copy</h2>
+        <p class="mt-1 text-sm text-text-secondary">
+          Section headings, buttons, empty states, and filter labels across selling, purchasing, lists, and reports.
+        </p>
+        <div class="mt-6 space-y-8">
+          <For each={UI_COPY_GROUPS}>
+            {(group) => (
+              <div>
+                <h3 class="text-sm font-semibold text-text-primary">{group.title}</h3>
+                <Show when={group.description}>
+                  <p class="mt-0.5 text-xs text-text-secondary">{group.description}</p>
+                </Show>
+                <div class="mt-3 space-y-3">
+                  <For each={group.entries}>
+                    {(p) => (
+                      <Field label={`${p.label} (${p.key})`}>
+                        <input
+                          type="text"
+                          class={inputClass}
+                          placeholder={p.fallback}
+                          value={draft().labels[p.key] ?? ""}
+                          onInput={(e) => patchLabel(p.key, e.currentTarget.value)}
+                        />
+                      </Field>
+                    )}
+                  </For>
+                </div>
+              </div>
             )}
           </For>
         </div>

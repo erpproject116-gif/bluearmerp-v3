@@ -5,6 +5,7 @@ import { getAccessToken } from "../../../shared/api";
 import { formatDisplayDate, statusExportUrl, type SalesStatusFilters } from "./salesStatusFilters";
 import type { SalesStatusReportRow } from "../../../shared/useSalesStatusReport";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
+import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
 
 type Props = {
   filters: SalesStatusFilters;
@@ -76,18 +77,10 @@ export function SalesStatusReport(props: Props) {
           </thead>
           <tbody>
             <Show when={props.loading}>
-              <tr>
-                <td colSpan={13} class="px-3 py-8 text-center text-text-secondary">
-                  Loading…
-                </td>
-              </tr>
+              <ReportLoadingRow colSpan={13} />
             </Show>
             <Show when={!props.loading && props.rows.length === 0}>
-              <tr>
-                <td colSpan={13} class="px-3 py-8 text-center text-text-secondary">
-                  No rows match your filters.
-                </td>
-              </tr>
+              <ReportEmptyRow colSpan={13} />
             </Show>
             <For each={props.rows}>
               {(row) => (

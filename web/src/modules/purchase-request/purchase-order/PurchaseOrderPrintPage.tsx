@@ -17,6 +17,7 @@ import {
 import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
 import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import "../../quotation/quotation/quotationPrint.css";
+import { PrintLoading } from "../../../shared/LoadingText";
 
 function PurchaseOrderPrintView() {
   const params = useParams<{ purchaseOrderId: string }>();
@@ -33,7 +34,7 @@ function PurchaseOrderPrintView() {
   return (
     <div class="quotation-print">
       <Show when={data.loading}>
-        <p class="quotation-print__loading">Loading…</p>
+        <PrintLoading />
       </Show>
       <Show when={data.error}>
         <p class="quotation-print__error">{String(data.error)}</p>

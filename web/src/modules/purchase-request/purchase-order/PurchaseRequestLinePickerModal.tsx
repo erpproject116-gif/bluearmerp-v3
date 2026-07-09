@@ -2,6 +2,7 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
+import { LoadingText } from "../../../shared/LoadingText";
 
 export type OpenPurchaseRequestLineRow = {
   purchase_request_id: number;
@@ -114,7 +115,7 @@ export function PurchaseRequestLinePickerModal(props: Props) {
 
           <div class="max-h-[50vh] overflow-auto p-5">
             <Show when={data.loading}>
-              <p class="text-sm text-text-secondary">Loading…</p>
+              <LoadingText class="text-sm text-text-secondary" as="p" />
             </Show>
             <Show when={data.error}>
               <p class="text-sm text-red-600">{String(data.error)}</p>

@@ -1,5 +1,6 @@
 import { type Accessor, type JSX, Show } from "solid-js";
 import { useAuth } from "../auth-context";
+import { uiLabel } from "../branding/uiLabel";
 
 export type ReportPageLayoutProps = {
   title: string;
@@ -36,7 +37,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
         <Show when={showDates()}>
           <div class="mt-4 flex flex-wrap items-end gap-3">
             <label class="text-sm">
-              <span class="mb-1 block text-text-secondary">From</span>
+              <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
               <input
                 type="date"
                 class="rounded-lg border border-stroke px-3 py-2"
@@ -45,7 +46,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
               />
             </label>
             <label class="text-sm">
-              <span class="mb-1 block text-text-secondary">To</span>
+              <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_to")}</span>
               <input
                 type="date"
                 class="rounded-lg border border-stroke px-3 py-2"
@@ -62,10 +63,10 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
             class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white"
             onClick={() => props.onSearch()}
           >
-            Search (F8)
+            {uiLabel("reports.search_button")}
           </button>
           <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => props.onReset()}>
-            Reset
+            {uiLabel("reports.reset_button")}
           </button>
         </div>
       </section>
@@ -79,15 +80,15 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
           <div class="overflow-x-auto">{props.children}</div>
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
             <span>
-              Generated {(props.generatedAt ?? new Date()).toLocaleString()}
+              {uiLabel("reports.generated_prefix")} {(props.generatedAt ?? new Date()).toLocaleString()}
               <Show when={props.loading}>
-                <span class="ml-2 text-text-secondary">Loading…</span>
+                <span class="ml-2 text-text-secondary">{uiLabel("common.loading")}</span>
               </Show>
             </span>
             <div class="flex gap-2">
               <Show when={props.onExportCsv}>
                 <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => props.onExportCsv!()}>
-                  Export CSV
+                  {uiLabel("reports.export_csv")}
                 </button>
               </Show>
               <Show when={props.onPageChange && props.page && props.totalPages}>
@@ -97,7 +98,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                   disabled={(props.page ?? 1) <= 1}
                   onClick={() => props.onPageChange!(props.page! - 1)}
                 >
-                  Prev
+                  {uiLabel("reports.prev_page")}
                 </button>
                 <span>
                   Page {props.page} / {props.totalPages}
@@ -108,7 +109,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                   disabled={(props.page ?? 1) >= (props.totalPages ?? 1)}
                   onClick={() => props.onPageChange!(props.page! + 1)}
                 >
-                  Next
+                  {uiLabel("reports.next_page")}
                 </button>
               </Show>
             </div>

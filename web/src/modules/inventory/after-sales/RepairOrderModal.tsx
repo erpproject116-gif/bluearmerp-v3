@@ -13,6 +13,7 @@ import {
 } from "../../../shared/repairOrderAttachments";
 import { DateInput } from "../../../shared/DateInput";
 import { ModalField } from "../../../shared/ModalField";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
@@ -428,7 +429,7 @@ export function RepairOrderModal(props: Props) {
       </div>
       <div class="rounded-lg border border-stroke bg-slate-50 px-4 py-3">
         <div class="mb-2 flex items-center justify-between">
-          <span class="text-sm font-medium text-text-primary">Attachments</span>
+          <span class="text-sm font-medium text-text-primary">{uiLabel("common.attachments")}</span>
           <Show when={effectiveEditing()}>
             <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
               {uploading() ? "Uploading…" : "Upload file"}

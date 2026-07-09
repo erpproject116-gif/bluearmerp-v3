@@ -6,6 +6,7 @@ import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeade
 import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
 import { fetchBir2307Print, formatMoney, formatPrintDate, type Bir2307PrintPayload } from "./bir2307Print";
 import "../../quotation/quotation/quotationPrint.css";
+import { PrintLoading } from "../../../shared/LoadingText";
 
 function Bir2307PrintView() {
   const params = useParams<{ id: string }>();
@@ -23,7 +24,7 @@ function Bir2307PrintView() {
   return (
     <div class="quotation-print">
       <Show when={data.loading}>
-        <p class="quotation-print__loading">Loading…</p>
+        <PrintLoading />
       </Show>
       <Show when={data.error}>
         <p class="quotation-print__error">{String(data.error)}</p>

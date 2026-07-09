@@ -17,6 +17,7 @@ import "./repairOrderPrint.css";
 import "../../quotation/quotation/quotationPrint.css";
 import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
 import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
+import { LoadingText } from "../../../shared/LoadingText";
 
 type Props = { doc: "receipt" | "warranty" };
 
@@ -75,7 +76,7 @@ function RepairOrderPrintView(props: Props) {
   return (
     <div class="repair-print">
       <Show when={data.loading}>
-        <p class="repair-print__loading">Loading…</p>
+        <LoadingText class="repair-print__loading" as="p" />
       </Show>
       <Show when={data.error}>
         <p class="repair-print__error">{String(data.error)}</p>

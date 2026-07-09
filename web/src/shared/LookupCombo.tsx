@@ -1,5 +1,6 @@
 import { createSignal, For, Show, onMount } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
+import { LoadingText } from "../shared/LoadingText";
 
 export type LookupOption = { id: number; label: string; sublabel?: string };
 
@@ -79,7 +80,7 @@ export function LookupCombo(props: Props) {
         <Show when={open() && (options().length > 0 || loading() || (!!props.onCreate && props.value().trim() !== ""))}>
           <ul class="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-stroke bg-white py-1 shadow-lg">
             <Show when={loading()}>
-              <li class="px-3 py-2 text-sm text-text-secondary">Loading…</li>
+              <LoadingText class="px-3 py-2 text-sm text-text-secondary" as="li" />
             </Show>
             <For each={options()}>
               {(opt) => (

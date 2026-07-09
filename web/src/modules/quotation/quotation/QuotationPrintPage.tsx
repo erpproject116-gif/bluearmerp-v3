@@ -18,6 +18,8 @@ import {
 import { progressStatusLabel } from "./progressStatus";
 import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
 import { PrintBrandingFooter } from "../../../shared/branding/PrintBrandingFooter";
+import { uiLabel } from "../../../shared/branding/uiLabel";
+import { PrintLoading } from "../../../shared/LoadingText";
 import "./quotationPrint.css";
 
 function QuotationPrintView() {
@@ -35,7 +37,7 @@ function QuotationPrintView() {
   return (
     <div class="quotation-print">
       <Show when={data.loading}>
-        <p class="quotation-print__loading">Loading…</p>
+        <PrintLoading />
       </Show>
       <Show when={data.error}>
         <p class="quotation-print__error">{String(data.error)}</p>
@@ -62,7 +64,7 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
 
         <section class="quotation-print__grid">
           <div>
-            <h3 class="quotation-print__section">Quotation Details</h3>
+            <h3 class="quotation-print__section">{uiLabel("print.quotation_details")}</h3>
             <dl class="quotation-print__dl">
               <dt>Date-no</dt>
               <dd>{q().date_no_display}</dd>
@@ -85,7 +87,7 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
             </dl>
           </div>
           <div>
-            <h3 class="quotation-print__section">Customer</h3>
+            <h3 class="quotation-print__section">{uiLabel("print.customer")}</h3>
             <dl class="quotation-print__dl">
               <dt>Name</dt>
               <dd>{p().partner.company_name}</dd>
@@ -103,28 +105,28 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
 
         <div class="quotation-print__totals">
           <div class="quotation-print__totals-row">
-            <span>Subtotal</span>
+            <span>{uiLabel("print.subtotal")}</span>
             <span>{formatMoney(q().subtotal, q().currency_code)}</span>
           </div>
           <div class="quotation-print__totals-row">
-            <span>Tax</span>
+            <span>{uiLabel("print.tax")}</span>
             <span>{formatMoney(q().tax_total, q().currency_code)}</span>
           </div>
           <div class="quotation-print__totals-row">
-            <span>Grand Total</span>
+            <span>{uiLabel("print.grand_total")}</span>
             <span>{formatMoney(q().grand_total, q().currency_code)}</span>
           </div>
         </div>
 
         <Show when={q().payment_terms}>
           <section class="quotation-print__notes">
-            <h3 class="quotation-print__section">Payment Terms</h3>
+            <h3 class="quotation-print__section">{uiLabel("print.payment_terms")}</h3>
             <p>{q().payment_terms}</p>
           </section>
         </Show>
         <Show when={q().notes}>
           <section class="quotation-print__notes">
-            <h3 class="quotation-print__section">Notes</h3>
+            <h3 class="quotation-print__section">{uiLabel("print.notes")}</h3>
             <p>{q().notes}</p>
           </section>
         </Show>
@@ -132,11 +134,11 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
         <footer class="quotation-print__signatures">
           <div class="quotation-print__sig">
             <div class="quotation-print__sig-line" />
-            <p>Prepared by</p>
+            <p>{uiLabel("print.prepared_by")}</p>
           </div>
           <div class="quotation-print__sig">
             <div class="quotation-print__sig-line" />
-            <p>Customer Acceptance</p>
+            <p>{uiLabel("print.customer_acceptance")}</p>
           </div>
         </footer>
 

@@ -30,11 +30,11 @@ export async function sendPresenceHeartbeat(payload: PresenceHeartbeatPayload) {
       current_label: payload.current_label,
       avatar_url: payload.avatar_url ?? "",
     }),
-  }, { silent: true });
+  }, { silent: true, background: true });
 }
 
 export async function clearPresence() {
-  return apiFetch("/api/v1/presence/", { method: "DELETE" }, { silent: true });
+  return apiFetch("/api/v1/presence/", { method: "DELETE" }, { silent: true, background: true });
 }
 
 export function useOnlinePresence(enabled: () => boolean) {

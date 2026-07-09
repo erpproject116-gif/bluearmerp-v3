@@ -7,6 +7,7 @@ import { useToast } from "../../shared/toast";
 import { useAuth, hasPermission } from "../../shared/auth-context";
 import { sanitizeIntegerInput, bindDecimalInput } from "../../shared/money";
 import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
+import { uiLabel } from "../../shared/branding/uiLabel";
 
 type ItemRow = {
   id: number;
@@ -217,7 +218,7 @@ function ProductsTab() {
         </table>
         <Show when={(items() ?? []).length === 0}>
           <p class="px-4 py-6 text-center text-sm text-text-secondary">
-            {items.loading ? "Loading…" : "No products found."}
+            {items.loading  ? uiLabel("common.loading") : "No products found."}
           </p>
         </Show>
       </div>
@@ -363,7 +364,7 @@ function CategoriesTab() {
             </tbody>
           </table>
           <Show when={(rows() ?? []).length === 0}>
-            <p class="px-4 py-6 text-center text-sm text-text-secondary">{rows.loading ? "Loading…" : "No categories yet."}</p>
+            <p class="px-4 py-6 text-center text-sm text-text-secondary">{rows.loading  ? uiLabel("common.loading") : "No categories yet."}</p>
           </Show>
         </div>
       </div>
@@ -478,7 +479,7 @@ function LogsTab() {
         </tbody>
       </table>
       <Show when={(logs() ?? []).length === 0}>
-        <p class="px-4 py-6 text-center text-sm text-text-secondary">{logs.loading ? "Loading…" : "No POS activity yet."}</p>
+        <p class="px-4 py-6 text-center text-sm text-text-secondary">{logs.loading  ? uiLabel("common.loading") : "No POS activity yet."}</p>
       </Show>
     </div>
   );
@@ -588,7 +589,7 @@ function ModifiersTab() {
         </For>
         <Show when={(groups() ?? []).length === 0}>
           <p class="rounded-xl border border-stroke bg-white px-4 py-6 text-center text-sm text-text-secondary">
-            {groups.loading ? "Loading…" : "No modifier groups yet. Create one to offer sizes and add-ons."}
+            {groups.loading  ? uiLabel("common.loading") : "No modifier groups yet. Create one to offer sizes and add-ons."}
           </p>
         </Show>
       </div>

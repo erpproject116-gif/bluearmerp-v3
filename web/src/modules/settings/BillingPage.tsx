@@ -3,6 +3,7 @@ import { useSearchParams } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
 import { apiAbsoluteUrl, apiFetch, getAccessToken } from "../../shared/api";
 import { useToast } from "../../shared/toast";
+import { LoadingText } from "../../shared/LoadingText";
 import {
   useBilling,
   useBillingPayments,
@@ -235,7 +236,7 @@ export default function BillingPage() {
           </p>
         </div>
       }>
-        <p class="mt-4 text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="mt-4 text-sm text-text-secondary" as="p" />
       </Show>
     </div>
   );

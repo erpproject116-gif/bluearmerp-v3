@@ -14,6 +14,7 @@ import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { SupportLayout } from "./SupportLayout";
 import { fetchRepairOrders, fetchSupportUsers, fetchWarrantyAssets } from "./supportLookups";
+import { LoadingText } from "../../shared/LoadingText";
 
 export default function TicketDetailPage() {
   const params = useParams();
@@ -71,7 +72,7 @@ export default function TicketDetailPage() {
       </div>
 
       <Show when={ticket.isFetching && !ticket.data} fallback={null}>
-        <p class="text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
 
       <Show when={ticket.data}>

@@ -4,6 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useToast } from "../../shared/toast";
 import { CommsLayout } from "./CommsLayout";
+import { LoadingText } from "../../shared/LoadingText";
 
 type GmailStatus = {
   id?: number;
@@ -100,7 +101,7 @@ export default function CommsSettingsPage() {
           </div>
 
           <Show when={status.loading}>
-            <p class="text-sm text-text-secondary">Loading…</p>
+            <LoadingText class="text-sm text-text-secondary" as="p" />
           </Show>
 
           <Show when={!status.loading}>

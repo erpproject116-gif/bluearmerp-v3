@@ -6,6 +6,7 @@ import {
   type CustomerQuotationsRow,
 } from "../../../shared/useCrmReports";
 import { formatDisplayDate, type CustomerQuotationsFilters } from "./customerQuotationsFilters";
+import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
 
 type Props = {
   filters: CustomerQuotationsFilters;
@@ -67,18 +68,10 @@ export function CustomerQuotationsReport(props: Props) {
           </thead>
           <tbody>
             <Show when={props.loading}>
-              <tr>
-                <td colSpan={4} class="px-3 py-8 text-center text-text-secondary">
-                  Loading…
-                </td>
-              </tr>
+              <ReportLoadingRow colSpan={4} />
             </Show>
             <Show when={!props.loading && props.rows.length === 0}>
-              <tr>
-                <td colSpan={4} class="px-3 py-8 text-center text-text-secondary">
-                  No rows match your filters.
-                </td>
-              </tr>
+              <ReportEmptyRow colSpan={4} />
             </Show>
             <For each={props.rows}>
               {(row) => (

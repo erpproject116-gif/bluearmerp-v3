@@ -16,6 +16,7 @@ import {
 import { SerialLotLayout } from "./SerialLotLayout";
 import { SerialReceiveScanner } from "../../../shared/SerialReceiveScanner";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 
 type PurchaseOrderRow = {
   id: number;
@@ -430,7 +431,7 @@ export default function SerialReceivePage() {
     <SerialLotLayout>
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <div class="mb-4">
-          <h2 class="text-lg font-semibold text-text-primary">Receive / Scan Serials</h2>
+          <h2 class="text-lg font-semibold text-text-primary">{uiLabel("goods_receipt.receive_page_title")}</h2>
           <p class="text-sm text-text-secondary">
             Select a confirmed purchase order, create a goods receipt, scan serial numbers or enter lots, then post.
           </p>
@@ -477,7 +478,7 @@ export default function SerialReceivePage() {
 
               <Show when={serialLines().length > 0}>
                 <div class="rounded-lg border border-stroke bg-slate-50 p-4">
-                  <h3 class="mb-2 text-sm font-semibold text-text-primary">Pre-post review (serials)</h3>
+                  <h3 class="mb-2 text-sm font-semibold text-text-primary">{uiLabel("goods_receipt.pre_post_review")}</h3>
                   <table class="min-w-full text-sm">
                     <thead class="text-left text-text-secondary">
                       <tr>
@@ -531,7 +532,7 @@ export default function SerialReceivePage() {
 
               <Show when={lotLines().length > 0}>
                 <div class="rounded-lg border border-stroke bg-slate-50 p-4">
-                  <h3 class="mb-3 text-sm font-semibold text-text-primary">Lot entry</h3>
+                  <h3 class="mb-3 text-sm font-semibold text-text-primary">{uiLabel("goods_receipt.lot_entry")}</h3>
                   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Field label="Lot line">
                       <select

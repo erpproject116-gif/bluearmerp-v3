@@ -2,6 +2,7 @@ import { For, Show, createSignal } from "solid-js";
 import { createResource } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import { LoadingText } from "../../shared/LoadingText";
 
 export type DocEmailEntry = {
   source: "sent" | "mail";
@@ -78,7 +79,7 @@ export function EmailHistoryPanel(props: Props) {
         <Show when={open()}>
           <div class="border-t border-stroke px-3 py-2">
             <Show when={emails.loading}>
-              <p class="py-2 text-sm text-text-secondary">Loading…</p>
+              <LoadingText class="py-2 text-sm text-text-secondary" as="p" />
             </Show>
             <Show when={!emails.loading && emails.error}>
               <p class="py-2 text-sm text-red-600">{(emails.error as Error).message}</p>

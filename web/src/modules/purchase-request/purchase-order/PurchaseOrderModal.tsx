@@ -24,6 +24,7 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
 import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
@@ -40,6 +41,7 @@ import {
   type PickedSupplierQuotationLine,
 } from "./SupplierQuotationLinePickerModal";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
+import { LoadingText } from "../../../shared/LoadingText";
 
 export type PurchaseOrderDetail = {
   id: number;
@@ -488,7 +490,7 @@ export function PurchaseOrderModal(props: Props) {
       }
     >
       <Show when={loading()}>
-        <p class="text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
       <Show when={!loading() && (isCreate() || po())}>
         <Show when={po()} keyed>
@@ -772,7 +774,7 @@ export function PurchaseOrderModal(props: Props) {
         scope="purchase-order/purchase-orders"
         formOpen={props.open}
         docId={effectivePoId() ?? undefined}
-        label="Attachments (carried to Purchases)"
+        label={uiLabel("purchasing.attachments_po")}
         required={policyRequiresAttachment(processPolicy.data, "purchase_order")}
         onCountChange={setAttachmentCount}
       />

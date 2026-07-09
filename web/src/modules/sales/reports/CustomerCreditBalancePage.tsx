@@ -1,6 +1,7 @@
 import { createQuery } from "@tanstack/solid-query";
 import { For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { LoadingText } from "../../../shared/LoadingText";
 
 type CreditBalanceRow = {
   partner_id: number;
@@ -35,7 +36,7 @@ export default function CustomerCreditBalancePage() {
         </p>
       </div>
 
-      <Show when={!report.isLoading} fallback={<p class="text-sm text-slate-500">Loading…</p>}>
+      <Show when={!report.isLoading} fallback={<LoadingText class="text-sm text-slate-500" as="p" />}>
         <table class="min-w-full overflow-hidden rounded-lg border border-slate-200 text-sm">
           <thead class="bg-slate-50">
             <tr>

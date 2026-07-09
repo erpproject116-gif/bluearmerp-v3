@@ -7,6 +7,7 @@ import { useToast } from "../../../shared/toast";
 import { BankAccountSearchModal } from "./BankAccountSearchModal";
 import { BankAccountRegisterModal } from "./BankAccountRegisterModal";
 import { ReceivableApplicationModal } from "./ReceivableApplicationModal";
+import { LoadingText } from "../../../shared/LoadingText";
 
 type JournalLine = {
   line_no: number;
@@ -189,7 +190,7 @@ export function ReceiptJournalModal(props: Props) {
     <>
       <Modal open={props.open} title={`Receipt Journal — ${detail()?.date_no_display ?? ""}`} onClose={props.onClose} wide>
         <Show when={loading()}>
-          <p class="text-sm text-text-secondary">Loading…</p>
+          <LoadingText class="text-sm text-text-secondary" as="p" />
         </Show>
         <Show when={detail()}>
           {(d) => (

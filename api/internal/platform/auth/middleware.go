@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -73,6 +74,20 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 			if err != nil {
 				response.Err(w, http.StatusUnauthorized, "Invalid token.", "ERR_UNAUTHORIZED")
 				return
+			}
+
+			if !isSessionIdleExemptPath(r.URL.Path) {
+				if err := enforceSessionActivity(r.Context(), pool, claims.Sub, shouldBumpSessionActivity(r)); err != nil {
+					if errors.Is(err, ErrSessionIdle) {
+						response.Err(w, http.StatusUnauthorized,
+							"Session expired due to inactivity. Please sign in again.",
+							"ERR_SESSION_IDLE")
+						return
+					}
+					log.Printf("auth: session activity(%s): %v", claims.Sub, err)
+					response.Err(w, http.StatusInternalServerError, "Failed to verify session.", "ERR_INTERNAL")
+					return
+				}
 			}
 
 			activeTenantID := parseActiveTenantHeader(r)

@@ -1,6 +1,7 @@
 import { createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { Modal } from "../../../shared/Modal";
+import { LoadingText } from "../../../shared/LoadingText";
 
 export type BankAccountOption = {
   id: number;
@@ -36,7 +37,7 @@ export function BankAccountSearchModal(props: Props) {
           Register new bank account
         </button>
         <Show when={banks.loading}>
-          <p class="text-sm text-text-secondary">Loading…</p>
+          <LoadingText class="text-sm text-text-secondary" as="p" />
         </Show>
         <div class="max-h-80 overflow-y-auto rounded border border-stroke">
           <table class="min-w-full text-sm">

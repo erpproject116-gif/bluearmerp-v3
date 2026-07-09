@@ -3,6 +3,7 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { LoadingText } from "../../shared/LoadingText";
 
 type JournalEntryRow = { id: number; entry_no: string; status: string; remarks?: string };
 
@@ -129,7 +130,7 @@ export default function JournalEntriesPage() {
         </div>
       </div>
 
-      <Show when={!list.isLoading} fallback={<p class="text-sm text-slate-500">Loading…</p>}>
+      <Show when={!list.isLoading} fallback={<LoadingText class="text-sm text-slate-500" as="p" />}>
         <table class="min-w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
           <thead class="bg-slate-50">
             <tr>

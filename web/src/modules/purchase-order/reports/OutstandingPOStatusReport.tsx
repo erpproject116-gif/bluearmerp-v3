@@ -9,6 +9,7 @@ import {
   type OutstandingPOFilters,
 } from "./purchaseOrderStatusFilters";
 import type { PurchaseOrderOutstandingReportRow } from "../../../shared/usePurchaseOrderOutstandingReport";
+import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
 
 type Props = {
   filters: OutstandingPOFilters;
@@ -74,18 +75,10 @@ export function OutstandingPOStatusReport(props: Props) {
           </thead>
           <tbody>
             <Show when={props.loading}>
-              <tr>
-                <td colSpan={11} class="px-3 py-8 text-center text-text-secondary">
-                  Loading…
-                </td>
-              </tr>
+              <ReportLoadingRow colSpan={11} />
             </Show>
             <Show when={!props.loading && props.rows.length === 0}>
-              <tr>
-                <td colSpan={11} class="px-3 py-8 text-center text-text-secondary">
-                  No rows match your filters.
-                </td>
-              </tr>
+              <ReportEmptyRow colSpan={11} />
             </Show>
             <For each={props.rows}>
               {(row) => (

@@ -4,6 +4,7 @@ import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
 import { useResizableColumns } from "../../../shared/useResizableColumns";
+import { LoadingText } from "../../../shared/LoadingText";
 
 export type UserSearchRow = {
   id: number;
@@ -53,7 +54,7 @@ export function UserSearchModal(props: Props) {
             </Field>
           </div>
           <Show when={users.loading}>
-            <p class="px-5 pb-5 text-sm text-text-secondary">Loading…</p>
+            <LoadingText class="px-5 pb-5 text-sm text-text-secondary" as="p" />
           </Show>
           <Show when={users()}>
             {(rows) => (

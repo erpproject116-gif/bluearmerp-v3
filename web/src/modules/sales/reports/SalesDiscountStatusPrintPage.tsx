@@ -24,6 +24,7 @@ import {
 } from "./salesDiscountStatusFilters";
 import { parseTemplateFromSearch } from "./salesDiscountStatusTemplate";
 import "../../quotation/quotation/quotationPrint.css";
+import { PrintLoading } from "../../../shared/LoadingText";
 
 
 
@@ -99,7 +100,7 @@ function PrintView() {
         onConfirm={(s) => applyPrintPageSettings(s)}
       />
       <Show when={data.loading}>
-        <p class="quotation-print__loading">Loading…</p>
+        <PrintLoading />
       </Show>
       <Show when={data.error}>
         <p class="quotation-print__error">{String(data.error)}</p>

@@ -8,6 +8,7 @@ import {
   useInvalidateCrmNotifications,
   type CrmNotification,
 } from "./useCrmNotifications";
+import { LoadingText } from "./LoadingText";
 
 type Props = {
   enabled: boolean;
@@ -111,7 +112,7 @@ export function CrmNotificationBell(props: Props) {
             </div>
             <div class="max-h-96 overflow-y-auto">
               <Show when={preview.isFetching && (preview.data?.rows.length ?? 0) === 0}>
-                <p class="px-4 py-6 text-center text-sm text-text-secondary">Loading…</p>
+                <LoadingText class="px-4 py-6 text-center text-sm text-text-secondary" as="p" />
               </Show>
               <Show when={!preview.isFetching && (preview.data?.rows.length ?? 0) === 0}>
                 <p class="px-4 py-6 text-center text-sm text-text-secondary">No notifications</p>

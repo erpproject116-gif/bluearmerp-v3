@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import type { PriceBatchLineRow } from "../../../shared/usePriceBatchLines";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
+import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
 import { progressStatusLabel } from "./progressStatus";
 
 export type EditablePriceBatchRow = PriceBatchLineRow & {
@@ -77,18 +78,10 @@ export function ChangeSalesPriceBatchGrid(props: Props) {
           </thead>
           <tbody>
             <Show when={props.loading}>
-              <tr>
-                <td colSpan={9} class="px-3 py-8 text-center text-text-secondary">
-                  Loading…
-                </td>
-              </tr>
+              <ReportLoadingRow colSpan={9} />
             </Show>
             <Show when={!props.loading && displayRows().length === 0}>
-              <tr>
-                <td colSpan={9} class="px-3 py-8 text-center text-text-secondary">
-                  No rows match your filters.
-                </td>
-              </tr>
+              <ReportEmptyRow colSpan={9} />
             </Show>
             <For each={displayRows()}>
               {(row) => (

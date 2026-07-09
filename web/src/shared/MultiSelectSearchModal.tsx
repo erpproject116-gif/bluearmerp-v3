@@ -1,6 +1,7 @@
 import { createEffect, createResource, createSignal, For, Show } from "solid-js";
 import { Modal } from "./Modal";
 import { inputClass } from "./SpreadsheetGrid";
+import { LoadingText } from "../shared/LoadingText";
 
 export type MultiSelectRow = {
   id: number;
@@ -78,7 +79,7 @@ export function MultiSelectSearchModal(props: Props) {
         </button>
       </div>
       <Show when={rows.loading}>
-        <p class="text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
       <Show when={!rows.loading && (rows()?.length ?? 0) === 0}>
         <p class="py-8 text-center text-sm text-text-secondary">Please use after Search.</p>

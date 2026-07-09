@@ -10,6 +10,7 @@ import {
 } from "../../shared/useCrmNotifications";
 import { useToast } from "../../shared/toast";
 import { CrmLayout } from "./CrmLayout";
+import { LoadingText } from "../../shared/LoadingText";
 
 const severityClass: Record<CrmNotification["severity"], string> = {
   info: "border-l-brand-500",
@@ -85,7 +86,7 @@ export default function CrmNotificationsPage() {
 
       <div class="space-y-2">
         <Show when={list.isFetching}>
-          <p class="text-sm text-text-secondary">Loading…</p>
+          <LoadingText class="text-sm text-text-secondary" as="p" />
         </Show>
         <Show when={!list.isFetching && (list.data?.rows.length ?? 0) === 0}>
           <p class="rounded-xl border border-stroke bg-white p-8 text-center text-sm text-text-secondary">

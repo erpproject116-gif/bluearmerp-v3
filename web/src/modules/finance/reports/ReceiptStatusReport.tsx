@@ -5,6 +5,7 @@ import { getAccessToken } from "../../../shared/api";
 import { receiptStatusExportUrl } from "../../../shared/useReceiptStatusReport";
 import type { ReceiptStatusReportRow } from "../../../shared/useReceiptStatusReport";
 import { formatDisplayDate, receiptStatusLabel, type ReceiptStatusFilters } from "./receiptStatusFilters";
+import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
 
 type Props = {
   filters: ReceiptStatusFilters;
@@ -77,18 +78,10 @@ export function ReceiptStatusReport(props: Props) {
           </thead>
           <tbody>
             <Show when={props.loading}>
-              <tr>
-                <td colSpan={11} class="px-3 py-8 text-center text-text-secondary">
-                  Loading…
-                </td>
-              </tr>
+              <ReportLoadingRow colSpan={11} />
             </Show>
             <Show when={!props.loading && props.rows.length === 0}>
-              <tr>
-                <td colSpan={11} class="px-3 py-8 text-center text-text-secondary">
-                  No rows match your filters.
-                </td>
-              </tr>
+              <ReportEmptyRow colSpan={11} />
             </Show>
             <For each={props.rows}>
               {(row) => (

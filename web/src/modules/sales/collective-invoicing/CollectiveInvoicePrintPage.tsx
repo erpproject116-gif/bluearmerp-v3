@@ -8,6 +8,7 @@ import { PrintPageSettingsModal } from "../../../shared/PrintPageSettingsModal";
 import { applyPrintPageSettings, loadPrintPageSettings } from "../../../shared/printPageSettings";
 import { formatMoney, formatPrintDate, partyContact } from "../sales/salesPrint";
 import "../../quotation/quotation/quotationPrint.css";
+import { PrintLoading } from "../../../shared/LoadingText";
 
 type InvoicePrintPayload = {
   tenant: { company_name: string };
@@ -99,7 +100,7 @@ function PrintView() {
         <button type="button" class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => window.print()}>Print</button>
       </div>
       <PrintPageSettingsModal open={settingsOpen()} onClose={() => setSettingsOpen(false)} onConfirm={(s) => applyPrintPageSettings(s)} />
-      <Show when={data.loading}><p class="quotation-print__loading">Loading…</p></Show>
+      <Show when={data.loading}><PrintLoading /></Show>
       <Show when={data.error}><p class="quotation-print__error">{String(data.error)}</p></Show>
       <Show when={data()}>
         {(p) => (

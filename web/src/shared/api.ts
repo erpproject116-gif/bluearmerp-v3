@@ -63,6 +63,8 @@ export type ApiResult<T> = ApiEnvelope<T> & {
 export type ApiFetchOptions = {
   /** Suppress automatic success toast (e.g. autosave, search, or custom messaging). */
   silent?: boolean;
+  /** Background poll — does not count as user activity for idle timeout. */
+  background?: boolean;
   /** Override the default success toast message. */
   successMessage?: string;
 };
@@ -119,6 +121,9 @@ export async function apiFetch<T>(
   if (activeBranchId && !headers.has("X-Branch-ID")) {
     headers.set("X-Branch-ID", String(activeBranchId));
   }
+  if (!options?.silent && !options?.background) {
+    headers.set("X-User-Activity", "1");
+  }
   const base = apiBase || "";
   let res: Response;
   try {
@@ -128,6 +133,11 @@ export async function apiFetch<T>(
   }
   const body = (await res.json()) as ApiEnvelope<T>;
   const result = { ...body, status: res.status, ok: res.ok };
+  if (body.code === "ERR_SESSION_IDLE" && !options?.background) {
+    const { handleServerSessionIdle } = await import("./sessionIdleClient");
+    void handleServerSessionIdle();
+    return result;
+  }
   if (body.success && shouldAutoSuccessToast(path, init.method, options)) {
     getGlobalToast()?.success(
       defaultSuccessMessage(init.method, body.message, options?.successMessage),

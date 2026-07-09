@@ -4,6 +4,7 @@ import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { onHandExportUrl, useOnHandReport, type OnHandFilters } from "../../../shared/reports/useModuleReports";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SAFETY_DOC_TYPES } from "../../../shared/itemMasterConstants";
+import { ReportEmptyMessage } from "../../../shared/reports/ReportTableStates";
 
 function defaultFilters(): OnHandFilters {
   return { as_of: new Date().toISOString().slice(0, 10), below_safety: false };
@@ -121,7 +122,7 @@ export default function OnHandReportPage() {
           </tbody>
         </table>
         <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
-          <p class="px-5 py-8 text-center text-sm text-text-secondary">No rows match your filters.</p>
+          <ReportEmptyMessage />
         </Show>
       </ReportPageLayout>
     </>

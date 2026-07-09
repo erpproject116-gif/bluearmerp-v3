@@ -6,6 +6,7 @@ import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { useOpenDeliveryLines, type OpenDeliveryLine } from "../../../shared/useDeliveryReceiptList";
+import { LoadingText } from "../../../shared/LoadingText";
 
 type LineRow = {
   sales_order_line_id: number;
@@ -164,7 +165,7 @@ export function DeliveryReceiptModal(props: Props) {
       <div class="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
           <h3 class="mb-2 text-sm font-semibold text-text-primary">Released lines</h3>
-          <Show when={!openLines.isFetching} fallback={<p class="text-sm text-text-secondary">Loading…</p>}>
+          <Show when={!openLines.isFetching} fallback={<LoadingText class="text-sm text-text-secondary" as="p" />}>
             <div class="max-h-56 overflow-y-auto rounded border border-stroke">
               <For each={openLines.data ?? []}>
                 {(row) => (

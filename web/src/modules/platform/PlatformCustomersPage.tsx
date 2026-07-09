@@ -5,6 +5,7 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { usePlatformCustomers, usePlatformPlansAdmin, usePlatformBillingSummary, type PlatformPlan } from "../../shared/usePlatform";
+import { LoadingText } from "../../shared/LoadingText";
 
 const urgencyBadge: Record<string, string> = {
   trial_critical: "bg-red-100 text-red-800",
@@ -313,7 +314,7 @@ export default function PlatformCustomersPage() {
           <p class="text-sm text-red-600">Failed to load customers.</p>
         </Show>
       }>
-        <p class="text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
     </div>
   );

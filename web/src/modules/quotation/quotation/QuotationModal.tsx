@@ -17,6 +17,7 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 import { SendEmailModal } from "../../comms/SendEmailModal";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { fetchQuotationPrint } from "./quotationPrint";
@@ -604,7 +605,7 @@ export function QuotationModal(props: Props) {
         scope="quotation/quotations"
         formOpen={props.open}
         docId={effectiveEditing()?.id}
-        label="Attachments (carried to Sales Order & Sales)"
+        label={uiLabel("selling.attachments_quotation")}
         required={policyRequiresAttachment(processPolicy.data, "quotation")}
         onCountChange={setAttachmentCount}
       />

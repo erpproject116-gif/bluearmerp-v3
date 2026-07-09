@@ -4,6 +4,7 @@ import { useAuth } from "../../shared/auth-context";
 import { useFinanceWorkspace } from "../../shared/reports/useModuleReports";
 import { acctINavLinks } from "../../shell/acct-i-nav";
 import { acctIINavLinks } from "../../shell/acct-ii-nav";
+import { LoadingText } from "../../shared/LoadingText";
 
 type KpiTile = {
   label: string;
@@ -99,7 +100,7 @@ export default function FinanceWorkspacePage() {
 
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <h3 class="mb-4 text-sm font-semibold text-text-primary">AR / AP operations</h3>
-        <Show when={!workspace.isLoading} fallback={<p class="text-sm text-text-secondary">Loading…</p>}>
+        <Show when={!workspace.isLoading} fallback={<LoadingText class="text-sm text-text-secondary" as="p" />}>
           <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <For each={operationalLinks}>
               {(link) => (

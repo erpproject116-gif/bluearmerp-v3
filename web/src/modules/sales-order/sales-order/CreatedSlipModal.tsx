@@ -1,6 +1,7 @@
 import { createResource, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { modalDismissClass } from "../../../shared/Modal";
+import { LoadingText } from "../../../shared/LoadingText";
 
 export type CreatedSlipLine = {
   line_id: number;
@@ -48,7 +49,7 @@ export function CreatedSlipModal(props: Props) {
             </button>
           </div>
           <Show when={data.loading}>
-            <p class="text-sm text-text-secondary">Loading…</p>
+            <LoadingText class="text-sm text-text-secondary" as="p" />
           </Show>
           <Show when={data.error}>
             <p class="text-sm text-red-600">{String(data.error)}</p>

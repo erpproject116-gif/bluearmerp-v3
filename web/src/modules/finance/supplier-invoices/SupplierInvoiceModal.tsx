@@ -14,6 +14,7 @@ import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
@@ -590,7 +591,7 @@ export function SupplierInvoiceModal(props: Props) {
               scope="finance/supplier-invoices"
               formOpen={props.open}
               docId={effectiveEditing()?.id}
-              label="Attachments (carried from Purchase Order/Receiving)"
+              label={uiLabel("purchasing.attachments_invoice")}
               required={policyRequiresAttachment(processPolicy.data, "supplier_invoice")}
               onCountChange={setAttachmentCount}
             />

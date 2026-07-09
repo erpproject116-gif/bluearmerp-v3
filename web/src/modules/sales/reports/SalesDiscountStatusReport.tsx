@@ -13,6 +13,7 @@ import {
 } from "./discountStatusColumns";
 import { formatDisplayDate, filtersToSearchParams, type SalesDiscountStatusFilters } from "./salesDiscountStatusFilters";
 import { templateToSearchParams, type DiscountSortField, type SalesDiscountStatusTemplate } from "./salesDiscountStatusTemplate";
+import { LoadingText } from "../../../shared/LoadingText";
 
 type Props = {
   filters: SalesDiscountStatusFilters;
@@ -92,7 +93,7 @@ export function SalesDiscountStatusReport(props: Props) {
           </button>
         </div>
       </div>
-      <Show when={props.loading}><p class="text-sm text-text-secondary">Loading…</p></Show>
+      <Show when={props.loading}><LoadingText class="text-sm text-text-secondary" as="p" /></Show>
       <Show when={props.subtotalMode && props.totalRows > props.pageSize}>
         <p class="mb-2 text-xs text-amber-700">
           Subtotal mode loaded {Math.min(props.rows.length, props.pageSize)} of {props.totalRows} row(s). Narrow filters if you need all groups.

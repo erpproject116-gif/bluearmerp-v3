@@ -3,6 +3,7 @@ import { formatPeso } from "../../shared/money";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { usePlatformCustomer, usePlatformPlansAdmin, type PlatformPlan } from "../../shared/usePlatform";
+import { LoadingText } from "../../shared/LoadingText";
 
 
 
@@ -147,7 +148,7 @@ export default function PlatformCustomerDetailPage() {
           }}
         </Show>
       }>
-        <p class="text-sm text-text-secondary">Loading…</p>
+        <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
     </div>
   );
