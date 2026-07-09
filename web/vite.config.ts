@@ -34,41 +34,22 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [solid(), tailwindcss()],
     envDir: ".",
+    resolve: {
+      dedupe: ["solid-js", "@solidjs/router"],
+    },
     build: {
       rollupOptions: {
         output: {
           manualChunks(id) {
             const path = id.replace(/\\/g, "/");
 
-            if (path.includes("node_modules")) {
-              if (path.includes("solid-js") || path.includes("@solidjs/")) return "vendor-solid";
-              if (path.includes("@supabase")) return "vendor-supabase";
-              if (path.includes("@tanstack")) return "vendor-query";
-              if (path.includes("tesseract") || path.includes("pdfjs-dist")) return "vendor-ocr";
-              return "vendor";
-            }
+            if (!path.includes("node_modules")) return undefined;
 
-            // Shared shell + UI helpers: keep out of feature chunks so modules do not
-            // import Solid/components from each other (causes circular chunk graphs).
-            if (path.includes("/src/shared/") || path.includes("/src/shell/")) {
-              return "app-shared";
-            }
-
-            if (path.includes("/modules/finance/")) return "module-finance";
-            if (path.includes("/modules/inventory/")) return "module-inventory";
-            if (path.includes("/modules/sales/")) return "module-sales";
-            if (path.includes("/modules/sales-order/")) return "module-sales-order";
-            if (
-              path.includes("/modules/purchase-request/") ||
-              path.includes("/modules/purchase-order/") ||
-              path.includes("/modules/buying/")
-            ) {
-              return "module-purchasing";
-            }
-            if (path.includes("/modules/quotation/")) return "module-quotation";
-            if (path.includes("/modules/crm/")) return "module-crm";
-            if (path.includes("/modules/documentation/")) return "module-docs";
-            return undefined;
+            if (path.includes("solid-js") || path.includes("@solidjs/")) return "vendor-solid";
+            if (path.includes("@supabase")) return "vendor-supabase";
+            if (path.includes("@tanstack")) return "vendor-query";
+            if (path.includes("tesseract") || path.includes("pdfjs-dist")) return "vendor-ocr";
+            return "vendor";
           },
         },
       },

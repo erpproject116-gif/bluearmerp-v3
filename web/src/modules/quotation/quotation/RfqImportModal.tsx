@@ -2,7 +2,6 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
-import { LoadingText } from "../../../shared/LoadingText";
 import { useToast } from "../../../shared/toast";
 import type { RfqOcrProgress } from "./rfqDocumentOcr";
 import type { QuotationLineRow } from "./QuotationLineGrid";
@@ -212,16 +211,15 @@ export function RfqImportModal(props: Props) {
 
       <Show when={busy()}>
         <div class="mb-4 rounded-lg border border-stroke bg-slate-50 px-4 py-3 text-sm text-text-secondary">
-          <Show when={progress()} fallback={<LoadingText />}>
-            {(p) => (
+          <span>
+            {progress()?.message ?? "Processing…"}
+            <Show when={progress() && progress()!.totalPages > 0}>
               <span>
-                {p().message}
-                <Show when={p().totalPages > 0}>
-                  <span> ({p().page}/{p().totalPages})</span>
-                </Show>
+                {" "}
+                ({progress()!.page}/{progress()!.totalPages})
               </span>
-            )}
-          </Show>
+            </Show>
+          </span>
         </div>
       </Show>
 

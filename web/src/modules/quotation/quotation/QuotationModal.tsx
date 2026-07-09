@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show, Suspense, lazy } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import type { LookupOption } from "../../../shared/LookupCombo";
@@ -31,9 +31,12 @@ import {
   recalculateQuotationLines,
   type QuotationLineRow,
 } from "./QuotationLineGrid";
-import { RfqImportModal } from "./RfqImportModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
+
+const RfqImportModal = lazy(() =>
+  import("./RfqImportModal").then((m) => ({ default: m.RfqImportModal })),
+);
 
 export type QuotationDetail = {
   id: number;
@@ -711,25 +714,35 @@ export function QuotationModal(props: Props) {
       defaultTo={emailDefaultTo()}
     />
 
-    <RfqImportModal
-      open={rfqImportOpen()}
-      onClose={() => setRfqImportOpen(false)}
-      onApply={(imported) => {
-        void (async () => {
-          const tid = taxTypeId();
-          const t = selectedTaxType();
-          if (tid && t) {
-            const recalc = await recalculateQuotationLines(imported, tid, {
-              tax_mode: t.tax_mode,
-              rate_percent: t.rate_percent,
-            });
-            setLines(recalc);
-          } else {
-            setLines(imported);
-          }
-        })();
-      }}
-    />
+    <Show when={rfqImportOpen()}>
+      <Suspense
+        fallback={
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/30 p-4">
+            <div class="rounded-xl bg-white px-6 py-4 text-sm text-text-secondary shadow-xl">Loading RFQ import…</div>
+          </div>
+        }
+      >
+        <RfqImportModal
+          open
+          onClose={() => setRfqImportOpen(false)}
+          onApply={(imported) => {
+            void (async () => {
+              const tid = taxTypeId();
+              const t = selectedTaxType();
+              if (tid && t) {
+                const recalc = await recalculateQuotationLines(imported, tid, {
+                  tax_mode: t.tax_mode,
+                  rate_percent: t.rate_percent,
+                });
+                setLines(recalc);
+              } else {
+                setLines(imported);
+              }
+            })();
+          }}
+        />
+      </Suspense>
+    </Show>
     </>
   );
 }

@@ -38,7 +38,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "stocks_management",
     label: "Stock",
-    defaultExpanded: true,
+    defaultExpanded: false,
     entries: [
       { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "WMS" },
       { kind: "module", moduleId: "inventory" },

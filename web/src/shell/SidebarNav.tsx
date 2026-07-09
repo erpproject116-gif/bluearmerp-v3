@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import { useAuth } from "../shared/auth-context";
 import { isTenantFeatureEnabled, isTenantModuleEnabled, moduleDisplayLabel } from "../shared/moduleAccess";
@@ -154,6 +154,28 @@ function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
   );
 }
 
+function navEntryMatchesPath(entry: NavGroupEntry, pathname: string): boolean {
+  if (entry.kind === "link") {
+    return pathname === entry.basePath || pathname.startsWith(`${entry.basePath}/`);
+  }
+  const mod = appModules.find((m) => m.id === entry.moduleId);
+  if (!mod) return false;
+  if (entry.kind === "module") {
+    if (mod.id === "finance") return isFinanceModulePath(pathname);
+    return pathname === mod.basePath || pathname.startsWith(`${mod.basePath}/`);
+  }
+  const branch = subBranchByFeature(mod, entry.featureCode);
+  if (!branch) return false;
+  if (branch.prefix != null) {
+    return (
+      branch.href === pathname ||
+      branch.settingsHref === pathname ||
+      isSubBranchPath(pathname, branch.prefix)
+    );
+  }
+  return pathname === branch.href || pathname === branch.settingsHref;
+}
+
 function NavGroupBlock(props: {
   groupId: string;
   label: string;
@@ -162,6 +184,7 @@ function NavGroupBlock(props: {
 }) {
   const auth = useAuth();
   const shell = useShell();
+  const loc = useLocation();
   const [open, setOpen] = createSignal(readExpanded(props.groupId, props.defaultExpanded));
 
   const visibleEntries = () =>
@@ -171,6 +194,24 @@ function NavGroupBlock(props: {
       }
       return isTenantFeatureEnabled(auth.me, entry.featureCode, entry.moduleId);
     });
+
+  createEffect(
+    on(
+      () => [loc.pathname, visibleEntries().length] as const,
+      ([pathname]) => {
+        if (visibleEntries().some((entry) => navEntryMatchesPath(entry, pathname))) {
+          if (!open()) {
+            setOpen(true);
+            try {
+              localStorage.setItem(navGroupStorageKey(props.groupId), "1");
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+      },
+    ),
+  );
 
   const renderEntry = (entry: NavGroupEntry) => {
     if (entry.kind === "link") {
@@ -233,6 +274,19 @@ export function SidebarNav() {
   const auth = useAuth();
   const loc = useLocation();
   const shell = useShell();
+  let navEl: HTMLElement | undefined;
+  let savedScrollTop = 0;
+
+  createEffect(
+    on(
+      () => loc.pathname,
+      () => {
+        queueMicrotask(() => {
+          if (navEl) navEl.scrollTop = savedScrollTop;
+        });
+      },
+    ),
+  );
 
   const ungrouped = () =>
     ungroupedModuleIds
@@ -245,7 +299,13 @@ export function SidebarNav() {
       .filter((m): m is AppModule => !!m && isTenantModuleEnabled(auth.me, m.id));
 
   return (
-    <nav class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
+    <nav
+      ref={navEl}
+      class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1"
+      onScroll={(e) => {
+        savedScrollTop = e.currentTarget.scrollTop;
+      }}
+    >
       <For each={ungrouped()}>{(module) => <NavModuleLink module={module} />}</For>
 
       <For each={navGroups}>
