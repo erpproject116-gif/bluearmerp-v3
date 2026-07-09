@@ -68,33 +68,35 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 
 ---
 
-## Phase 2 — Inventory & item master (months 5–11) **← current**
+## Phase 2 — Inventory & item master (months 5–11) **← complete**
 
 **Goal:** Serial/lot and item depth for distribution/retail pilots.
+
+**Exit gate met:** Serial trace with doc refs, Inv. Book + Stock Ledger reports with CSV export, 7-tab item master.
 
 **Started:**
 - [x] Lot batch pick on sales lines (`LotLineCell`, `lot_batch_id` on save)
 - [x] Serial registry origin filter (linked vs manual)
-- [x] Item master **Serial / Lot** tab + **Price B–J** + per-doc safety stock (migrations 144–145)
+- [x] Item master **Serial / Lot** tab + **Price B–J** + per-doc safety stock + **Cost tab** (migrations 144–146)
 - [x] Serial/Lot status + inv book reports (slip-type filter, VIP on item inv book)
 - [x] Lot adjustment UI + manual lot registration API
 - [x] On-hand as-of from stock movements; safety stock alerts on stock workspace
 - [x] Serial/lot policy optional/required enforcement on transactions (migration 145)
-- [ ] Full ECount 7-tab item form parity
+- [x] Full ECount 7-tab item form parity (Default / Item Info / Qty / Price / Cost / Additional / Management)
 
 | Track | Ecount reference | Deliverable |
 |-------|------------------|-------------|
-| Item modal | P1 Item master | Extend tabs toward 7-pill coverage |
-| Price levels | VIP + B–J | Price list on item |
-| Serial/lot | P1 Serial/Lot | Serial book, balance, adj-by-serial UI |
-| Stock ledger | P1 Inv Balance | Opening/issue/closing; location matrix |
-| Safety stock | Tab pill parity | Alerts on below-safety |
+| Item modal | P1 Item master | Extend tabs toward 7-pill coverage | **Done** |
+| Price levels | VIP + B–J | Price list on item | **Done** |
+| Serial/lot | P1 Serial/Lot | Serial book, balance, adj-by-serial UI | **Done** |
+| Stock ledger | P1 Inv Balance | Opening/issue/closing; location matrix | **Done** — Inv. Book summary + Stock Ledger detail |
+| Safety stock | Tab pill parity | Alerts on below-safety | **Done** |
 
 **Exit gate:** Serial sale + GR trace visible in UI and one stock ledger report without spreadsheets.
 
 ---
 
-## Phase 3 — Reports & analytics (months 8–18, parallel)
+## Phase 3 — Reports & analytics (months 8–18, parallel) **← current**
 
 **Goal:** Cover 80% of pilot questions without cloning every Ecount Option panel.
 

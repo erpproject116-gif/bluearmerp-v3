@@ -118,6 +118,9 @@ create index if not exists idx_po_purchase_order_lines_order
   on public.po_purchase_order_lines (purchase_order_id, line_no);
 
 alter table public.inv_serial_units
+  drop constraint if exists inv_serial_units_po_line_fk;
+
+alter table public.inv_serial_units
   add constraint inv_serial_units_po_line_fk
   foreign key (purchase_order_line_id) references public.po_purchase_order_lines(id) on delete set null;
 

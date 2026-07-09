@@ -1,19 +1,19 @@
 import { createSignal, For, onMount, Show } from "solid-js";
 import { ReportPageLayout, defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
-import { invBookExportUrl, useInvBookReport } from "../../../shared/reports/useModuleReports";
+import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { invBookExportUrl, useInvBookReport, type InvBookFilters } from "../../../shared/reports/useModuleReports";
 import { formatPeso } from "../../../shared/money";
 
 export default function InvBookReportPage() {
   const defaults = defaultReportDateRange();
-  const [dateFrom, setDateFrom] = createSignal(defaults.date_from);
-  const [dateTo, setDateTo] = createSignal(defaults.date_to);
+  const [filters, setFilters] = createSignal<InvBookFilters>(defaults);
   const [submitted, setSubmitted] = createSignal(false);
   const [page, setPage] = createSignal(1);
   const pageSize = 50;
 
   const report = useInvBookReport(() => ({
-    filters: { date_from: dateFrom(), date_to: dateTo() },
+    filters: filters(),
     page: page(),
     pageSize,
     sort: "item_code",
@@ -37,16 +37,18 @@ export default function InvBookReportPage() {
     setPage(1);
   };
 
+  const patch = (p: Partial<InvBookFilters>) => setFilters((prev) => ({ ...prev, ...p }));
+
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
 
   return (
     <ReportPageLayout
       title="Inv. Book"
       description="Opening, receipt, issue, and closing qty by item and location — Search (F8)."
-      dateFrom={dateFrom}
-      dateTo={dateTo}
-      onDateFromChange={setDateFrom}
-      onDateToChange={setDateTo}
+      dateFrom={() => filters().date_from ?? ""}
+      dateTo={() => filters().date_to ?? ""}
+      onDateFromChange={(v) => patch({ date_from: v })}
+      onDateToChange={(v) => patch({ date_to: v })}
       submitted={submitted()}
       loading={report.isFetching}
       page={page()}
@@ -54,10 +56,34 @@ export default function InvBookReportPage() {
       onPageChange={setPage}
       onSearch={search}
       onReset={() => {
+        setFilters(defaults);
         setSubmitted(false);
         setPage(1);
       }}
-      onExportCsv={() => void downloadReportCsv(invBookExportUrl({ date_from: dateFrom(), date_to: dateTo() }), "inv-book.csv")}
+      onExportCsv={() => void downloadReportCsv(invBookExportUrl(filters()), "inv-book.csv")}
+      filterExtra={
+        <div class="mt-4 grid gap-4 md:grid-cols-3">
+          <Field label="Item keyword">
+            <input class={inputClass} value={filters().q ?? ""} onInput={(e) => patch({ q: e.currentTarget.value })} />
+          </Field>
+          <Field label="Item ID">
+            <input
+              type="number"
+              class={inputClass}
+              value={filters().item_id ?? ""}
+              onInput={(e) => patch({ item_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
+            />
+          </Field>
+          <Field label="Location ID">
+            <input
+              type="number"
+              class={inputClass}
+              value={filters().location_id ?? ""}
+              onInput={(e) => patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
+            />
+          </Field>
+        </div>
+      }
     >
       <table class="erp-grid min-w-full text-left text-sm">
         <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
@@ -92,7 +118,7 @@ export default function InvBookReportPage() {
         </tbody>
       </table>
       <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
-        <p class="px-5 py-8 text-center text-sm text-text-secondary">No stock ledger rows for this period.</p>
+        <p class="px-5 py-8 text-center text-sm text-text-secondary">No inv. book rows for this period.</p>
       </Show>
     </ReportPageLayout>
   );

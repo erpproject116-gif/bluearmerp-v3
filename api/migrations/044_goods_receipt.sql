@@ -40,12 +40,21 @@ create table if not exists public.gr_goods_receipt_serials (
 );
 
 alter table public.inv_serial_units
+  drop constraint if exists inv_serial_units_gr_line_fk;
+
+alter table public.inv_serial_units
   add constraint inv_serial_units_gr_line_fk
   foreign key (goods_receipt_line_id) references public.gr_goods_receipt_lines(id) on delete set null;
 
 alter table public.inv_lot_batches
+  drop constraint if exists inv_lot_batches_po_line_fk;
+
+alter table public.inv_lot_batches
   add constraint inv_lot_batches_po_line_fk
   foreign key (purchase_order_line_id) references public.po_purchase_order_lines(id) on delete set null;
+
+alter table public.inv_lot_batches
+  drop constraint if exists inv_lot_batches_gr_line_fk;
 
 alter table public.inv_lot_batches
   add constraint inv_lot_batches_gr_line_fk

@@ -1,5 +1,7 @@
+import { A } from "@solidjs/router";
 import { createSignal, onMount, Show } from "solid-js";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
+import { inventoryRefLink } from "../../../shared/inventoryRefLink";
 import { useSerialTrace } from "../../../shared/useSerialLotList";
 import { SerialLotLayout } from "./SerialLotLayout";
 import { serialStatusLabel } from "./serialRegistryFilters";
@@ -130,7 +132,14 @@ export default function SerialTracePage() {
                     { key: "event_type", header: "Event" },
                     { key: "from_location_name", header: "From", render: (r) => r.from_location_name || "—" },
                     { key: "to_location_name", header: "To", render: (r) => r.to_location_name || "—" },
-                    { key: "ref_type", header: "Ref type", render: (r) => r.ref_type ?? "—" },
+                    { key: "ref_type", header: "Reference", render: (r) => {
+                      const link = inventoryRefLink(r.ref_type, r.ref_id);
+                      return link.href ? (
+                        <A href={link.href} class="text-brand-600 hover:underline">{link.label}</A>
+                      ) : (
+                        link.label
+                      );
+                    }},
                     { key: "created_by_name", header: "By", render: (r) => r.created_by_name || "—" },
                     { key: "notes", header: "Notes", render: (r) => r.notes ?? "—" },
                   ]}

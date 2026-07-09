@@ -30,6 +30,38 @@ export const TRACKING_POLICY_OPTIONS = [
   { value: "optional", label: "Optional on transactions" },
 ] as const;
 
+export const ITEM_CATEGORY_OPTIONS = [
+  { value: "raw_material", label: "Raw Material" },
+  { value: "sub_material", label: "Sub Material" },
+  { value: "finished_goods", label: "Finished Goods" },
+  { value: "semi_finished_goods", label: "Semi-Finished Goods" },
+  { value: "merchandise", label: "Merchandise" },
+  { value: "intangible_merchandise", label: "Intangible Merchandise" },
+] as const;
+
+export const ITEM_TYPE_OPTIONS = [
+  { value: "item", label: "Item" },
+  { value: "multiple_process_item", label: "Multiple Process Item" },
+  { value: "multi_spec_item", label: "Multi Spec. Item" },
+] as const;
+
+export const PRODUCTION_PROCESS_OPTIONS = [
+  { value: "", label: "None" },
+  { value: "bundle", label: "Bundle" },
+  { value: "service", label: "Service" },
+] as const;
+
+export type StandardCosts = {
+  material: number;
+  labor: number;
+  expenses: number;
+  overhead: number;
+};
+
+export function emptyStandardCosts(): StandardCosts {
+  return { material: 0, labor: 0, expenses: 0, overhead: 0 };
+}
+
 export function trackingPolicyLabel(policy?: string): string {
   return policy === "optional" ? "Optional" : "Required";
 }

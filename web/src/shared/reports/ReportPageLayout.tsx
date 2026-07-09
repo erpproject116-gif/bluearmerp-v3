@@ -18,6 +18,7 @@ export type ReportPageLayoutProps = {
   page?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
+  filterExtra?: JSX.Element;
   children: JSX.Element;
 };
 
@@ -54,6 +55,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
             </label>
           </div>
         </Show>
+        <Show when={props.filterExtra}>{props.filterExtra}</Show>
         <div class="mt-4 flex gap-2">
           <button
             type="button"

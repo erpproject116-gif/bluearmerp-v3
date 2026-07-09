@@ -1,10 +1,13 @@
 import { createSignal, For, onMount, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { defaultReportDateRange, ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
+import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { inventoryRefLink } from "../../../shared/inventoryRefLink";
 import {
   stockLedgerExportUrl,
   useStockLedgerReport,
-  type DateRangeFilters,
+  type StockLedgerFilters,
 } from "../../../shared/reports/useModuleReports";
 
 export default function StockLedgerReportPage() {
@@ -12,7 +15,7 @@ export default function StockLedgerReportPage() {
   const [submitted, setSubmitted] = createSignal(false);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
+  const [filters, setFilters] = createSignal<StockLedgerFilters>(defaults);
   const pageSize = 50;
 
   const report = useStockLedgerReport(() => ({
@@ -41,16 +44,18 @@ export default function StockLedgerReportPage() {
     setGeneratedAt(new Date());
   };
 
+  const patch = (p: Partial<StockLedgerFilters>) => setFilters((prev) => ({ ...prev, ...p }));
+
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
 
   return (
     <ReportPageLayout
       title="Stock Ledger"
-      description="Stock movement history — Search (F8)."
+      description="Movement detail with running balance by item and location — Search (F8)."
       dateFrom={() => filters().date_from ?? ""}
       dateTo={() => filters().date_to ?? ""}
-      onDateFromChange={(v) => setFilters((f) => ({ ...f, date_from: v }))}
-      onDateToChange={(v) => setFilters((f) => ({ ...f, date_to: v }))}
+      onDateFromChange={(v) => patch({ date_from: v })}
+      onDateToChange={(v) => patch({ date_to: v })}
       submitted={submitted()}
       loading={report.isFetching}
       generatedAt={generatedAt()}
@@ -64,6 +69,29 @@ export default function StockLedgerReportPage() {
         setPage(1);
       }}
       onExportCsv={() => void downloadReportCsv(stockLedgerExportUrl(filters()), "stock-ledger.csv")}
+      filterExtra={
+        <div class="mt-4 grid gap-4 md:grid-cols-3">
+          <Field label="Item keyword">
+            <input class={inputClass} value={filters().q ?? ""} onInput={(e) => patch({ q: e.currentTarget.value })} />
+          </Field>
+          <Field label="Item ID">
+            <input
+              type="number"
+              class={inputClass}
+              value={filters().item_id ?? ""}
+              onInput={(e) => patch({ item_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
+            />
+          </Field>
+          <Field label="Location ID">
+            <input
+              type="number"
+              class={inputClass}
+              value={filters().location_id ?? ""}
+              onInput={(e) => patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
+            />
+          </Field>
+        </div>
+      }
     >
       <table class="erp-grid min-w-full text-left text-sm">
         <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
@@ -72,26 +100,37 @@ export default function StockLedgerReportPage() {
             <th class="px-3 py-2">Item</th>
             <th class="px-3 py-2">Location</th>
             <th class="px-3 py-2 text-right">Qty Delta</th>
+            <th class="px-3 py-2 text-right">Balance</th>
             <th class="px-3 py-2">Type</th>
-            <th class="px-3 py-2">Ref</th>
+            <th class="px-3 py-2">Reference</th>
             <th class="px-3 py-2">Reason</th>
           </tr>
         </thead>
         <tbody>
           <For each={report.data?.rows ?? []}>
-            {(row) => (
-              <tr class="border-t border-stroke/60">
-                <td class="px-3 py-2">{row.created_at}</td>
-                <td class="px-3 py-2">
-                  {row.item_code} — {row.item_name}
-                </td>
-                <td class="px-3 py-2">{row.location_name}</td>
-                <td class="px-3 py-2 text-right">{row.qty_delta}</td>
-                <td class="px-3 py-2">{row.movement_type}</td>
-                <td class="px-3 py-2">{row.ref_type}</td>
-                <td class="px-3 py-2">{row.reason ?? ""}</td>
-              </tr>
-            )}
+            {(row) => {
+              const ref = () => inventoryRefLink(row.ref_type, row.ref_id);
+              return (
+                <tr class="border-t border-stroke/60">
+                  <td class="px-3 py-2">{row.created_at}</td>
+                  <td class="px-3 py-2">
+                    {row.item_code} — {row.item_name}
+                  </td>
+                  <td class="px-3 py-2">{row.location_name}</td>
+                  <td class="px-3 py-2 text-right">{row.qty_delta}</td>
+                  <td class="px-3 py-2 text-right">{row.running_balance}</td>
+                  <td class="px-3 py-2">{row.movement_type}</td>
+                  <td class="px-3 py-2">
+                    <Show when={ref().href} fallback={ref().label}>
+                      <A href={ref().href!} class="text-brand-600 hover:underline">
+                        {ref().label}
+                      </A>
+                    </Show>
+                  </td>
+                  <td class="px-3 py-2">{row.reason ?? ""}</td>
+                </tr>
+              );
+            }}
           </For>
         </tbody>
       </table>

@@ -18,48 +18,64 @@ import (
 )
 
 type Item struct {
-	ID                     int64   `json:"id"`
-	ItemCode               string  `json:"item_code"`
-	ItemName               string  `json:"item_name"`
-	PurchasePrice          float64 `json:"purchase_price"`
-	SalesPrice             float64 `json:"sales_price"`
+	ID                     int64              `json:"id"`
+	ItemCode               string             `json:"item_code"`
+	ItemName               string             `json:"item_name"`
+	SpecName               string             `json:"spec_name,omitempty"`
+	Unit                   string             `json:"unit,omitempty"`
+	ItemCategory           string             `json:"item_category,omitempty"`
+	ItemType               string             `json:"item_type,omitempty"`
+	ProductionProcess      *string            `json:"production_process,omitempty"`
+	PurchasePrice          float64            `json:"purchase_price"`
+	SalesPrice             float64            `json:"sales_price"`
 	VipPrice               float64            `json:"vip_price"`
 	PriceLevels            map[string]float64 `json:"price_levels,omitempty"`
 	SafetyStockByDoc       map[string]float64 `json:"safety_stock_by_doc,omitempty"`
+	OePrice                float64            `json:"oe_price"`
+	StandardCosts          map[string]float64 `json:"standard_costs,omitempty"`
 	WarrantyDurationMonths *int               `json:"warranty_duration_months,omitempty"`
-	ReorderLevel           *float64 `json:"reorder_level,omitempty"`
+	ReorderLevel           *float64           `json:"reorder_level,omitempty"`
 	TrackSerial            bool               `json:"track_serial"`
 	TrackLot               bool               `json:"track_lot"`
 	SerialPolicy           string             `json:"serial_policy"`
 	LotPolicy              string             `json:"lot_policy"`
 	TrackInventoryQty      bool               `json:"track_inventory_qty"`
-	Status                 string   `json:"status"`
-	ItemCategoryID         *int64         `json:"item_category_id,omitempty"`
-	CustomValues           map[string]any `json:"custom_values,omitempty"`
+	Status                 string             `json:"status"`
+	ItemCategoryID         *int64             `json:"item_category_id,omitempty"`
+	ItemCategoryName       string             `json:"item_category_name,omitempty"`
+	CustomValues           map[string]any     `json:"custom_values,omitempty"`
 }
 
 type itemBody struct {
-	ItemName               string         `json:"item_name"`
-	PurchasePrice          float64        `json:"purchase_price"`
-	SalesPrice             float64        `json:"sales_price"`
+	ItemName               string             `json:"item_name"`
+	SpecName               *string            `json:"spec_name"`
+	Unit                   *string            `json:"unit"`
+	ItemCategory           *string            `json:"item_category"`
+	ItemType               *string            `json:"item_type"`
+	ProductionProcess      *string            `json:"production_process"`
+	PurchasePrice          float64            `json:"purchase_price"`
+	SalesPrice             float64            `json:"sales_price"`
 	VipPrice               float64            `json:"vip_price"`
 	PriceLevels            map[string]float64 `json:"price_levels"`
 	SafetyStockByDoc       map[string]float64 `json:"safety_stock_by_doc"`
+	OePrice                *float64           `json:"oe_price"`
+	StandardCosts          map[string]float64 `json:"standard_costs"`
 	WarrantyDurationMonths *int               `json:"warranty_duration_months"`
-	ReorderLevel           *float64       `json:"reorder_level"`
-	TrackSerial            *bool          `json:"track_serial"`
-	TrackLot               *bool          `json:"track_lot"`
-	SerialPolicy           *string        `json:"serial_policy"`
-	LotPolicy              *string        `json:"lot_policy"`
-	TrackInventoryQty      *bool          `json:"track_inventory_qty"`
-	Status                 string         `json:"status"`
-	ItemCategoryID         *int64         `json:"item_category_id"`
-	CustomValues           map[string]any `json:"custom_values"`
+	ReorderLevel           *float64           `json:"reorder_level"`
+	TrackSerial            *bool              `json:"track_serial"`
+	TrackLot               *bool              `json:"track_lot"`
+	SerialPolicy           *string            `json:"serial_policy"`
+	LotPolicy              *string            `json:"lot_policy"`
+	TrackInventoryQty      *bool              `json:"track_inventory_qty"`
+	Status                 string             `json:"status"`
+	ItemCategoryID         *int64             `json:"item_category_id"`
+	CustomValues           map[string]any     `json:"custom_values"`
 }
 
 func registerItemRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/items/next-code", nextCodeHandler(pool, "item"))
 	r.Get("/items/import-template", itemImportTemplateHandler())
+	r.Get("/items/export", exportItemsCSV(pool))
 	r.Post("/items/import", itemImportCSVHandler(pool))
 	r.Get("/items", listItems(pool))
 	r.Post("/items", createItem(pool))
@@ -81,12 +97,22 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
-		where, args := buildWhere(tu.TenantID, p, "item_name", "item_code")
-		q := fmt.Sprintf(`select id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8,
-			price_levels, safety_stock_by_doc,
-			warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id, count(*) over()
-			from public.inv_items where %s order by %s %s limit $%d offset $%d`,
-			where, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
+		extra := parseItemListFilters(r)
+		where, args := buildItemListWhere(tu.TenantID, p, extra)
+		orderCol := "i.item_code"
+		if col, ok := allowed[p.Sort]; ok {
+			orderCol = "i." + col
+		}
+		q := fmt.Sprintf(`select i.id, i.item_code, i.item_name, coalesce(i.spec_name, ''), coalesce(i.unit, ''),
+			coalesce(i.item_category, 'merchandise'), coalesce(i.item_type, 'item'), i.production_process,
+			i.purchase_price::float8, i.sales_price::float8, i.vip_price::float8,
+			i.price_levels, i.safety_stock_by_doc, i.oe_price::float8, i.standard_costs,
+			i.warranty_duration_months, i.reorder_level::float8, i.track_serial, i.track_lot, i.serial_policy, i.lot_policy, i.track_inventory_qty, i.status, i.item_category_id,
+			coalesce(cat.name, ''), count(*) over()
+			from public.inv_items i
+			left join public.inv_item_categories cat on cat.id = i.item_category_id and cat.tenant_id = i.tenant_id
+			where %s order by %s %s limit $%d offset $%d`,
+			where, orderCol, orderSQL(p.Order), len(args)+1, len(args)+2)
 		args = append(args, p.PageSize, offset)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -98,15 +124,19 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		for rows.Next() {
 			var row Item
-			var priceLevelsJSON, safetyJSON []byte
-			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice,
-				&priceLevelsJSON, &safetyJSON,
-				&row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID, &total); err != nil {
+			var priceLevelsJSON, safetyJSON, standardJSON []byte
+			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit,
+				&row.ItemCategory, &row.ItemType, &row.ProductionProcess,
+				&row.PurchasePrice, &row.SalesPrice, &row.VipPrice,
+				&priceLevelsJSON, &safetyJSON, &row.OePrice, &standardJSON,
+				&row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID,
+				&row.ItemCategoryName, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read.", "ERR_INTERNAL")
 				return
 			}
 			row.PriceLevels = unmarshalJSONFloatMap(priceLevelsJSON)
 			row.SafetyStockByDoc = unmarshalJSONFloatMap(safetyJSON)
+			row.StandardCosts = unmarshalJSONFloatMap(standardJSON)
 			row.SerialPolicy = NormalizeTrackingPolicy(row.SerialPolicy)
 			row.LotPolicy = NormalizeTrackingPolicy(row.LotPolicy)
 			out = append(out, row)
@@ -145,12 +175,15 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			if !boolOrFalse(body.TrackLot) {
 				lotPolicy = TrackingPolicyRequired
 			}
-			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-				returning id, item_code, item_name, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id`,
-				tu.TenantID, code, strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), body.ItemCategoryID).
-				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
+			specName, unit, itemCategory, itemType, productionProcess, oePrice, standardCosts := itemBodyScalars(body)
+			standardJSON, _ := marshalJSONMap(standardCosts)
+			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, item_category, item_type, production_process, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, oe_price, standard_costs, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+				returning id, item_code, item_name, coalesce(spec_name,''), coalesce(unit,''), coalesce(item_category,'merchandise'), coalesce(item_type,'item'), production_process, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, oe_price::float8, standard_costs, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id`,
+				tu.TenantID, code, strings.TrimSpace(body.ItemName), specName, unit, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), body.ItemCategoryID).
+				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit, &row.ItemCategory, &row.ItemType, &row.ProductionProcess, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.OePrice, &standardJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
 			row.PriceLevels = unmarshalJSONFloatMap(priceJSON)
 			row.SafetyStockByDoc = unmarshalJSONFloatMap(safetyJSON)
+			row.StandardCosts = unmarshalJSONFloatMap(standardJSON)
 			return row.ID, row, err
 		})
 		if err != nil {
@@ -236,9 +269,12 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 			lotPolicy = TrackingPolicyRequired
 		}
 
-		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, purchase_price=$2, sales_price=$3, vip_price=$4, price_levels=$5, safety_stock_by_doc=$6, warranty_duration_months=$7, reorder_level=$8, track_serial=$9, track_lot=$10, serial_policy=$11, lot_policy=$12, track_inventory_qty=$13, status=$14, item_category_id=$17, updated_at=now()
-			where id=$15 and tenant_id=$16 and deleted_at is null`,
-			strings.TrimSpace(body.ItemName), body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
+		specName, unit, itemCategory, itemType, productionProcess, oePrice, standardCosts := itemBodyScalars(body)
+		standardJSON, _ := marshalJSONMap(standardCosts)
+
+		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, spec_name=$2, unit=$3, item_category=$4, item_type=$5, production_process=$6, purchase_price=$7, sales_price=$8, vip_price=$9, price_levels=$10, safety_stock_by_doc=$11, oe_price=$12, standard_costs=$13, warranty_duration_months=$14, reorder_level=$15, track_serial=$16, track_lot=$17, serial_policy=$18, lot_policy=$19, track_inventory_qty=$20, status=$21, item_category_id=$24, updated_at=now()
+			where id=$22 and tenant_id=$23 and deleted_at is null`,
+			strings.TrimSpace(body.ItemName), specName, unit, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
 			return
@@ -267,4 +303,34 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 
 func deleteItem(pool *pgxpool.Pool) http.HandlerFunc {
 	return softDeleteHandler(pool, "inv_items", "inventory.item.delete", "inv_item")
+}
+
+func itemBodyScalars(body itemBody) (specName, unit, itemCategory, itemType string, productionProcess *string, oePrice float64, standardCosts map[string]float64) {
+	specName = strings.TrimSpace(ptrStr(body.SpecName))
+	unit = strings.TrimSpace(ptrStr(body.Unit))
+	itemCategory = strings.TrimSpace(ptrStr(body.ItemCategory))
+	if itemCategory == "" {
+		itemCategory = "merchandise"
+	}
+	itemType = strings.TrimSpace(ptrStr(body.ItemType))
+	if itemType == "" {
+		itemType = "item"
+	}
+	productionProcess = body.ProductionProcess
+	if productionProcess != nil && strings.TrimSpace(*productionProcess) == "" {
+		productionProcess = nil
+	}
+	oePrice = 0
+	if body.OePrice != nil {
+		oePrice = *body.OePrice
+	}
+	standardCosts = sanitizeStandardCosts(body.StandardCosts)
+	return
+}
+
+func ptrStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,15 +29,17 @@ type stockBalanceRow struct {
 }
 
 type stockLedgerRow struct {
-	ID           int64   `json:"id"`
-	CreatedAt    string  `json:"created_at"`
-	ItemCode     string  `json:"item_code"`
-	ItemName     string  `json:"item_name"`
-	LocationName string  `json:"location_name"`
-	QtyDelta     float64 `json:"qty_delta"`
-	MovementType string  `json:"movement_type"`
-	RefType      string  `json:"ref_type"`
-	Reason       string  `json:"reason,omitempty"`
+	ID             int64   `json:"id"`
+	CreatedAt      string  `json:"created_at"`
+	ItemCode       string  `json:"item_code"`
+	ItemName       string  `json:"item_name"`
+	LocationName   string  `json:"location_name"`
+	QtyDelta       float64 `json:"qty_delta"`
+	RunningBalance float64 `json:"running_balance"`
+	MovementType   string  `json:"movement_type"`
+	RefType        string  `json:"ref_type"`
+	RefID          *int64  `json:"ref_id,omitempty"`
+	Reason         string  `json:"reason,omitempty"`
 }
 
 type stockAgeingRow struct {
@@ -147,28 +150,45 @@ func exportStockBalance(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func stockLedgerWhere(tenantID int64, dateFrom, dateTo *time.Time) (string, []any) {
+func stockLedgerWhere(tenantID int64, dateFrom, dateTo *time.Time, itemID, locationID *int64, q string) (string, []any) {
 	where := "sm.tenant_id = $1"
 	args := []any{tenantID}
 	n := 2
 	if dateFrom != nil && dateTo != nil {
 		where += fmt.Sprintf(" and sm.created_at >= $%d::timestamptz and sm.created_at < ($%d::date + interval '1 day')", n, n+1)
 		args = append(args, dateFrom.Format("2006-01-02")+" 00:00:00+00", dateTo.Format("2006-01-02"))
+		n += 2
+	}
+	if itemID != nil {
+		where += fmt.Sprintf(" and sm.item_id = $%d", n)
+		args = append(args, *itemID)
+		n++
+	}
+	if locationID != nil {
+		where += fmt.Sprintf(" and sm.location_id = $%d", n)
+		args = append(args, *locationID)
+		n++
+	}
+	if strings.TrimSpace(q) != "" {
+		where += fmt.Sprintf(" and (i.item_code ilike $%d or i.item_name ilike $%d)", n, n)
+		args = append(args, "%"+strings.TrimSpace(q)+"%")
 	}
 	return where, args
 }
 
-func stockLedgerSQL(tenantID int64, dateFrom, dateTo *time.Time) (string, []any) {
-	where, args := stockLedgerWhere(tenantID, dateFrom, dateTo)
-	q := fmt.Sprintf(`
+func stockLedgerSQL(tenantID int64, dateFrom, dateTo *time.Time, itemID, locationID *int64, q string) (string, []any) {
+	where, args := stockLedgerWhere(tenantID, dateFrom, dateTo, itemID, locationID, q)
+	qry := fmt.Sprintf(`
 		select sm.id, sm.created_at::text, i.item_code, i.item_name, l.location_name,
-		  sm.qty_delta::float8, sm.movement_type, sm.ref_type,
+		  sm.qty_delta::float8,
+		  sum(sm.qty_delta) over (partition by sm.item_id, sm.location_id order by sm.created_at, sm.id)::float8,
+		  sm.movement_type, sm.ref_type, sm.ref_id,
 		  coalesce(sm.reason, '')
 		from public.inv_stock_movements sm
 		join public.inv_items i on i.id = sm.item_id
 		join public.inv_locations l on l.id = sm.location_id
 		where %s`, where)
-	return q, args
+	return qry, args
 }
 
 func listStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
@@ -181,12 +201,15 @@ func listStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
 		if !ok {
 			return
 		}
+		itemID, _ := parseOptionalItemID(r)
+		locationID, _ := parseOptionalLocationID(r)
+		qFilter := strings.TrimSpace(r.URL.Query().Get("q"))
 		p := httputil.ParseListParams(r, "created_at", allowed)
 		if p.Order == "" {
 			p.Order = "desc"
 		}
 		offset := httputil.Offset(p)
-		base, args := stockLedgerSQL(tu.TenantID, dateFrom, dateTo)
+		base, args := stockLedgerSQL(tu.TenantID, dateFrom, dateTo, itemID, locationID, qFilter)
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
@@ -205,7 +228,7 @@ func listStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row stockLedgerRow
 			if err := rows.Scan(&row.ID, &row.CreatedAt, &row.ItemCode, &row.ItemName, &row.LocationName,
-				&row.QtyDelta, &row.MovementType, &row.RefType, &row.Reason); err != nil {
+				&row.QtyDelta, &row.RunningBalance, &row.MovementType, &row.RefType, &row.RefID, &row.Reason); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read report.", "ERR_INTERNAL")
 				return
 			}
@@ -225,7 +248,10 @@ func exportStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		base, args := stockLedgerSQL(tu.TenantID, dateFrom, dateTo)
+		itemID, _ := parseOptionalItemID(r)
+		locationID, _ := parseOptionalLocationID(r)
+		qFilter := strings.TrimSpace(r.URL.Query().Get("q"))
+		base, args := stockLedgerSQL(tu.TenantID, dateFrom, dateTo, itemID, locationID, qFilter)
 		q := fmt.Sprintf("select * from (%s) sub order by created_at desc limit %d", base, reports.ExportMaxRows)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -236,16 +262,20 @@ func exportStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", `attachment; filename="stock-ledger.csv"`)
 		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"Date", "Item Code", "Item Name", "Location", "Qty Delta", "Type", "Ref", "Reason"})
+		_ = cw.Write([]string{"Date", "Item Code", "Item Name", "Location", "Qty Delta", "Running Balance", "Type", "Ref", "Ref ID", "Reason"})
 		for rows.Next() {
 			var row stockLedgerRow
 			if err := rows.Scan(&row.ID, &row.CreatedAt, &row.ItemCode, &row.ItemName, &row.LocationName,
-				&row.QtyDelta, &row.MovementType, &row.RefType, &row.Reason); err != nil {
+				&row.QtyDelta, &row.RunningBalance, &row.MovementType, &row.RefType, &row.RefID, &row.Reason); err != nil {
 				return
+			}
+			refID := ""
+			if row.RefID != nil {
+				refID = strconv.FormatInt(*row.RefID, 10)
 			}
 			_ = cw.Write([]string{
 				row.CreatedAt, row.ItemCode, row.ItemName, row.LocationName,
-				fmt.Sprintf("%.4f", row.QtyDelta), row.MovementType, row.RefType, strings.TrimSpace(row.Reason),
+				fmt.Sprintf("%.4f", row.QtyDelta), fmt.Sprintf("%.4f", row.RunningBalance), row.MovementType, row.RefType, refID, strings.TrimSpace(row.Reason),
 			})
 		}
 		cw.Flush()

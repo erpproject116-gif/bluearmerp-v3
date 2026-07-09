@@ -8,6 +8,13 @@ export type InventoryListParams = {
   order: "asc" | "desc";
   q?: string;
   status?: string;
+  item_code?: string;
+  item_name?: string;
+  spec_name?: string;
+  item_category?: string;
+  item_type?: string;
+  track_serial?: string;
+  track_lot?: string;
 };
 
 export type InventoryListResult<T> = {
@@ -28,6 +35,13 @@ export function useInventoryList<T>(entity: string, params: () => InventoryListP
     });
     if (p.q) qs.set("q", p.q);
     if (p.status) qs.set("status", p.status);
+    if (p.item_code) qs.set("item_code", p.item_code);
+    if (p.item_name) qs.set("item_name", p.item_name);
+    if (p.spec_name) qs.set("spec_name", p.spec_name);
+    if (p.item_category) qs.set("item_category", p.item_category);
+    if (p.item_type) qs.set("item_type", p.item_type);
+    if (p.track_serial) qs.set("track_serial", p.track_serial);
+    if (p.track_lot) qs.set("track_lot", p.track_lot);
 
     return {
       queryKey: ["inventory", entity, p],

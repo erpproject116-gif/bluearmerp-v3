@@ -12,6 +12,8 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -24,6 +26,7 @@ var itemImportRequiredHeaders = []string{"item_name"}
 var itemImportOptionalHeaders = []string{
 	"purchase_price", "sales_price", "vip_price", "status",
 	"track_serial", "track_lot", "track_inventory_qty", "warranty_duration_months",
+	"spec_name", "unit", "item_category", "item_type", "oe_price",
 }
 var itemImportAllHeaders = append(append([]string{}, itemImportRequiredHeaders...), itemImportOptionalHeaders...)
 var itemImportExample = []string{"Widget A", "100.00", "150.00", "140.00", "active", "true", "false", "true", "24"}
@@ -188,6 +191,25 @@ func parseImportItemBody(row map[string]string) (itemBody, error) {
 		}
 		body.WarrantyDurationMonths = &n
 	}
+	if v := strings.TrimSpace(row["spec_name"]); v != "" {
+		body.SpecName = &v
+	}
+	if v := strings.TrimSpace(row["unit"]); v != "" {
+		body.Unit = &v
+	}
+	if v := strings.TrimSpace(row["item_category"]); v != "" {
+		body.ItemCategory = &v
+	}
+	if v := strings.TrimSpace(row["item_type"]); v != "" {
+		body.ItemType = &v
+	}
+	if v := strings.TrimSpace(row["oe_price"]); v != "" {
+		oe, err := parseCSVFloat(v, "oe_price")
+		if err != nil {
+			return itemBody{}, err
+		}
+		body.OePrice = &oe
+	}
 	return body, nil
 }
 
@@ -205,11 +227,12 @@ func bulkImportItems(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 			return nil, err
 		}
 		var id int64
+		specName, unit, itemCategory, itemType, _, oePrice, _ := itemBodyScalars(row.body)
 		err := tx.QueryRow(ctx, `
-			insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, warranty_duration_months, track_serial, track_lot, track_inventory_qty, status)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, item_category, item_type, purchase_price, sales_price, vip_price, oe_price, warranty_duration_months, track_serial, track_lot, track_inventory_qty, status)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 			returning id`,
-			tu.TenantID, code, row.body.ItemName, row.body.PurchasePrice, row.body.SalesPrice, row.body.VipPrice,
+			tu.TenantID, code, row.body.ItemName, specName, unit, itemCategory, itemType, row.body.PurchasePrice, row.body.SalesPrice, row.body.VipPrice, oePrice,
 			row.body.WarrantyDurationMonths, boolOrFalse(row.body.TrackSerial), boolOrFalse(row.body.TrackLot), boolOrFalse(row.body.TrackInventoryQty), row.body.Status).
 			Scan(&id)
 		if err != nil {
@@ -280,5 +303,53 @@ func parseCSVBool(raw, field string) (bool, error) {
 		return false, nil
 	default:
 		return false, fmt.Errorf("%s must be true/false, 1/0, or yes/no", field)
+	}
+}
+
+func exportItemsCSV(pool *pgxpool.Pool) http.HandlerFunc {
+	allowed := map[string]string{
+		"item_code": "item_code", "item_name": "item_name", "purchase_price": "purchase_price",
+		"sales_price": "sales_price", "vip_price": "vip_price", "status": "status",
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "item_code", allowed)
+		extra := parseItemListFilters(r)
+		where, args := buildItemListWhere(tu.TenantID, p, extra)
+		orderCol := "i.item_code"
+		if col, ok := allowed[p.Sort]; ok {
+			orderCol = "i." + col
+		}
+		q := fmt.Sprintf(`select i.item_code, i.item_name, coalesce(i.spec_name,''), coalesce(i.unit,''),
+			coalesce(i.item_category,''), coalesce(i.item_type,''),
+			i.purchase_price::float8, i.sales_price::float8, i.vip_price::float8, i.oe_price::float8,
+			i.track_serial, i.track_lot, i.track_inventory_qty, i.status, coalesce(cat.name,'')
+			from public.inv_items i
+			left join public.inv_item_categories cat on cat.id = i.item_category_id and cat.tenant_id = i.tenant_id
+			where %s order by %s asc limit %d`, where, orderCol, reports.ExportMaxRows)
+		rows, err := pool.Query(r.Context(), q, args...)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to export.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="items-export.csv"`)
+		cw := csv.NewWriter(w)
+		_ = cw.Write([]string{"item_code", "item_name", "spec_name", "unit", "item_category", "item_type", "purchase_price", "sales_price", "vip_price", "oe_price", "track_serial", "track_lot", "track_inventory_qty", "status", "pos_category"})
+		for rows.Next() {
+			var code, name, spec, unit, cat, itype, status, posCat string
+			var purchase, sales, vip, oe float64
+			var trackSerial, trackLot, trackQty bool
+			if err := rows.Scan(&code, &name, &spec, &unit, &cat, &itype, &purchase, &sales, &vip, &oe, &trackSerial, &trackLot, &trackQty, &status, &posCat); err != nil {
+				return
+			}
+			_ = cw.Write([]string{
+				code, name, spec, unit, cat, itype,
+				fmt.Sprintf("%.4f", purchase), fmt.Sprintf("%.4f", sales), fmt.Sprintf("%.4f", vip), fmt.Sprintf("%.4f", oe),
+				fmt.Sprintf("%t", trackSerial), fmt.Sprintf("%t", trackLot), fmt.Sprintf("%t", trackQty), status, posCat,
+			})
+		}
+		cw.Flush()
 	}
 }

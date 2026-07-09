@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,8 +30,25 @@ type invBookRow struct {
 	VipPrice      float64 `json:"vip_price"`
 }
 
-func invBookSQL(tenantID int64, dateFrom, dateTo time.Time) (string, []any) {
-	q := `
+func invBookSQL(tenantID int64, dateFrom, dateTo time.Time, itemID, locationID *int64, q string) (string, []any) {
+	args := []any{tenantID, dateFrom.Format("2006-01-02"), dateTo.Format("2006-01-02")}
+	extra := ""
+	n := 4
+	if itemID != nil {
+		extra += fmt.Sprintf(" and i.id = $%d", n)
+		args = append(args, *itemID)
+		n++
+	}
+	if locationID != nil {
+		extra += fmt.Sprintf(" and l.id = $%d", n)
+		args = append(args, *locationID)
+		n++
+	}
+	if strings.TrimSpace(q) != "" {
+		extra += fmt.Sprintf(" and (i.item_code ilike $%d or i.item_name ilike $%d)", n, n)
+		args = append(args, "%"+strings.TrimSpace(q)+"%")
+	}
+	qry := `
 		with bounds as (
 		  select $2::date as d_from, $3::date as d_to
 		),
@@ -55,8 +73,8 @@ func invBookSQL(tenantID int64, dateFrom, dateTo time.Time) (string, []any) {
 		from movements m
 		join public.inv_items i on i.id = m.item_id
 		join public.inv_locations l on l.id = m.location_id
-		where m.opening_qty <> 0 or m.receipt_qty <> 0 or m.issue_qty <> 0`
-	return q, []any{tenantID, dateFrom.Format("2006-01-02"), dateTo.Format("2006-01-02")}
+		where m.opening_qty <> 0 or m.receipt_qty <> 0 or m.issue_qty <> 0` + extra
+	return qry, args
 }
 
 func listInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
@@ -69,7 +87,10 @@ func listInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
-		base, args := invBookSQL(tu.TenantID, *dateFrom, *dateTo)
+		itemID, _ := parseOptionalItemID(r)
+		locationID, _ := parseOptionalLocationID(r)
+		qFilter := strings.TrimSpace(r.URL.Query().Get("q"))
+		base, args := invBookSQL(tu.TenantID, *dateFrom, *dateTo, itemID, locationID, qFilter)
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
@@ -108,7 +129,10 @@ func exportInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		base, args := invBookSQL(tu.TenantID, *dateFrom, *dateTo)
+		itemID, _ := parseOptionalItemID(r)
+		locationID, _ := parseOptionalLocationID(r)
+		qFilter := strings.TrimSpace(r.URL.Query().Get("q"))
+		base, args := invBookSQL(tu.TenantID, *dateFrom, *dateTo, itemID, locationID, qFilter)
 		q := fmt.Sprintf("select * from (%s) sub order by item_code asc limit %d", base, reports.ExportMaxRows)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {

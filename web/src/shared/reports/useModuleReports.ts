@@ -192,6 +192,18 @@ export function useStockBalanceReport(params: () => Omit<ReportParams<Record<str
 
 // --- Stock Ledger ---
 
+export type InvBookFilters = DateRangeFilters & {
+  q?: string;
+  item_id?: number;
+  location_id?: number;
+};
+
+export type StockLedgerFilters = DateRangeFilters & {
+  q?: string;
+  item_id?: number;
+  location_id?: number;
+};
+
 export type StockLedgerRow = {
   id: number;
   created_at: string;
@@ -199,16 +211,18 @@ export type StockLedgerRow = {
   item_name: string;
   location_name: string;
   qty_delta: number;
+  running_balance: number;
   movement_type: string;
   ref_type: string;
+  ref_id?: number | null;
   reason?: string;
 };
 
-export function stockLedgerExportUrl(filters: DateRangeFilters): string {
+export function stockLedgerExportUrl(filters: StockLedgerFilters): string {
   return exportUrl("/api/v1/inventory/reports/stock-ledger/export", filters);
 }
 
-export function useStockLedgerReport(params: () => ReportParams<DateRangeFilters>) {
+export function useStockLedgerReport(params: () => ReportParams<StockLedgerFilters>) {
   return createQuery(() => {
     const p = params();
     const qs = reportQs(p.filters as Record<string, string>, {
@@ -344,11 +358,11 @@ export type InvBookRow = {
   vip_price: number;
 };
 
-export function invBookExportUrl(filters: DateRangeFilters): string {
-  return exportUrl("/api/v1/inventory/reports/inv-book/export", filters);
+export function invBookExportUrl(filters: InvBookFilters): string {
+  return exportUrl("/api/v1/inventory/reports/inv-book/export", filters as Record<string, string | number>);
 }
 
-export function useInvBookReport(params: () => ReportParams<DateRangeFilters>) {
+export function useInvBookReport(params: () => ReportParams<InvBookFilters>) {
   return createQuery(() => {
     const p = params();
     const qs = reportQs(p.filters as Record<string, string>, {

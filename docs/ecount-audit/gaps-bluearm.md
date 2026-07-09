@@ -14,8 +14,8 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 
 | Gap | ECount | Bluearm target |
 |-----|--------|----------------|
-| Form split across 7 pills | Item New form: Default/Qty/Price/Cost/Additional/Management | Item modal — use tab panels not one long form | Partial — 3 tabs on item modal |
-| Option filter pills mirror form | Same 7 sections in search Option | Advanced search drawer with sections |
+| Form split across 7 pills | Item New form: Default/Qty/Price/Cost/Additional/Management | Item modal — use tab panels not one long form | **Done** — 7 tabs on item modal |
+| Option filter pills mirror form | Same 7 sections in search Option | Advanced search drawer with sections | **Done** — F3 advanced search on Items list |
 | Module L0 tabs switch menu tree | Setup vs Purchases vs Sales | Already similar; ensure each tab's programs cataloged |
 | Safety stock per document type | Qty pill — 7 doc types | **Done** — `safety_stock_by_doc` on item + on-hand filter |
 | Serial/Lot policy radios | Management pill | **Done** — `serial_policy` / `lot_policy` on item + API enforcement |
@@ -24,14 +24,14 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 
 | Gap | ECount | Bluearm target |
 |-----|--------|----------------|
-| Advanced item search | 7-section Option filter with 50+ fields | Extend item list filters + saved views |
-| Multi price levels | VIP + Price B–J + O/E | **Done** — VIP + `price_levels` B–J on item; price lists for partners |
-| Item modal tabs | 7-section ECount form | Tab panels on item modal | Partial — Default / Qty·Price / Serial·Lot / Management |
-| Item categories | 6 manufacturing/merchandise categories | Item type / category enum |
+| Advanced item search | 7-section Option filter with 50+ fields | Extend item list filters + saved views | **Done** — F3 drawer on Items list |
+| Multi price levels | VIP + Price B–J + O/E | **Done** — VIP + `price_levels` B–J + O/E on Cost tab |
+| Item modal tabs | 7-section ECount form | Tab panels on item modal | **Done** — 7 tabs |
+| Item categories | 6 manufacturing/merchandise categories | Item type / category enum | **Done** — legacy enum + POS category |
 | Bundle & service items | Naming + bundle status column | Product bundles module |
 | Barcode from list toolbar | Barcode button | Item barcode + POS scan |
 | Inv. adjustment from list | Inv. Adj. → Inv. Count I per-location grid | Stock entries shortcut — **Adjust flow crawled pass 7** |
-| Excel on list | Excel import/export | Data Center or item import |
+| Excel on list | Excel import/export | Data Center or item import | **Done** — CSV import + export |
 | Serial/lot on item | Management tab + filter | **Done** — Serial/Lot tab + registry links |
 
 ## P1 — Buying / Review Purchases
