@@ -614,6 +614,7 @@ export function SalesModal(props: Props) {
           <InvoicePanel
             kind="sales"
             docId={effectiveEditing()?.id}
+            formOpen={props.open}
             attachmentsScope="sales"
             onPrint={() => effectiveEditing() && openSalesInvoicePrint(effectiveEditing()!.id)}
           />

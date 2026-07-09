@@ -2,25 +2,28 @@ import { Show, createEffect, createSignal } from "solid-js";
 import { inputClass, Field } from "./SpreadsheetGrid";
 import { LookupCombo } from "./LookupCombo";
 import { AttachmentsField } from "./AttachmentsField";
+import { InvoiceLineItemsTable } from "./InvoiceLineItemsTable";
 import type { AttachmentScope } from "./attachments";
+import type { DocumentLineRow } from "./documentLinePrint";
 import { fetchAccountOptions } from "./accounts";
 import { formatPeso, bindDecimalInput } from "./money";
 import { useToast } from "./toast";
 import {
-  getPurchaseInvoice,
-  getSalesInvoice,
   savePurchaseInvoice,
   saveSalesInvoice,
   type PurchaseInvoice,
   type SalesInvoice,
 } from "./invoiceApi";
+import { loadInvoiceDocumentPrint, type InvoiceDocumentKind } from "./invoiceDocumentPrint";
 
-type Kind = "sales" | "purchase";
+type Kind = InvoiceDocumentKind;
 
 type Props = {
   kind: Kind;
   docId?: number;
   attachmentsScope: AttachmentScope;
+  /** Pass modal open so staged attachments reset correctly. */
+  formOpen?: boolean;
   onPrint?: () => void;
   onSaved?: () => void;
 };
@@ -45,15 +48,17 @@ const CONFIG: Record<Kind, { acctIType: string; acctILabel: string; acctIILabel:
 };
 
 /**
- * Accounting invoice for a Sale or Purchase: pretax/tax/total (read-only from the
- * transaction), Acct I (revenue/expense) and Acct II (AR/AP or cash/bank) pickers,
- * fees, remark, carried attachments, a link to the generated draft journal entry,
- * and print. Saving (re)builds the draft journal entry server-side.
+ * Accounting invoice for a Sale or Purchase: line breakdown, pretax/tax/total,
+ * Acct I (revenue/expense) and Acct II (AR/AP or cash/bank) pickers, fees,
+ * remark, carried attachments, journal entry link, and print.
  */
 export function InvoicePanel(props: Props) {
   const toast = useToast();
   const cfg = () => CONFIG[props.kind];
 
+  const [loading, setLoading] = createSignal(false);
+  const [lines, setLines] = createSignal<DocumentLineRow[]>([]);
+  const [currencyCode, setCurrencyCode] = createSignal<string | undefined>();
   const [pretax, setPretax] = createSignal(0);
   const [tax, setTax] = createSignal(0);
   const [grand, setGrand] = createSignal(0);
@@ -72,6 +77,37 @@ export function InvoicePanel(props: Props) {
   const [jeStatus, setJeStatus] = createSignal("");
   const [saving, setSaving] = createSignal(false);
 
+  const applyVoucher = (kind: Kind, voucher: SalesInvoice | PurchaseInvoice) => {
+    setPretax(voucher.pretax_amount);
+    setTax(voucher.tax);
+    setGrand(voucher.grand_total);
+    setFees(String(voucher.fees ?? 0));
+    setRemark(voucher.remark ?? "");
+    setJeNo(voucher.journal_entry_no ?? "");
+    setJeStatus(voucher.journal_status ?? "");
+    if (kind === "sales") {
+      const v = voucher as SalesInvoice;
+      setPartner(v.partner_name);
+      setDocNo(v.sales_no);
+      setDocDate(v.order_date);
+      setTaxType(v.tax_type_name);
+      setAcctILabel(v.sales_account ?? "");
+      setAcctIId(v.sales_account_id);
+      setAcctIILabel(v.deposit_account ?? "");
+      setAcctIIId(v.deposit_account_id);
+    } else {
+      const v = voucher as PurchaseInvoice;
+      setPartner(v.partner_name);
+      setDocNo(v.invoice_no);
+      setDocDate(v.invoice_date);
+      setTaxType("");
+      setAcctILabel(v.purchase_account ?? "");
+      setAcctIId(v.purchase_account_id);
+      setAcctIILabel(v.withdrawal_account ?? "");
+      setAcctIIId(v.withdrawal_account_id);
+    }
+  };
+
   const prefill = async (code: string, setLabel: (s: string) => void, setId: (n: number | null) => void) => {
     const opts = await fetchAccountOptions(code);
     const match = opts.find((o) => o.label.startsWith(`[${code}]`));
@@ -84,34 +120,32 @@ export function InvoicePanel(props: Props) {
   const load = async () => {
     const id = props.docId;
     if (!id) return;
-    if (props.kind === "sales") {
-      const res = await getSalesInvoice(id);
-      if (!res.success || !res.data) return;
-      const d: SalesInvoice = res.data;
-      setPretax(d.pretax_amount); setTax(d.tax); setGrand(d.grand_total);
-      setPartner(d.partner_name); setDocNo(d.sales_no); setDocDate(d.order_date); setTaxType(d.tax_type_name);
-      setFees(String(d.fees ?? 0)); setRemark(d.remark ?? "");
-      setAcctILabel(d.sales_account ?? ""); setAcctIId(d.sales_account_id);
-      setAcctIILabel(d.deposit_account ?? ""); setAcctIIId(d.deposit_account_id);
-      setJeNo(d.journal_entry_no ?? ""); setJeStatus(d.journal_status ?? "");
-    } else {
-      const res = await getPurchaseInvoice(id);
-      if (!res.success || !res.data) return;
-      const d: PurchaseInvoice = res.data;
-      setPretax(d.pretax_amount); setTax(d.tax); setGrand(d.grand_total);
-      setPartner(d.partner_name); setDocNo(d.invoice_no); setDocDate(d.invoice_date); setTaxType("");
-      setFees(String(d.fees ?? 0)); setRemark(d.remark ?? "");
-      setAcctILabel(d.purchase_account ?? ""); setAcctIId(d.purchase_account_id);
-      setAcctIILabel(d.withdrawal_account ?? ""); setAcctIIId(d.withdrawal_account_id);
-      setJeNo(d.journal_entry_no ?? ""); setJeStatus(d.journal_status ?? "");
+    setLoading(true);
+    try {
+      const data = await loadInvoiceDocumentPrint(props.kind, id);
+      setLines(data.lines);
+      setCurrencyCode(data.currencyCode);
+      applyVoucher(props.kind, data.voucher);
+      const voucher = data.voucher;
+      if (props.kind === "sales") {
+        const v = voucher as SalesInvoice;
+        if (!v.sales_account_id) void prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
+        if (!v.deposit_account_id) void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
+      } else {
+        const v = voucher as PurchaseInvoice;
+        if (!v.purchase_account_id) void prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
+        if (!v.withdrawal_account_id) void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
+      }
+    } catch (err) {
+      toast.warning(err instanceof Error ? err.message : "Failed to load invoice.");
+    } finally {
+      setLoading(false);
     }
-    // Suggest frequently-used defaults on first open.
-    if (!acctIId()) void prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
-    if (!acctIIId()) void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
   };
 
   createEffect(() => {
     void props.docId;
+    void props.kind;
     void load();
   });
 
@@ -141,6 +175,10 @@ export function InvoicePanel(props: Props) {
   return (
     <Show when={props.docId} fallback={<p class="text-sm text-text-secondary">Save the transaction first to prepare its invoice.</p>}>
       <div class="space-y-4">
+        <Show when={loading()}>
+          <p class="text-sm text-text-secondary">Loading invoice…</p>
+        </Show>
+
         <div class="grid grid-cols-2 gap-3 rounded-lg border border-stroke bg-slate-50 p-4 text-sm md:grid-cols-3">
           <div><div class="text-text-secondary">Date</div><div class="font-medium">{docDate()}</div></div>
           <div><div class="text-text-secondary">No.</div><div class="font-medium">{docNo()}</div></div>
@@ -150,6 +188,12 @@ export function InvoicePanel(props: Props) {
           <div><div class="text-text-secondary">Tax</div><div class="font-medium">{formatPeso(tax())}</div></div>
           <div><div class="text-text-secondary">Grand total</div><div class="font-semibold">{formatPeso(grand())}</div></div>
         </div>
+
+        <InvoiceLineItemsTable
+          lines={lines()}
+          currencyCode={currencyCode()}
+          useDocumentCurrency={props.kind === "sales"}
+        />
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <LookupCombo
@@ -189,7 +233,12 @@ export function InvoicePanel(props: Props) {
           </div>
         </Show>
 
-        <AttachmentsField scope={props.attachmentsScope} docId={props.docId} label="Attachments (from previous documents)" />
+        <AttachmentsField
+          scope={props.attachmentsScope}
+          docId={props.docId}
+          formOpen={props.formOpen ?? true}
+          label="Attachments (from previous documents)"
+        />
 
         <div class="flex justify-end gap-2">
           <Show when={props.onPrint}>

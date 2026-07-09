@@ -193,6 +193,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
           <InvoicePanel
             kind="purchase"
             docId={viewRow()!.id}
+            formOpen={viewRow() != null}
             attachmentsScope="finance/supplier-invoices"
             onPrint={() => openPurchaseInvoicePrint(viewRow()!.id)}
             onSaved={invalidate}

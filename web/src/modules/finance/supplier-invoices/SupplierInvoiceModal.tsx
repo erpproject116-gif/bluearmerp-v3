@@ -429,6 +429,7 @@ export function SupplierInvoiceModal(props: Props) {
           <InvoicePanel
             kind="purchase"
             docId={effectiveEditing()?.id}
+            formOpen={props.open}
             attachmentsScope="finance/supplier-invoices"
             onPrint={() => {
               const id = effectiveEditing()?.id;
