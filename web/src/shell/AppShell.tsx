@@ -12,6 +12,7 @@ import { IdleLogoutGuard } from "../shared/IdleLogoutGuard";
 import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ShellProvider, useShell } from "./shell-context";
 import { featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
+import { isSubBranchPath } from "./sub-branch-nav";
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
 import { CollectiveInvoicingHeaderNav } from "./CollectiveInvoicingHeaderNav";
 import { SerialLotHeaderNav } from "./SerialLotHeaderNav";
@@ -76,7 +77,6 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const featureNavModule = () => {
     const mod = activeModule();
     if (!mod || activeSubBranch() || isReviewPurchasesPath(loc.pathname)) return undefined;
-    if (mod.id === "finance" && isReviewPurchasesPath(loc.pathname)) return undefined;
     return mod;
   };
 
@@ -235,20 +235,30 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                     }
                     return true;
                   })
-                  .map((feature) => (
+                  .map((feature) => {
+                    const features = mod().features;
+                    const hasExactTab = features.some(
+                      (f) => f.href === loc.pathname || f.settingsHref === loc.pathname,
+                    );
+                    const active =
+                      loc.pathname === feature.href ||
+                      loc.pathname === feature.settingsHref ||
+                      (!hasExactTab &&
+                        feature.prefix != null &&
+                        isSubBranchPath(loc.pathname, feature.prefix));
+                    return (
                     <A
                       href={feature.href}
                       class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
                       classList={{
-                        "bg-brand-50 text-brand-600":
-                          loc.pathname === feature.href || loc.pathname === feature.settingsHref,
-                        "text-text-secondary hover:erp-panel hover:text-text-primary":
-                          loc.pathname !== feature.href && loc.pathname !== feature.settingsHref,
+                        "bg-brand-50 text-brand-600": active,
+                        "text-text-secondary hover:erp-panel hover:text-text-primary": !active,
                       }}
                     >
                       {feature.label}
                     </A>
-                  ))}
+                    );
+                  })}
               </nav>
             )}
           </Show>

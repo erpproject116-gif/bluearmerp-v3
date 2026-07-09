@@ -923,7 +923,7 @@ export const moduleKbArticles: KbArticle[] = [
         text: "Month-end: run Trial Balance and bank reconciliation after all material JEs for the period are posted. See the month-close runbook in docs.",
       },
     ],
-    primaryHref: "/app/finance/journal-entries",
+    primaryHref: "/app/finance/acct-i/journal-entries",
     primaryLabel: "Journal entries",
     relatedGuideIds: ["sales-cash-in-after-save", "finance-accounts-overview", "process-policies-foundation"],
   },

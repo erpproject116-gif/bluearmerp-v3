@@ -18,7 +18,7 @@ const GROUP_LABELS: Record<string, string> = {
   purchase_request: "Purchase Request",
   purchase_order: "Purchase Order",
   crm: "CRM",
-  finance: "Finance",
+  finance: "Accounting Dept",
   activity_logs: "Activity Logs",
   operations: "Project Management",
   documentation: "Help & guides",

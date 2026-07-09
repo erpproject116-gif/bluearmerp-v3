@@ -31,6 +31,7 @@ import {
   recalculateQuotationLines,
   type QuotationLineRow,
 } from "./QuotationLineGrid";
+import { RfqImportModal } from "./RfqImportModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 
@@ -186,6 +187,7 @@ export function QuotationModal(props: Props) {
   const [notes, setNotes] = createSignal("");
   const [progressStatus, setProgressStatus] = createSignal("unconfirmed");
   const [lines, setLines] = createSignal<QuotationLineRow[]>([emptyQuotationLine(1)]);
+  const [rfqImportOpen, setRfqImportOpen] = createSignal(false);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
 
@@ -665,6 +667,15 @@ export function QuotationModal(props: Props) {
         onChange={setCustom}
       />
       </div>
+      <div class="col-span-full mb-2 flex justify-end">
+        <button
+          type="button"
+          class="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100"
+          onClick={() => setRfqImportOpen(true)}
+        >
+          Import from RFQ (PDF / images)
+        </button>
+      </div>
       <QuotationLineGrid
         lines={lines}
         onChange={setLines}
@@ -698,6 +709,26 @@ export function QuotationModal(props: Props) {
       title="Email quotation"
       sendUrl={`/api/v1/quotation/quotations/${effectiveEditing()?.id ?? 0}/send-email`}
       defaultTo={emailDefaultTo()}
+    />
+
+    <RfqImportModal
+      open={rfqImportOpen()}
+      onClose={() => setRfqImportOpen(false)}
+      onApply={(imported) => {
+        void (async () => {
+          const tid = taxTypeId();
+          const t = selectedTaxType();
+          if (tid && t) {
+            const recalc = await recalculateQuotationLines(imported, tid, {
+              tax_mode: t.tax_mode,
+              rate_percent: t.rate_percent,
+            });
+            setLines(recalc);
+          } else {
+            setLines(imported);
+          }
+        })();
+      }}
     />
     </>
   );

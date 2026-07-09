@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createEffect, createMemo, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { apiFetch } from "./api";
 import { FIELD_TYPES, isCustomFieldType, type CustomFieldType } from "./CustomFieldsSection";
@@ -69,16 +69,23 @@ export function EntityFormSettingsPage(props: Props) {
 
   const canEdit = () => canManageFormSettings(auth.me);
 
-  const rows = () => (dirty() ? draft() : fields());
-  const columnRows = () => (columnDirty() ? columnDraft() : lineLabels.columns());
+  createEffect(() => {
+    if (!dirty()) {
+      setDraft([...fields()]);
+    }
+  });
 
-  const syncColumnDraft = () => {
-    setColumnDraft([...lineLabels.columns()]);
-    setColumnDirty(true);
-  };
+  createEffect(() => {
+    if (!columnDirty()) {
+      setColumnDraft([...lineLabels.columns()]);
+    }
+  });
+
+  const sortedRows = createMemo(() => [...draft()].sort((a, b) => a.sort_order - b.sort_order));
+  const sortedColumnRows = createMemo(() => [...columnDraft()].sort((a, b) => a.sort_order - b.sort_order));
 
   const updateColumnRow = (columnKey: string, label: string) => {
-    if (!columnDirty()) syncColumnDraft();
+    setColumnDirty(true);
     setColumnDraft((list) => list.map((r) => (r.column_key === columnKey ? { ...r, label } : r)));
   };
 
@@ -86,7 +93,7 @@ export function EntityFormSettingsPage(props: Props) {
     if (!canEdit() || !showLineColumns()) return;
     setSaving(true);
     try {
-      await lineLabels.save(columnRows());
+      await lineLabels.save(sortedColumnRows());
       setColumnDirty(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save column labels.");
@@ -95,20 +102,15 @@ export function EntityFormSettingsPage(props: Props) {
     }
   };
 
-  const syncDraft = () => {
-    setDraft([...fields()]);
-    setDirty(true);
-  };
-
   const updateRow = (fieldKey: string, patch: Partial<FormFieldSetting>) => {
-    if (!dirty()) syncDraft();
+    setDirty(true);
     setDraft((list) => list.map((r) => (r.field_key === fieldKey ? { ...r, ...patch } : r)));
   };
 
   const save = async () => {
     if (!canEdit()) return;
     setSaving(true);
-    const payload = rows();
+    const payload = draft();
     const res = await apiFetch<{ fields: FormFieldSetting[] }>(
       `/api/v1/form-field-settings?entity_type=${encodeURIComponent(props.entityType)}`,
       { method: "PATCH", body: JSON.stringify({ fields: payload }) },
@@ -205,8 +207,6 @@ export function EntityFormSettingsPage(props: Props) {
     setDirty(false);
     await reload();
   };
-
-  const sortedRows = () => [...rows()].sort((a, b) => a.sort_order - b.sort_order);
 
   return (
     <div class="mx-auto max-w-5xl">
@@ -374,7 +374,7 @@ export function EntityFormSettingsPage(props: Props) {
               </tr>
             </thead>
             <tbody>
-              <For each={columnRows()}>
+              <For each={sortedColumnRows()}>
                 {(row) => (
                   <tr>
                     <td class="px-4 py-3 font-medium text-text-primary">{row.column_key}</td>

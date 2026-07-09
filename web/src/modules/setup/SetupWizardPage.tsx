@@ -16,7 +16,7 @@ const STEP_COPY: Record<string, { title: string; why: string; action: string; li
     title: "Chart of accounts",
     why: "We seeded a standard chart of accounts. Review it before posting transactions.",
     action: "Review accounts",
-    link: "/app/finance/chart-of-accounts",
+    link: "/app/finance/acct-i/chart-of-accounts",
     ackStep: "chart_of_accounts",
   },
   currency_tax: {

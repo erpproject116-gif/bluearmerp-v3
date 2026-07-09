@@ -20,7 +20,7 @@ export function ReviewPurchasesHeaderNav() {
 
   return (
     <Show when={isReviewPurchasesPath(loc.pathname)}>
-      <nav class="erp-header-features mt-3" aria-label="Review Purchases">
+      <nav class="erp-header-features mt-3" aria-label="AP Review">
         {visibleLinks().map((link) => (
           <A
             href={link.href}

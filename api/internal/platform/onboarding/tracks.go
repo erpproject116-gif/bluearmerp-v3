@@ -105,9 +105,9 @@ var onboardingTracks = []trackDef{
 		Steps: []trackStepDef{
 			{ID: "receivable_payable", Label: "Receivable / Payable status", Href: "/app/selling/reports/receivable-status", Description: "Open customer or vendor balances as-of a date.", KbArticleID: "receivable-payable-status", Required: false},
 			{ID: "customer_vendor_book", Label: "Customer/Vendor Book", Href: "/app/finance/reports/customer-vendor-book-ar", Description: "Slip-level AR or AP ledger for a date range.", KbArticleID: "customer-vendor-book-report", Required: false},
-			{ID: "journal_entry", Label: "Post a journal entry", Href: "/app/finance/journal-entries", Description: "Manual GL adjustments when needed.", Required: false},
-			{ID: "trial_balance", Label: "Review trial balance", Href: "/app/finance/reports/trial-balance", Description: "Confirm accounts balance before month-end.", Required: false},
-			{ID: "bank_recon", Label: "Bank reconciliation", Href: "/app/finance/bank-reconciliation", Description: "Match bank statement lines to receipts and vouchers.", Required: false},
+			{ID: "journal_entry", Label: "Post a journal entry", Href: "/app/finance/acct-i/journal-entries", Description: "Manual GL adjustments when needed.", Required: false},
+			{ID: "trial_balance", Label: "Review trial balance", Href: "/app/finance/acct-i/reports/trial-balance", Description: "Confirm accounts balance before month-end.", Required: false},
+			{ID: "bank_recon", Label: "Bank reconciliation", Href: "/app/finance/acct-i/bank-reconciliation", Description: "Match bank statement lines to receipts and vouchers.", Required: false},
 		},
 	},
 	{

@@ -205,18 +205,15 @@ import {
   ArAgingReportPage,
   ApAgingReportPage,
   ArApStatusReportPage,
-  ReceivableStatusReportPage,
   AcctInventoryReconciliationPage,
   PaymentEntriesPage,
   ChartOfAccountsPage,
   BankReconciliationPage,
   FiscalYearsPage,
-  SellingWorkspacePage,
   BuyingWorkspacePage,
   PurchaseStatusPage,
   PurchasePreInvoicingPage,
   PayableStatusReportPage,
-  SellingReportsPage,
   FinanceWorkspacePage,
   PortalLoginPage,
   PortalDashboardPage,
@@ -397,9 +394,9 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
-          <Route path="/selling/reports/receivable-status" component={ReceivableStatusReportPage} />
-          <Route path="/selling/reports" component={SellingReportsPage} />
-          <Route path="/selling" component={SellingWorkspacePage} />
+          <Route path="/selling/reports/receivable-status" component={() => <Navigate href="/app/finance/reports/ar-by-customer" />} />
+          <Route path="/selling/reports" component={() => <Navigate href="/app/sales/sales/status" />} />
+          <Route path="/selling" component={() => <Navigate href="/app/sales/sales" />} />
           <Route path="/buying/reports/payable-status" component={PayableStatusReportPage} />
           <Route path="/buying/reports/purchase-status" component={PurchaseStatusPage} />
           <Route path="/buying/reports/pre-invoicing" component={PurchasePreInvoicingPage} />
@@ -478,21 +475,21 @@ export default function App() {
           <Route path="/finance/supplier-invoices" component={() => <Navigate href="/app/purchases/purchases" />} />
           <Route path="/finance/payment-vouchers/new" component={PaymentVoucherNewPage} />
           <Route path="/finance/payment-vouchers" component={PaymentVoucherListPage} />
-          <Route path="/finance/chart-of-accounts" component={ChartOfAccountsPage} />
-          <Route path="/finance/bank-reconciliation" component={BankReconciliationPage} />
-          <Route path="/finance/fiscal-years" component={FiscalYearsPage} />
-          <Route path="/finance/payment-entries" component={PaymentEntriesPage} />
-          <Route path="/finance/journal-entries" component={JournalEntriesPage} />
+          <Route path="/finance/chart-of-accounts" component={() => <Navigate href="/app/finance/acct-i/chart-of-accounts" />} />
+          <Route path="/finance/bank-reconciliation" component={() => <Navigate href="/app/finance/acct-i/bank-reconciliation" />} />
+          <Route path="/finance/fiscal-years" component={() => <Navigate href="/app/finance/acct-i/fiscal-years" />} />
+          <Route path="/finance/payment-entries" component={() => <Navigate href="/app/finance/acct-i/payment-entries" />} />
+          <Route path="/finance/journal-entries" component={() => <Navigate href="/app/finance/acct-i/journal-entries" />} />
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />
           <Route path="/finance/reports/budget-vs-actual" component={BudgetVsActualReportPage} />
           <Route path="/finance/budgets/:id" component={BudgetDetailPage} />
           <Route path="/finance/budgets" component={BudgetListPage} />
-          <Route path="/finance/reports/trial-balance" component={TrialBalanceReportPage} />
-          <Route path="/finance/reports/general-ledger" component={GeneralLedgerReportPage} />
-          <Route path="/finance/reports/profit-and-loss" component={ProfitAndLossReportPage} />
-          <Route path="/finance/reports/balance-sheet" component={BalanceSheetReportPage} />
+          <Route path="/finance/reports/trial-balance" component={() => <Navigate href="/app/finance/acct-i/reports/trial-balance" />} />
+          <Route path="/finance/reports/general-ledger" component={() => <Navigate href="/app/finance/acct-i/reports/general-ledger" />} />
+          <Route path="/finance/reports/profit-and-loss" component={() => <Navigate href="/app/finance/acct-i/reports/profit-and-loss" />} />
+          <Route path="/finance/reports/balance-sheet" component={() => <Navigate href="/app/finance/acct-i/reports/balance-sheet" />} />
           <Route path="/finance/reports/ar-aging" component={ArAgingReportPage} />
           <Route path="/finance/reports/ap-aging" component={ApAgingReportPage} />
           <Route path="/finance/reports/ar-ap-status" component={ArApStatusReportPage} />

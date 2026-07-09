@@ -5,9 +5,9 @@ export type ReviewPurchasesNavLink = {
 };
 
 /** Virtual marker for sub-branch detection (not a real URL path). */
-export const REVIEW_PURCHASES_SUB_BRANCH = "__buying_review_purchases__";
+export const REVIEW_PURCHASES_SUB_BRANCH = "__finance_ap_review__";
 
-/** Finance URLs for the buying "Review Purchases" AP workflow (payments & reports — not the Purchases document). */
+/** Finance URLs for AP review (payment vouchers & vendor reports). */
 export const REVIEW_PURCHASES_PREFIXES = [
   "/app/finance/payment-vouchers",
   "/app/finance/reports/supplier-payment-status",
@@ -45,7 +45,7 @@ export function reviewPurchasesHeaderTitle(pathname: string): string {
   if (pathname.includes("payment-vouchers")) return "Payment vouchers";
   if (pathname.includes("reports/")) {
     const link = reviewPurchasesNavLinks.find((l) => isReviewPurchasesNavLinkActive(pathname, l));
-    return link?.label ?? "Review Purchases report";
+    return link?.label ?? "AP Review report";
   }
-  return "Review Purchases";
+  return "AP Review";
 }

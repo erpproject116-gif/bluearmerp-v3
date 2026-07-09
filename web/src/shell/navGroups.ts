@@ -5,6 +5,8 @@ import { COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
 import { SERIAL_LOT_PREFIX } from "./serial-lot-nav";
 import { WMS_PREFIX } from "./wms-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
+import { ACCT_I_PREFIX } from "./acct-i-nav";
+import { ACCT_II_PREFIX } from "./acct-ii-nav";
 
 export type NavGroupEntry =
   | { kind: "module"; moduleId: string }
@@ -28,6 +30,8 @@ export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
   [TAX_MNGT_PREFIX]: "quotation.tax_mngt",
   [COLLECTIVE_INVOICING_PREFIX]: "sales.collective_invoicing",
   [REVIEW_PURCHASES_SUB_BRANCH]: "finance.payment_vouchers",
+  [ACCT_I_PREFIX]: "finance.acct_i",
+  [ACCT_II_PREFIX]: "finance.acct_ii",
 };
 
 export const navGroups: NavGroup[] = [
@@ -50,7 +54,6 @@ export const navGroups: NavGroup[] = [
       { kind: "module", moduleId: "quotation" },
       { kind: "module", moduleId: "sales_order" },
       { kind: "module", moduleId: "sales" },
-      { kind: "subBranch", moduleId: "quotation", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
       {
         kind: "subBranch",
         moduleId: "sales",
@@ -67,13 +70,18 @@ export const navGroups: NavGroup[] = [
       { kind: "module", moduleId: "buying" },
       { kind: "module", moduleId: "purchase_request" },
       { kind: "module", moduleId: "purchase_order" },
-      { kind: "module", moduleId: "purchases" },
-      {
-        kind: "subBranch",
-        moduleId: "buying",
-        featureCode: "finance.payment_vouchers",
-        branchLabel: "Review Purchases",
-      },
+    ],
+  },
+  {
+    id: "accounting_dept",
+    label: "Accounting Dept",
+    defaultExpanded: true,
+    entries: [
+      { kind: "module", moduleId: "finance" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "Acct. I" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Acct. II" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "AP Review" },
     ],
   },
   {
@@ -98,10 +106,7 @@ export const belowGroupModuleIds = [
   "support",
   "pos",
   "hr",
-  "fixed_assets",
-  "job_costing",
   "data_center",
-  "finance",
 ] as const;
 
 /** Modules shown above collapsible groups. */

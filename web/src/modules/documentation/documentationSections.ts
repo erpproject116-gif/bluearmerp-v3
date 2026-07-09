@@ -832,7 +832,7 @@ export const documentationSections: DocSection[] = [
     iconId: "after_sales",
     intro: "Manage repair orders and service work after the sale.",
     primaryHref: "/app/after-sales/repair-orders",
-    primaryLabel: "Open Repair Order List",
+    primaryLabel: "Open Repair Orders",
     blocks: [
       {
         type: "paragraph",

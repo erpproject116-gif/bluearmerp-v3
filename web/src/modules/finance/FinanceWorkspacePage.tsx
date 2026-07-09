@@ -16,15 +16,15 @@ type KpiTile = {
 const tiles: KpiTile[] = [
   { label: "A/R customers", value: (s) => s.ar_customers, href: "/app/finance/reports/ar-by-customer" },
   { label: "Unpaid purchases", value: (s) => s.unpaid_supplier_invoices, href: "/app/purchases/purchases", accent: "text-red-600" },
-  { label: "Draft journal entries", value: (s) => s.draft_journal_entries, href: "/app/finance/journal-entries", accent: "text-amber-600" },
-  { label: "Unmatched bank lines", value: (s) => s.unmatched_bank_lines, href: "/app/finance/bank-reconciliation", accent: "text-amber-600" },
+  { label: "Draft journal entries", value: (s) => s.draft_journal_entries, href: "/app/finance/acct-i/journal-entries", accent: "text-amber-600" },
+  { label: "Unmatched bank lines", value: (s) => s.unmatched_bank_lines, href: "/app/finance/acct-i/bank-reconciliation", accent: "text-amber-600" },
   { label: "AP over-applied", value: (s) => s.ap_over_application, href: "/app/finance/payment-vouchers", accent: "text-red-600" },
 ];
 
 const operationalLinks = [
   { label: "Payment Receipts", href: "/app/finance/official-receipts" },
   { label: "Payment Vouchers", href: "/app/finance/payment-vouchers" },
-  { label: "Purchases", href: "/app/purchases/purchases" },
+  { label: "Supplier Invoices", href: "/app/purchases/purchases" },
   { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer" },
   { label: "Customer/Vendor Book I (AR)", href: "/app/finance/reports/customer-vendor-book-ar" },
   { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor" },
@@ -40,7 +40,7 @@ export default function FinanceWorkspacePage() {
   return (
     <div class="space-y-6">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">Finance workspace</h2>
+        <h2 class="text-lg font-semibold text-text-primary">Accounting Dept workspace</h2>
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-2 text-sm text-text-secondary">
           BluearmERP accounting: <strong class="font-medium text-text-primary">Acct. I</strong> for core GL and vouchers;{" "}

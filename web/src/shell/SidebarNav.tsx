@@ -19,6 +19,26 @@ import {
 } from "./navGroups";
 import { isAnySubBranchPath, isSubBranchPath } from "./sub-branch-nav";
 import { isReviewPurchasesPath } from "./review-purchases-nav";
+import { isTaxMngtPath } from "./tax-mngt-nav";
+
+function isFinanceModulePath(pathname: string): boolean {
+  if (pathname === "/app/finance" || pathname.startsWith("/app/finance/")) return true;
+  if (isReviewPurchasesPath(pathname)) return true;
+  if (isTaxMngtPath(pathname)) return true;
+  if (pathname === "/app/purchases" || pathname.startsWith("/app/purchases/")) return true;
+  if (pathname === "/app/hr/payroll-runs" || pathname.startsWith("/app/hr/payroll-runs/")) return true;
+  if (pathname === "/app/fixed-assets" || pathname.startsWith("/app/fixed-assets/")) return true;
+  if (pathname === "/app/job-costing" || pathname.startsWith("/app/job-costing/")) return true;
+  if (
+    pathname === "/app/sales/reports/ar-by-customer" ||
+    pathname === "/app/sales/reports/official-receipt-status" ||
+    pathname === "/app/sales/reports/si-receipt-status" ||
+    pathname === "/app/sales/reports/customer-credit-balance"
+  ) {
+    return true;
+  }
+  return false;
+}
 
 function readExpanded(groupId: string, defaultExpanded: boolean): boolean {
   try {
@@ -37,8 +57,7 @@ function NavModuleLink(props: { module: AppModule }) {
   const auth = useAuth();
   const label = () => moduleDisplayLabel(auth.me, props.module.id, props.module.label);
   const inModule = () => {
-    if (props.module.id === "finance" && isReviewPurchasesPath(loc.pathname)) return false;
-    if (props.module.id === "buying" && isReviewPurchasesPath(loc.pathname)) return true;
+    if (props.module.id === "finance") return isFinanceModulePath(loc.pathname);
     return loc.pathname.startsWith(props.module.basePath);
   };
   const inSubBranch = () => isAnySubBranchPath(loc.pathname, props.module.subBranches);

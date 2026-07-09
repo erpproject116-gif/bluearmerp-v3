@@ -1,0 +1,150 @@
+package quotation
+
+import (
+	"regexp"
+	"strconv"
+	"strings"
+	"unicode"
+)
+
+// ParsedRfqLine is one item row extracted from RFQ document text.
+type ParsedRfqLine struct {
+	Page        int     `json:"page"`
+	LineNo      int     `json:"line_no"`
+	ItemCode    string  `json:"item_code"`
+	Description string  `json:"description"`
+	Qty         string  `json:"qty"`
+	Unit        string  `json:"unit"`
+	Confidence  float64 `json:"confidence"`
+}
+
+var (
+	rfqHeaderNoise = regexp.MustCompile(`(?i)^(page\s+\d+|request\s+for\s+quotation|rfq\b|date\b|total\b|subtotal\b|remarks?\b|notes?\b|prepared\b|approved\b|signature\b|qty\b|quantity\b|description\b|item\b|unit\b|uom\b|no\.?\b|#)`)
+	rfqQtyUnitDesc = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s+([a-zA-Z]{1,12})\s+(.+)$`)
+	rfqCodeQtyDesc = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9._\-/]{1,40})\s+(\d+(?:\.\d+)?)\s+(.+)$`)
+	rfqLineNoRow   = regexp.MustCompile(`^(\d{1,3})[\s.)]+(.+)$`)
+	rfqQtyDesc     = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s+(.+)$`)
+)
+
+func ParseRfqPages(pages []struct {
+	Page int
+	Text string
+}) []ParsedRfqLine {
+	var out []ParsedRfqLine
+	seen := map[string]struct{}{}
+	lineNo := 0
+	for _, p := range pages {
+		for _, raw := range strings.Split(p.Text, "\n") {
+			line := normalizeRfqLine(raw)
+			if line == "" || isRfqNoiseLine(line) {
+				continue
+			}
+			parsed, ok := parseRfqLine(line)
+			if !ok {
+				continue
+			}
+			parsed.Page = p.Page
+			key := strings.ToLower(strings.TrimSpace(parsed.ItemCode + "|" + parsed.Description + "|" + parsed.Qty))
+			if _, dup := seen[key]; dup {
+				continue
+			}
+			seen[key] = struct{}{}
+			lineNo++
+			parsed.LineNo = lineNo
+			out = append(out, parsed)
+		}
+	}
+	return out
+}
+
+func normalizeRfqLine(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\t", " ")
+	for strings.Contains(s, "  ") {
+		s = strings.ReplaceAll(s, "  ", " ")
+	}
+	return s
+}
+
+func isRfqNoiseLine(line string) bool {
+	if len(line) < 3 {
+		return true
+	}
+	if rfqHeaderNoise.MatchString(line) {
+		return true
+	}
+	// Mostly punctuation / separators.
+	letters := 0
+	for _, r := range line {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			letters++
+		}
+	}
+	return letters < 3
+}
+
+func parseRfqLine(line string) (ParsedRfqLine, bool) {
+	if m := rfqCodeQtyDesc.FindStringSubmatch(line); len(m) == 4 {
+		return ParsedRfqLine{
+			ItemCode:    m[1],
+			Qty:         m[2],
+			Description: strings.TrimSpace(m[3]),
+			Confidence:  0.9,
+		}, true
+	}
+	if m := rfqQtyUnitDesc.FindStringSubmatch(line); len(m) == 4 {
+		return ParsedRfqLine{
+			Qty:         m[1],
+			Unit:        strings.ToLower(m[2]),
+			Description: strings.TrimSpace(m[3]),
+			Confidence:  0.85,
+		}, true
+	}
+	if m := rfqLineNoRow.FindStringSubmatch(line); len(m) == 3 {
+		rest := strings.TrimSpace(m[2])
+		if sub, ok := parseRfqLine(rest); ok {
+			sub.Confidence = minF(sub.Confidence, 0.8)
+			return sub, true
+		}
+		if m2 := rfqQtyDesc.FindStringSubmatch(rest); len(m2) == 3 {
+			return ParsedRfqLine{
+				Qty:         m2[1],
+				Description: strings.TrimSpace(m2[2]),
+				Confidence:  0.75,
+			}, true
+		}
+		if len(rest) > 4 {
+			return ParsedRfqLine{Description: rest, Qty: "1", Confidence: 0.6}, true
+		}
+	}
+	if m := rfqQtyDesc.FindStringSubmatch(line); len(m) == 3 {
+		desc := strings.TrimSpace(m[2])
+		if len(desc) >= 4 {
+			return ParsedRfqLine{
+				Qty:         m[1],
+				Description: desc,
+				Confidence:  0.7,
+			}, true
+		}
+	}
+	// Long description-only row (common in OCR).
+	if len(line) >= 8 && !strings.Contains(line, "http") {
+		return ParsedRfqLine{Description: line, Qty: "1", Confidence: 0.5}, true
+	}
+	return ParsedRfqLine{}, false
+}
+
+func minF(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func parseQtyFloat(q string) float64 {
+	v, err := strconv.ParseFloat(strings.TrimSpace(q), 64)
+	if err != nil || v <= 0 {
+		return 1
+	}
+	return v
+}

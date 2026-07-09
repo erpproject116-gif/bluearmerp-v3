@@ -1,0 +1,182 @@
+package quotation
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"strings"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+)
+
+type rfqPageText struct {
+	Page int    `json:"page"`
+	Text string `json:"text"`
+}
+
+type rfqParseRequest struct {
+	Pages []rfqPageText `json:"pages"`
+}
+
+type rfqMatchRequest struct {
+	Lines []ParsedRfqLine `json:"lines"`
+}
+
+type rfqMatchedLine struct {
+	ParsedRfqLine
+	ItemID    *int64  `json:"item_id"`
+	ItemCode  string  `json:"item_code"`
+	ItemName  string  `json:"item_name"`
+	SalesPrice float64 `json:"sales_price"`
+	MatchScore float64 `json:"match_score"`
+}
+
+func registerRfqImportRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.Post("/rfq-import/parse", parseRfqImport(pool))
+	r.Post("/rfq-import/match-items", matchRfqImportItems(pool))
+}
+
+func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := auth.FromContext(r.Context()); !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		var body rfqParseRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if len(body.Pages) == 0 {
+			response.Validation(w, map[string]string{"pages": "At least one page of text is required."})
+			return
+		}
+		pages := make([]struct {
+			Page int
+			Text string
+		}, len(body.Pages))
+		for i, p := range body.Pages {
+			pages[i].Page = p.Page
+			pages[i].Text = p.Text
+		}
+		lines := ParseRfqPages(pages)
+		response.OK(w, map[string]any{
+			"lines":       lines,
+			"page_count":  len(body.Pages),
+			"line_count":  len(lines),
+		}, "RFQ parsed.")
+	}
+}
+
+func matchRfqImportItems(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		var body rfqMatchRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		out := make([]rfqMatchedLine, 0, len(body.Lines))
+		for _, ln := range body.Lines {
+			matched := rfqMatchedLine{ParsedRfqLine: ln}
+			item, score := lookupRfqItem(r.Context(), pool, tu.TenantID, ln)
+			if item != nil {
+				matched.ItemID = &item.ID
+				matched.ItemCode = item.Code
+				matched.ItemName = item.Name
+				matched.SalesPrice = item.SalesPrice
+				matched.MatchScore = score
+			} else if strings.TrimSpace(ln.ItemCode) != "" {
+				matched.ItemCode = ln.ItemCode
+			}
+			if matched.ItemName == "" && strings.TrimSpace(ln.Description) != "" {
+				matched.ItemName = ln.Description
+			}
+			out = append(out, matched)
+		}
+		response.OK(w, map[string]any{"lines": out}, "Items matched.")
+	}
+}
+
+type rfqItemHit struct {
+	ID         int64
+	Code       string
+	Name       string
+	SalesPrice float64
+}
+
+func lookupRfqItem(ctx context.Context, pool *pgxpool.Pool, tenantID int64, ln ParsedRfqLine) (*rfqItemHit, float64) {
+	code := strings.TrimSpace(ln.ItemCode)
+	desc := strings.TrimSpace(ln.Description)
+	if code != "" {
+		var hit rfqItemHit
+		err := pool.QueryRow(ctx, `
+			select id, item_code, item_name, coalesce(sales_price, 0)
+			from public.inv_items
+			where tenant_id = $1 and deleted_at is null
+			  and lower(item_code) = lower($2)
+			limit 1`, tenantID, code).Scan(&hit.ID, &hit.Code, &hit.Name, &hit.SalesPrice)
+		if err == nil {
+			return &hit, 1.0
+		}
+	}
+	if code != "" {
+		var hit rfqItemHit
+		err := pool.QueryRow(ctx, `
+			select id, item_code, item_name, coalesce(sales_price, 0)
+			from public.inv_items
+			where tenant_id = $1 and deleted_at is null
+			  and item_code ilike $2
+			order by length(item_code)
+			limit 1`, tenantID, "%"+code+"%").Scan(&hit.ID, &hit.Code, &hit.Name, &hit.SalesPrice)
+		if err == nil {
+			return &hit, 0.85
+		}
+	}
+	if desc != "" {
+		var hit rfqItemHit
+		err := pool.QueryRow(ctx, `
+			select id, item_code, item_name, coalesce(sales_price, 0)
+			from public.inv_items
+			where tenant_id = $1 and deleted_at is null
+			  and item_name ilike $2
+			order by length(item_name)
+			limit 1`, tenantID, "%"+desc+"%").Scan(&hit.ID, &hit.Code, &hit.Name, &hit.SalesPrice)
+		if err == nil {
+			return &hit, 0.7
+		}
+		// Token match on first significant word.
+		tok := firstSignificantToken(desc)
+		if tok != "" {
+			err = pool.QueryRow(ctx, `
+				select id, item_code, item_name, coalesce(sales_price, 0)
+				from public.inv_items
+				where tenant_id = $1 and deleted_at is null
+				  and (item_name ilike $2 or item_code ilike $2)
+				order by length(item_name)
+				limit 1`, tenantID, "%"+tok+"%").Scan(&hit.ID, &hit.Code, &hit.Name, &hit.SalesPrice)
+			if err == nil {
+				return &hit, 0.55
+			}
+		}
+	}
+	return nil, 0
+}
+
+func firstSignificantToken(s string) string {
+	for _, part := range strings.Fields(s) {
+		p := strings.Trim(part, ".,;:-")
+		if len(p) >= 3 {
+			return p
+		}
+	}
+	return ""
+}
