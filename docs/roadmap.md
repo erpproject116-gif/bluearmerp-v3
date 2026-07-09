@@ -39,24 +39,25 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 ### Selling
 - [x] Harden invoice tab = print parity (line breakdown, approval on tab) — largely done
 - [x] Automated tests: SO → sale residual qty, slip lines, fulfillment status
-- [ ] Cash In + accounting voucher docs in KB
+- [x] Cash In + accounting voucher docs in KB
 - [ ] Sales Hold / reservation (Ecount gap) — if pilot needs it
 - [ ] Shipping order from line — if distribution pilot
 
 ### Buying
-- [ ] Purchase attachments end-to-end on prod (migration 142)
-- [ ] GR / PO / RFQ load slip regression tests
+- [x] Purchase attachments end-to-end on prod (migration 142) — CI smoke + `/health/schema`; operator redeploy
+- [x] GR / PO / RFQ load slip regression tests
 - [ ] Cash Payment on purchase (Ecount footer) — optional
 
 ### Finance (Acct I minimum)
 - [x] Bank reconciliation: match modal usable weekly
-- [ ] JE draft → post workflow documented; auto-post policies in setup wizard
-- [ ] Month-close checklist (pilot runbook)
-- [ ] Block account changes when JE posted — done
+- [x] JE draft → post workflow documented; auto-post policies in setup wizard
+- [x] Month-close checklist (pilot runbook)
+- [x] Block account changes when JE posted — done
 
 ### Engineering
 - [x] Expand `routes.golden.json` with POST smoke (create draft quotation) behind feature flag
 - [x] Playwright: open sale → Invoice tab shows lines
+- [x] Playwright in CI (`e2e-demo-smoke.yml` with bench JWT)
 - [ ] Every Phase 1 feature: migration + API + UI + KB + demo seed row
 
 **Exit gate:** Pilot runs month-close on Bluearm; finance README checklist 80% automated.

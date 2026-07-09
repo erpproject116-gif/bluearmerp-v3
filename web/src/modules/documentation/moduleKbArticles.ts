@@ -629,21 +629,26 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Cash In and accounting after saving a sales invoice",
     scenario: "You just created a sales invoice and want to record payment or GL immediately.",
     intro:
-      "After saving a new sale, BluearmERP can prompt for Cash In (official receipt) or jump to the Invoice tab for accounting voucher setup.",
+      "After saving a new sale, BluearmERP can prompt for Cash In (official receipt) or jump to the Invoice tab for accounting voucher setup. Saving also creates or refreshes a draft sales journal entry when invoice accounts are configured.",
     blocks: [
       {
         type: "steps",
         items: [
           "Save a new sales invoice from Sales → New Sale.",
-          "On the post-save dialog, choose Cash In to open the receipt form prefilled with customer and amount.",
-          "Or choose Accounting to open the Invoice tab and configure auto-post sales / AR journal when enabled.",
-          "Enable accounts_auto_post_sales under Process Policies if checkout should post GL automatically.",
+          "On the post-save dialog, choose Cash In to open the official receipt form prefilled with customer and amount.",
+          "Or choose Accounting to open the Invoice tab — review Acct I/II, fees, remark, and the item breakdown table.",
+          "Submit or approve the sale if your workflow requires it before posting GL.",
+          "Enable accounts_auto_post_sales under Settings → Process policies if invoices should post journals automatically on save.",
         ],
+      },
+      {
+        type: "tip",
+        text: "If the journal is already posted, account pickers on the Invoice tab lock — adjust GL under Finance → Journal entries instead.",
       },
     ],
     primaryHref: "/app/sales/sales/new",
     primaryLabel: "New sale",
-    relatedGuideIds: ["quotation-to-sales-flow", "finance-accounts-overview"],
+    relatedGuideIds: ["quotation-to-sales-flow", "finance-accounts-overview", "finance-je-draft-to-post"],
   },
   {
     id: "receivable-payable-status",
@@ -797,6 +802,37 @@ export const moduleKbArticles: KbArticle[] = [
     ],
     primaryHref: "/app/finance",
     primaryLabel: "Finance workspace",
+    relatedGuideIds: ["finance-je-draft-to-post", "receivable-payable-status"],
+  },
+  {
+    id: "finance-je-draft-to-post",
+    title: "Journal entries: draft → review → post",
+    scenario: "You need to understand how sales and purchase invoices create GL and when entries post.",
+    intro:
+      "Saving invoice accounting on the Invoice tab creates or refreshes a draft journal entry (JE). Posting moves amounts into the GL; auto-post policies skip the manual post step when enabled.",
+    blocks: [
+      {
+        type: "flow",
+        items: ["Save invoice accounts", "Draft JE created", "Review lines", "Post (or auto-post)", "TB / statements updated"],
+      },
+      {
+        type: "steps",
+        items: [
+          "Open a sale or supplier invoice → Invoice tab. Set Acct I (revenue/expense), Acct II (AR/AP), fees, and remark.",
+          "Save — the linked JE stays in draft until posted (unless auto-post is on).",
+          "Open Finance → Journal entries to review, approve (if policy requires), and post.",
+          "Settings → Process policies: accounts_auto_post_sales, accounts_auto_post_purchase, accounts_auto_post_or, accounts_auto_post_pv.",
+          "After a JE is posted, invoice account fields lock; use journal entries for corrections.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Month-end: run Trial Balance and bank reconciliation after all material JEs for the period are posted. See the month-close runbook in docs.",
+      },
+    ],
+    primaryHref: "/app/finance/journal-entries",
+    primaryLabel: "Journal entries",
+    relatedGuideIds: ["sales-cash-in-after-save", "finance-accounts-overview", "process-policies-foundation"],
   },
   {
     id: "crm-follow-ups",

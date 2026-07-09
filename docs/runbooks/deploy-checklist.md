@@ -24,7 +24,7 @@ Use this for **every** API + web deploy to Render/Vercel (or any hosted environm
    curl -s https://YOUR-API.onrender.com/health/schema
    ```
 
-   Expect: `"healthy": true`, `"pending_count": 0`, `"missing_tables": []`.
+   Expect: `"healthy": true`, `"pending_count": 0`, `"missing_tables": []` (includes `fin_supplier_invoice_attachments` from migration **142**).
 
 5. **DB connectivity** (optional):
 
@@ -52,8 +52,14 @@ curl -s https://YOUR-API.onrender.com/health/schema
 # Authenticated golden path (local or CI pattern)
 export API_BASE=https://YOUR-API.onrender.com
 export BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs)   # needs valid user in DB
-node scripts/golden-path-smoke.mjs
+GOLDEN_CREATE_QUOTATION=true node scripts/golden-path-smoke.mjs
 ```
+
+Attachment endpoints are exercised automatically when demo PO/SI rows exist.
+
+## Month-close
+
+Pilot month-end steps: [`month-close-checklist.md`](month-close-checklist.md).
 
 ## Manual UX spot-check (5 min)
 

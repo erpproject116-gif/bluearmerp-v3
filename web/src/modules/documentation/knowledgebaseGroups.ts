@@ -94,6 +94,7 @@ export const knowledgebaseGroups: KbGroup[] = [
     description: "Receipts, vouchers, GL, and reporting.",
     articleIds: [
       "finance-accounts-overview",
+      "finance-je-draft-to-post",
       "receivable-payable-status",
       "customer-vendor-book-report",
       "acct-vs-inventory-reconciliation",

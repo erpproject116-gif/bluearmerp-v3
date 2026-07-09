@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const routes = JSON.parse(readFileSync(join(__dirname, "perf", "routes.golden.json"), "utf8"));
+const loadSlipRoutes = JSON.parse(readFileSync(join(__dirname, "perf", "routes.load-slip.json"), "utf8"));
 
 const base = (process.env.API_BASE ?? "http://localhost:8080").replace(/\/$/, "");
 const token = process.env.BENCH_TOKEN ?? "";
@@ -52,6 +53,29 @@ for (const route of routes) {
   if (!r.ok && r.body?.message) {
     console.log(`    ${r.body.message}`);
   }
+}
+
+console.log("\nLoad slip open-line endpoints\n");
+for (const route of loadSlipRoutes) {
+  const r = await hit(route);
+  if (!r.ok) failed = true;
+  const flag = r.ok ? "✓" : "✗";
+  console.log(`${flag} ${r.id.padEnd(28)} ${r.status}`);
+  if (!r.ok && r.body?.message) {
+    console.log(`    ${r.body.message}`);
+  }
+}
+
+const poList = await request("/api/v1/purchase-order/purchase-orders?page=1&pageSize=1");
+const poId = poList.body?.data?.[0]?.id;
+if (poId) {
+  const att = await request(`/api/v1/purchase-order/purchase-orders/${poId}/attachments`);
+  const ok = att.status === 200;
+  if (!ok) failed = true;
+  console.log(`${ok ? "✓" : "✗"} purchase_order.attachments`.padEnd(30), att.status, `(id=${poId})`);
+  if (!ok && att.body?.message) console.log(`    ${att.body.message}`);
+} else {
+  console.log("· purchase_order.attachments     skipped (no POs in DB)");
 }
 
 const siList = await request("/api/v1/finance/supplier-invoices?page=1&pageSize=1");

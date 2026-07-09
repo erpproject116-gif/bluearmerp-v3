@@ -1,0 +1,10 @@
+[
+  { "id": "load_slip.so_to_sale", "path": "/api/v1/sales/sales-order-lines/open?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "load_slip.quotation_to_so", "path": "/api/v1/sales-order/sales-orders/quotation-lines/open?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "load_slip.so_to_pr", "path": "/api/v1/purchase-request/purchase-requests/open-sales-order-lines?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "load_slip.pr_to_po", "path": "/api/v1/purchase-order/purchase-orders/purchase-request-lines/open?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "load_slip.rfq_to_po", "path": "/api/v1/purchase-order/purchase-orders/supplier-quotation-lines/open?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "load_slip.gr_to_si", "path": "/api/v1/finance/supplier-invoices/open-gr-lines?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "load_slip.po_to_si", "path": "/api/v1/finance/supplier-invoices/open-po-lines?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "load_slip.rfq_to_si", "path": "/api/v1/finance/supplier-invoices/open-supplier-quotation-lines?page=1&pageSize=5", "expectedStatuses": [200] }
+]

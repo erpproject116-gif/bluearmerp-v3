@@ -1,14 +1,25 @@
 import { test, expect } from "@playwright/test";
+import { benchAuthAvailable, seedBenchSession } from "./helpers/benchAuth";
 
 async function demoSignIn(page: import("@playwright/test").Page) {
+  const benchToken = process.env.E2E_BENCH_TOKEN;
+  if (benchToken) {
+    await seedBenchSession(page, benchToken);
+    await page.goto("/app/inventory/partners");
+    await page.waitForURL("**/app/**", { timeout: 15000 });
+    return;
+  }
   await page.goto("/signin");
   await page.getByRole("button", { name: /Try free demo/i }).click();
   await page.waitForURL("**/app/**", { timeout: 15000 });
 }
 
 test.describe("Sales invoice tab", () => {
-  test("demo sale invoice tab shows item breakdown", async ({ page }) => {
-    test.skip(!process.env.E2E_DEMO_PASSWORD, "Set E2E_DEMO_PASSWORD for authenticated smoke");
+  test("sale invoice tab shows item breakdown", async ({ page }) => {
+    test.skip(
+      !benchAuthAvailable() && !process.env.E2E_DEMO_PASSWORD,
+      "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD for authenticated smoke",
+    );
 
     await demoSignIn(page);
     await page.goto("/app/sales/sales");

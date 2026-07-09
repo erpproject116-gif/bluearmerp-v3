@@ -78,6 +78,22 @@ Supplier Invoice → Payment Voucher → fin_payment_applications
 7. Reconciliation: `GET /inventory/reconciliation/gr-without-supplier-invoice` lists unbilled GR after S3 receive.
 8. Reconciliation: `GET /inventory/reconciliation/ap-over-application` should be empty on demo data.
 
+## Journal entry workflow (draft → post)
+
+Sales and supplier invoices sync a **draft** journal when you save invoice accounts on the **Invoice** tab (`PUT .../invoice` → `invoicejournal.Sync`).
+
+| Step | Where | What happens |
+|------|--------|----------------|
+| Configure accounts | Sale or supplier invoice → **Invoice** tab | Acct I/II, fees, remark saved |
+| Draft JE | Finance → Journal entries | DR/CR lines created or refreshed while status = `draft` |
+| Review / approve | Journal entry detail | Optional when `journal_require_approval` is enabled in process policies |
+| Post | Journal entry → Post | Status → `posted`; TB / financial statements include amounts |
+| Auto-post | Settings → Process policies | `accounts_auto_post_sales`, `accounts_auto_post_purchase`, `accounts_auto_post_or`, `accounts_auto_post_pv` |
+
+**Posted JE lock:** Once posted, invoice account pickers are read-only; change GL via journal entries or reversing entries.
+
+**Month-end:** See [`docs/runbooks/month-close-checklist.md`](../../runbooks/month-close-checklist.md).
+
 ## Migrations
 
 - `017_finance.sql` — `fin_official_receipts`, `fin_receipt_applications`, module registry

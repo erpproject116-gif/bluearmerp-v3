@@ -1,22 +1,20 @@
-name: API golden path smoke
+name: E2E demo smoke (API + web)
 
 on:
   workflow_dispatch:
   push:
     branches: [main, master]
     paths:
+      - "web/**"
       - "api/**"
-      - "scripts/golden-path-smoke.mjs"
-      - "scripts/perf/routes.golden.json"
-      - "scripts/perf/routes.load-slip.json"
       - "scripts/mint-bench-jwt.mjs"
       - "scripts/seed-ci-bench-auth.sql"
       - "scripts/seed-demo-*.sql"
       - "supabase/seed.sql"
-      - ".github/workflows/api-golden-smoke.yml"
+      - ".github/workflows/e2e-demo-smoke.yml"
 
 jobs:
-  golden:
+  demo-smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,27 +47,49 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
           SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
-          CORS_ORIGIN: http://localhost:5173
+          CORS_ORIGIN: http://localhost:4173
           PORT: "8080"
           MIGRATIONS_DIR: api/migrations
         run: |
           cd api
-          go build -o /tmp/migrate ./cmd/migrate
-          /tmp/migrate
           go build -o /tmp/server ./cmd/server
           /tmp/server &
           sleep 3
 
-      - name: Schema health
-        run: |
-          curl -sf http://localhost:8080/health/schema | tee /tmp/schema.json
-          node -e "const j=require('/tmp/schema.json'); if(!j.data?.healthy) { console.error(j); process.exit(1); }"
+      - name: Install web deps
+        working-directory: web
+        run: npm ci
 
-      - name: Golden path smoke
+      - name: Install Playwright
+        working-directory: web
+        run: npx playwright install chromium --with-deps
+
+      - name: Build web for preview
+        working-directory: web
         env:
-          API_BASE: http://localhost:8080
-          SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
-          GOLDEN_CREATE_QUOTATION: "true"
+          VITE_API_BASE_URL: http://localhost:8080
+          VITE_SUPABASE_URL: http://127.0.0.1
+          VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used-for-bench-jwt
+        run: npm run build
+
+      - name: Start preview server
+        working-directory: web
+        run: npm run preview -- --host 127.0.0.1 --port 4173 &
+
+      - name: Wait for preview
         run: |
-          export BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs)
-          node scripts/golden-path-smoke.mjs
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4173 >/dev/null && exit 0
+            sleep 2
+          done
+          echo "Preview server did not start" && exit 1
+
+      - name: Playwright demo smoke
+        working-directory: web
+        env:
+          CI: "true"
+          E2E_BASE_URL: http://127.0.0.1:4173
+          SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
+        run: |
+          export E2E_BENCH_TOKEN=$(node ../scripts/mint-bench-jwt.mjs)
+          npx playwright test e2e/sales-invoice.spec.ts
