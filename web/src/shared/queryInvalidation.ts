@@ -62,7 +62,16 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
   manufacturing: ["mfg-boms", "mfg-work-orders"],
   hr: ["hr-employees", "hr-pay-periods", "hr-payslips"],
   platform: ["onboarding", "setup-readiness"],
-  crm: ["crm-warranty", "crm-task-summaries", "crm-sales-team"],
+  crm: ["crm-warranty", "crm-task-summaries", "crm-sales-team", "crm-notifications", "crm-dashboard", "crm-follow-up-tasks"],
+  operations: [
+    "operations-workspaces",
+    "operations-columns",
+    "operations-work-items",
+    "operations-automation",
+    "operations-dashboards",
+    "operations-widget-data",
+    "operations-industry-packs",
+  ],
 };
 
 type MutationRule = {
@@ -85,6 +94,7 @@ const MUTATION_RULES: MutationRule[] = [
   { test: (p) => p.startsWith("/api/v1/quality"), domains: ["quality"] },
   { test: (p) => p.startsWith("/api/v1/manufacturing"), domains: ["manufacturing"] },
   { test: (p) => p.startsWith("/api/v1/crm"), domains: ["crm"] },
+  { test: (p) => p.startsWith("/api/v1/operations"), domains: ["operations"] },
   { test: (p) => p.startsWith("/api/v1/hr"), domains: ["hr"] },
   { test: (p) => p.startsWith("/api/v1/platform/onboarding"), domains: ["platform"] },
   { test: (p) => p.startsWith("/api/v1/platform/setup"), domains: ["platform"] },
@@ -113,8 +123,18 @@ const DASHBOARD_MUTATION_RULES: MutationRule[] = [
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-/** Paths that mutate data but should not trigger broad cache invalidation. */
-function skipInvalidation(path: string, method: string): boolean {
+/**
+ * POST endpoints that only read/query data must not trigger mutation cache invalidation,
+ * or TanStack Query can refetch in a loop (see crm/follow-up-tasks/summaries).
+ */
+const READ_ONLY_POST_PATH_MARKERS = [
+  "/follow-up-tasks/summaries",
+  "/resolve-scan",
+  "/items/search",
+] as const;
+
+/** True when a mutating request should not fan out cache invalidation. */
+export function shouldSkipMutationInvalidation(path: string, method: string): boolean {
   const m = method.toUpperCase();
   if (!MUTATING.has(m)) return true;
   if (/\/search(\?|$)/.test(path)) return true;
@@ -126,11 +146,20 @@ function skipInvalidation(path: string, method: string): boolean {
   if (/\/print(\?|$)/.test(path)) return true;
   if (path.includes("/auth/")) return true;
   if (path.includes("/presence/")) return true;
-  if (path.includes("/follow-up-tasks/summaries")) return true;
   if (path.includes("/attachments")) return true;
   if (path.startsWith("/api/v1/settings/")) return true;
   if (path.startsWith("/api/v1/form-field-settings")) return true;
+  if (m === "POST") {
+    for (const marker of READ_ONLY_POST_PATH_MARKERS) {
+      if (path.includes(marker)) return true;
+    }
+  }
   return false;
+}
+
+/** Paths that mutate data but should not trigger broad cache invalidation. */
+function skipInvalidation(path: string, method: string): boolean {
+  return shouldSkipMutationInvalidation(path, method);
 }
 
 function collectKeys(domains: string[]): Set<string> {

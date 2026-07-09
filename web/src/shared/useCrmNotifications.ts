@@ -1,5 +1,6 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
+import { queryErrorFromApi, shouldRetryQuery } from "./queryRetry";
 
 export type CrmNotification = {
   id: number;
@@ -32,15 +33,17 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
       enabled: p.enabled !== false,
       queryFn: async () => {
         const res = await apiFetch<CrmNotification[]>(`/api/v1/crm/notifications?${qs}`);
-        if (!res.success) throw new Error(res.message ?? "Failed to load notifications");
+        if (!res.success) throw queryErrorFromApi(res.status, res.message ?? "Failed to load notifications");
         return {
           rows: res.data ?? [],
           total: res.meta?.total ?? 0,
           unreadTotal: Number((res.meta as { unread_total?: number } | undefined)?.unread_total ?? 0),
         };
       },
-      staleTime: 15_000,
+      staleTime: 30_000,
       refetchInterval: p.enabled !== false ? 60_000 : false,
+      refetchOnWindowFocus: false,
+      retry: shouldRetryQuery,
     };
   });
 }
