@@ -68,6 +68,7 @@ jobs:
         env:
           API_BASE: http://localhost:8080
           SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
+          GOLDEN_CREATE_QUOTATION: "true"
         run: |
           export BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs)
           node scripts/golden-path-smoke.mjs

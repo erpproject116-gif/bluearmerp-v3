@@ -37,8 +37,8 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 **Goal:** Daily selling/buying/finance matches Ecount **operations** (not full report tree).
 
 ### Selling
-- [ ] Harden invoice tab = print parity (line breakdown, approval on tab) — largely done
-- [ ] Automated tests: SO → sale residual qty, slip lines, fulfillment status
+- [x] Harden invoice tab = print parity (line breakdown, approval on tab) — largely done
+- [x] Automated tests: SO → sale residual qty, slip lines, fulfillment status
 - [ ] Cash In + accounting voucher docs in KB
 - [ ] Sales Hold / reservation (Ecount gap) — if pilot needs it
 - [ ] Shipping order from line — if distribution pilot
@@ -49,14 +49,14 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 - [ ] Cash Payment on purchase (Ecount footer) — optional
 
 ### Finance (Acct I minimum)
-- [ ] Bank reconciliation: match modal usable weekly
+- [x] Bank reconciliation: match modal usable weekly
 - [ ] JE draft → post workflow documented; auto-post policies in setup wizard
 - [ ] Month-close checklist (pilot runbook)
 - [ ] Block account changes when JE posted — done
 
 ### Engineering
-- [ ] Expand `routes.golden.json` with POST smoke (create draft quotation) behind feature flag
-- [ ] Playwright: open sale → Invoice tab shows lines
+- [x] Expand `routes.golden.json` with POST smoke (create draft quotation) behind feature flag
+- [x] Playwright: open sale → Invoice tab shows lines
 - [ ] Every Phase 1 feature: migration + API + UI + KB + demo seed row
 
 **Exit gate:** Pilot runs month-close on Bluearm; finance README checklist 80% automated.

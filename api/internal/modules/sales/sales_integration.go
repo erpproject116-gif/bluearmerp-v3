@@ -167,6 +167,51 @@ func balanceExpr(useDelivery bool) string {
 	return "coalesce(rel.released, 0) - coalesce(slip.sold, 0)"
 }
 
+func zeroBalanceMessage(useDelivery bool) string {
+	if useDelivery {
+		return "No delivered balance available."
+	}
+	return "No released balance available."
+}
+
+func salesOrderLineQtyError(balance, qty float64) string {
+	if qty > balance+0.0001 {
+		return fmt.Sprintf("Exceeds available balance (%.4f).", balance)
+	}
+	return ""
+}
+
+type releaseSoldLine struct {
+	released float64
+	sold     float64
+}
+
+func computeSalesOrderFulfillmentStatus(lines []releaseSoldLine) string {
+	totalReleasedLines := 0
+	fullySold := 0
+	anySold := false
+	for _, ln := range lines {
+		if ln.released <= 0.0001 {
+			continue
+		}
+		totalReleasedLines++
+		if ln.sold > 0.0001 {
+			anySold = true
+		}
+		if ln.sold+0.0001 >= ln.released {
+			fullySold++
+		}
+	}
+	status := "none"
+	if anySold {
+		status = "partial"
+	}
+	if totalReleasedLines > 0 && fullySold == totalReleasedLines {
+		status = "completed"
+	}
+	return status
+}
+
 func salesOrderLineBalance(ctx context.Context, tx pgx.Tx, tenantID, salesOrderLineID int64, useDelivery bool) (float64, error) {
 	var balance float64
 	err := tx.QueryRow(ctx, fmt.Sprintf(`
@@ -235,15 +280,12 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 			continue
 		}
 		if balance <= 0.0001 {
-			msg := "No released balance available."
-			if useDelivery {
-				msg = "No delivered balance available."
-			}
+			msg := zeroBalanceMessage(useDelivery)
 			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = msg
 			continue
 		}
-		if ln.Qty > balance+0.0001 {
-			errs[fmt.Sprintf("lines[%d].qty", i)] = fmt.Sprintf("Exceeds available balance (%.4f).", balance)
+		if msg := salesOrderLineQtyError(balance, ln.Qty); msg != "" {
+			errs[fmt.Sprintf("lines[%d].qty", i)] = msg
 			continue
 		}
 		if policy.SalesRequireDeliveryReceipt && useDelivery {
@@ -308,9 +350,7 @@ func writeSalesOrderSlipsForSales(ctx context.Context, tx pgx.Tx, tenantID, sale
 }
 
 func recomputeSalesOrderFulfillmentStatus(ctx context.Context, tx pgx.Tx, tenantID, salesOrderID int64) error {
-	var totalReleasedLines int
-	var fullySold int
-	var anySold bool
+	var lines []releaseSoldLine
 
 	rows, err := tx.Query(ctx, `
 		select coalesce(rel.released, 0)::float8, coalesce(slip.sold, 0)::float8
@@ -336,25 +376,10 @@ func recomputeSalesOrderFulfillmentStatus(ctx context.Context, tx pgx.Tx, tenant
 		if err := rows.Scan(&released, &sold); err != nil {
 			return err
 		}
-		if released <= 0.0001 {
-			continue
-		}
-		totalReleasedLines++
-		if sold > 0.0001 {
-			anySold = true
-		}
-		if sold+0.0001 >= released {
-			fullySold++
-		}
+		lines = append(lines, releaseSoldLine{released: released, sold: sold})
 	}
 
-	status := "none"
-	if anySold {
-		status = "partial"
-	}
-	if totalReleasedLines > 0 && fullySold == totalReleasedLines {
-		status = "completed"
-	}
+	status := computeSalesOrderFulfillmentStatus(lines)
 
 	_, err = tx.Exec(ctx, `
 		update public.so_sales_orders

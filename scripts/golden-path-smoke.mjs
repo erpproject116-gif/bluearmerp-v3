@@ -5,6 +5,7 @@
  *
  * Usage:
  *   API_BASE=http://localhost:8080 BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs) node scripts/golden-path-smoke.mjs
+ *   GOLDEN_CREATE_QUOTATION=true ...   # optional POST create draft quotation smoke
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -76,6 +77,67 @@ if (saleId) {
 } else {
   console.log("· sales.invoice                    skipped (no sales in DB)");
 }
+
+async function firstListId(path) {
+  const res = await request(path);
+  if (!res.ok || !Array.isArray(res.body?.data) || res.body.data.length === 0) return null;
+  return res.body.data[0];
+}
+
+async function smokeCreateQuotation() {
+  if (process.env.GOLDEN_CREATE_QUOTATION !== "true") {
+    console.log("· quotation.create               skipped (set GOLDEN_CREATE_QUOTATION=true)");
+    return;
+  }
+
+  const partner = await firstListId("/api/v1/inventory/partners?page=1&pageSize=1&sort=partner_code&order=asc");
+  const taxType = await firstListId("/api/v1/quotation/tax-types?page=1&pageSize=1&sort=sort_order&order=asc");
+  const currency = await firstListId("/api/v1/quotation/currencies?page=1&pageSize=1&sort=id&order=asc");
+  const location = await firstListId("/api/v1/inventory/locations?page=1&pageSize=1&sort=location_code&order=asc");
+  const item = await firstListId("/api/v1/inventory/items?page=1&pageSize=1&sort=item_code&order=asc");
+
+  if (!partner?.id || !taxType?.id || !currency?.id || !location?.id || !item?.id) {
+    failed = true;
+    console.log("✗ quotation.create               skipped (missing lookup seed data)");
+    return;
+  }
+
+  const orderDate = new Date().toISOString().slice(0, 10);
+  const body = {
+    order_date: orderDate,
+    tax_type_id: taxType.id,
+    currency_id: currency.id,
+    partner_id: partner.id,
+    location_id: location.id,
+    pic_name: "Golden smoke",
+    progress_status: "unconfirmed",
+    lines: [
+      {
+        line_no: 1,
+        item_id: item.id,
+        item_code: item.item_code ?? "SMOKE",
+        item_name: item.item_name ?? "Smoke item",
+        qty: 1,
+        unit_price: 100,
+        input_basis: "vat_inc_unit",
+      },
+    ],
+  };
+
+  const create = await request("/api/v1/quotation/quotations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const ok = create.status === 201 || create.status === 200;
+  if (!ok) failed = true;
+  const id = create.body?.data?.id;
+  console.log(`${ok ? "✓" : "✗"} quotation.create`.padEnd(30), create.status, id ? `(id=${id})` : "");
+  if (!ok && create.body?.message) console.log(`    ${create.body.message}`);
+  if (!ok && create.body?.errors) console.log(`    ${JSON.stringify(create.body.errors)}`);
+}
+
+await smokeCreateQuotation();
 
 console.log("");
 if (failed) {

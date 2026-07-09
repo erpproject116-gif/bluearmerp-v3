@@ -1,5 +1,5 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
@@ -71,6 +71,22 @@ export default function BankReconciliationPage() {
 
   const selectedStatementLine = createMemo(() => (statements.data ?? []).find((s) => s.id === selectedStatementLineId()) ?? null);
 
+  createEffect(() => {
+    const list = accounts.data;
+    if (!list || list.length !== 1 || bankAccountId()) return;
+    setBankAccountId(String(list[0].id));
+  });
+
+  const statementCount = createMemo(() => (statements.data ?? []).length);
+  const unmatchedCount = createMemo(() => (unmatched.data ?? []).length);
+
+  const sortedUnmatched = createMemo(() => {
+    const stmt = selectedStatementLine();
+    const rows = [...(unmatched.data ?? [])];
+    if (!stmt) return rows;
+    return rows.sort((a, b) => Math.abs(a.amount - stmt.amount) - Math.abs(b.amount - stmt.amount));
+  });
+
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["finance-bank-recon-statements"] });
     void client.invalidateQueries({ queryKey: ["finance-bank-recon-unmatched"] });
@@ -103,6 +119,7 @@ export default function BankReconciliationPage() {
       toast.warning(res.message ?? "Failed to match statement line.");
       return;
     }
+    toast.success("Statement line matched.");
     setPendingMatch(null);
     setSelectedStatementLineId(null);
     refresh();
@@ -110,6 +127,15 @@ export default function BankReconciliationPage() {
 
   return (
     <FinanceLayout>
+      <div class="mb-4 rounded-xl border border-stroke bg-slate-50 px-4 py-3 text-sm text-text-secondary">
+        <p class="font-medium text-text-primary">Weekly bank reconciliation</p>
+        <ol class="mt-2 list-decimal space-y-1 pl-5">
+          <li>Select a bank account (or leave All to scan every account).</li>
+          <li>Click an unmatched statement line on the left.</li>
+          <li>Match a payment on the right — closest amounts are listed first.</li>
+        </ol>
+      </div>
+
       <div class="mb-4 flex flex-wrap items-center gap-3">
         <label class="text-sm text-slate-700">
           Bank account
@@ -138,8 +164,15 @@ export default function BankReconciliationPage() {
 
       <div class="grid gap-4 lg:grid-cols-2">
         <div class="rounded-xl border border-stroke">
-          <div class="border-b border-stroke px-4 py-3 text-sm font-semibold">Statement lines (unmatched)</div>
+          <div class="flex items-center justify-between border-b border-stroke px-4 py-3">
+            <div class="text-sm font-semibold">Statement lines (unmatched)</div>
+            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-text-secondary">{statementCount()}</span>
+          </div>
           <Show when={!statements.isLoading} fallback={<p class="p-4 text-sm text-slate-500">Loading…</p>}>
+            <Show
+              when={(statements.data ?? []).length > 0}
+              fallback={<p class="p-4 text-sm text-text-secondary">No unmatched statement lines. Import a bank statement or clear filters.</p>}
+            >
             <table class="min-w-full text-sm">
               <thead class="bg-slate-50">
                 <tr>
@@ -168,12 +201,20 @@ export default function BankReconciliationPage() {
                 </For>
               </tbody>
             </table>
+            </Show>
           </Show>
         </div>
 
         <div class="rounded-xl border border-stroke">
-          <div class="border-b border-stroke px-4 py-3 text-sm font-semibold">Unmatched payments</div>
+          <div class="flex items-center justify-between border-b border-stroke px-4 py-3">
+            <div class="text-sm font-semibold">Unmatched payments</div>
+            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-text-secondary">{unmatchedCount()}</span>
+          </div>
           <Show when={!unmatched.isLoading} fallback={<p class="p-4 text-sm text-slate-500">Loading…</p>}>
+            <Show
+              when={sortedUnmatched().length > 0}
+              fallback={<p class="p-4 text-sm text-text-secondary">No unmatched official receipts or payment vouchers for this filter.</p>}
+            >
             <table class="min-w-full text-sm">
               <thead class="bg-slate-50">
                 <tr>
@@ -185,7 +226,7 @@ export default function BankReconciliationPage() {
                 </tr>
               </thead>
               <tbody>
-                <For each={unmatched.data ?? []}>
+                <For each={sortedUnmatched()}>
                   {(row) => (
                     <tr class="border-t border-slate-100">
                       <td class="px-3 py-2">{row.payment_date}</td>
@@ -195,8 +236,9 @@ export default function BankReconciliationPage() {
                       <td class="px-3 py-2 text-right">
                         <button
                           type="button"
-                          class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
+                          class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                           disabled={!selectedStatementLine()}
+                          title={selectedStatementLine() ? "Match to selected statement line" : "Select a statement line first"}
                           onClick={() => setPendingMatch(row)}
                         >
                           Match…
@@ -207,6 +249,7 @@ export default function BankReconciliationPage() {
                 </For>
               </tbody>
             </table>
+            </Show>
           </Show>
         </div>
       </div>
