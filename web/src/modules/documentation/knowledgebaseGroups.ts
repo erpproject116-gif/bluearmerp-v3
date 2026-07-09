@@ -68,6 +68,7 @@ export const knowledgebaseGroups: KbGroup[] = [
       "purchasing-load-slip-po",
       "supplier-invoice-load-slip-rfq",
       "purchase-pre-invoicing-report",
+      "purchase-cash-payment-after-save",
     ],
   },
   {
@@ -95,6 +96,7 @@ export const knowledgebaseGroups: KbGroup[] = [
     articleIds: [
       "finance-accounts-overview",
       "finance-je-draft-to-post",
+      "bank-reconciliation-weekly",
       "receivable-payable-status",
       "customer-vendor-book-report",
       "acct-vs-inventory-reconciliation",

@@ -8,7 +8,7 @@ Operating plan to reach **Ecount-class trading ERP** reliability, then depth in 
 
 ---
 
-## Phase 0 — Production trust (weeks 1–6) **← current**
+## Phase 0 — Production trust (weeks 1–6) **Done**
 
 **Goal:** No silent schema failure; golden paths verified in CI; deploy is repeatable.
 
@@ -32,7 +32,7 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 
 ---
 
-## Phase 1 — Core commercial GA (months 2–5)
+## Phase 1 — Core commercial GA (months 2–5) **← current**
 
 **Goal:** Daily selling/buying/finance matches Ecount **operations** (not full report tree).
 
@@ -46,7 +46,7 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 ### Buying
 - [x] Purchase attachments end-to-end on prod (migration 142) — CI smoke + `/health/schema`; operator redeploy
 - [x] GR / PO / RFQ load slip regression tests
-- [ ] Cash Payment on purchase (Ecount footer) — optional
+- [x] Cash Payment on purchase (Ecount footer) — post-save dialog + payment voucher modal
 
 ### Finance (Acct I minimum)
 - [x] Bank reconciliation: match modal usable weekly
@@ -58,7 +58,7 @@ node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 - [x] Expand `routes.golden.json` with POST smoke (create draft quotation) behind feature flag
 - [x] Playwright: open sale → Invoice tab shows lines
 - [x] Playwright in CI (`e2e-demo-smoke.yml` with bench JWT)
-- [ ] Every Phase 1 feature: migration + API + UI + KB + demo seed row
+- [x] Every Phase 1 feature: migration + API + UI + KB + demo seed row — core paths covered; optional pilot features deferred
 
 **Exit gate:** Pilot runs month-close on Bluearm; finance README checklist 80% automated.
 

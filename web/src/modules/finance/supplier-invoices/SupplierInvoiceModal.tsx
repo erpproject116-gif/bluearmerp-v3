@@ -33,6 +33,8 @@ import {
   type PurchaseRequestLineRow,
 } from "../../purchase-request/purchase-request/PurchaseRequestLineGrid";
 import { SupplierInvoiceApprovalPanel } from "./SupplierInvoiceApprovalPanel";
+import { SupplierInvoicePostSaveDialog } from "./SupplierInvoicePostSaveDialog";
+import { CashPaymentToVendorModal } from "./CashPaymentToVendorModal";
 
 export type { SupplierInvoiceDetail as PurchaseDetail };
 
@@ -116,6 +118,8 @@ export function SupplierInvoiceModal(props: Props) {
   const currencies = () => currenciesQuery.data ?? [];
   const [saving, setSaving] = createSignal(false);
   const [createdInvoice, setCreatedInvoice] = createSignal<SupplierInvoiceDetail | null>(null);
+  const [postSaveOpen, setPostSaveOpen] = createSignal(false);
+  const [cashPaymentOpen, setCashPaymentOpen] = createSignal(false);
   const effectiveEditing = () => props.editing ?? createdInvoice();
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
@@ -395,6 +399,12 @@ export function SupplierInvoiceModal(props: Props) {
       return;
     }
     setCreatedInvoice(res.data);
+    setPostSaveOpen(true);
+  };
+
+  const finishPostSave = () => {
+    setPostSaveOpen(false);
+    props.onClose();
   };
 
   return (
@@ -647,6 +657,40 @@ export function SupplierInvoiceModal(props: Props) {
         targetId={effectiveEditing()?.id}
         title="History — Purchase"
       />
+
+      <SupplierInvoicePostSaveDialog
+        open={postSaveOpen()}
+        invoiceNo={createdInvoice()?.invoice_no ?? ""}
+        amount={createdInvoice()?.grand_total ?? 0}
+        onCashPayment={() => {
+          setPostSaveOpen(false);
+          setCashPaymentOpen(true);
+        }}
+        onAccounting={() => {
+          setPostSaveOpen(false);
+          setActiveTab("invoice");
+        }}
+        onDone={finishPostSave}
+      />
+
+      <Show when={createdInvoice()}>
+        {(inv) => (
+          <CashPaymentToVendorModal
+            open={cashPaymentOpen()}
+            supplierInvoiceId={inv().id}
+            partnerId={inv().partner_id}
+            currencyId={inv().currency_id}
+            amount={inv().grand_total}
+            invoiceNo={inv().invoice_no}
+            paymentDate={inv().invoice_date}
+            onClose={() => {
+              setCashPaymentOpen(false);
+              finishPostSave();
+            }}
+            onSaved={() => props.onSaved()}
+          />
+        )}
+      </Show>
     </>
   );
 }

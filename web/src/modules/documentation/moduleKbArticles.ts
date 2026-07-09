@@ -509,6 +509,52 @@ export const moduleKbArticles: KbArticle[] = [
     relatedGuideIds: ["goods-receipt-load-slip", "purchase-request-to-ap-flow"],
   },
   {
+    id: "purchase-cash-payment-after-save",
+    title: "Cash Payment and accounting after saving a purchase",
+    scenario: "You just created a supplier invoice (purchase) and want to pay the vendor or set up GL immediately.",
+    intro:
+      "After saving a new purchase, BluearmERP prompts for Cash Payment (payment voucher) or the Invoice tab for accounting — mirroring Cash In on sales.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Save a new purchase from Buying → Purchases → New Purchase.",
+          "On the post-save dialog, choose Cash Payment to record a payment voucher prefilled with vendor and amount.",
+          "Or choose Link accounting voucher to open the Invoice tab — review line breakdown, Acct I/II, and approval.",
+          "Enable accounts_auto_post_purchase under Settings → Process policies for automatic GL posting on save.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "For partial payments, skip the post-save dialog and create a payment voucher under Finance with a lower applied amount.",
+      },
+    ],
+    primaryHref: "/app/finance/supplier-invoices/new",
+    primaryLabel: "New purchase",
+    relatedGuideIds: ["purchase-request-to-ap-flow", "finance-je-draft-to-post", "sales-cash-in-after-save"],
+  },
+  {
+    id: "bank-reconciliation-weekly",
+    title: "Bank reconciliation — match statements to receipts and payments",
+    scenario: "You import or enter bank statement lines and need to tie them to official receipts or payment vouchers.",
+    intro:
+      "Finance → Bank Reconciliation shows unmatched statement lines alongside unmatched OR/PV documents. Select a line on the left, then match a payment on the right.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Finance → Bank Reconciliation.",
+          "Filter by bank account if needed; demo data includes statement line DEMO-STMT-OR after seed-demo-finance.sql.",
+          "Click an unmatched statement line, then Match on the closest payment amount.",
+          "Confirm in the dialog — amounts can differ slightly; investigate large variances before posting.",
+        ],
+      },
+    ],
+    primaryHref: "/app/finance/acct-i/bank-reconciliation",
+    primaryLabel: "Bank reconciliation",
+    relatedGuideIds: ["finance-accounts-overview", "finance-je-draft-to-post"],
+  },
+  {
     id: "sales-load-slip-so",
     title: "Load Slip: sales invoice from sales order",
     scenario: "You released or delivered a sales order and need to bill the customer.",

@@ -47,6 +47,8 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Load Slip slip-type menu | ECount multi-type picker (21 slip types) | `LoadSlipMenu` on Sales/Purchases/PO | **Done** — SO, Quotation, Shipping, PO, GR, PR, RFQ (SI shows PO/GR/RFQ) |
 | Bulk serial barcode scan | Scan many serials into lines | `POST .../resolve-scan/batch` + `ScannedSerialTable` | **Done** |
 | Live list refresh (no manual F5) | Real-time slip updates | Query invalidation + 30s polling | **Done** (not WebSocket) |
+| Cash Payment on save | E040303 footer Cash Payment | Payment voucher modal on purchase save | **Done** — `SupplierInvoicePostSaveDialog` + `CashPaymentToVendorModal` |
+| Link with Accounting Vouchers (purchase) | E010301 on purchase save | Invoice tab + post-save prompt | **Done** |
 
 ## P1 — Sales (E040205 / C000030)
 
@@ -88,7 +90,7 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | General Journal form | Dr/Cr grid + party sub-ledger + Load Slip | `/app/finance/journal` voucher entry |
 | 4-way journal split | General / Payment / Receipt / S/A separate forms | **All 4 crawled** — S/A uses Employee sub-ledger; see E010505 |
 | Auto Generate Voucher List | E010213 — single All pill list | GL auto-post from slips — see E010213 |
-| Bank Reconciliation | E010208 — list + match modal | `/app/finance/acct-i/bank-reconciliation` partial |
+| Bank Reconciliation | E010208 — list + match modal | `/app/finance/acct-i/bank-reconciliation` | **Done** — match modal + demo statement seed |
 | Balance adjustment subtree | New/adjustment/count lists | Period close workflow — **E010209–212 pass 3** (sub-ledger Bal. Count + E010210 F2) |
 
 ## P1 — Sales reports (Inv. I → Reports → Sales)

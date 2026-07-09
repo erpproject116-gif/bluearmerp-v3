@@ -96,6 +96,20 @@ begin
     join public.fin_gl_accounts g on g.account_code = b.gl_account_code
     where r.tenant_id = v_tenant and r.receipt_no = to_char(v_d, 'YYMMDD') || '301'
     on conflict (official_receipt_id, line_no) do nothing;
+
+    -- Demo bank statement line (unmatched) for bank reconciliation practice — mirrors OR cash deposit
+    if v_bank_id is not null and not exists (
+      select 1 from public.fin_bank_statement_lines
+      where tenant_id = v_tenant and reference_no = 'DEMO-STMT-OR' and matched_payment_id is null
+    ) then
+      insert into public.fin_bank_statement_lines (
+        tenant_id, bank_account_id, statement_date, reference_no, description, amount
+      )
+      values (
+        v_tenant, v_bank_id, v_d, 'DEMO-STMT-OR', 'Demo bank deposit — match to official receipt', v_grand_total
+      );
+      raise notice 'seed-demo-finance: bank statement line DEMO-STMT-OR for tenant %', v_code;
+    end if;
   end loop;
 end $$;
 
