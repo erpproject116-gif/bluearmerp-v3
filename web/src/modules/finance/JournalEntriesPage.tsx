@@ -1,9 +1,9 @@
+import { uiLabel } from "../../shared/branding/uiLabel";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
-import { LoadingText } from "../../shared/LoadingText";
 
 // #region agent log
 fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
@@ -11,13 +11,13 @@ fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
   headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
   body: JSON.stringify({
     sessionId: "a1498a",
-    runId: "pre-fix",
+    runId: "post-fix",
     hypothesisId: "H1",
     location: "JournalEntriesPage.tsx:module",
     message: "JournalEntriesPage chunk init",
     data: {
-      loadingTextType: typeof LoadingText,
-      loadingTextIsFunction: typeof LoadingText === "function",
+      inlineFallback: true,
+      uiLabelType: typeof uiLabel,
       showType: typeof Show,
     },
     timestamp: Date.now(),
@@ -58,7 +58,7 @@ export default function JournalEntriesPage() {
     headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
     body: JSON.stringify({
       sessionId: "a1498a",
-      runId: "pre-fix",
+      runId: "post-fix",
       hypothesisId: "H3",
       location: "JournalEntriesPage.tsx:render",
       message: "JournalEntriesPage render",
@@ -170,7 +170,7 @@ export default function JournalEntriesPage() {
         </div>
       </div>
 
-      <Show when={!list.isLoading} fallback={<LoadingText class="text-sm text-slate-500" as="p" />}>
+      <Show when={!list.isLoading} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
         <table class="min-w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
           <thead class="bg-slate-50">
             <tr>

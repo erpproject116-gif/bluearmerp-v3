@@ -2,7 +2,7 @@ import { A } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { useAuth } from "../../shared/auth-context";
 import { useSellingWorkspace } from "../../shared/reports/useModuleReports";
-import { LoadingText } from "../../shared/LoadingText";
+import { uiLabel } from "../../shared/branding/uiLabel";
 
 type KpiTile = {
   label: string;
@@ -59,7 +59,7 @@ export default function SellingWorkspacePage() {
 
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <h3 class="mb-4 text-sm font-semibold text-text-primary">Reports</h3>
-        <Show when={!workspace.isLoading} fallback={<LoadingText class="text-sm text-text-secondary" as="p" />}>
+        <Show when={!workspace.isLoading} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
           <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <For each={reportLinks}>
               {(link) => (

@@ -14,7 +14,7 @@ import {
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
-import { LoadingText } from "../../shared/LoadingText";
+import { uiLabel } from "../../shared/branding/uiLabel";
 
 const BUDGET_CATEGORIES = ["labor", "materials", "overhead", "other"];
 
@@ -191,7 +191,7 @@ export default function JobCostingPage() {
                 </button>
               </Show>
             </div>
-            <Show when={bva.data} fallback={<LoadingText class="text-sm text-text-secondary" as="p" />}>
+            <Show when={bva.data} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
               {(data) => (
                 <div>
                   <div class="mb-3 grid grid-cols-3 gap-4 text-sm">

@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
-import { LoadingText } from "../../../shared/LoadingText";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 
 type DemoStatus = {
   eligible: boolean;
@@ -110,7 +110,7 @@ export default function DemoDataPage() {
         </p>
       </div>
 
-      <Show when={!loading()} fallback={<LoadingText class="text-sm text-slate-500" as="p" />}>
+      <Show when={!loading()} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
         <Show
           when={status()?.can_manage}
           fallback={

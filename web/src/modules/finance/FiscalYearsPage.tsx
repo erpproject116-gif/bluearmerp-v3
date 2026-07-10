@@ -4,7 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { FinanceLayout } from "./FinanceLayout";
-import { LoadingText } from "../../shared/LoadingText";
+import { uiLabel } from "../../shared/branding/uiLabel";
 
 type FiscalYear = {
   id: number;
@@ -96,7 +96,7 @@ export default function FiscalYearsPage() {
       </div>
 
       <div class="rounded-xl border border-stroke">
-        <Show when={!list.isLoading} fallback={<LoadingText class="p-4 text-sm text-slate-500" as="p" />}>
+        <Show when={!list.isLoading} fallback={<p class="p-4 text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
           <table class="min-w-full text-sm">
             <thead class="bg-slate-50">
               <tr>

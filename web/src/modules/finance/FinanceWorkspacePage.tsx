@@ -1,10 +1,10 @@
+import { uiLabel } from "../../shared/branding/uiLabel";
 import { A } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { useAuth } from "../../shared/auth-context";
 import { useFinanceWorkspace } from "../../shared/reports/useModuleReports";
 import { acctINavLinks } from "../../shell/acct-i-nav";
 import { acctIINavLinks } from "../../shell/acct-ii-nav";
-import { LoadingText } from "../../shared/LoadingText";
 
 // #region agent log
 fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
@@ -12,13 +12,13 @@ fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
   headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
   body: JSON.stringify({
     sessionId: "a1498a",
-    runId: "pre-fix",
+    runId: "post-fix",
     hypothesisId: "H1",
     location: "FinanceWorkspacePage.tsx:module",
     message: "FinanceWorkspacePage chunk init",
     data: {
-      loadingTextType: typeof LoadingText,
-      loadingTextIsFunction: typeof LoadingText === "function",
+      inlineFallback: true,
+      uiLabelType: typeof uiLabel,
       showType: typeof Show,
     },
     timestamp: Date.now(),
@@ -63,7 +63,7 @@ export default function FinanceWorkspacePage() {
     headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
     body: JSON.stringify({
       sessionId: "a1498a",
-      runId: "pre-fix",
+      runId: "post-fix",
       hypothesisId: "H3",
       location: "FinanceWorkspacePage.tsx:render",
       message: "FinanceWorkspacePage render",
@@ -140,7 +140,7 @@ export default function FinanceWorkspacePage() {
 
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <h3 class="mb-4 text-sm font-semibold text-text-primary">AR / AP operations</h3>
-        <Show when={!workspace.isLoading} fallback={<LoadingText class="text-sm text-text-secondary" as="p" />}>
+        <Show when={!workspace.isLoading} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
           <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <For each={operationalLinks}>
               {(link) => (

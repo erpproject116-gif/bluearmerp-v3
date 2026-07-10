@@ -287,7 +287,7 @@ export function SidebarNav() {
           headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
           body: JSON.stringify({
             sessionId: "a1498a",
-            runId: "pre-fix",
+            runId: "post-fix",
             hypothesisId: "H4",
             location: "SidebarNav.tsx:route-change",
             message: "Sidebar route change",

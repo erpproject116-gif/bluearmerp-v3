@@ -6,7 +6,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { useToast } from "../../../shared/toast";
-import { LoadingText } from "../../../shared/LoadingText";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 
 type RfqLine = {
   id: number;
@@ -213,7 +213,7 @@ export function SupplierQuotationModal(props: Props) {
             </div>
           </div>
 
-          <Show when={!loading()} fallback={<LoadingText class="text-sm text-slate-500" as="p" />}>
+          <Show when={!loading()} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
               <LookupCombo
                 label="Supplier"

@@ -43,7 +43,12 @@ export default defineConfig(({ mode }) => {
           manualChunks(id) {
             const path = id.replace(/\\/g, "/");
 
-            if (!path.includes("node_modules")) return undefined;
+            if (!path.includes("node_modules")) {
+              if (path.includes("/src/shared/LoadingText") || path.includes("/src/shared/branding/uiLabel")) {
+                return "app-ui-copy";
+              }
+              return undefined;
+            }
 
             if (path.includes("solid-js") || path.includes("@solidjs/")) return "vendor-solid";
             if (path.includes("@supabase")) return "vendor-supabase";

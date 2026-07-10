@@ -1,10 +1,9 @@
+import { uiLabel } from "../../../shared/branding/uiLabel";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { useAuth } from "../../../shared/auth-context";
 import type { TenantModuleRow } from "../../../shared/moduleAccess";
 import { useToast } from "../../../shared/toast";
-import { LoadingText } from "../../../shared/LoadingText";
-
 const GROUP_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   inventory: "Inventory",
@@ -131,7 +130,7 @@ export default function ModuleFeaturesPage() {
         </p>
       </div>
 
-      <Show when={!loading()} fallback={<LoadingText class="text-sm text-slate-500" as="p" />}>
+      <Show when={!loading()} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
         <Show when={!isEmpty()} fallback={
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             No modules loaded. Confirm migration <code class="font-mono text-xs">057_tenant_modules_features.sql</code> has

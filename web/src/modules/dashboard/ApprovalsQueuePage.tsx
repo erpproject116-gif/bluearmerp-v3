@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { DashboardLayout } from "./DashboardLayout";
-import { LoadingText } from "../../shared/LoadingText";
+import { uiLabel } from "../../shared/branding/uiLabel";
 
 type ApprovalRequest = {
   id: number;
@@ -111,7 +111,7 @@ export default function ApprovalsQueuePage() {
         </button>
       </div>
 
-      <Show when={!loading()} fallback={<LoadingText class="text-sm text-text-secondary" as="p" />}>
+      <Show when={!loading()} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
         <Show
           when={items().length > 0}
           fallback={

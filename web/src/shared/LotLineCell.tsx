@@ -3,7 +3,7 @@ import { apiFetch } from "./api";
 import { Modal } from "./Modal";
 import { inputClass } from "./SpreadsheetGrid";
 import type { LotBatchRow } from "./useSerialLotList";
-import { LoadingText } from "../shared/LoadingText";
+import { uiLabel } from "../shared/branding/uiLabel";
 
 type Props = {
   itemId: number;
@@ -50,7 +50,7 @@ export function LotLineCell(props: Props) {
         {label()}
       </button>
       <Modal open={open()} title="Select lot batch" onClose={() => setOpen(false)} wide>
-        <Show when={!loading()} fallback={<LoadingText class="text-sm text-text-secondary" as="p" />}>
+        <Show when={!loading()} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
           <Show
             when={rows().length > 0}
             fallback={<p class="text-sm text-text-secondary">No available lot batches at this location.</p>}

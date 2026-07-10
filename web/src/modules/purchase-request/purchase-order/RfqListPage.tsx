@@ -5,7 +5,7 @@ import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
-import { LoadingText } from "../../../shared/LoadingText";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 
 type RfqRow = {
   id: number;
@@ -89,7 +89,7 @@ export default function RfqListPage() {
         </button>
       </div>
 
-      <Show when={!list.isLoading} fallback={<LoadingText class="text-sm text-slate-500" as="p" />}>
+      <Show when={!list.isLoading} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
         <table class="min-w-full overflow-hidden rounded-lg border border-slate-200 text-sm">
           <thead class="bg-slate-50">
             <tr>

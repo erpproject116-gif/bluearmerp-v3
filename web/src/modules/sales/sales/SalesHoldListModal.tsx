@@ -5,7 +5,7 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { formatPeso } from "../../../shared/money";
 import { useToast } from "../../../shared/toast";
 import type { SalesLineRow, SalesTemplateCode } from "./SalesLineGrid";
-import { LoadingText } from "../../../shared/LoadingText";
+import { uiLabel } from "../../../shared/branding/uiLabel";
 
 export type SalesHoldPayload = {
   order_date: string;
@@ -115,7 +115,7 @@ export function SalesHoldListModal(props: Props) {
       <p class="mb-4 text-sm text-text-secondary">
         Park up to 5 draft sales invoices (Ecount-style). Save the current form to a slot, or load a held slip back into the grid.
       </p>
-      <Show when={!loading()} fallback={<LoadingText class="text-sm text-text-secondary" as="p" />}>
+      <Show when={!loading()} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
         <table class="min-w-full text-sm">
           <thead class="bg-slate-50 text-left text-xs uppercase text-text-secondary">
             <tr>
