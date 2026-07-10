@@ -22,7 +22,7 @@ export type SpreadsheetExtractOptions = {
 };
 
 const HEADER_HINTS =
-  /item|qty|quantity|description|spec|unit|price|cost|amount|total|remarks|code|sku|part|uom|no\.?/i;
+  /item|qty|quantity|description|spec|specification|unit|price|cost|amount|total|remarks|code|sku|part|uom|no\.?|boq|brand|model|budget|reference\s*price|line\s*total|bill\s+of\s+quantities|schedule\s+of\s+requirements/i;
 
 const FOOTER_ROW =
   /^(grand\s+total|sub\s*total|subtotal|total\s+amount|total\s*:?|amount\s+due|prepared|approved|signature|vat|tax\s+total|net\s+total)/i;
@@ -101,6 +101,7 @@ function isDataRow(cells: string[]): boolean {
   const joined = cells.join(" ").trim();
   if (FOOTER_ROW.test(joined)) return false;
   if (filled === 1 && joined.length > 80) return false;
+  if (filled < 2 && joined.length > 50 && !/\d/.test(joined)) return false;
   return true;
 }
 

@@ -157,10 +157,14 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			ForceColumns:    body.ForceColumns,
 			HeaderOverrides: body.HeaderOverrides,
 		}
-		result := mergeRfqParseResults(
-			ParseRfqStructuredTables(body.Tables, opts),
-			ParseRfqDocumentWithOptions(pages, opts),
-		)
+		structured := ParseRfqStructuredTables(body.Tables, opts)
+		var docResult RfqParseResult
+		if len(structured.Lines) > 0 && len(body.Tables) > 0 {
+			docResult = parseRfqDocumentLayoutOnly(pages, opts)
+		} else {
+			docResult = ParseRfqDocumentWithOptions(pages, opts)
+		}
+		result := mergeRfqParseResults(structured, docResult)
 		response.OK(w, map[string]any{
 			"lines":            result.Lines,
 			"page_count":       len(body.Pages),

@@ -112,7 +112,6 @@ export function RfqImportModal(props: Props) {
   const [progress, setProgress] = createSignal<RfqOcrProgress | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [lines, setLines] = createSignal<RfqParsedLine[]>([]);
-  const [pageCount, setPageCount] = createSignal(0);
   const [sourcePages, setSourcePages] = createSignal<RfqOcrPage[]>([]);
   const [sourceTables, setSourceTables] = createSignal<RfqStructuredTable[]>([]);
   const [tableDetected, setTableDetected] = createSignal(false);
@@ -121,6 +120,7 @@ export function RfqImportModal(props: Props) {
   const [pageFrom, setPageFrom] = createSignal("");
   const [pageTo, setPageTo] = createSignal("");
   const [skippedPageCount, setSkippedPageCount] = createSignal(0);
+  const [tableSourceCount, setTableSourceCount] = createSignal(0);
   const [largeDocHint, setLargeDocHint] = createSignal<string | null>(null);
   const [showSheetPicker, setShowSheetPicker] = createSignal(false);
   const [sheetPickerGroups, setSheetPickerGroups] = createSignal<SheetPickerGroup[]>([]);
@@ -138,7 +138,6 @@ export function RfqImportModal(props: Props) {
 
   const reset = () => {
     setLines([]);
-    setPageCount(0);
     setSourcePages([]);
     setSourceTables([]);
     setTableDetected(false);
@@ -147,6 +146,7 @@ export function RfqImportModal(props: Props) {
     setPageFrom("");
     setPageTo("");
     setSkippedPageCount(0);
+    setTableSourceCount(0);
     setLargeDocHint(null);
     setShowSheetPicker(false);
     setSheetPickerGroups([]);
@@ -199,7 +199,6 @@ export function RfqImportModal(props: Props) {
     setBusy(true);
     setError(null);
     setLines([]);
-    setPageCount(0);
     setShowSheetPicker(false);
     setProgress({ phase: "ocr", page: 0, totalPages: 0, message: "Loading document tools…" });
 
@@ -245,13 +244,37 @@ export function RfqImportModal(props: Props) {
       setSourceTables(payload.tables);
       setSkippedPageCount(payload.skippedPages ?? 0);
       const unitCount = payload.pages.length + payload.tables.length;
-      setPageCount(unitCount);
+      setTableSourceCount(payload.tablePages ?? unitCount);
       setProgress({ phase: "parse", page: 0, totalPages: unitCount, message: "Detecting line items…" });
 
       const saved = loadSavedForceColumns(props.partnerId?.() ?? null);
       const initialForce = saved?.length ? saved : [];
       const count = await parsePayload(payload, initialForce);
       const skipNote = payload.skippedPages ? ` (${payload.skippedPages} non-table pages skipped)` : "";
+      // #region agent log
+      fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+        body: JSON.stringify({
+          sessionId: "a1498a",
+          runId: "rfq-baseline",
+          hypothesisId: "H1",
+          location: "RfqImportModal.tsx:runImport",
+          message: "import complete",
+          data: {
+            fileCount: files.length,
+            fileTypes: files.map((f) => f.type || f.name.split(".").pop()),
+            pageUnits: payload.pages.length,
+            tableUnits: payload.tables.length,
+            skippedPages: payload.skippedPages ?? 0,
+            lineCount: count,
+            tableDetected: tableDetected(),
+            columnCount: detectedColumns().length,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       toast.success(`Found ${count} line item(s) from ${files.length} file(s)${skipNote}.`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "RFQ import failed.";
@@ -437,6 +460,20 @@ export function RfqImportModal(props: Props) {
 
   const showColumnMap = () => tableDetected() && detectedColumns().length > 0;
 
+  const tableSourceLabel = () => {
+    const sheets = sourceTables().map((t) => t.sheet).filter(Boolean) as string[];
+    const parts: string[] = [];
+    if (sheets.length) parts.push(`Excel: ${sheets.join(", ")}`);
+    if (sourcePages().length) parts.push(`${sourcePages().length} PDF/image table page(s)`);
+    return parts.join(" · ") || `${tableSourceCount()} table source(s)`;
+  };
+
+  const columnSummary = () =>
+    detectedColumns()
+      .map((c) => c.label || c.field)
+      .filter(Boolean)
+      .join(" · ");
+
   return (
     <Modal
       open={props.open}
@@ -456,6 +493,34 @@ export function RfqImportModal(props: Props) {
         needed, then pick inventory matches before applying. Legacy .doc files should be saved as .docx first.
       </p>
 
+      <Show when={lines().length > 0}>
+        <div class="mb-4 rounded-xl border-2 border-brand-200 bg-brand-50/60 px-4 py-4 shadow-sm">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="text-sm font-semibold text-brand-800">
+                {tableDetected() ? "Line-item table detected" : "Extracted line items"}
+              </p>
+              <p class="mt-1 text-sm text-brand-900/90">{tableSourceLabel()}</p>
+              <Show when={columnSummary()}>
+                <p class="mt-1 text-xs text-brand-800/80">
+                  Columns: {columnSummary()}
+                </p>
+              </Show>
+              <Show when={skippedPageCount() > 0}>
+                <p class="mt-1 text-xs text-brand-700/70">
+                  {skippedPageCount()} non-table page(s) skipped to reduce noise.
+                </p>
+              </Show>
+            </div>
+            <div class="text-right">
+              <p class="text-2xl font-bold text-brand-700">{lines().length}</p>
+              <p class="text-xs text-brand-800/80">line items found</p>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={lines().length === 0}>
       <div class="mb-4 grid gap-3 rounded-lg border border-stroke bg-slate-50 px-4 py-3 sm:grid-cols-2">
         <label class="flex flex-col gap-1 text-xs">
           <span class="font-medium text-text-primary">Page from (optional)</span>
@@ -596,6 +661,7 @@ export function RfqImportModal(props: Props) {
           onChange={(e) => void onFiles(e.currentTarget.files)}
         />
       </div>
+      </Show>
 
       <Show when={busy()}>
         <div class="mb-4 rounded-lg border border-stroke bg-slate-50 px-4 py-3 text-sm text-text-secondary">
@@ -661,14 +727,27 @@ export function RfqImportModal(props: Props) {
       </Show>
 
       <Show when={lines().length > 0}>
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-semibold text-text-primary">Review line items</h3>
+          <button
+            type="button"
+            class="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+            disabled={busy()}
+            onClick={() => {
+              reset();
+              fileInputRef?.click();
+            }}
+          >
+            Import another file
+          </button>
+        </div>
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm text-text-secondary">
-            {lines().filter((l) => l.include).length} of {lines().length} lines selected · {pageCount()} table page(s)
-            {skippedPageCount() > 0 ? ` · ${skippedPageCount()} skipped` : ""}
-            {tableDetected() ? " · table detected" : " · text fallback"}
+            {lines().filter((l) => l.include).length} of {lines().length} lines selected
+            {skippedPageCount() > 0 ? ` · ${skippedPageCount()} pages skipped` : ""}
           </span>
         </div>
-        <div class="max-h-[50vh] overflow-auto rounded-lg border border-stroke">
+        <div class="max-h-[55vh] overflow-auto rounded-lg border-2 border-brand-100 shadow-sm">
           <table class="erp-grid w-full text-left text-sm">
             <thead class="sticky top-0 bg-slate-50 text-xs uppercase text-text-secondary">
               <tr>

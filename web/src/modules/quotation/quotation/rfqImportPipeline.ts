@@ -35,6 +35,36 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+function summarizeRfqLines(lines: Array<{ confidence?: number; match_score?: number; item_id?: number | null; item_code?: string; qty?: string }>) {
+  const conf = lines.map((l) => l.confidence ?? 0.5);
+  const match = lines.map((l) => l.match_score ?? 0);
+  const matched = lines.filter((l) => l.item_id != null).length;
+  const lowConf = lines.filter((l) => (l.confidence ?? 0.5) < 0.65).length;
+  const lowMatch = lines.filter((l) => l.item_id != null && (l.match_score ?? 0) < 0.7).length;
+  const emptyQty = lines.filter((l) => !l.qty?.trim() || l.qty === "1").length;
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  return {
+    total: lines.length,
+    matched,
+    unmatched: lines.length - matched,
+    avgConfidence: Math.round(avg(conf) * 100) / 100,
+    avgMatchScore: Math.round(avg(match) * 100) / 100,
+    lowConfidence: lowConf,
+    weakMatch: lowMatch,
+    defaultQty: emptyQty,
+  };
+}
+
+// #region agent log
+function rfqDbgLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
+  fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+    body: JSON.stringify({ sessionId: "a1498a", runId: "rfq-baseline", hypothesisId, location, message, data, timestamp: Date.now() }),
+  }).catch(() => {});
+}
+// #endregion
+
 async function parseBatch(
   pages: RfqDocumentPayload["pages"],
   tables: RfqDocumentPayload["tables"],
@@ -107,6 +137,18 @@ export async function parsePayloadInBatches(
     deduped.push(ln);
   }
 
+  // #region agent log
+  rfqDbgLog("H2", "rfqImportPipeline.ts:parse", "parse batch complete", {
+    rawLines: mergedLines.length,
+    dedupedLines: deduped.length,
+    dedupRemoved: mergedLines.length - deduped.length,
+    tableDetected,
+    columnCount: detectedColumns.length,
+    columns: detectedColumns.map((c) => c.field),
+    ...summarizeRfqLines(deduped),
+  });
+  // #endregion
+
   return {
     lines: deduped.map((ln, idx) => ({ ...ln, line_no: idx + 1 })),
     table_detected: tableDetected,
@@ -137,6 +179,15 @@ export async function matchLinesInBatches(
         partner_id: partnerId ?? undefined,
       }),
     });
+    // #region agent log
+    if (!matchRes.success) {
+      rfqDbgLog("H4", "rfqImportPipeline.ts:match", "match API failed", {
+        batch: i + 1,
+        message: matchRes.message ?? "unknown",
+        lineCount: batches[i].length,
+      });
+    }
+    // #endregion
     const batchLines = (matchRes.data?.lines ?? batches[i]).map((ln) => ({
       ...ln,
       item_code: ln.item_code ?? "",
@@ -151,6 +202,13 @@ export async function matchLinesInBatches(
     }));
     out.push(...batchLines);
   }
+
+  // #region agent log
+  rfqDbgLog("H3", "rfqImportPipeline.ts:match", "match complete", {
+    partnerId,
+    ...summarizeRfqLines(out),
+  });
+  // #endregion
 
   return out.map((ln, idx) => ({ ...ln, line_no: idx + 1 }));
 }

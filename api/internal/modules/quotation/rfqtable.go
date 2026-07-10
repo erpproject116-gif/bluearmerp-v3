@@ -590,8 +590,16 @@ func finishRowParseFromLine(line ParsedRfqLine, row rfqTextRow) rowParseResult {
 	if line.ItemCode == "" && line.Description == "" && line.ItemName == "" {
 		return rowParseResult{ok: false}
 	}
+	joined := strings.Join(row.cells, " ")
+	if line.ItemCode == "" && len(line.Description) > 55 && !containsDigit(joined) {
+		return rowParseResult{ok: false}
+	}
 	if line.Qty == "" {
-		line.Qty = "1"
+		if line.ItemCode != "" || len(strings.TrimSpace(line.Description)) >= 4 {
+			line.Qty = "1"
+		} else {
+			return rowParseResult{ok: false}
+		}
 	}
 	if line.ItemCode == "" && looksLikeItemCode(firstCell(row)) {
 		line.ItemCode = firstCell(row)
@@ -647,12 +655,22 @@ func isLikelyNonTableRow(row rfqTextRow, schema []rfqColumnSlot) bool {
 	if isRfqNoiseLine(normalizeRfqLine(line)) {
 		return true
 	}
-	// Cover page paragraphs: one long cell, no numeric qty column.
 	if len(row.cells) == 1 && len(line) > 80 {
 		return true
 	}
 	if len(schema) > 0 && len(row.cells) == 1 && !containsDigit(line) {
 		return true
+	}
+	if len(row.cells) >= 2 && !containsDigit(line) {
+		filled := 0
+		for _, c := range row.cells {
+			if strings.TrimSpace(c) != "" {
+				filled++
+			}
+		}
+		if filled <= 1 && len(line) > 45 {
+			return true
+		}
 	}
 	return false
 }
@@ -737,14 +755,15 @@ func ParseRfqDocumentWithOptions(pages []RfqPageInput, opts RfqParseOptions) Rfq
 	if len(layout) > 0 {
 		return RfqParseResult{Lines: layout, TableDetected: true, DetectedColumns: cols}
 	}
-	plain := make([]struct {
+	var plain []struct {
 		Page int
 		Text string
-	}, len(pages))
-	for i, p := range pages {
-		plain[i].Page = p.Page
-		plain[i].Text = p.Text
-		if plain[i].Text == "" && len(p.Words) > 0 {
+	}
+	for _, p := range pages {
+		wc := len(p.Words)
+		kind := classifyRfqPageText(p.Text, wc)
+		text := p.Text
+		if text == "" && len(p.Words) > 0 {
 			var b strings.Builder
 			rows := groupWordsIntoRows(p.Words)
 			for ri, row := range rows {
@@ -753,8 +772,34 @@ func ParseRfqDocumentWithOptions(pages []RfqPageInput, opts RfqParseOptions) Rfq
 				}
 				b.WriteString(strings.Join(row.cells, " "))
 			}
-			plain[i].Text = b.String()
+			text = b.String()
 		}
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		parseable := pageTextHasParseableLines(text)
+		if kind == rfqPageSkip && !parseable {
+			continue
+		}
+		if kind != rfqPageTable && scoreRfqPageTable(text, wc) < 28 && !parseable {
+			continue
+		}
+		plain = append(plain, struct {
+			Page int
+			Text string
+		}{Page: p.Page, Text: text})
+	}
+	if len(plain) == 0 {
+		return RfqParseResult{}
 	}
 	return RfqParseResult{Lines: ParseRfqPages(plain), TableDetected: false}
+}
+
+// parseRfqDocumentLayoutOnly runs table layout parsing without plain-text regex fallback.
+func parseRfqDocumentLayoutOnly(pages []RfqPageInput, opts RfqParseOptions) RfqParseResult {
+	layout, cols := ParseRfqLayoutPagesWithOptions(pages, opts)
+	if len(layout) == 0 {
+		return RfqParseResult{}
+	}
+	return RfqParseResult{Lines: layout, TableDetected: true, DetectedColumns: cols}
 }

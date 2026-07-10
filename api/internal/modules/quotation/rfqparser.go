@@ -23,7 +23,7 @@ type ParsedRfqLine struct {
 }
 
 var (
-	rfqHeaderNoise = regexp.MustCompile(`(?i)^(page\s+\d+|request\s+for\s+quotation|rfq\b|date\b|total\b|subtotal\b|remarks?\b|notes?\b|prepared\b|approved\b|signature\b|qty\b|quantity\b|description\b|item\b|unit\b|uom\b|no\.?\b|#)`)
+	rfqHeaderNoise = regexp.MustCompile(`(?i)^(page\s+\d+|request\s+for\s+quotation|rfq\b|date\b|total\b|subtotal\b|remarks?\b|notes?\b|prepared\b|approved\b|signature\b|qty\b|quantity\b|description\b|item\b|unit\b|uom\b|no\.?\b|#|terms\s+and\s+conditions|instruction\s+to|eligible|warranty|delivery\s+period|payment\s+terms|scope\s+of\s+work|company\s+profile|hereby|whereas|pursuant)`)
 	rfqQtyUnitDesc = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s+([a-zA-Z]{1,12})\s+(.+)$`)
 	rfqCodeQtyDesc = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9._\-/]{1,40})\s+(\d+(?:\.\d+)?)\s+(.+)$`)
 	rfqLineNoRow   = regexp.MustCompile(`^(\d{1,3})[\s.)]+(.+)$`)
@@ -77,6 +77,9 @@ func isRfqNoiseLine(line string) bool {
 	if rfqHeaderNoise.MatchString(line) {
 		return true
 	}
+	if len(line) > 90 && !rfqQtyDesc.MatchString(line) && !rfqCodeQtyDesc.MatchString(line) && !rfqLineNoRow.MatchString(line) {
+		return true
+	}
 	// Mostly punctuation / separators.
 	letters := 0
 	for _, r := range line {
@@ -85,6 +88,19 @@ func isRfqNoiseLine(line string) bool {
 		}
 	}
 	return letters < 3
+}
+
+func pageTextHasParseableLines(text string) bool {
+	for _, raw := range strings.Split(text, "\n") {
+		line := normalizeRfqLine(raw)
+		if line == "" || isRfqNoiseLine(line) {
+			continue
+		}
+		if _, ok := parseRfqLine(line); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func parseRfqLine(line string) (ParsedRfqLine, bool) {

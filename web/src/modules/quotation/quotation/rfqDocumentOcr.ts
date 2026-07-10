@@ -205,27 +205,49 @@ async function extractPdfPages(
   const to = Math.min(pdf.numPages, options.pageTo ?? pdf.numPages);
   if (from > to) return [];
 
-  const { classifyRfqPage } = await import("./rfqPageClassifier");
-  const useFilter = options.filterNonTablePages !== false && to - from + 1 > 3;
+  const { classifyRfqPage, focusTablePages } = await import("./rfqPageClassifier");
+  const useFilter = options.filterNonTablePages !== false && to - from + 1 > 2;
 
-  type PagePlan = { pdfIndex: number; kind: ReturnType<typeof classifyRfqPage> | "pending" };
-  const plan: PagePlan[] = [];
+  type PagePreview = { pdfIndex: number; preview: { text: string; words: RfqOcrPage["words"] } };
+  const previews: PagePreview[] = [];
 
   for (let i = from; i <= to; i++) {
     onProgress?.({
       phase: "scan",
       page: pageOffset + (i - from + 1),
       totalPages: pageOffset + (to - from + 1),
-      message: `Scanning page ${i} of ${pdf.numPages}…`,
+      message: `Scanning page ${i} of ${pdf.numPages} for line-item tables…`,
     });
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     const words = extractPdfWords(page, textContent);
     const text = wordsToPlainText(words);
-    const preview = { text, words };
-    const kind = useFilter ? classifyRfqPage(preview) : "unknown";
-    if (useFilter && kind === "skip") continue;
-    plan.push({ pdfIndex: i, kind });
+    previews.push({ pdfIndex: i, preview: { text, words } });
+  }
+
+  let plan = previews;
+  if (useFilter) {
+    const pseudoPages = previews.map((p, idx) => ({
+      page: pageOffset + idx + 1,
+      text: p.preview.text,
+      words: p.preview.words,
+      width: 0,
+      height: 0,
+    }));
+    const { kept, skipped } = focusTablePages(pseudoPages, true);
+    const keptSet = new Set(kept.map((k) => k.page));
+    plan = previews.filter((_, idx) => keptSet.has(pageOffset + idx + 1));
+    if (plan.length === 0 && previews.length > 0) {
+      plan = previews.filter((p) => classifyRfqPage(p.preview) !== "skip");
+    }
+    if (skipped > 0) {
+      onProgress?.({
+        phase: "scan",
+        page: plan.length,
+        totalPages: previews.length,
+        message: `Focused on ${plan.length} table page(s); ${skipped} non-table page(s) skipped.`,
+      });
+    }
   }
 
   const pages: RfqOcrPage[] = [];
@@ -288,6 +310,8 @@ export type RfqDocumentPayload = {
   tables: import("./rfqSpreadsheetImport").RfqStructuredTable[];
   /** Pages skipped by classifier (cover/terms). */
   skippedPages?: number;
+  /** Pages classified as line-item table / BOQ grid. */
+  tablePages?: number;
   /** Original document page count before filtering. */
   sourcePageCount?: number;
 };
@@ -426,7 +450,7 @@ export async function extractRfqDocumentPayload(
         `Unsupported file: ${file.name}. Use PDF, images, Excel (.xlsx/.xls), CSV, or Word (.docx).`,
       );
     }
-    return { pages, tables, skippedPages, sourcePageCount: sourcePageCount || pages.length + tables.length };
+    return { pages, tables, skippedPages, tablePages: pages.length + tables.length, sourcePageCount: sourcePageCount || pages.length + tables.length };
   } finally {
     await shutdownOcrWorker();
   }

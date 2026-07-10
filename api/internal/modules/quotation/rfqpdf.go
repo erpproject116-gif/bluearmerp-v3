@@ -60,11 +60,15 @@ func extractRfqPDFPages(data []byte, opts rfqPDFExtractOptions) (rfqPDFExtractRe
 		return rfqPDFExtractResult{}, fmt.Errorf("invalid page range %d–%d", from, to)
 	}
 
-	useFilter := opts.FilterNonTable && to-from+1 > 3
+	useFilter := opts.FilterNonTable && to-from+1 > 2
 	type pagePlan struct {
 		pdfIndex int
 	}
-	var plan []pagePlan
+	var previews []struct {
+		pdfIndex int
+		text     string
+		words    []RfqWord
+	}
 	skipped := 0
 
 	for i := from; i <= to; i++ {
@@ -78,11 +82,35 @@ func extractRfqPDFPages(data []byte, opts rfqPDFExtractOptions) (rfqPDFExtractRe
 			text = ""
 		}
 		words := plainTextToWords(text)
-		if useFilter && classifyRfqPageText(text, len(words)) == rfqPageSkip {
-			skipped++
-			continue
+		previews = append(previews, struct {
+			pdfIndex int
+			text     string
+			words    []RfqWord
+		}{pdfIndex: i, text: strings.TrimSpace(text), words: words})
+	}
+
+	texts := make([]string, len(previews))
+	wordCounts := make([]int, len(previews))
+	for i, p := range previews {
+		texts[i] = p.text
+		wordCounts[i] = len(p.words)
+	}
+	keptIdx, focusSkipped := focusTablePageIndices(texts, wordCounts, useFilter)
+	skipped += focusSkipped
+
+	var plan []pagePlan
+	if len(keptIdx) == 0 && len(previews) > 0 {
+		for _, p := range previews {
+			if classifyRfqPageText(p.text, len(p.words)) != rfqPageSkip {
+				plan = append(plan, pagePlan{pdfIndex: p.pdfIndex})
+			} else {
+				skipped++
+			}
 		}
-		plan = append(plan, pagePlan{pdfIndex: i})
+	} else {
+		for _, idx := range keptIdx {
+			plan = append(plan, pagePlan{pdfIndex: previews[idx].pdfIndex})
+		}
 	}
 
 	out := rfqPDFExtractResult{
