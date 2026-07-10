@@ -6,6 +6,26 @@ import { acctINavLinks } from "../../shell/acct-i-nav";
 import { acctIINavLinks } from "../../shell/acct-ii-nav";
 import { LoadingText } from "../../shared/LoadingText";
 
+// #region agent log
+fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+  body: JSON.stringify({
+    sessionId: "a1498a",
+    runId: "pre-fix",
+    hypothesisId: "H1",
+    location: "FinanceWorkspacePage.tsx:module",
+    message: "FinanceWorkspacePage chunk init",
+    data: {
+      loadingTextType: typeof LoadingText,
+      loadingTextIsFunction: typeof LoadingText === "function",
+      showType: typeof Show,
+    },
+    timestamp: Date.now(),
+  }),
+}).catch(() => {});
+// #endregion
+
 type KpiTile = {
   label: string;
   value: (s: NonNullable<ReturnType<typeof useFinanceWorkspace>["data"]>) => number;
@@ -36,6 +56,26 @@ const operationalLinks = [
 export default function FinanceWorkspacePage() {
   const auth = useAuth();
   const workspace = useFinanceWorkspace();
+
+  // #region agent log
+  fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+    body: JSON.stringify({
+      sessionId: "a1498a",
+      runId: "pre-fix",
+      hypothesisId: "H3",
+      location: "FinanceWorkspacePage.tsx:render",
+      message: "FinanceWorkspacePage render",
+      data: {
+        isLoadingType: typeof workspace.isLoading,
+        isLoadingValue: workspace.isLoading,
+        isLoadingNegated: !workspace.isLoading,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
 
   return (
     <div class="space-y-6">

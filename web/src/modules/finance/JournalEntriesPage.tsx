@@ -5,6 +5,26 @@ import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { LoadingText } from "../../shared/LoadingText";
 
+// #region agent log
+fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+  body: JSON.stringify({
+    sessionId: "a1498a",
+    runId: "pre-fix",
+    hypothesisId: "H1",
+    location: "JournalEntriesPage.tsx:module",
+    message: "JournalEntriesPage chunk init",
+    data: {
+      loadingTextType: typeof LoadingText,
+      loadingTextIsFunction: typeof LoadingText === "function",
+      showType: typeof Show,
+    },
+    timestamp: Date.now(),
+  }),
+}).catch(() => {});
+// #endregion
+
 type JournalEntryRow = { id: number; entry_no: string; status: string; remarks?: string };
 
 type JournalLine = { account_code: string; debit: string; credit: string };
@@ -31,6 +51,26 @@ export default function JournalEntriesPage() {
       return res.data ?? [];
     },
   }));
+
+  // #region agent log
+  fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+    body: JSON.stringify({
+      sessionId: "a1498a",
+      runId: "pre-fix",
+      hypothesisId: "H3",
+      location: "JournalEntriesPage.tsx:render",
+      message: "JournalEntriesPage render",
+      data: {
+        isLoadingType: typeof list.isLoading,
+        isLoadingValue: list.isLoading,
+        isLoadingNegated: !list.isLoading,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   const accounts = createQuery(() => ({
     queryKey: ["finance-accounts-picker"],
     queryFn: async () => {

@@ -280,7 +280,22 @@ export function SidebarNav() {
   createEffect(
     on(
       () => loc.pathname,
-      () => {
+      (pathname) => {
+        // #region agent log
+        fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
+          body: JSON.stringify({
+            sessionId: "a1498a",
+            runId: "pre-fix",
+            hypothesisId: "H4",
+            location: "SidebarNav.tsx:route-change",
+            message: "Sidebar route change",
+            data: { pathname },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         queueMicrotask(() => {
           if (navEl) navEl.scrollTop = savedScrollTop;
         });
