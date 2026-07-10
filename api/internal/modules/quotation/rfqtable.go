@@ -41,15 +41,15 @@ const (
 )
 
 var rfqColumnSynonyms = map[rfqColumnField][]string{
-	colLineNo:      {"no", "no.", "#", "line", "item no", "item no.", "s/n", "sn", "line no", "line no."},
-	colItemCode:    {"item", "item code", "code", "sku", "part no", "part no.", "part number", "catalog", "material code", "item #", "product code"},
-	colItemName:    {"item", "item name", "product", "product name", "material", "material name", "name", "equipment"},
-	colDescription: {"description", "desc", "specification", "specifications", "technical specifications", "spec", "specs", "details", "item description", "requirements"},
+	colLineNo:      {"no", "no.", "#", "line", "item no", "item no.", "s/n", "sn", "line no", "line no.", "item #", "stock no", "stock no.", "property no"},
+	colItemCode:    {"item", "item code", "code", "sku", "part no", "part no.", "part number", "catalog", "material code", "item #", "product code", "stock number"},
+	colItemName:    {"item", "item name", "product", "product name", "material", "material name", "name", "equipment", "particulars"},
+	colDescription: {"description", "desc", "specification", "specifications", "technical specifications", "spec", "specs", "details", "item description", "requirements", "scope", "schedule of requirements", "equipment description", "item description/specification"},
 	colRemarks:     {"remarks", "remark", "notes", "note", "comment", "comments", "for reference only", "reference", "reference link"},
-	colQty:         {"qty", "quantity", "q'ty", "q ty"},
-	colUnit:        {"unit", "uom", "u/m", "um"},
-	colUnitPrice:   {"unit price", "price", "rate", "unit cost", "cost", "cost per unit", "u/p", "up", "budget", "estimated cost", "reference price"},
-	colLineTotal:   {"amount", "total", "line total", "extended", "ext price", "ext. price", "sub total", "subtotal", "total cost"},
+	colQty:         {"qty", "quantity", "q'ty", "q ty", "qty.", "quantity required", "req qty", "required qty"},
+	colUnit:        {"unit", "uom", "u/m", "um", "unit of measure", "unit of issue"},
+	colUnitPrice:   {"unit price", "price", "rate", "unit cost", "cost", "cost per unit", "u/p", "up", "budget", "estimated cost", "reference price", "abc", "estimated unit cost", "budget price"},
+	colLineTotal:   {"amount", "total", "line total", "extended", "ext price", "ext. price", "sub total", "subtotal", "total cost", "total amount", "extended price"},
 }
 
 var rfqTableFooter = regexp.MustCompile(`(?i)^(grand\s+total|sub\s*total|subtotal|total\s+amount|total\s*:?|amount\s+due|approved\s+by|prepared\s+by|signature|vat|tax\s+total|net\s+total)`)
@@ -95,13 +95,14 @@ func ParseRfqLayoutPagesWithOptions(pages []RfqPageInput, opts RfqParseOptions) 
 	forceFields := parseForceColumnFields(opts.ForceColumns)
 
 	for _, page := range pages {
-		if len(page.Words) < 2 {
+		pageWords := mergeNearbyWords(page.Words)
+		if len(pageWords) < 2 {
 			continue
 		}
-		if len(schema) == 0 && len(page.Words) < 6 {
+		if len(schema) == 0 && len(pageWords) < 6 {
 			continue
 		}
-		rows := groupWordsIntoRows(page.Words)
+		rows := groupWordsIntoRows(pageWords)
 		minRows := 1
 		if len(schema) == 0 {
 			minRows = 2
@@ -111,6 +112,7 @@ func ParseRfqLayoutPagesWithOptions(pages []RfqPageInput, opts RfqParseOptions) 
 		}
 
 		headerIdx := -1
+		startIdx := 0
 		if len(schema) == 0 {
 			headerIdx = findHeaderRowIndexWithOverrides(rows, opts.HeaderOverrides)
 			if headerIdx >= 0 {
@@ -123,19 +125,32 @@ func ParseRfqLayoutPagesWithOptions(pages []RfqPageInput, opts RfqParseOptions) 
 				if len(schema) > 0 {
 					detected = schemaToDetectedColumns(schema, headerRow)
 				}
+				startIdx = headerIdx + 1
+			} else if len(forceFields) >= 2 {
+				// Forced columns without a recognized header row.
+				if idx, row := findBestDataHeaderRow(rows, len(forceFields)); idx >= 0 {
+					headerRow = row
+					schema = buildForcedColumnSchema(headerRow, forceFields, page.Width)
+					if len(schema) > 0 {
+						detected = schemaToDetectedColumns(schema, headerRow)
+						startIdx = idx + 1
+					}
+				}
+			} else {
+				inferred, inferStart, inferCols := inferGridSchemaFromRows(rows, page.Width, opts.HeaderOverrides)
+				if len(inferred) >= 2 {
+					schema = inferred
+					startIdx = inferStart
+					if len(inferCols) > 0 {
+						detected = inferCols
+					}
+				}
 			}
-		}
-
-		startIdx := 0
-		if headerIdx >= 0 {
-			startIdx = headerIdx + 1
-		} else if len(schema) > 0 {
+		} else {
 			// Continuation page: skip repeated header only when cells are header labels.
 			if idx := findHeaderRowIndex(rows); idx >= 0 && countHeaderCells(rows[idx]) >= 2 {
 				startIdx = idx + 1
 			}
-		} else {
-			continue
 		}
 
 		if len(schema) == 0 {
@@ -755,6 +770,32 @@ func ParseRfqDocumentWithOptions(pages []RfqPageInput, opts RfqParseOptions) Rfq
 	if len(layout) > 0 {
 		return RfqParseResult{Lines: layout, TableDetected: true, DetectedColumns: cols}
 	}
+
+	// Plain multi-column text (tabs / fixed spaces) → structured table parse.
+	var textTables []RfqStructuredTable
+	for _, p := range pages {
+		text := strings.TrimSpace(p.Text)
+		if text == "" && len(p.Words) > 0 {
+			var b strings.Builder
+			for _, row := range groupWordsIntoRows(mergeNearbyWords(p.Words)) {
+				if b.Len() > 0 {
+					b.WriteByte('\n')
+				}
+				b.WriteString(strings.Join(row.cells, "\t"))
+			}
+			text = b.String()
+		}
+		if tbl := pageTextToStructuredTable(p.Page, text); tbl != nil {
+			textTables = append(textTables, *tbl)
+		}
+	}
+	if len(textTables) > 0 {
+		structured := ParseRfqStructuredTables(textTables, opts)
+		if len(structured.Lines) > 0 {
+			return structured
+		}
+	}
+
 	var plain []struct {
 		Page int
 		Text string
@@ -792,7 +833,8 @@ func ParseRfqDocumentWithOptions(pages []RfqPageInput, opts RfqParseOptions) Rfq
 	if len(plain) == 0 {
 		return RfqParseResult{}
 	}
-	return RfqParseResult{Lines: ParseRfqPages(plain), TableDetected: false}
+	fallback := filterFallbackLines(ParseRfqPages(plain))
+	return RfqParseResult{Lines: fallback, TableDetected: false}
 }
 
 // parseRfqDocumentLayoutOnly runs table layout parsing without plain-text regex fallback.

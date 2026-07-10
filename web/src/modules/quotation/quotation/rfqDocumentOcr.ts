@@ -104,7 +104,7 @@ async function ocrCanvas(canvas: HTMLCanvasElement, onStatus?: (msg: string) => 
   }
   return {
     text: data.text ?? "",
-    words,
+    words: mergeNearbyWords(words),
     width: canvas.width,
     height: canvas.height,
   };
@@ -142,6 +142,33 @@ async function renderPdfPageToCanvas(page: import("pdfjs-dist").PDFPageProxy): P
   return canvas;
 }
 
+function mergeNearbyWords(words: RfqOcrWord[]): RfqOcrWord[] {
+  if (words.length < 2) return words;
+  const sorted = [...words].sort((a, b) => a.y - b.y || a.x - b.x);
+  const avgH = sorted.reduce((s, w) => s + (w.h || 10), 0) / sorted.length;
+  const rowTol = Math.max(6, avgH * 0.55);
+  const gapTol = Math.max(4, avgH * 0.35);
+  const out: RfqOcrWord[] = [];
+  for (const w of sorted) {
+    const t = w.text.trim();
+    if (!t) continue;
+    const word = { ...w, text: t };
+    const last = out[out.length - 1];
+    if (last) {
+      const sameRow = Math.abs(word.y - last.y) <= rowTol;
+      const gap = word.x - (last.x + last.w);
+      if (sameRow && gap >= -1 && gap <= gapTol) {
+        last.text = gap > Math.max(3, gapTol * 0.6) ? `${last.text} ${word.text}` : `${last.text}${word.text}`;
+        last.w = word.x + word.w - last.x;
+        last.h = Math.max(last.h, word.h);
+        continue;
+      }
+    }
+    out.push(word);
+  }
+  return out;
+}
+
 function extractPdfWords(
   page: import("pdfjs-dist").PDFPageProxy,
   textContent: Awaited<ReturnType<import("pdfjs-dist").PDFPageProxy["getTextContent"]>>,
@@ -164,7 +191,7 @@ function extractPdfWords(
       h: Math.max(1, item.height ?? 10),
     });
   }
-  return words;
+  return mergeNearbyWords(words);
 }
 
 function wordsToPlainText(words: RfqOcrWord[]): string {

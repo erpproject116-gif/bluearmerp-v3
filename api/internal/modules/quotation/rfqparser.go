@@ -147,9 +147,14 @@ func parseRfqLine(line string) (ParsedRfqLine, bool) {
 			}, true
 		}
 	}
-	// Long description-only row (common in OCR).
-	if len(line) >= 8 && !strings.Contains(line, "http") {
-		return ParsedRfqLine{Description: line, Qty: "1", Confidence: 0.5}, true
+	// Long description-only row (common in OCR) — require stronger signal than arbitrary text.
+	if len(line) >= 12 && !strings.Contains(line, "http") {
+		if m := rfqLineNoRow.FindStringSubmatch(line); len(m) == 3 {
+			rest := strings.TrimSpace(m[2])
+			if len(rest) >= 8 {
+				return ParsedRfqLine{Description: rest, Qty: "1", Confidence: 0.55}, true
+			}
+		}
 	}
 	return ParsedRfqLine{}, false
 }

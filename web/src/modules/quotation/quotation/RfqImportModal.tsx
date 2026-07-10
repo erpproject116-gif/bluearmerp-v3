@@ -251,30 +251,6 @@ export function RfqImportModal(props: Props) {
       const initialForce = saved?.length ? saved : [];
       const count = await parsePayload(payload, initialForce);
       const skipNote = payload.skippedPages ? ` (${payload.skippedPages} non-table pages skipped)` : "";
-      // #region agent log
-      fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a1498a" },
-        body: JSON.stringify({
-          sessionId: "a1498a",
-          runId: "rfq-baseline",
-          hypothesisId: "H1",
-          location: "RfqImportModal.tsx:runImport",
-          message: "import complete",
-          data: {
-            fileCount: files.length,
-            fileTypes: files.map((f) => f.type || f.name.split(".").pop()),
-            pageUnits: payload.pages.length,
-            tableUnits: payload.tables.length,
-            skippedPages: payload.skippedPages ?? 0,
-            lineCount: count,
-            tableDetected: tableDetected(),
-            columnCount: detectedColumns().length,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       toast.success(`Found ${count} line item(s) from ${files.length} file(s)${skipNote}.`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "RFQ import failed.";

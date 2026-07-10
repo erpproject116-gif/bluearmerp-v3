@@ -81,7 +81,7 @@ func extractRfqPDFPages(data []byte, opts rfqPDFExtractOptions) (rfqPDFExtractRe
 		if err != nil {
 			text = ""
 		}
-		words := plainTextToWords(text)
+		words := mergeNearbyWords(plainTextToWords(text))
 		previews = append(previews, struct {
 			pdfIndex int
 			text     string
@@ -122,7 +122,7 @@ func extractRfqPDFPages(data []byte, opts rfqPDFExtractOptions) (rfqPDFExtractRe
 	for pi, p := range plan {
 		page := reader.Page(p.pdfIndex)
 		text, _ := page.GetPlainText(nil)
-		words := plainTextToWords(text)
+		words := mergeNearbyWords(plainTextToWords(text))
 		out.Pages = append(out.Pages, RfqPageInput{
 			Page:   pi + 1,
 			Text:   strings.TrimSpace(text),
