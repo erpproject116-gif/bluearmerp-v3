@@ -11,16 +11,31 @@ export type RfqParsedLine = {
   page: number;
   line_no: number;
   item_code: string;
+  item_name?: string;
   description: string;
+  remarks?: string;
   qty: string;
   unit: string;
+  unit_price?: string;
+  line_total?: string;
   confidence: number;
   item_id?: number | null;
-  item_name?: string;
   sales_price?: number;
   match_score?: number;
   include: boolean;
 };
+
+function confidenceClass(c: number): string {
+  if (c >= 0.85) return "text-green-700";
+  if (c >= 0.65) return "text-amber-700";
+  return "text-red-700";
+}
+
+function pickUnitPrice(ln: RfqParsedLine): string {
+  if (ln.unit_price?.trim()) return ln.unit_price.trim();
+  if (ln.sales_price && ln.sales_price > 0) return String(ln.sales_price);
+  return "";
+}
 
 type Props = {
   open: boolean;
@@ -67,7 +82,7 @@ export function RfqImportModal(props: Props) {
         return;
       }
       setPageCount(pages.length);
-      setProgress({ phase: "parse", page: pages.length, totalPages: pages.length, message: "Parsing line items…" });
+      setProgress({ phase: "parse", page: pages.length, totalPages: pages.length, message: "Detecting table rows…" });
 
       const res = await apiFetch<{
         lines: Array<Omit<RfqParsedLine, "include">>;
@@ -83,7 +98,7 @@ export function RfqImportModal(props: Props) {
         return;
       }
       if (!res.data.lines.length) {
-        const msg = "No line items detected. Try a clearer scan or add lines manually.";
+        const msg = "No line items detected in the table area. Try a clearer scan or add lines manually.";
         setError(msg);
         toast.warning(msg);
         setLines([]);
@@ -102,6 +117,9 @@ export function RfqImportModal(props: Props) {
           description: ln.description ?? ln.item_name ?? "",
           qty: ln.qty || "1",
           unit: ln.unit ?? "",
+          unit_price: ln.unit_price ?? "",
+          line_total: ln.line_total ?? "",
+          remarks: ln.remarks ?? "",
           confidence: ln.confidence ?? 0.5,
           include: true,
         })),
@@ -141,7 +159,9 @@ export function RfqImportModal(props: Props) {
     }
     const out: QuotationLineRow[] = selected.map((ln, idx) => {
       const description = (ln.description || ln.item_name || ln.item_code || "").trim();
-      const base = emptyQuotationLine(idx + 1, ln.sales_price ? String(ln.sales_price) : "");
+      const price = pickUnitPrice(ln);
+      const base = emptyQuotationLine(idx + 1, price);
+      const remarkParts = [ln.remarks?.trim(), ln.unit?.trim() ? `UOM: ${ln.unit.trim()}` : ""].filter(Boolean);
       return {
         ...base,
         line_no: idx + 1,
@@ -150,6 +170,7 @@ export function RfqImportModal(props: Props) {
         item_name: (ln.item_name || description).trim(),
         description,
         qty: ln.qty || "1",
+        remark: remarkParts.length ? remarkParts.join(" · ") : base.remark,
       };
     });
     props.onApply(out);
@@ -172,8 +193,9 @@ export function RfqImportModal(props: Props) {
       wide
     >
       <p class="mb-4 text-sm text-text-secondary">
-        Upload a customer RFQ (PDF or images, multiple pages supported). We read each page and extract line items.
-        Inventory matching is optional — unmatched lines import as free-text rows you can edit before saving the quotation.
+        Upload a customer RFQ (PDF or images, multiple pages supported). We locate the line-item table on each page,
+        map common columns (item, qty, description, unit price, etc.), and skip headers and totals. Unmatched lines import
+        as free-text rows you can edit before saving.
       </p>
 
       <div
@@ -239,9 +261,12 @@ export function RfqImportModal(props: Props) {
               <tr>
                 <th class="px-3 py-2">Use</th>
                 <th class="px-3 py-2">Pg</th>
+                <th class="px-3 py-2">Conf.</th>
                 <th class="px-3 py-2">Item code</th>
                 <th class="px-3 py-2">Description</th>
                 <th class="px-3 py-2">Qty</th>
+                <th class="px-3 py-2">Unit price</th>
+                <th class="px-3 py-2">Remarks</th>
                 <th class="px-3 py-2">Inventory match</th>
               </tr>
             </thead>
@@ -257,6 +282,9 @@ export function RfqImportModal(props: Props) {
                       />
                     </td>
                     <td class="px-3 py-2 text-text-secondary">{row.page}</td>
+                    <td class={`px-3 py-2 text-xs ${confidenceClass(row.confidence)}`}>
+                      {Math.round(row.confidence * 100)}%
+                    </td>
                     <td class="px-3 py-2">
                       <input
                         class={inputClass}
@@ -276,6 +304,21 @@ export function RfqImportModal(props: Props) {
                         class={`${inputClass} w-20`}
                         value={row.qty}
                         onInput={(e) => updateLine(row.line_no, { qty: e.currentTarget.value })}
+                      />
+                    </td>
+                    <td class="px-3 py-2">
+                      <input
+                        class={`${inputClass} w-24`}
+                        value={row.unit_price ?? ""}
+                        placeholder={row.sales_price ? String(row.sales_price) : ""}
+                        onInput={(e) => updateLine(row.line_no, { unit_price: e.currentTarget.value })}
+                      />
+                    </td>
+                    <td class="px-3 py-2">
+                      <input
+                        class={inputClass}
+                        value={row.remarks ?? ""}
+                        onInput={(e) => updateLine(row.line_no, { remarks: e.currentTarget.value })}
                       />
                     </td>
                     <td class="px-3 py-2 text-xs">

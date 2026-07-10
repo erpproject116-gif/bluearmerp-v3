@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -14,8 +15,11 @@ import (
 )
 
 type rfqPageText struct {
-	Page int    `json:"page"`
-	Text string `json:"text"`
+	Page   int       `json:"page"`
+	Text   string    `json:"text"`
+	Words  []RfqWord `json:"words,omitempty"`
+	Width  float64   `json:"width,omitempty"`
+	Height float64   `json:"height,omitempty"`
 }
 
 type rfqParseRequest struct {
@@ -55,15 +59,17 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"pages": "At least one page of text is required."})
 			return
 		}
-		pages := make([]struct {
-			Page int
-			Text string
-		}, len(body.Pages))
+		pages := make([]RfqPageInput, len(body.Pages))
 		for i, p := range body.Pages {
-			pages[i].Page = p.Page
-			pages[i].Text = p.Text
+			pages[i] = RfqPageInput{
+				Page:   p.Page,
+				Text:   p.Text,
+				Words:  p.Words,
+				Width:  p.Width,
+				Height: p.Height,
+			}
 		}
-		lines := ParseRfqPages(pages)
+		lines := ParseRfqDocument(pages)
 		response.OK(w, map[string]any{
 			"lines":       lines,
 			"page_count":  len(body.Pages),
@@ -99,6 +105,11 @@ func matchRfqImportItems(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			if matched.ItemName == "" && strings.TrimSpace(ln.Description) != "" {
 				matched.ItemName = ln.Description
+			}
+			if matched.SalesPrice == 0 && strings.TrimSpace(ln.UnitPrice) != "" {
+				if v, err := strconv.ParseFloat(strings.ReplaceAll(ln.UnitPrice, ",", ""), 64); err == nil && v > 0 {
+					matched.SalesPrice = v
+				}
 			}
 			out = append(out, matched)
 		}

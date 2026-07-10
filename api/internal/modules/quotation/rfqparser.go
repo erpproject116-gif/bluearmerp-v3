@@ -12,9 +12,13 @@ type ParsedRfqLine struct {
 	Page        int     `json:"page"`
 	LineNo      int     `json:"line_no"`
 	ItemCode    string  `json:"item_code"`
+	ItemName    string  `json:"item_name,omitempty"`
 	Description string  `json:"description"`
+	Remarks     string  `json:"remarks,omitempty"`
 	Qty         string  `json:"qty"`
 	Unit        string  `json:"unit"`
+	UnitPrice   string  `json:"unit_price,omitempty"`
+	LineTotal   string  `json:"line_total,omitempty"`
 	Confidence  float64 `json:"confidence"`
 }
 

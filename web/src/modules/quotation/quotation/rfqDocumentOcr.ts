@@ -7,9 +7,21 @@ GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const TESS_CORE_VERSION = "7.0.0";
 
+export type RfqOcrWord = {
+  text: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 export type RfqOcrPage = {
   page: number;
+  /** Plain text fallback for legacy line parser. */
   text: string;
+  words: RfqOcrWord[];
+  width: number;
+  height: number;
 };
 
 export type RfqOcrProgress = {
@@ -51,25 +63,39 @@ async function shutdownOcrWorker() {
   }
 }
 
-async function renderPdfPageToCanvas(page: import("pdfjs-dist").PDFPageProxy): Promise<HTMLCanvasElement> {
-  const viewport = page.getViewport({ scale: 2 });
-  const canvas = document.createElement("canvas");
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas not supported.");
-  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-  return canvas;
-}
+type OcrWordsResult = { text: string; words: RfqOcrWord[]; width: number; height: number };
 
-async function ocrCanvas(canvas: HTMLCanvasElement, onStatus?: (msg: string) => void): Promise<string> {
+async function ocrCanvas(canvas: HTMLCanvasElement, onStatus?: (msg: string) => void): Promise<OcrWordsResult> {
   const worker = await getOcrWorker();
   onStatus?.("Recognizing text…");
   const { data } = await worker.recognize(canvas);
-  return data.text ?? "";
+  const words: RfqOcrWord[] = [];
+  for (const block of data.blocks ?? []) {
+    for (const para of block.paragraphs ?? []) {
+      for (const line of para.lines ?? []) {
+        for (const w of line.words ?? []) {
+          const t = w.text?.trim();
+          if (!t) continue;
+          words.push({
+            text: t,
+            x: w.bbox.x0,
+            y: w.bbox.y0,
+            w: Math.max(1, w.bbox.x1 - w.bbox.x0),
+            h: Math.max(1, w.bbox.y1 - w.bbox.y0),
+          });
+        }
+      }
+    }
+  }
+  return {
+    text: data.text ?? "",
+    words,
+    width: canvas.width,
+    height: canvas.height,
+  };
 }
 
-async function ocrImageFile(file: File, onStatus?: (msg: string) => void): Promise<string> {
+async function ocrImageFile(file: File, onStatus?: (msg: string) => void): Promise<OcrWordsResult> {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
@@ -90,6 +116,68 @@ async function ocrImageFile(file: File, onStatus?: (msg: string) => void): Promi
   }
 }
 
+async function renderPdfPageToCanvas(page: import("pdfjs-dist").PDFPageProxy): Promise<HTMLCanvasElement> {
+  const viewport = page.getViewport({ scale: 2 });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported.");
+  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  return canvas;
+}
+
+function extractPdfWords(
+  page: import("pdfjs-dist").PDFPageProxy,
+  textContent: Awaited<ReturnType<import("pdfjs-dist").PDFPageProxy["getTextContent"]>>,
+): RfqOcrWord[] {
+  const viewport = page.getViewport({ scale: 1 });
+  const pageH = viewport.height;
+  const words: RfqOcrWord[] = [];
+
+  for (const item of textContent.items) {
+    if (!("str" in item) || !item.str.trim()) continue;
+    const tx = item.transform;
+    const x = tx[4];
+    const pdfY = tx[5];
+    const yTop = pageH - pdfY - (item.height ?? 10);
+    words.push({
+      text: item.str.trim(),
+      x,
+      y: yTop,
+      w: Math.max(1, item.width ?? 10),
+      h: Math.max(1, item.height ?? 10),
+    });
+  }
+  return words;
+}
+
+function wordsToPlainText(words: RfqOcrWord[]): string {
+  if (!words.length) return "";
+  const sorted = [...words].sort((a, b) => a.y - b.y || a.x - b.x);
+  const lines: string[] = [];
+  let row: RfqOcrWord[] = [];
+  let rowY = sorted[0].y;
+  const rowTol = Math.max(4, sorted[0].h * 0.6);
+
+  const flush = () => {
+    if (!row.length) return;
+    row.sort((a, b) => a.x - b.x);
+    lines.push(row.map((w) => w.text).join(" "));
+    row = [];
+  };
+
+  for (const w of sorted) {
+    if (Math.abs(w.y - rowY) > rowTol) {
+      flush();
+      rowY = w.y;
+    }
+    row.push(w);
+  }
+  flush();
+  return lines.join("\n");
+}
+
 async function extractPdfPages(
   file: File,
   onProgress?: (p: RfqOcrProgress) => void,
@@ -98,6 +186,7 @@ async function extractPdfPages(
   const data = new Uint8Array(await file.arrayBuffer());
   const pdf = await getDocument({ data }).promise;
   const pages: RfqOcrPage[] = [];
+
   for (let i = 1; i <= pdf.numPages; i++) {
     onProgress?.({
       phase: "pdf",
@@ -106,12 +195,12 @@ async function extractPdfPages(
       message: `Reading PDF page ${i} of ${pdf.numPages}…`,
     });
     const page = await pdf.getPage(i);
-    let text = (await page.getTextContent())
-      .items.map((it) => ("str" in it ? it.str : ""))
-      .join(" ")
-      .trim();
+    const viewport = page.getViewport({ scale: 1 });
+    const textContent = await page.getTextContent();
+    let words = extractPdfWords(page, textContent);
+    let text = wordsToPlainText(words);
 
-    if (text.length < 40) {
+    if (words.length < 8) {
       onProgress?.({
         phase: "ocr",
         page: pageOffset + i,
@@ -119,14 +208,31 @@ async function extractPdfPages(
         message: `OCR on PDF page ${i}…`,
       });
       const canvas = await renderPdfPageToCanvas(page);
-      text = await ocrCanvas(canvas);
+      const ocr = await ocrCanvas(canvas);
+      words = ocr.words;
+      text = ocr.text || wordsToPlainText(words);
+      pages.push({
+        page: pageOffset + i,
+        text,
+        words,
+        width: ocr.width,
+        height: ocr.height,
+      });
+      continue;
     }
-    pages.push({ page: pageOffset + i, text });
+
+    pages.push({
+      page: pageOffset + i,
+      text,
+      words,
+      width: viewport.width,
+      height: viewport.height,
+    });
   }
   return pages;
 }
 
-/** Extract text from RFQ PDFs and images, page by page (OCR when needed). */
+/** Extract positioned words + plain text from RFQ PDFs and images. */
 export async function extractRfqDocumentPages(
   files: File[],
   onProgress?: (p: RfqOcrProgress) => void,
@@ -150,10 +256,16 @@ export async function extractRfqDocumentPages(
           totalPages: pageOffset,
           message: `OCR image ${file.name}…`,
         });
-        const text = await ocrImageFile(file, (msg) =>
+        const ocr = await ocrImageFile(file, (msg) =>
           onProgress?.({ phase: "ocr", page: pageOffset, totalPages: pageOffset, message: msg }),
         );
-        pages.push({ page: pageOffset, text });
+        pages.push({
+          page: pageOffset,
+          text: ocr.text || wordsToPlainText(ocr.words),
+          words: ocr.words,
+          width: ocr.width,
+          height: ocr.height,
+        });
         continue;
       }
       throw new Error(`Unsupported file type: ${file.name}. Use PDF or image files.`);
