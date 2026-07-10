@@ -7,6 +7,20 @@ export type RfqStructuredTable = {
   rows: string[][];
 };
 
+export type WorkbookSheetInfo = {
+  name: string;
+  rowCount: number;
+  hasTable: boolean;
+  lineCount: number;
+  headers: string[];
+};
+
+export type SpreadsheetExtractOptions = {
+  pageOffset?: number;
+  /** When set, only these sheet names are imported. */
+  selectedSheets?: string[];
+};
+
 const HEADER_HINTS =
   /item|qty|quantity|description|spec|unit|price|cost|amount|total|remarks|code|sku|part|uom|no\.?/i;
 
@@ -120,10 +134,47 @@ export function gridToStructuredTable(
   return { page, sheet, headers, rows };
 }
 
-function workbookToTables(wb: XLSX.WorkBook, pageOffset = 0): RfqStructuredTable[] {
+async function readWorkbook(file: File): Promise<XLSX.WorkBook> {
+  const buf = await file.arrayBuffer();
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".csv") || file.type === "text/csv") {
+    const text = new TextDecoder("utf-8").decode(buf);
+    return XLSX.read(text, { type: "string" });
+  }
+  return XLSX.read(buf, { type: "array", cellDates: true });
+}
+
+/** List sheets and whether each looks like a line-item table. */
+export async function inspectWorkbookSheets(file: File): Promise<WorkbookSheetInfo[]> {
+  const wb = await readWorkbook(file);
+  const out: WorkbookSheetInfo[] = [];
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    if (!ws) continue;
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false }) as unknown[][];
+    const stringGrid = grid.map((row) => (Array.isArray(row) ? row.map(cellStr) : []));
+    const table = gridToStructuredTable(stringGrid, 0, sheetName);
+    out.push({
+      name: sheetName,
+      rowCount: stringGrid.length,
+      hasTable: !!table,
+      lineCount: table?.rows.length ?? 0,
+      headers: table?.headers ?? [],
+    });
+  }
+  return out;
+}
+
+function workbookToTables(
+  wb: XLSX.WorkBook,
+  pageOffset = 0,
+  selectedSheets?: string[],
+): RfqStructuredTable[] {
+  const allow = selectedSheets?.length ? new Set(selectedSheets) : null;
   const tables: RfqStructuredTable[] = [];
   let page = pageOffset;
   for (const sheetName of wb.SheetNames) {
+    if (allow && !allow.has(sheetName)) continue;
     const ws = wb.Sheets[sheetName];
     if (!ws) continue;
     const grid = XLSX.utils.sheet_to_json(ws, {
@@ -139,18 +190,12 @@ function workbookToTables(wb: XLSX.WorkBook, pageOffset = 0): RfqStructuredTable
   return tables;
 }
 
-export async function extractSpreadsheetTables(file: File, pageOffset = 0): Promise<RfqStructuredTable[]> {
-  const buf = await file.arrayBuffer();
-  const lower = file.name.toLowerCase();
-
-  if (lower.endsWith(".csv") || file.type === "text/csv") {
-    const text = new TextDecoder("utf-8").decode(buf);
-    const wb = XLSX.read(text, { type: "string" });
-    return workbookToTables(wb, pageOffset);
-  }
-
-  const wb = XLSX.read(buf, { type: "array", cellDates: true });
-  return workbookToTables(wb, pageOffset);
+export async function extractSpreadsheetTables(
+  file: File,
+  options: SpreadsheetExtractOptions = {},
+): Promise<RfqStructuredTable[]> {
+  const wb = await readWorkbook(file);
+  return workbookToTables(wb, options.pageOffset ?? 0, options.selectedSheets);
 }
 
 export function isSpreadsheetFile(file: File): boolean {
@@ -163,4 +208,18 @@ export function isSpreadsheetFile(file: File): boolean {
     file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
     file.type === "application/vnd.ms-excel"
   );
+}
+
+export function isMultiSheetWorkbook(file: File): boolean {
+  const lower = file.name.toLowerCase();
+  return lower.endsWith(".xlsx") || lower.endsWith(".xls");
+}
+
+/** True when user should pick sheets (2+ importable tabs). */
+export function needsSheetPicker(sheets: WorkbookSheetInfo[]): boolean {
+  return sheets.filter((s) => s.hasTable).length >= 2;
+}
+
+export function defaultSelectedSheets(sheets: WorkbookSheetInfo[]): string[] {
+  return sheets.filter((s) => s.hasTable).map((s) => s.name);
 }

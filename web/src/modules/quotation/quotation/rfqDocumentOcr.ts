@@ -25,11 +25,26 @@ export type RfqOcrPage = {
 };
 
 export type RfqOcrProgress = {
-  phase: "pdf" | "ocr" | "parse";
+  phase: "pdf" | "ocr" | "parse" | "scan";
   page: number;
   totalPages: number;
   message: string;
 };
+
+export type RfqExtractOptions = {
+  /** 1-based first page to process (inclusive). */
+  pageFrom?: number;
+  /** 1-based last page to process (inclusive). */
+  pageTo?: number;
+  /** Skip cover/terms pages when document has more than 3 pages. */
+  filterNonTablePages?: boolean;
+  /** Per-file selected Excel sheet names (key = fileKey from fileImportKey). */
+  sheetSelections?: Record<string, string[]>;
+};
+
+export function fileImportKey(file: File, index: number): string {
+  return `${file.name}::${index}`;
+}
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
 
@@ -182,16 +197,44 @@ async function extractPdfPages(
   file: File,
   onProgress?: (p: RfqOcrProgress) => void,
   pageOffset = 0,
+  options: RfqExtractOptions = {},
 ): Promise<RfqOcrPage[]> {
   const data = new Uint8Array(await file.arrayBuffer());
   const pdf = await getDocument({ data }).promise;
-  const pages: RfqOcrPage[] = [];
+  const from = Math.max(1, options.pageFrom ?? 1);
+  const to = Math.min(pdf.numPages, options.pageTo ?? pdf.numPages);
+  if (from > to) return [];
 
-  for (let i = 1; i <= pdf.numPages; i++) {
+  const { classifyRfqPage } = await import("./rfqPageClassifier");
+  const useFilter = options.filterNonTablePages !== false && to - from + 1 > 3;
+
+  type PagePlan = { pdfIndex: number; kind: ReturnType<typeof classifyRfqPage> | "pending" };
+  const plan: PagePlan[] = [];
+
+  for (let i = from; i <= to; i++) {
+    onProgress?.({
+      phase: "scan",
+      page: pageOffset + (i - from + 1),
+      totalPages: pageOffset + (to - from + 1),
+      message: `Scanning page ${i} of ${pdf.numPages}…`,
+    });
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    const words = extractPdfWords(page, textContent);
+    const text = wordsToPlainText(words);
+    const preview = { text, words };
+    const kind = useFilter ? classifyRfqPage(preview) : "unknown";
+    if (useFilter && kind === "skip") continue;
+    plan.push({ pdfIndex: i, kind });
+  }
+
+  const pages: RfqOcrPage[] = [];
+  for (let pi = 0; pi < plan.length; pi++) {
+    const { pdfIndex: i } = plan[pi];
     onProgress?.({
       phase: "pdf",
-      page: pageOffset + i,
-      totalPages: pageOffset + pdf.numPages,
+      page: pageOffset + pi + 1,
+      totalPages: pageOffset + plan.length,
       message: `Reading PDF page ${i} of ${pdf.numPages}…`,
     });
     const page = await pdf.getPage(i);
@@ -203,8 +246,8 @@ async function extractPdfPages(
     if (words.length < 8) {
       onProgress?.({
         phase: "ocr",
-        page: pageOffset + i,
-        totalPages: pageOffset + pdf.numPages,
+        page: pageOffset + pi + 1,
+        totalPages: pageOffset + plan.length,
         message: `OCR on PDF page ${i}…`,
       });
       const canvas = await renderPdfPageToCanvas(page);
@@ -212,7 +255,7 @@ async function extractPdfPages(
       words = ocr.words;
       text = ocr.text || wordsToPlainText(words);
       pages.push({
-        page: pageOffset + i,
+        page: pageOffset + pi + 1,
         text,
         words,
         width: ocr.width,
@@ -222,7 +265,7 @@ async function extractPdfPages(
     }
 
     pages.push({
-      page: pageOffset + i,
+      page: pageOffset + pi + 1,
       text,
       words,
       width: viewport.width,
@@ -232,16 +275,28 @@ async function extractPdfPages(
   return pages;
 }
 
+/** Returns total page count for a PDF without full extraction. */
+export async function getPdfPageCount(file: File): Promise<number> {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdf = await getDocument({ data }).promise;
+  return pdf.numPages;
+}
+
 /** Payload sent to RFQ parse API (PDF/images + structured spreadsheet/word tables). */
 export type RfqDocumentPayload = {
   pages: RfqOcrPage[];
   tables: import("./rfqSpreadsheetImport").RfqStructuredTable[];
+  /** Pages skipped by classifier (cover/terms). */
+  skippedPages?: number;
+  /** Original document page count before filtering. */
+  sourcePageCount?: number;
 };
 
 /** Extract positioned words, plain text, and structured tables from RFQ uploads. */
 export async function extractRfqDocumentPayload(
   files: File[],
   onProgress?: (p: RfqOcrProgress) => void,
+  options: RfqExtractOptions = {},
 ): Promise<RfqDocumentPayload> {
   onProgress?.({ phase: "ocr", page: 0, totalPages: 0, message: "Preparing document reader…" });
   const { isSpreadsheetFile, extractSpreadsheetTables } = await import("./rfqSpreadsheetImport");
@@ -251,8 +306,12 @@ export async function extractRfqDocumentPayload(
     const pages: RfqOcrPage[] = [];
     const tables: RfqDocumentPayload["tables"] = [];
     let pageOffset = 0;
+    let skippedPages = 0;
+    let sourcePageCount = 0;
 
-    for (const file of files) {
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
+      const fileKey = fileImportKey(file, fi);
       if (isLegacyDocFile(file)) {
         throw new Error(
           `${file.name}: Legacy Word (.doc) is not supported. Save as .docx, .pdf, or .xlsx and try again.`,
@@ -265,7 +324,10 @@ export async function extractRfqDocumentPayload(
           totalPages: pageOffset,
           message: `Reading spreadsheet ${file.name}…`,
         });
-        const sheetTables = await extractSpreadsheetTables(file, pageOffset);
+        const sheetTables = await extractSpreadsheetTables(file, {
+          pageOffset,
+          selectedSheets: options.sheetSelections?.[fileKey],
+        });
         if (!sheetTables.length) {
           throw new Error(`${file.name}: No line-item table found in spreadsheet.`);
         }
@@ -287,13 +349,61 @@ export async function extractRfqDocumentPayload(
         continue;
       }
       if (isPdf(file)) {
-        const pdfPages = await extractPdfPages(file, onProgress, pageOffset);
+        const pdfTotal = await getPdfPageCount(file);
+        const from = options.pageFrom ?? 1;
+        const to = options.pageTo ?? pdfTotal;
+        sourcePageCount += Math.max(0, to - from + 1);
+        const rangeCount = to - from + 1;
+        const before = pageOffset;
+
+        const { RFQ_CLIENT_OCR_PAGE_MAX } = await import("./rfqImportPipeline");
+
+        if (rangeCount > RFQ_CLIENT_OCR_PAGE_MAX) {
+          onProgress?.({
+            phase: "parse",
+            page: 0,
+            totalPages: rangeCount,
+            message: `Large PDF (${rangeCount} pages) — extracting on server…`,
+          });
+          const { extractPdfOnServer } = await import("./rfqPdfServer");
+          const server = await extractPdfOnServer(
+            file,
+            {
+              pageFrom: from,
+              pageTo: to,
+              filterNonTablePages: options.filterNonTablePages !== false,
+            },
+            onProgress,
+          );
+          if (server.emptyTextPages > 0 && server.pages.length === 0) {
+            throw new Error(
+              `${file.name}: Server found no readable text (likely scanned pages). Use page range on a text PDF or import as images under ${RFQ_CLIENT_OCR_PAGE_MAX} pages.`,
+            );
+          }
+          if (server.emptyTextPages > server.pages.length / 2) {
+            onProgress?.({
+              phase: "parse",
+              page: server.pages.length,
+              totalPages: server.pages.length,
+              message: `${server.emptyTextPages} page(s) had no text layer — OCR not run on server.`,
+            });
+          }
+          const offsetPages = server.pages.map((p, i) => ({ ...p, page: pageOffset + i + 1 }));
+          pages.push(...offsetPages);
+          skippedPages += server.skippedPages;
+          pageOffset = before + offsetPages.length;
+          continue;
+        }
+
+        const pdfPages = await extractPdfPages(file, onProgress, pageOffset, options);
+        skippedPages += Math.max(0, to - from + 1 - pdfPages.length);
         pages.push(...pdfPages);
-        pageOffset += pdfPages.length;
+        pageOffset = before + pdfPages.length;
         continue;
       }
       if (isImage(file)) {
         pageOffset += 1;
+        sourcePageCount += 1;
         onProgress?.({
           phase: "ocr",
           page: pageOffset,
@@ -316,7 +426,7 @@ export async function extractRfqDocumentPayload(
         `Unsupported file: ${file.name}. Use PDF, images, Excel (.xlsx/.xls), CSV, or Word (.docx).`,
       );
     }
-    return { pages, tables };
+    return { pages, tables, skippedPages, sourcePageCount: sourcePageCount || pages.length + tables.length };
   } finally {
     await shutdownOcrWorker();
   }

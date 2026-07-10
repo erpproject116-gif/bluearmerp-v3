@@ -1,10 +1,9 @@
 import { createSignal, For, Show } from "solid-js";
-import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
-import type { RfqDocumentPayload, RfqOcrPage, RfqOcrProgress } from "./rfqDocumentOcr";
-import type { RfqStructuredTable } from "./rfqSpreadsheetImport";
+import { fileImportKey, type RfqDocumentPayload, type RfqOcrPage, type RfqOcrProgress } from "./rfqDocumentOcr";
+import type { RfqStructuredTable, WorkbookSheetInfo } from "./rfqSpreadsheetImport";
 import type { QuotationLineRow } from "./QuotationLineGrid";
 import { emptyQuotationLine } from "./QuotationLineGrid";
 
@@ -92,6 +91,14 @@ function saveForceColumns(partnerId: number | null | undefined, cols: string[]) 
   localStorage.setItem(key, JSON.stringify(cols));
 }
 
+type SheetPickerRow = WorkbookSheetInfo & { selected: boolean };
+
+type SheetPickerGroup = {
+  fileKey: string;
+  fileName: string;
+  sheets: SheetPickerRow[];
+};
+
 type Props = {
   open: boolean;
   partnerId?: () => number | null;
@@ -111,7 +118,23 @@ export function RfqImportModal(props: Props) {
   const [tableDetected, setTableDetected] = createSignal(false);
   const [detectedColumns, setDetectedColumns] = createSignal<RfqDetectedColumn[]>([]);
   const [forceColumns, setForceColumns] = createSignal<string[]>([]);
+  const [pageFrom, setPageFrom] = createSignal("");
+  const [pageTo, setPageTo] = createSignal("");
+  const [skippedPageCount, setSkippedPageCount] = createSignal(0);
+  const [largeDocHint, setLargeDocHint] = createSignal<string | null>(null);
+  const [showSheetPicker, setShowSheetPicker] = createSignal(false);
+  const [sheetPickerGroups, setSheetPickerGroups] = createSignal<SheetPickerGroup[]>([]);
+  const [pendingFiles, setPendingFiles] = createSignal<File[]>([]);
   let fileInputRef: HTMLInputElement | undefined;
+
+  const parsePageFrom = () => {
+    const v = parseInt(pageFrom().trim(), 10);
+    return Number.isFinite(v) && v > 0 ? v : undefined;
+  };
+  const parsePageTo = () => {
+    const v = parseInt(pageTo().trim(), 10);
+    return Number.isFinite(v) && v > 0 ? v : undefined;
+  };
 
   const reset = () => {
     setLines([]);
@@ -121,69 +144,125 @@ export function RfqImportModal(props: Props) {
     setTableDetected(false);
     setDetectedColumns([]);
     setForceColumns([]);
+    setPageFrom("");
+    setPageTo("");
+    setSkippedPageCount(0);
+    setLargeDocHint(null);
+    setShowSheetPicker(false);
+    setSheetPickerGroups([]);
+    setPendingFiles([]);
     setProgress(null);
     setError(null);
     if (fileInputRef) fileInputRef.value = "";
   };
 
-  const normalizeLines = (raw: Array<Omit<RfqParsedLine, "include">>): RfqParsedLine[] =>
-    raw.map((ln) => ({
-      ...ln,
-      item_code: ln.item_code ?? "",
-      description: ln.description ?? ln.item_name ?? "",
-      qty: ln.qty || "1",
-      unit: ln.unit ?? "",
-      unit_price: ln.unit_price ?? "",
-      line_total: ln.line_total ?? "",
-      remarks: ln.remarks ?? "",
-      confidence: ln.confidence ?? 0.5,
-      include: true,
-    }));
-
   const matchLines = async (parsed: Array<Omit<RfqParsedLine, "include">>) => {
+    const { matchLinesInBatches } = await import("./rfqImportPipeline");
     const partnerId = props.partnerId?.() ?? null;
-    const matchRes = await apiFetch<{ lines: RfqParsedLine[] }>("/api/v1/quotation/rfq-import/match-items", {
-      method: "POST",
-      body: JSON.stringify({
-        lines: parsed,
-        partner_id: partnerId ?? undefined,
+    return matchLinesInBatches(parsed, partnerId, (p) =>
+      setProgress({
+        phase: "parse",
+        page: p.batch,
+        totalPages: p.totalBatches,
+        message: p.message,
       }),
-    });
-    return normalizeLines(matchRes.data?.lines ?? parsed);
+    );
   };
 
   const parsePayload = async (payload: RfqDocumentPayload, force: string[]) => {
-    const res = await apiFetch<{
-      lines: Array<Omit<RfqParsedLine, "include">>;
-      line_count: number;
-      table_detected?: boolean;
-      detected_columns?: RfqDetectedColumn[];
-    }>("/api/v1/quotation/rfq-import/parse", {
-      method: "POST",
-      body: JSON.stringify({
-        pages: payload.pages,
-        tables: payload.tables,
-        force_columns: force.filter(Boolean).length >= 2 ? force : undefined,
+    const { parsePayloadInBatches } = await import("./rfqImportPipeline");
+    const parsed = await parsePayloadInBatches(payload, force, (p) =>
+      setProgress({
+        phase: "parse",
+        page: p.batch,
+        totalPages: p.totalBatches,
+        message: p.message,
       }),
-    });
-    if (!res.success || !res.data?.lines) {
-      throw new Error(res.message ?? "Failed to parse RFQ.");
-    }
-    setTableDetected(!!res.data.table_detected);
-    const cols = res.data.detected_columns ?? [];
-    setDetectedColumns(cols);
+    );
+    setTableDetected(parsed.table_detected);
+    setDetectedColumns(parsed.detected_columns);
     if (force.filter(Boolean).length >= 2) {
       setForceColumns(force);
-    } else if (cols.length) {
-      setForceColumns(cols.map((c) => c.field));
+    } else if (parsed.force_columns.length) {
+      setForceColumns(parsed.force_columns);
     }
-    if (!res.data.lines.length) {
+    if (!parsed.lines.length) {
       setLines([]);
       throw new Error("No line items detected in the table area. Adjust column mapping or try a clearer scan.");
     }
-    const matched = await matchLines(res.data.lines);
+    const matched = await matchLines(parsed.lines);
     setLines(matched);
     return matched.length;
+  };
+
+  const runImport = async (files: File[], sheetSelections: Record<string, string[]>) => {
+    setBusy(true);
+    setError(null);
+    setLines([]);
+    setPageCount(0);
+    setShowSheetPicker(false);
+    setProgress({ phase: "ocr", page: 0, totalPages: 0, message: "Loading document tools…" });
+
+    try {
+      const { RFQ_SERVER_PDF_PAGE_MAX, RFQ_LARGE_DOC_PAGE_WARN } = await import("./rfqImportPipeline");
+      const { extractRfqDocumentPayload, getPdfPageCount } = await import("./rfqDocumentOcr");
+
+      let estimatedPages = 0;
+      for (const file of files) {
+        if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+          estimatedPages += await getPdfPageCount(file);
+        } else {
+          estimatedPages += 1;
+        }
+      }
+      const pf = parsePageFrom();
+      const pt = parsePageTo();
+      const rangeCount = pf || pt ? (pt ?? estimatedPages) - (pf ?? 1) + 1 : estimatedPages;
+      if (rangeCount > RFQ_SERVER_PDF_PAGE_MAX) {
+        throw new Error(
+          `This import has ${rangeCount} pages (max ${RFQ_SERVER_PDF_PAGE_MAX}). Use page range or split the RFQ.`,
+        );
+      }
+      if (rangeCount >= RFQ_LARGE_DOC_PAGE_WARN) {
+        const serverNote =
+          rangeCount > 150 ? " Pages 151+ are extracted on the server (text PDFs)." : "";
+        setLargeDocHint(
+          `Large document (${rangeCount} pages): non-table pages are skipped; parsing runs in batches.${serverNote} This may take several minutes.`,
+        );
+      }
+
+      const payload = await extractRfqDocumentPayload(files, setProgress, {
+        pageFrom: pf,
+        pageTo: pt,
+        filterNonTablePages: true,
+        sheetSelections,
+      });
+      if (!payload.pages.length && !payload.tables.length) {
+        setError("No table pages found. Try widening the page range or selecting different Excel sheets.");
+        return;
+      }
+      setSourcePages(payload.pages);
+      setSourceTables(payload.tables);
+      setSkippedPageCount(payload.skippedPages ?? 0);
+      const unitCount = payload.pages.length + payload.tables.length;
+      setPageCount(unitCount);
+      setProgress({ phase: "parse", page: 0, totalPages: unitCount, message: "Detecting line items…" });
+
+      const saved = loadSavedForceColumns(props.partnerId?.() ?? null);
+      const initialForce = saved?.length ? saved : [];
+      const count = await parsePayload(payload, initialForce);
+      const skipNote = payload.skippedPages ? ` (${payload.skippedPages} non-table pages skipped)` : "";
+      toast.success(`Found ${count} line item(s) from ${files.length} file(s)${skipNote}.`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "RFQ import failed.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+      setProgress(null);
+      setPendingFiles([]);
+      if (fileInputRef) fileInputRef.value = "";
+    }
   };
 
   const onFiles = async (fileList: FileList | null) => {
@@ -194,38 +273,87 @@ export function RfqImportModal(props: Props) {
       return;
     }
 
-    setBusy(true);
     setError(null);
     setLines([]);
-    setPageCount(0);
-    setProgress({ phase: "ocr", page: 0, totalPages: 0, message: "Loading document tools…" });
 
-    try {
-      const { extractRfqDocumentPayload } = await import("./rfqDocumentOcr");
-      const payload = await extractRfqDocumentPayload(files, setProgress);
-      if (!payload.pages.length && !payload.tables.length) {
-        setError("No pages or tables could be read from the uploaded file(s).");
-        return;
-      }
-      setSourcePages(payload.pages);
-      setSourceTables(payload.tables);
-      const unitCount = payload.pages.length + payload.tables.length;
-      setPageCount(unitCount);
-      setProgress({ phase: "parse", page: unitCount, totalPages: unitCount, message: "Detecting line items…" });
+    const {
+      inspectWorkbookSheets,
+      isMultiSheetWorkbook,
+      needsSheetPicker,
+      defaultSelectedSheets,
+    } = await import("./rfqSpreadsheetImport");
 
-      const saved = loadSavedForceColumns(props.partnerId?.() ?? null);
-      const initialForce = saved?.length ? saved : [];
-      const count = await parsePayload(payload, initialForce);
-      toast.success(`Found ${count} line item(s) from ${files.length} file(s).`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "RFQ import failed.";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setBusy(false);
-      setProgress(null);
-      if (fileInputRef) fileInputRef.value = "";
+    const pickerGroups: SheetPickerGroup[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!isMultiSheetWorkbook(file)) continue;
+      const sheets = await inspectWorkbookSheets(file);
+      if (!needsSheetPicker(sheets)) continue;
+      const selected = new Set(defaultSelectedSheets(sheets));
+      pickerGroups.push({
+        fileKey: fileImportKey(file, i),
+        fileName: file.name,
+        sheets: sheets.map((s) => ({ ...s, selected: selected.has(s.name) })),
+      });
     }
+
+    if (pickerGroups.length > 0) {
+      setPendingFiles(files);
+      setSheetPickerGroups(pickerGroups);
+      setShowSheetPicker(true);
+      if (fileInputRef) fileInputRef.value = "";
+      return;
+    }
+
+    const sheetSelections: Record<string, string[]> = {};
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!isMultiSheetWorkbook(file)) continue;
+      const sheets = await inspectWorkbookSheets(file);
+      const picked = defaultSelectedSheets(sheets);
+      if (picked.length) sheetSelections[fileImportKey(file, i)] = picked;
+    }
+    await runImport(files, sheetSelections);
+  };
+
+  const confirmSheetPicker = async () => {
+    const files = pendingFiles();
+    if (!files.length || busy()) return;
+    const sheetSelections: Record<string, string[]> = {};
+    for (const group of sheetPickerGroups()) {
+      const picked = group.sheets.filter((s) => s.selected && s.hasTable).map((s) => s.name);
+      if (picked.length) sheetSelections[group.fileKey] = picked;
+    }
+    for (let i = 0; i < files.length; i++) {
+      const key = fileImportKey(files[i], i);
+      if (sheetSelections[key]) continue;
+      const { inspectWorkbookSheets, isMultiSheetWorkbook, defaultSelectedSheets } = await import(
+        "./rfqSpreadsheetImport"
+      );
+      if (!isMultiSheetWorkbook(files[i])) continue;
+      const sheets = await inspectWorkbookSheets(files[i]);
+      const picked = defaultSelectedSheets(sheets);
+      if (picked.length) sheetSelections[key] = picked;
+    }
+    const anySheet = Object.values(sheetSelections).some((s) => s.length > 0);
+    if (!anySheet && !files.some((f) => !f.name.match(/\.xlsx?$/i))) {
+      toast.warning("Select at least one worksheet with line items.");
+      return;
+    }
+    await runImport(files, sheetSelections);
+  };
+
+  const toggleSheet = (fileKey: string, sheetName: string, selected: boolean) => {
+    setSheetPickerGroups((groups) =>
+      groups.map((g) =>
+        g.fileKey !== fileKey
+          ? g
+          : {
+              ...g,
+              sheets: g.sheets.map((s) => (s.name === sheetName ? { ...s, selected } : s)),
+            },
+      ),
+    );
   };
 
   const reparseWithMapping = async () => {
@@ -328,6 +456,114 @@ export function RfqImportModal(props: Props) {
         needed, then pick inventory matches before applying. Legacy .doc files should be saved as .docx first.
       </p>
 
+      <div class="mb-4 grid gap-3 rounded-lg border border-stroke bg-slate-50 px-4 py-3 sm:grid-cols-2">
+        <label class="flex flex-col gap-1 text-xs">
+          <span class="font-medium text-text-primary">Page from (optional)</span>
+          <input
+            class={inputClass}
+            type="number"
+            min={1}
+            placeholder="1"
+            disabled={busy()}
+            value={pageFrom()}
+            onInput={(e) => setPageFrom(e.currentTarget.value)}
+          />
+        </label>
+        <label class="flex flex-col gap-1 text-xs">
+          <span class="font-medium text-text-primary">Page to (optional)</span>
+          <input
+            class={inputClass}
+            type="number"
+            min={1}
+            placeholder="All pages"
+            disabled={busy()}
+            value={pageTo()}
+            onInput={(e) => setPageTo(e.currentTarget.value)}
+          />
+        </label>
+        <p class="text-xs text-text-secondary sm:col-span-2">
+          For long PDFs, set a page range (e.g. 5–60) to import only the BOQ section. Cover and terms pages are skipped
+          automatically when possible.
+        </p>
+      </div>
+
+      <Show when={showSheetPicker()}>
+        <div class="mb-4 rounded-lg border border-brand-200 bg-brand-50/50 px-4 py-3">
+          <div class="mb-2 text-sm font-medium text-brand-800">Choose worksheets to import</div>
+          <p class="mb-3 text-xs text-text-secondary">
+            This workbook has multiple tabs with line-item tables. Select which sheets to include (e.g. Laptop vs
+            Desktop).
+          </p>
+          <For each={sheetPickerGroups()}>
+            {(group) => (
+              <div class="mb-3 rounded-lg border border-stroke bg-white px-3 py-2">
+                <div class="mb-2 text-xs font-medium text-text-primary">{group.fileName}</div>
+                <div class="flex flex-col gap-2">
+                  <For each={group.sheets}>
+                    {(sheet) => (
+                      <label
+                        class={`flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm ${
+                          sheet.hasTable ? "hover:bg-slate-50" : "opacity-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          class="mt-0.5"
+                          disabled={!sheet.hasTable || busy()}
+                          checked={sheet.selected && sheet.hasTable}
+                          onChange={(e) => toggleSheet(group.fileKey, sheet.name, e.currentTarget.checked)}
+                        />
+                        <span>
+                          <span class="font-medium">{sheet.name}</span>
+                          <Show
+                            when={sheet.hasTable}
+                            fallback={<span class="text-text-secondary"> — no line-item table detected</span>}
+                          >
+                            <span class="text-text-secondary">
+                              {" "}
+                              — {sheet.lineCount} line(s)
+                              {sheet.headers.length ? ` · ${sheet.headers.slice(0, 4).join(", ")}` : ""}
+                            </span>
+                          </Show>
+                        </span>
+                      </label>
+                    )}
+                  </For>
+                </div>
+              </div>
+            )}
+          </For>
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
+              disabled={busy()}
+              onClick={() => {
+                setShowSheetPicker(false);
+                setPendingFiles([]);
+                setSheetPickerGroups([]);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              disabled={busy()}
+              onClick={() => void confirmSheetPicker()}
+            >
+              Import selected sheets
+            </button>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={largeDocHint()}>
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {largeDocHint()}
+        </div>
+      </Show>
+
       <div
         role="button"
         tabindex={busy() ? -1 : 0}
@@ -427,7 +663,8 @@ export function RfqImportModal(props: Props) {
       <Show when={lines().length > 0}>
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm text-text-secondary">
-            {lines().filter((l) => l.include).length} of {lines().length} lines selected · {pageCount()} page(s)
+            {lines().filter((l) => l.include).length} of {lines().length} lines selected · {pageCount()} table page(s)
+            {skippedPageCount() > 0 ? ` · ${skippedPageCount()} skipped` : ""}
             {tableDetected() ? " · table detected" : " · text fallback"}
           </span>
         </div>

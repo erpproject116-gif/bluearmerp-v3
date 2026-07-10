@@ -15,6 +15,8 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
+const rfqImportMaxUploadBytes = 50 << 20
+
 type rfqPageText struct {
 	Page   int       `json:"page"`
 	Text   string    `json:"text"`
@@ -55,8 +57,75 @@ type rfqMatchedLine struct {
 }
 
 func registerRfqImportRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.Post("/rfq-import/extract-pdf", extractRfqPDF(pool))
 	r.Post("/rfq-import/parse", parseRfqImport(pool))
 	r.Post("/rfq-import/match-items", matchRfqImportItems(pool))
+}
+
+func extractRfqPDF(_ *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := auth.FromContext(r.Context()); !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if err := r.ParseMultipartForm(rfqImportMaxUploadBytes + 1024); err != nil {
+			response.Validation(w, map[string]string{"file": "Invalid upload or file too large (max 50 MB)."})
+			return
+		}
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			response.Validation(w, map[string]string{"file": "PDF file is required."})
+			return
+		}
+		defer file.Close()
+		data, err := readAllLimited(file, rfqImportMaxUploadBytes)
+		if err != nil {
+			response.Validation(w, map[string]string{"file": err.Error()})
+			return
+		}
+
+		opts := rfqPDFExtractOptions{FilterNonTable: true}
+		if v := strings.TrimSpace(r.FormValue("page_from")); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				opts.PageFrom = n
+			}
+		}
+		if v := strings.TrimSpace(r.FormValue("page_to")); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				opts.PageTo = n
+			}
+		}
+		if v := strings.TrimSpace(r.FormValue("filter_non_table")); v == "0" || v == "false" {
+			opts.FilterNonTable = false
+		}
+
+		result, err := extractRfqPDFPages(data, opts)
+		if err != nil {
+			response.Validation(w, map[string]string{"file": err.Error()})
+			return
+		}
+
+		emptyText := 0
+		pagesOut := make([]rfqPageText, len(result.Pages))
+		for i, p := range result.Pages {
+			if strings.TrimSpace(p.Text) == "" && len(p.Words) == 0 {
+				emptyText++
+			}
+			pagesOut[i] = rfqPageText{
+				Page: p.Page, Text: p.Text, Words: p.Words, Width: p.Width, Height: p.Height,
+			}
+		}
+
+		response.OK(w, map[string]any{
+			"pages":           pagesOut,
+			"total_pages":     result.TotalPages,
+			"skipped_pages":   result.Skipped,
+			"extracted_pages": len(pagesOut),
+			"empty_text_pages": emptyText,
+			"text_only":       result.TextOnly,
+			"server_extract":  result.ServerParse,
+		}, "PDF extracted.")
+	}
 }
 
 func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {

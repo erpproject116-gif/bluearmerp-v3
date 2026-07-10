@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -143,7 +144,10 @@ type createdSlipLine struct {
 
 func registerQuotationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerAttachmentRoutes(r, pool)
-	registerRfqImportRoutes(r, pool)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Timeout(5 * time.Minute))
+		registerRfqImportRoutes(r, pool)
+	})
 	r.Get("/quotations/preview-sequences", previewQuotationSequences(pool))
 	r.Get("/quotations/status-report/export", exportQuotationStatusReport(pool))
 	r.Get("/quotations/status-report", listQuotationStatusReport(pool))
