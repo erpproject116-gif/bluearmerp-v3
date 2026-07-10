@@ -3,7 +3,8 @@ import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
-import type { RfqOcrPage, RfqOcrProgress } from "./rfqDocumentOcr";
+import type { RfqDocumentPayload, RfqOcrPage, RfqOcrProgress } from "./rfqDocumentOcr";
+import type { RfqStructuredTable } from "./rfqSpreadsheetImport";
 import type { QuotationLineRow } from "./QuotationLineGrid";
 import { emptyQuotationLine } from "./QuotationLineGrid";
 
@@ -106,6 +107,7 @@ export function RfqImportModal(props: Props) {
   const [lines, setLines] = createSignal<RfqParsedLine[]>([]);
   const [pageCount, setPageCount] = createSignal(0);
   const [sourcePages, setSourcePages] = createSignal<RfqOcrPage[]>([]);
+  const [sourceTables, setSourceTables] = createSignal<RfqStructuredTable[]>([]);
   const [tableDetected, setTableDetected] = createSignal(false);
   const [detectedColumns, setDetectedColumns] = createSignal<RfqDetectedColumn[]>([]);
   const [forceColumns, setForceColumns] = createSignal<string[]>([]);
@@ -115,6 +117,7 @@ export function RfqImportModal(props: Props) {
     setLines([]);
     setPageCount(0);
     setSourcePages([]);
+    setSourceTables([]);
     setTableDetected(false);
     setDetectedColumns([]);
     setForceColumns([]);
@@ -149,7 +152,7 @@ export function RfqImportModal(props: Props) {
     return normalizeLines(matchRes.data?.lines ?? parsed);
   };
 
-  const parsePages = async (pages: RfqOcrPage[], force: string[]) => {
+  const parsePayload = async (payload: RfqDocumentPayload, force: string[]) => {
     const res = await apiFetch<{
       lines: Array<Omit<RfqParsedLine, "include">>;
       line_count: number;
@@ -158,7 +161,8 @@ export function RfqImportModal(props: Props) {
     }>("/api/v1/quotation/rfq-import/parse", {
       method: "POST",
       body: JSON.stringify({
-        pages,
+        pages: payload.pages,
+        tables: payload.tables,
         force_columns: force.filter(Boolean).length >= 2 ? force : undefined,
       }),
     });
@@ -197,20 +201,22 @@ export function RfqImportModal(props: Props) {
     setProgress({ phase: "ocr", page: 0, totalPages: 0, message: "Loading document tools…" });
 
     try {
-      const { extractRfqDocumentPages } = await import("./rfqDocumentOcr");
-      const pages = await extractRfqDocumentPages(files, setProgress);
-      if (!pages.length) {
-        setError("No pages could be read from the uploaded file(s).");
+      const { extractRfqDocumentPayload } = await import("./rfqDocumentOcr");
+      const payload = await extractRfqDocumentPayload(files, setProgress);
+      if (!payload.pages.length && !payload.tables.length) {
+        setError("No pages or tables could be read from the uploaded file(s).");
         return;
       }
-      setSourcePages(pages);
-      setPageCount(pages.length);
-      setProgress({ phase: "parse", page: pages.length, totalPages: pages.length, message: "Detecting table rows…" });
+      setSourcePages(payload.pages);
+      setSourceTables(payload.tables);
+      const unitCount = payload.pages.length + payload.tables.length;
+      setPageCount(unitCount);
+      setProgress({ phase: "parse", page: unitCount, totalPages: unitCount, message: "Detecting line items…" });
 
       const saved = loadSavedForceColumns(props.partnerId?.() ?? null);
       const initialForce = saved?.length ? saved : [];
-      const count = await parsePages(pages, initialForce);
-      toast.success(`Found ${count} line item(s) across ${pages.length} page(s).`);
+      const count = await parsePayload(payload, initialForce);
+      toast.success(`Found ${count} line item(s) from ${files.length} file(s).`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "RFQ import failed.";
       setError(msg);
@@ -224,18 +230,19 @@ export function RfqImportModal(props: Props) {
 
   const reparseWithMapping = async () => {
     const pages = sourcePages();
+    const tables = sourceTables();
     const force = forceColumns();
-    if (!pages.length || busy()) return;
+    if ((!pages.length && !tables.length) || busy()) return;
     if (force.filter(Boolean).length < 2) {
       toast.warning("Map at least two columns before re-parsing.");
       return;
     }
     setBusy(true);
     setError(null);
-    setProgress({ phase: "parse", page: pages.length, totalPages: pages.length, message: "Re-parsing with column map…" });
+    setProgress({ phase: "parse", page: pages.length + tables.length, totalPages: pages.length + tables.length, message: "Re-parsing with column map…" });
     try {
       saveForceColumns(props.partnerId?.() ?? null, force);
-      const count = await parsePages(pages, force);
+      const count = await parsePayload({ pages, tables }, force);
       toast.success(`Re-parsed ${count} line item(s).`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Re-parse failed.";
@@ -316,9 +323,9 @@ export function RfqImportModal(props: Props) {
       wide
     >
       <p class="mb-4 text-sm text-text-secondary">
-        Upload a customer RFQ (PDF or images, multiple pages supported). We locate the line-item table on each page,
-        map common columns (item, qty, description, unit price, etc.), and skip headers and totals. Adjust column mapping
-        if needed, then pick inventory matches before applying.
+        Upload a customer RFQ — PDF, scanned images, Excel (.xlsx/.xls), CSV, or Word (.docx). We locate line-item tables,
+        map common columns (item, qty, specs, unit price, etc.), and skip headers and totals. Adjust column mapping if
+        needed, then pick inventory matches before applying. Legacy .doc files should be saved as .docx first.
       </p>
 
       <div
@@ -342,12 +349,12 @@ export function RfqImportModal(props: Props) {
         onDrop={onDrop}
       >
         <span class="text-sm font-medium text-brand-700">Drop RFQ files here or click to browse</span>
-        <span class="mt-1 text-xs text-text-secondary">PDF, PNG, JPG, WEBP — multiple files OK</span>
+        <span class="mt-1 text-xs text-text-secondary">PDF, PNG, JPG, WEBP, XLSX, XLS, CSV, DOCX — multiple files OK</span>
         <input
           ref={fileInputRef}
           type="file"
           class="hidden"
-          accept=".pdf,image/*"
+          accept=".pdf,.docx,image/*,.xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           multiple
           disabled={busy()}
           onChange={(e) => void onFiles(e.currentTarget.files)}
@@ -379,7 +386,7 @@ export function RfqImportModal(props: Props) {
             <button
               type="button"
               class="rounded-lg border border-stroke bg-white px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-              disabled={busy() || !sourcePages().length}
+              disabled={busy() || (!sourcePages().length && !sourceTables().length)}
               onClick={() => void reparseWithMapping()}
             >
               Re-parse with mapping

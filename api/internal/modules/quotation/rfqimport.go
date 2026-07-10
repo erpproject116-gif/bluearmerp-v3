@@ -24,9 +24,10 @@ type rfqPageText struct {
 }
 
 type rfqParseRequest struct {
-	Pages           []rfqPageText     `json:"pages"`
-	ForceColumns    []string          `json:"force_columns,omitempty"`
-	HeaderOverrides map[string]string `json:"header_overrides,omitempty"`
+	Pages           []rfqPageText          `json:"pages"`
+	Tables          []RfqStructuredTable   `json:"tables,omitempty"`
+	ForceColumns    []string               `json:"force_columns,omitempty"`
+	HeaderOverrides map[string]string      `json:"header_overrides,omitempty"`
 }
 
 type rfqMatchRequest struct {
@@ -69,8 +70,8 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if len(body.Pages) == 0 {
-			response.Validation(w, map[string]string{"pages": "At least one page of text is required."})
+		if len(body.Pages) == 0 && len(body.Tables) == 0 {
+			response.Validation(w, map[string]string{"pages": "At least one page or table is required."})
 			return
 		}
 		pages := make([]RfqPageInput, len(body.Pages))
@@ -87,10 +88,14 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			ForceColumns:    body.ForceColumns,
 			HeaderOverrides: body.HeaderOverrides,
 		}
-		result := ParseRfqDocumentWithOptions(pages, opts)
+		result := mergeRfqParseResults(
+			ParseRfqStructuredTables(body.Tables, opts),
+			ParseRfqDocumentWithOptions(pages, opts),
+		)
 		response.OK(w, map[string]any{
 			"lines":            result.Lines,
 			"page_count":       len(body.Pages),
+			"table_count":      len(body.Tables),
 			"line_count":       len(result.Lines),
 			"table_detected":   result.TableDetected,
 			"detected_columns": result.DetectedColumns,

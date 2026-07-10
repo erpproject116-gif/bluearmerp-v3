@@ -232,16 +232,60 @@ async function extractPdfPages(
   return pages;
 }
 
-/** Extract positioned words + plain text from RFQ PDFs and images. */
-export async function extractRfqDocumentPages(
+/** Payload sent to RFQ parse API (PDF/images + structured spreadsheet/word tables). */
+export type RfqDocumentPayload = {
+  pages: RfqOcrPage[];
+  tables: import("./rfqSpreadsheetImport").RfqStructuredTable[];
+};
+
+/** Extract positioned words, plain text, and structured tables from RFQ uploads. */
+export async function extractRfqDocumentPayload(
   files: File[],
   onProgress?: (p: RfqOcrProgress) => void,
-): Promise<RfqOcrPage[]> {
+): Promise<RfqDocumentPayload> {
   onProgress?.({ phase: "ocr", page: 0, totalPages: 0, message: "Preparing document reader…" });
+  const { isSpreadsheetFile, extractSpreadsheetTables } = await import("./rfqSpreadsheetImport");
+  const { isDocxFile, isLegacyDocFile, extractDocxContent } = await import("./rfqDocxImport");
+
   try {
     const pages: RfqOcrPage[] = [];
+    const tables: RfqDocumentPayload["tables"] = [];
     let pageOffset = 0;
+
     for (const file of files) {
+      if (isLegacyDocFile(file)) {
+        throw new Error(
+          `${file.name}: Legacy Word (.doc) is not supported. Save as .docx, .pdf, or .xlsx and try again.`,
+        );
+      }
+      if (isSpreadsheetFile(file)) {
+        onProgress?.({
+          phase: "parse",
+          page: pageOffset,
+          totalPages: pageOffset,
+          message: `Reading spreadsheet ${file.name}…`,
+        });
+        const sheetTables = await extractSpreadsheetTables(file, pageOffset);
+        if (!sheetTables.length) {
+          throw new Error(`${file.name}: No line-item table found in spreadsheet.`);
+        }
+        tables.push(...sheetTables);
+        pageOffset += sheetTables.length;
+        continue;
+      }
+      if (isDocxFile(file)) {
+        onProgress?.({
+          phase: "parse",
+          page: pageOffset,
+          totalPages: pageOffset,
+          message: `Reading Word document ${file.name}…`,
+        });
+        const docx = await extractDocxContent(file, pageOffset);
+        pages.push(...docx.pages);
+        tables.push(...docx.tables);
+        pageOffset += Math.max(docx.pages.length, docx.tables.length);
+        continue;
+      }
       if (isPdf(file)) {
         const pdfPages = await extractPdfPages(file, onProgress, pageOffset);
         pages.push(...pdfPages);
@@ -268,10 +312,21 @@ export async function extractRfqDocumentPages(
         });
         continue;
       }
-      throw new Error(`Unsupported file type: ${file.name}. Use PDF or image files.`);
+      throw new Error(
+        `Unsupported file: ${file.name}. Use PDF, images, Excel (.xlsx/.xls), CSV, or Word (.docx).`,
+      );
     }
-    return pages;
+    return { pages, tables };
   } finally {
     await shutdownOcrWorker();
   }
+}
+
+/** @deprecated Use extractRfqDocumentPayload */
+export async function extractRfqDocumentPages(
+  files: File[],
+  onProgress?: (p: RfqOcrProgress) => void,
+): Promise<RfqOcrPage[]> {
+  const payload = await extractRfqDocumentPayload(files, onProgress);
+  return payload.pages;
 }

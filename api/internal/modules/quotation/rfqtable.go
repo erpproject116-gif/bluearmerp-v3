@@ -43,13 +43,13 @@ const (
 var rfqColumnSynonyms = map[rfqColumnField][]string{
 	colLineNo:      {"no", "no.", "#", "line", "item no", "item no.", "s/n", "sn", "line no", "line no."},
 	colItemCode:    {"item", "item code", "code", "sku", "part no", "part no.", "part number", "catalog", "material code", "item #", "product code"},
-	colItemName:    {"item name", "product", "product name", "material", "material name", "name"},
-	colDescription: {"description", "desc", "specification", "spec", "specs", "details", "item description"},
-	colRemarks:     {"remarks", "remark", "notes", "note", "comment", "comments"},
+	colItemName:    {"item", "item name", "product", "product name", "material", "material name", "name", "equipment"},
+	colDescription: {"description", "desc", "specification", "specifications", "technical specifications", "spec", "specs", "details", "item description", "requirements"},
+	colRemarks:     {"remarks", "remark", "notes", "note", "comment", "comments", "for reference only", "reference", "reference link"},
 	colQty:         {"qty", "quantity", "q'ty", "q ty"},
 	colUnit:        {"unit", "uom", "u/m", "um"},
-	colUnitPrice:   {"unit price", "price", "rate", "unit cost", "cost", "u/p", "up"},
-	colLineTotal:   {"amount", "total", "line total", "extended", "ext price", "ext. price", "sub total", "subtotal"},
+	colUnitPrice:   {"unit price", "price", "rate", "unit cost", "cost", "cost per unit", "u/p", "up", "budget", "estimated cost", "reference price"},
+	colLineTotal:   {"amount", "total", "line total", "extended", "ext price", "ext. price", "sub total", "subtotal", "total cost"},
 }
 
 var rfqTableFooter = regexp.MustCompile(`(?i)^(grand\s+total|sub\s*total|subtotal|total\s+amount|total\s*:?|amount\s+due|approved\s+by|prepared\s+by|signature|vat|tax\s+total|net\s+total)`)
@@ -392,6 +392,10 @@ func matchColumnFieldWithOverride(token string, overrides map[string]string) rfq
 			}
 		}
 	}
+	// Bare "item" on RFQ spreadsheets is usually the product label, not a SKU column.
+	if t == "item" {
+		return colItemName
+	}
 	return matchColumnField(token)
 }
 
@@ -572,6 +576,10 @@ func rowToLine(row rfqTextRow, schema []rfqColumnSlot) rowParseResult {
 		LineTotal:   normalizeMoney(join(colLineTotal)),
 		Confidence:  0.88,
 	}
+	return finishRowParseFromLine(line, row)
+}
+
+func finishRowParseFromLine(line ParsedRfqLine, row rfqTextRow) rowParseResult {
 	if line.ItemName != "" && line.Description == "" {
 		line.Description = line.ItemName
 	}
@@ -579,7 +587,7 @@ func rowToLine(row rfqTextRow, schema []rfqColumnSlot) rowParseResult {
 		line.ItemName = line.Description
 	}
 
-	if line.ItemCode == "" && line.Description == "" {
+	if line.ItemCode == "" && line.Description == "" && line.ItemName == "" {
 		return rowParseResult{ok: false}
 	}
 	if line.Qty == "" {
