@@ -3,7 +3,7 @@ import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
-import type { RfqOcrProgress } from "./rfqDocumentOcr";
+import type { RfqOcrPage, RfqOcrProgress } from "./rfqDocumentOcr";
 import type { QuotationLineRow } from "./QuotationLineGrid";
 import { emptyQuotationLine } from "./QuotationLineGrid";
 
@@ -21,9 +21,38 @@ export type RfqParsedLine = {
   confidence: number;
   item_id?: number | null;
   sales_price?: number;
+  rfq_unit_price?: number;
   match_score?: number;
+  alternatives?: RfqItemAlternative[];
   include: boolean;
 };
+
+export type RfqItemAlternative = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  sales_price: number;
+  match_score: number;
+};
+
+export type RfqDetectedColumn = {
+  index: number;
+  field: string;
+  label: string;
+};
+
+const COLUMN_FIELDS = [
+  { value: "", label: "— ignore —" },
+  { value: "line_no", label: "Line no." },
+  { value: "item_code", label: "Item code" },
+  { value: "item_name", label: "Item name" },
+  { value: "description", label: "Description" },
+  { value: "qty", label: "Qty" },
+  { value: "unit", label: "Unit" },
+  { value: "unit_price", label: "Unit price" },
+  { value: "line_total", label: "Line total" },
+  { value: "remarks", label: "Remarks" },
+] as const;
 
 function confidenceClass(c: number): string {
   if (c >= 0.85) return "text-green-700";
@@ -33,12 +62,38 @@ function confidenceClass(c: number): string {
 
 function pickUnitPrice(ln: RfqParsedLine): string {
   if (ln.unit_price?.trim()) return ln.unit_price.trim();
+  if (ln.rfq_unit_price && ln.rfq_unit_price > 0) return String(ln.rfq_unit_price);
   if (ln.sales_price && ln.sales_price > 0) return String(ln.sales_price);
   return "";
 }
 
+function templateKey(partnerId: number | null | undefined): string | null {
+  if (!partnerId) return null;
+  return `rfq-column-template-${partnerId}`;
+}
+
+function loadSavedForceColumns(partnerId: number | null | undefined): string[] | null {
+  const key = templateKey(partnerId);
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.map(String) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveForceColumns(partnerId: number | null | undefined, cols: string[]) {
+  const key = templateKey(partnerId);
+  if (!key || !cols.some(Boolean)) return;
+  localStorage.setItem(key, JSON.stringify(cols));
+}
+
 type Props = {
   open: boolean;
+  partnerId?: () => number | null;
   onClose: () => void;
   onApply: (lines: QuotationLineRow[]) => void;
 };
@@ -50,14 +105,81 @@ export function RfqImportModal(props: Props) {
   const [error, setError] = createSignal<string | null>(null);
   const [lines, setLines] = createSignal<RfqParsedLine[]>([]);
   const [pageCount, setPageCount] = createSignal(0);
+  const [sourcePages, setSourcePages] = createSignal<RfqOcrPage[]>([]);
+  const [tableDetected, setTableDetected] = createSignal(false);
+  const [detectedColumns, setDetectedColumns] = createSignal<RfqDetectedColumn[]>([]);
+  const [forceColumns, setForceColumns] = createSignal<string[]>([]);
   let fileInputRef: HTMLInputElement | undefined;
 
   const reset = () => {
     setLines([]);
     setPageCount(0);
+    setSourcePages([]);
+    setTableDetected(false);
+    setDetectedColumns([]);
+    setForceColumns([]);
     setProgress(null);
     setError(null);
     if (fileInputRef) fileInputRef.value = "";
+  };
+
+  const normalizeLines = (raw: Array<Omit<RfqParsedLine, "include">>): RfqParsedLine[] =>
+    raw.map((ln) => ({
+      ...ln,
+      item_code: ln.item_code ?? "",
+      description: ln.description ?? ln.item_name ?? "",
+      qty: ln.qty || "1",
+      unit: ln.unit ?? "",
+      unit_price: ln.unit_price ?? "",
+      line_total: ln.line_total ?? "",
+      remarks: ln.remarks ?? "",
+      confidence: ln.confidence ?? 0.5,
+      include: true,
+    }));
+
+  const matchLines = async (parsed: Array<Omit<RfqParsedLine, "include">>) => {
+    const partnerId = props.partnerId?.() ?? null;
+    const matchRes = await apiFetch<{ lines: RfqParsedLine[] }>("/api/v1/quotation/rfq-import/match-items", {
+      method: "POST",
+      body: JSON.stringify({
+        lines: parsed,
+        partner_id: partnerId ?? undefined,
+      }),
+    });
+    return normalizeLines(matchRes.data?.lines ?? parsed);
+  };
+
+  const parsePages = async (pages: RfqOcrPage[], force: string[]) => {
+    const res = await apiFetch<{
+      lines: Array<Omit<RfqParsedLine, "include">>;
+      line_count: number;
+      table_detected?: boolean;
+      detected_columns?: RfqDetectedColumn[];
+    }>("/api/v1/quotation/rfq-import/parse", {
+      method: "POST",
+      body: JSON.stringify({
+        pages,
+        force_columns: force.filter(Boolean).length >= 2 ? force : undefined,
+      }),
+    });
+    if (!res.success || !res.data?.lines) {
+      throw new Error(res.message ?? "Failed to parse RFQ.");
+    }
+    setTableDetected(!!res.data.table_detected);
+    const cols = res.data.detected_columns ?? [];
+    setDetectedColumns(cols);
+    if (force.filter(Boolean).length >= 2) {
+      setForceColumns(force);
+    } else if (cols.length) {
+      setForceColumns(cols.map((c) => c.field));
+    }
+    if (!res.data.lines.length) {
+      setLines([]);
+      throw new Error("No line items detected in the table area. Adjust column mapping or try a clearer scan.");
+    }
+    const matched = await matchLines(res.data.lines);
+    setLines(matched);
+    return matched.length;
   };
 
   const onFiles = async (fileList: FileList | null) => {
@@ -81,50 +203,14 @@ export function RfqImportModal(props: Props) {
         setError("No pages could be read from the uploaded file(s).");
         return;
       }
+      setSourcePages(pages);
       setPageCount(pages.length);
       setProgress({ phase: "parse", page: pages.length, totalPages: pages.length, message: "Detecting table rows…" });
 
-      const res = await apiFetch<{
-        lines: Array<Omit<RfqParsedLine, "include">>;
-        line_count: number;
-      }>("/api/v1/quotation/rfq-import/parse", {
-        method: "POST",
-        body: JSON.stringify({ pages }),
-      });
-      if (!res.success || !res.data?.lines) {
-        const msg = res.message ?? "Failed to parse RFQ.";
-        setError(msg);
-        toast.error(msg);
-        return;
-      }
-      if (!res.data.lines.length) {
-        const msg = "No line items detected in the table area. Try a clearer scan or add lines manually.";
-        setError(msg);
-        toast.warning(msg);
-        setLines([]);
-        return;
-      }
-
-      const matchRes = await apiFetch<{ lines: RfqParsedLine[] }>("/api/v1/quotation/rfq-import/match-items", {
-        method: "POST",
-        body: JSON.stringify({ lines: res.data.lines }),
-      });
-      const matched = matchRes.data?.lines ?? res.data.lines;
-      setLines(
-        matched.map((ln) => ({
-          ...ln,
-          item_code: ln.item_code ?? "",
-          description: ln.description ?? ln.item_name ?? "",
-          qty: ln.qty || "1",
-          unit: ln.unit ?? "",
-          unit_price: ln.unit_price ?? "",
-          line_total: ln.line_total ?? "",
-          remarks: ln.remarks ?? "",
-          confidence: ln.confidence ?? 0.5,
-          include: true,
-        })),
-      );
-      toast.success(`Found ${matched.length} line item(s) across ${pages.length} page(s).`);
+      const saved = loadSavedForceColumns(props.partnerId?.() ?? null);
+      const initialForce = saved?.length ? saved : [];
+      const count = await parsePages(pages, initialForce);
+      toast.success(`Found ${count} line item(s) across ${pages.length} page(s).`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "RFQ import failed.";
       setError(msg);
@@ -133,6 +219,31 @@ export function RfqImportModal(props: Props) {
       setBusy(false);
       setProgress(null);
       if (fileInputRef) fileInputRef.value = "";
+    }
+  };
+
+  const reparseWithMapping = async () => {
+    const pages = sourcePages();
+    const force = forceColumns();
+    if (!pages.length || busy()) return;
+    if (force.filter(Boolean).length < 2) {
+      toast.warning("Map at least two columns before re-parsing.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setProgress({ phase: "parse", page: pages.length, totalPages: pages.length, message: "Re-parsing with column map…" });
+    try {
+      saveForceColumns(props.partnerId?.() ?? null, force);
+      const count = await parsePages(pages, force);
+      toast.success(`Re-parsed ${count} line item(s).`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Re-parse failed.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -149,6 +260,16 @@ export function RfqImportModal(props: Props) {
 
   const updateLine = (lineNo: number, patch: Partial<RfqParsedLine>) => {
     setLines((rows) => rows.map((r) => (r.line_no === lineNo ? { ...r, ...patch } : r)));
+  };
+
+  const pickAlternative = (lineNo: number, alt: RfqItemAlternative) => {
+    updateLine(lineNo, {
+      item_id: alt.item_id,
+      item_code: alt.item_code,
+      item_name: alt.item_name,
+      sales_price: alt.sales_price,
+      match_score: alt.match_score,
+    });
   };
 
   const apply = () => {
@@ -179,6 +300,8 @@ export function RfqImportModal(props: Props) {
     toast.success(`Imported ${out.length} line(s) into the quotation.`);
   };
 
+  const showColumnMap = () => tableDetected() && detectedColumns().length > 0;
+
   return (
     <Modal
       open={props.open}
@@ -194,8 +317,8 @@ export function RfqImportModal(props: Props) {
     >
       <p class="mb-4 text-sm text-text-secondary">
         Upload a customer RFQ (PDF or images, multiple pages supported). We locate the line-item table on each page,
-        map common columns (item, qty, description, unit price, etc.), and skip headers and totals. Unmatched lines import
-        as free-text rows you can edit before saving.
+        map common columns (item, qty, description, unit price, etc.), and skip headers and totals. Adjust column mapping
+        if needed, then pick inventory matches before applying.
       </p>
 
       <div
@@ -249,10 +372,56 @@ export function RfqImportModal(props: Props) {
         <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error()}</div>
       </Show>
 
+      <Show when={showColumnMap()}>
+        <div class="mb-4 rounded-lg border border-stroke bg-slate-50 px-4 py-3">
+          <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span class="text-sm font-medium text-text-primary">Column mapping</span>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke bg-white px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              disabled={busy() || !sourcePages().length}
+              onClick={() => void reparseWithMapping()}
+            >
+              Re-parse with mapping
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <For each={detectedColumns()}>
+              {(col) => (
+                <label class="flex flex-col gap-1 text-xs">
+                  <span class="text-text-secondary">{col.label || `Col ${col.index + 1}`}</span>
+                  <select
+                    class={`${inputClass} min-w-[8rem]`}
+                    value={forceColumns()[col.index] ?? col.field}
+                    onChange={(e) => {
+                      const val = e.currentTarget.value;
+                      setForceColumns((prev) => {
+                        const next = [...prev];
+                        while (next.length <= col.index) next.push("");
+                        next[col.index] = val;
+                        return next;
+                      });
+                    }}
+                  >
+                    <For each={COLUMN_FIELDS}>
+                      {(opt) => <option value={opt.value}>{opt.label}</option>}
+                    </For>
+                  </select>
+                </label>
+              )}
+            </For>
+          </div>
+          <Show when={props.partnerId?.()}>
+            <p class="mt-2 text-xs text-text-secondary">Column map is saved for this customer and reused on the next import.</p>
+          </Show>
+        </div>
+      </Show>
+
       <Show when={lines().length > 0}>
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm text-text-secondary">
             {lines().filter((l) => l.include).length} of {lines().length} lines selected · {pageCount()} page(s)
+            {tableDetected() ? " · table detected" : " · text fallback"}
           </span>
         </div>
         <div class="max-h-[50vh] overflow-auto rounded-lg border border-stroke">
@@ -265,7 +434,8 @@ export function RfqImportModal(props: Props) {
                 <th class="px-3 py-2">Item code</th>
                 <th class="px-3 py-2">Description</th>
                 <th class="px-3 py-2">Qty</th>
-                <th class="px-3 py-2">Unit price</th>
+                <th class="px-3 py-2">RFQ price</th>
+                <th class="px-3 py-2">Our price</th>
                 <th class="px-3 py-2">Remarks</th>
                 <th class="px-3 py-2">Inventory match</th>
               </tr>
@@ -310,9 +480,14 @@ export function RfqImportModal(props: Props) {
                       <input
                         class={`${inputClass} w-24`}
                         value={row.unit_price ?? ""}
-                        placeholder={row.sales_price ? String(row.sales_price) : ""}
+                        placeholder={row.rfq_unit_price ? String(row.rfq_unit_price) : ""}
                         onInput={(e) => updateLine(row.line_no, { unit_price: e.currentTarget.value })}
                       />
+                    </td>
+                    <td class="px-3 py-2 text-xs text-text-secondary">
+                      <Show when={row.sales_price && row.sales_price > 0} fallback="—">
+                        {row.sales_price}
+                      </Show>
                     </td>
                     <td class="px-3 py-2">
                       <input
@@ -323,12 +498,35 @@ export function RfqImportModal(props: Props) {
                     </td>
                     <td class="px-3 py-2 text-xs">
                       <Show
-                        when={row.item_id}
-                        fallback={<span class="text-text-secondary">Free text — editable in quotation</span>}
+                        when={row.alternatives?.length}
+                        fallback={
+                          row.item_id ? (
+                            <span class="text-text-primary">
+                              {row.item_code} — {row.item_name}
+                            </span>
+                          ) : (
+                            <span class="text-text-secondary">Free text — editable in quotation</span>
+                          )
+                        }
                       >
-                        <span class="text-text-primary">
-                          {row.item_code} — {row.item_name}
-                        </span>
+                        <select
+                          class={`${inputClass} max-w-[14rem]`}
+                          value={String(row.item_id ?? "")}
+                          onChange={(e) => {
+                            const id = Number(e.currentTarget.value);
+                            const alt = row.alternatives?.find((a) => a.item_id === id);
+                            if (alt) pickAlternative(row.line_no, alt);
+                          }}
+                        >
+                          <option value="">Free text</option>
+                          <For each={row.alternatives}>
+                            {(alt) => (
+                              <option value={String(alt.item_id)}>
+                                {alt.item_code} — {alt.item_name} ({Math.round(alt.match_score * 100)}%)
+                              </option>
+                            )}
+                          </For>
+                        </select>
                       </Show>
                     </td>
                   </tr>

@@ -68,10 +68,31 @@ type rfqColumnSlot struct {
 
 // ParseRfqLayoutPages extracts line items from positioned words (table-first).
 func ParseRfqLayoutPages(pages []RfqPageInput) []ParsedRfqLine {
+	lines, _ := ParseRfqLayoutPagesWithOptions(pages, RfqParseOptions{})
+	return lines
+}
+
+func schemaToDetectedColumns(schema []rfqColumnSlot, header rfqTextRow) []RfqDetectedColumn {
+	out := make([]RfqDetectedColumn, len(schema))
+	for i, slot := range schema {
+		label := string(slot.field)
+		if i < len(header.cells) {
+			label = header.cells[i]
+		}
+		out[i] = RfqDetectedColumn{Index: i, Field: string(slot.field), Label: label}
+	}
+	return out
+}
+
+// ParseRfqLayoutPagesWithOptions extracts lines and returns detected column mapping when found.
+func ParseRfqLayoutPagesWithOptions(pages []RfqPageInput, opts RfqParseOptions) ([]ParsedRfqLine, []RfqDetectedColumn) {
 	var out []ParsedRfqLine
 	var schema []rfqColumnSlot
+	var detected []RfqDetectedColumn
+	var headerRow rfqTextRow
 	seen := map[string]struct{}{}
 	lineNo := 0
+	forceFields := parseForceColumnFields(opts.ForceColumns)
 
 	for _, page := range pages {
 		if len(page.Words) < 2 {
@@ -91,9 +112,17 @@ func ParseRfqLayoutPages(pages []RfqPageInput) []ParsedRfqLine {
 
 		headerIdx := -1
 		if len(schema) == 0 {
-			headerIdx = findHeaderRowIndex(rows)
+			headerIdx = findHeaderRowIndexWithOverrides(rows, opts.HeaderOverrides)
 			if headerIdx >= 0 {
-				schema = buildColumnSchema(rows[headerIdx], page.Width)
+				headerRow = rows[headerIdx]
+				if len(forceFields) > 0 {
+					schema = buildForcedColumnSchema(headerRow, forceFields, page.Width)
+				} else {
+					schema = buildColumnSchemaWithOverrides(headerRow, page.Width, opts.HeaderOverrides)
+				}
+				if len(schema) > 0 {
+					detected = schemaToDetectedColumns(schema, headerRow)
+				}
 			}
 		}
 
@@ -137,7 +166,7 @@ func ParseRfqLayoutPages(pages []RfqPageInput) []ParsedRfqLine {
 			out = append(out, parsed.line)
 		}
 	}
-	return out
+	return out, detected
 }
 
 func groupWordsIntoRows(words []RfqWord) []rfqTextRow {
@@ -290,6 +319,10 @@ func findHeaderRowIndex(rows []rfqTextRow) int {
 }
 
 func buildColumnSchema(header rfqTextRow, pageWidth float64) []rfqColumnSlot {
+	return buildColumnSchemaWithOverrides(header, pageWidth, nil)
+}
+
+func buildColumnSchemaWithOverrides(header rfqTextRow, pageWidth float64, overrides map[string]string) []rfqColumnSlot {
 	// Map each header word/cell to a field and X range.
 	type hdrPiece struct {
 		field rfqColumnField
@@ -300,7 +333,7 @@ func buildColumnSchema(header rfqTextRow, pageWidth float64) []rfqColumnSlot {
 
 	if len(header.words) >= 2 {
 		for _, w := range header.words {
-			f := matchColumnField(w.Text)
+			f := matchColumnFieldWithOverride(w.Text, overrides)
 			if f == "" {
 				continue
 			}
@@ -312,7 +345,7 @@ func buildColumnSchema(header rfqTextRow, pageWidth float64) []rfqColumnSlot {
 		n := float64(len(header.cells))
 		cellW := pageWidth / math.Max(n, 1)
 		for i, cell := range header.cells {
-			f := matchColumnField(cell)
+			f := matchColumnFieldWithOverride(cell, overrides)
 			if f == "" {
 				continue
 			}
@@ -348,6 +381,153 @@ func buildColumnSchema(header rfqTextRow, pageWidth float64) []rfqColumnSlot {
 		slots[i] = rfqColumnSlot{field: p.field, xMin: xMin, xMax: xMax}
 	}
 	return slots
+}
+
+func matchColumnFieldWithOverride(token string, overrides map[string]string) rfqColumnField {
+	t := normalizeHeaderToken(token)
+	if t != "" && len(overrides) > 0 {
+		for k, v := range overrides {
+			if normalizeHeaderToken(k) == t {
+				return rfqColumnField(strings.TrimSpace(strings.ToLower(v)))
+			}
+		}
+	}
+	return matchColumnField(token)
+}
+
+func parseForceColumnFields(fields []string) []rfqColumnField {
+	if len(fields) == 0 {
+		return nil
+	}
+	out := make([]rfqColumnField, 0, len(fields))
+	for _, f := range fields {
+		f = strings.TrimSpace(strings.ToLower(f))
+		if f == "" {
+			continue
+		}
+		out = append(out, rfqColumnField(f))
+	}
+	return out
+}
+
+func buildForcedColumnSchema(header rfqTextRow, fields []rfqColumnField, pageWidth float64) []rfqColumnSlot {
+	if len(fields) < 2 {
+		return nil
+	}
+	bounds := forcedColumnBounds(header, len(fields), pageWidth)
+	slots := make([]rfqColumnSlot, len(fields))
+	for i, f := range fields {
+		xMin := bounds[i]
+		xMax := bounds[i+1]
+		if i == 0 {
+			xMin -= 8
+		}
+		if i+1 == len(fields) {
+			xMax += 8
+		}
+		slots[i] = rfqColumnSlot{field: f, xMin: xMin, xMax: xMax}
+	}
+	return slots
+}
+
+func forcedColumnBounds(header rfqTextRow, nCols int, pageWidth float64) []float64 {
+	bounds := make([]float64, nCols+1)
+	bounds[0] = 0
+	bounds[nCols] = pageWidth
+	if len(header.words) < 2 {
+		cellW := pageWidth / float64(nCols)
+		for i := 1; i < nCols; i++ {
+			bounds[i] = cellW * float64(i)
+		}
+		return bounds
+	}
+	sorted := append([]RfqWord(nil), header.words...)
+	for i := 0; i < len(sorted); i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].X < sorted[i].X {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+	if len(sorted) <= nCols {
+		for i := 1; i < nCols; i++ {
+			if i < len(sorted) {
+				bounds[i] = sorted[i].X - 4
+			} else {
+				bounds[i] = pageWidth * float64(i) / float64(nCols)
+			}
+		}
+		return bounds
+	}
+	// Split header words into nCols consecutive groups; internal bounds are midpoints between groups.
+	groupSize := float64(len(sorted)) / float64(nCols)
+	for i := 1; i < nCols; i++ {
+		leftLast := int(math.Min(float64(len(sorted)-1), math.Ceil(groupSize*float64(i))-1))
+		rightFirst := int(math.Min(float64(len(sorted)-1), math.Ceil(groupSize*float64(i))))
+		if leftLast < 0 {
+			leftLast = 0
+		}
+		if rightFirst <= leftLast {
+			rightFirst = leftLast + 1
+		}
+		if rightFirst >= len(sorted) {
+			rightFirst = len(sorted) - 1
+		}
+		leftX := sorted[leftLast].X + sorted[leftLast].W
+		rightX := sorted[rightFirst].X
+		if rightX <= leftX {
+			rightX = leftX + 8
+		}
+		bounds[i] = (leftX + rightX) / 2
+	}
+	return bounds
+}
+
+func countHeaderCellsWithOverrides(row rfqTextRow, overrides map[string]string) int {
+	n := 0
+	for _, cell := range row.cells {
+		if matchColumnFieldWithOverride(cell, overrides) != "" {
+			n++
+		}
+	}
+	return n
+}
+
+func findHeaderRowIndexWithOverrides(rows []rfqTextRow, overrides map[string]string) int {
+	bestIdx := -1
+	bestHits := 0
+	for i, row := range rows {
+		if i > 25 {
+			break
+		}
+		hits := 0
+		for _, cell := range row.cells {
+			if matchColumnFieldWithOverride(cell, overrides) != "" {
+				hits++
+			}
+		}
+		if hits == 0 && len(row.cells) >= 2 {
+			joined := normalizeHeaderToken(strings.Join(row.cells, " "))
+			if len(joined) <= 48 {
+				for _, syns := range rfqColumnSynonyms {
+					for _, syn := range syns {
+						if len(syn) < 3 {
+							continue
+						}
+						if strings.Contains(joined, syn) {
+							hits++
+							break
+						}
+					}
+				}
+			}
+		}
+		if hits > bestHits && hits >= 2 {
+			bestHits = hits
+			bestIdx = i
+		}
+	}
+	return bestIdx
 }
 
 type rowParseResult struct {
@@ -520,11 +700,34 @@ func max(a, b int) int {
 	return b
 }
 
+type RfqParseOptions struct {
+	// ForceColumns maps table columns left-to-right to field names (item_code, qty, description, …).
+	ForceColumns []string `json:"force_columns,omitempty"`
+	// HeaderOverrides maps a header cell label to a field name before synonym matching.
+	HeaderOverrides map[string]string `json:"header_overrides,omitempty"`
+}
+
+type RfqDetectedColumn struct {
+	Index  int    `json:"index"`
+	Field  string `json:"field"`
+	Label  string `json:"label"`
+}
+
+type RfqParseResult struct {
+	Lines           []ParsedRfqLine
+	TableDetected   bool
+	DetectedColumns []RfqDetectedColumn
+}
+
 // ParseRfqDocument tries table layout parsing first, then plain-text regex fallback.
 func ParseRfqDocument(pages []RfqPageInput) []ParsedRfqLine {
-	layout := ParseRfqLayoutPages(pages)
+	return ParseRfqDocumentWithOptions(pages, RfqParseOptions{}).Lines
+}
+
+func ParseRfqDocumentWithOptions(pages []RfqPageInput, opts RfqParseOptions) RfqParseResult {
+	layout, cols := ParseRfqLayoutPagesWithOptions(pages, opts)
 	if len(layout) > 0 {
-		return layout
+		return RfqParseResult{Lines: layout, TableDetected: true, DetectedColumns: cols}
 	}
 	plain := make([]struct {
 		Page int
@@ -545,5 +748,5 @@ func ParseRfqDocument(pages []RfqPageInput) []ParsedRfqLine {
 			plain[i].Text = b.String()
 		}
 	}
-	return ParseRfqPages(plain)
+	return RfqParseResult{Lines: ParseRfqPages(plain), TableDetected: false}
 }

@@ -182,6 +182,62 @@ func TestParseRfqLayoutPages_headerlessContinuation(t *testing.T) {
 	}
 }
 
+func TestParseRfqDocument_forceColumns(t *testing.T) {
+	pages := []RfqPageInput{
+		{
+			Page: 1, Width: 600, Height: 800,
+			Words: []RfqWord{
+				{Text: "Part", X: 40, Y: 120, W: 30, H: 12},
+				{Text: "#", X: 75, Y: 120, W: 10, H: 12},
+				{Text: "Q'ty", X: 180, Y: 120, W: 30, H: 12},
+				{Text: "Spec", X: 260, Y: 120, W: 40, H: 12},
+				{Text: "XYZ-9", X: 40, Y: 145, W: 50, H: 12},
+				{Text: "5", X: 180, Y: 145, W: 10, H: 12},
+				{Text: "Heavy", X: 260, Y: 145, W: 45, H: 12},
+				{Text: "duty", X: 310, Y: 145, W: 30, H: 12},
+				{Text: "valve", X: 345, Y: 145, W: 35, H: 12},
+			},
+		},
+	}
+	result := ParseRfqDocumentWithOptions(pages, RfqParseOptions{
+		ForceColumns: []string{"item_code", "qty", "description"},
+	})
+	if len(result.Lines) != 1 {
+		t.Fatalf("expected 1 line, got %d: %+v", len(result.Lines), result.Lines)
+	}
+	if result.Lines[0].ItemCode != "XYZ-9" || result.Lines[0].Qty != "5" {
+		t.Fatalf("unexpected line: %+v", result.Lines[0])
+	}
+	if !result.TableDetected {
+		t.Fatal("expected table detected")
+	}
+}
+
+func TestParseRfqDocument_headerOverrides(t *testing.T) {
+	pages := []RfqPageInput{
+		{
+			Page: 1, Width: 500, Height: 700,
+			Words: []RfqWord{
+				{Text: "Part", X: 40, Y: 100, W: 30, H: 12},
+				{Text: "Q'ty", X: 120, Y: 100, W: 30, H: 12},
+				{Text: "Spec", X: 200, Y: 100, W: 40, H: 12},
+				{Text: "P-1", X: 40, Y: 125, W: 25, H: 12},
+				{Text: "2", X: 120, Y: 125, W: 10, H: 12},
+				{Text: "Gasket", X: 200, Y: 125, W: 50, H: 12},
+			},
+		},
+	}
+	result := ParseRfqDocumentWithOptions(pages, RfqParseOptions{
+		HeaderOverrides: map[string]string{"part": "item_code", "spec": "description"},
+	})
+	if len(result.Lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(result.Lines))
+	}
+	if result.Lines[0].ItemCode != "P-1" {
+		t.Fatalf("expected item code P-1, got %q", result.Lines[0].ItemCode)
+	}
+}
+
 func TestParseRfqDocument_fallbackPlainText(t *testing.T) {
 	pages := []RfqPageInput{
 		{Page: 1, Text: "ABC-001 10 Industrial pump seal kit"},

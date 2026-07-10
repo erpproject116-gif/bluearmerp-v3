@@ -724,6 +724,7 @@ export function QuotationModal(props: Props) {
       >
         <RfqImportModal
           open
+          partnerId={partnerId}
           onClose={() => setRfqImportOpen(false)}
           onApply={(imported) => {
             void (async () => {

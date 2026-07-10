@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -23,20 +24,33 @@ type rfqPageText struct {
 }
 
 type rfqParseRequest struct {
-	Pages []rfqPageText `json:"pages"`
+	Pages           []rfqPageText     `json:"pages"`
+	ForceColumns    []string          `json:"force_columns,omitempty"`
+	HeaderOverrides map[string]string `json:"header_overrides,omitempty"`
 }
 
 type rfqMatchRequest struct {
-	Lines []ParsedRfqLine `json:"lines"`
+	Lines     []ParsedRfqLine `json:"lines"`
+	PartnerID *int64          `json:"partner_id,omitempty"`
+}
+
+type rfqItemAlternative struct {
+	ItemID     int64   `json:"item_id"`
+	ItemCode   string  `json:"item_code"`
+	ItemName   string  `json:"item_name"`
+	SalesPrice float64 `json:"sales_price"`
+	MatchScore float64 `json:"match_score"`
 }
 
 type rfqMatchedLine struct {
 	ParsedRfqLine
-	ItemID    *int64  `json:"item_id"`
-	ItemCode  string  `json:"item_code"`
-	ItemName  string  `json:"item_name"`
-	SalesPrice float64 `json:"sales_price"`
-	MatchScore float64 `json:"match_score"`
+	ItemID       *int64               `json:"item_id"`
+	ItemCode     string               `json:"item_code"`
+	ItemName     string               `json:"item_name"`
+	SalesPrice   float64              `json:"sales_price"`
+	RfqUnitPrice float64              `json:"rfq_unit_price,omitempty"`
+	MatchScore   float64              `json:"match_score"`
+	Alternatives []rfqItemAlternative `json:"alternatives,omitempty"`
 }
 
 func registerRfqImportRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -69,11 +83,17 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 				Height: p.Height,
 			}
 		}
-		lines := ParseRfqDocument(pages)
+		opts := RfqParseOptions{
+			ForceColumns:    body.ForceColumns,
+			HeaderOverrides: body.HeaderOverrides,
+		}
+		result := ParseRfqDocumentWithOptions(pages, opts)
 		response.OK(w, map[string]any{
-			"lines":       lines,
-			"page_count":  len(body.Pages),
-			"line_count":  len(lines),
+			"lines":            result.Lines,
+			"page_count":       len(body.Pages),
+			"line_count":       len(result.Lines),
+			"table_detected":   result.TableDetected,
+			"detected_columns": result.DetectedColumns,
 		}, "RFQ parsed.")
 	}
 }
@@ -90,31 +110,63 @@ func matchRfqImportItems(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
+		var partnerID int64
+		if body.PartnerID != nil {
+			partnerID = *body.PartnerID
+		}
 		out := make([]rfqMatchedLine, 0, len(body.Lines))
 		for _, ln := range body.Lines {
 			matched := rfqMatchedLine{ParsedRfqLine: ln}
-			item, score := lookupRfqItem(r.Context(), pool, tu.TenantID, ln)
-			if item != nil {
-				matched.ItemID = &item.ID
-				matched.ItemCode = item.Code
-				matched.ItemName = item.Name
-				matched.SalesPrice = item.SalesPrice
-				matched.MatchScore = score
+			if v := parseMoneyFloat(ln.UnitPrice); v > 0 {
+				matched.RfqUnitPrice = v
+			}
+			candidates := lookupRfqItemCandidates(r.Context(), pool, tu.TenantID, ln, 5)
+			if len(candidates) > 0 {
+				best := candidates[0]
+				matched.ItemID = &best.ID
+				matched.ItemCode = best.Code
+				matched.ItemName = best.Name
+				matched.SalesPrice = resolveRfqSalesPrice(r.Context(), pool, tu.TenantID, best.ID, partnerID, best.SalesPrice)
+				matched.MatchScore = best.Score
+				for _, alt := range candidates {
+					price := resolveRfqSalesPrice(r.Context(), pool, tu.TenantID, alt.ID, partnerID, alt.SalesPrice)
+					matched.Alternatives = append(matched.Alternatives, rfqItemAlternative{
+						ItemID: alt.ID, ItemCode: alt.Code, ItemName: alt.Name,
+						SalesPrice: price, MatchScore: alt.Score,
+					})
+				}
 			} else if strings.TrimSpace(ln.ItemCode) != "" {
 				matched.ItemCode = ln.ItemCode
 			}
 			if matched.ItemName == "" && strings.TrimSpace(ln.Description) != "" {
 				matched.ItemName = ln.Description
 			}
-			if matched.SalesPrice == 0 && strings.TrimSpace(ln.UnitPrice) != "" {
-				if v, err := strconv.ParseFloat(strings.ReplaceAll(ln.UnitPrice, ",", ""), 64); err == nil && v > 0 {
-					matched.SalesPrice = v
-				}
+			if matched.SalesPrice == 0 && matched.RfqUnitPrice > 0 {
+				matched.SalesPrice = matched.RfqUnitPrice
 			}
 			out = append(out, matched)
 		}
 		response.OK(w, map[string]any{"lines": out}, "Items matched.")
 	}
+}
+
+func resolveRfqSalesPrice(ctx context.Context, pool *pgxpool.Pool, tenantID, itemID, partnerID int64, current float64) float64 {
+	if partnerID <= 0 {
+		return current
+	}
+	return inventory.ResolveSellingUnitPrice(ctx, pool, tenantID, itemID, partnerID, current)
+}
+
+func parseMoneyFloat(s string) float64 {
+	s = strings.TrimSpace(strings.ReplaceAll(s, ",", ""))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
 }
 
 type rfqItemHit struct {
