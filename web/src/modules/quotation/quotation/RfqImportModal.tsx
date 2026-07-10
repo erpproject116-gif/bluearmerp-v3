@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
@@ -6,6 +6,7 @@ import { fileImportKey, type RfqDocumentPayload, type RfqOcrPage, type RfqOcrPro
 import type { RfqStructuredTable, WorkbookSheetInfo } from "./rfqSpreadsheetImport";
 import type { QuotationLineRow } from "./QuotationLineGrid";
 import { emptyQuotationLine } from "./QuotationLineGrid";
+import { rfqParseNeedsAiEnhancement } from "./rfqImportPipeline";
 
 export type RfqParsedLine = {
   page: number;
@@ -125,7 +126,18 @@ export function RfqImportModal(props: Props) {
   const [showSheetPicker, setShowSheetPicker] = createSignal(false);
   const [sheetPickerGroups, setSheetPickerGroups] = createSignal<SheetPickerGroup[]>([]);
   const [pendingFiles, setPendingFiles] = createSignal<File[]>([]);
+  const [sourceFiles, setSourceFiles] = createSignal<File[]>([]);
+  const [aiAvailable, setAiAvailable] = createSignal(false);
+  const [aiUsed, setAiUsed] = createSignal(false);
+  const [aiModel, setAiModel] = createSignal<string | null>(null);
   let fileInputRef: HTMLInputElement | undefined;
+
+  createEffect(() => {
+    if (!props.open) return;
+    void import("./rfqImportPipeline").then(({ fetchRfqAiConfig }) =>
+      fetchRfqAiConfig().then((cfg) => setAiAvailable(!!cfg?.enabled)),
+    );
+  });
 
   const parsePageFrom = () => {
     const v = parseInt(pageFrom().trim(), 10);
@@ -151,6 +163,9 @@ export function RfqImportModal(props: Props) {
     setShowSheetPicker(false);
     setSheetPickerGroups([]);
     setPendingFiles([]);
+    setSourceFiles([]);
+    setAiUsed(false);
+    setAiModel(null);
     setProgress(null);
     setError(null);
     if (fileInputRef) fileInputRef.value = "";
@@ -242,6 +257,9 @@ export function RfqImportModal(props: Props) {
       }
       setSourcePages(payload.pages);
       setSourceTables(payload.tables);
+      setSourceFiles(files);
+      setAiUsed(false);
+      setAiModel(null);
       setSkippedPageCount(payload.skippedPages ?? 0);
       const unitCount = payload.pages.length + payload.tables.length;
       setTableSourceCount(payload.tablePages ?? unitCount);
@@ -353,6 +371,68 @@ export function RfqImportModal(props: Props) {
             },
       ),
     );
+  };
+
+  const needsAiEnhancement = () =>
+    rfqParseNeedsAiEnhancement(
+      lines().map((l) => ({ description: l.description, confidence: l.confidence })),
+      tableDetected(),
+    );
+
+  const enhanceWithAI = async () => {
+    const files = sourceFiles();
+    const pages = sourcePages();
+    const tables = sourceTables();
+    if ((!pages.length && !tables.length) || busy()) return;
+    if (!aiAvailable()) {
+      toast.warning("AI enhancement is not configured on the server (OPENROUTER_API_KEY).");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setProgress({ phase: "parse", page: 0, totalPages: pages.length, message: "Preparing pages for AI…" });
+
+    try {
+      const { fetchRfqAiConfig, aiParsePayload } = await import("./rfqImportPipeline");
+      const { renderRfqPageImagesForAI } = await import("./rfqDocumentOcr");
+      const cfg = await fetchRfqAiConfig();
+      if (!cfg?.enabled) {
+        throw new Error("RFQ AI is not available on this server.");
+      }
+
+      const pageImages =
+        files.length && pages.length
+          ? await renderRfqPageImagesForAI(files, pages, cfg.max_pages || 10, (msg) =>
+              setProgress({ phase: "parse", page: 0, totalPages: pages.length, message: msg }),
+            )
+          : [];
+
+      const parsed = await aiParsePayload({ pages, tables }, pageImages, (p) =>
+        setProgress({
+          phase: "parse",
+          page: p.batch,
+          totalPages: p.totalBatches,
+          message: p.message,
+        }),
+      );
+
+      setTableDetected(parsed.table_detected);
+      setDetectedColumns(parsed.detected_columns);
+      setAiUsed(true);
+      setAiModel(parsed.ai_model ?? cfg.vision_model ?? null);
+
+      const matched = await matchLines(parsed.lines);
+      setLines(matched);
+      toast.success(`AI extracted ${matched.length} line item(s).`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "AI enhancement failed.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
   };
 
   const reparseWithMapping = async () => {
@@ -474,8 +554,15 @@ export function RfqImportModal(props: Props) {
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p class="text-sm font-semibold text-brand-800">
-                {tableDetected() ? "Line-item table detected" : "Extracted line items"}
+                {aiUsed()
+                  ? "AI-enhanced line items"
+                  : tableDetected()
+                    ? "Line-item table detected"
+                    : "Extracted line items"}
               </p>
+              <Show when={aiUsed() && aiModel()}>
+                <p class="mt-1 text-xs text-brand-700/80">Model: {aiModel()}</p>
+              </Show>
               <p class="mt-1 text-sm text-brand-900/90">{tableSourceLabel()}</p>
               <Show when={columnSummary()}>
                 <p class="mt-1 text-xs text-brand-800/80">
@@ -491,6 +578,26 @@ export function RfqImportModal(props: Props) {
             <div class="text-right">
               <p class="text-2xl font-bold text-brand-700">{lines().length}</p>
               <p class="text-xs text-brand-800/80">line items found</p>
+              <Show when={aiAvailable() && needsAiEnhancement() && !aiUsed()}>
+                <button
+                  type="button"
+                  class="mt-2 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                  disabled={busy()}
+                  onClick={() => void enhanceWithAI()}
+                >
+                  Enhance with AI
+                </button>
+              </Show>
+              <Show when={aiAvailable() && !needsAiEnhancement() && !aiUsed() && sourcePages().length > 0}>
+                <button
+                  type="button"
+                  class="mt-2 rounded-lg border border-violet-300 px-3 py-1.5 text-xs font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+                  disabled={busy()}
+                  onClick={() => void enhanceWithAI()}
+                >
+                  Re-run with AI
+                </button>
+              </Show>
             </div>
           </div>
         </div>

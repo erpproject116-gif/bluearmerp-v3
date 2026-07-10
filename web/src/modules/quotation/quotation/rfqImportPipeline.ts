@@ -11,6 +11,13 @@ export const RFQ_CLIENT_OCR_PAGE_MAX = 150;
 export const RFQ_SERVER_PDF_PAGE_MIN = 151;
 export const RFQ_SERVER_PDF_PAGE_MAX = 400;
 
+export type RfqAiConfig = {
+  enabled: boolean;
+  text_model: string;
+  vision_model: string;
+  max_pages: number;
+};
+
 type ParseApiLine = Omit<RfqParsedLine, "include">;
 
 type ParseBatchResult = {
@@ -153,4 +160,78 @@ export async function matchLinesInBatches(
   }
 
   return out.map((ln, idx) => ({ ...ln, line_no: idx + 1 }));
+}
+
+let rfqAiConfigCache: RfqAiConfig | null | undefined;
+
+export async function fetchRfqAiConfig(): Promise<RfqAiConfig | null> {
+  if (rfqAiConfigCache !== undefined) return rfqAiConfigCache;
+  try {
+    const res = await apiFetch<RfqAiConfig>("/api/v1/quotation/rfq-import/ai-config");
+    if (!res.success || !res.data?.enabled) {
+      rfqAiConfigCache = null;
+      return null;
+    }
+    rfqAiConfigCache = res.data;
+    return res.data;
+  } catch {
+    rfqAiConfigCache = null;
+    return null;
+  }
+}
+
+export function rfqParseNeedsAiEnhancement(
+  lines: Array<{ description?: string; confidence?: number }>,
+  tableDetected: boolean,
+): boolean {
+  if (!lines.length) return true;
+  if (!tableDetected) return true;
+  const weak = lines.filter((l) => !l.description?.trim() || (l.confidence ?? 0.5) < 0.65).length;
+  return weak / lines.length > 0.4;
+}
+
+export async function aiParsePayload(
+  payload: RfqDocumentPayload,
+  pageImages: Array<{ page: number; image_base64: string; mime: string }>,
+  onProgress?: (p: RfqImportProgress) => void,
+): Promise<{ lines: ParseApiLine[]; table_detected: boolean; detected_columns: RfqDetectedColumn[]; ai_model?: string }> {
+  onProgress?.({
+    phase: "parse",
+    batch: 1,
+    totalBatches: 1,
+    message: "Sending pages to AI for line-item extraction…",
+  });
+
+  const res = await apiFetch<{
+    lines: ParseApiLine[];
+    table_detected?: boolean;
+    detected_columns?: RfqDetectedColumn[];
+    ai_model?: string;
+  }>("/api/v1/quotation/rfq-import/ai-parse", {
+    method: "POST",
+    body: JSON.stringify({
+      pages: payload.pages.map((p) => ({
+        page: p.page,
+        text: p.text,
+        words: p.words,
+        width: p.width,
+        height: p.height,
+        source_pdf_page: p.source_pdf_page,
+        source_file_index: p.source_file_index,
+      })),
+      tables: payload.tables,
+      page_images: pageImages,
+    }),
+  });
+
+  if (!res.success || !res.data?.lines?.length) {
+    throw new Error(res.message ?? "AI extraction returned no line items.");
+  }
+
+  return {
+    lines: res.data.lines.map((ln, idx) => ({ ...ln, line_no: idx + 1 })),
+    table_detected: !!res.data.table_detected,
+    detected_columns: res.data.detected_columns ?? [],
+    ai_model: res.data.ai_model,
+  };
 }

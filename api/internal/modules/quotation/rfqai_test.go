@@ -1,0 +1,64 @@
+package quotation
+
+import "testing"
+
+func TestParseRfqAIJSON_validLines(t *testing.T) {
+	raw := `{"lines":[{"page":2,"item_code":"ABC-1","description":"Network switch 24-port","qty":"10","unit":"pcs","unit_price":"12500","remarks":""}]}`
+	lines, err := parseRfqAIJSON(raw)
+	if err != nil {
+		t.Fatalf("parseRfqAIJSON: %v", err)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+	ln := lines[0]
+	if ln.Page != 2 || ln.ItemCode != "ABC-1" || ln.Description != "Network switch 24-port" || ln.Qty != "10" {
+		t.Fatalf("unexpected line: %+v", ln)
+	}
+	if ln.Confidence < 0.85 {
+		t.Fatalf("expected high confidence, got %v", ln.Confidence)
+	}
+}
+
+func TestParseRfqAIJSON_skipsEmptyRows(t *testing.T) {
+	raw := `{"lines":[{"page":1,"item_code":"","description":"","qty":"1"}]}`
+	lines, err := parseRfqAIJSON(raw)
+	if err != nil {
+		t.Fatalf("parseRfqAIJSON: %v", err)
+	}
+	if len(lines) != 0 {
+		t.Fatalf("expected 0 lines, got %d", len(lines))
+	}
+}
+
+func TestParseRfqAIJSON_stripsMarkdownFence(t *testing.T) {
+	raw := "```json\n{\"lines\":[{\"page\":1,\"description\":\"Item A\",\"qty\":\"2\"}]}\n```"
+	lines, err := parseRfqAIJSON(raw)
+	if err != nil {
+		t.Fatalf("parseRfqAIJSON: %v", err)
+	}
+	if len(lines) != 1 || lines[0].Description != "Item A" {
+		t.Fatalf("unexpected: %+v", lines)
+	}
+}
+
+func TestRfqAIConfigFromEnv_defaults(t *testing.T) {
+	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("RFQ_AI_ENABLED", "")
+	cfg := RfqAIConfigFromEnv()
+	if cfg.Available() {
+		t.Fatal("expected unavailable without API key")
+	}
+	if cfg.TextModel == "" || cfg.VisionModel == "" {
+		t.Fatal("expected default models")
+	}
+}
+
+func TestRfqAIConfigFromEnv_withKey(t *testing.T) {
+	t.Setenv("OPENROUTER_API_KEY", "sk-test")
+	t.Setenv("RFQ_AI_ENABLED", "true")
+	cfg := RfqAIConfigFromEnv()
+	if !cfg.Available() {
+		t.Fatal("expected available with API key")
+	}
+}

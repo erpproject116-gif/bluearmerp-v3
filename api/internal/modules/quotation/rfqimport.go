@@ -16,13 +16,16 @@ import (
 )
 
 const rfqImportMaxUploadBytes = 50 << 20
+const rfqAIParseMaxBodyBytes = 32 << 20
 
 type rfqPageText struct {
-	Page   int       `json:"page"`
-	Text   string    `json:"text"`
-	Words  []RfqWord `json:"words,omitempty"`
-	Width  float64   `json:"width,omitempty"`
-	Height float64   `json:"height,omitempty"`
+	Page            int       `json:"page"`
+	Text            string    `json:"text"`
+	Words           []RfqWord `json:"words,omitempty"`
+	Width           float64   `json:"width,omitempty"`
+	Height          float64   `json:"height,omitempty"`
+	SourcePDFPage   int       `json:"source_pdf_page,omitempty"`
+	SourceFileIndex int       `json:"source_file_index,omitempty"`
 }
 
 type rfqParseRequest struct {
@@ -59,6 +62,8 @@ type rfqMatchedLine struct {
 func registerRfqImportRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/rfq-import/extract-pdf", extractRfqPDF(pool))
 	r.Post("/rfq-import/parse", parseRfqImport(pool))
+	r.Post("/rfq-import/ai-parse", aiParseRfqImport(pool))
+	r.Get("/rfq-import/ai-config", rfqAIConfigHandler())
 	r.Post("/rfq-import/match-items", matchRfqImportItems(pool))
 }
 
@@ -113,6 +118,7 @@ func extractRfqPDF(_ *pgxpool.Pool) http.HandlerFunc {
 			}
 			pagesOut[i] = rfqPageText{
 				Page: p.Page, Text: p.Text, Words: p.Words, Width: p.Width, Height: p.Height,
+				SourcePDFPage: p.SourcePDFPage,
 			}
 		}
 
@@ -146,11 +152,13 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 		pages := make([]RfqPageInput, len(body.Pages))
 		for i, p := range body.Pages {
 			pages[i] = RfqPageInput{
-				Page:   p.Page,
-				Text:   p.Text,
-				Words:  p.Words,
-				Width:  p.Width,
-				Height: p.Height,
+				Page:            p.Page,
+				Text:            p.Text,
+				Words:           p.Words,
+				Width:           p.Width,
+				Height:          p.Height,
+				SourcePDFPage:   p.SourcePDFPage,
+				SourceFileIndex: p.SourceFileIndex,
 			}
 		}
 		opts := RfqParseOptions{

@@ -124,11 +124,12 @@ func extractRfqPDFPages(data []byte, opts rfqPDFExtractOptions) (rfqPDFExtractRe
 		text, _ := page.GetPlainText(nil)
 		words := mergeNearbyWords(plainTextToWords(text))
 		out.Pages = append(out.Pages, RfqPageInput{
-			Page:   pi + 1,
-			Text:   strings.TrimSpace(text),
-			Words:  words,
-			Width:  rfqPDFDefaultW,
-			Height: rfqPDFDefaultH,
+			Page:          pi + 1,
+			Text:          strings.TrimSpace(text),
+			Words:         words,
+			Width:         rfqPDFDefaultW,
+			Height:        rfqPDFDefaultH,
+			SourcePDFPage: p.pdfIndex,
 		})
 	}
 	return out, nil

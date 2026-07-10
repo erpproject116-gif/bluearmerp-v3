@@ -105,7 +105,8 @@ func TierForPath(method, path string) Tier {
 	}
 	if strings.Contains(p, "/serial-units/resolve-scan") ||
 		strings.Contains(p, "/goods-receipts/") && strings.Contains(p, "/scan") ||
-		strings.HasSuffix(p, "/export") {
+		strings.HasSuffix(p, "/export") ||
+		strings.Contains(p, "/rfq-import/ai-parse") {
 		return TierExpensive
 	}
 	if strings.HasPrefix(p, "/api/v1/") {

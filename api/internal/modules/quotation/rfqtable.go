@@ -19,11 +19,13 @@ type RfqWord struct {
 
 // RfqPageInput is one page sent from the client OCR layer.
 type RfqPageInput struct {
-	Page   int       `json:"page"`
-	Text   string    `json:"text"`
-	Words  []RfqWord `json:"words"`
-	Width  float64   `json:"width"`
-	Height float64   `json:"height"`
+	Page            int       `json:"page"`
+	Text            string    `json:"text"`
+	Words           []RfqWord `json:"words"`
+	Width           float64   `json:"width,omitempty"`
+	Height          float64   `json:"height,omitempty"`
+	SourcePDFPage   int       `json:"source_pdf_page,omitempty"`
+	SourceFileIndex int       `json:"source_file_index,omitempty"`
 }
 
 type rfqColumnField string

@@ -22,6 +22,10 @@ export type RfqOcrPage = {
   words: RfqOcrWord[];
   width: number;
   height: number;
+  /** Index in the upload batch (matches fileImportKey order). */
+  source_file_index?: number;
+  /** 1-based page in the source PDF, or 1 for single images. */
+  source_pdf_page?: number;
 };
 
 export type RfqOcrProgress = {
@@ -40,6 +44,8 @@ export type RfqExtractOptions = {
   filterNonTablePages?: boolean;
   /** Per-file selected Excel sheet names (key = fileKey from fileImportKey). */
   sheetSelections?: Record<string, string[]>;
+  /** Index of the file within the upload batch. */
+  fileIndex?: number;
 };
 
 export function fileImportKey(file: File, index: number): string {
@@ -309,6 +315,8 @@ async function extractPdfPages(
         words,
         width: ocr.width,
         height: ocr.height,
+        source_file_index: options.fileIndex,
+        source_pdf_page: i,
       });
       continue;
     }
@@ -319,6 +327,8 @@ async function extractPdfPages(
       words,
       width: viewport.width,
       height: viewport.height,
+      source_file_index: options.fileIndex,
+      source_pdf_page: i,
     });
   }
   return pages;
@@ -329,6 +339,115 @@ export async function getPdfPageCount(file: File): Promise<number> {
   const data = new Uint8Array(await file.arrayBuffer());
   const pdf = await getDocument({ data }).promise;
   return pdf.numPages;
+}
+
+export type RfqPageImageForAI = {
+  page: number;
+  image_base64: string;
+  mime: string;
+};
+
+async function canvasToJpegBase64(canvas: HTMLCanvasElement, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Could not encode page image."));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = String(reader.result ?? "");
+          const comma = dataUrl.indexOf(",");
+          resolve(comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl);
+        };
+        reader.onerror = () => reject(new Error("Could not read page image."));
+        reader.readAsDataURL(blob);
+      },
+      "image/jpeg",
+      quality,
+    );
+  });
+}
+
+async function renderImageFileToJpegBase64(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error(`Could not load image ${file.name}.`));
+      el.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas not supported.");
+    ctx.drawImage(img, 0, 0);
+    return canvasToJpegBase64(canvas);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+const pdfDocCache = new Map<string, Promise<import("pdfjs-dist").PDFDocumentProxy>>();
+
+async function loadPdfDocument(file: File): Promise<import("pdfjs-dist").PDFDocumentProxy> {
+  const key = `${file.name}::${file.size}::${file.lastModified}`;
+  let pending = pdfDocCache.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const data = new Uint8Array(await file.arrayBuffer());
+      return getDocument({ data }).promise;
+    })();
+    pdfDocCache.set(key, pending);
+  }
+  return pending;
+}
+
+/** Render table pages to JPEG base64 for OpenRouter vision extraction. */
+export async function renderRfqPageImagesForAI(
+  files: File[],
+  pages: RfqOcrPage[],
+  maxPages: number,
+  onProgress?: (message: string) => void,
+): Promise<RfqPageImageForAI[]> {
+  const cap = Math.max(1, maxPages);
+  const targets = pages.slice(0, cap);
+  const out: RfqPageImageForAI[] = [];
+
+  for (let i = 0; i < targets.length; i++) {
+    const pg = targets[i];
+    const fileIdx = pg.source_file_index ?? 0;
+    const file = files[fileIdx];
+    if (!file) continue;
+
+    onProgress?.(`Rendering page ${i + 1} of ${targets.length} for AI…`);
+
+    if (isImage(file)) {
+      const image_base64 = await renderImageFileToJpegBase64(file);
+      out.push({ page: pg.page, image_base64, mime: "image/jpeg" });
+      continue;
+    }
+    if (!isPdf(file)) continue;
+
+    const pdfPage = pg.source_pdf_page ?? pg.page;
+    const pdf = await loadPdfDocument(file);
+    if (pdfPage < 1 || pdfPage > pdf.numPages) continue;
+    const page = await pdf.getPage(pdfPage);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas not supported.");
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    const image_base64 = await canvasToJpegBase64(canvas);
+    out.push({ page: pg.page, image_base64, mime: "image/jpeg" });
+  }
+
+  return out;
 }
 
 /** Payload sent to RFQ parse API (PDF/images + structured spreadsheet/word tables). */
@@ -439,14 +558,19 @@ export async function extractRfqDocumentPayload(
               message: `${server.emptyTextPages} page(s) had no text layer — OCR not run on server.`,
             });
           }
-          const offsetPages = server.pages.map((p, i) => ({ ...p, page: pageOffset + i + 1 }));
+          const offsetPages = server.pages.map((p, i) => ({
+            ...p,
+            page: pageOffset + i + 1,
+            source_file_index: fi,
+            source_pdf_page: p.source_pdf_page ?? p.page,
+          }));
           pages.push(...offsetPages);
           skippedPages += server.skippedPages;
           pageOffset = before + offsetPages.length;
           continue;
         }
 
-        const pdfPages = await extractPdfPages(file, onProgress, pageOffset, options);
+        const pdfPages = await extractPdfPages(file, onProgress, pageOffset, { ...options, fileIndex: fi });
         skippedPages += Math.max(0, to - from + 1 - pdfPages.length);
         pages.push(...pdfPages);
         pageOffset = before + pdfPages.length;
@@ -470,6 +594,8 @@ export async function extractRfqDocumentPayload(
           words: ocr.words,
           width: ocr.width,
           height: ocr.height,
+          source_file_index: fi,
+          source_pdf_page: 1,
         });
         continue;
       }
