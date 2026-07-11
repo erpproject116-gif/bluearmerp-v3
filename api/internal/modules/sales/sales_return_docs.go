@@ -29,13 +29,14 @@ type SalesReturn struct {
 }
 
 type SalesReturnLine struct {
-	ID          int64   `json:"id,omitempty"`
-	LineNo      int     `json:"line_no"`
-	SalesLineID int64   `json:"sales_line_id"`
-	ItemCode    string  `json:"item_code"`
-	ItemName    string  `json:"item_name"`
-	Qty         float64 `json:"qty"`
-	LineTotal   float64 `json:"line_total"`
+	ID             int64   `json:"id,omitempty"`
+	LineNo         int     `json:"line_no"`
+	SalesLineID    int64   `json:"sales_line_id"`
+	ItemCode       string  `json:"item_code"`
+	ItemName       string  `json:"item_name"`
+	Qty            float64 `json:"qty"`
+	LineTotal      float64 `json:"line_total"`
+	SerialUnitIDs  []int64 `json:"serial_unit_ids,omitempty"`
 }
 
 func registerSalesReturnRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -85,8 +86,9 @@ func createSalesReturn(pool *pgxpool.Pool) http.HandlerFunc {
 		var body struct {
 			SalesID int64 `json:"sales_id"`
 			Lines   []struct {
-				SalesLineID int64   `json:"sales_line_id"`
-				Qty         float64 `json:"qty"`
+				SalesLineID   int64   `json:"sales_line_id"`
+				Qty           float64 `json:"qty"`
+				SerialUnitIDs []int64 `json:"serial_unit_ids"`
 			} `json:"lines"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.SalesID <= 0 || len(body.Lines) == 0 {
@@ -131,20 +133,41 @@ func createSalesReturn(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		for i, ln := range body.Lines {
-			var lineTotal float64
+			if ln.Qty <= 0 {
+				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d]", i): "Return qty must be positive."})
+				return
+			}
+			var itemID *int64
+			var lineQty, returnedQty, unitVatInc float64
 			err = tx.QueryRow(r.Context(), `
-				select unit_vat_inc::float8 * $2
-				from public.sa_sales_lines where id = $1 and sales_id = $3`,
-				ln.SalesLineID, ln.Qty, body.SalesID).Scan(&lineTotal)
+				select item_id, qty::float8, coalesce(returned_qty, 0)::float8, unit_vat_inc::float8
+				from public.sa_sales_lines where id = $1 and sales_id = $2`,
+				ln.SalesLineID, body.SalesID).Scan(&itemID, &lineQty, &returnedQty, &unitVatInc)
 			if err != nil {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d]", i): "Invalid sales line."})
 				return
 			}
+			if ln.Qty+returnedQty > lineQty+0.0001 {
+				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d]", i): "Return qty exceeds remaining billable qty."})
+				return
+			}
+			if err := validateReturnSerialUnits(r.Context(), tx, tu.TenantID, ln.SalesLineID, itemID, ln.Qty, ln.SerialUnitIDs); err != nil {
+				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d]", i): err.Error()})
+				return
+			}
+			lineTotal := unitVatInc * ln.Qty
 			grandTotal += lineTotal
+			serialIDs := ln.SerialUnitIDs
+			if serialIDs == nil {
+				serialIDs = []int64{}
+			}
 			_, err = tx.Exec(r.Context(), `
-				insert into public.sr_sales_return_lines (sales_return_id, line_no, sales_line_id, item_code, item_name, qty, unit_vat_inc, line_total)
-				select $1, $2, id, item_code, item_name, $3, unit_vat_inc, $4 from public.sa_sales_lines where id = $5`,
-				returnID, i+1, ln.Qty, lineTotal, ln.SalesLineID)
+				insert into public.sr_sales_return_lines (
+				  sales_return_id, line_no, sales_line_id, item_id, item_code, item_name, qty, unit_vat_inc, line_total, serial_unit_ids
+				)
+				select $1, $2, id, item_id, item_code, item_name, $3, unit_vat_inc, $4, $5
+				from public.sa_sales_lines where id = $6`,
+				returnID, i+1, ln.Qty, lineTotal, serialIDs, ln.SalesLineID)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to insert return line.", "ERR_INTERNAL")
 				return
@@ -191,17 +214,19 @@ func submitSalesReturn(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		rows, err := tx.Query(r.Context(), `
-			select id, sales_line_id, qty::float8 from public.sr_sales_return_lines where sales_return_id = $1 order by line_no`, id)
+			select id, sales_line_id, qty::float8, item_id, coalesce(serial_unit_ids, '{}')
+			from public.sr_sales_return_lines where sales_return_id = $1 order by line_no`, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
-		var lineIDs []int64
 		for rows.Next() {
 			var returnLineID, salesLineID int64
 			var qty float64
-			if err := rows.Scan(&returnLineID, &salesLineID, &qty); err != nil {
+			var itemID *int64
+			var serialUnitIDs []int64
+			if err := rows.Scan(&returnLineID, &salesLineID, &qty, &itemID, &serialUnitIDs); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read line.", "ERR_INTERNAL")
 				return
 			}
@@ -218,11 +243,18 @@ func submitSalesReturn(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Validation(w, map[string]string{"lines": "Return qty exceeds remaining billable qty on a line."})
 				return
 			}
+			if err := validateReturnSerialUnits(r.Context(), tx, tu.TenantID, salesLineID, itemID, qty, serialUnitIDs); err != nil {
+				response.Validation(w, map[string]string{"lines": err.Error()})
+				return
+			}
 			if err := applySalesReturnStock(r.Context(), tx, tu.TenantID, salesID, locationID, returnLineID, salesLineID, tu.AppUserID, qty); err != nil {
 				response.Err(w, http.StatusInternalServerError, err.Error(), "ERR_INTERNAL")
 				return
 			}
-			lineIDs = append(lineIDs, salesLineID)
+			if err := restoreSaleSerialUnitsForReturn(r.Context(), tx, tu.TenantID, salesID, returnLineID, salesLineID, locationID, serialUnitIDs); err != nil {
+				response.Err(w, http.StatusInternalServerError, err.Error(), "ERR_INTERNAL")
+				return
+			}
 			if err := fulfillment.SyncSalesLineReturnedQty(r.Context(), tx, salesLineID, qty); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to update returned qty.", "ERR_INTERNAL")
 				return
@@ -230,10 +262,6 @@ func submitSalesReturn(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := rows.Err(); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
-			return
-		}
-		if err := reverseSaleSerialsForLines(r.Context(), tx, tu.TenantID, salesID, lineIDs); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to restore serial units.", "ERR_INTERNAL")
 			return
 		}
 

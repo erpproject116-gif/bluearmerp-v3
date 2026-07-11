@@ -385,7 +385,7 @@ export function RfqImportModal(props: Props) {
     const tables = sourceTables();
     if ((!pages.length && !tables.length) || busy()) return;
     if (!aiAvailable()) {
-      toast.warning("AI enhancement is not configured on the server (OPENROUTER_API_KEY).");
+      toast.warning("AI enhancement is not configured on the server (DASHSCOPE_API_KEY).");
       return;
     }
 

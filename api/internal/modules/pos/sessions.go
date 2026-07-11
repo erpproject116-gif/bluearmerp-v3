@@ -50,8 +50,10 @@ type CartLine struct {
 	LineTotal float64           `json:"line_total"`
 	Notes     *string           `json:"notes,omitempty"`
 	SizeLabel *string           `json:"size_label,omitempty"`
-	SerialUnitIDs []int64           `json:"serial_unit_ids,omitempty"`
-	Modifiers []CartLineModifier `json:"modifiers,omitempty"`
+	SerialUnitIDs []int64            `json:"serial_unit_ids,omitempty"`
+	LotBatchID    *int64             `json:"lot_batch_id,omitempty"`
+	LotNo         string             `json:"lot_no,omitempty"`
+	Modifiers     []CartLineModifier `json:"modifiers,omitempty"`
 }
 
 type CartLineModifier struct {
@@ -94,6 +96,7 @@ type cartLinePatch struct {
 	Qty           *float64 `json:"qty"`
 	UnitPrice     *float64 `json:"unit_price"`
 	SerialUnitIDs []int64  `json:"serial_unit_ids"`
+	LotBatchID    *int64   `json:"lot_batch_id"`
 }
 
 type checkoutBody struct {
@@ -430,20 +433,29 @@ func patchCartLine(pool *pgxpool.Pool) http.HandlerFunc {
 			unitPrice = *body.UnitPrice
 		}
 		lineTotal := roundMoney(qty * unitPrice)
-		if body.SerialUnitIDs != nil {
-			_, err := pool.Exec(r.Context(), `update public.pos_cart_lines set qty=$3, unit_price=$4, line_total=$5, serial_unit_ids=$6, updated_at=now() where id=$1 and session_id=$2`, lineID, sessionID, qty, unitPrice, lineTotal, body.SerialUnitIDs)
+		if body.SerialUnitIDs != nil || body.LotBatchID != nil {
+			serialIDs := body.SerialUnitIDs
+			if serialIDs == nil {
+				_ = pool.QueryRow(r.Context(), `select coalesce(serial_unit_ids, '{}') from public.pos_cart_lines where id = $1 and session_id = $2`, lineID, sessionID).Scan(&serialIDs)
+			}
+			lotBatchID := body.LotBatchID
+			if lotBatchID == nil {
+				_ = pool.QueryRow(r.Context(), `select lot_batch_id from public.pos_cart_lines where id = $1 and session_id = $2`, lineID, sessionID).Scan(&lotBatchID)
+			}
+			_, err := pool.Exec(r.Context(), `update public.pos_cart_lines set qty=$3, unit_price=$4, line_total=$5, serial_unit_ids=$6, lot_batch_id=$7, updated_at=now() where id=$1 and session_id=$2`, lineID, sessionID, qty, unitPrice, lineTotal, serialIDs, lotBatchID)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to update cart line.", "ERR_INTERNAL")
 				return
 			}
-		} else {
-			tag, err := pool.Exec(r.Context(), `update public.pos_cart_lines set qty=$3, unit_price=$4, line_total=$5, updated_at=now() where id=$1 and session_id=$2`, lineID, sessionID, qty, unitPrice, lineTotal)
-			if err != nil || tag.RowsAffected() == 0 {
-				response.Err(w, http.StatusNotFound, "Cart line not found.", "ERR_NOT_FOUND")
-				return
-			}
+			response.OK(w, CartLine{ID: lineID, Qty: qty, UnitPrice: unitPrice, LineTotal: lineTotal, SerialUnitIDs: serialIDs, LotBatchID: lotBatchID}, "Updated.")
+			return
 		}
-		response.OK(w, CartLine{ID: lineID, Qty: qty, UnitPrice: unitPrice, LineTotal: lineTotal, SerialUnitIDs: body.SerialUnitIDs}, "Updated.")
+		tag, err := pool.Exec(r.Context(), `update public.pos_cart_lines set qty=$3, unit_price=$4, line_total=$5, updated_at=now() where id=$1 and session_id=$2`, lineID, sessionID, qty, unitPrice, lineTotal)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Cart line not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.OK(w, CartLine{ID: lineID, Qty: qty, UnitPrice: unitPrice, LineTotal: lineTotal}, "Updated.")
 	}
 }
 
@@ -519,6 +531,21 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			discountTotal = subtotalLines
 		}
 		subtotalLines = roundMoney(subtotalLines - discountTotal)
+
+		lotInputs := make([]sales.SaleLotLineInput, len(lines))
+		for i, ln := range lines {
+			itemID := ln.ItemID
+			lotInputs[i] = sales.SaleLotLineInput{
+				LineNo:     i + 1,
+				ItemID:     &itemID,
+				Qty:        ln.Qty,
+				LotBatchID: ln.LotBatchID,
+			}
+		}
+		if err := sales.ValidateSaleLotForCheckout(r.Context(), tx, tu.TenantID, lotInputs); err != nil {
+			response.Validation(w, map[string]string{"cart": err.Error()})
+			return
+		}
 
 		// Resolve tax from POS settings (default tax type + inclusive flag).
 		var settingsTaxTypeID *int64
@@ -611,9 +638,9 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		for i, ln := range lines {
 			var saleLineID int64
 			if err := tx.QueryRow(r.Context(), `
-				insert into public.sa_sales_lines (sales_id, line_no, item_id, item_code, item_name, qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total)
-				values ($1,$2,$3,$4,$5,$6,$7,$8,0,$7,$8) returning id`,
-				salesID, i+1, ln.ItemID, ln.ItemCode, ln.ItemName, ln.Qty, ln.UnitPrice, ln.LineTotal).Scan(&saleLineID); err != nil {
+				insert into public.sa_sales_lines (sales_id, line_no, item_id, item_code, item_name, qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, lot_batch_id)
+				values ($1,$2,$3,$4,$5,$6,$7,$8,0,$7,$8,$9) returning id`,
+				salesID, i+1, ln.ItemID, ln.ItemCode, ln.ItemName, ln.Qty, ln.UnitPrice, ln.LineTotal, ln.LotBatchID).Scan(&saleLineID); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to save sale lines.", "ERR_INTERNAL")
 				return
 			}
@@ -635,6 +662,10 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := sales.ApplySaleSerialUnitsForCheckout(r.Context(), tx, tu.TenantID, salesID, partnerID, serialInputs); err != nil {
 			response.Validation(w, map[string]string{"serials": err.Error()})
+			return
+		}
+		if err := sales.ApplySaleLot(r.Context(), tx, tu.TenantID, salesID); err != nil {
+			response.Validation(w, map[string]string{"lots": err.Error()})
 			return
 		}
 		acct, err := postCheckoutAccounting(r.Context(), tx, tu.TenantID, tu.AppUserID, salesID, partnerID, currencyID, orderDate, salesNo, subtotal, taxTotal, grandTotal, primaryTender)
@@ -709,7 +740,12 @@ func loadCartLinesTx(ctx context.Context, tx pgx.Tx, sessionID int64) ([]CartLin
 }
 
 func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64) ([]CartLine, error) {
-	rows, err := q.Query(ctx, `select id, line_no, item_id, item_code, item_name, qty::float8, unit_price::float8, line_total::float8, notes, size_label, coalesce(serial_unit_ids, '{}') from public.pos_cart_lines where session_id=$1 order by line_no`, sessionID)
+	rows, err := q.Query(ctx, `
+		select cl.id, cl.line_no, cl.item_id, cl.item_code, cl.item_name, cl.qty::float8, cl.unit_price::float8, cl.line_total::float8,
+		  cl.notes, cl.size_label, coalesce(cl.serial_unit_ids, '{}'), cl.lot_batch_id, coalesce(lb.lot_no, '')
+		from public.pos_cart_lines cl
+		left join public.inv_lot_batches lb on lb.id = cl.lot_batch_id
+		where cl.session_id=$1 order by cl.line_no`, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -719,7 +755,7 @@ func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64)
 	var lineIDs []int64
 	for rows.Next() {
 		var ln CartLine
-		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.SerialUnitIDs); err != nil {
+		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.SerialUnitIDs, &ln.LotBatchID, &ln.LotNo); err != nil {
 			return nil, err
 		}
 		byID[ln.ID] = len(out)

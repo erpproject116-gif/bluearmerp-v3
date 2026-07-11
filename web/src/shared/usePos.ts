@@ -66,6 +66,8 @@ export type PosCartLine = {
   notes?: string | null;
   size_label?: string | null;
   serial_unit_ids?: number[];
+  lot_batch_id?: number | null;
+  lot_no?: string;
   modifiers?: PosCartLineModifier[];
 };
 
@@ -147,6 +149,8 @@ export type PosCatalogItem = {
   image_url?: string;
   item_category_id?: number | null;
   track_inventory_qty: boolean;
+  track_serial?: boolean;
+  track_lot?: boolean;
   has_modifiers: boolean;
 };
 
@@ -220,7 +224,7 @@ export async function savePosSettings(body: PosSettings) {
 export async function patchPosCartLine(
   sessionId: number,
   lineId: number,
-  body: { qty?: number; unit_price?: number; serial_unit_ids?: number[] },
+  body: { qty?: number; unit_price?: number; serial_unit_ids?: number[]; lot_batch_id?: number | null },
 ) {
   return apiFetch<PosCartLine>(`/api/v1/pos/sessions/${sessionId}/cart-lines/${lineId}`, {
     method: "PATCH",

@@ -8,38 +8,44 @@ import (
 	"strings"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openrouter"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/dashscope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/llm"
 )
 
-// RfqAIConfig controls OpenRouter fallback for RFQ line-item extraction.
+const defaultQwenVLModel = "qwen-vl-plus"
+
+// RfqAIConfig controls DashScope (Qwen) RFQ line-item extraction.
 type RfqAIConfig struct {
 	Enabled            bool
 	APIKey             string
-	TextModel          string
-	VisionModel        string
+	BaseURL            string
+	VLModel            string
 	MaxTotalPages      int
 	MaxPagesPerRequest int
-	AppReferer         string
-	AppTitle           string
 }
 
 func RfqAIConfigFromEnv() RfqAIConfig {
-	key := strings.TrimSpace(os.Getenv("OPENROUTER_API_KEY"))
+	key := strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY"))
 	enabled := parseEnvBoolDefault(os.Getenv("RFQ_AI_ENABLED"), key != "")
+	model := envOrDefault("QWEN_VL_MODEL", defaultQwenVLModel)
 	return RfqAIConfig{
 		Enabled:            enabled,
 		APIKey:             key,
-		TextModel:          envOrDefault("OPENROUTER_MODEL", "deepseek/deepseek-chat"),
-		VisionModel:        envOrDefault("OPENROUTER_VISION_MODEL", "openai/gpt-4o"),
+		BaseURL:            envOrDefault("DASHSCOPE_BASE_URL", dashscope.DefaultBaseURL),
+		VLModel:            model,
 		MaxTotalPages:      config.ParseIntDefault(os.Getenv("RFQ_AI_MAX_PAGES"), 10),
 		MaxPagesPerRequest: config.ParseIntDefault(os.Getenv("RFQ_AI_PAGES_PER_CALL"), 2),
-		AppReferer:         envOrDefault("OPENROUTER_HTTP_REFERER", "https://bluearm.local"),
-		AppTitle:           envOrDefault("OPENROUTER_APP_TITLE", "Bluearm ERP RFQ Import"),
 	}
 }
 
 func (c RfqAIConfig) Available() bool {
 	return c.Enabled && c.APIKey != ""
+}
+
+func (c RfqAIConfig) newLLMClient() llm.Client {
+	client := dashscope.NewClient(c.APIKey)
+	client.BaseURL = c.BaseURL
+	return client
 }
 
 type rfqAIPageInput struct {
@@ -51,6 +57,7 @@ type rfqAIPageInput struct {
 
 type RfqAIUsage struct {
 	Model          string `json:"ai_model"`
+	Provider       string `json:"ai_provider"`
 	PagesProcessed int    `json:"ai_pages_processed"`
 	UsedVision     bool   `json:"ai_used_vision"`
 }
@@ -82,16 +89,15 @@ type rfqAIExtractResponse struct {
 func ParseRfqWithAI(ctx context.Context, cfg RfqAIConfig, pages []rfqAIPageInput, tables []RfqStructuredTable) (RfqParseResult, RfqAIUsage, error) {
 	var empty RfqParseResult
 	var usage RfqAIUsage
+	usage.Provider = "dashscope"
 	if !cfg.Available() {
-		return empty, usage, fmt.Errorf("RFQ AI is not configured (set OPENROUTER_API_KEY and RFQ_AI_ENABLED)")
+		return empty, usage, fmt.Errorf("RFQ AI is not configured (set DASHSCOPE_API_KEY and RFQ_AI_ENABLED)")
 	}
 	if len(pages) == 0 && len(tables) == 0 {
 		return empty, usage, fmt.Errorf("at least one page or table is required")
 	}
 
-	client := openrouter.NewClient(cfg.APIKey)
-	client.Referer = cfg.AppReferer
-	client.Title = cfg.AppTitle
+	client := cfg.newLLMClient()
 
 	maxPages := cfg.MaxTotalPages
 	if maxPages <= 0 {
@@ -157,13 +163,13 @@ func ParseRfqWithAI(ctx context.Context, cfg RfqAIConfig, pages []rfqAIPageInput
 	}
 
 	return RfqParseResult{
-		Lines:          allLines,
-		TableDetected:  true,
+		Lines:           allLines,
+		TableDetected:   true,
 		DetectedColumns: defaultRfqAIColumns(),
 	}, usage, nil
 }
 
-func extractRfqAIBatch(ctx context.Context, client openrouter.Client, cfg RfqAIConfig, batch []rfqAIPageInput) ([]ParsedRfqLine, string, bool, error) {
+func extractRfqAIBatch(ctx context.Context, client llm.Client, cfg RfqAIConfig, batch []rfqAIPageInput) ([]ParsedRfqLine, string, bool, error) {
 	useVision := false
 	for _, p := range batch {
 		if strings.TrimSpace(p.ImageBase64) != "" {
@@ -171,13 +177,13 @@ func extractRfqAIBatch(ctx context.Context, client openrouter.Client, cfg RfqAIC
 			break
 		}
 	}
-	model := cfg.TextModel
-	if useVision {
-		model = cfg.VisionModel
+	model := cfg.VLModel
+	if model == "" {
+		model = defaultQwenVLModel
 	}
 
-	var userParts []openrouter.ContentPart
-	userParts = append(userParts, openrouter.ContentPart{
+	var userParts []llm.ContentPart
+	userParts = append(userParts, llm.ContentPart{
 		Type: "text",
 		Text: buildRfqAIUserPrompt(batch),
 	})
@@ -190,11 +196,11 @@ func extractRfqAIBatch(ctx context.Context, client openrouter.Client, cfg RfqAIC
 		if mime == "" {
 			mime = "image/jpeg"
 		}
-		userParts = append(userParts, openrouter.ContentPart{
+		userParts = append(userParts, llm.ContentPart{
 			Type: "text",
 			Text: fmt.Sprintf("Page %d image:", p.Page),
 		})
-		userParts = append(userParts, openrouter.ContentPart{
+		userParts = append(userParts, llm.ContentPart{
 			Type: "image_url",
 			ImageURL: &struct {
 				URL string `json:"url"`
@@ -202,9 +208,9 @@ func extractRfqAIBatch(ctx context.Context, client openrouter.Client, cfg RfqAIC
 		})
 	}
 
-	content, err := client.ChatCompletion(ctx, openrouter.ChatRequest{
+	content, err := client.ChatCompletion(ctx, llm.ChatRequest{
 		Model: model,
-		Messages: []openrouter.Message{
+		Messages: []llm.Message{
 			{Role: "system", Content: rfqAISystemPrompt},
 			{Role: "user", Content: userParts},
 		},
@@ -318,10 +324,16 @@ func envOrDefault(key, fallback string) string {
 }
 
 func parseRfqAIStatus(cfg RfqAIConfig) map[string]any {
+	model := cfg.VLModel
+	if model == "" {
+		model = defaultQwenVLModel
+	}
 	return map[string]any{
-		"enabled":      cfg.Available(),
-		"text_model":   cfg.TextModel,
-		"vision_model": cfg.VisionModel,
-		"max_pages":    cfg.MaxTotalPages,
+		"enabled":       cfg.Available(),
+		"provider":      "dashscope",
+		"model":         model,
+		"text_model":    model,
+		"vision_model":  model,
+		"max_pages":     cfg.MaxTotalPages,
 	}
 }

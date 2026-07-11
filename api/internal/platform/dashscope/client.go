@@ -1,4 +1,4 @@
-package openrouter
+package dashscope
 
 import (
 	"bytes"
@@ -9,17 +9,19 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/llm"
 )
 
-const DefaultBaseURL = "https://openrouter.ai/api/v1"
+// DefaultBaseURL is the OpenAI-compatible DashScope endpoint (international).
+// China mainland: https://dashscope.aliyuncs.com/compatible-mode/v1
+const DefaultBaseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 
-// Client calls the OpenRouter chat completions API.
+// Client calls Alibaba Cloud DashScope (Qwen) chat completions API.
 type Client struct {
 	APIKey     string
 	HTTPClient *http.Client
 	BaseURL    string
-	Referer    string
-	Title      string
 }
 
 func NewClient(apiKey string) Client {
@@ -36,27 +38,6 @@ func (c Client) Enabled() bool {
 	return c.APIKey != ""
 }
 
-type ContentPart struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	ImageURL *struct {
-		URL string `json:"url"`
-	} `json:"image_url,omitempty"`
-}
-
-type Message struct {
-	Role    string `json:"role"`
-	Content any    `json:"content"`
-}
-
-type ChatRequest struct {
-	Model          string            `json:"model"`
-	Messages       []Message         `json:"messages"`
-	Temperature    float64           `json:"temperature,omitempty"`
-	MaxTokens      int               `json:"max_tokens,omitempty"`
-	ResponseFormat map[string]string `json:"response_format,omitempty"`
-}
-
 type chatResponse struct {
 	Choices []struct {
 		Message struct {
@@ -70,9 +51,9 @@ type chatResponse struct {
 }
 
 // ChatCompletion sends a chat request and returns the assistant message text.
-func (c Client) ChatCompletion(ctx context.Context, req ChatRequest) (string, error) {
+func (c Client) ChatCompletion(ctx context.Context, req llm.ChatRequest) (string, error) {
 	if !c.Enabled() {
-		return "", fmt.Errorf("OPENROUTER_API_KEY not configured")
+		return "", fmt.Errorf("DASHSCOPE_API_KEY not configured")
 	}
 	if strings.TrimSpace(req.Model) == "" {
 		return "", fmt.Errorf("model is required")
@@ -96,12 +77,6 @@ func (c Client) ChatCompletion(ctx context.Context, req ChatRequest) (string, er
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
-	if ref := strings.TrimSpace(c.Referer); ref != "" {
-		httpReq.Header.Set("HTTP-Referer", ref)
-	}
-	if title := strings.TrimSpace(c.Title); title != "" {
-		httpReq.Header.Set("X-Title", title)
-	}
 
 	client := c.HTTPClient
 	if client == nil {
@@ -122,18 +97,18 @@ func (c Client) ChatCompletion(ctx context.Context, req ChatRequest) (string, er
 		if len(msg) > 240 {
 			msg = msg[:240] + "…"
 		}
-		return "", fmt.Errorf("openrouter HTTP %d: %s", res.StatusCode, msg)
+		return "", fmt.Errorf("dashscope HTTP %d: %s", res.StatusCode, msg)
 	}
 
 	var parsed chatResponse
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return "", fmt.Errorf("openrouter response decode: %w", err)
+		return "", fmt.Errorf("dashscope response decode: %w", err)
 	}
 	if parsed.Error != nil && strings.TrimSpace(parsed.Error.Message) != "" {
-		return "", fmt.Errorf("openrouter: %s", parsed.Error.Message)
+		return "", fmt.Errorf("dashscope: %s", parsed.Error.Message)
 	}
 	if len(parsed.Choices) == 0 || strings.TrimSpace(parsed.Choices[0].Message.Content) == "" {
-		return "", fmt.Errorf("openrouter returned empty completion")
+		return "", fmt.Errorf("dashscope returned empty completion")
 	}
 	return parsed.Choices[0].Message.Content, nil
 }

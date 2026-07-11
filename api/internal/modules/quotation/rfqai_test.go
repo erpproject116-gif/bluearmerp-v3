@@ -43,22 +43,26 @@ func TestParseRfqAIJSON_stripsMarkdownFence(t *testing.T) {
 }
 
 func TestRfqAIConfigFromEnv_defaults(t *testing.T) {
-	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("DASHSCOPE_API_KEY", "")
 	t.Setenv("RFQ_AI_ENABLED", "")
 	cfg := RfqAIConfigFromEnv()
 	if cfg.Available() {
 		t.Fatal("expected unavailable without API key")
 	}
-	if cfg.TextModel == "" || cfg.VisionModel == "" {
-		t.Fatal("expected default models")
+	if cfg.VLModel != "qwen-vl-plus" {
+		t.Fatalf("expected default qwen-vl-plus, got %q", cfg.VLModel)
 	}
 }
 
 func TestRfqAIConfigFromEnv_withKey(t *testing.T) {
-	t.Setenv("OPENROUTER_API_KEY", "sk-test")
+	t.Setenv("DASHSCOPE_API_KEY", "sk-test")
 	t.Setenv("RFQ_AI_ENABLED", "true")
+	t.Setenv("QWEN_VL_MODEL", "qwen2.5-vl-72b-instruct")
 	cfg := RfqAIConfigFromEnv()
 	if !cfg.Available() {
 		t.Fatal("expected available with API key")
+	}
+	if cfg.VLModel != "qwen2.5-vl-72b-instruct" {
+		t.Fatalf("unexpected model: %q", cfg.VLModel)
 	}
 }

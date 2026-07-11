@@ -4,6 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { modalDismissClass } from "../../shared/Modal";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { ReturnSerialPicker } from "../../shared/ReturnSerialPicker";
 import { useToast } from "../../shared/toast";
 import { uiLabel } from "../../shared/branding/uiLabel";
 
@@ -24,6 +25,12 @@ type SalesLine = {
   qty: number;
   returned_qty?: number;
   line_total: number;
+  track_serial?: boolean;
+  track_lot?: boolean;
+  serial_policy?: string;
+  lot_no?: string;
+  serial_lot_no?: string;
+  serial_units?: { id: number; serial_no: string }[];
 };
 
 type SalesDetail = {
@@ -55,6 +62,7 @@ export default function SalesReturnsPage() {
   const [salesId, setSalesId] = createSignal<number | null>(null);
   const [salesDetail, setSalesDetail] = createSignal<SalesDetail | null>(null);
   const [returnQtys, setReturnQtys] = createSignal<Record<number, string>>({});
+  const [returnSerials, setReturnSerials] = createSignal<Record<number, number[]>>({});
   const [creating, setCreating] = createSignal(false);
   const [submittingId, setSubmittingId] = createSignal<number | null>(null);
 
@@ -77,11 +85,19 @@ export default function SalesReturnsPage() {
     }
     setSalesDetail(res.data);
     const qtys: Record<number, string> = {};
+    const serials: Record<number, number[]> = {};
     for (const ln of res.data.lines ?? []) {
       const remaining = ln.qty - (ln.returned_qty ?? 0);
-      if (remaining > 0) qtys[ln.id] = String(remaining);
+      if (remaining > 0) {
+        qtys[ln.id] = String(remaining);
+        if (ln.track_serial && ln.serial_units?.length) {
+          const take = Math.min(Math.floor(remaining), ln.serial_units.length);
+          serials[ln.id] = ln.serial_units.slice(0, take).map((u) => u.id);
+        }
+      }
     }
     setReturnQtys(qtys);
+    setReturnSerials(serials);
   };
 
   const resetCreate = () => {
@@ -89,6 +105,7 @@ export default function SalesReturnsPage() {
     setSalesId(null);
     setSalesDetail(null);
     setReturnQtys({});
+    setReturnSerials({});
   };
 
   const createReturn = async () => {
@@ -98,11 +115,30 @@ export default function SalesReturnsPage() {
       return;
     }
     const lines = (salesDetail()?.lines ?? [])
-      .map((ln) => ({ sales_line_id: ln.id, qty: Number(returnQtys()[ln.id] ?? 0) }))
+      .map((ln) => {
+        const qty = Number(returnQtys()[ln.id] ?? 0);
+        const serialIds = returnSerials()[ln.id] ?? [];
+        return {
+          sales_line_id: ln.id,
+          qty,
+          serial_unit_ids: ln.track_serial && serialIds.length ? serialIds : undefined,
+        };
+      })
       .filter((l) => l.qty > 0);
     if (!lines.length) {
       toast.warning("Enter return quantity for at least one line.");
       return;
+    }
+    for (const ln of salesDetail()?.lines ?? []) {
+      const qty = Number(returnQtys()[ln.id] ?? 0);
+      if (qty <= 0) continue;
+      if (!ln.track_serial) continue;
+      const required = (ln.serial_policy ?? "required") !== "optional";
+      const serialIds = returnSerials()[ln.id] ?? [];
+      if (required && serialIds.length !== Math.floor(qty)) {
+        toast.warning(`${ln.item_code}: select ${Math.floor(qty)} serial number(s) to return.`);
+        return;
+      }
     }
     setCreating(true);
     const res = await apiFetch<{ return_no: string }>("/api/v1/sales/sales-returns", {
@@ -196,7 +232,7 @@ export default function SalesReturnsPage() {
 
       <Show when={createOpen()}>
         <div class="fixed inset-0 z-[55] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center">
-          <div class="w-full max-w-2xl rounded-2xl border border-stroke bg-white p-6 shadow-xl">
+          <div class="w-full max-w-3xl rounded-2xl border border-stroke bg-white p-6 shadow-xl">
             <div class="mb-4 flex items-center justify-between">
               <h2 class="text-lg font-semibold">New Sales Return</h2>
               <button
@@ -237,6 +273,7 @@ export default function SalesReturnsPage() {
                         <th class="px-2 py-2 text-right">Sold</th>
                         <th class="px-2 py-2 text-right">Returned</th>
                         <th class="px-2 py-2 text-right">Return qty</th>
+                        <th class="px-2 py-2">Serial / lot</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -255,10 +292,42 @@ export default function SalesReturnsPage() {
                                 min="0"
                                 max={ln.qty - (ln.returned_qty ?? 0)}
                                 value={returnQtys()[ln.id] ?? ""}
-                                onInput={(e) =>
-                                  setReturnQtys((prev) => ({ ...prev, [ln.id]: e.currentTarget.value }))
-                                }
+                                onInput={(e) => {
+                                  const raw = e.currentTarget.value;
+                                  setReturnQtys((prev) => ({ ...prev, [ln.id]: raw }));
+                                  const nextQty = Math.floor(Number(raw) || 0);
+                                  if (ln.track_serial && ln.serial_units?.length) {
+                                    const cur = returnSerials()[ln.id] ?? [];
+                                    if (cur.length > nextQty) {
+                                      setReturnSerials((prev) => ({
+                                        ...prev,
+                                        [ln.id]: cur.slice(0, nextQty),
+                                      }));
+                                    }
+                                  }
+                                }}
                               />
+                            </td>
+                            <td class="px-2 py-2">
+                              <Show when={ln.track_serial}>
+                                <ReturnSerialPicker
+                                  soldUnits={ln.serial_units ?? []}
+                                  returnQty={Number(returnQtys()[ln.id] ?? 0)}
+                                  selectedIds={returnSerials()[ln.id] ?? []}
+                                  serialPolicy={ln.serial_policy}
+                                  onChange={(ids) =>
+                                    setReturnSerials((prev) => ({ ...prev, [ln.id]: ids }))
+                                  }
+                                />
+                              </Show>
+                              <Show when={ln.track_lot && !ln.track_serial}>
+                                <p class="text-xs text-text-secondary">
+                                  Lot: {ln.lot_no || ln.serial_lot_no || "—"}
+                                  <span class="block text-[10px] uppercase tracking-wide">
+                                    Restores to same lot on submit
+                                  </span>
+                                </p>
+                              </Show>
                             </td>
                           </tr>
                         )}

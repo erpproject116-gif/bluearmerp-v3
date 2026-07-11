@@ -30,6 +30,8 @@ type CatalogItem struct {
 	ImageURL       string  `json:"image_url,omitempty"`
 	ItemCategoryID *int64  `json:"item_category_id,omitempty"`
 	TrackInventory bool    `json:"track_inventory_qty"`
+	TrackSerial    bool    `json:"track_serial"`
+	TrackLot       bool    `json:"track_lot"`
 	HasModifiers   bool    `json:"has_modifiers"`
 }
 
@@ -87,6 +89,7 @@ func listCatalogItems(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		query := fmt.Sprintf(`
 			select i.id, i.item_code, i.item_name, i.sales_price::float8, i.image_path, i.item_category_id, i.track_inventory_qty,
+			  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
 			  exists(
 			    select 1 from public.pos_modifier_groups g
 			    join public.pos_modifiers m on m.group_id = g.id and m.active = true
@@ -108,7 +111,7 @@ func listCatalogItems(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var it CatalogItem
 			var imagePath *string
-			if err := rows.Scan(&it.ID, &it.ItemCode, &it.ItemName, &it.Price, &imagePath, &it.ItemCategoryID, &it.TrackInventory, &it.HasModifiers); err != nil {
+			if err := rows.Scan(&it.ID, &it.ItemCode, &it.ItemName, &it.Price, &imagePath, &it.ItemCategoryID, &it.TrackInventory, &it.TrackSerial, &it.TrackLot, &it.HasModifiers); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read items.", "ERR_INTERNAL")
 				return
 			}

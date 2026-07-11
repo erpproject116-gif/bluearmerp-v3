@@ -4,6 +4,7 @@ import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
 import { formatPeso, sanitizeIntegerInput, parseDecimalInput, bindDecimalInput, computePosOrderTax, roundMoney } from "../../shared/money";
 import { AuthImage } from "../../shared/AuthImage";
+import { LotLineCell } from "../../shared/LotLineCell";
 import { QuickCustomerModal } from "../../shared/QuickCustomerModal";
 import { useToast } from "../../shared/toast";
 import { useAuth, hasPermission } from "../../shared/auth-context";
@@ -200,6 +201,23 @@ export default function PosPage() {
     }
     invalidate();
   };
+
+  const pickLot = async (ln: PosCartLine, lotBatchId: number | null, _lotNo: string) => {
+    const s = session.data;
+    if (!s?.id) return;
+    const res = await patchPosCartLine(s.id, ln.id, { lot_batch_id: lotBatchId });
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not assign lot.");
+      return;
+    }
+    invalidate();
+  };
+
+  const catalogByItemId = createMemo(() => {
+    const map = new Map<number, PosCatalogItem>();
+    for (const item of items.data ?? []) map.set(item.id, item);
+    return map;
+  });
 
   const clearOrder = async () => {
     const s = session.data;
@@ -550,6 +568,8 @@ export default function PosPage() {
             orderTypes={orderTypes()}
             onOrderType={setOrderType}
             lines={cartLines()}
+            locationId={session.data?.location_id ?? null}
+            catalogByItemId={catalogByItemId()}
             subtotal={taxPreview().subtotal}
             tax={taxPreview().tax}
             discount={taxPreview().discount}
@@ -561,6 +581,7 @@ export default function PosPage() {
             onBills={openBills}
             onQty={changeQty}
             onRemove={removeLine}
+            onLot={pickLot}
             onClear={clearOrder}
             onCheckout={openPayment}
             checkingOut={checkingOut()}
@@ -1284,6 +1305,8 @@ function OrderPanel(props: {
   orderTypes: string[];
   onOrderType: (t: string) => void;
   lines: PosCartLine[];
+  locationId: number | null;
+  catalogByItemId: Map<number, PosCatalogItem>;
   subtotal: number;
   tax: number;
   discount: number;
@@ -1295,6 +1318,7 @@ function OrderPanel(props: {
   onBills: () => void;
   onQty: (ln: PosCartLine, delta: number) => void;
   onRemove: (ln: PosCartLine) => void;
+  onLot: (ln: PosCartLine, lotBatchId: number | null, lotNo: string) => void;
   onClear: () => void;
   onCheckout: () => void;
   checkingOut: boolean;
@@ -1367,6 +1391,18 @@ function OrderPanel(props: {
                     </Show>
                     <Show when={ln.notes}>
                       <p class="truncate text-xs italic text-slate-400">“{ln.notes}”</p>
+                    </Show>
+                    <Show when={props.catalogByItemId.get(ln.item_id)?.track_lot}>
+                      <div class="mt-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Lot</span>
+                        <LotLineCell
+                          itemId={ln.item_id}
+                          locationId={props.locationId}
+                          lotBatchId={ln.lot_batch_id}
+                          lotNo={ln.lot_no}
+                          onChange={(lotBatchId, lotNo) => props.onLot(ln, lotBatchId, lotNo)}
+                        />
+                      </div>
                     </Show>
                     <p class="text-xs text-slate-500">{money(ln.unit_price)}</p>
                   </div>

@@ -98,3 +98,16 @@ Fill values from the Supabase Dashboard.
 | `GZIP_ENABLED` | `false` | Compress responses ≥ 8KB |
 
 See [ADR 0004](../adr/0004-performance-patterns.md) and [baseline-and-targets.md](../performance/baseline-and-targets.md).
+
+## Smart RFQ import — DashScope / Qwen (server-side)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DASHSCOPE_API_KEY` | — | Alibaba Model Studio API key (**never** expose to web) |
+| `QWEN_VL_MODEL` | `qwen-vl-plus` | Qwen vision-language model for RFQ line extraction |
+| `DASHSCOPE_BASE_URL` | intl compatible-mode URL | Override for China mainland endpoint |
+| `RFQ_AI_ENABLED` | `true` when key set | Toggle AI enhancement |
+| `RFQ_AI_MAX_PAGES` | `10` | Max pages sent to Qwen per import |
+| `RFQ_AI_PAGES_PER_CALL` | `2` | Pages batched per API call |
+
+Setup: [dashscope-rfq-ai.md](./dashscope-rfq-ai.md). Alibaba deploy: [alibaba-deploy.md](./alibaba-deploy.md).

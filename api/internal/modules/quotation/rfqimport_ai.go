@@ -42,7 +42,7 @@ func aiParseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 		}
 		cfg := RfqAIConfigFromEnv()
 		if !cfg.Available() {
-			response.Err(w, http.StatusServiceUnavailable, "RFQ AI is not configured. Set OPENROUTER_API_KEY on the server.", "ERR_RFQ_AI_DISABLED")
+			response.Err(w, http.StatusServiceUnavailable, "RFQ AI is not configured. Set DASHSCOPE_API_KEY on the server.", "ERR_RFQ_AI_DISABLED")
 			return
 		}
 
@@ -92,7 +92,8 @@ func aiParseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			"detected_columns": result.DetectedColumns,
 			"parse_method":     "ai",
 			"ai_used":          true,
-			"ai_model":         usage.Model,
+			"ai_model":           usage.Model,
+			"ai_provider":        usage.Provider,
 			"ai_pages_processed": usage.PagesProcessed,
 			"ai_used_vision":   usage.UsedVision,
 		}, "RFQ parsed with AI.")

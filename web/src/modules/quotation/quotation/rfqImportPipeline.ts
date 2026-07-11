@@ -13,6 +13,8 @@ export const RFQ_SERVER_PDF_PAGE_MAX = 400;
 
 export type RfqAiConfig = {
   enabled: boolean;
+  provider?: string;
+  model?: string;
   text_model: string;
   vision_model: string;
   max_pages: number;

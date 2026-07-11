@@ -45,12 +45,19 @@ type SaleLine struct {
 	Remark                 *string `json:"remark,omitempty"`
 	SerialLotNo            *string `json:"serial_lot_no,omitempty"`
 	SerialUnitIDs          []int64 `json:"serial_unit_ids,omitempty"`
+	SerialUnits            []SaleSerialUnit `json:"serial_units,omitempty"`
 	TrackSerial            bool    `json:"track_serial,omitempty"`
 	TrackLot               bool    `json:"track_lot,omitempty"`
 	LotBatchID             *int64  `json:"lot_batch_id,omitempty"`
+	LotNo                  string  `json:"lot_no,omitempty"`
 	SerialPolicy           string  `json:"serial_policy,omitempty"`
 	LotPolicy              string  `json:"lot_policy,omitempty"`
 	SourceSalesOrderLineID *int64  `json:"source_sales_order_line_id,omitempty"`
+}
+
+type SaleSerialUnit struct {
+	ID       int64  `json:"id"`
+	SerialNo string `json:"serial_no"`
 }
 
 type Sale struct {
@@ -421,9 +428,17 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 		    from public.inv_serial_unit_sales_lines j
 		    join public.inv_serial_units su on su.id = j.serial_unit_id
 		    where j.sales_line_id = sl.id
-		  ), '{}')
+		  ), '{}'),
+		  coalesce((
+		    select json_agg(json_build_object('id', su.id, 'serial_no', su.serial_no) order by su.serial_no)
+		    from public.inv_serial_unit_sales_lines j
+		    join public.inv_serial_units su on su.id = j.serial_unit_id
+		    where j.sales_line_id = sl.id and su.status = 'sold'
+		  ), '[]'::json),
+		  coalesce(lb.lot_no, '')
 		from public.sa_sales_lines sl
 		left join public.inv_items i on i.id = sl.item_id
+		left join public.inv_lot_batches lb on lb.id = sl.lot_batch_id
 		where sl.sales_id = $1
 		order by sl.line_no`, salesID)
 	if err != nil {
@@ -434,13 +449,21 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 	var lines []SaleLine
 	for rows.Next() {
 		var ln SaleLine
+		var serialUnitsJSON []byte
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.ReturnedQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal,
 			&ln.DiscountAmount, &ln.DiscountedUnitNonVat, &ln.DiscountedUnitVatInc,
 			&ln.Remark, &ln.SerialLotNo, &ln.LotBatchID, &ln.SourceSalesOrderLineID,
-			&ln.TrackSerial, &ln.TrackLot, &ln.SerialPolicy, &ln.LotPolicy, &ln.SerialUnitIDs); err != nil {
+			&ln.TrackSerial, &ln.TrackLot, &ln.SerialPolicy, &ln.LotPolicy, &ln.SerialUnitIDs,
+			&serialUnitsJSON, &ln.LotNo); err != nil {
 			return nil, err
+		}
+		if len(serialUnitsJSON) > 0 && string(serialUnitsJSON) != "null" {
+			_ = json.Unmarshal(serialUnitsJSON, &ln.SerialUnits)
+		}
+		if ln.SerialUnits == nil {
+			ln.SerialUnits = []SaleSerialUnit{}
 		}
 		lines = append(lines, ln)
 	}

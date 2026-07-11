@@ -1,16 +1,22 @@
 import { createResource, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { apiFetch } from "./api";
+import { GrLotEntryPanel, type GrLotLine } from "./GrLotEntryPanel";
 import { SerialReceiveScanner, type SerialReceiveLine } from "./SerialReceiveScanner";
 import { SerialLineCell } from "./SerialLineCell";
 import { uiLabel } from "./branding/uiLabel";
 import { LoadingText } from "./LoadingText";
 
+type GoodsReceiptLine = SerialReceiveLine &
+  GrLotLine & {
+    track_serial: boolean;
+  };
+
 type GoodsReceiptDetail = {
   id: number;
   status: string;
   purchase_order_no?: string;
-  lines?: SerialReceiveLine[];
+  lines?: GoodsReceiptLine[];
 };
 
 export function GoodsReceiptScanPanel(props: { grId: number; onClose?: () => void }) {
@@ -27,7 +33,7 @@ export function GoodsReceiptScanPanel(props: { grId: number; onClose?: () => voi
     <div class="mt-4 rounded-xl border border-stroke bg-white p-4 shadow-sm">
       <div class="mb-3 flex items-center justify-between gap-2">
         <div>
-          <h3 class="text-sm font-semibold text-text-primary">{uiLabel("goods_receipt.scan_serials")}</h3>
+          <h3 class="text-sm font-semibold text-text-primary">Scan serials & enter lots</h3>
           <Show when={detail()}>
             <p class="text-xs text-text-secondary">
               GR #{detail()!.id}
@@ -64,7 +70,9 @@ export function GoodsReceiptScanPanel(props: { grId: number; onClose?: () => voi
           lines={detail()!.lines ?? []}
           status={detail()!.status}
           onLinesUpdate={(lines) => {
-            mutate((d: GoodsReceiptDetail | undefined) => (d ? { ...d, lines } : d));
+            mutate((d: GoodsReceiptDetail | undefined) =>
+              d ? { ...d, lines: lines as GoodsReceiptLine[] } : d,
+            );
           }}
           onAfterScan={() => void refetch()}
         />
@@ -121,6 +129,13 @@ export function GoodsReceiptScanPanel(props: { grId: number; onClose?: () => voi
             </table>
           </div>
         </Show>
+
+        <GrLotEntryPanel
+          grId={props.grId}
+          lines={detail()!.lines ?? []}
+          status={detail()!.status}
+          onRefresh={() => void refetch()}
+        />
       </Show>
       <Show when={detail() && detail()!.status !== "draft"}>
         <p class="text-sm text-text-secondary">{uiLabel("goods_receipt.draft_only_scans")}</p>
