@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"strconv"
-	"strings"
 )
 
 type RateLimitConfig struct {
@@ -96,26 +95,6 @@ func Load() Config {
 			ExpensiveRPM:         ParseIntDefault(os.Getenv("RATE_LIMIT_EXPENSIVE_RPM"), 60),
 		},
 	}
-}
-
-// CORSOrigins splits CORS_ORIGIN on commas (e.g. production + local dev).
-func (c Config) CORSOrigins() []string {
-	raw := strings.TrimSpace(c.CORSOrigin)
-	if raw == "" {
-		return []string{"http://localhost:5173"}
-	}
-	parts := strings.Split(raw, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	if len(out) == 0 {
-		return []string{"http://localhost:5173"}
-	}
-	return out
 }
 
 func envOr(key, fallback string) string {

@@ -38,7 +38,7 @@ export function apiNetworkErrorMessage(): string {
   if (!apiBase) {
     return "API URL is not configured. Set VITE_API_BASE_URL on Vercel to your Render URL, then redeploy.";
   }
-  return `Could not reach the API at ${apiBase}. On Render, set CORS_ORIGIN to https://bluearmerp-v3.vercel.app (no trailing slash) and redeploy the API.`;
+  return `Could not reach the API at ${apiBase}. If the browser console shows CORS errors, set CORS_ORIGIN on Render to your Vercel URL (no trailing slash), redeploy the API, then hard-refresh. Render free tier may also need 30–60s to wake after idle.`;
 }
 
 export async function getAccessToken(): Promise<string | null> {

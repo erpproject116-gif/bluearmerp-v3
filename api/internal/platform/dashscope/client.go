@@ -13,9 +13,23 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/llm"
 )
 
-// DefaultBaseURL is the OpenAI-compatible DashScope endpoint (international).
-// China mainland: https://dashscope.aliyuncs.com/compatible-mode/v1
+// DefaultBaseURL is the legacy international DashScope endpoint.
+// Singapore workspace keys should set DASHSCOPE_BASE_URL to your Model Studio workspace URL:
+// https://{workspace-id}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
 const DefaultBaseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+
+// NormalizeBaseURL fixes common Model Studio console URLs (e.g. .../api/v1 → .../compatible-mode/v1).
+func NormalizeBaseURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return DefaultBaseURL
+	}
+	raw = strings.TrimRight(raw, "/")
+	if strings.HasSuffix(raw, "/api/v1") {
+		raw = strings.TrimSuffix(raw, "/api/v1") + "/compatible-mode/v1"
+	}
+	return raw
+}
 
 // Client calls Alibaba Cloud DashScope (Qwen) chat completions API.
 type Client struct {
@@ -67,10 +81,7 @@ func (c Client) ChatCompletion(ctx context.Context, req llm.ChatRequest) (string
 		return "", err
 	}
 
-	base := strings.TrimRight(c.BaseURL, "/")
-	if base == "" {
-		base = DefaultBaseURL
-	}
+	base := NormalizeBaseURL(c.BaseURL)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return "", err
@@ -97,7 +108,7 @@ func (c Client) ChatCompletion(ctx context.Context, req llm.ChatRequest) (string
 		if len(msg) > 240 {
 			msg = msg[:240] + "…"
 		}
-		return "", fmt.Errorf("dashscope HTTP %d: %s", res.StatusCode, msg)
+		return "", fmt.Errorf("dashscope HTTP %d at %s/chat/completions: %s", res.StatusCode, base, msg)
 	}
 
 	var parsed chatResponse

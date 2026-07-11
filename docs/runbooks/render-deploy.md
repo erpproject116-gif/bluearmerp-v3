@@ -81,7 +81,19 @@ curl.exe -s -i -X OPTIONS "https://YOUR-SERVICE.onrender.com/api/v1/auth/me" ^
   -H "Access-Control-Request-Headers: authorization,content-type"
 ```
 
-You must see `access-control-allow-origin: https://bluearmerp-v3.vercel.app`. If that header is **missing**, `CORS_ORIGIN` on Render is wrong (often still the default `http://localhost:5173`). Update it and **Save** — Render restarts the service automatically.
+You must see `access-control-allow-origin: https://bluearmerp-v3.vercel.app`. If that header is **missing**:
+
+1. **`CORS_ORIGIN` on Render is wrong or missing** — set exactly:
+   ```
+   https://bluearmerp-v3.vercel.app,http://localhost:5173
+   ```
+   No trailing slashes. Save — Render restarts automatically.
+
+2. **Render service is waking from sleep (free tier)** — the first request after idle can fail with a CORS-looking error because the proxy returns 502 before the Go app runs. Wait 30–60s and hard-refresh the Vercel app.
+
+3. **Deploy in progress** — wait for Render deploy to finish, then retry.
+
+After deploying the latest API, Vercel preview URLs (`*.vercel.app`) are allowed automatically when your production Vercel URL is in `CORS_ORIGIN`.
 
 ## Passwords with special characters
 

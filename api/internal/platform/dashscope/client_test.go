@@ -7,6 +7,20 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/llm"
 )
 
+func TestNormalizeBaseURL_apiV1ToCompatible(t *testing.T) {
+	got := NormalizeBaseURL("https://ws-ad7upimxrblamew2.ap-southeast-1.maas.aliyuncs.com/api/v1")
+	want := "https://ws-ad7upimxrblamew2.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestNormalizeBaseURL_emptyUsesDefault(t *testing.T) {
+	if NormalizeBaseURL("") != DefaultBaseURL {
+		t.Fatal("expected default base URL")
+	}
+}
+
 func TestClient_Enabled(t *testing.T) {
 	if NewClient("").Enabled() {
 		t.Fatal("expected disabled without API key")

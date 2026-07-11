@@ -31,7 +31,7 @@ func RfqAIConfigFromEnv() RfqAIConfig {
 	return RfqAIConfig{
 		Enabled:            enabled,
 		APIKey:             key,
-		BaseURL:            envOrDefault("DASHSCOPE_BASE_URL", dashscope.DefaultBaseURL),
+		BaseURL:            dashscope.NormalizeBaseURL(envOrDefault("DASHSCOPE_BASE_URL", dashscope.DefaultBaseURL)),
 		VLModel:            model,
 		MaxTotalPages:      config.ParseIntDefault(os.Getenv("RFQ_AI_MAX_PAGES"), 10),
 		MaxPagesPerRequest: config.ParseIntDefault(os.Getenv("RFQ_AI_PAGES_PER_CALL"), 2),

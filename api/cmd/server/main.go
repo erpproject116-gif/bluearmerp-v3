@@ -90,12 +90,7 @@ func main() {
 
 	r := chi.NewRouter()
 	// CORS must wrap all handlers so every response (including errors) carries ACAO.
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   cfg.CORSOrigins(),
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: true,
-	}))
+	r.Use(cors.Handler(cfg.CORSOptions()))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(platformmw.RateLimitPublic(cfg.RateLimit))

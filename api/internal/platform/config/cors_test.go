@@ -10,6 +10,7 @@ func TestCORSOrigins(t *testing.T) {
 	}{
 		{"empty defaults localhost", "", []string{"http://localhost:5173"}},
 		{"single", "https://bluearmerp-v3.vercel.app", []string{"https://bluearmerp-v3.vercel.app"}},
+		{"trailing slash stripped", "https://bluearmerp-v3.vercel.app/", []string{"https://bluearmerp-v3.vercel.app"}},
 		{"comma separated", "https://a.vercel.app, http://localhost:5173", []string{"https://a.vercel.app", "http://localhost:5173"}},
 	}
 	for _, tt := range tests {
@@ -24,5 +25,18 @@ func TestCORSOrigins(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCORSAllowOrigin_vercelPreview(t *testing.T) {
+	cfg := Config{CORSOrigin: "https://bluearmerp-v3.vercel.app"}
+	if !cfg.corsAllowOrigin("https://bluearmerp-v3.vercel.app") {
+		t.Fatal("expected production origin")
+	}
+	if !cfg.corsAllowOrigin("https://bluearmerp-v3-git-main-user.vercel.app") {
+		t.Fatal("expected vercel preview origin")
+	}
+	if cfg.corsAllowOrigin("https://evil.vercel.app.evil.com") {
+		t.Fatal("expected reject lookalike domain")
 	}
 }

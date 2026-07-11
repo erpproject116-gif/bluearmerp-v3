@@ -25,12 +25,26 @@ Response should include `"enabled": true`, `"provider": "dashscope"`, and your m
 
 ## Endpoint region
 
+Alibaba Model Studio gives a **workspace URL** for Singapore. Use the **OpenAI compatible** path:
+
+```env
+# Correct (Singapore workspace from Model Studio console):
+DASHSCOPE_BASE_URL=https://{your-workspace-id}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+
+# Wrong — causes HTTP 404:
+# DASHSCOPE_BASE_URL=https://{workspace}.ap-southeast-1.maas.aliyuncs.com/api/v1
+```
+
+The API auto-corrects `/api/v1` → `/compatible-mode/v1` if you paste the console URL by mistake.
+
 | Deployment | `DASHSCOPE_BASE_URL` |
 |------------|----------------------|
-| International (Singapore, etc.) — **default** | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` |
+| Singapore workspace (recommended) | `https://{workspace-id}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1` |
+| US (Virginia) | `https://dashscope-us.aliyuncs.com/compatible-mode/v1` |
 | China mainland | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| Legacy intl (may 404 with new keys) | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` |
 
-Omit `DASHSCOPE_BASE_URL` to use the international default.
+Omit `DASHSCOPE_BASE_URL` only if the legacy intl endpoint works for your API key.
 
 ## Model selection
 
