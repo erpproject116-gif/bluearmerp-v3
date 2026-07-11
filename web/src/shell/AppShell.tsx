@@ -37,6 +37,7 @@ import { SidebarNav } from "./SidebarNav";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBar";
 import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
+import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -80,7 +81,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     return mod;
   };
 
-  return (
+  const layout = (
     <div class="flex min-h-screen bg-body">
       <SetupFirstRunRedirect />
       <aside
@@ -276,6 +277,12 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         </main>
       </div>
     </div>
+  );
+
+  return (
+    <Show when={auth.me} fallback={layout}>
+      <HelpAssistantProvider>{layout}</HelpAssistantProvider>
+    </Show>
   );
 }
 

@@ -3,6 +3,7 @@ import { For, Show, createMemo, createSignal } from "solid-js";
 import type { DocBlock, DocGroup, DocSection, KbArticle, KbGroup } from "./documentationTypes";
 import { ModuleIcon } from "../../shell/ModuleIcon";
 import { filterKbArticles, filterSections } from "./documentationSearch";
+import { HelpAssistantAskButton } from "../help-assistant/HelpAssistantAskButton";
 
 export type DocTab = "guides" | "knowledgebase";
 
@@ -324,8 +325,11 @@ export function DocumentationHome(props: HomeProps) {
           <A href="/app/documentation/kb" class="font-medium text-brand-600 hover:underline">
             Knowledge base
           </A>{" "}
-          tab.
+          tab — or ask the help assistant for a quick answer.
         </p>
+        <div class="mt-4">
+          <HelpAssistantAskButton />
+        </div>
       </header>
 
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -494,8 +498,11 @@ export function KnowledgebaseHome(props: KbHomeProps) {
           <A href="/app/documentation" class="font-medium text-brand-600 hover:underline">
             Guides
           </A>{" "}
-          tab.
+          tab — or ask the help assistant.
         </p>
+        <div class="mt-4">
+          <HelpAssistantAskButton />
+        </div>
       </header>
 
       <div class="grid gap-4 sm:grid-cols-2">
