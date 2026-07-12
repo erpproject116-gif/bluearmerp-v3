@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,21 +33,24 @@ type workspaceBody struct {
 	WorkspaceCode string  `json:"workspace_code"`
 	WorkspaceName string  `json:"workspace_name"`
 	IndustryPack  *string `json:"industry_pack"`
+	PackID        *int64  `json:"pack_id"`
 	Status        string  `json:"status"`
 }
 
+type workspacePatchBody struct {
+	WorkspaceName *string `json:"workspace_name"`
+	Status        *string `json:"status"`
+}
+
 func registerWorkspaceRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.Get("/industry-packs", listIndustryPacksHandler())
+	r.Get("/industry-packs", listIndustryPacksHandler(pool))
 	r.Get("/workspaces", listWorkspaces(pool))
 	r.With(auth.RequirePermission("operations.workspaces_new", auth.AccessWrite)).Post("/workspaces", createWorkspace(pool))
 	r.Get("/workspaces/{id}", getWorkspace(pool))
+	r.With(auth.RequirePermission("operations.workspaces", auth.AccessWrite)).Patch("/workspaces/{id}", patchWorkspace(pool))
 	r.Get("/workspaces/{id}/columns", listColumns(pool))
-}
-
-func listIndustryPacksHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		response.OK(w, listIndustryPacks(), "OK")
-	}
+	registerColumnRoutes(r, pool)
+	registerPackRoutes(r, pool)
 }
 
 func listWorkspaces(pool *pgxpool.Pool) http.HandlerFunc {
@@ -147,14 +149,27 @@ func createWorkspace(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var pack IndustryPack
 		var hasPack bool
-		if body.IndustryPack != nil && strings.TrimSpace(*body.IndustryPack) != "" {
+		var packLabel *string
+		if body.PackID != nil && *body.PackID > 0 {
 			var err error
-			pack, err = loadIndustryPack(strings.TrimSpace(*body.IndustryPack))
+			pack, err = loadPackDefinition(r.Context(), pool, tu.TenantID, *body.PackID, "")
+			if err != nil {
+				response.Validation(w, map[string]string{"pack_id": "Unknown industry pack."})
+				return
+			}
+			hasPack = true
+			code := pack.PackCode
+			packLabel = &code
+		} else if body.IndustryPack != nil && strings.TrimSpace(*body.IndustryPack) != "" {
+			code := strings.TrimSpace(*body.IndustryPack)
+			var err error
+			pack, err = loadPackDefinition(r.Context(), pool, tu.TenantID, 0, code)
 			if err != nil {
 				response.Validation(w, map[string]string{"industry_pack": "Unknown industry pack."})
 				return
 			}
 			hasPack = true
+			packLabel = &code
 		}
 
 		tx, err := pool.Begin(r.Context())
@@ -189,7 +204,7 @@ func createWorkspace(pool *pgxpool.Pool) http.HandlerFunc {
 			  inv_project_id, job_cost_project_id, status
 			) values ($1, $2, $3, $4, $5, $6, $7)
 			returning id`,
-			tu.TenantID, jcCode, strings.TrimSpace(body.WorkspaceName), body.IndustryPack,
+			tu.TenantID, jcCode, strings.TrimSpace(body.WorkspaceName), packLabel,
 			invProjectID, jobCostProjectID, status,
 		).Scan(&workspaceID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create workspace.", "ERR_INTERNAL")
@@ -198,108 +213,28 @@ func createWorkspace(pool *pgxpool.Pool) http.HandlerFunc {
 
 		columnIDs := map[string]int64{}
 		if hasPack {
-			for _, col := range pack.Columns {
-				var colID int64
-				if err := tx.QueryRow(r.Context(), `
-					insert into public.wm_columns (workspace_id, column_key, column_name, sort_order, column_color)
-					values ($1, $2, $3, $4, $5)
-					returning id`,
-					workspaceID, col.Key, col.Name, col.SortOrder, nullIfBlank(col.Color),
-				).Scan(&colID); err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to create columns.", "ERR_INTERNAL")
-					return
-				}
-				columnIDs[col.Key] = colID
+			if err := applyPackToWorkspaceTx(r.Context(), tx, tu.TenantID, workspaceID, pack, &columnIDs); err != nil {
+				response.Err(w, http.StatusInternalServerError, err.Error(), "ERR_INTERNAL")
+				return
 			}
 		} else {
 			defaultCols := []IndustryColumn{
 				{Key: "todo", Name: "To Do", SortOrder: 0},
 				{Key: "doing", Name: "In Progress", SortOrder: 10},
-				{Key: "done", Name: "Done", SortOrder: 20},
+				{Key: "done", Name: "Done", SortOrder: 20, IsDone: true},
 			}
 			for _, col := range defaultCols {
 				var colID int64
 				if err := tx.QueryRow(r.Context(), `
-					insert into public.wm_columns (workspace_id, column_key, column_name, sort_order)
-					values ($1, $2, $3, $4)
+					insert into public.wm_columns (workspace_id, column_key, column_name, sort_order, is_done)
+					values ($1, $2, $3, $4, $5)
 					returning id`,
-					workspaceID, col.Key, col.Name, col.SortOrder,
+					workspaceID, col.Key, col.Name, col.SortOrder, col.IsDone,
 				).Scan(&colID); err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to create columns.", "ERR_INTERNAL")
 					return
 				}
 				columnIDs[col.Key] = colID
-			}
-		}
-
-		if hasPack {
-			for _, sample := range pack.SampleWorkItems {
-				colID, ok := columnIDs[sample.ColumnKey]
-				if !ok {
-					continue
-				}
-				priority := sample.Priority
-				if priority == "" {
-					priority = "normal"
-				}
-				var startDate, endDate *time.Time
-				if sample.StartDateOffsetDays != 0 || sample.EndDateOffsetDays != 0 {
-					startDate = offsetDate(sample.StartDateOffsetDays)
-					endDate = offsetDate(sample.EndDateOffsetDays)
-				}
-				if _, err := tx.Exec(r.Context(), `
-					insert into public.wm_work_items (
-					  tenant_id, workspace_id, column_id, title, status, priority, start_date, end_date
-					) values ($1, $2, $3, $4, 'open', $5, $6, $7)`,
-					tu.TenantID, workspaceID, colID, sample.Title, priority, startDate, endDate,
-				); err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to seed work items.", "ERR_INTERNAL")
-					return
-				}
-			}
-
-			for _, rule := range pack.AutomationRules {
-				triggerCfg, _ := json.Marshal(rule.TriggerConfig)
-				actionCfg, _ := json.Marshal(rule.ActionConfig)
-				if _, err := tx.Exec(r.Context(), `
-					insert into public.wm_automation_rules (
-					  tenant_id, workspace_id, rule_name, trigger_event, trigger_config,
-					  action_type, action_config, is_active
-					) values ($1, $2, $3, $4, $5, $6, $7, true)`,
-					tu.TenantID, workspaceID, rule.RuleName, rule.TriggerEvent, triggerCfg,
-					rule.ActionType, actionCfg,
-				); err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to seed automation rules.", "ERR_INTERNAL")
-					return
-				}
-			}
-
-			var dashboardID int64
-			if err := tx.QueryRow(r.Context(), `
-				insert into public.wm_dashboards (tenant_id, workspace_id, dashboard_name, is_default)
-				values ($1, $2, 'Operations Dashboard', true)
-				returning id`,
-				tu.TenantID, workspaceID,
-			).Scan(&dashboardID); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to create dashboard.", "ERR_INTERNAL")
-				return
-			}
-			for _, widget := range pack.DashboardWidgets {
-				cfg := widget.Config
-				if cfg == nil {
-					cfg = map[string]any{}
-				}
-				cfgJSON, _ := json.Marshal(cfg)
-				if _, err := tx.Exec(r.Context(), `
-					insert into public.wm_dashboard_widgets (
-					  dashboard_id, widget_type, title, config, grid_x, grid_y, grid_w, grid_h, sort_order
-					) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-					dashboardID, widget.WidgetType, widget.Title, cfgJSON,
-					widget.GridX, widget.GridY, widget.GridW, widget.GridH, widget.SortOrder,
-				); err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to create dashboard widgets.", "ERR_INTERNAL")
-					return
-				}
 			}
 		}
 
@@ -310,10 +245,58 @@ func createWorkspace(pool *pgxpool.Pool) http.HandlerFunc {
 
 		row, _ := loadWorkspace(r.Context(), pool, tu.TenantID, workspaceID)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "operations.workspace.create", "wm_workspace", &workspaceID, nil, body)
-		EmitERPEvent(r.Context(), tu.TenantID, "operations.workspace.created", map[string]any{
-			"workspace_id": workspaceID, "industry_pack": body.IndustryPack,
+		EmitERPEvent(r.Context(), pool, tu.TenantID, "workspace.created", map[string]any{
+			"workspace_id": workspaceID, "industry_pack": packLabel,
 		})
 		response.OK(w, row, "Created.")
+	}
+}
+
+func patchWorkspace(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid workspace id."})
+			return
+		}
+		existing, err := loadWorkspace(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Workspace not found.", "ERR_NOT_FOUND")
+			return
+		}
+		var body workspacePatchBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		name := existing.WorkspaceName
+		if body.WorkspaceName != nil {
+			name = strings.TrimSpace(*body.WorkspaceName)
+			if name == "" {
+				response.Validation(w, map[string]string{"workspace_name": "Workspace name is required."})
+				return
+			}
+		}
+		status := existing.Status
+		if body.Status != nil {
+			status = strings.TrimSpace(*body.Status)
+			if status != "active" && status != "archived" {
+				response.Validation(w, map[string]string{"status": "Status must be active or archived."})
+				return
+			}
+		}
+		if _, err := pool.Exec(r.Context(), `
+			update public.wm_workspaces
+			set workspace_name = $1, status = $2, updated_at = now()
+			where id = $3 and tenant_id = $4`,
+			name, status, id, tu.TenantID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update workspace.", "ERR_INTERNAL")
+			return
+		}
+		row, _ := loadWorkspace(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "operations.workspace.update", "wm_workspace", &id, nil, body)
+		response.OK(w, row, "Updated.")
 	}
 }
 
@@ -345,13 +328,17 @@ type Column struct {
 	ColumnName  string  `json:"column_name"`
 	SortOrder   int     `json:"sort_order"`
 	ColumnColor *string `json:"column_color,omitempty"`
+	IsDone      bool    `json:"is_done"`
+	WipLimit    *int    `json:"wip_limit,omitempty"`
+	Archived    bool    `json:"archived"`
 }
 
 func loadColumns(ctx context.Context, pool *pgxpool.Pool, workspaceID int64) ([]Column, error) {
 	rows, err := pool.Query(ctx, `
-		select id, workspace_id, column_key, column_name, sort_order, column_color
+		select id, workspace_id, column_key, column_name, sort_order, column_color,
+		  coalesce(is_done, false), wip_limit, archived_at is not null
 		from public.wm_columns
-		where workspace_id = $1
+		where workspace_id = $1 and archived_at is null
 		order by sort_order, id`, workspaceID)
 	if err != nil {
 		return nil, err
@@ -360,7 +347,10 @@ func loadColumns(ctx context.Context, pool *pgxpool.Pool, workspaceID int64) ([]
 	var out []Column
 	for rows.Next() {
 		var c Column
-		if err := rows.Scan(&c.ID, &c.WorkspaceID, &c.ColumnKey, &c.ColumnName, &c.SortOrder, &c.ColumnColor); err != nil {
+		if err := rows.Scan(
+			&c.ID, &c.WorkspaceID, &c.ColumnKey, &c.ColumnName, &c.SortOrder, &c.ColumnColor,
+			&c.IsDone, &c.WipLimit, &c.Archived,
+		); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

@@ -27,6 +27,8 @@ type IndustryColumn struct {
 	Name      string `json:"name"`
 	SortOrder int    `json:"sort_order"`
 	Color     string `json:"color"`
+	IsDone    bool   `json:"is_done"`
+	WipLimit  *int   `json:"wip_limit,omitempty"`
 }
 
 type IndustryWorkItem struct {
@@ -38,11 +40,11 @@ type IndustryWorkItem struct {
 }
 
 type IndustryAutomationRule struct {
-	RuleName       string         `json:"rule_name"`
-	TriggerEvent   string         `json:"trigger_event"`
-	TriggerConfig  map[string]any `json:"trigger_config"`
-	ActionType     string         `json:"action_type"`
-	ActionConfig   map[string]any `json:"action_config"`
+	RuleName      string         `json:"rule_name"`
+	TriggerEvent  string         `json:"trigger_event"`
+	TriggerConfig map[string]any `json:"trigger_config"`
+	ActionType    string         `json:"action_type"`
+	ActionConfig  map[string]any `json:"action_config"`
 }
 
 type IndustryDashboardWidget struct {
@@ -57,15 +59,25 @@ type IndustryDashboardWidget struct {
 }
 
 type IndustryPack struct {
-	PackCode           string                    `json:"pack_code"`
-	PackName           string                    `json:"pack_name"`
-	Columns            []IndustryColumn          `json:"columns"`
-	SampleWorkItems    []IndustryWorkItem        `json:"sample_work_items"`
-	AutomationRules    []IndustryAutomationRule  `json:"automation_rules"`
-	DashboardWidgets   []IndustryDashboardWidget `json:"dashboard_widgets"`
+	ID               int64                     `json:"id,omitempty"`
+	PackCode         string                    `json:"pack_code"`
+	PackName         string                    `json:"pack_name"`
+	Description      string                    `json:"description,omitempty"`
+	IsSystem         bool                      `json:"is_system,omitempty"`
+	TenantID         *int64                    `json:"tenant_id,omitempty"`
+	Columns          []IndustryColumn          `json:"columns"`
+	SampleWorkItems  []IndustryWorkItem        `json:"sample_work_items"`
+	AutomationRules  []IndustryAutomationRule  `json:"automation_rules"`
+	DashboardWidgets []IndustryDashboardWidget `json:"dashboard_widgets"`
 }
 
-func loadIndustryPack(code string) (IndustryPack, error) {
+var embedPackCodesList = []string{"general", "construction", "professional_services", "warehouse", "job_shop"}
+
+func embedPackCodes() []string {
+	return embedPackCodesList
+}
+
+func loadEmbedPack(code string) (IndustryPack, error) {
 	var raw []byte
 	switch code {
 	case "construction":
@@ -85,14 +97,26 @@ func loadIndustryPack(code string) (IndustryPack, error) {
 	if err := json.Unmarshal(raw, &pack); err != nil {
 		return IndustryPack{}, err
 	}
+	for i := range pack.Columns {
+		if !pack.Columns[i].IsDone {
+			k := pack.Columns[i].Key
+			pack.Columns[i].IsDone = k == "done" || k == "closed" || k == "complete" || k == "completed"
+		}
+	}
+	pack.IsSystem = true
 	return pack, nil
 }
 
+// loadIndustryPack keeps backward compatibility for callers that only know embed codes.
+func loadIndustryPack(code string) (IndustryPack, error) {
+	return loadEmbedPack(code)
+}
+
 func listIndustryPacks() []map[string]string {
-	codes := []string{"general", "construction", "professional_services", "warehouse", "job_shop"}
+	codes := embedPackCodes()
 	out := make([]map[string]string, 0, len(codes))
 	for _, code := range codes {
-		pack, err := loadIndustryPack(code)
+		pack, err := loadEmbedPack(code)
 		if err != nil {
 			continue
 		}

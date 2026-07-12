@@ -167,6 +167,8 @@ export const TicketsPage = lazy(() => import("../modules/support/TicketsPage"));
 export const TicketDetailPage = lazy(() => import("../modules/support/TicketDetailPage"));
 export const SentDocumentsPage = lazy(() => import("../modules/comms/SentDocumentsPage"));
 export const OperationsHubPage = lazy(() => import("../modules/operations/OperationsHubPage"));
+export const OperationsPacksPage = lazy(() => import("../modules/operations/OperationsPacksPage"));
+export const OperationsWorkItemSettingsPage = lazy(() => import("../modules/operations/OperationsWorkItemSettingsPage"));
 export const OperationsCalendarPage = lazy(() => import("../modules/operations/OperationsCalendarPage"));
 export const OperationsTimelinePage = lazy(() => import("../modules/operations/OperationsTimelinePage"));
 export const OperationsDashboardPage = lazy(() => import("../modules/operations/OperationsDashboardPage"));

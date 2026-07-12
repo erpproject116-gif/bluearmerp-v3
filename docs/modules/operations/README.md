@@ -1,59 +1,116 @@
 # Operations Hub module
 
-Project workspaces with Kanban/table views, calendar and timeline planning, automation rules, dashboards, and ERP document links (quotations, POs, job cost projects).
+Project workspaces with Kanban/table views, calendar and timeline planning, **live automation**, dashboards, **ERP document links**, custom fields, editable boards, and tenant industry packs.
 
 ## Features
 
 | Feature | Web route | API |
 |---------|-----------|-----|
 | Work Hub (Kanban / table) | `/app/operations` | `GET/POST/PATCH /api/v1/operations/work-items` |
+| Form settings / custom fields | `/app/operations/work-items/settings` | `/api/v1/custom-fields?entity_type=ops_work_item` |
+| Board settings | Hub → Board settings | Column CRUD + workspace PATCH |
+| Industry packs | `/app/operations/packs` | `GET/POST/PATCH/DELETE /api/v1/operations/packs` |
+| Save board as pack | Board settings | `POST .../workspaces/{id}/save-as-pack` |
+| Apply pack to board | API | `POST .../workspaces/{id}/apply-pack` |
+| Document links | Edit work item | `GET/POST/DELETE .../work-items/{id}/links` |
+| Doc search | Link picker | `GET .../doc-search?doc_type=&q=` |
 | Calendar | `/app/operations/calendar` | `GET .../work-items?view=calendar&board=1` |
 | Timeline | `/app/operations/timeline` | `GET .../work-items?view=timeline&board=1` |
 | Dashboards | `/app/operations/dashboard` | `GET/POST /api/v1/operations/dashboards` |
 | Automation | `/app/operations/automation` | `GET/POST/PATCH /api/v1/operations/automation-rules` |
-| Workspaces | (selector + create) | `GET/POST /api/v1/operations/workspaces` |
-| Industry packs | create workspace UI | `GET /api/v1/operations/industry-packs` |
+| Workspaces | (selector + create) | `GET/POST/PATCH /api/v1/operations/workspaces` |
 | Create quotation from item | work item action | `POST /api/v1/operations/work-items/{id}/create-quotation` |
 
-## Schema (migration `140_operations_hub.sql`)
+## Schema
 
-- `wm_workspaces` — tenant workspaces with optional `inv_project_id` / `job_cost_project_id`
-- `wm_columns` — Kanban columns per workspace
-- `wm_work_items` — cards with status, priority, assignee, dates, `quotation_id`
-- `wm_links` — generic doc links (`doc_type`, `doc_id`)
+### Migration `140_operations_hub.sql`
+
+- `wm_workspaces`, `wm_columns`, `wm_work_items`, `wm_links`
 - `wm_automation_rules`, `wm_dashboards`, `wm_dashboard_widgets`
 
-Migration `141_operations_crm_mirror.sql` adds `legacy_crm_task_id` on `wm_work_items` for CRM follow-up dual-read.
+### Migration `155_operations_board_and_packs.sql`
+
+- Column config: `wm_columns.is_done`, `wip_limit`, `archived_at`
+- Pack tables: `ops_packs`, `ops_pack_columns`, `ops_pack_sample_items`, `ops_pack_automation_rules`, `ops_pack_dashboard_widgets`
+- Permissions: `operations.packs`, `operations.board_config`
+
+### Migration `156_operations_links_unique.sql`
+
+- Unique `(work_item_id, doc_type, doc_id)` on `wm_links`
+
+Platform packs are seeded from embed JSON into `ops_packs` (`tenant_id` null, `is_system` true) on first pack list. Tenants clone or create custom packs; system packs are read-only.
+
+## Custom fields
+
+Entity type: `ops_work_item`. Configure at Form settings; values save with create/patch work items (`custom_values`).
+
+## Document links
+
+Supported `doc_type` values:
+
+| doc_type | Label |
+|----------|-------|
+| `quo_quotation` | Quotation |
+| `po_purchase_order` | Purchase order |
+| `sa_sales` | Sales invoice |
+| `fin_official_receipt` | Official receipt |
+| `job_cost_project` | Job cost project |
+
+Linking a quotation also sets `wm_work_items.quotation_id` when empty.
+
+## Automation engine
+
+`EmitERPEvent` evaluates active `wm_automation_rules` for the workspace (and tenant-wide rules with null workspace).
+
+| Trigger | When |
+|---------|------|
+| `work_item.created` | New work item |
+| `work_item.column_changed` | Column move (drag or edit) |
+| `work_item.status_changed` | Status patch |
+| `work_item.quotation_created` | Create quotation from item |
+
+| Action | Behavior |
+|--------|----------|
+| `notify` / `log` | Activity Log entry (`operations.automation.*`) |
+| `set_status` | Updates work item status |
+| `set_priority` | Updates work item priority |
+
+Optional `trigger_config` filters: `column_id`, `column_key` / `to_column_key`, `status`.
+
+## Board configuration
+
+- Add / rename / reorder / mark done / archive columns after workspace create
+- Soft-archive columns (cannot remove last active column)
+- Archive workspace via status `archived`
+- **Save board as pack** snapshots active columns into a tenant pack
+
+## Industry packs
+
+| Action | Behavior |
+|--------|----------|
+| List | Platform + tenant packs (`GET /packs`) |
+| Clone | Copy system/tenant pack into tenant-owned pack |
+| Create blank | Minimal 3-column custom pack |
+| Save as pack | From current workspace columns |
+| Apply | `add_missing_columns` (safe) or `replace_empty_only` (no work items) |
+
+Workspace create accepts `industry_pack` (code) and/or `pack_id`.
 
 ## CRM mirror
 
-CRM follow-up tasks (`crm_follow_up_tasks`) are mirrored to Operations work items. PATCH from either surface updates both. See in-app KB article `crm-operations-tasks-sync`.
-
-## Board API notes
-
-- Board fetches use `?workspace_id=N&board=1&pageSize=200` (required `workspace_id`).
-- Assignee display uses `users.full_name` (not `display_name`).
-- Hosted deploys must apply migrations **136–141** before Operations routes return data.
+CRM follow-up tasks (`crm_follow_up_tasks`) are mirrored to Operations work items. See KB `crm-operations-tasks-sync`.
 
 ## Demo data
 
-`api/internal/modules/demodata/sql/seed-demo-operations.sql` creates workspace `demo-riverside-reno` (Construction pack) per demo tenant. Status check: `demo_operations_workspace` on Demo Data screen.
-
-Populate via **User Management → Demo Data** (includes `seed-demo-operations.sql` in script list).
-
-## In-app documentation
-
-| Artifact | Location |
-|----------|----------|
-| Guide section | `web/src/modules/documentation/documentationSections.ts` → `operations` |
-| KB articles | `operations-hub-intro`, `crm-operations-tasks-sync` in `moduleKbArticles.ts` |
-| Onboarding track | `operations_hub` in `api/internal/platform/onboarding/tracks.go` |
+`api/internal/modules/demodata/sql/seed-demo-operations.sql` creates workspace `demo-riverside-reno` (Construction pack).
 
 ## Manual test checklist
 
-1. Apply migrations `140`, `141`; enable `operations` module for tenant.
-2. Open `/app/operations` — workspace selector loads; empty state offers sample project.
-3. Create workspace with industry pack — columns and starter items appear.
-4. Drag Kanban card — column and sort order persist; Calendar/Timeline show same items.
-5. Create CRM follow-up task — mirrored card appears on Operations board.
-6. Demo Data populate — `demo-riverside-reno` workspace and work items present.
+1. Apply migrations through **156**; enable `operations` module.
+2. Open `/app/operations` — create workspace with pack → columns appear.
+3. **Board settings** — rename/add/reorder/archive columns; save as pack.
+4. `/app/operations/packs` — clone Construction → create workspace from clone.
+5. **Form settings** — add a custom field; create/edit work item and confirm value persists.
+6. Edit work item → **Linked documents** — search and link a quotation/PO/SI/OR/job cost.
+7. Drag Kanban card with an automation rule on `work_item.column_changed` → Activity Log (or status/priority update).
+8. CRM follow-up still mirrors to board.

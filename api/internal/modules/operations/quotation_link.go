@@ -137,8 +137,9 @@ func createQuotationFromWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 			EditURL:     "/app/quotation/quotations/" + strconv.FormatInt(quotationID, 10),
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "operations.work_item.create_quotation", "wm_work_item", &workItemID, nil, result)
-		EmitERPEvent(r.Context(), tu.TenantID, "operations.work_item.quotation_created", map[string]any{
+		EmitERPEvent(r.Context(), pool, tu.TenantID, "work_item.quotation_created", map[string]any{
 			"work_item_id": workItemID, "quotation_id": quotationID, "reference_no": referenceNo,
+			"workspace_id": item.WorkspaceID, "actor_user_id": tu.AppUserID,
 		})
 		response.OK(w, result, "Quotation created.")
 	}

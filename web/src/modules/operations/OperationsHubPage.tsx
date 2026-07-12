@@ -3,12 +3,16 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { KanbanBoard } from "../../shared/KanbanBoard";
 import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
+import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../shared/ViewModeToggle";
+import { useCustomValues } from "../../shared/useCustomValues";
 import { useDebouncedSignal } from "../../shared/useDebouncedSignal";
+import { useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import { OPERATIONS_ENTITY, OPERATIONS_SETTINGS_HREF } from "../../shared/entityTypes";
 import {
   createQuotationFromWorkItem,
   createWorkItem,
@@ -17,6 +21,7 @@ import {
   boardWorkItemsQueryKey,
   FALLBACK_INDUSTRY_PACKS,
   useIndustryPacks,
+  useInvalidateColumns,
   useInvalidateWorkItems,
   useInvalidateWorkspaces,
   useOperationsBoardWorkItems,
@@ -26,7 +31,9 @@ import {
   type Workspace,
 } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
+import { OperationsBoardSettingsModal } from "./OperationsBoardSettingsModal";
 import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
+import { WorkItemLinksPanel } from "./WorkItemLinksPanel";
 
 const STORAGE_KEY = "operations-hub-view";
 
@@ -72,14 +79,19 @@ export default function OperationsHubPage() {
   const qc = useQueryClient();
   const invalidateWorkspaces = useInvalidateWorkspaces();
   const invalidateWorkItems = useInvalidateWorkItems();
+  const invalidateColumns = useInvalidateColumns();
   const { workspaceId, setWorkspaceId } = useOperationsWorkspace();
   const canCreateWorkspace = () => hasPermission(auth.me, "operations.workspaces_new", "write");
   const canCreateItem = () => hasPermission(auth.me, "operations.work_items_new", "write");
   const canCreateQuote = () => hasPermission(auth.me, "operations.create_quotation", "write");
   const canEditItem = () => hasPermission(auth.me, "operations.work_items", "write");
+  const canConfigBoard = () =>
+    hasPermission(auth.me, "operations.board_config", "write") ||
+    hasPermission(auth.me, "operations.workspaces", "write");
 
   const [viewMode, setViewMode] = createSignal<ViewMode>(loadViewMode(STORAGE_KEY));
   const [workspaceModalOpen, setWorkspaceModalOpen] = createSignal(false);
+  const [boardSettingsOpen, setBoardSettingsOpen] = createSignal(false);
   const [itemModalOpen, setItemModalOpen] = createSignal(false);
   const [editItem, setEditItem] = createSignal<WorkItem | null>(null);
   const [wsCode, setWsCode] = createSignal("");
@@ -96,6 +108,8 @@ export default function OperationsHubPage() {
   const [editStartDate, setEditStartDate] = createSignal("");
   const [editEndDate, setEditEndDate] = createSignal("");
   const [saving, setSaving] = createSignal(false);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
+  const { activeCustomFields } = useFormFieldSettings(OPERATIONS_ENTITY.workItem);
 
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("title");
   const debouncedQ = useDebouncedSignal(q);
@@ -162,6 +176,7 @@ export default function OperationsHubPage() {
     setEditStatus(item.status);
     setEditStartDate(item.start_date ?? "");
     setEditEndDate(item.end_date ?? "");
+    loadCustom(item.custom_values ?? {});
     setSelectedId(item.id);
   };
 
@@ -198,10 +213,12 @@ export default function OperationsHubPage() {
       return;
     }
     setSaving(true);
+    const pack = selectedPack();
     const res = await createWorkspace({
       workspace_code: wsCode().trim(),
       workspace_name: wsName().trim(),
-      industry_pack: wsPack() || undefined,
+      industry_pack: pack?.pack_code || wsPack() || undefined,
+      pack_id: pack?.id,
     });
     setSaving(false);
     if (!res.success) {
@@ -250,6 +267,7 @@ export default function OperationsHubPage() {
     setItemColumnId(firstCol?.id ?? null);
     setItemStartDate("");
     setItemEndDate("");
+    loadCustom({});
     setItemModalOpen(true);
   };
 
@@ -260,6 +278,11 @@ export default function OperationsHubPage() {
       toast.warning("Workspace, column, and title are required.");
       return;
     }
+    const cfError = validateCustomFields(customValues(), activeCustomFields());
+    if (cfError) {
+      toast.warning(cfError);
+      return;
+    }
     setSaving(true);
     const res = await createWorkItem({
       workspace_id: wsId,
@@ -267,6 +290,7 @@ export default function OperationsHubPage() {
       title: itemTitle().trim(),
       start_date: itemStartDate() || undefined,
       end_date: itemEndDate() || undefined,
+      custom_values: customValues(),
     });
     setSaving(false);
     if (!res.success) {
@@ -285,6 +309,11 @@ export default function OperationsHubPage() {
       toast.warning("Title and column are required.");
       return;
     }
+    const cfError = validateCustomFields(customValues(), activeCustomFields());
+    if (cfError) {
+      toast.warning(cfError);
+      return;
+    }
     setSaving(true);
     const res = await patchWorkItem(item.id, {
       title: editTitle().trim(),
@@ -293,6 +322,7 @@ export default function OperationsHubPage() {
       status: editStatus(),
       start_date: editStartDate() || null,
       end_date: editEndDate() || null,
+      custom_values: customValues(),
     });
     setSaving(false);
     if (!res.success) {
@@ -331,6 +361,21 @@ export default function OperationsHubPage() {
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <ViewModeToggle value={viewMode()} onChange={setViewMode} storageKey={STORAGE_KEY} />
+          <A href="/app/operations/packs" class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-primary hover:bg-slate-50">
+            Industry packs
+          </A>
+          <A href={OPERATIONS_SETTINGS_HREF.workItem} class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-primary hover:bg-slate-50">
+            Form settings
+          </A>
+          <Show when={canConfigBoard() && activeWorkspace()}>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-primary hover:bg-slate-50"
+              onClick={() => setBoardSettingsOpen(true)}
+            >
+              Board settings
+            </button>
+          </Show>
           <Show when={canCreateWorkspace()}>
             <button
               type="button"
@@ -550,6 +595,11 @@ export default function OperationsHubPage() {
         <Field label="End date">
           <input type="date" class={inputClass} value={itemEndDate()} onInput={(e) => setItemEndDate(e.currentTarget.value)} />
         </Field>
+        <CustomFieldsSection
+          entityType={OPERATIONS_ENTITY.workItem}
+          values={customValues}
+          onChange={setCustom}
+        />
       </EntityModal>
 
       <EntityModal
@@ -596,7 +646,38 @@ export default function OperationsHubPage() {
         <Field label="End date">
           <input type="date" class={inputClass} value={editEndDate()} onInput={(e) => setEditEndDate(e.currentTarget.value)} disabled={!canEditItem()} />
         </Field>
+        <CustomFieldsSection
+          entityType={OPERATIONS_ENTITY.workItem}
+          values={customValues}
+          onChange={setCustom}
+        />
+        <Show when={editItem()}>
+          {(item) => (
+            <WorkItemLinksPanel
+              workItemId={item().id}
+              canEdit={canEditItem()}
+              onChanged={() => invalidateWorkItems()}
+            />
+          )}
+        </Show>
       </EntityModal>
+
+      <Show when={activeWorkspace()}>
+        {(ws) => (
+          <OperationsBoardSettingsModal
+            open={boardSettingsOpen()}
+            workspace={ws()}
+            columns={columns.data ?? []}
+            canEdit={canConfigBoard()}
+            onClose={() => setBoardSettingsOpen(false)}
+            onChanged={() => {
+              invalidateWorkspaces();
+              invalidateColumns();
+              invalidateWorkItems();
+            }}
+          />
+        )}
+      </Show>
     </OperationsLayout>
   );
 }

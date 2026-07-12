@@ -282,16 +282,37 @@ func validateAutomationRuleBody(body automationRuleBody) map[string]string {
 	if strings.TrimSpace(body.RuleName) == "" {
 		errs["rule_name"] = "Rule name is required."
 	}
-	if strings.TrimSpace(body.TriggerEvent) == "" {
+	trigger := strings.TrimSpace(body.TriggerEvent)
+	if trigger == "" {
 		errs["trigger_event"] = "Trigger event is required."
+	} else if !allowedTriggers[trigger] {
+		errs["trigger_event"] = "Unsupported trigger event."
 	}
-	if strings.TrimSpace(body.ActionType) == "" {
+	action := strings.TrimSpace(body.ActionType)
+	if action == "" {
 		errs["action_type"] = "Action type is required."
+	} else if !allowedActions[action] {
+		errs["action_type"] = "Unsupported action type."
 	}
 	if len(errs) > 0 {
 		return errs
 	}
 	return nil
+}
+
+var allowedTriggers = map[string]bool{
+	"work_item.created":            true,
+	"work_item.column_changed":     true,
+	"work_item.status_changed":     true,
+	"work_item.quotation_created":  true,
+	"workspace.created":            true,
+}
+
+var allowedActions = map[string]bool{
+	"notify":       true,
+	"log":          true,
+	"set_status":   true,
+	"set_priority": true,
 }
 
 func defaultMap(m map[string]any) map[string]any {

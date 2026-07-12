@@ -169,6 +169,8 @@ import {
   CommsInboxPage,
   CommsSettingsPage,
   OperationsHubPage,
+  OperationsPacksPage,
+  OperationsWorkItemSettingsPage,
   OperationsCalendarPage,
   OperationsTimelinePage,
   OperationsDashboardPage,
@@ -564,6 +566,12 @@ export default function App() {
           )} />
           <Route path="/comms/settings" component={() => (
             <CommsRoute><CommsSettingsPage /></CommsRoute>
+          )} />
+          <Route path="/operations/packs" component={() => (
+            <OperationsRoute><OperationsPacksPage /></OperationsRoute>
+          )} />
+          <Route path="/operations/work-items/settings" component={() => (
+            <OperationsRoute><OperationsWorkItemSettingsPage /></OperationsRoute>
           )} />
           <Route path="/operations/calendar" component={() => (
             <OperationsRoute><OperationsCalendarPage /></OperationsRoute>

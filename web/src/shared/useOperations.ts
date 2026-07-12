@@ -20,6 +20,9 @@ export type Column = {
   column_name: string;
   sort_order: number;
   column_color?: string | null;
+  is_done?: boolean;
+  wip_limit?: number | null;
+  archived?: boolean;
 };
 
 export type WorkItem = {
@@ -41,6 +44,25 @@ export type WorkItem = {
   blocked_by_title?: string;
   quotation_id?: number | null;
   quotation_reference?: string;
+  custom_values?: Record<string, unknown>;
+};
+
+export type WorkItemLink = {
+  id: number;
+  work_item_id: number;
+  link_type: string;
+  doc_type: string;
+  doc_id: number;
+  label?: string;
+  href?: string;
+  created_at?: string;
+};
+
+export type DocSearchHit = {
+  doc_type: string;
+  doc_id: number;
+  label: string;
+  href?: string;
 };
 
 export type AutomationRule = {
@@ -69,9 +91,27 @@ export type WidgetData = {
 };
 
 export type IndustryPack = {
+  id?: number;
   pack_code: string;
   pack_name: string;
   summary?: string;
+  description?: string;
+  is_system?: boolean;
+  source_pack_code?: string;
+  columns?: Array<{
+    key: string;
+    name: string;
+    sort_order: number;
+    color?: string;
+    is_done?: boolean;
+  }>;
+  sample_work_items?: Array<{
+    title: string;
+    column_key: string;
+    priority?: string;
+    start_date_offset_days?: number;
+    end_date_offset_days?: number;
+  }>;
 };
 
 export const FALLBACK_INDUSTRY_PACKS: IndustryPack[] = [
@@ -269,12 +309,32 @@ export function useIndustryPacks() {
   return createQuery(() => ({
     queryKey: ["operations-industry-packs"],
     queryFn: async () => {
-      const res = await apiFetch<IndustryPack[]>("/api/v1/operations/industry-packs");
-      if (!res.success) throw new Error(res.message ?? "Failed to load packs");
+      const res = await apiFetch<IndustryPack[]>("/api/v1/operations/packs");
+      if (!res.success) {
+        const fallback = await apiFetch<IndustryPack[]>("/api/v1/operations/industry-packs");
+        if (!fallback.success) throw new Error(res.message ?? "Failed to load packs");
+        return fallback.data ?? [];
+      }
       return res.data ?? [];
     },
     staleTime: 60_000,
   }));
+}
+
+export function useOperationsPackDetail(packId: () => number | null) {
+  return createQuery(() => {
+    const id = packId();
+    return {
+      queryKey: ["operations-pack", id],
+      enabled: id != null && id > 0,
+      queryFn: async () => {
+        const res = await apiFetch<IndustryPack>(`/api/v1/operations/packs/${id}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load pack");
+        return res.data!;
+      },
+      staleTime: OPS_STALE_MS,
+    };
+  });
 }
 
 export function useInvalidateWorkspaces() {
@@ -300,19 +360,34 @@ export function useInvalidateDashboards() {
   };
 }
 
+export function useInvalidateColumns() {
+  const qc = useQueryClient();
+  return () => void qc.invalidateQueries({ queryKey: ["operations-columns"] });
+}
+
+export function useInvalidatePacks() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ["operations-industry-packs"] });
+    void qc.invalidateQueries({ queryKey: ["operations-pack"] });
+  };
+}
+
 /** Broad invalidation — prefer targeted helpers when possible. */
 export function useInvalidateOperations() {
   const invalidateWorkspaces = useInvalidateWorkspaces();
   const invalidateWorkItems = useInvalidateWorkItems();
   const invalidateAutomation = useInvalidateAutomationRules();
   const invalidateDashboards = useInvalidateDashboards();
-  const qc = useQueryClient();
+  const invalidateColumns = useInvalidateColumns();
+  const invalidatePacks = useInvalidatePacks();
   return () => {
     invalidateWorkspaces();
-    void qc.invalidateQueries({ queryKey: ["operations-columns"] });
+    invalidateColumns();
     invalidateWorkItems();
     invalidateAutomation();
     invalidateDashboards();
+    invalidatePacks();
   };
 }
 
@@ -320,8 +395,109 @@ export async function createWorkspace(body: {
   workspace_code: string;
   workspace_name: string;
   industry_pack?: string;
+  pack_id?: number;
 }) {
   return apiFetch<Workspace>("/api/v1/operations/workspaces", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchWorkspace(id: number, body: { workspace_name?: string; status?: string }) {
+  return apiFetch<Workspace>(`/api/v1/operations/workspaces/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createColumn(workspaceId: number, body: {
+  column_key: string;
+  column_name: string;
+  sort_order?: number;
+  column_color?: string;
+  is_done?: boolean;
+  wip_limit?: number | null;
+}) {
+  return apiFetch<Column>(`/api/v1/operations/workspaces/${workspaceId}/columns`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchColumn(workspaceId: number, columnId: number, body: Record<string, unknown>) {
+  return apiFetch<Column>(`/api/v1/operations/workspaces/${workspaceId}/columns/${columnId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function reorderColumns(workspaceId: number, columns: Array<{ id: number; sort_order: number }>) {
+  return apiFetch<Column[]>(`/api/v1/operations/workspaces/${workspaceId}/columns/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ columns }),
+  });
+}
+
+export async function deleteColumn(workspaceId: number, columnId: number, force = false) {
+  const qs = force ? "?force=1" : "";
+  return apiFetch(`/api/v1/operations/workspaces/${workspaceId}/columns/${columnId}${qs}`, { method: "DELETE" });
+}
+
+export async function clonePack(packId: number, body?: { pack_code?: string; pack_name?: string }) {
+  return apiFetch<IndustryPack>(`/api/v1/operations/packs/${packId}/clone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export async function createPack(body: {
+  pack_code: string;
+  pack_name: string;
+  description?: string;
+  columns: Array<{ key: string; name: string; sort_order: number; color?: string; is_done?: boolean }>;
+}) {
+  return apiFetch<IndustryPack>("/api/v1/operations/packs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchPack(packId: number, body: Record<string, unknown>) {
+  return apiFetch<IndustryPack>(`/api/v1/operations/packs/${packId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deletePack(packId: number) {
+  return apiFetch(`/api/v1/operations/packs/${packId}`, { method: "DELETE" });
+}
+
+export async function saveWorkspaceAsPack(workspaceId: number, body: {
+  pack_code: string;
+  pack_name: string;
+  description?: string;
+}) {
+  return apiFetch<IndustryPack>(`/api/v1/operations/workspaces/${workspaceId}/save-as-pack`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function applyPackToWorkspace(workspaceId: number, body: {
+  pack_id: number;
+  mode?: "add_missing_columns" | "replace_empty_only";
+}) {
+  return apiFetch(`/api/v1/operations/workspaces/${workspaceId}/apply-pack`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -338,6 +514,7 @@ export async function createWorkItem(body: {
   start_date?: string;
   end_date?: string;
   blocked_by_item_id?: number;
+  custom_values?: Record<string, unknown>;
 }) {
   return apiFetch<WorkItem>("/api/v1/operations/work-items", {
     method: "POST",
@@ -352,6 +529,33 @@ export async function patchWorkItem(id: number, body: Record<string, unknown>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+export async function listWorkItemLinks(workItemId: number) {
+  return apiFetch<WorkItemLink[]>(`/api/v1/operations/work-items/${workItemId}/links`);
+}
+
+export async function createWorkItemLink(
+  workItemId: number,
+  body: { doc_type: string; doc_id: number; link_type?: string },
+) {
+  return apiFetch<WorkItemLink>(`/api/v1/operations/work-items/${workItemId}/links`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteWorkItemLink(workItemId: number, linkId: number) {
+  return apiFetch(`/api/v1/operations/work-items/${workItemId}/links/${linkId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function searchERPDocs(docType: string, q: string) {
+  const params = new URLSearchParams({ doc_type: docType });
+  if (q.trim()) params.set("q", q.trim());
+  return apiFetch<DocSearchHit[]>(`/api/v1/operations/doc-search?${params}`);
 }
 
 export async function createQuotationFromWorkItem(id: number) {

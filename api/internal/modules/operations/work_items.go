@@ -37,36 +37,39 @@ type WorkItem struct {
 	EndDate          *string `json:"end_date,omitempty"`
 	BlockedByItemID  *int64  `json:"blocked_by_item_id,omitempty"`
 	BlockedByTitle   string  `json:"blocked_by_title,omitempty"`
-	QuotationID      *int64  `json:"quotation_id,omitempty"`
-	QuotationRef     string  `json:"quotation_reference,omitempty"`
-	SortOrder        int     `json:"sort_order"`
+	QuotationID      *int64         `json:"quotation_id,omitempty"`
+	QuotationRef     string         `json:"quotation_reference,omitempty"`
+	SortOrder        int            `json:"sort_order"`
+	CustomValues     map[string]any `json:"custom_values,omitempty"`
 }
 
 type workItemBody struct {
-	WorkspaceID     int64   `json:"workspace_id"`
-	ColumnID        int64   `json:"column_id"`
-	Title           string  `json:"title"`
-	Description     *string `json:"description"`
-	Status          string  `json:"status"`
-	Priority        string  `json:"priority"`
-	AssigneeUserID  *int64  `json:"assignee_user_id"`
-	PartnerID       *int64  `json:"partner_id"`
-	StartDate       *string `json:"start_date"`
-	EndDate         *string `json:"end_date"`
-	BlockedByItemID *int64  `json:"blocked_by_item_id"`
+	WorkspaceID     int64          `json:"workspace_id"`
+	ColumnID        int64          `json:"column_id"`
+	Title           string         `json:"title"`
+	Description     *string        `json:"description"`
+	Status          string         `json:"status"`
+	Priority        string         `json:"priority"`
+	AssigneeUserID  *int64         `json:"assignee_user_id"`
+	PartnerID       *int64         `json:"partner_id"`
+	StartDate       *string        `json:"start_date"`
+	EndDate         *string        `json:"end_date"`
+	BlockedByItemID *int64         `json:"blocked_by_item_id"`
+	CustomValues    map[string]any `json:"custom_values"`
 }
 
 type workItemPatchBody struct {
-	ColumnID        *int64  `json:"column_id"`
-	Title           *string `json:"title"`
-	Description     *string `json:"description"`
-	Status          *string `json:"status"`
-	Priority        *string `json:"priority"`
-	AssigneeUserID  *int64  `json:"assignee_user_id"`
-	PartnerID       *int64  `json:"partner_id"`
-	StartDate       *string `json:"start_date"`
-	EndDate         *string `json:"end_date"`
-	BlockedByItemID *int64  `json:"blocked_by_item_id"`
+	ColumnID        *int64         `json:"column_id"`
+	Title           *string        `json:"title"`
+	Description     *string        `json:"description"`
+	Status          *string        `json:"status"`
+	Priority        *string        `json:"priority"`
+	AssigneeUserID  *int64         `json:"assignee_user_id"`
+	PartnerID       *int64         `json:"partner_id"`
+	StartDate       *string        `json:"start_date"`
+	EndDate         *string        `json:"end_date"`
+	BlockedByItemID *int64         `json:"blocked_by_item_id"`
+	CustomValues    map[string]any `json:"custom_values"`
 }
 
 func registerWorkItemRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -179,6 +182,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 			if out == nil {
 				out = []WorkItem{}
 			}
+			attachListCustom(r.Context(), pool, tu.TenantID, out)
 			response.OKList(w, out, p.Page, p.PageSize, int64(len(out)))
 			return
 		}
@@ -223,6 +227,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 		if out == nil {
 			out = []WorkItem{}
 		}
+		attachListCustom(r.Context(), pool, tu.TenantID, out)
 		response.OKList(w, out, p.Page, p.PageSize, total)
 	}
 }
@@ -267,8 +272,15 @@ func createWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		status := defaultItemStatus(body.Status)
 		priority := defaultPriority(body.Priority)
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to start transaction.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
 		var id int64
-		err := pool.QueryRow(r.Context(), `
+		err = tx.QueryRow(r.Context(), `
 			insert into public.wm_work_items (
 			  tenant_id, workspace_id, column_id, title, description, status, priority,
 			  assignee_user_id, partner_id, start_date, end_date, blocked_by_item_id
@@ -282,10 +294,19 @@ func createWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create work item.", "ERR_INTERNAL")
 			return
 		}
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, id, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create work item.", "ERR_INTERNAL")
+			return
+		}
 		row, _ := loadWorkItem(r.Context(), pool, tu.TenantID, id)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "operations.work_item.create", "wm_work_item", &id, nil, body)
-		EmitERPEvent(r.Context(), tu.TenantID, "operations.work_item.created", map[string]any{
-			"work_item_id": id, "workspace_id": body.WorkspaceID,
+		EmitERPEvent(r.Context(), pool, tu.TenantID, "work_item.created", map[string]any{
+			"work_item_id": id, "workspace_id": body.WorkspaceID, "column_id": body.ColumnID,
+			"status": status, "priority": priority, "actor_user_id": tu.AppUserID,
 		})
 		response.OK(w, row, "Created.")
 	}
@@ -373,18 +394,43 @@ func patchWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, body.BlockedByItemID)
 			n++
 		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to start transaction.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
 		q := fmt.Sprintf(`update public.wm_work_items set %s where id = $1 and tenant_id = $2`, strings.Join(sets, ", "))
-		tag, err := pool.Exec(r.Context(), q, args...)
+		tag, err := tx.Exec(r.Context(), q, args...)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Work item not found.", "ERR_NOT_FOUND")
 			return
 		}
+		if body.CustomValues != nil {
+			if errs := saveCustom(r.Context(), tx, tu.TenantID, id, body.CustomValues); errs != nil {
+				response.Validation(w, errs)
+				return
+			}
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update work item.", "ERR_INTERNAL")
+			return
+		}
 		row, _ := loadWorkItem(r.Context(), pool, tu.TenantID, id)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "operations.work_item.update", "wm_work_item", &id, before, row)
-		if body.ColumnID != nil {
-			EmitERPEvent(r.Context(), tu.TenantID, "operations.work_item.column_changed", map[string]any{
-				"work_item_id": id, "column_id": *body.ColumnID,
-			})
+		basePayload := map[string]any{
+			"work_item_id": id, "workspace_id": row.WorkspaceID,
+			"column_id": row.ColumnID, "column_key": row.ColumnKey,
+			"status": row.Status, "priority": row.Priority,
+			"actor_user_id": tu.AppUserID,
+		}
+		if body.ColumnID != nil && *body.ColumnID != before.ColumnID {
+			EmitERPEvent(r.Context(), pool, tu.TenantID, "work_item.column_changed", basePayload)
+		}
+		if body.Status != nil && defaultItemStatus(*body.Status) != before.Status {
+			EmitERPEvent(r.Context(), pool, tu.TenantID, "work_item.status_changed", basePayload)
 		}
 		response.OK(w, row, "Updated.")
 	}
@@ -417,7 +463,11 @@ func loadWorkItem(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		&row.QuotationID, &row.QuotationRef,
 		&row.SortOrder,
 	)
-	return row, err
+	if err != nil {
+		return row, err
+	}
+	row.CustomValues = attachCustom(ctx, pool, tenantID, id)
+	return row, nil
 }
 
 func validateWorkItemBody(body workItemBody) map[string]string {

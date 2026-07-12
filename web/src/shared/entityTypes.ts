@@ -88,6 +88,16 @@ export const FINANCE_SETTINGS_HREF = {
 
 export type FinanceFeature = keyof typeof FINANCE_ENTITY;
 
+export const OPERATIONS_ENTITY = {
+  workItem: "ops_work_item",
+} as const;
+
+export const OPERATIONS_SETTINGS_HREF = {
+  workItem: "/app/operations/work-items/settings",
+} as const;
+
+export type OperationsFeature = keyof typeof OPERATIONS_ENTITY;
+
 export const CRM_ENTITY = {
   alertRule: "crm_alert_rule",
   followUpTask: "crm_follow_up_task",

@@ -24,6 +24,9 @@ export default function OperationsAutomationPage() {
   const [ruleName, setRuleName] = createSignal("");
   const [triggerEvent, setTriggerEvent] = createSignal("work_item.created");
   const [actionType, setActionType] = createSignal("notify");
+  const [message, setMessage] = createSignal("Automation triggered.");
+  const [setStatus, setSetStatus] = createSignal("done");
+  const [setPriority, setSetPriority] = createSignal("high");
   const [saving, setSaving] = createSignal(false);
 
   const { page, setPage, pageSize } = useListState("rule_name", 25);
@@ -37,7 +40,21 @@ export default function OperationsAutomationPage() {
     setRuleName("");
     setTriggerEvent("work_item.created");
     setActionType("notify");
+    setMessage("Automation triggered.");
+    setSetStatus("done");
+    setSetPriority("high");
     setModalOpen(true);
+  };
+
+  const actionConfig = () => {
+    switch (actionType()) {
+      case "set_status":
+        return { status: setStatus() };
+      case "set_priority":
+        return { priority: setPriority() };
+      default:
+        return { message: message().trim() || "Automation triggered." };
+    }
   };
 
   const saveRule = async () => {
@@ -51,7 +68,7 @@ export default function OperationsAutomationPage() {
       rule_name: ruleName().trim(),
       trigger_event: triggerEvent(),
       action_type: actionType(),
-      action_config: { message: "Automation triggered." },
+      action_config: actionConfig(),
     });
     setSaving(false);
     if (!res.success) {
@@ -97,6 +114,11 @@ export default function OperationsAutomationPage() {
           </button>
         </Show>
       </div>
+
+      <p class="mb-3 text-sm text-text-secondary">
+        Rules run when work items are created, moved, or status-changed. Notify/log actions appear in Activity Log;
+        set status/priority update the card automatically.
+      </p>
 
       <Show when={rules.isError}>
         <p class="mb-3 text-sm text-red-600">
@@ -160,15 +182,43 @@ export default function OperationsAutomationPage() {
           <select class={inputClass} value={triggerEvent()} onChange={(e) => setTriggerEvent(e.currentTarget.value)}>
             <option value="work_item.created">Work item created</option>
             <option value="work_item.column_changed">Column changed</option>
+            <option value="work_item.status_changed">Status changed</option>
             <option value="work_item.quotation_created">Quotation created</option>
           </select>
         </Field>
         <Field label="Action type">
           <select class={inputClass} value={actionType()} onChange={(e) => setActionType(e.currentTarget.value)}>
-            <option value="notify">Notify</option>
+            <option value="notify">Notify (Activity Log)</option>
             <option value="log">Log event</option>
+            <option value="set_status">Set status</option>
+            <option value="set_priority">Set priority</option>
           </select>
         </Field>
+        <Show when={actionType() === "notify" || actionType() === "log"}>
+          <Field label="Message">
+            <input class={inputClass} value={message()} onInput={(e) => setMessage(e.currentTarget.value)} />
+          </Field>
+        </Show>
+        <Show when={actionType() === "set_status"}>
+          <Field label="Status">
+            <select class={inputClass} value={setStatus()} onChange={(e) => setSetStatus(e.currentTarget.value)}>
+              <option value="open">Open</option>
+              <option value="in_progress">In progress</option>
+              <option value="done">Done</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </Field>
+        </Show>
+        <Show when={actionType() === "set_priority"}>
+          <Field label="Priority">
+            <select class={inputClass} value={setPriority()} onChange={(e) => setSetPriority(e.currentTarget.value)}>
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </Field>
+        </Show>
       </EntityModal>
     </OperationsLayout>
   );

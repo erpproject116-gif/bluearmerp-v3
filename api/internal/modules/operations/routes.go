@@ -12,6 +12,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		or.Use(auth.RequirePermission("operations.workspaces", auth.AccessRead))
 		registerWorkspaceRoutes(or, pool)
 		registerWorkItemRoutes(or, pool)
+		registerLinkRoutes(or, pool)
 		registerAutomationRoutes(or, pool)
 		registerDashboardRoutes(or, pool)
 	})

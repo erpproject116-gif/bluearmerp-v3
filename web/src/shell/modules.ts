@@ -326,7 +326,8 @@ export const appModules: AppModule[] = [
     href: "/app/operations",
     basePath: "/app/operations",
     features: [
-      { label: "Work hub", href: "/app/operations", settingsHref: "/app/operations" },
+      { label: "Work hub", href: "/app/operations", settingsHref: "/app/operations/work-items/settings" },
+      { label: "Industry packs", href: "/app/operations/packs", settingsHref: "/app/operations/packs" },
       { label: "Calendar", href: "/app/operations/calendar", settingsHref: "/app/operations/calendar" },
       { label: "Timeline", href: "/app/operations/timeline", settingsHref: "/app/operations/timeline" },
       { label: "Project dashboard", href: "/app/operations/dashboard", settingsHref: "/app/operations/dashboard" },
