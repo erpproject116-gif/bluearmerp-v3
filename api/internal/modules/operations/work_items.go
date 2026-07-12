@@ -38,6 +38,9 @@ type WorkItem struct {
 	StartTime        *string        `json:"start_time,omitempty"`
 	EndTime          *string        `json:"end_time,omitempty"`
 	AllDay           bool           `json:"all_day"`
+	ReminderOffsetMinutes *int     `json:"reminder_offset_minutes,omitempty"`
+	ReminderAt       *string        `json:"reminder_at,omitempty"`
+	ReminderSentAt   *string        `json:"reminder_sent_at,omitempty"`
 	BlockedByItemID  *int64         `json:"blocked_by_item_id,omitempty"`
 	BlockedByTitle   string         `json:"blocked_by_title,omitempty"`
 	QuotationID      *int64         `json:"quotation_id,omitempty"`
@@ -60,6 +63,7 @@ type workItemBody struct {
 	StartTime       *string        `json:"start_time"`
 	EndTime         *string        `json:"end_time"`
 	AllDay          *bool          `json:"all_day"`
+	ReminderOffsetMinutes *int     `json:"reminder_offset_minutes"`
 	BlockedByItemID *int64         `json:"blocked_by_item_id"`
 	CustomValues    map[string]any `json:"custom_values"`
 }
@@ -77,6 +81,8 @@ type workItemPatchBody struct {
 	StartTime       *string        `json:"start_time"`
 	EndTime         *string        `json:"end_time"`
 	AllDay          *bool          `json:"all_day"`
+	ReminderOffsetMinutes *int     `json:"reminder_offset_minutes"`
+	ReminderSentAt  *string        `json:"reminder_sent_at"`
 	BlockedByItemID *int64         `json:"blocked_by_item_id"`
 	CustomValues    map[string]any `json:"custom_values"`
 }
@@ -150,6 +156,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 			  wi.start_date::text, wi.end_date::text,
 			  to_char(wi.start_time, 'HH24:MI'), to_char(wi.end_time, 'HH24:MI'),
 			  wi.all_day,
+			  wi.reminder_offset_minutes, wi.reminder_at::text, wi.reminder_sent_at::text,
 			  wi.blocked_by_item_id, coalesce(blocker.title, ''),
 			  wi.quotation_id, coalesce(q.reference_no, ''),
 			  wi.sort_order`
@@ -182,6 +189,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 					&row.PartnerID, &row.PartnerName,
 					&row.StartDate, &row.EndDate,
 					&row.StartTime, &row.EndTime, &row.AllDay,
+					&row.ReminderOffsetMinutes, &row.ReminderAt, &row.ReminderSentAt,
 					&row.BlockedByItemID, &row.BlockedByTitle,
 					&row.QuotationID, &row.QuotationRef,
 					&row.SortOrder,
@@ -228,6 +236,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.PartnerID, &row.PartnerName,
 				&row.StartDate, &row.EndDate,
 				&row.StartTime, &row.EndTime, &row.AllDay,
+				&row.ReminderOffsetMinutes, &row.ReminderAt, &row.ReminderSentAt,
 				&row.BlockedByItemID, &row.BlockedByTitle,
 				&row.QuotationID, &row.QuotationRef,
 				&row.SortOrder, &total,
@@ -294,6 +303,11 @@ func createWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 		} else if startTime != nil {
 			allDay = false
 		}
+		remOffset, remAt, remErrs := resolveReminder(body.ReminderOffsetMinutes, body.StartDate, startTime, allDay)
+		if remErrs != nil {
+			response.Validation(w, remErrs)
+			return
+		}
 		status := defaultItemStatus(body.Status)
 		priority := defaultPriority(body.Priority)
 		tx, err := pool.Begin(r.Context())
@@ -307,12 +321,14 @@ func createWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 		err = tx.QueryRow(r.Context(), `
 			insert into public.wm_work_items (
 			  tenant_id, workspace_id, column_id, title, description, status, priority,
-			  assignee_user_id, partner_id, start_date, end_date, start_time, end_time, all_day, blocked_by_item_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+			  assignee_user_id, partner_id, start_date, end_date, start_time, end_time, all_day,
+			  reminder_offset_minutes, reminder_at, blocked_by_item_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 			returning id`,
 			tu.TenantID, body.WorkspaceID, body.ColumnID, strings.TrimSpace(body.Title),
 			body.Description, status, priority,
-			body.AssigneeUserID, body.PartnerID, startDate, endDate, startTime, endTime, allDay, body.BlockedByItemID,
+			body.AssigneeUserID, body.PartnerID, startDate, endDate, startTime, endTime, allDay,
+			remOffset, remAt, body.BlockedByItemID,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create work item.", "ERR_INTERNAL")
@@ -441,6 +457,49 @@ func patchWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *body.AllDay)
 			n++
 		}
+		if body.ReminderSentAt != nil {
+			sets = append(sets, "reminder_sent_at = now()")
+		}
+		scheduleTouched := body.StartDate != nil || body.StartTime != nil || body.AllDay != nil || body.ReminderOffsetMinutes != nil
+		if scheduleTouched {
+			mergedDate := before.StartDate
+			if body.StartDate != nil {
+				mergedDate = body.StartDate
+			}
+			mergedTime := before.StartTime
+			if body.StartTime != nil {
+				st, _, errs := parseOptionalTimes(body.StartTime, nil)
+				if errs != nil {
+					response.Validation(w, errs)
+					return
+				}
+				mergedTime = st
+			}
+			mergedAllDay := before.AllDay
+			if body.AllDay != nil {
+				mergedAllDay = *body.AllDay
+			} else if body.StartTime != nil && mergedTime != nil {
+				mergedAllDay = false
+			}
+			offset := before.ReminderOffsetMinutes
+			if body.ReminderOffsetMinutes != nil {
+				offset = body.ReminderOffsetMinutes
+			}
+			remOffset, remAt, remErrs := resolveReminder(offset, mergedDate, mergedTime, mergedAllDay)
+			if remErrs != nil {
+				response.Validation(w, remErrs)
+				return
+			}
+			sets = append(sets, fmt.Sprintf("reminder_offset_minutes = $%d", n))
+			args = append(args, remOffset)
+			n++
+			sets = append(sets, fmt.Sprintf("reminder_at = $%d", n))
+			args = append(args, remAt)
+			n++
+			if body.ReminderOffsetMinutes != nil || body.StartDate != nil || body.StartTime != nil || body.AllDay != nil {
+				sets = append(sets, "reminder_sent_at = null")
+			}
+		}
 		if body.BlockedByItemID != nil {
 			sets = append(sets, fmt.Sprintf("blocked_by_item_id = $%d", n))
 			args = append(args, body.BlockedByItemID)
@@ -498,6 +557,7 @@ func loadWorkItem(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		  wi.start_date::text, wi.end_date::text,
 		  to_char(wi.start_time, 'HH24:MI'), to_char(wi.end_time, 'HH24:MI'),
 		  wi.all_day,
+		  wi.reminder_offset_minutes, wi.reminder_at::text, wi.reminder_sent_at::text,
 		  wi.blocked_by_item_id, coalesce(blocker.title, ''),
 		  wi.quotation_id, coalesce(q.reference_no, ''),
 		  wi.sort_order
@@ -514,6 +574,7 @@ func loadWorkItem(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		&row.PartnerID, &row.PartnerName,
 		&row.StartDate, &row.EndDate,
 		&row.StartTime, &row.EndTime, &row.AllDay,
+		&row.ReminderOffsetMinutes, &row.ReminderAt, &row.ReminderSentAt,
 		&row.BlockedByItemID, &row.BlockedByTitle,
 		&row.QuotationID, &row.QuotationRef,
 		&row.SortOrder,
@@ -609,4 +670,35 @@ func parseOptionalTimes(start, end *string) (*string, *string, map[string]string
 		return nil, nil, errs
 	}
 	return st, et, nil
+}
+
+// resolveReminder returns offset + fire time. offset <= 0 or nil clears reminder.
+func resolveReminder(offset *int, startDate *string, startTime *string, allDay bool) (*int, *time.Time, map[string]string) {
+	if offset == nil || *offset <= 0 {
+		return nil, nil, nil
+	}
+	allowed := map[int]bool{10: true, 30: true, 60: true, 1440: true}
+	if !allowed[*offset] {
+		return nil, nil, map[string]string{"reminder_offset_minutes": "Use 10, 30, 60, or 1440 minutes."}
+	}
+	if startDate == nil || strings.TrimSpace(*startDate) == "" {
+		return nil, nil, map[string]string{"reminder_offset_minutes": "Start date is required for reminders."}
+	}
+	d, err := time.Parse("2006-01-02", strings.TrimSpace(*startDate))
+	if err != nil {
+		return nil, nil, map[string]string{"start_date": "Invalid date."}
+	}
+	start := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.Local)
+	if !allDay && startTime != nil && strings.TrimSpace(*startTime) != "" {
+		tStr := strings.TrimSpace(*startTime)
+		for _, layout := range []string{"15:04:05", "15:04"} {
+			if t, err := time.Parse(layout, tStr); err == nil {
+				start = time.Date(d.Year(), d.Month(), d.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.Local)
+				break
+			}
+		}
+	}
+	fire := start.Add(-time.Duration(*offset) * time.Minute)
+	off := *offset
+	return &off, &fire, nil
 }

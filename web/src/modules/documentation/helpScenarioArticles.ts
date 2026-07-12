@@ -271,7 +271,7 @@ export const helpScenarioArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Timed slots need migration 158 (start_time, end_time, all_day on work items). Reminder delivery is still coming; reminder choice is stored for that release.",
+        text: "In Day view, drag an event to move it or drag the bottom edge to resize. Set a reminder on the task form — toasts fire while Calendar is open; allow browser notifications for desktop alerts (migration 160).",
       },
     ],
     primaryHref: "/app/operations/calendar",
@@ -1087,5 +1087,215 @@ export const helpScenarioArticles: KbArticle[] = [
     primaryHref: "/app/data-ops",
     primaryLabel: "Data Center",
     relatedGuideIds: ["data-center-ingestion", "inventory-master-data"],
+  },
+
+  // ─── Quality expansion: common blockers ─────────────────────────────────
+  {
+    id: "load-slip-no-lines",
+    title: "Load Slip shows no lines",
+    scenario: "You open Load Slip on a sale, PO, GR, or invoice and the picker is empty or shows no eligible lines.",
+    intro:
+      "Load Slip only lists open, confirmable source lines that match process policy and remaining quantity. An empty list usually means the source is not confirmed, already fully consumed, or filtered out by branch/partner.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Confirm the source document (quotation, SO, PR, RFQ, PO, or GR) is Confirmed / Complete — drafts never appear.",
+          "Check remaining qty: fully Load Slipped or invoiced lines drop out of the picker.",
+          "Match partner and active branch/location to the source document header.",
+          "If policy requires a prior step (for example SO before sale), complete that document first.",
+          "Retry Load Slip after Save on the target form so filters refresh.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Wrong document type in the Load Slip menu (Quotation vs Sales Order vs GR) is a common cause — pick the same source you actually created.",
+      },
+    ],
+    primaryHref: "/app/sales",
+    primaryLabel: "Sales",
+    relatedGuideIds: ["load-slip-overview", "mapping-center-when-to-use", "cannot-confirm-document"],
+  },
+  {
+    id: "insufficient-stock-on-release",
+    title: "Insufficient stock on sales order release",
+    scenario: "Pick List / Release blocks you with insufficient stock or on-hand too low for the release qty.",
+    intro:
+      "Release reserves or issues stock from the active branch location. The system rejects release when available qty (and serials, when tracked) cannot cover the lines.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Confirm Active branch matches the warehouse that should supply the order.",
+          "Check on-hand for each item at that location; receive goods or transfer stock if short.",
+          "Lower release qty to available, or split release across later receipts.",
+          "For serial items, scan enough accepted serials to equal the release quantity.",
+          "Retry Pick List → Release after stock moves post.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Stock on another branch does not count until you transfer. Soft allocations on other open orders can also reduce available qty.",
+      },
+    ],
+    primaryHref: "/app/sales-order/sales-orders/release",
+    primaryLabel: "Pick List / Release",
+    relatedGuideIds: ["sales-order-release", "transfer-stock-between-branches", "serial-count-mismatch"],
+  },
+  {
+    id: "print-or-pdf-failed",
+    title: "Print or PDF failed",
+    scenario: "Print preview is blank, PDF download fails, or the browser blocks the print window.",
+    intro:
+      "Most document prints open a dedicated print route in a new tab. Failures are usually popup blockers, missing save/confirm, or a session that expired before the print URL loaded.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Save the document first; unsaved drafts often have no printable snapshot.",
+          "Allow pop-ups for this site, then use Print / PDF again from the list or detail toolbar.",
+          "If the tab opens blank, refresh once while still signed in, or re-open print from the document list.",
+          "Try another browser or disable extensions that block downloads/pop-ups.",
+          "For collective invoices and packing slips, use the matching Print status / slip action — not a generic browser print of the grid.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "If every print fails after idle time, sign out and back in — expired sessions commonly break print routes that reload auth.",
+      },
+    ],
+    primaryHref: "/app/sales",
+    primaryLabel: "Sales documents",
+    relatedGuideIds: ["session-or-signin-issues", "collective-invoicing"],
+  },
+  {
+    id: "empty-list-wrong-branch",
+    title: "Empty list — wrong active branch",
+    scenario: "Partners, stock, or documents disappear from a list even though you know they exist.",
+    intro:
+      "Many grids and on-hand views filter by Active branch. Working in the wrong warehouse looks like “missing data” when records live on another branch.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Check the Active branch switcher in the header — switch to the warehouse you expect.",
+          "Clear list filters (date, status, partner) after switching branch.",
+          "Open the document and confirm its location/branch field; change it only when you intend to.",
+          "Use Stock transfer when goods physically moved — switching branch alone does not move inventory.",
+          "If the whole company looks empty, you may have switched business (tenant), not branch.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Empty Load Slip pickers and zero on-hand are often the same root cause: active branch ≠ document location.",
+      },
+    ],
+    primaryHref: "/app/inventory",
+    primaryLabel: "Inventory",
+    relatedGuideIds: ["multi-branch-defaults", "switch-active-branch", "switch-tenant-vs-branch"],
+  },
+  {
+    id: "write-permission-vs-read",
+    title: "Can view but cannot save or confirm",
+    scenario: "You can open a screen but Save, Confirm, New, or Release fails or stays disabled.",
+    intro:
+      "Read permission shows menus and lists. Write (or a specific *_new / action permission) is required to create, update, confirm, or reverse documents.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Reproduce once and note the exact action (Save, Confirm, Release, Reverse).",
+          "Ask an admin to open User Management → Roles and grant write on the matching permission (for example sales.sales, sales_order.release, purchase_order.goods_receipts).",
+          "Some actions use a separate code (release undo, GR reverse, form field settings) — grant that code, not only the parent module.",
+          "Sign out and back in after role changes.",
+          "If the menu itself is missing, see “Menu or screen is missing” instead.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "API errors that say you do not have permission are authoritative even when the button looks clickable — fix the role, then retry.",
+      },
+    ],
+    primaryHref: "/app/user-management",
+    primaryLabel: "User management",
+    relatedGuideIds: ["missing-menu-permission", "user-management-admin"],
+  },
+  {
+    id: "tax-wrong-on-document",
+    title: "Tax amount looks wrong on a document",
+    scenario: "VAT or tax lines on a quotation, SO, sale, or purchase do not match what you expect.",
+    intro:
+      "Tax follows the document’s tax type (inclusive vs exclusive), line amounts, and seeded tax codes. Wrong totals usually come from the wrong tax type, stale defaults, or editing price after tax was applied.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Quotation → Tax Management and confirm VAT codes (inclusive vs exclusive) match your pricing practice.",
+          "On the document header/lines, pick the intended tax type — do not assume the previous document’s tax carried over.",
+          "Re-check unit price: inclusive prices already contain VAT; exclusive prices add tax on top.",
+          "Save once so totals recalculate, then compare the tax summary block.",
+          "For multi-currency docs, confirm exchange rate and that tax is computed in the document currency.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Changing tax type after lines are entered can leave confusing totals — clear or re-enter line prices after switching inclusive/exclusive.",
+      },
+    ],
+    primaryHref: "/app/quotation/tax-mngt/tax-types",
+    primaryLabel: "Tax types",
+    relatedGuideIds: ["tax-and-currency", "cannot-confirm-document"],
+  },
+  {
+    id: "session-or-signin-issues",
+    title: "Session expired or cannot sign in",
+    scenario: "You are bounced to sign-in, see unauthorized errors, or password/reset links fail.",
+    intro:
+      "BluearmERP sessions expire after idle time or when tokens are cleared. Sign-in problems are usually wrong workspace email, expired reset links, or browser storage blocked.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Sign out fully, then sign in again with the email invited to this business.",
+          "If the app opens but API calls fail, refresh once; if still unauthorized, sign in again.",
+          "Use Forgot password for a fresh reset link — old email links expire.",
+          "Allow cookies/storage for this site; private mode or blocked third-party cookies can drop sessions.",
+          "Confirm you are entering the correct business after login if you belong to multiple companies.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Print/PDF and Help votes also need an active session — fix sign-in before treating those as product bugs.",
+      },
+    ],
+    primaryHref: "/signin",
+    primaryLabel: "Sign in",
+    relatedGuideIds: ["switch-between-businesses", "join-business-by-invite", "print-or-pdf-failed"],
+  },
+  {
+    id: "calendar-drag-and-reminders",
+    title: "Calendar: drag, resize, and reminders",
+    scenario: "You want to move or lengthen a timed task on the Operations day calendar, or set a reminder before it starts.",
+    intro:
+      "Day view shows timed work items on an hourly grid. Drag a block to change its start, resize the edge to change duration, or edit times in the task form. Reminder offsets are stored on the work item for notification delivery.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Operations → Calendar, select a workspace, and switch to Day (or click Today).",
+          "Drag a timed block up/down the hour grid to move its start time; drag the bottom edge to resize end time.",
+          "Alternatively open the task and set Start time / End time (uncheck All day for timed slots).",
+          "Choose Reminder: None, 10 minutes, 30 minutes, 1 hour, or 1 day before start — save the task.",
+          "Confirm the card still appears on the Kanban board with the updated schedule.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "All-day tasks live in the top strip and are not resized on the hour grid. Reminder preference is saved even when push/email delivery is still rolling out for your tenant.",
+      },
+    ],
+    primaryHref: "/app/operations/calendar",
+    primaryLabel: "Operations calendar",
+    relatedGuideIds: ["operations-calendar-day-today", "operations-hub-intro", "work-item-link-erp-doc"],
   },
 ];

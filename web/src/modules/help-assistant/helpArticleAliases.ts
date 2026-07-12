@@ -257,4 +257,72 @@ export const helpArticleAliases: Record<string, HelpArticleAlias> = {
     questions: ["attachment required to confirm", "why need file on quotation"],
     errorPhrases: ["attach a file before confirming"],
   },
+  "load-slip-no-lines": {
+    questions: [
+      "load slip empty",
+      "load slip no lines",
+      "no eligible lines load slip",
+      "why is load slip blank",
+    ],
+    errorPhrases: ["no lines available", "no eligible source lines"],
+  },
+  "insufficient-stock-on-release": {
+    questions: [
+      "insufficient stock on release",
+      "cannot release sales order",
+      "pick list not enough stock",
+      "on hand too low to release",
+    ],
+    errorPhrases: ["insufficient stock", "not enough stock"],
+  },
+  "print-or-pdf-failed": {
+    questions: [
+      "print failed",
+      "pdf download failed",
+      "print preview blank",
+      "cannot print invoice",
+    ],
+  },
+  "empty-list-wrong-branch": {
+    questions: [
+      "empty list wrong branch",
+      "stock list empty",
+      "documents missing after switch",
+      "wrong warehouse filter",
+    ],
+  },
+  "write-permission-vs-read": {
+    questions: [
+      "can view but cannot save",
+      "read only permission",
+      "confirm button needs write",
+      "save not allowed",
+    ],
+    errorPhrases: ["you do not have permission", "permission denied"],
+  },
+  "tax-wrong-on-document": {
+    questions: [
+      "tax amount wrong",
+      "vat incorrect on invoice",
+      "inclusive vs exclusive tax",
+      "wrong tax type on quotation",
+    ],
+  },
+  "session-or-signin-issues": {
+    questions: [
+      "session expired",
+      "cannot sign in",
+      "unauthorized after idle",
+      "password reset link expired",
+    ],
+    errorPhrases: ["unauthorized", "session expired"],
+  },
+  "calendar-drag-and-reminders": {
+    questions: [
+      "drag calendar task",
+      "resize day view event",
+      "calendar reminder",
+      "move timed task on calendar",
+    ],
+  },
 };

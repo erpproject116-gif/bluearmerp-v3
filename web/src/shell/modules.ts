@@ -496,6 +496,11 @@ export const appModules: AppModule[] = [
         href: "/app/user-management/demo-data",
         settingsHref: "/app/user-management/demo-data",
       },
+      {
+        label: "Help feedback",
+        href: "/app/user-management/help-feedback",
+        settingsHref: "/app/user-management/help-feedback",
+      },
     ],
   },
 ];

@@ -140,6 +140,7 @@ export const ProcessPoliciesPage = lazy(() => import("../modules/user-management
 export const MappingCenterPage = lazy(() => import("../modules/user-management/mapping-center/MappingCenterPage"));
 export const ModuleFeaturesPage = lazy(() => import("../modules/user-management/tenant-modules/ModuleFeaturesPage"));
 export const DemoDataPage = lazy(() => import("../modules/user-management/demo-data/DemoDataPage"));
+export const HelpFeedbackPage = lazy(() => import("../modules/user-management/help-feedback/HelpFeedbackPage"));
 export const ActivityLogListPage = lazy(() => import("../modules/activity-logs/ActivityLogListPage"));
 export const ChangeLogListPage = lazy(() => import("../modules/activity-logs/ChangeLogListPage"));
 export const CrmDashboardPage = lazy(() => import("../modules/crm/CrmDashboardPage"));

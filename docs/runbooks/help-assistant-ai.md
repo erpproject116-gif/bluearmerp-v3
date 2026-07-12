@@ -17,6 +17,20 @@ POST /api/v1/help/feedback
 
 Events are also kept in browser `localStorage` (`bluearm-help-feedback-v1`) as a local buffer.
 
+## Feedback admin UI
+
+Store users with `user_management.users` read can open:
+
+`/app/user-management/help-feedback`
+
+- **Summary** — down-voted query + article counts (last N days)
+- **Recent** — latest down votes with links to KB articles
+
+```http
+GET /api/v1/help/feedback?vote=down&limit=50
+GET /api/v1/help/feedback/summary?days=30
+```
+
 ## Optional AI (grounded compose)
 
 1. Reuse the same DashScope key as RFQ AI (`DASHSCOPE_API_KEY`, `DASHSCOPE_BASE_URL`).

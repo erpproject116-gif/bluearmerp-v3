@@ -42,6 +42,44 @@ export async function postHelpFeedback(body: {
   }, { silent: true, background: true });
 }
 
+export type HelpFeedbackAdminRow = {
+  id: number;
+  query: string;
+  pathname: string;
+  article_id: string;
+  vote: "up" | "down" | string;
+  user_id?: number | null;
+  user_name?: string;
+  created_at: string;
+};
+
+export type HelpFeedbackSummaryRow = {
+  query: string;
+  article_id: string;
+  down_votes: number;
+  up_votes: number;
+  last_at: string;
+  sample_pathname?: string;
+};
+
+export async function listHelpFeedbackAdmin(opts?: {
+  vote?: "up" | "down";
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (opts?.vote) params.set("vote", opts.vote);
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  const q = params.toString();
+  return apiFetch<HelpFeedbackAdminRow[]>(`/api/v1/help/feedback${q ? `?${q}` : ""}`);
+}
+
+export async function summarizeHelpFeedback(opts?: { days?: number }) {
+  const params = new URLSearchParams();
+  if (opts?.days != null) params.set("days", String(opts.days));
+  const q = params.toString();
+  return apiFetch<HelpFeedbackSummaryRow[]>(`/api/v1/help/feedback/summary${q ? `?${q}` : ""}`);
+}
+
 export async function composeHelpWithAI(input: {
   query: string;
   pathname: string;

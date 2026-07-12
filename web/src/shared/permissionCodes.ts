@@ -137,6 +137,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/user-management/mapping-center": "user_management.users",
   "/app/user-management/tenant-modules": "settings.tenant_modules",
   "/app/user-management/demo-data": "settings.demo_data",
+  "/app/user-management/help-feedback": "user_management.users",
   "/app/purchase-order/purchase-orders": "purchase_order.purchase_orders",
   "/app/purchase-order/rfq": "purchase_order.rfq",
   "/app/purchase-order/goods-receipt": "purchase_order.goods_receipts",

@@ -43,6 +43,9 @@ export type WorkItem = {
   start_time?: string | null;
   end_time?: string | null;
   all_day?: boolean;
+  reminder_offset_minutes?: number | null;
+  reminder_at?: string | null;
+  reminder_sent_at?: string | null;
   blocked_by_item_id?: number | null;
   blocked_by_title?: string;
   quotation_id?: number | null;
@@ -519,6 +522,7 @@ export async function createWorkItem(body: {
   start_time?: string;
   end_time?: string;
   all_day?: boolean;
+  reminder_offset_minutes?: number | null;
   blocked_by_item_id?: number;
   custom_values?: Record<string, unknown>;
 }) {

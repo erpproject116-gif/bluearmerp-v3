@@ -140,6 +140,7 @@ import {
   MappingCenterPage,
   ModuleFeaturesPage,
   DemoDataPage,
+  HelpFeedbackPage,
   ActivityLogListPage,
   ChangeLogListPage,
   CrmDashboardPage,
@@ -680,6 +681,11 @@ export default function App() {
           <Route path="/user-management/demo-data" component={() => (
             <AdminModuleRoute>
               <DemoDataPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/help-feedback" component={() => (
+            <AdminModuleRoute>
+              <HelpFeedbackPage />
             </AdminModuleRoute>
           )} />
         </Route>

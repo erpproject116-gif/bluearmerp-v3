@@ -12,11 +12,28 @@ import {
 } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
 import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
+import { HOUR_H, TimedDayEvent } from "./calendarDayEvents";
 
 type CalView = "month" | "week" | "day";
 
-const HOUR_H = 56;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
+const REMIND_MAP: Record<string, number | null> = {
+  none: null,
+  "10m": 10,
+  "30m": 30,
+  "1h": 60,
+  "1d": 1440,
+};
+
+function remindOptFromMinutes(m?: number | null): string {
+  if (!m || m <= 0) return "none";
+  if (m === 10) return "10m";
+  if (m === 30) return "30m";
+  if (m === 60) return "1h";
+  if (m === 1440) return "1d";
+  return "none";
+}
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -64,15 +81,6 @@ function itemOnDate(item: WorkItem, iso: string): boolean {
   return s <= iso && iso <= e;
 }
 
-function parseHourFraction(t?: string | null): number | null {
-  if (!t) return null;
-  const parts = t.split(":");
-  const h = Number(parts[0]);
-  const m = Number(parts[1] ?? 0);
-  if (Number.isNaN(h)) return null;
-  return h + (Number.isNaN(m) ? 0 : m) / 60;
-}
-
 function formatHourLabel(h: number): string {
   const ampm = h < 12 ? "AM" : "PM";
   const hr = h % 12 === 0 ? 12 : h % 12;
@@ -89,18 +97,6 @@ function hourToTime(h: number): string {
 
 function isTimedItem(item: WorkItem): boolean {
   return !item.all_day && !!item.start_time;
-}
-
-function eventLayout(item: WorkItem): { top: number; height: number; label: string } {
-  const start = parseHourFraction(item.start_time) ?? 0;
-  let end = parseHourFraction(item.end_time);
-  if (end == null || end <= start) end = Math.min(start + 1, 24);
-  const top = start * HOUR_H;
-  const height = Math.max((end - start) * HOUR_H, HOUR_H * 0.5);
-  const label = item.end_time
-    ? `${item.start_time} – ${item.end_time}`
-    : (item.start_time ?? "");
-  return { top, height, label };
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -134,6 +130,7 @@ export default function OperationsCalendarPage() {
   const columns = useOperationsColumns(workspaceId);
 
   const todayISO = () => toISODate(new Date());
+  const rows = () => items.data?.rows ?? [];
 
   createEffect(() => {
     const tick = () => {
@@ -142,6 +139,31 @@ export default function OperationsCalendarPage() {
     };
     tick();
     const id = window.setInterval(tick, 60_000);
+    onCleanup(() => clearInterval(id));
+  });
+
+  // Fire due reminders while the calendar page is open (toast + browser notification).
+  createEffect(() => {
+    const list = rows();
+    const check = () => {
+      const now = Date.now();
+      for (const item of list) {
+        if (!item.reminder_at || item.reminder_sent_at) continue;
+        const at = Date.parse(item.reminder_at);
+        if (Number.isNaN(at) || at > now) continue;
+        toast.success(`Reminder: ${item.title}`);
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          try {
+            new Notification("Bluearm reminder", { body: item.title });
+          } catch {
+            // ignore
+          }
+        }
+        void patchWorkItem(item.id, { reminder_sent_at: new Date().toISOString() }).then(() => invalidate());
+      }
+    };
+    check();
+    const id = window.setInterval(check, 30_000);
     onCleanup(() => clearInterval(id));
   });
 
@@ -179,7 +201,6 @@ export default function OperationsCalendarPage() {
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   });
 
-  const rows = () => items.data?.rows ?? [];
   const itemsFor = (iso: string) => rows().filter((r) => itemOnDate(r, iso));
 
   const dayISO = createMemo(() => toISODate(cursor()));
@@ -221,6 +242,9 @@ export default function OperationsCalendarPage() {
     }
     setColumnId(columns.data?.[0]?.id ?? null);
     setRemindOpt("none");
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
     setModalOpen(true);
   };
 
@@ -234,8 +258,25 @@ export default function OperationsCalendarPage() {
     setEndTime(item.end_time ?? "");
     setAllDay(!isTimedItem(item));
     setColumnId(item.column_id);
-    setRemindOpt("none");
+    setRemindOpt(remindOptFromMinutes(item.reminder_offset_minutes));
     setModalOpen(true);
+  };
+
+  const commitTimedDrag = async (item: WorkItem, st: string, et: string) => {
+    if (!canEdit()) return;
+    const res = await patchWorkItem(item.id, {
+      start_time: st,
+      end_time: et,
+      all_day: false,
+      start_date: item.start_date ?? dayISO(),
+      end_date: item.end_date ?? item.start_date ?? dayISO(),
+      reminder_offset_minutes: item.reminder_offset_minutes ?? null,
+    });
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not update time.");
+      return;
+    }
+    invalidate();
   };
 
   const save = async () => {
@@ -256,6 +297,7 @@ export default function OperationsCalendarPage() {
     setSaving(true);
     const ed = editing();
     const timed = !allDay() && !!startTime();
+    const remMinutes = REMIND_MAP[remindOpt()] ?? null;
     const body = {
       title: title().trim(),
       description: description().trim() || undefined,
@@ -265,6 +307,8 @@ export default function OperationsCalendarPage() {
       start_time: timed ? startTime() : "",
       end_time: timed && endTime() ? endTime() : "",
       all_day: !timed,
+      // 0 clears reminder on the API (null JSON is ignored by Go pointers).
+      reminder_offset_minutes: remMinutes ?? 0,
     };
     const res = ed
       ? await patchWorkItem(ed.id, body)
@@ -274,11 +318,11 @@ export default function OperationsCalendarPage() {
       toast.warning(res.message ?? "Could not save task.");
       return;
     }
-    if (remindOpt() !== "none") {
+    if (remMinutes) {
       toast.success(
         ed
-          ? "Task updated. Reminder preference saved for a future notification release."
-          : "Task created. Reminder preference noted for a future notification release.",
+          ? "Task updated. Reminder will notify while this calendar is open (and via browser notifications if allowed)."
+          : "Task created with reminder.",
       );
     } else {
       toast.success(ed ? "Task updated." : "Task created.");
@@ -487,27 +531,15 @@ export default function OperationsCalendarPage() {
 
                 <div class="pointer-events-none absolute bottom-0 left-16 right-0 top-0">
                   <For each={dayTimed()}>
-                    {(item) => {
-                      const layout = () => eventLayout(item);
-                      return (
-                        <button
-                          type="button"
-                          class="pointer-events-auto absolute left-1 right-2 overflow-hidden rounded-md border border-blue-700/30 bg-blue-600 px-2 py-1 text-left text-xs font-medium text-white shadow-sm hover:bg-blue-700"
-                          style={{
-                            top: `${layout().top}px`,
-                            height: `${layout().height}px`,
-                          }}
-                          title={`${layout().label} ${item.title}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEdit(item);
-                          }}
-                        >
-                          <div class="truncate">{item.title}</div>
-                          <div class="truncate text-[10px] opacity-90">{layout().label}</div>
-                        </button>
-                      );
-                    }}
+                    {(item) => (
+                      <TimedDayEvent
+                        item={item}
+                        canEdit={canEdit()}
+                        gridEl={() => dayScrollEl}
+                        onOpen={openEdit}
+                        onCommitTimes={commitTimedDrag}
+                      />
+                    )}
                   </For>
 
                   <Show when={dayISO() === todayISO()}>
@@ -628,7 +660,7 @@ export default function OperationsCalendarPage() {
             </Field>
           </div>
         </Show>
-        <Field label="Reminder (coming soon)">
+        <Field label="Reminder">
           <select
             class={inputClass}
             value={remindOpt()}
@@ -642,6 +674,9 @@ export default function OperationsCalendarPage() {
             <option value="1d">1 day before</option>
           </select>
         </Field>
+        <p class="mb-2 text-xs text-text-secondary">
+          Reminders fire as an in-app toast while Operations Calendar is open. Allow browser notifications for a desktop alert.
+        </p>
       </EntityModal>
     </OperationsLayout>
   );

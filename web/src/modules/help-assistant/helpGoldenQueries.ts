@@ -96,4 +96,16 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
   { query: "cash payment after purchase save", path: "/app/finance/payment-vouchers", expectArticleId: "purchase-cash-payment-after-save" },
   { query: "collect after sales invoice cash in", path: "/app/finance/official-receipts", expectArticleId: "sales-cash-in-after-save" },
   { query: "attachment required to confirm quotation", path: "/app/quotation/quotations", expectArticleId: "attachment-requirements" },
+
+  // Quality expansion
+  { query: "load slip no lines", path: "/app/sales", expectArticleId: "load-slip-no-lines" },
+  { query: "load slip empty picker", path: "/app/purchase-order", expectArticleId: "load-slip-no-lines" },
+  { query: "insufficient stock on release", path: "/app/sales-order/sales-orders/release", expectArticleId: "insufficient-stock-on-release" },
+  { query: "print pdf failed blank", path: "/app/sales", expectArticleId: "print-or-pdf-failed" },
+  { query: "empty list wrong branch", path: "/app/inventory", expectArticleId: "empty-list-wrong-branch" },
+  { query: "can view but cannot save", path: "/app/quotation/quotations", expectArticleId: "write-permission-vs-read" },
+  { query: "tax amount wrong on invoice", path: "/app/quotation/tax-mngt/tax-types", expectArticleId: "tax-wrong-on-document" },
+  { query: "session expired cannot sign in", path: "/signin", expectArticleId: "session-or-signin-issues" },
+  { query: "drag resize calendar reminder", path: "/app/operations/calendar", expectArticleId: "calendar-drag-and-reminders" },
+  { query: "move timed task day view", path: "/app/operations/calendar", expectArticleId: "calendar-drag-and-reminders" },
 ];
