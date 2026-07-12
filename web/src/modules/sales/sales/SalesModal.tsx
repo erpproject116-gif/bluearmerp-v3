@@ -12,7 +12,7 @@ import { SALES_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
-import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
@@ -619,21 +619,26 @@ export function SalesModal(props: Props) {
       toast.warning("Please select a location.");
       return;
     }
-    const formValues = {
-      order_date: orderDate(),
-      partner_id: partnerId(),
-      location_id: locationId(),
-      tax_type_id: taxTypeId(),
-      currency_id: currencyId(),
-      due_date: dueDate(),
-      pic_name: picName(),
-      si_dr_no: siDrNo(),
-      payment_terms: paymentTerms(),
-      notes: notes(),
-      project_id: projectId(),
-      progress_status: progressStatus() || "unconfirmed",
-    };
-    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    const status = (progressStatus() || "unconfirmed").trim() || "unconfirmed";
+    if (progressStatus() !== status) setProgressStatus(status);
+    const { checks, values: formValues } = buildRequiredChecksForSave(
+      fields(),
+      {
+        order_date: orderDate(),
+        partner_id: partnerId(),
+        location_id: locationId(),
+        tax_type_id: taxTypeId(),
+        currency_id: currencyId(),
+        due_date: dueDate(),
+        pic_name: picName(),
+        si_dr_no: siDrNo(),
+        payment_terms: paymentTerms(),
+        notes: notes(),
+        project_id: projectId(),
+        progress_status: status,
+      },
+    );
+    const clientError = requireFields(formValues, checks);
     if (clientError) {
       toast.warning(clientError);
       return;
@@ -641,7 +646,7 @@ export function SalesModal(props: Props) {
     const attachmentErr = validateAttachmentBeforeConfirm(
       processPolicy.data,
       "sales",
-      progressStatus() || "unconfirmed",
+      status,
       attachmentCount(),
       props.editing?.id ?? createdSale()?.id,
     );
@@ -665,7 +670,7 @@ export function SalesModal(props: Props) {
       payment_terms: paymentTerms() || null,
       si_dr_no: siDrNo() || null,
       notes: notes() || null,
-      progress_status: progressStatus() || "unconfirmed",
+      progress_status: status,
       template_code: templateCode(),
       sales_category: salesCategory() || null,
       source_sales_order_id: sourceSalesOrderId(),

@@ -96,7 +96,10 @@ export function useFormFieldSettings(entityType: string) {
   const canManage = createMemo(() => Boolean(query.data?.can_manage));
   const byKey = createMemo(() => {
     const map: Record<string, FormFieldSetting> = {};
-    for (const f of fields()) map[f.field_key] = f;
+    // Prefer standard fields when a custom field reuses the same key.
+    for (const f of fields()) {
+      if (f.kind === "standard" || !map[f.field_key]) map[f.field_key] = f;
+    }
     return map;
   });
 
@@ -166,4 +169,30 @@ export function buildRequiredChecks(settings: FormFieldSetting[]): { key: string
   return settings
     .filter((f) => f.kind === "standard" && f.is_visible && f.is_required && !f.is_disabled)
     .map((f) => ({ key: f.field_key, label: f.label }));
+}
+
+/** Fields that always have a UI/API default — never block save when empty. */
+export const DEFAULTED_STATUS_FIELDS = new Set(["progress_status"]);
+
+export function buildRequiredChecksForSave(
+  settings: FormFieldSetting[],
+  values: Record<string, unknown>,
+  defaults: Record<string, unknown> = { progress_status: "unconfirmed" },
+): { checks: { key: string; label: string }[]; values: Record<string, unknown> } {
+  const merged: Record<string, unknown> = { ...values };
+  for (const [key, fallback] of Object.entries(defaults)) {
+    if (isMissingValue(merged[key])) merged[key] = fallback;
+  }
+  const checks = buildRequiredChecks(settings).filter((c) => {
+    if (DEFAULTED_STATUS_FIELDS.has(c.key)) return false;
+    return true;
+  });
+  return { checks, values: merged };
+}
+
+function isMissingValue(v: unknown): boolean {
+  if (v == null) return true;
+  if (typeof v === "string") return !v.trim();
+  if (typeof v === "number") return !Number.isFinite(v) || v <= 0;
+  return false;
 }

@@ -10,7 +10,7 @@ import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
-import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
@@ -358,7 +358,9 @@ export function QuotationModal(props: Props) {
       toast.warning("Please select a location.");
       return;
     }
-    const formValues = {
+    const status = (progressStatus() || "unconfirmed").trim() || "unconfirmed";
+    if (progressStatus() !== status) setProgressStatus(status);
+    const { checks, values: formValues } = buildRequiredChecksForSave(fields(), {
       order_date: orderDate(),
       partner_id: partnerId(),
       location_id: locationId(),
@@ -370,10 +372,10 @@ export function QuotationModal(props: Props) {
       note_for_pic_only: noteForPic(),
       notes: notes(),
       project_id: projectId(),
-      progress_status: progressStatus() || "unconfirmed",
-    };
+      progress_status: status,
+    });
     const clientError =
-      requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields())) ??
+      requireFields(formValues, checks) ??
       validateCustomFields(customValues(), activeCustomFields());
     if (clientError) {
       toast.warning(clientError);
@@ -382,7 +384,7 @@ export function QuotationModal(props: Props) {
     const attachmentErr = validateAttachmentBeforeConfirm(
       processPolicy.data,
       "quotation",
-      progressStatus(),
+      status,
       attachmentCount(),
       effectiveEditing()?.id,
     );
@@ -405,7 +407,7 @@ export function QuotationModal(props: Props) {
       payment_terms: paymentTerms() || null,
       note_for_pic_only: noteForPic() || null,
       notes: notes() || null,
-      progress_status: progressStatus() || "unconfirmed",
+      progress_status: status,
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
         item_id: ln.item_id || null,

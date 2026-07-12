@@ -7,18 +7,24 @@ type Props = {
   onChange: (value: string) => void;
   class?: string;
   disabled?: boolean;
+  fallback?: string;
 };
 
 export function ProgressStatusMenu(props: Props) {
+  const fallback = () => props.fallback ?? "unconfirmed";
+  const current = () => {
+    const v = (props.value ?? "").trim();
+    return v || fallback();
+  };
   return (
     <select
       class={props.class ?? inputClass}
-      value={props.value}
+      value={current()}
       disabled={props.disabled}
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => {
         e.stopPropagation();
-        props.onChange(e.currentTarget.value);
+        props.onChange(e.currentTarget.value.trim() || fallback());
       }}
     >
       <For each={progressStatusGroups()}>

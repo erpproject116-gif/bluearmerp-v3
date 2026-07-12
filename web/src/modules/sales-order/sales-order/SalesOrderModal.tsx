@@ -10,7 +10,7 @@ import { SALES_ORDER_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
-import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
@@ -409,24 +409,29 @@ export function SalesOrderModal(props: Props) {
       toast.warning("Please select a location.");
       return;
     }
-    const formValues = {
-      order_date: orderDate(),
-      partner_id: partnerId(),
-      location_id: locationId(),
-      tax_type_id: taxTypeId(),
-      currency_id: currencyId(),
-      due_date: dueDate(),
-      delivery_date: deliveryDate(),
-      pic_name: picName(),
-      reference: reference(),
-      notes: notes(),
-      delivery_remarks: deliveryRemarks(),
-      payment_terms: paymentTerms(),
-      mop: mop(),
-      project_id: projectId(),
-      progress_status: progressStatus() || "unconfirmed",
-    };
-    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    const status = (progressStatus() || "unconfirmed").trim() || "unconfirmed";
+    if (progressStatus() !== status) setProgressStatus(status);
+    const { checks, values: formValues } = buildRequiredChecksForSave(
+      fields(),
+      {
+        order_date: orderDate(),
+        partner_id: partnerId(),
+        location_id: locationId(),
+        tax_type_id: taxTypeId(),
+        currency_id: currencyId(),
+        due_date: dueDate(),
+        delivery_date: deliveryDate(),
+        pic_name: picName(),
+        reference: reference(),
+        notes: notes(),
+        delivery_remarks: deliveryRemarks(),
+        payment_terms: paymentTerms(),
+        mop: mop(),
+        project_id: projectId(),
+        progress_status: status,
+      },
+    );
+    const clientError = requireFields(formValues, checks);
     if (clientError) {
       toast.warning(clientError);
       return;
@@ -434,7 +439,7 @@ export function SalesOrderModal(props: Props) {
     const attachmentErr = validateAttachmentBeforeConfirm(
       processPolicy.data,
       "sales_order",
-      progressStatus() || "unconfirmed",
+      status,
       attachmentCount(),
       effectiveEditing()?.id,
     );
@@ -461,7 +466,7 @@ export function SalesOrderModal(props: Props) {
       payment_terms: paymentTerms() || null,
       delivery_remarks: deliveryRemarks() || null,
       notes: notes() || null,
-      progress_status: progressStatus() || "unconfirmed",
+      progress_status: status,
       source_quotation_id: sourceQuotationId(),
       lines: lines().map((ln, i) => ({
         line_no: i + 1,

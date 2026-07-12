@@ -49,7 +49,7 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "partner_id", Label: "Customer", FieldType: "select", DefaultRequired: true, SortOrder: 20},
 		{FieldKey: "pic_name", Label: "PIC", FieldType: "text", SortOrder: 30},
 		{FieldKey: "location_id", Label: "Location", FieldType: "select", DefaultRequired: true, SortOrder: 40},
-		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", DefaultRequired: true, SortOrder: 50},
+		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", SortOrder: 50},
 		{FieldKey: "scheduled_completion_date", Label: "Scheduled completion date", FieldType: "date", SortOrder: 60},
 		{FieldKey: "latest_update", Label: "Latest update", FieldType: "textarea", SortOrder: 70},
 		{FieldKey: "repair_details", Label: "Repair details", FieldType: "textarea", SortOrder: 80},
@@ -80,7 +80,7 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "payment_terms", Label: "Payment terms", FieldType: "text", SortOrder: 80},
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 90},
 		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 100},
-		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", DefaultRequired: true, SortOrder: 110},
+		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", SortOrder: 110},
 	},
 	"so_sales_order": {
 		{FieldKey: "order_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
@@ -97,7 +97,7 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "payment_terms", Label: "Payment terms", FieldType: "text", SortOrder: 110},
 		{FieldKey: "mop", Label: "MOP", FieldType: "text", SortOrder: 120},
 		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 130},
-		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", DefaultRequired: true, SortOrder: 140},
+		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", SortOrder: 140},
 	},
 	"fin_official_receipt": {
 		{FieldKey: "receipt_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
@@ -119,7 +119,7 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "note_for_pic_only", Label: "Note for PIC only", FieldType: "textarea", SortOrder: 90},
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 100},
 		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 110},
-		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", DefaultRequired: true, SortOrder: 120},
+		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", SortOrder: 120},
 	},
 	"pr_purchase_request": {
 		{FieldKey: "request_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},

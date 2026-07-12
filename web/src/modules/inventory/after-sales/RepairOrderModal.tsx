@@ -18,7 +18,7 @@ import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useCustomValues } from "../../../shared/useCustomValues";
-import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { type SerialTraceResult } from "../../../shared/useSerialLotList";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 
@@ -220,7 +220,7 @@ export function RepairOrderModal(props: Props) {
     partner_id: partnerId(),
     pic_name: picName(),
     location_id: locationId(),
-    progress_status: progressStatus(),
+    progress_status: progressStatus() || "received",
     scheduled_completion_date: scheduledDate(),
     latest_update: latestUpdate(),
     repair_details: repairDetails(),
@@ -259,8 +259,13 @@ export function RepairOrderModal(props: Props) {
       toast.warning("Please select a location.");
       return;
     }
+    const status = (progressStatus() || "received").trim() || "received";
+    if (progressStatus() !== status) setProgressStatus(status);
+    const { checks, values } = buildRequiredChecksForSave(fields(), formValues(), {
+      progress_status: "received",
+    });
     const clientError =
-      requireFields(formValues() as Record<string, unknown>, buildRequiredChecks(fields())) ??
+      requireFields(values, checks) ??
       validateCustomFields(customValues(), activeCustomFields());
     if (clientError) {
       toast.warning(clientError);
@@ -276,7 +281,7 @@ export function RepairOrderModal(props: Props) {
       project_id: projectId(),
       project_name: projectName() || null,
       technician_name: technicianName() || null,
-      progress_status: progressStatus(),
+      progress_status: status,
       scheduled_completion_date: scheduledDate() || null,
       latest_update: latestUpdate() || null,
       repair_details: repairDetails() || null,

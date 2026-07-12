@@ -10,7 +10,7 @@ import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
-import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
@@ -368,18 +368,23 @@ export function PurchaseRequestModal(props: Props) {
       toast.warning("Please select a location.");
       return;
     }
-    const formValues = {
-      request_date: requestDate(),
-      location_id: locationId(),
-      tax_type_id: taxTypeId(),
-      currency_id: currencyId(),
-      pic_name: picName(),
-      reference_no: reference(),
-      notes: notes(),
-      project_id: projectId(),
-      progress_status: progressStatus() || "unconfirmed",
-    };
-    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    const status = (progressStatus() || "unconfirmed").trim() || "unconfirmed";
+    if (progressStatus() !== status) setProgressStatus(status);
+    const { checks, values: formValues } = buildRequiredChecksForSave(
+      fields(),
+      {
+        request_date: requestDate(),
+        location_id: locationId(),
+        tax_type_id: taxTypeId(),
+        currency_id: currencyId(),
+        pic_name: picName(),
+        reference_no: reference(),
+        notes: notes(),
+        project_id: projectId(),
+        progress_status: status,
+      },
+    );
+    const clientError = requireFields(formValues, checks);
     if (clientError) {
       toast.warning(clientError);
       return;
@@ -399,7 +404,7 @@ export function PurchaseRequestModal(props: Props) {
       send_status: sendStatus(),
       reference: reference() || null,
       notes: notes() || null,
-      progress_status: progressStatus() || "unconfirmed",
+      progress_status: status,
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
         partner_id: ln.partner_id || null,
