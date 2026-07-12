@@ -45,7 +45,7 @@ async function fetchSalesInvoices(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", sort: "order_date", order: "desc" });
   if (q) qs.set("q", q);
   const res = await apiFetch<{ id: number; sales_no: string; date_no_display: string; partner_name: string }[]>(
-    `/api/v1/sales/sales?${qs}`,
+    `/api/v1/sales?${qs}`,
   );
   return (res.data ?? []).map((s) => ({
     id: s.id,
@@ -78,7 +78,7 @@ export default function SalesReturnsPage() {
   const invalidate = () => void client.invalidateQueries({ queryKey: ["sales-returns"] });
 
   const loadSales = async (id: number) => {
-    const res = await apiFetch<SalesDetail>(`/api/v1/sales/sales/${id}`);
+    const res = await apiFetch<SalesDetail>(`/api/v1/sales/${id}`);
     if (!res.success || !res.data) {
       toast.warning(res.message ?? "Failed to load sales invoice.");
       return;

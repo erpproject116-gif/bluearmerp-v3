@@ -59,5 +59,30 @@
     "id": "finance.receipts.list",
     "path": "/api/v1/finance/official-receipts?page=1&pageSize=50",
     "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "dashboard.summary",
+    "path": "/api/v1/dashboard/summary",
+    "expectedStatuses": [200, 401, 403]
+  },
+  {
+    "id": "dashboard.red_flags",
+    "path": "/api/v1/dashboard/red-flags",
+    "expectedStatuses": [200, 401, 403]
+  },
+  {
+    "id": "inventory.reconciliation.summary",
+    "path": "/api/v1/inventory/reconciliation/summary",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "goods_receipt.list",
+    "path": "/api/v1/goods-receipt/goods-receipts?page=1&pageSize=5",
+    "expectedStatuses": [200, 401]
+  },
+  {
+    "id": "sales_order.release_queue",
+    "path": "/api/v1/sales-order/sales-orders/release-queue?page=1&pageSize=5",
+    "expectedStatuses": [200, 401]
   }
 ]

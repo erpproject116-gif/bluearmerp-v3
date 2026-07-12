@@ -5,7 +5,7 @@ import { useAuth } from "../../../shared/auth-context";
 import type { TenantModuleRow } from "../../../shared/moduleAccess";
 import { useToast } from "../../../shared/toast";
 const GROUP_LABELS: Record<string, string> = {
-  dashboard: "Dashboard",
+  dashboard: "Business Dashboard",
   inventory: "Inventory",
   "inventory.serial_lot": "Serial & Lot",
   after_sales: "After-Sales",

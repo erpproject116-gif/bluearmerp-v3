@@ -16,7 +16,7 @@ declare
   v_d date;
   v_ref text;
 begin
-  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
+  foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then
@@ -41,7 +41,7 @@ begin
 
     -- PR with line-level vendor (hybrid: header partner null)
     v_d := current_date;
-    v_ref := to_char(v_d, 'YYMMDD') || '201';
+    v_ref := 'DEMOPR201';
     if not exists (select 1 from public.pr_purchase_requests where tenant_id = v_tenant and purchase_request_no = v_ref) then
       insert into public.pr_purchase_requests (
         tenant_id, request_date, date_seq, purchase_request_no,
@@ -75,7 +75,7 @@ begin
     end if;
 
     -- PR with header vendor partner
-    v_ref := to_char(v_d, 'YYMMDD') || '202';
+    v_ref := 'DEMOPR202';
     if not exists (select 1 from public.pr_purchase_requests where tenant_id = v_tenant and purchase_request_no = v_ref) then
       insert into public.pr_purchase_requests (
         tenant_id, request_date, date_seq, purchase_request_no,

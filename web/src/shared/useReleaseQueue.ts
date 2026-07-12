@@ -73,6 +73,38 @@ export async function postSalesOrderReleases(
   }, { silent: true });
 }
 
+export type RecentReleaseRow = {
+  release_line_id: number;
+  sales_order_no: string;
+  customer_name: string;
+  item_code: string;
+  item_name: string;
+  release_qty: number;
+  release_date: string;
+  created_at: string;
+};
+
+export function useRecentReleases(enabled: () => boolean) {
+  return createQuery(() => ({
+    queryKey: ["sales-order-recent-releases"],
+    enabled: enabled(),
+    queryFn: async () => {
+      const res = await apiFetch<RecentReleaseRow[]>(
+        "/api/v1/sales-order/sales-orders/recent-releases?page=1&pageSize=25&sort=created_at&order=desc",
+      );
+      if (!res.success) throw new Error(res.message ?? "Failed to load recent releases");
+      return res.data ?? [];
+    },
+    staleTime: 15_000,
+  }));
+}
+
+export async function undoSalesOrderRelease(releaseLineId: number) {
+  return apiFetch(`/api/v1/sales-order/sales-orders/releases/${releaseLineId}/undo`, {
+    method: "POST",
+  }, { silent: true });
+}
+
 export type AvailableSerial = {
   id: number;
   serial_no: string;

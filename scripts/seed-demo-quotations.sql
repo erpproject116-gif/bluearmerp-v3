@@ -1,7 +1,7 @@
 -- Demo quotations for DEMO000 + BLUEARM tenants
 -- Realistic Philippines B2B scenarios: multiple customers, lines, progress states,
 -- validity windows, and one partial slip for Outstanding Quote testing.
--- Idempotent: skips each quote by (tenant_id, reference_no).
+-- Idempotent: skips each quote by (tenant_id, reference_no); date_seq = max+1 per order_date.
 -- Run after: migrations 010–011, seed-demo-inventory.sql
 begin;
 
@@ -18,6 +18,7 @@ declare
   v_qid bigint;
   v_ref text;
   v_d date;
+  v_date_seq int;
 begin
   foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
@@ -46,8 +47,10 @@ begin
 
     -- Quote A — medical / hospitality customer, printer line (37,000 vat-inc)
     v_d := current_date;
-    v_ref := to_char(v_d, 'YYMMDD') || '001';
+    v_ref := 'DEMOQUO001';
     if not exists (select 1 from public.quo_quotations where tenant_id = v_tenant and reference_no = v_ref) then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.quo_quotations where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
       insert into public.quo_quotations (
         tenant_id, order_date, date_seq, reference_no,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
@@ -57,7 +60,7 @@ begin
         progress_status, voucher_status, subtotal, tax_total, grand_total, created_by_user_id
       )
       select
-        v_tenant, v_d, 1, v_ref,
+        v_tenant, v_d, v_date_seq, v_ref,
         v_tax_vat, v_currency_id, p.id, v_user_id,
         coalesce(u.full_name, 'Nel Tristan Juarez'),
         v_loc_hq, v_proj, pr.project_name,
@@ -85,8 +88,10 @@ begin
 
     -- Quote B — SM Retail fit-out (in progress, multi-line)
     v_d := current_date;
-    v_ref := to_char(v_d, 'YYMMDD') || '002';
+    v_ref := 'DEMOQUO002';
     if not exists (select 1 from public.quo_quotations where tenant_id = v_tenant and reference_no = v_ref) then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.quo_quotations where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
       insert into public.quo_quotations (
         tenant_id, order_date, date_seq, reference_no,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
@@ -95,7 +100,7 @@ begin
         subtotal, tax_total, grand_total, created_by_user_id
       )
       select
-        v_tenant, v_d, 2, v_ref,
+        v_tenant, v_d, v_date_seq, v_ref,
         v_tax_vat, v_currency_id, p.id, v_user_id,
         coalesce(u.full_name, 'Demo Sales'),
         v_loc_hq, v_proj,
@@ -126,8 +131,10 @@ begin
 
     -- Quote C — Ayala (completed, 14 days ago)
     v_d := current_date - 14;
-    v_ref := to_char(v_d, 'YYMMDD') || '001';
+    v_ref := 'DEMOQUOARC';
     if not exists (select 1 from public.quo_quotations where tenant_id = v_tenant and reference_no = v_ref) then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.quo_quotations where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
       insert into public.quo_quotations (
         tenant_id, order_date, date_seq, reference_no,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
@@ -136,7 +143,7 @@ begin
         subtotal, tax_total, grand_total, created_by_user_id
       )
       select
-        v_tenant, v_d, 1, v_ref,
+        v_tenant, v_d, v_date_seq, v_ref,
         v_tax_vat, v_currency_id, p.id, v_user_id, 'Roberto Mendoza',
         v_loc_hq, '14 DAYS', 14, v_d + 14,
         'Converted to PO — archived for reference.',
@@ -159,8 +166,10 @@ begin
 
     -- Quote D — Robinsons (partial slip: qty 3, fulfilled 1 → balance 2 for Outstanding)
     v_d := current_date - 3;
-    v_ref := to_char(v_d, 'YYMMDD') || '001';
+    v_ref := 'DEMOQUOPRT';
     if not exists (select 1 from public.quo_quotations where tenant_id = v_tenant and reference_no = v_ref) then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.quo_quotations where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
       insert into public.quo_quotations (
         tenant_id, order_date, date_seq, reference_no,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
@@ -169,7 +178,7 @@ begin
         subtotal, tax_total, grand_total, created_by_user_id
       )
       select
-        v_tenant, v_d, 1, v_ref,
+        v_tenant, v_d, v_date_seq, v_ref,
         v_tax_vat, v_currency_id, p.id, v_user_id, 'Andrea Flores',
         v_loc_hq, '5 DAYS', 5, v_d + 5,
         'in_progress', 'partial',
@@ -197,8 +206,10 @@ begin
     -- Quote E — Vista (Non-VAT labor), yesterday
     if v_tax_none is not null then
       v_d := current_date - 1;
-      v_ref := to_char(v_d, 'YYMMDD') || '002';
+      v_ref := 'DEMOQUOLAB';
       if not exists (select 1 from public.quo_quotations where tenant_id = v_tenant and reference_no = v_ref) then
+        select coalesce(max(date_seq), 0) + 1 into v_date_seq
+        from public.quo_quotations where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
         insert into public.quo_quotations (
           tenant_id, order_date, date_seq, reference_no,
           tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
@@ -206,7 +217,7 @@ begin
           progress_status, subtotal, tax_total, grand_total, created_by_user_id
         )
         select
-          v_tenant, v_d, 2, v_ref,
+          v_tenant, v_d, v_date_seq, v_ref,
           v_tax_none, v_currency_id, p.id, v_user_id, 'Carla Reyes',
           v_loc_hq, '3 DAYS', 3, v_d + 3,
           'unconfirmed', 7000, 0, 7000, v_user_id

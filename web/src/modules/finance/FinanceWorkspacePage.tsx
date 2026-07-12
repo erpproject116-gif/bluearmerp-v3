@@ -40,7 +40,6 @@ export default function FinanceWorkspacePage() {
   return (
     <div class="space-y-6">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">Accounting Dept workspace</h2>
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-2 text-sm text-text-secondary">
           BluearmERP accounting: <strong class="font-medium text-text-primary">Acct. I</strong> for core GL and vouchers;{" "}

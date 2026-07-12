@@ -51,6 +51,8 @@ import {
 import { CashInFromCustomerModal } from "./CashInFromCustomerModal";
 import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
 import { SalesHoldListModal, type SalesHoldPayload } from "./SalesHoldListModal";
+import { ReturnSaleLinesModal } from "./ReturnSaleLinesModal";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 
 export type SalesDetail = {
   id: number;
@@ -84,6 +86,7 @@ export type SalesDetail = {
   grand_total: number;
   created_by_name?: string;
   lines?: Array<{
+    id?: number;
     line_no: number;
     item_id?: number | null;
     item_code: string;
@@ -178,6 +181,7 @@ function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
 export function SalesModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const auth = useAuth();
   const processPolicy = useProcessPolicy(() => props.open);
   const [attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
@@ -197,6 +201,9 @@ export function SalesModal(props: Props) {
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
   const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [returnLinesOpen, setReturnLinesOpen] = createSignal(false);
+  const [returningLines, setReturningLines] = createSignal(false);
+  const [detailLines, setDetailLines] = createSignal<NonNullable<SalesDetail["lines"]>>([]);
   const [newCustomerName, setNewCustomerName] = createSignal("");
   const [orderDate, setOrderDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
@@ -281,6 +288,75 @@ export function SalesModal(props: Props) {
   };
 
   const holdGrandTotal = () => lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0);
+
+  const canReturnLines = () =>
+    Boolean(props.editing?.id) && hasPermission(auth.me, "sales.sales_return", "write");
+
+  const returnableLines = () =>
+    detailLines()
+      .filter((ln): ln is NonNullable<SalesDetail["lines"]>[number] & { id: number } => typeof ln.id === "number")
+      .map((ln) => ({
+        id: ln.id,
+        line_no: ln.line_no,
+        item_code: ln.item_code,
+        item_name: ln.item_name,
+        qty: ln.qty,
+        line_total: ln.line_total,
+      }));
+
+  const hydrateFromDetail = (ed: SalesDetail) => {
+    setOrderDate(ed.order_date);
+    setDateNoDisplay(ed.date_no_display);
+    setSalesNo(ed.sales_no);
+    setTaxTypeId(ed.tax_type_id);
+    setCurrencyId(ed.currency_id);
+    setPartnerId(ed.partner_id);
+    setCustomerLabel(ed.customer_name);
+    setPicUserId(ed.pic_user_id ?? null);
+    setPicName(ed.pic_name);
+    setLocationId(ed.location_id);
+    setLocationLabel(ed.location_name ?? "");
+    setProjectId(ed.project_id ?? null);
+    setProjectLabel(ed.project_name ?? "");
+    setProjectName(ed.project_name ?? "");
+    setDueDate(ed.due_date ?? "");
+    setTermsOfPayment(ed.terms_of_payment ?? "");
+    setPaymentTerms(ed.payment_terms ?? "");
+    setSiDrNo(ed.si_dr_no ?? "");
+    setNotes(ed.notes ?? "");
+    setProgressStatus(ed.progress_status);
+    setSalesCategory(ed.sales_category ?? "");
+    setSourceSalesOrderId(ed.source_sales_order_id ?? null);
+    setLines(linesFromDetail(ed.lines));
+    setDetailLines(ed.lines ?? []);
+  };
+
+  const returnSelectedLines = async (lineIds: number[]) => {
+    const saleId = props.editing?.id;
+    if (!saleId) return;
+    if (
+      !window.confirm(
+        `Return ${lineIds.length} line(s) from ${props.editing?.sales_no ?? "this sale"}? Stock will be reversed and lines removed.`,
+      )
+    ) {
+      return;
+    }
+    setReturningLines(true);
+    const res = await apiFetch<SalesDetail>(`/api/v1/sales/${saleId}/return-lines`, {
+      method: "POST",
+      body: JSON.stringify({ line_ids: lineIds }),
+    });
+    setReturningLines(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Failed to return lines.");
+      return;
+    }
+    toast.success(res.message ?? "Lines returned.");
+    setReturnLinesOpen(false);
+    hydrateFromDetail(res.data);
+    invalidateRecordHistory(queryClient, "sa_sales", saleId);
+    props.onSaved();
+  };
 
   const loadHoldPayload = (payload: SalesHoldPayload) => {
     applyDraftPayload({
@@ -380,29 +456,7 @@ export function SalesModal(props: Props) {
     }
     const ed = props.editing;
     if (ed) {
-      setOrderDate(ed.order_date);
-      setDateNoDisplay(ed.date_no_display);
-      setSalesNo(ed.sales_no);
-      setTaxTypeId(ed.tax_type_id);
-      setCurrencyId(ed.currency_id);
-      setPartnerId(ed.partner_id);
-      setCustomerLabel(ed.customer_name);
-      setPicUserId(ed.pic_user_id ?? null);
-      setPicName(ed.pic_name);
-      setLocationId(ed.location_id);
-      setLocationLabel(ed.location_name ?? "");
-      setProjectId(ed.project_id ?? null);
-      setProjectLabel(ed.project_name ?? "");
-      setProjectName(ed.project_name ?? "");
-      setDueDate(ed.due_date ?? "");
-      setTermsOfPayment(ed.terms_of_payment ?? "");
-      setPaymentTerms(ed.payment_terms ?? "");
-      setSiDrNo(ed.si_dr_no ?? "");
-      setNotes(ed.notes ?? "");
-      setProgressStatus(ed.progress_status);
-      setSalesCategory(ed.sales_category ?? "");
-      setSourceSalesOrderId(ed.source_sales_order_id ?? null);
-      setLines(linesFromDetail(ed.lines));
+      hydrateFromDetail(ed);
     } else {
       setOrderDate(todayISO());
       setPartnerId(null);
@@ -687,6 +741,15 @@ export function SalesModal(props: Props) {
             >
               History
             </button>
+            <Show when={canReturnLines() && returnableLines().length > 0}>
+              <button
+                type="button"
+                class="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+                onClick={() => setReturnLinesOpen(true)}
+              >
+                Return lines
+              </button>
+            </Show>
           </Show>
         }
       >
@@ -1042,6 +1105,15 @@ export function SalesModal(props: Props) {
         currentPayload={() => buildHoldPayload()}
         currentAmount={() => holdGrandTotal()}
         onLoad={loadHoldPayload}
+      />
+
+      <ReturnSaleLinesModal
+        open={returnLinesOpen()}
+        salesNo={props.editing?.sales_no ?? ""}
+        lines={returnableLines()}
+        returning={returningLines()}
+        onClose={() => setReturnLinesOpen(false)}
+        onConfirm={(lineIds) => void returnSelectedLines(lineIds)}
       />
     </>
   );

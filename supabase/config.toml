@@ -29,6 +29,7 @@ sql_paths = [
   "../scripts/seed-demo-sales-orders.sql",
   "../scripts/seed-demo-golden-scenarios.sql",
   "../scripts/seed-demo-po-gr-open.sql",
+  "../scripts/seed-demo-serial-lot.sql",
   "../scripts/seed-demo-sales.sql",
   "../scripts/seed-demo-finance.sql",
   "../scripts/seed-demo-finance-ap.sql",

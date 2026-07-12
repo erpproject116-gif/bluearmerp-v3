@@ -11,7 +11,7 @@ import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
 import { IdleLogoutGuard } from "../shared/IdleLogoutGuard";
 import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ShellProvider, useShell } from "./shell-context";
-import { featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch } from "./modules";
+import { featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch, visibleHeaderFeatures } from "./modules";
 import { isSubBranchPath } from "./sub-branch-nav";
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
 import { CollectiveInvoicingHeaderNav } from "./CollectiveInvoicingHeaderNav";
@@ -38,6 +38,7 @@ import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBar";
 import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
 import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
+import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -163,7 +164,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                   <>
                     <SetupBreadcrumbHint />
                     <p class="text-xs font-medium text-text-secondary">{appTitle()}</p>
-                    <h1 class="text-xl font-semibold text-text-primary">Dashboard</h1>
+                    <h1 class="text-xl font-semibold text-text-primary">Home</h1>
                   </>
                 }
               >
@@ -223,44 +224,46 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <SetupReminderBar />
           <Show when={featureNavModule()}>
             {(mod) => (
-              <nav class="erp-header-features mt-3" aria-label={`${mod().label} features`}>
-                {mod()
-                  .features.filter((feature) => {
-                    if (mod().id === "crm") {
-                      if (feature.analyticsOnly && !canViewCrmAnalytics(auth.me)) return false;
-                      if (feature.managersOnly && !canManageCrmRules(auth.me)) return false;
-                    }
-                    const code = permissionCodeForHref(feature.href);
-                    if (code && auth.me?.user?.permissions && Object.keys(auth.me.user.permissions).length > 0) {
-                      return hasPermission(auth.me, code, "read");
-                    }
-                    return true;
-                  })
-                  .map((feature) => {
-                    const features = mod().features;
-                    const hasExactTab = features.some(
-                      (f) => f.href === loc.pathname || f.settingsHref === loc.pathname,
-                    );
-                    const active =
-                      loc.pathname === feature.href ||
-                      loc.pathname === feature.settingsHref ||
-                      (!hasExactTab &&
-                        feature.prefix != null &&
-                        isSubBranchPath(loc.pathname, feature.prefix));
-                    return (
-                    <A
-                      href={feature.href}
-                      class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
-                      classList={{
-                        "bg-brand-50 text-brand-600": active,
-                        "text-text-secondary hover:erp-panel hover:text-text-primary": !active,
-                      }}
-                    >
-                      {feature.label}
-                    </A>
-                    );
-                  })}
-              </nav>
+              <Show when={visibleHeaderFeatures(mod()).length > 0}>
+                <nav class="erp-header-features mt-3" aria-label={`${mod().label} features`}>
+                  {visibleHeaderFeatures(mod())
+                    .filter((feature) => {
+                      if (mod().id === "crm") {
+                        if (feature.analyticsOnly && !canViewCrmAnalytics(auth.me)) return false;
+                        if (feature.managersOnly && !canManageCrmRules(auth.me)) return false;
+                      }
+                      const code = permissionCodeForHref(feature.href);
+                      if (code && auth.me?.user?.permissions && Object.keys(auth.me.user.permissions).length > 0) {
+                        return hasPermission(auth.me, code, "read");
+                      }
+                      return true;
+                    })
+                    .map((feature) => {
+                      const features = visibleHeaderFeatures(mod());
+                      const hasExactTab = features.some(
+                        (f) => f.href === loc.pathname || f.settingsHref === loc.pathname,
+                      );
+                      const active =
+                        loc.pathname === feature.href ||
+                        loc.pathname === feature.settingsHref ||
+                        (!hasExactTab &&
+                          feature.prefix != null &&
+                          isSubBranchPath(loc.pathname, feature.prefix));
+                      return (
+                      <A
+                        href={feature.href}
+                        class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                        classList={{
+                          "bg-brand-50 text-brand-600": active,
+                          "text-text-secondary hover:erp-panel hover:text-text-primary": !active,
+                        }}
+                      >
+                        {feature.label}
+                      </A>
+                      );
+                    })}
+                </nav>
+              </Show>
             )}
           </Show>
           <TaxMngtHeaderNav />
@@ -273,7 +276,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         </header>
         <main class="flex-1 p-6">
           <EntitlementBanner />
-          {props.children}
+          <ModuleAccessGate>{props.children}</ModuleAccessGate>
         </main>
       </div>
     </div>

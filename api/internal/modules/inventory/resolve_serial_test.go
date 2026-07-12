@@ -20,13 +20,11 @@ func TestExtractManufacturer(t *testing.T) {
 
 func TestResolveOneSerialBatchDuplicate(t *testing.T) {
 	seen := map[string]bool{}
-	res := resolveOneSerial(t.Context(), nil, 0, "SN1", nil, nil, "sale", seen)
+	res := resolveOneSerial(t.Context(), nil, 0, "", nil, nil, "sale", seen)
 	if res.Status != resolveScanEmpty {
 		t.Fatalf("empty status got %s", res.Status)
 	}
-	seen = map[string]bool{}
-	// second call with same serial in batch
-	seen["SN1"] = true
+	seen = map[string]bool{"SN1": true}
 	res = resolveOneSerial(t.Context(), nil, 0, "SN1", nil, nil, "sale", seen)
 	if res.Status != resolveScanBatchDuplicate {
 		t.Fatalf("expected batch_duplicate got %s", res.Status)

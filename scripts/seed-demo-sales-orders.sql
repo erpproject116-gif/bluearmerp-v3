@@ -45,7 +45,7 @@ begin
 
     -- Standalone SO — printer customer (partner 00008)
     v_d := current_date;
-    v_ref := to_char(v_d, 'YYMMDD') || '101';
+    v_ref := 'DEMOSO101';
     if not exists (select 1 from public.so_sales_orders where tenant_id = v_tenant and sales_order_no = v_ref) then
       insert into public.so_sales_orders (
         tenant_id, order_date, date_seq, sales_order_no,
@@ -103,7 +103,7 @@ begin
     if v_qid is not null then
       select ln.id into v_qln from public.quo_quotation_lines ln where ln.quotation_id = v_qid and ln.line_no = 1;
       v_d := current_date;
-      v_ref := to_char(v_d, 'YYMMDD') || '102';
+      v_ref := 'DEMOSO102';
       if v_qln is not null and not exists (select 1 from public.so_sales_orders where tenant_id = v_tenant and sales_order_no = v_ref) then
         insert into public.so_sales_orders (
           tenant_id, order_date, date_seq, sales_order_no,

@@ -1,4 +1,5 @@
 const ROUTE_TAG_RULES: Array<{ prefix: string; tags: string[] }> = [
+  { prefix: "/app/selling", tags: ["selling", "reports"] },
   { prefix: "/app/quotation", tags: ["quotation", "selling"] },
   { prefix: "/app/sales-order", tags: ["sales-order", "selling"] },
   { prefix: "/app/sales", tags: ["sales", "selling", "return"] },
@@ -26,6 +27,9 @@ export function routeTagsFromPath(pathname: string): string[] {
 }
 
 export function suggestedPrompts(pathname: string): string[] {
+  if (pathname.includes("/selling")) {
+    return ["What KPIs are on the selling workspace?", "Where is Sales Status?", "Where is receivable status?"];
+  }
   if (pathname.includes("/quotation")) {
     return ["How do I create a quotation?", "How do I convert a quote to a sales order?", "Where is tax setup?"];
   }

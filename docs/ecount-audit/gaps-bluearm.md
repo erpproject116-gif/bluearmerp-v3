@@ -9,6 +9,19 @@ Prioritized gaps discovered during ECount reference review. Update as audit prog
 | Supplier invoices showed full Accounts header | Purchases/review under Inv. I **Purchases** tab (C000031), not Acct. I | `ReviewPurchasesHeaderNav` + `resolveModule` override | **Done** |
 | Sidebar label | Purchases review area | Renamed to **Review Purchases** in Buying group | **Done** |
 | List status filter pills | Purchase List: All / e-Approval / Unconfirmed / Confirm | Payment status filter done; doc-status pills on Purchases list | **Done** (`DOC_PROGRESS_STATUS_TABS`) |
+| Selling workspace unreachable | Inv. I **Sales** module L0 → selling cockpit | `/app/selling` wired + **Selling** sidebar module (mirrors Buying) | **Done** (2026-06-23) |
+| Finance header tab sprawl | Reports duplicated workspace + Reports module | `visibleHeaderFeatures()` hides `/reports/` on finance + inventory headers | **Done** (2026-06-23) |
+| Duplicate page H2 under shell header | List pages repeat module tab label | GR, pick list, DR, serial-lot lists — description only | **Done** (2026-06-23) |
+
+## Bluearm shell header audit (2026-06-23)
+
+| Area | Before | After |
+|------|--------|-------|
+| Dashboard | "Dashboard" + Report Catalogue tab | **Business Dashboard**; catalogue removed (Reports sidebar) |
+| Finance header | 15+ tabs incl. cross-module sales reports | 8 ops tabs; reports via workspace |
+| Inventory header | Stock report tabs duplicate workspace | Report paths hidden from header |
+| Sales header | Long labels; reports under Finance | Short labels; SI receipts / AR on Sales |
+| New-* header tabs | Duplicated list **+ New row** | Removed from `modules.ts` features |
 
 ## Tab pill parity (cross-cutting)
 

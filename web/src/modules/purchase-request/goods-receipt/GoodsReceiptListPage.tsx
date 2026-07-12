@@ -31,6 +31,7 @@ export default function GoodsReceiptListPage() {
   const auth = useAuth();
   const canInspect = () => hasPermission(auth.me, "quality.gr_inspection", "write");
   const canQc = () => hasPermission(auth.me, "quality.qc_requests", "write");
+  const canReverse = () => hasPermission(auth.me, "purchase_order.goods_receipts_reverse", "write");
   const toast = useToast();
   const invalidate = useInvalidateGoodsReceipts();
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -42,6 +43,24 @@ export default function GoodsReceiptListPage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [inspectingId, setInspectingId] = createSignal<number | null>(null);
   const [qcCreatingId, setQcCreatingId] = createSignal<number | null>(null);
+  const [reversingId, setReversingId] = createSignal<number | null>(null);
+
+  const reverseReceipt = async (row: GoodsReceiptRow) => {
+    if (row.status !== "posted") return;
+    const label = row.purchase_order_no || `GR #${row.id}`;
+    if (!window.confirm(`Reverse posted goods receipt for ${label}? Stock and serials will be rolled back if allowed.`)) {
+      return;
+    }
+    setReversingId(row.id);
+    const res = await apiFetch(`/api/v1/goods-receipt/goods-receipts/${row.id}/reverse`, { method: "POST" });
+    setReversingId(null);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to reverse goods receipt.");
+      return;
+    }
+    toast.success(res.message ?? "Goods receipt reversed.");
+    invalidate();
+  };
 
   const createQcRequest = async (row: GoodsReceiptRow) => {
     setQcCreatingId(row.id);
@@ -85,10 +104,7 @@ export default function GoodsReceiptListPage() {
   return (
     <PurchaseRequestLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-semibold text-text-primary">{uiLabel("goods_receipt.list_title")}</h2>
-          <p class="text-sm text-text-secondary">{uiLabel("goods_receipt.list_description")}</p>
-        </div>
+        <p class="text-sm text-text-secondary">{uiLabel("goods_receipt.list_description")}</p>
         <div class="flex flex-wrap gap-2">
           <A
             href="/app/inventory/serial-lot/receive"
@@ -142,7 +158,21 @@ export default function GoodsReceiptListPage() {
             key: "status",
             header: "Status",
             sortable: false,
-            render: (r) => <span class="capitalize">{statusLabel(r.status)}</span>,
+            render: (r) => (
+              <div class="flex items-center gap-2">
+                <span class="capitalize">{statusLabel(r.status)}</span>
+                <Show when={r.status === "posted" && canReverse()}>
+                  <button
+                    type="button"
+                    class="text-xs text-amber-700 hover:underline disabled:opacity-50"
+                    disabled={reversingId() === r.id}
+                    onClick={(e) => { e.stopPropagation(); void reverseReceipt(r); }}
+                  >
+                    {reversingId() === r.id ? "Reversing…" : "Reverse"}
+                  </button>
+                </Show>
+              </div>
+            ),
           },
           {
             key: "qc",

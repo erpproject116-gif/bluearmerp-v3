@@ -154,7 +154,6 @@ export default function LotBatchesListPage() {
     <SerialLotLayout>
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <div class="mb-4">
-          <h2 class="text-lg font-semibold text-text-primary">Lot Batches</h2>
           <p class="text-sm text-text-secondary">Set filters, then Search (F8).</p>
         </div>
         <div class="grid gap-4 md:grid-cols-2">

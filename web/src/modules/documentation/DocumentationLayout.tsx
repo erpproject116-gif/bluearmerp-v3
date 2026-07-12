@@ -100,6 +100,8 @@ type ContentProps = {
   adminNote?: string;
   scenario?: string;
   relatedGuideIds?: string[];
+  relatedKbArticleIds?: string[];
+  articlesById?: Map<string, KbArticle>;
   sectionsById?: Map<string, DocSection>;
   prev?: { id: string; title: string };
   next?: { id: string; title: string };
@@ -156,6 +158,30 @@ export function DocumentationContent(props: ContentProps) {
                         >
                           {g().title}
                         </button>
+                      </li>
+                    )}
+                  </Show>
+                );
+              }}
+            </For>
+          </ul>
+        </div>
+      </Show>
+
+      <Show when={props.relatedKbArticleIds?.length && props.articlesById}>
+        <div class="mt-8 max-w-2xl rounded-lg border border-stroke bg-slate-50/80 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Related how-to articles</p>
+          <ul class="mt-2 space-y-1">
+            <For each={props.relatedKbArticleIds}>
+              {(articleId) => {
+                const article = props.articlesById!.get(articleId);
+                return (
+                  <Show when={article}>
+                    {(a) => (
+                      <li>
+                        <A href={`/app/documentation/kb/${articleId}`} class="text-sm font-medium text-brand-600 hover:underline">
+                          {a().title}
+                        </A>
                       </li>
                     )}
                   </Show>

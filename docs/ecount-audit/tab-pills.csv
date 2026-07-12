@@ -312,3 +312,6 @@ acct-txn-history-default,E010712,Change History (Acct.),L2,Default,yes,Voucher S
 acct-txn-history-all,E010712,Change History (Acct.),L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
 acct-all-in-one-customer,E040627,All-In-One I (Acct. I),L0,Customer workspace,yes,Quick links AR/AP/Sales/Purchase/Slip Entry,,,,,/app/reports,yes,Pass 16; menuSeq MENUTREE_001352
 update-balance-acct,E010705,Update Balance for Accounting,action,—,yes,Start/End month + F8 rebuild,,,,,/app/finance/period-close,yes,Pass 16 Jul 2026
+bluearm-header-finance-reports,,,Bluearm shell,L0,Finance reports (hidden),no,AR/AP aging budget reports etc,,,,,finance workspace + /app/reports,yes,2026-06-23 visibleHeaderFeatures
+bluearm-header-inventory-reports,,,Bluearm shell,L0,Inventory reports (hidden),no,Stock balance ledger ageing etc,,,,,stock workspace + /app/reports,yes,2026-06-23 visibleHeaderFeatures
+bluearm-selling-workspace,,,Bluearm /app/selling,L0,Selling workspace,yes,KPI tiles + report links,,,,,/app/selling,yes,2026-06-23 wired SellingWorkspacePage

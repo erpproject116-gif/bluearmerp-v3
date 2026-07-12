@@ -21,6 +21,7 @@ import {
   orderedKbArticleIds,
 } from "./knowledgebaseArticles";
 import { knowledgebaseGroups } from "./knowledgebaseGroups";
+import { kbArticlesForSection } from "./sectionKbCrossRefs";
 
 export default function DocumentationPage() {
   const params = useParams<{ sectionId?: string; articleId?: string }>();
@@ -171,6 +172,8 @@ export default function DocumentationPage() {
                       primaryHref={s().primaryHref}
                       primaryLabel={s().primaryLabel}
                       adminNote={adminNote()}
+                      relatedKbArticleIds={kbArticlesForSection(s().id)}
+                      articlesById={articlesById()}
                       prev={guideNeighbors().prev}
                       next={guideNeighbors().next}
                       onNavigate={selectSection}

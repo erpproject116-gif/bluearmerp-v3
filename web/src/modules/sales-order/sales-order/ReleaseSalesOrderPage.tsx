@@ -6,15 +6,21 @@ import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { useListState } from "../../../shared/useListState";
 import {
   postSalesOrderReleases,
+  undoSalesOrderRelease,
   useInvalidateReleaseQueue,
+  useRecentReleases,
   useReleaseQueue,
   type ReleaseQueueRow,
+  type RecentReleaseRow,
 } from "../../../shared/useReleaseQueue";
 import { useToast } from "../../../shared/toast";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { SalesOrderLayout } from "../SalesOrderLayout";
 import { progressStatusLabel } from "./progressStatus";
 
 export default function ReleaseSalesOrderPage() {
+  const auth = useAuth();
+  const canUndo = () => hasPermission(auth.me, "sales_order.release_undo", "write");
   const toast = useToast();
   const navigate = useNavigate();
   const invalidate = useInvalidateReleaseQueue();
@@ -23,6 +29,9 @@ export default function ReleaseSalesOrderPage() {
   const [serialIds, setSerialIds] = createSignal<Record<number, number[]>>({});
   const [serialLabels, setSerialLabels] = createSignal<Record<number, string>>({});
   const [submitting, setSubmitting] = createSignal(false);
+  const [undoingId, setUndoingId] = createSignal<number | null>(null);
+
+  const recent = useRecentReleases(canUndo);
 
   const queue = useReleaseQueue(() => ({
     page: page(),
@@ -87,6 +96,21 @@ export default function ReleaseSalesOrderPage() {
     setQty(row.sales_order_line_id, String(row.balance_qty));
   };
 
+  const undoRelease = async (row: RecentReleaseRow) => {
+    const label = `${row.sales_order_no} · ${row.item_code}`;
+    if (!window.confirm(`Undo release of ${row.release_qty} for ${label}?`)) return;
+    setUndoingId(row.release_line_id);
+    const res = await undoSalesOrderRelease(row.release_line_id);
+    setUndoingId(null);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to undo release.");
+      return;
+    }
+    toast.success(res.message ?? "Release undone.");
+    invalidate();
+    void recent.refetch();
+  };
+
   const totalPages = () => Math.max(1, Math.ceil((queue.data?.total ?? 0) / pageSize));
 
   return (
@@ -94,7 +118,6 @@ export default function ReleaseSalesOrderPage() {
       <section class="rounded-xl border border-stroke bg-white shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-stroke px-5 py-4">
           <div>
-            <h2 class="text-lg font-semibold text-text-primary">Release Sales Order</h2>
             <p class="text-sm text-text-secondary">Enter release quantities for lines with balance.</p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -231,6 +254,68 @@ export default function ReleaseSalesOrderPage() {
           </button>
         </div>
       </section>
+
+      <Show when={canUndo()}>
+        <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
+          <div class="border-b border-stroke px-5 py-4">
+            <h3 class="text-base font-semibold text-text-primary">Recent releases</h3>
+            <p class="text-sm text-text-secondary">Undo a release when nothing has been invoiced from it yet.</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="erp-grid min-w-full text-left text-sm">
+              <thead class="bg-slate-50 text-xs font-semibold uppercase text-text-secondary">
+                <tr>
+                  <th class="px-3 py-2">Sales order</th>
+                  <th class="px-3 py-2">Customer</th>
+                  <th class="px-3 py-2">Item</th>
+                  <th class="px-3 py-2 text-right">Qty</th>
+                  <th class="px-3 py-2">Released</th>
+                  <th class="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                <Show when={recent.isFetching}>
+                  <tr>
+                    <td colSpan={6} class="px-3 py-6 text-center text-text-secondary">
+                      Loading…
+                    </td>
+                  </tr>
+                </Show>
+                <Show when={!recent.isFetching && (recent.data ?? []).length === 0}>
+                  <tr>
+                    <td colSpan={6} class="px-3 py-6 text-center text-text-secondary">
+                      No release lines yet.
+                    </td>
+                  </tr>
+                </Show>
+                <For each={recent.data ?? []}>
+                  {(row) => (
+                    <tr class="border-t border-stroke/60">
+                      <td class="px-3 py-2">{row.sales_order_no}</td>
+                      <td class="px-3 py-2">{row.customer_name}</td>
+                      <td class="px-3 py-2">
+                        {row.item_code} — {row.item_name}
+                      </td>
+                      <td class="px-3 py-2 text-right">{row.release_qty}</td>
+                      <td class="px-3 py-2">{row.release_date}</td>
+                      <td class="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          class="text-xs text-amber-700 hover:underline disabled:opacity-50"
+                          disabled={undoingId() === row.release_line_id}
+                          onClick={() => void undoRelease(row)}
+                        >
+                          {undoingId() === row.release_line_id ? "Undoing…" : "Undo"}
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </Show>
 
     </SalesOrderLayout>
   );

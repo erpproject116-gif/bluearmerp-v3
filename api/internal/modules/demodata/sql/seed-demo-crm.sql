@@ -45,7 +45,7 @@ declare
 begin
   v_d := current_date;
 
-  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
+  foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then
@@ -215,11 +215,11 @@ begin
 
     -- Link quotations for pipeline / follow-up demos
     select id into v_q_active from public.quo_quotations
-    where tenant_id = v_tenant and reference_no = to_char(v_d, 'YYMMDD') || '001' limit 1;
+    where tenant_id = v_tenant and reference_no = 'DEMOQUO001' limit 1;
     select id into v_q_in_progress from public.quo_quotations
-    where tenant_id = v_tenant and reference_no = to_char(v_d, 'YYMMDD') || '002' limit 1;
+    where tenant_id = v_tenant and reference_no = 'DEMOQUO002' limit 1;
     select id into v_q_expired from public.quo_quotations
-    where tenant_id = v_tenant and reference_no = to_char(v_d - 14, 'YYMMDD') || '001' limit 1;
+    where tenant_id = v_tenant and reference_no = 'DEMOQUOARC' limit 1;
 
     -- Ensure at least one clearly expired quote for dashboard KPIs
     if v_q_expired is not null then
@@ -232,7 +232,7 @@ begin
     from public.sa_sales s
     join public.sa_sales_lines ln on ln.sales_id = s.id
     where s.tenant_id = v_tenant
-      and s.sales_no = to_char(v_d, 'YYMMDD') || '201'
+      and s.sales_no = 'DEMOSI201'
       and s.deleted_at is null
     limit 1;
 
@@ -348,7 +348,7 @@ begin
       (
         v_tenant, v_user_id, v_rule_quote, 'warning',
         'Quotation expiring soon',
-        'Quote ' || to_char(v_d, 'YYMMDD') || '001 for Seda Hotels expires in 2 days.',
+        'Quote DEMOQUO001 for Seda Hotels expires in 2 days.',
         'quo_quotation', v_q_active,
         v_code || ':seed:quote-expiring'
       ),

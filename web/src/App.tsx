@@ -214,6 +214,9 @@ import {
   PurchaseStatusPage,
   PurchasePreInvoicingPage,
   PayableStatusReportPage,
+  ReceivableStatusReportPage,
+  SellingWorkspacePage,
+  SellingReportsPage,
   FinanceWorkspacePage,
   PortalLoginPage,
   PortalDashboardPage,
@@ -400,9 +403,9 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
-          <Route path="/selling/reports/receivable-status" component={() => <Navigate href="/app/finance/reports/ar-by-customer" />} />
-          <Route path="/selling/reports" component={() => <Navigate href="/app/sales/sales/status" />} />
-          <Route path="/selling" component={() => <Navigate href="/app/sales/sales" />} />
+          <Route path="/selling/reports/receivable-status" component={ReceivableStatusReportPage} />
+          <Route path="/selling/reports" component={SellingReportsPage} />
+          <Route path="/selling" component={SellingWorkspacePage} />
           <Route path="/buying/reports/payable-status" component={PayableStatusReportPage} />
           <Route path="/buying/reports/purchase-status" component={PurchaseStatusPage} />
           <Route path="/buying/reports/pre-invoicing" component={PurchasePreInvoicingPage} />

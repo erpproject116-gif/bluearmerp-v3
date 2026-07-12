@@ -41,7 +41,7 @@ begin
 
     -- PR with line-level vendor (hybrid: header partner null)
     v_d := current_date;
-    v_ref := to_char(v_d, 'YYMMDD') || '201';
+    v_ref := 'DEMOPR201';
     if not exists (select 1 from public.pr_purchase_requests where tenant_id = v_tenant and purchase_request_no = v_ref) then
       insert into public.pr_purchase_requests (
         tenant_id, request_date, date_seq, purchase_request_no,
@@ -75,7 +75,7 @@ begin
     end if;
 
     -- PR with header vendor partner
-    v_ref := to_char(v_d, 'YYMMDD') || '202';
+    v_ref := 'DEMOPR202';
     if not exists (select 1 from public.pr_purchase_requests where tenant_id = v_tenant and purchase_request_no = v_ref) then
       insert into public.pr_purchase_requests (
         tenant_id, request_date, date_seq, purchase_request_no,

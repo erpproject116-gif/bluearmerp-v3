@@ -9,5 +9,11 @@
   { "id": "supplier_invoice.list", "path": "/api/v1/finance/supplier-invoices?page=1&pageSize=5", "expectedStatuses": [200] },
   { "id": "official_receipt.list", "path": "/api/v1/finance/official-receipts?page=1&pageSize=5", "expectedStatuses": [200] },
   { "id": "payment_voucher.list", "path": "/api/v1/finance/payment-vouchers?page=1&pageSize=5", "expectedStatuses": [200] },
-  { "id": "process_policies", "path": "/api/v1/settings/process-policies", "expectedStatuses": [200] }
+  { "id": "process_policies", "path": "/api/v1/settings/process-policies", "expectedStatuses": [200] },
+  { "id": "dashboard.summary", "path": "/api/v1/dashboard/summary", "expectedStatuses": [200, 403] },
+  { "id": "dashboard.red_flags", "path": "/api/v1/dashboard/red-flags", "expectedStatuses": [200, 403] },
+  { "id": "inventory.reconciliation.summary", "path": "/api/v1/inventory/reconciliation/summary", "expectedStatuses": [200] },
+  { "id": "inventory.serial_units.list", "path": "/api/v1/inventory/serial-units?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "sales_order.release_queue", "path": "/api/v1/sales-order/sales-orders/release-queue?page=1&pageSize=5", "expectedStatuses": [200] },
+  { "id": "sales_order.recent_releases", "path": "/api/v1/sales-order/sales-orders/recent-releases?page=1&pageSize=5", "expectedStatuses": [200, 403] }
 ]

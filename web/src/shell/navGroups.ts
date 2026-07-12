@@ -51,6 +51,7 @@ export const navGroups: NavGroup[] = [
     label: "Selling",
     defaultExpanded: true,
     entries: [
+      { kind: "module", moduleId: "selling" },
       { kind: "module", moduleId: "quotation" },
       { kind: "module", moduleId: "sales_order" },
       { kind: "module", moduleId: "sales" },

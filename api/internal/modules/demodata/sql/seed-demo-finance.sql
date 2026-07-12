@@ -20,7 +20,7 @@ declare
 begin
   v_d := current_date;
 
-  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
+  foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then
@@ -32,14 +32,14 @@ begin
     select id into v_currency_id from public.quo_currencies
     where tenant_id = v_tenant and is_default = true and deleted_at is null limit 1;
 
-    -- Demo sale from seed-demo-sales.sql (YYMMDD201)
-    v_receipt_no := to_char(v_d, 'YYMMDD') || '301';
+    -- Demo sale from seed-demo-sales.sql (DEMOSI201)
+    v_receipt_no := 'DEMOFIN301';
 
     select s.id, s.partner_id, s.grand_total
     into v_sale_id, v_partner_id, v_grand_total
     from public.sa_sales s
     where s.tenant_id = v_tenant
-      and s.sales_no = to_char(v_d, 'YYMMDD') || '201'
+      and s.sales_no = 'DEMOSI201'
       and s.deleted_at is null
     limit 1;
 
@@ -94,8 +94,22 @@ begin
     from public.fin_official_receipts r
     join public.fin_bank_accounts b on b.tenant_id = r.tenant_id and b.bank_account_code = 'DEMO-BDO'
     join public.fin_gl_accounts g on g.account_code = b.gl_account_code
-    where r.tenant_id = v_tenant and r.receipt_no = to_char(v_d, 'YYMMDD') || '301'
+    where r.tenant_id = v_tenant and r.receipt_no = 'DEMOFIN301'
     on conflict (official_receipt_id, line_no) do nothing;
+
+    -- Demo bank statement line (unmatched) for bank reconciliation practice — mirrors OR cash deposit
+    if v_bank_id is not null and not exists (
+      select 1 from public.fin_bank_statement_lines
+      where tenant_id = v_tenant and reference_no = 'DEMO-STMT-OR' and matched_payment_id is null
+    ) then
+      insert into public.fin_bank_statement_lines (
+        tenant_id, bank_account_id, statement_date, reference_no, description, amount
+      )
+      values (
+        v_tenant, v_bank_id, v_d, 'DEMO-STMT-OR', 'Demo bank deposit — match to official receipt', v_grand_total
+      );
+      raise notice 'seed-demo-finance: bank statement line DEMO-STMT-OR for tenant %', v_code;
+    end if;
   end loop;
 end $$;
 
@@ -108,7 +122,7 @@ declare
   v_d date;
 begin
   v_d := current_date;
-  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
+  foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then continue; end if;

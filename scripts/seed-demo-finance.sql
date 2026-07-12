@@ -32,14 +32,14 @@ begin
     select id into v_currency_id from public.quo_currencies
     where tenant_id = v_tenant and is_default = true and deleted_at is null limit 1;
 
-    -- Demo sale from seed-demo-sales.sql (YYMMDD201)
-    v_receipt_no := to_char(v_d, 'YYMMDD') || '301';
+    -- Demo sale from seed-demo-sales.sql (DEMOSI201)
+    v_receipt_no := 'DEMOFIN301';
 
     select s.id, s.partner_id, s.grand_total
     into v_sale_id, v_partner_id, v_grand_total
     from public.sa_sales s
     where s.tenant_id = v_tenant
-      and s.sales_no = to_char(v_d, 'YYMMDD') || '201'
+      and s.sales_no = 'DEMOSI201'
       and s.deleted_at is null
     limit 1;
 
@@ -94,7 +94,7 @@ begin
     from public.fin_official_receipts r
     join public.fin_bank_accounts b on b.tenant_id = r.tenant_id and b.bank_account_code = 'DEMO-BDO'
     join public.fin_gl_accounts g on g.account_code = b.gl_account_code
-    where r.tenant_id = v_tenant and r.receipt_no = to_char(v_d, 'YYMMDD') || '301'
+    where r.tenant_id = v_tenant and r.receipt_no = 'DEMOFIN301'
     on conflict (official_receipt_id, line_no) do nothing;
 
     -- Demo bank statement line (unmatched) for bank reconciliation practice — mirrors OR cash deposit

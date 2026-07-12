@@ -40,6 +40,9 @@ jobs:
           psql "$DATABASE_URL" -f supabase/seed.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
           psql "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
+          psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
+          psql "$DATABASE_URL" -f scripts/seed-demo-quotations.sql || true
+          psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql || true
           psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql || true
           psql "$DATABASE_URL" -f scripts/seed-demo-finance-ap.sql || true
 
@@ -92,4 +95,4 @@ jobs:
           SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
         run: |
           export E2E_BENCH_TOKEN=$(node ../scripts/mint-bench-jwt.mjs)
-          npx playwright test e2e/sales-invoice.spec.ts
+          npx playwright test e2e/sales-invoice.spec.ts e2e/goods-receipt-receive.spec.ts

@@ -20,7 +20,7 @@ declare
   v_d date;
   v_date_seq int;
 begin
-  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
+  foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then
@@ -43,15 +43,15 @@ begin
       continue;
     end if;
 
-    -- Sale from released standalone SO (YYMMDD101)
+    -- Sale from released standalone SO (DEMOSO101)
     v_d := current_date;
-    v_ref := to_char(v_d, 'YYMMDD') || '201';
+    v_ref := 'DEMOSI201';
 
     select so.id, sol.id into v_soid, v_soline
     from public.so_sales_orders so
     join public.so_sales_order_lines sol on sol.sales_order_id = so.id and sol.line_no = 1
     where so.tenant_id = v_tenant
-      and so.sales_order_no = to_char(v_d, 'YYMMDD') || '101'
+      and so.sales_order_no = 'DEMOSO101'
       and so.deleted_at is null
     limit 1;
 
@@ -127,7 +127,7 @@ declare
   v_d date;
 begin
   v_d := current_date;
-  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
+  foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then continue; end if;
@@ -167,7 +167,7 @@ declare
   v_grand numeric;
 begin
   v_d := current_date;
-  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
+  foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then continue; end if;
@@ -176,7 +176,7 @@ begin
     into v_sale_id, v_partner_id, v_subtotal, v_tax, v_grand
     from public.sa_sales s
     where s.tenant_id = v_tenant
-      and s.sales_no = to_char(v_d, 'YYMMDD') || '201'
+      and s.sales_no = 'DEMOSI201'
       and s.deleted_at is null
       and s.invoicing_status = false
       and s.progress_status = 'completed'

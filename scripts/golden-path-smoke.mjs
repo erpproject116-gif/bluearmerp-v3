@@ -6,6 +6,7 @@
  * Usage:
  *   API_BASE=http://localhost:8080 BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs) node scripts/golden-path-smoke.mjs
  *   GOLDEN_CREATE_QUOTATION=true ...   # optional POST create draft quotation smoke
+ *   GOLDEN_CREATE_GR=true ...          # optional POST create draft goods receipt (DEMOGR902)
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -161,7 +162,56 @@ async function smokeCreateQuotation() {
   if (!ok && create.body?.errors) console.log(`    ${JSON.stringify(create.body.errors)}`);
 }
 
+async function smokeCreateGoodsReceipt() {
+  if (process.env.GOLDEN_CREATE_GR !== "true") {
+    console.log("· goods_receipt.create            skipped (set GOLDEN_CREATE_GR=true)");
+    return;
+  }
+
+  const poList = await request("/api/v1/purchase-order/purchase-orders?q=DEMOGR902&page=1&pageSize=5");
+  let po = (poList.body?.data ?? []).find((row) => row.purchase_order_no === "DEMOGR902");
+  if (!po?.id) {
+    po = (await request("/api/v1/purchase-order/purchase-orders?page=1&pageSize=1")).body?.data?.[0];
+  }
+  if (!po?.id) {
+    failed = true;
+    console.log("✗ goods_receipt.create            skipped (no open PO in DB)");
+    return;
+  }
+
+  const location = await firstListId("/api/v1/inventory/locations?page=1&pageSize=1&sort=location_code&order=asc");
+  if (!location?.id) {
+    failed = true;
+    console.log("✗ goods_receipt.create            skipped (no location)");
+    return;
+  }
+
+  const receiptDate = new Date().toISOString().slice(0, 10);
+  const create = await request("/api/v1/goods-receipt/goods-receipts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      purchase_order_id: po.id,
+      receipt_date: receiptDate,
+      location_id: location.id,
+      reference: "golden-smoke-gr",
+    }),
+  });
+  const ok = create.status === 201 || create.status === 200;
+  if (!ok) failed = true;
+  const id = create.body?.data?.id;
+  const lineCount = create.body?.data?.lines?.length ?? 0;
+  console.log(
+    `${ok ? "✓" : "✗"} goods_receipt.create`.padEnd(30),
+    create.status,
+    id ? `(id=${id}, lines=${lineCount})` : "",
+  );
+  if (!ok && create.body?.message) console.log(`    ${create.body.message}`);
+  if (!ok && create.body?.errors) console.log(`    ${JSON.stringify(create.body.errors)}`);
+}
+
 await smokeCreateQuotation();
+await smokeCreateGoodsReceipt();
 
 console.log("");
 if (failed) {

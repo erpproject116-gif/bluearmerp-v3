@@ -1,5 +1,6 @@
--- Demo serial/lot chain: track_serial items, PO from PR, goods receipt with serial units
--- Run after: migrations 040-044, seed-demo-purchase-requests.sql, seed-demo-inventory.sql
+-- Demo serial/lot chain: posted GR with serial units (separate from open PO DEMOGR902)
+-- Idempotent: stable PO DEMOSER901 + PR DEMOPRGR01 (from seed-demo-po-gr-open.sql)
+-- Run after: migrations 040-044, seed-demo-inventory.sql, seed-demo-po-gr-open.sql (for DEMOPRGR01)
 begin;
 
 do $$
@@ -17,9 +18,10 @@ declare
   v_grid bigint;
   v_grline bigint;
   v_item bigint;
-  v_d date;
-  v_po_no text;
-  v_serial text;
+    v_d date;
+    v_po_no text := 'DEMOSER901';
+    v_pr_no text := 'DEMOPRGR01';
+    v_serial text;
 begin
   foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
@@ -39,11 +41,10 @@ begin
     where id = v_item;
 
     v_d := current_date;
-    v_po_no := to_char(v_d, 'YYMMDD') || '901';
 
     select pr.id into v_prid
     from public.pr_purchase_requests pr
-    where pr.tenant_id = v_tenant and pr.purchase_request_no = to_char(v_d, 'YYMMDD') || '202'
+    where pr.tenant_id = v_tenant and pr.purchase_request_no = v_pr_no
     limit 1;
 
     if v_prid is null then continue; end if;
@@ -88,12 +89,12 @@ begin
       returning id into v_grid;
 
       insert into public.gr_goods_receipt_lines (goods_receipt_id, purchase_order_line_id, line_no, expected_qty, received_qty)
-      select v_grid, pol.id, pol.line_no, pol.qty, pol.qty
+      select v_grid, pol.id, row_number() over (order by pol.line_no), pol.qty, pol.qty
       from public.po_purchase_order_lines pol where pol.purchase_order_id = v_poid
       returning id into v_grline;
 
       for i in 1..2 loop
-        v_serial := upper(v_code) || '-SN-' || to_char(v_d, 'YYMMDD') || '-' || lpad(i::text, 3, '0');
+        v_serial := upper(v_code) || '-SN-DEMO-' || lpad(i::text, 3, '0');
         if not exists (select 1 from public.inv_serial_units where tenant_id = v_tenant and serial_no = v_serial) then
           insert into public.inv_serial_units (
             tenant_id, item_id, serial_no, status, location_id,

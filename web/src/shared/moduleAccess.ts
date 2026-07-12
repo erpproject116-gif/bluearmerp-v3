@@ -4,6 +4,13 @@ import { canManageUsers, canViewActivityLogs, canViewCrm, hasModuleAccess } from
 export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: string): boolean {
   if (moduleId === "documentation") return true;
   if (moduleId === "buying") return isTenantModuleEnabled(me, "purchase_order");
+  if (moduleId === "selling") {
+    return (
+      isTenantModuleEnabled(me, "sales") ||
+      isTenantModuleEnabled(me, "quotation") ||
+      isTenantModuleEnabled(me, "sales_order")
+    );
+  }
   if (moduleId === "user_management" && !canManageUsers(me)) return false;
   if (moduleId === "activity_logs" && !canViewActivityLogs(me)) return false;
   if (moduleId === "crm" && !canViewCrm(me)) return false;

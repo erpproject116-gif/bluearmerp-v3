@@ -34,7 +34,6 @@ export default function BuyingWorkspacePage() {
   return (
     <div class="space-y-6">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">Buying workspace</h2>
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
       </section>
 

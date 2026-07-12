@@ -499,3 +499,66 @@ func undoRelease(pool *pgxpool.Pool) http.HandlerFunc {
 		response.OK(w, map[string]any{"release_line_id": releaseLineID}, "Release undone.")
 	}
 }
+
+type recentReleaseRow struct {
+	ReleaseLineID  int64   `json:"release_line_id"`
+	SalesOrderNo   string  `json:"sales_order_no"`
+	CustomerName   string  `json:"customer_name"`
+	ItemCode       string  `json:"item_code"`
+	ItemName       string  `json:"item_name"`
+	ReleaseQty     float64 `json:"release_qty"`
+	ReleaseDate    string  `json:"release_date"`
+	CreatedAt      string  `json:"created_at"`
+}
+
+func listRecentReleases(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "created_at", map[string]string{
+			"created_at":     "rl.created_at",
+			"sales_order_no": "so.sales_order_no",
+			"customer_name":  "p.company_name",
+			"item_code":      "ln.item_code",
+			"release_qty":    "rl.release_qty",
+		})
+		offset := httputil.Offset(p)
+
+		q := fmt.Sprintf(`
+			select rl.id, so.sales_order_no, p.company_name,
+			  ln.item_code, ln.item_name, rl.release_qty::float8,
+			  rl.release_date::text, rl.created_at::text,
+			  count(*) over()
+			from public.so_sales_order_release_lines rl
+			join public.so_sales_order_lines ln on ln.id = rl.sales_order_line_id
+			join public.so_sales_orders so on so.id = ln.sales_order_id
+			join public.inv_partners p on p.id = so.partner_id
+			where so.tenant_id = $1 and so.deleted_at is null
+			order by rl.created_at desc
+			limit $2 offset $3`)
+		rows, err := pool.Query(r.Context(), q, tu.TenantID, p.PageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load recent releases.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+
+		var out []recentReleaseRow
+		var total int64
+		for rows.Next() {
+			var row recentReleaseRow
+			if err := rows.Scan(
+				&row.ReleaseLineID, &row.SalesOrderNo, &row.CustomerName,
+				&row.ItemCode, &row.ItemName, &row.ReleaseQty,
+				&row.ReleaseDate, &row.CreatedAt, &total,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read release.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, row)
+		}
+		if out == nil {
+			out = []recentReleaseRow{}
+		}
+		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}

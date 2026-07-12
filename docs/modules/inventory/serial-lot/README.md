@@ -27,14 +27,19 @@ On **Inventory → Items**, enable **Track serial** or **Track lot** (mutually e
 
 ## Hybrid stock policy
 
-| Path | Qty movement | Serial |
-|------|--------------|--------|
-| GR post | `qty_on_hand` + | `in_stock` |
-| SO Release | `qty_on_hand` − | `reserved` (+ `reserved_at`) |
-| Sales from SO line | None (release already deducted) | `sold`; sold qty ≤ released |
-| Direct sales | `qty_on_hand` − at invoice | `sold` when picked |
+Depends on **Process Policies → Legacy combined SO release** (`legacy_combined_so_release`). See [dashboard README](../../dashboard/README.md) and [ADR 0005](../../../adr/0005-process-flows-and-policies.md).
 
-Sales update/delete reverses direct-sale stock and serial state. SO-linked lines validate against `so_sales_order_release_lines` totals.
+| Path | Legacy combined (`true`) | Split mode (`false`) |
+|------|--------------------------|----------------------|
+| GR post | `qty_on_hand` + | `in_stock` |
+| SO Release | `qty_on_hand` − | `qty_reserved` + serial `reserved` |
+| DR post | Slip only | Deducts on-hand + reserved; serials issued |
+| Sales from SO line | Validates released − invoiced | Validates delivered − invoiced |
+| Direct sales | `qty_on_hand` − at invoice | Same |
+
+Sales update/delete reverses direct-sale stock and serial state. SO-linked lines validate against release/delivery totals.
+
+**UI reversals:** Goods Receipt List → **Reverse** (posted); Release Sales Order → **Recent releases → Undo**; direct-sale return via API `POST /sales/{id}/return-lines` or Sales Returns documents.
 
 ## APIs
 
@@ -98,13 +103,12 @@ Red flags from reconciliation appear on [Business Dashboard](../../dashboard/REA
 ## Demo data
 
 ```bash
-psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
-psql "$DATABASE_URL" -f scripts/seed-demo-serial-lot.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
+psql "$DATABASE_URL" -f scripts/seed-demo-serial-lot.sql
 psql "$DATABASE_URL" -f scripts/seed-demo-dashboard.sql
 ```
 
-For serial receive testing, pick purchase order **DEMOGR902** (5 units open) on Receive / Scan after running `seed-demo-po-gr-open.sql`.
+For serial receive testing, pick purchase order **DEMOGR902** (5 units open) on Receive / Scan after running `seed-demo-po-gr-open.sql`. **DEMOSER901** is a separate posted-GR demo chain from `seed-demo-serial-lot.sql`.
 
 ## Legacy backfill (optional)
 

@@ -91,7 +91,6 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
     <SalesOrderLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-lg font-semibold text-text-primary">Delivery Receipt List</h2>
           <p class="text-sm text-text-secondary">Deliver released sales order quantities to customers.</p>
         </div>
         <div class="flex flex-wrap gap-2">

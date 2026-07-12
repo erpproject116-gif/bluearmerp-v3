@@ -35,13 +35,12 @@ export type AppModule = {
 export const appModules: AppModule[] = [
   {
     id: "dashboard",
-    label: "Dashboard",
+    label: "Business Dashboard",
     href: "/app/dashboard",
     basePath: "/app/dashboard",
     features: [
-      { label: "Dashboard", href: "/app/dashboard", settingsHref: "/app/dashboard" },
+      { label: "Overview", href: "/app/dashboard", settingsHref: "/app/dashboard" },
       { label: "Approvals", href: "/app/dashboard/approvals", settingsHref: "/app/dashboard/approvals" },
-      { label: "Report Catalogue", href: "/app/reports", settingsHref: "/app/reports" },
     ],
   },
   {
@@ -104,6 +103,17 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "selling",
+    label: "Selling",
+    href: "/app/selling",
+    basePath: "/app/selling",
+    features: [
+      { label: "Workspace", href: "/app/selling", settingsHref: "/app/selling" },
+      { label: "Sales Status", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings" },
+      { label: "Receivable Status", href: "/app/selling/reports/receivable-status", settingsHref: "/app/sales/sales/settings" },
+    ],
+  },
+  {
     id: "after_sales",
     label: "After-Sales",
     href: "/app/after-sales/repair-orders",
@@ -116,12 +126,7 @@ export const appModules: AppModule[] = [
         prefix: "/app/after-sales/repair-orders",
       },
       {
-        label: "New Repair Order",
-        href: "/app/after-sales/repair-orders/new",
-        settingsHref: "/app/after-sales/repair-orders/settings",
-      },
-      {
-        label: "Repair Status",
+        label: "Status",
         href: "/app/after-sales/repair-orders/status",
         settingsHref: "/app/after-sales/repair-orders/settings",
       },
@@ -149,11 +154,10 @@ export const appModules: AppModule[] = [
     href: "/app/quotation/quotations",
     basePath: "/app/quotation",
     features: [
-      { label: "New Quotation", href: "/app/quotation/quotations/new", settingsHref: "/app/quotation/quotations/settings" },
-      { label: "Quotation List", href: "/app/quotation/quotations", settingsHref: "/app/quotation/quotations/settings" },
-      { label: "Quotation Status", href: "/app/quotation/quotations/status", settingsHref: "/app/quotation/quotations/settings" },
+      { label: "List", href: "/app/quotation/quotations", settingsHref: "/app/quotation/quotations/settings" },
+      { label: "Status", href: "/app/quotation/quotations/status", settingsHref: "/app/quotation/quotations/settings" },
       {
-        label: "Open Quotations",
+        label: "Open quotes",
         href: "/app/quotation/quotations/outstanding",
         settingsHref: "/app/quotation/quotations/settings",
       },
@@ -165,23 +169,25 @@ export const appModules: AppModule[] = [
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
-      { label: "New Sale", href: "/app/sales/sales/new", settingsHref: "/app/sales/sales/settings" },
-      { label: "Sales List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings" },
-      { label: "Sales Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
+      { label: "List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings" },
+      { label: "Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
       {
-        label: "Billing Status",
+        label: "Pre-invoicing",
         href: "/app/sales/sales/pre-invoicing",
         settingsHref: "/app/sales/sales/settings",
       },
       {
-        label: "Change Sales Price-Batch",
+        label: "Price batch",
         href: "/app/sales/sales/price-batch",
         settingsHref: "/app/sales/sales/settings",
       },
-      { label: "Sales Discount Status", href: "/app/sales/reports/discount-status", settingsHref: "/app/sales/sales/settings" },
-      { label: "Print Sales Slips", href: "/app/sales/reports/print-slips", settingsHref: "/app/sales/sales/settings" },
-      { label: "Sales Returns", href: "/app/sales/sales-returns", settingsHref: "/app/sales/sales/settings" },
-      { label: "Commission Rules", href: "/app/sales/commission-rules", settingsHref: "/app/sales/sales/settings" },
+      { label: "Discount status", href: "/app/sales/reports/discount-status", settingsHref: "/app/sales/sales/settings" },
+      { label: "Print slips", href: "/app/sales/reports/print-slips", settingsHref: "/app/sales/sales/settings" },
+      { label: "Returns", href: "/app/sales/sales-returns", settingsHref: "/app/sales/sales/settings" },
+      { label: "Commissions", href: "/app/sales/commission-rules", settingsHref: "/app/sales/sales/settings" },
+      { label: "SI receipts", href: "/app/sales/reports/si-receipt-status", settingsHref: "/app/sales/sales/settings" },
+      { label: "Customer credit", href: "/app/sales/reports/customer-credit-balance", settingsHref: "/app/sales/sales/settings" },
+      { label: "AR by customer", href: "/app/sales/reports/ar-by-customer", settingsHref: "/app/sales/sales/settings" },
     ],
     subBranches: [
       {
@@ -198,27 +204,21 @@ export const appModules: AppModule[] = [
     href: "/app/sales-order/sales-orders",
     basePath: "/app/sales-order",
     features: [
-      { label: "New Sales Order", href: "/app/sales-order/sales-orders/new", settingsHref: "/app/sales-order/sales-orders/settings" },
-      { label: "Sales Order List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings" },
-      { label: "Sales Order Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
       {
-        label: "Open Sales Orders",
+        label: "Open orders",
         href: "/app/sales-order/sales-orders/outstanding",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       {
-        label: "Pick List",
+        label: "Pick list",
         href: "/app/sales-order/sales-orders/release",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       {
-        label: "Delivery Note List",
+        label: "Delivery notes",
         href: "/app/sales-order/delivery-receipts",
-        settingsHref: "/app/sales-order/sales-orders/settings",
-      },
-      {
-        label: "New Delivery Note",
-        href: "/app/sales-order/delivery-receipts/new",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       { label: "SO Analysis", href: "/app/sales-order/reports/so-analysis", settingsHref: "/app/sales-order/sales-orders/settings" },
@@ -236,9 +236,8 @@ export const appModules: AppModule[] = [
     href: "/app/purchase-request/purchase-requests",
     basePath: "/app/purchase-request",
     features: [
-      { label: "New Purchase Request", href: "/app/purchase-request/purchase-requests/new", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
-      { label: "Purchase Request Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
     ],
   },
   {
@@ -247,29 +246,28 @@ export const appModules: AppModule[] = [
     href: "/app/purchase-order/purchase-orders",
     basePath: "/app/purchase-order",
     features: [
-      { label: "Purchase Order List", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "List", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       {
-        label: "Request for Quotation",
+        label: "RFQ",
         href: "/app/purchase-order/rfq",
         settingsHref: "/app/purchase-order/purchase-orders/settings",
         prefix: "/app/purchase-order/rfq",
       },
-      { label: "Purchase Returns", href: "/app/purchase-order/purchase-returns", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "Returns", href: "/app/purchase-order/purchase-returns", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Receiving", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/goods-receipt/settings" },
-      { label: "PO Analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "PO Status", href: "/app/purchase-order/purchase-orders/status", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "Outstanding PO", href: "/app/purchase-order/purchase-orders/outstanding", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "Items to Receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "PO analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "PO status", href: "/app/purchase-order/purchase-orders/status", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "Open POs", href: "/app/purchase-order/purchase-orders/outstanding", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "To receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
     ],
   },
   {
     id: "purchases",
-    label: "Purchases",
+    label: "Supplier Invoices",
     href: "/app/purchases/purchases",
     basePath: "/app/purchases",
     features: [
-      { label: "New Purchase", href: "/app/purchases/purchases/new", settingsHref: "/app/purchases/purchases/settings" },
-      { label: "Purchase List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
     ],
   },
   {
@@ -278,7 +276,7 @@ export const appModules: AppModule[] = [
     href: "/app/crm/dashboard",
     basePath: "/app/crm",
     features: [
-      { label: "Dashboard", href: "/app/crm/dashboard", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "My pipeline", href: "/app/crm/dashboard", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Notifications", href: "/app/crm/notifications", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Follow-up Tasks", href: "/app/crm/follow-up-tasks", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Leads", href: "/app/crm/leads", settingsHref: "/app/crm/settings/alert-rules" },
@@ -328,10 +326,10 @@ export const appModules: AppModule[] = [
     href: "/app/operations",
     basePath: "/app/operations",
     features: [
-      { label: "Work Hub", href: "/app/operations", settingsHref: "/app/operations" },
+      { label: "Work hub", href: "/app/operations", settingsHref: "/app/operations" },
       { label: "Calendar", href: "/app/operations/calendar", settingsHref: "/app/operations/calendar" },
       { label: "Timeline", href: "/app/operations/timeline", settingsHref: "/app/operations/timeline" },
-      { label: "Dashboard", href: "/app/operations/dashboard", settingsHref: "/app/operations/dashboard" },
+      { label: "Project dashboard", href: "/app/operations/dashboard", settingsHref: "/app/operations/dashboard" },
       { label: "Automation", href: "/app/operations/automation", settingsHref: "/app/operations/automation" },
     ],
   },
@@ -369,7 +367,7 @@ export const appModules: AppModule[] = [
     href: "/app/job-costing",
     basePath: "/app/job-costing",
     features: [
-      { label: "Job Costing", href: "/app/job-costing", settingsHref: "/app/job-costing" },
+      { label: "Overview", href: "/app/job-costing", settingsHref: "/app/job-costing" },
     ],
   },
   {
@@ -379,26 +377,13 @@ export const appModules: AppModule[] = [
     basePath: "/app/finance",
     features: [
       { label: "Workspace", href: "/app/finance", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "New Payment Receipt", href: "/app/finance/official-receipts/new", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Payment Receipt List", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "New Payment Voucher", href: "/app/finance/payment-vouchers/new", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Payment Voucher List", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "New Supplier Invoice", href: "/app/purchases/purchases/new", settingsHref: "/app/purchases/purchases/settings" },
-      { label: "Supplier Invoices", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
-      { label: "Payment Status", href: "/app/finance/reports/supplier-payment-status", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "A/P Aging", href: "/app/finance/reports/ap-aging", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "A/R Aging", href: "/app/finance/reports/ar-aging", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "AR/AP Status", href: "/app/finance/reports/ar-ap-status", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Receipt Status", href: "/app/finance/reports/official-receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "SI Receipt Status", href: "/app/sales/reports/si-receipt-status", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Customer Credit", href: "/app/sales/reports/customer-credit-balance", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Company Budgets", href: "/app/finance/budgets", settingsHref: "/app/finance/budgets" },
-      { label: "Budget vs Actual", href: "/app/finance/reports/budget-vs-actual", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Payroll Runs", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
-      { label: "Fixed Assets", href: "/app/fixed-assets", settingsHref: "/app/fixed-assets" },
-      { label: "Job Costing", href: "/app/job-costing", settingsHref: "/app/job-costing" },
+      { label: "Receipts", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Vouchers", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Supplier invoices", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Budgets", href: "/app/finance/budgets", settingsHref: "/app/finance/budgets" },
+      { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
+      { label: "Assets", href: "/app/fixed-assets", settingsHref: "/app/fixed-assets" },
+      { label: "Job costing", href: "/app/job-costing", settingsHref: "/app/job-costing" },
     ],
     subBranches: [
       {
@@ -433,8 +418,8 @@ export const appModules: AppModule[] = [
     href: "/app/data-center/ingestion-rules",
     basePath: "/app/data-center",
     features: [
-      { label: "Ingestion Rules", href: "/app/data-center/ingestion-rules", settingsHref: "/app/data-center/ingestion-rules" },
-      { label: "Inbox", href: "/app/data-center/inbox", settingsHref: "/app/data-center/inbox" },
+      { label: "Ingestion rules", href: "/app/data-center/ingestion-rules", settingsHref: "/app/data-center/ingestion-rules" },
+      { label: "Import inbox", href: "/app/data-center/inbox", settingsHref: "/app/data-center/inbox" },
     ],
   },
   {
@@ -444,12 +429,12 @@ export const appModules: AppModule[] = [
     basePath: "/app/activity-logs",
     features: [
       {
-        label: "Activity Logs",
+        label: "All activity",
         href: "/app/activity-logs",
         settingsHref: "/app/activity-logs",
       },
       {
-        label: "Change Logs",
+        label: "Change log",
         href: "/app/activity-logs/changes",
         settingsHref: "/app/activity-logs/changes",
       },
@@ -574,4 +559,18 @@ export function isFeatureSettings(pathname: string, feature: ModuleFeature): boo
 
 export function featureHeaderTitle(feature: ModuleFeature, pathname: string): string {
   return isFeatureSettings(pathname, feature) ? `${feature.label} settings` : feature.label;
+}
+
+/** Header tabs: drop redundant New-* shortcuts, report clutter, and single-tab modules. */
+export function visibleHeaderFeatures(module: AppModule): ModuleFeature[] {
+  let features = module.features.filter((feature) => {
+    if (feature.href.endsWith("/new")) return false;
+    if (module.id === "inventory" && feature.href.includes("/reports/")) return false;
+    if (module.id === "finance" && feature.href.includes("/reports/")) return false;
+    return true;
+  });
+  if (features.length === 1 && features[0].href === module.href) {
+    return [];
+  }
+  return features;
 }

@@ -38,8 +38,10 @@ export default function StockWorkspacePage() {
   return (
     <div class="space-y-6">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">Stock workspace</h2>
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
+        <p class="mt-1 text-sm text-text-secondary">
+          Quick links to items, locations, movement reports, and stock reconciliation.
+        </p>
       </section>
 
       <ReconciliationBanner />
