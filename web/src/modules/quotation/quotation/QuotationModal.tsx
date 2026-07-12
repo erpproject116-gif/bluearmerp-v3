@@ -232,7 +232,7 @@ export function QuotationModal(props: Props) {
     setPaymentTerms(payload.payment_terms);
     setNoteForPic(payload.note_for_pic);
     setNotes(payload.notes);
-    setProgressStatus(payload.progress_status);
+    setProgressStatus(payload.progress_status || "unconfirmed");
     setLines(payload.lines);
   };
 
@@ -294,7 +294,7 @@ export function QuotationModal(props: Props) {
       setPaymentTerms(ed.payment_terms ?? "");
       setNoteForPic(ed.note_for_pic_only ?? "");
       setNotes(ed.notes ?? "");
-      setProgressStatus(ed.progress_status);
+      setProgressStatus(ed.progress_status || "unconfirmed");
       setLines(linesFromDetail(ed.lines));
       loadCustom(ed.custom_values ?? {});
     } else {
@@ -370,6 +370,7 @@ export function QuotationModal(props: Props) {
       note_for_pic_only: noteForPic(),
       notes: notes(),
       project_id: projectId(),
+      progress_status: progressStatus() || "unconfirmed",
     };
     const clientError =
       requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields())) ??
@@ -404,7 +405,7 @@ export function QuotationModal(props: Props) {
       payment_terms: paymentTerms() || null,
       note_for_pic_only: noteForPic() || null,
       notes: notes() || null,
-      progress_status: progressStatus(),
+      progress_status: progressStatus() || "unconfirmed",
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
         item_id: ln.item_id || null,

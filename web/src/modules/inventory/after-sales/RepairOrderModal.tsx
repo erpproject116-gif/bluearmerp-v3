@@ -179,7 +179,7 @@ export function RepairOrderModal(props: Props) {
       setProjectLabel(ed.project_name ?? "");
       setProjectName(ed.project_name ?? "");
       setTechnicianName(ed.technician_name ?? "");
-      setProgressStatus(ed.progress_status);
+      setProgressStatus(ed.progress_status || "received");
       setScheduledDate(ed.scheduled_completion_date ?? "");
       setLatestUpdate(ed.latest_update ?? "");
       setRepairDetails(ed.repair_details ?? "");
@@ -221,6 +221,12 @@ export function RepairOrderModal(props: Props) {
     pic_name: picName(),
     location_id: locationId(),
     progress_status: progressStatus(),
+    scheduled_completion_date: scheduledDate(),
+    latest_update: latestUpdate(),
+    repair_details: repairDetails(),
+    project_id: projectId(),
+    project_name: projectName(),
+    technician_name: technicianName(),
   });
 
   const onSerialLotBlur = async (index: number, serialNo: string) => {

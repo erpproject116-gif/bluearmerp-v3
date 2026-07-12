@@ -324,7 +324,7 @@ export function SalesModal(props: Props) {
     setPaymentTerms(ed.payment_terms ?? "");
     setSiDrNo(ed.si_dr_no ?? "");
     setNotes(ed.notes ?? "");
-    setProgressStatus(ed.progress_status);
+    setProgressStatus(ed.progress_status || "unconfirmed");
     setSalesCategory(ed.sales_category ?? "");
     setSourceSalesOrderId(ed.source_sales_order_id ?? null);
     setLines(linesFromDetail(ed.lines));
@@ -415,7 +415,7 @@ export function SalesModal(props: Props) {
     setPaymentTerms(payload.payment_terms);
     setSiDrNo(payload.si_dr_no);
     setNotes(payload.notes);
-    setProgressStatus(payload.progress_status);
+    setProgressStatus(payload.progress_status || "unconfirmed");
     setSalesCategory(payload.sales_category);
     setSourceSalesOrderId(payload.source_sales_order_id);
     setLines(payload.lines);
@@ -631,7 +631,7 @@ export function SalesModal(props: Props) {
       payment_terms: paymentTerms(),
       notes: notes(),
       project_id: projectId(),
-      progress_status: progressStatus(),
+      progress_status: progressStatus() || "unconfirmed",
     };
     const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
     if (clientError) {
@@ -641,7 +641,7 @@ export function SalesModal(props: Props) {
     const attachmentErr = validateAttachmentBeforeConfirm(
       processPolicy.data,
       "sales",
-      progressStatus(),
+      progressStatus() || "unconfirmed",
       attachmentCount(),
       props.editing?.id ?? createdSale()?.id,
     );
@@ -665,7 +665,7 @@ export function SalesModal(props: Props) {
       payment_terms: paymentTerms() || null,
       si_dr_no: siDrNo() || null,
       notes: notes() || null,
-      progress_status: progressStatus(),
+      progress_status: progressStatus() || "unconfirmed",
       template_code: templateCode(),
       sales_category: salesCategory() || null,
       source_sales_order_id: sourceSalesOrderId(),

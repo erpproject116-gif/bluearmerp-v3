@@ -246,7 +246,7 @@ export function SalesOrderModal(props: Props) {
     setPaymentTerms(payload.payment_terms);
     setDeliveryRemarks(payload.delivery_remarks);
     setNotes(payload.notes);
-    setProgressStatus(payload.progress_status);
+    setProgressStatus(payload.progress_status || "unconfirmed");
     setSourceQuotationId(payload.source_quotation_id);
     setLines(payload.lines);
   };
@@ -307,7 +307,7 @@ export function SalesOrderModal(props: Props) {
       setPaymentTerms(ed.payment_terms ?? "");
       setDeliveryRemarks(ed.delivery_remarks ?? "");
       setNotes(ed.notes ?? "");
-      setProgressStatus(ed.progress_status);
+      setProgressStatus(ed.progress_status || "unconfirmed");
       setSourceQuotationId(ed.source_quotation_id ?? null);
       setLines(linesFromDetail(ed.lines));
     } else {
@@ -424,7 +424,7 @@ export function SalesOrderModal(props: Props) {
       payment_terms: paymentTerms(),
       mop: mop(),
       project_id: projectId(),
-      progress_status: progressStatus(),
+      progress_status: progressStatus() || "unconfirmed",
     };
     const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
     if (clientError) {
@@ -434,7 +434,7 @@ export function SalesOrderModal(props: Props) {
     const attachmentErr = validateAttachmentBeforeConfirm(
       processPolicy.data,
       "sales_order",
-      progressStatus(),
+      progressStatus() || "unconfirmed",
       attachmentCount(),
       effectiveEditing()?.id,
     );
@@ -461,7 +461,7 @@ export function SalesOrderModal(props: Props) {
       payment_terms: paymentTerms() || null,
       delivery_remarks: deliveryRemarks() || null,
       notes: notes() || null,
-      progress_status: progressStatus(),
+      progress_status: progressStatus() || "unconfirmed",
       source_quotation_id: sourceQuotationId(),
       lines: lines().map((ln, i) => ({
         line_no: i + 1,

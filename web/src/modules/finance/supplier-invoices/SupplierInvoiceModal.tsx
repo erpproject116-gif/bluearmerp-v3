@@ -191,7 +191,7 @@ export function SupplierInvoiceModal(props: Props) {
       setVendorInvoiceNo(ed.vendor_invoice_no ?? "");
       setReference(ed.reference ?? "");
       setNotes(ed.notes ?? "");
-      setProgressStatus(ed.progress_status);
+      setProgressStatus(ed.progress_status || "unconfirmed");
       setLines(linesFromDetail(ed.lines));
       setActiveTab("details");
     } else {

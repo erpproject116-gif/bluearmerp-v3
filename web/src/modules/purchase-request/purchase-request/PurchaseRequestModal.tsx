@@ -217,7 +217,7 @@ export function PurchaseRequestModal(props: Props) {
     setSendStatus(payload.send_status);
     setReference(payload.reference);
     setNotes(payload.notes);
-    setProgressStatus(payload.progress_status);
+    setProgressStatus(payload.progress_status || "unconfirmed");
     setLines(payload.lines);
     setDateNoDisplay(formatDateNoDisplay(payload.request_date, payload.date_seq));
   };
@@ -304,7 +304,7 @@ export function PurchaseRequestModal(props: Props) {
       setSendStatus(ed.send_status === "sent" ? "sent" : "unsent");
       setReference(ed.reference ?? "");
       setNotes(ed.notes ?? "");
-      setProgressStatus(ed.progress_status);
+      setProgressStatus(ed.progress_status || "unconfirmed");
       setApprovedAt(ed.approved_at ?? null);
       setApprovedByName(ed.approved_by_name ?? "");
       setLines(linesFromDetail(ed.lines));
@@ -377,7 +377,7 @@ export function PurchaseRequestModal(props: Props) {
       reference_no: reference(),
       notes: notes(),
       project_id: projectId(),
-      progress_status: progressStatus(),
+      progress_status: progressStatus() || "unconfirmed",
     };
     const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
     if (clientError) {
@@ -399,7 +399,7 @@ export function PurchaseRequestModal(props: Props) {
       send_status: sendStatus(),
       reference: reference() || null,
       notes: notes() || null,
-      progress_status: progressStatus(),
+      progress_status: progressStatus() || "unconfirmed",
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
         partner_id: ln.partner_id || null,
