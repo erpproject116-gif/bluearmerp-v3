@@ -19,24 +19,27 @@ import (
 )
 
 type WorkItem struct {
-	ID               int64   `json:"id"`
-	WorkspaceID      int64   `json:"workspace_id"`
-	ColumnID         int64   `json:"column_id"`
-	ColumnKey        string  `json:"column_key,omitempty"`
-	ColumnName       string  `json:"column_name,omitempty"`
-	ItemCode         *string `json:"item_code,omitempty"`
-	Title            string  `json:"title"`
-	Description      *string `json:"description,omitempty"`
-	Status           string  `json:"status"`
-	Priority         string  `json:"priority"`
-	AssigneeUserID   *int64  `json:"assignee_user_id,omitempty"`
-	AssigneeName     string  `json:"assignee_name,omitempty"`
-	PartnerID        *int64  `json:"partner_id,omitempty"`
-	PartnerName      string  `json:"partner_name,omitempty"`
-	StartDate        *string `json:"start_date,omitempty"`
-	EndDate          *string `json:"end_date,omitempty"`
-	BlockedByItemID  *int64  `json:"blocked_by_item_id,omitempty"`
-	BlockedByTitle   string  `json:"blocked_by_title,omitempty"`
+	ID               int64          `json:"id"`
+	WorkspaceID      int64          `json:"workspace_id"`
+	ColumnID         int64          `json:"column_id"`
+	ColumnKey        string         `json:"column_key,omitempty"`
+	ColumnName       string         `json:"column_name,omitempty"`
+	ItemCode         *string        `json:"item_code,omitempty"`
+	Title            string         `json:"title"`
+	Description      *string        `json:"description,omitempty"`
+	Status           string         `json:"status"`
+	Priority         string         `json:"priority"`
+	AssigneeUserID   *int64         `json:"assignee_user_id,omitempty"`
+	AssigneeName     string         `json:"assignee_name,omitempty"`
+	PartnerID        *int64         `json:"partner_id,omitempty"`
+	PartnerName      string         `json:"partner_name,omitempty"`
+	StartDate        *string        `json:"start_date,omitempty"`
+	EndDate          *string        `json:"end_date,omitempty"`
+	StartTime        *string        `json:"start_time,omitempty"`
+	EndTime          *string        `json:"end_time,omitempty"`
+	AllDay           bool           `json:"all_day"`
+	BlockedByItemID  *int64         `json:"blocked_by_item_id,omitempty"`
+	BlockedByTitle   string         `json:"blocked_by_title,omitempty"`
 	QuotationID      *int64         `json:"quotation_id,omitempty"`
 	QuotationRef     string         `json:"quotation_reference,omitempty"`
 	SortOrder        int            `json:"sort_order"`
@@ -54,6 +57,9 @@ type workItemBody struct {
 	PartnerID       *int64         `json:"partner_id"`
 	StartDate       *string        `json:"start_date"`
 	EndDate         *string        `json:"end_date"`
+	StartTime       *string        `json:"start_time"`
+	EndTime         *string        `json:"end_time"`
+	AllDay          *bool          `json:"all_day"`
 	BlockedByItemID *int64         `json:"blocked_by_item_id"`
 	CustomValues    map[string]any `json:"custom_values"`
 }
@@ -68,6 +74,9 @@ type workItemPatchBody struct {
 	PartnerID       *int64         `json:"partner_id"`
 	StartDate       *string        `json:"start_date"`
 	EndDate         *string        `json:"end_date"`
+	StartTime       *string        `json:"start_time"`
+	EndTime         *string        `json:"end_time"`
+	AllDay          *bool          `json:"all_day"`
 	BlockedByItemID *int64         `json:"blocked_by_item_id"`
 	CustomValues    map[string]any `json:"custom_values"`
 }
@@ -139,6 +148,8 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 			  wi.assignee_user_id, coalesce(u.full_name, ''),
 			  wi.partner_id, coalesce(pt.company_name, ''),
 			  wi.start_date::text, wi.end_date::text,
+			  to_char(wi.start_time, 'HH24:MI'), to_char(wi.end_time, 'HH24:MI'),
+			  wi.all_day,
 			  wi.blocked_by_item_id, coalesce(blocker.title, ''),
 			  wi.quotation_id, coalesce(q.reference_no, ''),
 			  wi.sort_order`
@@ -170,6 +181,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 					&row.AssigneeUserID, &row.AssigneeName,
 					&row.PartnerID, &row.PartnerName,
 					&row.StartDate, &row.EndDate,
+					&row.StartTime, &row.EndTime, &row.AllDay,
 					&row.BlockedByItemID, &row.BlockedByTitle,
 					&row.QuotationID, &row.QuotationRef,
 					&row.SortOrder,
@@ -215,6 +227,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.AssigneeUserID, &row.AssigneeName,
 				&row.PartnerID, &row.PartnerName,
 				&row.StartDate, &row.EndDate,
+				&row.StartTime, &row.EndTime, &row.AllDay,
 				&row.BlockedByItemID, &row.BlockedByTitle,
 				&row.QuotationID, &row.QuotationRef,
 				&row.SortOrder, &total,
@@ -270,6 +283,17 @@ func createWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, errs)
 			return
 		}
+		startTime, endTime, errs := parseOptionalTimes(body.StartTime, body.EndTime)
+		if errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+		allDay := true
+		if body.AllDay != nil {
+			allDay = *body.AllDay
+		} else if startTime != nil {
+			allDay = false
+		}
 		status := defaultItemStatus(body.Status)
 		priority := defaultPriority(body.Priority)
 		tx, err := pool.Begin(r.Context())
@@ -283,12 +307,12 @@ func createWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 		err = tx.QueryRow(r.Context(), `
 			insert into public.wm_work_items (
 			  tenant_id, workspace_id, column_id, title, description, status, priority,
-			  assignee_user_id, partner_id, start_date, end_date, blocked_by_item_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			  assignee_user_id, partner_id, start_date, end_date, start_time, end_time, all_day, blocked_by_item_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 			returning id`,
 			tu.TenantID, body.WorkspaceID, body.ColumnID, strings.TrimSpace(body.Title),
 			body.Description, status, priority,
-			body.AssigneeUserID, body.PartnerID, startDate, endDate, body.BlockedByItemID,
+			body.AssigneeUserID, body.PartnerID, startDate, endDate, startTime, endTime, allDay, body.BlockedByItemID,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create work item.", "ERR_INTERNAL")
@@ -389,6 +413,34 @@ func patchWorkItem(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, ed)
 			n++
 		}
+		if body.StartTime != nil {
+			st, _, errs := parseOptionalTimes(body.StartTime, nil)
+			if errs != nil {
+				response.Validation(w, errs)
+				return
+			}
+			sets = append(sets, fmt.Sprintf("start_time = $%d", n))
+			args = append(args, st)
+			n++
+			if body.AllDay == nil && st != nil {
+				sets = append(sets, "all_day = false")
+			}
+		}
+		if body.EndTime != nil {
+			_, et, errs := parseOptionalTimes(nil, body.EndTime)
+			if errs != nil {
+				response.Validation(w, errs)
+				return
+			}
+			sets = append(sets, fmt.Sprintf("end_time = $%d", n))
+			args = append(args, et)
+			n++
+		}
+		if body.AllDay != nil {
+			sets = append(sets, fmt.Sprintf("all_day = $%d", n))
+			args = append(args, *body.AllDay)
+			n++
+		}
 		if body.BlockedByItemID != nil {
 			sets = append(sets, fmt.Sprintf("blocked_by_item_id = $%d", n))
 			args = append(args, body.BlockedByItemID)
@@ -444,6 +496,8 @@ func loadWorkItem(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		  wi.assignee_user_id, coalesce(u.full_name, ''),
 		  wi.partner_id, coalesce(pt.company_name, ''),
 		  wi.start_date::text, wi.end_date::text,
+		  to_char(wi.start_time, 'HH24:MI'), to_char(wi.end_time, 'HH24:MI'),
+		  wi.all_day,
 		  wi.blocked_by_item_id, coalesce(blocker.title, ''),
 		  wi.quotation_id, coalesce(q.reference_no, ''),
 		  wi.sort_order
@@ -459,6 +513,7 @@ func loadWorkItem(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		&row.AssigneeUserID, &row.AssigneeName,
 		&row.PartnerID, &row.PartnerName,
 		&row.StartDate, &row.EndDate,
+		&row.StartTime, &row.EndTime, &row.AllDay,
 		&row.BlockedByItemID, &row.BlockedByTitle,
 		&row.QuotationID, &row.QuotationRef,
 		&row.SortOrder,
@@ -524,4 +579,34 @@ func parseOptionalDates(start, end *string) (*time.Time, *time.Time, map[string]
 		ed = &d
 	}
 	return sd, ed, nil
+}
+
+// parseOptionalTimes accepts HH:MM or HH:MM:SS and returns HH:MM:SS strings for TIME columns.
+// Empty string clears (nil).
+func parseOptionalTimes(start, end *string) (*string, *string, map[string]string) {
+	parseOne := func(raw *string, field string) (*string, map[string]string) {
+		if raw == nil {
+			return nil, nil
+		}
+		s := strings.TrimSpace(*raw)
+		if s == "" {
+			return nil, nil
+		}
+		for _, layout := range []string{"15:04", "15:04:05"} {
+			if t, err := time.Parse(layout, s); err == nil {
+				out := t.Format("15:04:05")
+				return &out, nil
+			}
+		}
+		return nil, map[string]string{field: "Invalid time (use HH:MM)."}
+	}
+	st, errs := parseOne(start, "start_time")
+	if errs != nil {
+		return nil, nil, errs
+	}
+	et, errs := parseOne(end, "end_time")
+	if errs != nil {
+		return nil, nil, errs
+	}
+	return st, et, nil
 }

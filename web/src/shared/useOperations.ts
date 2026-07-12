@@ -40,6 +40,9 @@ export type WorkItem = {
   partner_name?: string;
   start_date?: string | null;
   end_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  all_day?: boolean;
   blocked_by_item_id?: number | null;
   blocked_by_title?: string;
   quotation_id?: number | null;
@@ -513,6 +516,9 @@ export async function createWorkItem(body: {
   partner_id?: number;
   start_date?: string;
   end_date?: string;
+  start_time?: string;
+  end_time?: string;
+  all_day?: boolean;
   blocked_by_item_id?: number;
   custom_values?: Record<string, unknown>;
 }) {

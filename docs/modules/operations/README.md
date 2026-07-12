@@ -15,7 +15,7 @@ Project workspaces with Kanban/table views, calendar and timeline planning, **li
 | Apply pack to board | API | `POST .../workspaces/{id}/apply-pack` |
 | Document links | Edit work item | `GET/POST/DELETE .../work-items/{id}/links` |
 | Doc search | Link picker | `GET .../doc-search?doc_type=&q=` |
-| Calendar (month/week) | `/app/operations/calendar` | `GET .../work-items?board=1` + create/patch |
+| Calendar (month/week/day) | `/app/operations/calendar` | `GET .../work-items?board=1` + create/patch with optional times |
 | Timeline | `/app/operations/timeline` | `GET .../work-items?view=timeline&board=1` |
 | Dashboards | `/app/operations/dashboard` | `GET/POST /api/v1/operations/dashboards` |
 | Automation | `/app/operations/automation` | `GET/POST/PATCH /api/v1/operations/automation-rules` |
@@ -101,7 +101,7 @@ Workspace create accepts `industry_pack` (code) and/or `pack_id`.
 
 ## Calendar
 
-Month and week grids on `/app/operations/calendar`. Click a day or **+ Task** to create a work item with title, description, dates, and column. Events are the same `wm_work_items` as the Kanban board (date-based for now; timed slots + reminder delivery are a follow-up).
+Month, week, and **day** views on `/app/operations/calendar`. **Today** jumps to the current date in the hourly day view (Google Calendar–style). Click a day number to open that day, or click an hour row to create a timed task. All-day tasks sit in the top strip; timed tasks use `start_time` / `end_time` on `wm_work_items` (migration `158`). Reminder delivery is still a follow-up.
 
 ## CRM mirror
 
@@ -119,6 +119,6 @@ CRM follow-up tasks (`crm_follow_up_tasks`) are mirrored to Operations work item
 4. `/app/operations/packs` — clone Construction → **Edit pack** (rename columns) → create workspace from clone.
 5. **Form settings** — add a custom field; create/edit work item and confirm value persists.
 6. Edit work item → **Linked documents** — search and link a quotation/PO/SI/OR/job cost.
-7. `/app/operations/calendar` — month/week views; click a day to add a dated task; confirm it appears on the hub board.
+7. `/app/operations/calendar` — month/week/day views; **Today** opens the hourly day layout; click an hour to add a timed task; confirm it appears on the hub board.
 8. Drag Kanban card with an automation rule on `work_item.column_changed` → Activity Log (or status/priority update).
 9. CRM follow-up still mirrors to board.
