@@ -561,73 +561,81 @@ func validatePackWrite(body packWriteBody, requireCode bool) map[string]string {
 }
 
 func replacePackChildrenTx(ctx context.Context, tx pgx.Tx, packID int64, body packWriteBody) error {
-	if _, err := tx.Exec(ctx, `delete from public.ops_pack_columns where pack_id = $1`, packID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `delete from public.ops_pack_sample_items where pack_id = $1`, packID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `delete from public.ops_pack_automation_rules where pack_id = $1`, packID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `delete from public.ops_pack_dashboard_widgets where pack_id = $1`, packID); err != nil {
-		return err
-	}
-	for _, col := range body.Columns {
-		key := strings.TrimSpace(col.Key)
-		if key == "" {
-			continue
-		}
-		isDone := col.IsDone || key == "done" || key == "closed"
-		if _, err := tx.Exec(ctx, `
-			insert into public.ops_pack_columns (
-			  pack_id, column_key, column_name, sort_order, column_color, is_done, wip_limit
-			) values ($1,$2,$3,$4,$5,$6,$7)`,
-			packID, key, col.Name, col.SortOrder, nullIfBlank(col.Color), isDone, col.WipLimit,
-		); err != nil {
+	if body.Columns != nil {
+		if _, err := tx.Exec(ctx, `delete from public.ops_pack_columns where pack_id = $1`, packID); err != nil {
 			return err
 		}
-	}
-	for i, sample := range body.SampleItems {
-		prio := sample.Priority
-		if prio == "" {
-			prio = "normal"
-		}
-		if _, err := tx.Exec(ctx, `
-			insert into public.ops_pack_sample_items (
-			  pack_id, title, column_key, priority, start_date_offset_days, end_date_offset_days, sort_order
-			) values ($1,$2,$3,$4,$5,$6,$7)`,
-			packID, sample.Title, sample.ColumnKey, prio, sample.StartDateOffsetDays, sample.EndDateOffsetDays, i*10,
-		); err != nil {
-			return err
-		}
-	}
-	for i, rule := range body.Rules {
-		trig, _ := json.Marshal(rule.TriggerConfig)
-		act, _ := json.Marshal(rule.ActionConfig)
-		if _, err := tx.Exec(ctx, `
-			insert into public.ops_pack_automation_rules (
-			  pack_id, rule_name, trigger_event, trigger_config, action_type, action_config, sort_order
-			) values ($1,$2,$3,$4,$5,$6,$7)`,
-			packID, rule.RuleName, rule.TriggerEvent, trig, rule.ActionType, act, i*10,
-		); err != nil {
-			return err
+		for _, col := range body.Columns {
+			key := strings.TrimSpace(col.Key)
+			if key == "" {
+				continue
+			}
+			isDone := col.IsDone || key == "done" || key == "closed"
+			if _, err := tx.Exec(ctx, `
+				insert into public.ops_pack_columns (
+				  pack_id, column_key, column_name, sort_order, column_color, is_done, wip_limit
+				) values ($1,$2,$3,$4,$5,$6,$7)`,
+				packID, key, col.Name, col.SortOrder, nullIfBlank(col.Color), isDone, col.WipLimit,
+			); err != nil {
+				return err
+			}
 		}
 	}
-	for _, widget := range body.Widgets {
-		cfg := widget.Config
-		if cfg == nil {
-			cfg = map[string]any{}
-		}
-		cfgJSON, _ := json.Marshal(cfg)
-		if _, err := tx.Exec(ctx, `
-			insert into public.ops_pack_dashboard_widgets (
-			  pack_id, widget_type, title, config, grid_x, grid_y, grid_w, grid_h, sort_order
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-			packID, widget.WidgetType, widget.Title, cfgJSON,
-			widget.GridX, widget.GridY, widget.GridW, widget.GridH, widget.SortOrder,
-		); err != nil {
+	if body.SampleItems != nil {
+		if _, err := tx.Exec(ctx, `delete from public.ops_pack_sample_items where pack_id = $1`, packID); err != nil {
 			return err
+		}
+		for i, sample := range body.SampleItems {
+			prio := sample.Priority
+			if prio == "" {
+				prio = "normal"
+			}
+			if _, err := tx.Exec(ctx, `
+				insert into public.ops_pack_sample_items (
+				  pack_id, title, column_key, priority, start_date_offset_days, end_date_offset_days, sort_order
+				) values ($1,$2,$3,$4,$5,$6,$7)`,
+				packID, sample.Title, sample.ColumnKey, prio, sample.StartDateOffsetDays, sample.EndDateOffsetDays, i*10,
+			); err != nil {
+				return err
+			}
+		}
+	}
+	if body.Rules != nil {
+		if _, err := tx.Exec(ctx, `delete from public.ops_pack_automation_rules where pack_id = $1`, packID); err != nil {
+			return err
+		}
+		for i, rule := range body.Rules {
+			trig, _ := json.Marshal(rule.TriggerConfig)
+			act, _ := json.Marshal(rule.ActionConfig)
+			if _, err := tx.Exec(ctx, `
+				insert into public.ops_pack_automation_rules (
+				  pack_id, rule_name, trigger_event, trigger_config, action_type, action_config, sort_order
+				) values ($1,$2,$3,$4,$5,$6,$7)`,
+				packID, rule.RuleName, rule.TriggerEvent, trig, rule.ActionType, act, i*10,
+			); err != nil {
+				return err
+			}
+		}
+	}
+	if body.Widgets != nil {
+		if _, err := tx.Exec(ctx, `delete from public.ops_pack_dashboard_widgets where pack_id = $1`, packID); err != nil {
+			return err
+		}
+		for _, widget := range body.Widgets {
+			cfg := widget.Config
+			if cfg == nil {
+				cfg = map[string]any{}
+			}
+			cfgJSON, _ := json.Marshal(cfg)
+			if _, err := tx.Exec(ctx, `
+				insert into public.ops_pack_dashboard_widgets (
+				  pack_id, widget_type, title, config, grid_x, grid_y, grid_w, grid_h, sort_order
+				) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+				packID, widget.WidgetType, widget.Title, cfgJSON,
+				widget.GridX, widget.GridY, widget.GridW, widget.GridH, widget.SortOrder,
+			); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

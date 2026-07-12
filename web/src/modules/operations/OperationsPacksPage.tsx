@@ -3,6 +3,7 @@ import { createMemo, createSignal, Show } from "solid-js";
 import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import { apiFetch } from "../../shared/api";
 import {
   clonePack,
   createPack,
@@ -12,6 +13,7 @@ import {
   type IndustryPack,
 } from "../../shared/useOperations";
 import { OperationsLayout } from "./OperationsLayout";
+import { OperationsPackEditorModal } from "./OperationsPackEditorModal";
 
 type PackRow = IndustryPack & { id: number };
 
@@ -23,6 +25,9 @@ export default function OperationsPacksPage() {
   const canWrite = () => hasPermission(auth.me, "operations.packs", "write");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [createOpen, setCreateOpen] = createSignal(false);
+  const [editorOpen, setEditorOpen] = createSignal(false);
+  const [editorPack, setEditorPack] = createSignal<IndustryPack | null>(null);
+  const [editorCanEdit, setEditorCanEdit] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [code, setCode] = createSignal("");
   const [name, setName] = createSignal("");
@@ -42,6 +47,22 @@ export default function OperationsPacksPage() {
     return s && s.id > 0 ? s.id : null;
   });
 
+  const openEditor = async (row: PackRow, forceEdit: boolean) => {
+    if (!row.id || row.id <= 0) {
+      toast.warning("Select a catalog pack (run migration 155 so packs load from the database).");
+      return;
+    }
+    const res = await apiFetch<IndustryPack>(`/api/v1/operations/packs/${row.id}`);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Could not load pack details.");
+      return;
+    }
+    const canEdit = forceEdit && canWrite() && !res.data.is_system;
+    setEditorPack(res.data);
+    setEditorCanEdit(canEdit);
+    setEditorOpen(true);
+  };
+
   const cloneSelected = async () => {
     const id = selectedDbId();
     if (!id) {
@@ -59,8 +80,12 @@ export default function OperationsPacksPage() {
       toast.warning(res.message ?? "Could not clone pack.");
       return;
     }
-    toast.success("Pack cloned — edit it from your tenant packs.");
+    toast.success("Pack cloned — open Edit to customize columns and labels.");
     invalidate();
+    if (res.data?.id) {
+      setSelectedId(res.data.id);
+      void openEditor({ ...res.data, id: res.data.id }, true);
+    }
   };
 
   const removeSelected = async () => {
@@ -109,6 +134,10 @@ export default function OperationsPacksPage() {
     setName("");
     toast.success("Custom pack created.");
     invalidate();
+    if (res.data?.id) {
+      setSelectedId(res.data.id);
+      void openEditor({ ...res.data, id: res.data.id }, true);
+    }
   };
 
   return (
@@ -117,7 +146,7 @@ export default function OperationsPacksPage() {
         <div>
           <h2 class="text-lg font-semibold text-text-primary">Industry packs</h2>
           <p class="text-sm text-text-secondary">
-            Platform starters plus your tenant packs. Clone a system pack or create a blank one, then use it when creating a workspace.
+            Clone a platform pack or create your own, then edit names, descriptions, and Kanban columns.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -132,6 +161,17 @@ export default function OperationsPacksPage() {
               onClick={() => void cloneSelected()}
             >
               Clone selected
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              disabled={!selectedDbId()}
+              onClick={() => {
+                const row = selected();
+                if (row) void openEditor(row, !row.is_system);
+              }}
+            >
+              {selected()?.is_system ? "View columns" : "Edit pack"}
             </button>
             <button
               type="button"
@@ -154,7 +194,7 @@ export default function OperationsPacksPage() {
 
       <SpreadsheetGrid
         columns={[
-          { key: "pack_name", header: "Name" },
+          { key: "pack_name", header: "Name", clickable: true },
           { key: "pack_code", header: "Code" },
           {
             key: "is_system",
@@ -162,14 +202,15 @@ export default function OperationsPacksPage() {
             render: (r) => (r.is_system ? "Platform" : "Tenant"),
             sortable: false,
           },
-          { key: "summary", header: "Summary", render: (r) => r.summary ?? "—" },
+          { key: "summary", header: "Summary", render: (r) => r.summary ?? r.description ?? "—" },
         ]}
         rows={rows()}
         loading={packs.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onEdit={() => undefined}
+        onEdit={(row) => void openEditor(row, !row.is_system && canWrite())}
         onNew={() => setCreateOpen(true)}
+        showNew={canWrite()}
         codeKey="pack_code"
         nameKey="pack_name"
         page={1}
@@ -194,7 +235,7 @@ export default function OperationsPacksPage() {
         <Field label="Pack name">
           <input class={inputClass} placeholder="Fit-out delivery" value={name()} onInput={(e) => setName(e.currentTarget.value)} />
         </Field>
-        <p class="mb-2 text-xs text-text-secondary">Starter columns (refine on a workspace, then Save as pack).</p>
+        <p class="mb-2 text-xs text-text-secondary">Starter columns — refine them in the pack editor after create.</p>
         <Field label="Column 1 name">
           <input class={inputClass} value={colTodo()} onInput={(e) => setColTodo(e.currentTarget.value)} />
         </Field>
@@ -206,17 +247,16 @@ export default function OperationsPacksPage() {
         </Field>
       </EntityModal>
 
-      <Show when={selected()}>
-        {(pack) => (
-          <div class="mt-4 rounded-xl border border-stroke bg-white p-4 text-sm">
-            <p class="font-medium text-text-primary">{pack().pack_name}</p>
-            <p class="text-text-secondary">{pack().summary}</p>
-            <Show when={pack().id > 0}>
-              <p class="mt-1 text-xs text-text-secondary">Id: {pack().id}</p>
-            </Show>
-          </div>
-        )}
-      </Show>
+      <OperationsPackEditorModal
+        open={editorOpen()}
+        pack={editorPack()}
+        canEdit={editorCanEdit()}
+        onClose={() => {
+          setEditorOpen(false);
+          setEditorPack(null);
+        }}
+        onSaved={invalidate}
+      />
     </OperationsLayout>
   );
 }
