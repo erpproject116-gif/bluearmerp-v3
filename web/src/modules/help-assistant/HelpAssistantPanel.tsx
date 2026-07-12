@@ -21,6 +21,7 @@ export function HelpAssistantPanel(props: {
   createEffect(() => {
     if (props.open) {
       queueMicrotask(() => inputEl?.focus());
+      props.assistant.refreshAIConfig();
     }
   });
 
@@ -66,7 +67,11 @@ export function HelpAssistantPanel(props: {
         <header class="flex items-center justify-between border-b border-stroke px-4 py-3">
           <div>
             <h2 class="text-sm font-semibold text-text-primary">Help assistant</h2>
-            <p class="text-xs text-text-secondary">Search guides & knowledge base</p>
+            <p class="text-xs text-text-secondary">
+              {props.assistant.aiEnabled()
+                ? "Answers grounded in docs (AI when available)"
+                : "Search guides & knowledge base"}
+            </p>
           </div>
           <div class="flex items-center gap-1">
             <Show when={props.assistant.messages().length > 0}>
@@ -94,7 +99,10 @@ export function HelpAssistantPanel(props: {
             when={props.assistant.messages().length > 0}
             fallback={
               <div class="space-y-3 text-sm text-text-secondary">
-                <p>Ask how to use Bluearm ERP. Answers come from in-app documentation.</p>
+                <p>
+                  Ask how to use Bluearm ERP. Answers come from in-app documentation
+                  {props.assistant.aiEnabled() ? ", with optional AI wording when the server is configured" : ""}.
+                </p>
                 <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">Try asking</p>
                 <div class="flex flex-wrap gap-2">
                   <For each={suggestedPrompts(loc.pathname)}>
@@ -112,7 +120,11 @@ export function HelpAssistantPanel(props: {
               </div>
             }
           >
-            <HelpChatThread messages={props.assistant.messages()} />
+            <HelpChatThread
+              messages={props.assistant.messages()}
+              pathname={loc.pathname}
+              onAsk={(text) => props.assistant.ask(text)}
+            />
           </Show>
         </div>
 

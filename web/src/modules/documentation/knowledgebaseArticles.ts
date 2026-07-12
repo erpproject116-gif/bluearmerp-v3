@@ -1,5 +1,6 @@
 import type { KbArticle } from "./documentationTypes";
 import { knowledgebaseGroups } from "./knowledgebaseGroups";
+import { helpScenarioArticles } from "./helpScenarioArticles";
 import { moduleKbArticles } from "./moduleKbArticles";
 
 export const knowledgebaseArticles: KbArticle[] = [
@@ -438,6 +439,7 @@ export const knowledgebaseArticles: KbArticle[] = [
     relatedGuideIds: ["inventory", "sales"],
   },
   ...moduleKbArticles,
+  ...helpScenarioArticles,
 ];
 
 export function getKbArticle(id: string): KbArticle | undefined {

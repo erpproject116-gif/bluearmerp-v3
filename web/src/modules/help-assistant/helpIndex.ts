@@ -1,13 +1,14 @@
 import type { DocBlock, DocSection, KbArticle } from "../documentation/documentationTypes";
 import { documentationSections } from "../documentation/documentationSections";
 import { knowledgebaseArticles } from "../documentation/knowledgebaseArticles";
+import { helpArticleAliases } from "./helpArticleAliases";
 import type { HelpChunk, HelpChunkSource } from "./helpTypes";
 
 function inferTagsFromHref(href?: string, relatedGuideIds?: string[]): string[] {
   const tags = new Set<string>();
   if (href) {
     const parts = href.replace(/^\/app\//, "").split("/").filter(Boolean);
-    if (parts[0]) tags.add(parts[0].replace(/-/g, "-"));
+    if (parts[0]) tags.add(parts[0]);
     if (parts.length >= 2) tags.add(parts.slice(0, 2).join("-"));
   }
   for (const id of relatedGuideIds ?? []) {
@@ -30,6 +31,14 @@ function blockText(block: DocBlock): { text: string; steps?: string[] } {
   }
 }
 
+function resolveAliases(article: KbArticle): { questions: string[]; errorPhrases: string[] } {
+  const fromMap = helpArticleAliases[article.id];
+  return {
+    questions: [...new Set([...(article.questions ?? []), ...(fromMap?.questions ?? [])])],
+    errorPhrases: [...new Set([...(article.errorPhrases ?? []), ...(fromMap?.errorPhrases ?? [])])],
+  };
+}
+
 function pushArticleChunks(
   out: HelpChunk[],
   source: HelpChunkSource,
@@ -40,21 +49,40 @@ function pushArticleChunks(
   const moduleTags = [
     ...new Set([...inferTagsFromHref(article.primaryHref, article.relatedGuideIds), ...extraTags]),
   ];
+  const { questions, errorPhrases } = resolveAliases(article);
+  const base = {
+    source,
+    articleId: article.id,
+    title: article.title,
+    scenario: article.scenario,
+    href,
+    actionHref: article.primaryHref,
+    actionLabel: article.primaryLabel,
+    moduleTags,
+    questions,
+    errorPhrases,
+  };
+
+  // Overview chunk so questions/errors score even when block text is thin.
+  const overviewParts = [article.intro, article.scenario, ...questions, ...errorPhrases]
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (overviewParts.length) {
+    out.push({
+      ...base,
+      id: `${source}:${article.id}#overview`,
+      text: overviewParts.join(" "),
+    });
+  }
+
   article.blocks.forEach((block, idx) => {
     const { text, steps } = blockText(block);
     if (!text.trim() && !steps?.length) return;
     out.push({
+      ...base,
       id: `${source}:${article.id}#${idx}`,
-      source,
-      articleId: article.id,
-      title: article.title,
-      scenario: article.scenario,
       text: text.trim(),
       steps,
-      href,
-      actionHref: article.primaryHref,
-      actionLabel: article.primaryLabel,
-      moduleTags,
     });
   });
 }
@@ -62,11 +90,7 @@ function pushArticleChunks(
 function pushSectionChunks(out: HelpChunk[], section: DocSection) {
   const href = `/app/documentation/${section.id}`;
   const moduleTags = [
-    ...new Set([
-      section.id,
-      section.iconId,
-      ...inferTagsFromHref(section.primaryHref),
-    ]),
+    ...new Set([section.id, section.iconId, ...inferTagsFromHref(section.primaryHref)]),
   ];
   const intro = section.intro?.trim();
   if (intro) {
@@ -101,6 +125,11 @@ function pushSectionChunks(out: HelpChunk[], section: DocSection) {
 }
 
 let cached: HelpChunk[] | null = null;
+
+/** Test helper — clears the chunk cache after content changes in the same process. */
+export function clearHelpChunksCache() {
+  cached = null;
+}
 
 export function getHelpChunks(): HelpChunk[] {
   if (cached) return cached;

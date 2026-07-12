@@ -12,6 +12,8 @@ export type HelpChunk = {
   actionHref?: string;
   actionLabel?: string;
   moduleTags: string[];
+  questions?: string[];
+  errorPhrases?: string[];
 };
 
 export type HelpSearchHit = {
@@ -21,6 +23,7 @@ export type HelpSearchHit = {
 };
 
 export type HelpReplyHit = {
+  articleId: string;
   title: string;
   scenario?: string;
   snippet: string;
@@ -35,8 +38,20 @@ export type HelpReply = {
   hits: HelpReplyHit[];
   fallback: boolean;
   message: string;
+  suggestions?: string[];
+  usedAi?: boolean;
 };
 
 export type HelpChatMessage =
   | { id: string; role: "user"; text: string }
   | { id: string; role: "assistant"; reply: HelpReply };
+
+export type HelpFeedbackVote = "up" | "down";
+
+export type HelpFeedbackEvent = {
+  at: string;
+  query: string;
+  pathname: string;
+  articleId: string;
+  vote: HelpFeedbackVote;
+};

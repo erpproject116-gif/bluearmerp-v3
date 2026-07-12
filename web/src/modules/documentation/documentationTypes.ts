@@ -32,6 +32,10 @@ export type KbArticle = {
   primaryHref?: string;
   primaryLabel?: string;
   relatedGuideIds?: string[];
+  /** Extra paraphrases users type into Help / KB search. */
+  questions?: string[];
+  /** Exact or near-exact UI/API error strings that should retrieve this article. */
+  errorPhrases?: string[];
 };
 
 export type KbGroup = {

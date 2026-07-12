@@ -1,4 +1,5 @@
 import type { DocSection, KbArticle } from "./documentationTypes";
+import { helpArticleAliases } from "../help-assistant/helpArticleAliases";
 
 /** Flatten section text for client-side search. */
 export function sectionSearchText(section: DocSection): string {
@@ -14,7 +15,16 @@ export function sectionSearchText(section: DocSection): string {
 }
 
 export function articleSearchText(article: KbArticle): string {
-  const parts = [article.title, article.scenario, article.intro];
+  const alias = helpArticleAliases[article.id];
+  const parts = [
+    article.title,
+    article.scenario,
+    article.intro,
+    ...(article.questions ?? []),
+    ...(article.errorPhrases ?? []),
+    ...(alias?.questions ?? []),
+    ...(alias?.errorPhrases ?? []),
+  ];
   for (const block of article.blocks) {
     if (block.type === "paragraph" || block.type === "tip" || block.type === "heading") {
       parts.push(block.text);
