@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -78,6 +79,17 @@ func (s *service) ackCOA(w http.ResponseWriter, r *http.Request) {
 	tu, ok := auth.FromContext(r.Context())
 	if !ok {
 		response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+		return
+	}
+	ready, err := financedefaults.HasMinimumCoreAccounts(r.Context(), s.pool, tu.TenantID, minCOAAccounts, minCOATypes)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to verify chart of accounts.", "ERR_INTERNAL")
+		return
+	}
+	if !ready {
+		response.Err(w, http.StatusBadRequest,
+			"Add at least 5 active accounts covering asset, liability, income, and expense before continuing.",
+			"ERR_SETUP_INCOMPLETE")
 		return
 	}
 	if err := AckChartOfAccounts(r.Context(), s.pool, tu.TenantID); err != nil {

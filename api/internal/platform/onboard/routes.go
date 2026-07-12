@@ -250,10 +250,6 @@ func (s *service) createTrialTenant(ctx context.Context, a trialArgs) (int64, er
 		return 0, err
 	}
 
-	if _, err := tx.Exec(ctx, `select public.seed_tenant_chart_of_accounts($1)`, tenantID); err != nil {
-		return 0, err
-	}
-
 	if _, err := tx.Exec(ctx, `select public.seed_tenant_base_config($1)`, tenantID); err != nil {
 		return 0, err
 	}

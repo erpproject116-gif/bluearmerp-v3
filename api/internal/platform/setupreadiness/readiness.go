@@ -9,9 +9,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 )
 
-const minCOAAccounts = 10
+const minCOAAccounts = 5
+const minCOATypes = 4
 
 type StepDef struct {
 	ID       string
@@ -22,7 +24,7 @@ type StepDef struct {
 
 var WizardSteps = []StepDef{
 	{ID: "company", Label: "Set your company name and logo", Href: "/app/setup/company", Required: true},
-	{ID: "chart_of_accounts", Label: "Review your chart of accounts", Href: "/app/setup/chart-of-accounts", Required: true},
+	{ID: "chart_of_accounts", Label: "Set up your chart of accounts", Href: "/app/setup/chart-of-accounts", Required: true},
 	{ID: "currency_tax", Label: "Confirm currency and tax types", Href: "/app/setup/currency-tax", Required: true},
 	{ID: "process_policies", Label: "Review process policies", Href: "/app/setup/process-policies", Required: true},
 	{ID: "location", Label: "Confirm your stock location", Href: "/app/setup/location", Required: true},
@@ -180,11 +182,11 @@ func detect(ctx context.Context, pool *pgxpool.Pool, tenantID int64, store progr
 		from public.tenant_branding where tenant_id = $1`, tenantID).Scan(&brandingName)
 	out["company"] = (companyName != "" || brandingName != "") && store.CompanyAck
 
-	var coaCount int
-	_ = pool.QueryRow(ctx, `
-		select count(*)::int from public.fin_accounts
-		where tenant_id = $1 and deleted_at is null`, tenantID).Scan(&coaCount)
-	out["chart_of_accounts"] = coaCount >= minCOAAccounts && store.ChartOfAccountsAck
+	coaReady, err := financedefaults.HasMinimumCoreAccounts(ctx, pool, tenantID, minCOAAccounts, minCOATypes)
+	if err != nil {
+		return nil, err
+	}
+	out["chart_of_accounts"] = coaReady && store.ChartOfAccountsAck
 
 	var currencies int
 	_ = pool.QueryRow(ctx, `
@@ -255,7 +257,7 @@ func blockingMessage(stepID string) string {
 	case "company":
 		return "Set your company name before creating transactions."
 	case "chart_of_accounts":
-		return "Review your chart of accounts before creating transactions."
+		return "Set up your chart of accounts (at least 5 accounts covering asset, liability, income, and expense) before creating transactions."
 	case "currency_tax":
 		return "Configure currency and tax types before creating transactions."
 	case "process_policies":

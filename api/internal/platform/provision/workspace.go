@@ -72,7 +72,7 @@ func LookupAuthUserID(ctx context.Context, pool *pgxpool.Pool, email string) str
 	return ""
 }
 
-// CreateProductionTenant creates a non-demo tenant, owner user, modules, and chart of accounts.
+// CreateProductionTenant creates a non-demo tenant, owner user, and modules (empty chart of accounts).
 // When AuthUserID is empty the owner is created as invited with a pending user_invites row.
 func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArgs) (TenantResult, error) {
 	email := strings.ToLower(strings.TrimSpace(a.Email))
@@ -170,10 +170,6 @@ func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArg
 		where tenant_enableable = true
 		on conflict (tenant_id, module_code) do update
 		  set is_enabled = true, disabled_at = null`, tenantID); err != nil {
-		return TenantResult{}, err
-	}
-
-	if _, err := tx.Exec(ctx, `select public.seed_tenant_chart_of_accounts($1)`, tenantID); err != nil {
 		return TenantResult{}, err
 	}
 

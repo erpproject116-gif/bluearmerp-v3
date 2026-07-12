@@ -214,7 +214,7 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 func accountsExist(ctx context.Context, pool *pgxpool.Pool, tenantID int64, ids ...int64) bool {
 	for _, aid := range ids {
 		var ok bool
-		if err := pool.QueryRow(ctx, `select exists(select 1 from public.fin_accounts where id = $1 and tenant_id = $2 and is_active)`, aid, tenantID).Scan(&ok); err != nil || !ok {
+		if err := pool.QueryRow(ctx, `select exists(select 1 from public.fin_accounts where id = $1 and tenant_id = $2 and is_active and deleted_at is null)`, aid, tenantID).Scan(&ok); err != nil || !ok {
 			return false
 		}
 	}

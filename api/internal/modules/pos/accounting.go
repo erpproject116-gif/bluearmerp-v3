@@ -196,7 +196,7 @@ func resolveAccount(ctx context.Context, tx pgx.Tx, tenantID int64, configured *
 		var id int64
 		err := tx.QueryRow(ctx, `
 			select id from public.fin_accounts
-			where id = $1 and tenant_id = $2 and is_active`, *configured, tenantID).Scan(&id)
+			where id = $1 and tenant_id = $2 and is_active and deleted_at is null`, *configured, tenantID).Scan(&id)
 		if err == nil {
 			return id, nil
 		}

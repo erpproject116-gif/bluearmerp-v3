@@ -14,8 +14,8 @@ const STEP_COPY: Record<string, { title: string; why: string; action: string; li
   },
   chart_of_accounts: {
     title: "Chart of accounts",
-    why: "We seeded a standard chart of accounts. Review it before posting transactions.",
-    action: "Review accounts",
+    why: "Your chart starts empty. Add accounts manually using Philippine code bands (1000–5999), or import the SME starter template.",
+    action: "Set up accounts",
     link: "/app/finance/acct-i/chart-of-accounts",
     ackStep: "chart_of_accounts",
   },

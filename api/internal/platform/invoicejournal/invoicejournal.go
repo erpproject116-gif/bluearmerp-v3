@@ -11,6 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 )
 
 // Line is one leg of the journal entry. Exactly one of Debit/Credit is non-zero.
@@ -39,20 +41,12 @@ func EntryStatus(ctx context.Context, pool *pgxpool.Pool, tenantID int64, jeID *
 
 // ResolveAccountID looks up a tenant account id by its code (e.g. "2559").
 func ResolveAccountID(ctx context.Context, pool *pgxpool.Pool, tenantID int64, code string) (int64, error) {
-	var id int64
-	err := pool.QueryRow(ctx,
-		`select id from public.fin_accounts where tenant_id = $1 and account_code = $2 and is_active`,
-		tenantID, code).Scan(&id)
-	return id, err
+	return financedefaults.ResolveByCode(ctx, pool, tenantID, code)
 }
 
 // ResolveAccountIDTx looks up an account within an existing transaction.
 func ResolveAccountIDTx(ctx context.Context, tx pgx.Tx, tenantID int64, code string) (int64, error) {
-	var id int64
-	err := tx.QueryRow(ctx,
-		`select id from public.fin_accounts where tenant_id = $1 and account_code = $2 and is_active`,
-		tenantID, code).Scan(&id)
-	return id, err
+	return financedefaults.ResolveByCode(ctx, tx, tenantID, code)
 }
 
 // Sync creates a new draft journal entry for the source document, or refreshes an
