@@ -1,3 +1,4 @@
+import { Dynamic } from "solid-js/web";
 import { uiLabel } from "./branding/uiLabel";
 
 type Props = {
@@ -7,8 +8,11 @@ type Props = {
 
 /** Tenant-editable loading message for inline UI. */
 export function LoadingText(props: Props) {
-  const Tag = props.as ?? "span";
-  return <Tag class={props.class}>{uiLabel("common.loading")}</Tag>;
+  return (
+    <Dynamic component={props.as ?? "span"} class={props.class}>
+      {uiLabel("common.loading")}
+    </Dynamic>
+  );
 }
 
 /** Loading state for print preview pages. */
