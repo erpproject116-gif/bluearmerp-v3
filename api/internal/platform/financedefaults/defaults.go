@@ -178,6 +178,8 @@ func resolveByCode(ctx context.Context, q querier, tenantID int64, code string) 
 }
 
 // HasMinimumCoreAccounts reports whether the tenant has enough accounts to pass setup.
+// Requires at least one active account in each of the core types (asset, liability, income, expense).
+// minCount is a floor on total active accounts (typically 4 when requiring all four types).
 func HasMinimumCoreAccounts(ctx context.Context, pool *pgxpool.Pool, tenantID int64, minCount, minTypes int) (bool, error) {
 	var count int
 	if err := pool.QueryRow(ctx, `

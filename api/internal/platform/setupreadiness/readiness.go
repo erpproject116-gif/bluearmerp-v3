@@ -12,7 +12,8 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 )
 
-const minCOAAccounts = 5
+// One active account per core type (asset, liability, income, expense).
+const minCOAAccounts = 4
 const minCOATypes = 4
 
 type StepDef struct {
@@ -257,7 +258,7 @@ func blockingMessage(stepID string) string {
 	case "company":
 		return "Set your company name before creating transactions."
 	case "chart_of_accounts":
-		return "Set up your chart of accounts (at least 5 accounts covering asset, liability, income, and expense) before creating transactions."
+		return "Set up your chart of accounts (at least one active account each for asset, liability, income, and expense) before creating transactions."
 	case "currency_tax":
 		return "Configure currency and tax types before creating transactions."
 	case "process_policies":

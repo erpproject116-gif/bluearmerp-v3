@@ -88,7 +88,7 @@ func (s *service) ackCOA(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ready {
 		response.Err(w, http.StatusBadRequest,
-			"Add at least 5 active accounts covering asset, liability, income, and expense before continuing.",
+			"Add at least one active account each for asset, liability, income, and expense before continuing.",
 			"ERR_SETUP_INCOMPLETE")
 		return
 	}
