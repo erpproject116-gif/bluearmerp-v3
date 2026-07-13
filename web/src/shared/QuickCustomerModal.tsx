@@ -76,7 +76,7 @@ export function QuickCustomerModal(props: Props) {
   };
 
   return (
-    <Modal open={props.open} title="New customer" onClose={props.onClose}>
+    <Modal open={props.open} title="New customer" onClose={props.onClose} stacked>
       <div class="space-y-4">
         <Field label="Company name *">
           <input

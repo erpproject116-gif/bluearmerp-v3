@@ -81,7 +81,7 @@ export function ReceivableApplicationModal(props: Props) {
   const totalApplied = () => rows().reduce((s, r) => s + (Number(r.applied_amount) || 0), 0);
 
   return (
-    <Modal open={props.open} title="Receivable Application" onClose={props.onClose} wide>
+    <Modal open={props.open} title="Receivable Application" onClose={props.onClose} wide stacked>
       <Show when={openRecv.loading}>
         <p class="text-sm text-text-secondary">Loading open receivables…</p>
       </Show>

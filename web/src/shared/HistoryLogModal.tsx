@@ -27,6 +27,9 @@ function formatWhen(iso: string): string {
  * Full activity + change history for a single transaction, shown in its own modal.
  * Lists every recorded action (create, edits, conversions, attachment uploads,
  * invoice posting, ...) with timestamp and the PIC (actor) who made it.
+ *
+ * Always stacked (z-[70] + portal) so it appears above WideEntityModal / nested
+ * transaction windows that also use fixed overlays.
  */
 export function HistoryLogModal(props: Props) {
   const isOpen = createMemo(() => readOpen(props.open));
@@ -43,7 +46,13 @@ export function HistoryLogModal(props: Props) {
   }));
 
   return (
-    <Modal open={isOpen()} title={props.title ?? "History log"} onClose={props.onClose} wide>
+    <Modal
+      open={isOpen()}
+      title={props.title ?? "History log"}
+      onClose={props.onClose}
+      wide
+      stacked
+    >
       <Show
         when={targetId()}
         fallback={<p class="py-4 text-sm text-text-secondary">Save the transaction first to see its history.</p>}

@@ -73,6 +73,7 @@ export function SendEmailModal(props: SendEmailModalProps) {
       onSave={() => void send()}
       saving={saving()}
       singleColumn
+      stacked
     >
       <Field label="To *" span="full">
         <input

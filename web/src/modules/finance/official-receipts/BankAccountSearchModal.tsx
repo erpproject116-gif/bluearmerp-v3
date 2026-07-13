@@ -30,7 +30,7 @@ export function BankAccountSearchModal(props: Props) {
   const [banks] = createResource(q, fetchBanks);
 
   return (
-    <Modal open={props.open} title="Search Bank Account" onClose={props.onClose}>
+    <Modal open={props.open} title="Search Bank Account" onClose={props.onClose} stacked>
       <div class="space-y-3">
         <input class="w-full rounded-lg border border-stroke px-3 py-2 text-sm" placeholder="Search code or name…" value={q()} onInput={(e) => setQ(e.currentTarget.value)} />
         <button type="button" class="text-sm text-brand-600 hover:underline" onClick={props.onRegister}>

@@ -54,7 +54,7 @@ export function BankAccountRegisterModal(props: Props) {
   };
 
   return (
-    <Modal open={props.open} title="Register Bank Account" onClose={props.onClose}>
+    <Modal open={props.open} title="Register Bank Account" onClose={props.onClose} stacked>
       <div class="grid gap-3">
         <Field label="Bank Account Code">
           <input class={inputClass} value={code()} onInput={(e) => setCode(e.currentTarget.value)} />

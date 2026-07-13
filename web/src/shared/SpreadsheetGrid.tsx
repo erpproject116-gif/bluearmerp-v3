@@ -1,4 +1,5 @@
 import { type JSX, For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { Portal } from "solid-js/web";
 import { A } from "@solidjs/router";
 import {
   downloadItemsImportTemplate,
@@ -398,43 +399,49 @@ export function EntityModal(props: {
   saving?: boolean;
   wide?: boolean;
   singleColumn?: boolean;
+  /** Render above another modal (e.g. email over a transaction window). */
+  stacked?: boolean;
   children: JSX.Element;
 }) {
   return (
     <Show when={props.open}>
-      <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-6 sm:items-center">
+      <Portal>
         <div
-          class="erp-surface w-full rounded-2xl border border-stroke p-6 shadow-xl"
-          classList={{ "max-w-6xl": props.wide, "max-w-4xl": !props.wide }}
+          class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-6 sm:items-center ${props.stacked ? "z-[70]" : "z-50"}`}
         >
-          <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
           <div
-            class="mt-5"
-            classList={{
-              "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3": !props.singleColumn,
-            }}
+            class="erp-surface w-full rounded-2xl border border-stroke p-6 shadow-xl"
+            classList={{ "max-w-6xl": props.wide, "max-w-4xl": !props.wide }}
           >
-            {props.children}
-          </div>
-          <div class="mt-6 flex justify-end gap-3 border-t border-stroke pt-4">
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
-              onClick={() => props.onClose()}
+            <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
+            <div
+              class="mt-5"
+              classList={{
+                "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3": !props.singleColumn,
+              }}
             >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              disabled={props.saving}
-              onClick={() => props.onSave()}
-            >
-              Save changes
-            </button>
+              {props.children}
+            </div>
+            <div class="mt-6 flex justify-end gap-3 border-t border-stroke pt-4">
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
+                onClick={() => props.onClose()}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                disabled={props.saving}
+                onClick={() => props.onSave()}
+              >
+                Save changes
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </Portal>
     </Show>
   );
 }

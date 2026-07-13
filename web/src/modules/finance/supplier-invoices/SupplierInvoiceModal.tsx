@@ -690,7 +690,7 @@ export function SupplierInvoiceModal(props: Props) {
       />
 
       <HistoryLogModal
-        open={historyOpen()}
+        open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         targetType="fin_supplier_invoice"
         targetId={effectiveEditing()?.id}

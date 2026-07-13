@@ -42,7 +42,10 @@ export function RecordHistoryButton(props: Props) {
               props.class ??
               "rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
             }
-            onClick={() => setOpen(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(true);
+            }}
           >
             History
           </button>

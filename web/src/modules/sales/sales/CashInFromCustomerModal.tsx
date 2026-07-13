@@ -54,7 +54,7 @@ export function CashInFromCustomerModal(props: Props) {
   };
 
   return (
-    <Modal open={props.open} title="Cash In — From Customer" onClose={props.onClose}>
+    <Modal open={props.open} title="Cash In — From Customer" onClose={props.onClose} stacked>
       <p class="mb-4 text-sm text-text-secondary">
         Apply customer payment to sale <strong>{props.salesNo}</strong> — {formatPeso(props.amount)}.
       </p>

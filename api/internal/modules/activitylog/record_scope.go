@@ -20,6 +20,10 @@ func recordHistoryParentKey(targetType string) string {
 		return "goods_receipt_id"
 	case "fin_supplier_invoice":
 		return "supplier_invoice_id"
+	case "rfq_supplier_quotation":
+		return "supplier_quotation_id"
+	case "fin_official_receipt":
+		return "official_receipt_id"
 	default:
 		return ""
 	}
@@ -28,7 +32,8 @@ func recordHistoryParentKey(targetType string) string {
 func appendScopedRecordWhere(where string, targetType string, typeArg, idArg int) string {
 	parentKey := recordHistoryParentKey(targetType)
 	if parentKey == "" {
-		return where + fmt.Sprintf(" and al.target_id = $%d", idArg)
+		// Always scope by both type and id so unrelated rows with the same numeric id are excluded.
+		return where + fmt.Sprintf(" and al.target_type = $%d and al.target_id = $%d", typeArg, idArg)
 	}
 	return where + fmt.Sprintf(` and (
 	  (al.target_type = $%d and al.target_id = $%d)

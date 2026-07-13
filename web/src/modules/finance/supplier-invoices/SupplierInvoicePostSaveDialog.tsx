@@ -12,7 +12,7 @@ type Props = {
 
 export function SupplierInvoicePostSaveDialog(props: Props) {
   return (
-    <Modal open={props.open} title="Purchase saved" onClose={props.onDone}>
+    <Modal open={props.open} title="Purchase saved" onClose={props.onDone} stacked>
       <p class="text-sm text-text-secondary">
         <strong>{props.invoiceNo}</strong> saved — {formatPeso(props.amount)}. Record vendor payment or set up the accounting invoice now?
       </p>

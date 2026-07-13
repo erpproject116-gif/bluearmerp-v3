@@ -188,7 +188,7 @@ export function ReceiptJournalModal(props: Props) {
 
   return (
     <>
-      <Modal open={props.open} title={`Receipt Journal — ${detail()?.date_no_display ?? ""}`} onClose={props.onClose} wide>
+      <Modal open={props.open} title={`Receipt Journal — ${detail()?.date_no_display ?? ""}`} onClose={props.onClose} wide stacked>
         <Show when={loading()}>
           <LoadingText class="text-sm text-text-secondary" as="p" />
         </Show>

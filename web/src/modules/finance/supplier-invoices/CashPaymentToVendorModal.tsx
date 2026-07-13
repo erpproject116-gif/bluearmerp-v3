@@ -54,7 +54,7 @@ export function CashPaymentToVendorModal(props: Props) {
   };
 
   return (
-    <Modal open={props.open} title="Cash Payment — To Vendor" onClose={props.onClose}>
+    <Modal open={props.open} title="Cash Payment — To Vendor" onClose={props.onClose} stacked>
       <p class="mb-4 text-sm text-text-secondary">
         Apply vendor payment to purchase <strong>{props.invoiceNo}</strong> — {formatPeso(props.amount)}.
       </p>
