@@ -461,6 +461,7 @@ export function PurchaseRequestModal(props: Props) {
       }
     >
       <draft.DraftBanner />
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label="Date-no">
         <input class={inputClass} value={dateNoDisplay()} readOnly />
       </Field>
@@ -580,7 +581,7 @@ export function PurchaseRequestModal(props: Props) {
         <input class={inputClass} value={cc()} onInput={(e) => setCc(e.currentTarget.value)} />
       </Field>
       <Field label="Domestic / Foreign">
-        <div class="flex gap-4 text-sm">
+        <div class="flex gap-4 pt-2 text-sm">
           <label class="flex items-center gap-1.5">
             <input type="radio" name="domestic_foreign" checked={domesticForeign() === "domestic"} onChange={() => setDomesticForeign("domestic")} />
             Domestic
@@ -601,21 +602,23 @@ export function PurchaseRequestModal(props: Props) {
         <ProgressStatusMenu value={progressStatus()} onChange={setProgressStatus} />
       </Field>
       <Show when={props.editing}>
-        <PurchaseRequestApprovalPanel
-          purchaseRequestId={props.editing!.id}
-          progressStatus={progressStatus()}
-          approvedAt={approvedAt()}
-          approvedByName={approvedByName()}
-          onChanged={async () => {
-            const res = await apiFetch<PurchaseRequestDetail>(`/api/v1/purchase-request/purchase-requests/${props.editing!.id}`);
-            if (res.success && res.data) {
-              setProgressStatus(res.data.progress_status);
-              setApprovedAt(res.data.approved_at ?? null);
-              setApprovedByName(res.data.approved_by_name ?? "");
-            }
-            props.onSaved();
-          }}
-        />
+        <div class="col-span-full">
+          <PurchaseRequestApprovalPanel
+            purchaseRequestId={props.editing!.id}
+            progressStatus={progressStatus()}
+            approvedAt={approvedAt()}
+            approvedByName={approvedByName()}
+            onChanged={async () => {
+              const res = await apiFetch<PurchaseRequestDetail>(`/api/v1/purchase-request/purchase-requests/${props.editing!.id}`);
+              if (res.success && res.data) {
+                setProgressStatus(res.data.progress_status);
+                setApprovedAt(res.data.approved_at ?? null);
+                setApprovedByName(res.data.approved_by_name ?? "");
+              }
+              props.onSaved();
+            }}
+          />
+        </div>
       </Show>
       <ModalField settings={byKey} fieldKey="reference_no" fallbackLabel="Reference">
         {(m) => (
@@ -645,6 +648,7 @@ export function PurchaseRequestModal(props: Props) {
           <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
         </Field>
       </Show>
+      </div>
       <div class="col-span-full mb-2">
         <button
           type="button"
