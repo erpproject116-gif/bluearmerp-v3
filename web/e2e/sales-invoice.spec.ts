@@ -14,7 +14,8 @@ test.describe("Sales invoice tab", () => {
     await firstRow.dblclick();
 
     await expect(page.getByRole("heading", { name: /Edit Sale \(actual sale\)/i })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: "Invoice" }).click();
+    // exact: avoid matching "Create collective invoice (0)"
+    await page.getByRole("button", { name: "Invoice", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Item breakdown", level: 3 })).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole("columnheader", { name: "Item code" })).toBeVisible();

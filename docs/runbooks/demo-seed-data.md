@@ -89,6 +89,14 @@ This runbook covers the **DEMO000** demo tenant. For platform superadmins (`itsj
 
    Creates stable PO numbers `DEMOGR902` (confirmed, 5 open), `DEMOGR903` (confirmed, 3 open), `DEMOGR904` (partial), `DEMOGR905` (draft). Verify with `scripts/verify-demo-po-gr-open.sql`. Use **Serial & Lot → Receive / Scan** and pick **DEMOGR902**.
 
+   After e2e receive posts against `DEMOGR902`, re-open without a full purge:
+
+   ```bash
+   psql "$DATABASE_URL" -f scripts/reset-demo-po-gr-open.sql
+   # or re-run seed-demo-po-gr-open.sql (now reopens fully received DEMOGR902)
+   psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
+   ```
+
    Expected for DEMO000 after quotation seed:
 
    | Entity | Count |

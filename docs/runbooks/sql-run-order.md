@@ -173,7 +173,8 @@ See [docs/modules/inventory/serial-lot/README.md](../modules/inventory/serial-lo
 | 5 | `scripts/seed-demo-purchase-requests.sql` | Demo purchase requests |
 | 6 | `scripts/seed-demo-sales-orders.sql` | Demo sales orders |
 | 7 | `scripts/seed-demo-golden-scenarios.sql` | Wired S2 serial, S3 lot, S4 direct sale chains |
-| 8 | `scripts/seed-demo-po-gr-open.sql` | Open POs `DEMOGR902`–`905` for receive/scan |
+| 8 | `scripts/seed-demo-po-gr-open.sql` | Open POs `DEMOGR902`–`905` for receive/scan (reopens fully received `DEMOGR902`) |
+| 8b | `scripts/reset-demo-po-gr-open.sql` | Surgical reopen of `DEMOGR902` only (after e2e receive) |
 | 9 | `scripts/seed-demo-sales.sql` | Demo sales (SI) |
 | 10 | `scripts/seed-demo-finance.sql` | Demo official receipt (AR) |
 | 11 | `scripts/seed-demo-finance-ap.sql` | S8 supplier invoice + partial payment (AP) |

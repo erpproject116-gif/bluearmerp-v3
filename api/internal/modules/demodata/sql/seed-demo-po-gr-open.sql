@@ -25,7 +25,7 @@ declare
   v_marker text := 'SEED-PO-GR-OPEN';
   v_line_count int;
 begin
-  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
+  foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then continue; end if;
@@ -158,6 +158,80 @@ begin
         3571.4286, 17857.1429, 2142.8571, 4000, 20000, 'vat_inc_unit'
       );
       update public.po_purchase_orders set status = 'confirmed', notes = v_marker || ' Open PO — scan 5 serials on Receive / Scan.' where id = v_poid;
+    end if;
+
+    -- Reopen DEMOGR902 when prior receive/e2e left no open qty (idempotent repair)
+    select id into v_poid from public.po_purchase_orders where tenant_id = v_tenant and purchase_order_no = 'DEMOGR902';
+    if v_poid is not null and exists (
+      select 1 from public.po_purchase_order_lines
+      where purchase_order_id = v_poid and coalesce(received_qty, 0) >= qty and qty > 0
+    ) then
+      delete from public.inv_serial_events
+      where serial_unit_id in (
+        select su.id from public.inv_serial_units su
+        where su.tenant_id = v_tenant
+          and su.goods_receipt_line_id in (
+            select ln.id from public.gr_goods_receipt_lines ln
+            join public.gr_goods_receipts gr on gr.id = ln.goods_receipt_id
+            where gr.purchase_order_id = v_poid
+          )
+      );
+      delete from public.inv_serial_unit_sales_lines
+      where serial_unit_id in (
+        select su.id from public.inv_serial_units su
+        where su.tenant_id = v_tenant
+          and su.goods_receipt_line_id in (
+            select ln.id from public.gr_goods_receipt_lines ln
+            join public.gr_goods_receipts gr on gr.id = ln.goods_receipt_id
+            where gr.purchase_order_id = v_poid
+          )
+      );
+      -- Decrement balances for posted received qty on this PO
+      update public.inv_item_location_balances b
+      set qty_on_hand = greatest(0, b.qty_on_hand - x.qty), updated_at = now()
+      from (
+        select gr.location_id, pol.item_id, coalesce(sum(ln.received_qty), 0)::numeric as qty
+        from public.gr_goods_receipts gr
+        join public.gr_goods_receipt_lines ln on ln.goods_receipt_id = gr.id
+        join public.po_purchase_order_lines pol on pol.id = ln.purchase_order_line_id
+        where gr.purchase_order_id = v_poid and gr.status = 'posted'
+        group by gr.location_id, pol.item_id
+      ) x
+      where b.tenant_id = v_tenant and b.item_id = x.item_id and b.location_id = x.location_id;
+
+      delete from public.inv_serial_units
+      where tenant_id = v_tenant
+        and goods_receipt_line_id in (
+          select ln.id from public.gr_goods_receipt_lines ln
+          join public.gr_goods_receipts gr on gr.id = ln.goods_receipt_id
+          where gr.purchase_order_id = v_poid
+        );
+      delete from public.gr_goods_receipt_serials
+      where goods_receipt_line_id in (
+        select ln.id from public.gr_goods_receipt_lines ln
+        join public.gr_goods_receipts gr on gr.id = ln.goods_receipt_id
+        where gr.purchase_order_id = v_poid
+      );
+      delete from public.gr_goods_receipt_line_lots
+      where goods_receipt_line_id in (
+        select ln.id from public.gr_goods_receipt_lines ln
+        join public.gr_goods_receipts gr on gr.id = ln.goods_receipt_id
+        where gr.purchase_order_id = v_poid
+      );
+      delete from public.gr_goods_receipt_slip_lines
+      where goods_receipt_line_id in (
+        select ln.id from public.gr_goods_receipt_lines ln
+        join public.gr_goods_receipts gr on gr.id = ln.goods_receipt_id
+        where gr.purchase_order_id = v_poid
+      );
+      delete from public.gr_goods_receipt_lines
+      where goods_receipt_id in (select id from public.gr_goods_receipts where purchase_order_id = v_poid);
+      delete from public.gr_goods_receipts where purchase_order_id = v_poid;
+      update public.po_purchase_order_lines set received_qty = 0 where purchase_order_id = v_poid;
+      update public.po_purchase_orders
+      set status = 'confirmed', notes = v_marker || ' Open PO — scan 5 serials on Receive / Scan.', updated_at = now()
+      where id = v_poid;
+      raise notice 'seed-demo-po-gr-open: reopened DEMOGR902 for %', v_code;
     end if;
 
     -- PO DEMOGR903: confirmed, 3 open (second PO for receive testing)

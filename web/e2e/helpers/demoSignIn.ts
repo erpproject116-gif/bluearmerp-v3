@@ -1,20 +1,66 @@
 import type { Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { benchAuthAvailable, seedBenchSession } from "./benchAuth";
+import { assertApiReachable } from "./apiReady";
 
 export function demoAuthAvailable(): boolean {
-  return benchAuthAvailable() || Boolean(process.env.E2E_DEMO_PASSWORD);
+  return benchAuthAvailable() || Boolean(process.env.E2E_DEMO_PASSWORD || process.env.DEMO_USER_PASSWORD);
 }
 
-/** Sign in via bench JWT (CI) or Try free demo (local). */
+function demoCredentials() {
+  const email =
+    process.env.E2E_DEMO_EMAIL ||
+    process.env.DEMO_USER_EMAIL ||
+    process.env.VITE_DEMO_USER_EMAIL ||
+    "demo@demo.bluearm.local";
+  const password =
+    process.env.E2E_DEMO_PASSWORD ||
+    process.env.DEMO_USER_PASSWORD ||
+    process.env.VITE_DEMO_USER_PASSWORD ||
+    "";
+  return { email, password };
+}
+
+/** Sign in via bench JWT (CI) or email/password (local). */
 export async function demoSignIn(page: Page) {
   const benchToken = process.env.E2E_BENCH_TOKEN;
   if (benchToken) {
     await seedBenchSession(page, benchToken);
     await page.goto("/app/inventory/partners");
-    await page.waitForURL("**/app/**", { timeout: 15000 });
+    await page.waitForURL("**/app/**", { timeout: 20000 });
+    await assertApiReachable(page);
     return;
   }
+
+  const { email, password } = demoCredentials();
+  if (!password) {
+    throw new Error(
+      "Missing demo password. Set E2E_DEMO_PASSWORD or DEMO_USER_PASSWORD in web/.env.local",
+    );
+  }
+
   await page.goto("/signin");
-  await page.getByRole("button", { name: /Try free demo/i }).click();
-  await page.waitForURL("**/app/**", { timeout: 15000 });
+  await expect(page.getByRole("heading", { name: /^Sign in$/i })).toBeVisible({ timeout: 15000 });
+
+  await page.getByPlaceholder("you@company.com").fill(email);
+  await page.locator('input[type="password"]').fill(password);
+  await page.getByRole("button", { name: /Sign in with email/i }).click();
+
+  try {
+    await page.waitForURL("**/app/**", { timeout: 25000 });
+  } catch {
+    const alert = page.locator("p").filter({ hasText: /invalid|credential|error|not configured/i }).first();
+    const msg = (await alert.textContent().catch(() => null))?.trim();
+    throw new Error(
+      msg
+        ? `Demo sign-in failed: ${msg}. Ensure Supabase user ${email} exists with DEMO_USER_PASSWORD.`
+        : `Demo sign-in did not reach /app (still on ${page.url()}).`,
+    );
+  }
+  await assertApiReachable(page);
+}
+
+/** Assert signed-in workspace is provisioned (DEMO000 linked). Call after demoSignIn + first /app goto. */
+export async function requireProvisionedWorkspace(page: Page) {
+  await assertApiReachable(page);
 }

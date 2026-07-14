@@ -24,6 +24,10 @@ export default defineConfig(({ mode }) => {
   const apiBase =
     mode === "development" ? "" : pickEnv(merged, "VITE_API_BASE_URL", "VITE_API_BASE_URL");
   const demoSignInEnabled = pickEnv(merged, "VITE_DEMO_SIGNIN_ENABLED", "VITE_DEMO_SIGNIN_ENABLED") === "true";
+  const demoUserEmail =
+    pickEnv(merged, "DEMO_USER_EMAIL", "VITE_DEMO_USER_EMAIL") || "demo@demo.bluearm.local";
+  const demoUserPassword =
+    pickEnv(merged, "DEMO_USER_PASSWORD", "VITE_DEMO_USER_PASSWORD") || "DemoBluearm2026!";
 
   if (mode === "production" && !apiBase) {
     console.warn(
@@ -64,6 +68,8 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabaseAnon),
       "import.meta.env.VITE_API_BASE_URL": JSON.stringify(apiBase),
       "import.meta.env.VITE_DEMO_SIGNIN_ENABLED": JSON.stringify(demoSignInEnabled),
+      "import.meta.env.VITE_DEMO_USER_EMAIL": JSON.stringify(demoUserEmail),
+      "import.meta.env.VITE_DEMO_USER_PASSWORD": JSON.stringify(demoUserPassword),
     },
     server: {
       port: 5173,

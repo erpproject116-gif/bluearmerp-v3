@@ -40,6 +40,7 @@ jobs:
           psql "$DATABASE_URL" -f supabase/seed.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
           psql "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
+          psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-quotations.sql || true
           psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql || true
