@@ -67,7 +67,7 @@ export function PayslipDocument(props: { payload: PayslipDetail; secureNote: boo
 
   return (
     <>
-      <PrintToolbar />
+      <PrintToolbar onPrint={() => window.print()} />
       <article class="quotation-print__page">
         <header class="mb-6 border-b border-slate-200 pb-4">
           <h1 class="text-2xl font-semibold text-slate-900">Payslip</h1>
