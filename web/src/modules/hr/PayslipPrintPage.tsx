@@ -4,7 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { ProtectedRoute } from "../../shared/ProtectedRoute";
 import { PrintToolbar } from "../../shared/PrintToolbar";
 import { PrintLoading } from "../../shared/LoadingText";
-import "../../quotation/quotation/quotationPrint.css";
+import "../quotation/quotation/quotationPrint.css";
 
 export type PayslipDetail = {
   id: number;
