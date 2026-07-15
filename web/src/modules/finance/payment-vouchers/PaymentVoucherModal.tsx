@@ -6,6 +6,8 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
+import { useDocumentDraft } from "../../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import type { PaymentVoucherDetail } from "../../../shared/usePaymentVoucherList";
@@ -136,6 +138,40 @@ export function PaymentVoucherModal(props: Props) {
   const totalApplied = () =>
     applications().reduce((sum, a) => sum + (Number(a.applied_amount) || 0), 0);
 
+  const buildDraftPayload = () => ({
+    payment_date: paymentDate(),
+    partner_id: partnerId(),
+    vendor_label: vendorLabel(),
+    currency_id: currencyId(),
+    payment_method: paymentMethod(),
+    reference_no: referenceNo(),
+    bank_account_id: bankAccountId(),
+    applications: applications(),
+    withholding_lines: withholdingLines(),
+  });
+
+  const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
+    setPaymentDate(payload.payment_date);
+    setPartnerId(payload.partner_id);
+    setVendorLabel(payload.vendor_label);
+    setCurrencyId(payload.currency_id);
+    setPaymentMethod(payload.payment_method);
+    setReferenceNo(payload.reference_no);
+    setBankAccountId(payload.bank_account_id);
+    setApplications(payload.applications?.length ? payload.applications : [{ supplier_invoice_id: null, label: "", grand_total: 0, applied_amount: "" }]);
+    setWithholdingLines(payload.withholding_lines ?? []);
+  };
+
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.finPaymentVoucher,
+    draftKey: "new",
+    getPayload: buildDraftPayload,
+    onApply: applyDraftPayload,
+    enabled: () => props.open,
+    // No autoApply: the reset effect below async-fetches a default currency, which can resolve
+    // after draft recovery and stomp currency_id.
+  });
+
   const save = async () => {
     if (!partnerId() || !currencyId()) {
       toast.warning("Select vendor and currency.");
@@ -175,7 +211,10 @@ export function PaymentVoucherModal(props: Props) {
       "Payment voucher created.",
     );
     setSaving(false);
-    if (ok) props.onSaved();
+    if (ok) {
+      await draft.clearOnSave();
+      props.onSaved();
+    }
   };
 
   const addWhtLine = () => {
@@ -189,6 +228,7 @@ export function PaymentVoucherModal(props: Props) {
 
   return (
     <WideEntityModal open={props.open} title="New Payment Voucher" onClose={props.onClose} onSave={() => void save()} saving={saving()}>
+      <draft.DraftBanner />
       <Field label="Payment date">
         <DateInput value={paymentDate()} onInput={(e) => setPaymentDate(e.currentTarget.value)} />
       </Field>

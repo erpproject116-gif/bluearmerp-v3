@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Index, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Index, Show, onCleanup, onMount } from "solid-js";
 import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
@@ -7,6 +7,8 @@ import { AuthImage } from "../../shared/AuthImage";
 import { LotLineCell } from "../../shared/LotLineCell";
 import { QuickCustomerModal } from "../../shared/QuickCustomerModal";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useAuth, hasPermission } from "../../shared/auth-context";
 import {
   addPosCartLine,
@@ -34,6 +36,12 @@ import {
   type PosModifierGroup,
   type SessionReport,
 } from "../../shared/usePos";
+import {
+  enqueuePosOffline,
+  isLikelyOfflineError,
+  peekPosOfflineQueue,
+  removePosOfflineAction,
+} from "../../shared/posOfflineQueue";
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "25" });
@@ -93,15 +101,119 @@ export default function PosPage() {
   const [shiftReport, setShiftReport] = createSignal<SessionReport | null>(null);
   const [modalItem, setModalItem] = createSignal<PosCatalogItem | null>(null);
   const [discount, setDiscount] = createSignal(0);
+  const [privilegeType, setPrivilegeType] = createSignal<"none" | "senior" | "pwd" | "student" | "manual">("none");
+  const [privilegeIdNo, setPrivilegeIdNo] = createSignal("");
+  const [privilegeName, setPrivilegeName] = createSignal("");
+  const [tipAmount, setTipAmount] = createSignal(0);
+  const [tableLabel, setTableLabel] = createSignal("");
   const [customerId, setCustomerId] = createSignal<number | null>(null);
   const [customerLabel, setCustomerLabel] = createSignal("");
+
+  // UI-only order extras (privilege, discount, tip, table, order type, customer picker) —
+  // the cart itself lives server-side in the POS session, so we never draft cart lines here.
+  const orderExtrasDraft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.posOrderUi,
+    draftKey: () => (session.data?.id ? `session-${session.data.id}` : "no-session"),
+    getPayload: () => ({
+      privilege_type: privilegeType(),
+      privilege_id_no: privilegeIdNo(),
+      privilege_name: privilegeName(),
+      discount: discount(),
+      tip_amount: tipAmount(),
+      table_label: tableLabel(),
+      order_type: orderType(),
+      customer_id: customerId(),
+      customer_label: customerLabel(),
+    }),
+    onApply: (payload) => {
+      setPrivilegeType(payload.privilege_type);
+      setPrivilegeIdNo(payload.privilege_id_no);
+      setPrivilegeName(payload.privilege_name);
+      setDiscount(payload.discount);
+      setTipAmount(payload.tip_amount);
+      setTableLabel(payload.table_label);
+      setOrderType(payload.order_type);
+      setCustomerId(payload.customer_id);
+      setCustomerLabel(payload.customer_label);
+    },
+    enabled: () => true,
+    localOnly: true,
+    autoApply: () => true,
+  });
+
   const [showPayment, setShowPayment] = createSignal(false);
   const [showBills, setShowBills] = createSignal(false);
   const [heldOrders, setHeldOrders] = createSignal<HeldOrder[]>([]);
   const [showCustomer, setShowCustomer] = createSignal(false);
   const [showDiscount, setShowDiscount] = createSignal(false);
+  const [offlinePending, setOfflinePending] = createSignal(peekPosOfflineQueue().length);
+  const [syncingOffline, setSyncingOffline] = createSignal(false);
+
+  const refreshOfflinePending = () => setOfflinePending(peekPosOfflineQueue().length);
+
+  const flushOfflineQueue = async () => {
+    if (syncingOffline() || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+    const queue = peekPosOfflineQueue();
+    if (queue.length === 0) return;
+    setSyncingOffline(true);
+    let synced = 0;
+    try {
+      for (const action of queue) {
+        if (action.kind === "checkout") {
+          const res = await checkoutPos(action.sessionId, action.body as Parameters<typeof checkoutPos>[1]);
+          if (!res.success) {
+            if (isLikelyOfflineError(null, res)) break;
+            removePosOfflineAction(action.id);
+            toast.warning(res.message ?? "Queued checkout failed and was dropped.");
+            continue;
+          }
+          removePosOfflineAction(action.id);
+          synced += 1;
+        } else if (action.kind === "add_line") {
+          const res = await addPosCartLine(action.sessionId, action.body as Parameters<typeof addPosCartLine>[1]);
+          if (!res.success) {
+            if (isLikelyOfflineError(null, res)) break;
+            removePosOfflineAction(action.id);
+            toast.warning(res.message ?? "Queued line failed and was dropped.");
+            continue;
+          }
+          removePosOfflineAction(action.id);
+          synced += 1;
+        }
+      }
+      if (synced > 0) {
+        toast.success(`Synced ${synced} offline POS action${synced === 1 ? "" : "s"}.`);
+        invalidate();
+      }
+    } catch (err) {
+      if (!isLikelyOfflineError(err)) {
+        toast.warning("Offline sync interrupted.");
+      }
+    } finally {
+      setSyncingOffline(false);
+      refreshOfflinePending();
+    }
+  };
+
+  onMount(() => {
+    refreshOfflinePending();
+    void flushOfflineQueue();
+    const onOnline = () => {
+      refreshOfflinePending();
+      void flushOfflineQueue();
+    };
+    window.addEventListener("online", onOnline);
+    onCleanup(() => window.removeEventListener("online", onOnline));
+  });
 
   const items = usePosCatalogItems(() => ({ categoryId: activeCategory(), q: search().trim() || undefined }));
+
+  const sessionHasQueuedCheckout = createMemo(() => {
+    offlinePending(); // re-read queue when pending count changes
+    const sid = session.data?.id;
+    if (!sid) return false;
+    return peekPosOfflineQueue().some((a) => a.kind === "checkout" && a.sessionId === sid);
+  });
 
   const orderTypes = createMemo(() => settings.data?.order_types ?? ["dine_in", "take_away"]);
 
@@ -111,13 +223,36 @@ export default function PosPage() {
   const taxPreview = createMemo(() => {
     const s = settings.data;
     const rawSub = subtotalLines();
-    const disc = Math.min(Math.max(discount(), 0), rawSub);
+    const pType = privilegeType();
+    let disc = 0;
+    let vatExempt = false;
+    if (pType === "senior") {
+      disc = roundMoney(rawSub * ((s?.privilege_senior_pct ?? 20) / 100));
+      vatExempt = true;
+    } else if (pType === "pwd") {
+      disc = roundMoney(rawSub * ((s?.privilege_pwd_pct ?? 20) / 100));
+      vatExempt = true;
+    } else if (pType === "student") {
+      disc = roundMoney(rawSub * ((s?.student_discount_pct ?? 10) / 100));
+    } else {
+      disc = Math.min(Math.max(discount(), 0), rawSub);
+    }
+    disc = Math.min(disc, rawSub);
     const sub = roundMoney(rawSub - disc);
     const rate = s?.tax_rate_percent ?? 0;
-    const mode = s?.tax_mode ?? "none";
+    const mode = vatExempt ? "none" : (s?.tax_mode ?? "none");
     const taxInclusive = s?.tax_inclusive ?? true;
     const computed = computePosOrderTax(sub, mode, rate, taxInclusive);
-    return { discount: disc, subtotal: computed.subtotal, tax: computed.tax, total: computed.total };
+    const tip = Math.max(0, tipAmount());
+    return {
+      discount: disc,
+      subtotal: computed.subtotal,
+      tax: computed.tax,
+      total: roundMoney(computed.total + tip),
+      tip,
+      vatExempt,
+      privilegeType: pType,
+    };
   });
 
   const openShift = async () => {
@@ -233,41 +368,82 @@ export default function PosPage() {
       toast.warning("Cart is empty.");
       return;
     }
+    if (sessionHasQueuedCheckout()) {
+      toast.warning("A checkout is already queued offline for this shift. Wait for sync or reconnect.");
+      return;
+    }
     setShowPayment(true);
   };
 
   const checkout = async (tenders: { tender_type: string; amount: number }[]) => {
     const s = session.data;
     if (!s?.id) return;
-    const total = Number(taxPreview().total.toFixed(2));
-    if (total <= 0) {
+    const preview = taxPreview();
+    const total = Number(preview.total.toFixed(2));
+    if (total <= 0 && cartLines().length === 0) {
       toast.warning("Cart is empty.");
       return;
     }
-    setCheckingOut(true);
-    const res = await checkoutPos(s.id, {
-      tenders,
-      partner_id: customerId(),
-      discount_amount: taxPreview().discount,
-    });
-    setCheckingOut(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Checkout failed.");
+    if ((preview.privilegeType === "senior" || preview.privilegeType === "pwd") && !privilegeIdNo().trim()) {
+      toast.warning(preview.privilegeType === "pwd" ? "PWD ID is required." : "Senior / OSCA ID is required.");
       return;
     }
-    const change = res.data?.change ?? 0;
-    const label =
-      tenders.length === 1
-        ? posTenderLabel(tenders[0].tender_type)
-        : tenders.map((t) => posTenderLabel(t.tender_type)).join(" + ");
-    toast.success(
-      `Sale ${res.data?.sales_no} — ${money(total)} · ${label}${change > 0 ? ` · Change ${money(change)}` : ""}`,
-    );
-    setShowPayment(false);
-    setDiscount(0);
-    setCustomerId(null);
-    setCustomerLabel("");
-    invalidate();
+    const body = {
+      tenders,
+      partner_id: customerId(),
+      discount_amount: preview.privilegeType === "manual" || preview.privilegeType === "none" ? preview.discount : 0,
+      privilege_type: preview.privilegeType === "none" && preview.discount > 0 ? "manual" : preview.privilegeType,
+      privilege_id_no: privilegeIdNo().trim() || undefined,
+      privilege_name: privilegeName().trim() || undefined,
+      tip_amount: tipAmount(),
+      table_label: tableLabel().trim() || undefined,
+      order_type: orderType(),
+    };
+    setCheckingOut(true);
+    try {
+      const res = await checkoutPos(s.id, body);
+      setCheckingOut(false);
+      if (!res.success) {
+        if (isLikelyOfflineError(null, res)) {
+          enqueuePosOffline({ kind: "checkout", sessionId: s.id, body });
+          refreshOfflinePending();
+          toast.warning("Offline — checkout queued. It will retry when you are back online.");
+          setShowPayment(false);
+          return;
+        }
+        toast.warning(res.message ?? "Checkout failed.");
+        return;
+      }
+      const change = res.data?.change ?? 0;
+      const label =
+        tenders.length === 1
+          ? posTenderLabel(tenders[0].tender_type)
+          : tenders.map((t) => posTenderLabel(t.tender_type)).join(" + ");
+      toast.success(
+        `Sale ${res.data?.sales_no} — ${money(total)} · ${label}${change > 0 ? ` · Change ${money(change)}` : ""}`,
+      );
+      setShowPayment(false);
+      setDiscount(0);
+      setPrivilegeType("none");
+      setPrivilegeIdNo("");
+      setPrivilegeName("");
+      setTipAmount(0);
+      setTableLabel("");
+      setCustomerId(null);
+      setCustomerLabel("");
+      await orderExtrasDraft.clearOnSave();
+      invalidate();
+    } catch (err) {
+      setCheckingOut(false);
+      if (isLikelyOfflineError(err)) {
+        enqueuePosOffline({ kind: "checkout", sessionId: s.id, body });
+        refreshOfflinePending();
+        toast.warning("Offline — checkout queued. It will retry when you are back online.");
+        setShowPayment(false);
+        return;
+      }
+      toast.warning("Checkout failed.");
+    }
   };
 
   const saveBill = async () => {
@@ -309,10 +485,21 @@ export default function PosPage() {
 
   const applyDiscount = () => setShowDiscount(true);
 
-  const confirmDiscount = (raw: string) => {
-    const val = Number(raw);
-    const max = subtotalLines();
-    setDiscount(Number.isFinite(val) && val > 0 ? Math.min(val, max) : 0);
+  const confirmDiscount = (next: {
+    privilegeType: "none" | "senior" | "pwd" | "student" | "manual";
+    amount: number;
+    idNo: string;
+    name: string;
+  }) => {
+    setPrivilegeType(next.privilegeType);
+    setPrivilegeIdNo(next.idNo);
+    setPrivilegeName(next.name);
+    if (next.privilegeType === "manual" || next.privilegeType === "none") {
+      setDiscount(next.amount > 0 ? Math.min(next.amount, subtotalLines()) : 0);
+      if (next.amount > 0 && next.privilegeType === "none") setPrivilegeType("manual");
+    } else {
+      setDiscount(0);
+    }
     setShowDiscount(false);
   };
 
@@ -439,6 +626,27 @@ export default function PosPage() {
           </A>
         </div>
       </header>
+      <Show when={offlinePending() > 0}>
+        <div class="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-5 py-2 text-sm text-amber-950">
+          <span>
+            {offlinePending()} offline action{offlinePending() === 1 ? "" : "s"} pending
+            {typeof navigator !== "undefined" && !navigator.onLine ? " (device offline)" : ""}.
+          </span>
+          <button
+            type="button"
+            class="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium hover:bg-amber-100 disabled:opacity-50"
+            disabled={syncingOffline() || (typeof navigator !== "undefined" && !navigator.onLine)}
+            onClick={() => void flushOfflineQueue()}
+          >
+            {syncingOffline() ? "Syncing…" : "Sync now"}
+          </button>
+        </div>
+      </Show>
+      <Show when={orderExtrasDraft.hasDraft()}>
+        <div class="px-5 pt-2">
+          <orderExtrasDraft.DraftBanner />
+        </div>
+      </Show>
 
       <Show
         when={session.data}
@@ -596,6 +804,12 @@ export default function PosPage() {
       <Show when={showPayment()}>
         <PaymentModal
           total={taxPreview().total}
+          tipEnabled={settings.data?.tip_enabled !== false}
+          tip={tipAmount()}
+          onTipChange={setTipAmount}
+          tableLabel={tableLabel()}
+          onTableLabelChange={setTableLabel}
+          showTable={orderType() === "dine_in"}
           tenders={settings.data?.allowed_tenders ?? ["cash"]}
           checkingOut={checkingOut()}
           onCancel={() => setShowPayment(false)}
@@ -620,8 +834,14 @@ export default function PosPage() {
 
       <Show when={showDiscount()}>
         <DiscountModal
-          current={discount()}
+          currentAmount={discount()}
+          currentType={privilegeType()}
+          currentIdNo={privilegeIdNo()}
+          currentName={privilegeName()}
           max={subtotalLines()}
+          seniorPct={settings.data?.privilege_senior_pct ?? 20}
+          pwdPct={settings.data?.privilege_pwd_pct ?? 20}
+          studentPct={settings.data?.student_discount_pct ?? 10}
           onCancel={() => setShowDiscount(false)}
           onConfirm={confirmDiscount}
         />
@@ -792,6 +1012,12 @@ type PayLine = { type: string; amount: string };
 
 function PaymentModal(props: {
   total: number;
+  tipEnabled?: boolean;
+  tip?: number;
+  onTipChange?: (n: number) => void;
+  tableLabel?: string;
+  onTableLabelChange?: (s: string) => void;
+  showTable?: boolean;
   tenders: string[];
   checkingOut: boolean;
   onCancel: () => void;
@@ -799,6 +1025,16 @@ function PaymentModal(props: {
 }) {
   const first = () => props.tenders[0] ?? "cash";
   const [lines, setLines] = createSignal<PayLine[]>([{ type: first(), amount: props.total.toFixed(2) }]);
+  const [tipRaw, setTipRaw] = createSignal(props.tip && props.tip > 0 ? props.tip.toFixed(2) : "");
+
+  createEffect(() => {
+    // Keep cash line in sync when tip/table changes amount due from parent.
+    const t = props.total.toFixed(2);
+    setLines((prev) => {
+      if (prev.length !== 1) return prev;
+      return [{ ...prev[0], amount: t }];
+    });
+  });
 
   const paid = createMemo(() =>
     lines().reduce((sum, l) => {
@@ -853,6 +1089,33 @@ function PaymentModal(props: {
       <div class="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h3 class="mb-1 text-lg font-semibold">Payment</h3>
         <p class="mb-4 text-sm text-slate-500">Amount due <span class="font-semibold text-slate-900">{money(props.total)}</span></p>
+        <Show when={props.showTable}>
+          <label class="mb-1 block text-xs font-medium text-slate-500">Table / seat</label>
+          <input
+            class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            value={props.tableLabel ?? ""}
+            onInput={(e) => props.onTableLabelChange?.(e.currentTarget.value)}
+            placeholder="e.g. Table 5"
+          />
+        </Show>
+        <Show when={props.tipEnabled !== false}>
+          <label class="mb-1 block text-xs font-medium text-slate-500">Tip (optional)</label>
+          <input
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-sm font-semibold"
+            value={tipRaw()}
+            onInput={(e) => {
+              bindDecimalInput(e.currentTarget, (v) => {
+                setTipRaw(v);
+                const n = Number(v);
+                props.onTipChange?.(Number.isFinite(n) && n > 0 ? n : 0);
+              });
+            }}
+            placeholder="0.00"
+          />
+        </Show>
 
         <div class="space-y-3">
           <Index each={lines()}>
@@ -960,36 +1223,110 @@ function PaymentModal(props: {
 }
 
 function DiscountModal(props: {
-  current: number;
+  currentAmount: number;
+  currentType: "none" | "senior" | "pwd" | "student" | "manual";
+  currentIdNo: string;
+  currentName: string;
   max: number;
+  seniorPct: number;
+  pwdPct: number;
+  studentPct: number;
   onCancel: () => void;
-  onConfirm: (amount: string) => void;
+  onConfirm: (next: {
+    privilegeType: "none" | "senior" | "pwd" | "student" | "manual";
+    amount: number;
+    idNo: string;
+    name: string;
+  }) => void;
 }) {
-  const [amount, setAmount] = createSignal(props.current > 0 ? props.current.toFixed(2) : "");
+  const [type, setType] = createSignal(props.currentType === "none" && props.currentAmount > 0 ? "manual" : props.currentType);
+  const [amount, setAmount] = createSignal(props.currentAmount > 0 ? props.currentAmount.toFixed(2) : "");
+  const [idNo, setIdNo] = createSignal(props.currentIdNo);
+  const [name, setName] = createSignal(props.currentName);
+
+  const previewDisc = () => {
+    const t = type();
+    if (t === "senior") return roundMoney(props.max * (props.seniorPct / 100));
+    if (t === "pwd") return roundMoney(props.max * (props.pwdPct / 100));
+    if (t === "student") return roundMoney(props.max * (props.studentPct / 100));
+    const n = Number(amount());
+    return Number.isFinite(n) && n > 0 ? Math.min(n, props.max) : 0;
+  };
+
+  const apply = () => {
+    const t = type();
+    if ((t === "senior" || t === "pwd") && !idNo().trim()) return;
+    props.onConfirm({
+      privilegeType: t,
+      amount: t === "manual" || t === "none" ? previewDisc() : 0,
+      idNo: idNo().trim(),
+      name: name().trim(),
+    });
+  };
 
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
-      <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div class="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h3 class="mb-1 text-lg font-semibold">Discount</h3>
-        <p class="mb-4 text-sm text-slate-500">Enter a fixed discount amount (max {money(props.max)}).</p>
-        <label class="mb-1 block text-xs font-medium text-slate-500">Amount</label>
-        <input
-          type="text"
-          inputmode="decimal"
-          autocomplete="off"
-          class="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
-          placeholder="0.00"
-          value={amount()}
-          onInput={(e) => bindDecimalInput(e.currentTarget, setAmount)}
-        />
+        <p class="mb-4 text-sm text-slate-500">
+          Senior / PWD use statutory % and VAT exemption. Student is commercial policy. Manual is a fixed peso amount.
+        </p>
+        <label class="mb-1 block text-xs font-medium text-slate-500">Type</label>
+        <select
+          class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          value={type()}
+          onChange={(e) => setType(e.currentTarget.value as "none" | "senior" | "pwd" | "student" | "manual")}
+        >
+          <option value="none">None</option>
+          <option value="senior">Senior citizen ({props.seniorPct}% · VAT exempt)</option>
+          <option value="pwd">PWD ({props.pwdPct}% · VAT exempt)</option>
+          <option value="student">Student ({props.studentPct}% · commercial)</option>
+          <option value="manual">Manual fixed amount</option>
+        </select>
+        <Show when={type() === "senior" || type() === "pwd" || type() === "student"}>
+          <label class="mb-1 block text-xs font-medium text-slate-500">
+            {type() === "pwd" ? "PWD ID (required)" : type() === "senior" ? "OSCA / Senior ID (required)" : "Student ID (optional)"}
+          </label>
+          <input
+            class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            value={idNo()}
+            onInput={(e) => setIdNo(e.currentTarget.value)}
+            placeholder="ID number"
+          />
+          <label class="mb-1 block text-xs font-medium text-slate-500">Cardholder name (optional)</label>
+          <input
+            class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            value={name()}
+            onInput={(e) => setName(e.currentTarget.value)}
+          />
+        </Show>
+        <Show when={type() === "manual"}>
+          <label class="mb-1 block text-xs font-medium text-slate-500">Amount (max {money(props.max)})</label>
+          <input
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
+            placeholder="0.00"
+            value={amount()}
+            onInput={(e) => bindDecimalInput(e.currentTarget, setAmount)}
+          />
+        </Show>
+        <p class="mb-4 text-sm text-slate-600">
+          Discount preview: <span class="font-semibold tabular-nums">{money(previewDisc())}</span>
+          <Show when={type() === "senior" || type() === "pwd"}>
+            <span class="ml-2 text-xs text-emerald-700">VAT will be exempted</span>
+          </Show>
+        </p>
         <div class="flex gap-2">
           <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
             Cancel
           </button>
           <button
             type="button"
-            class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
-            onClick={() => props.onConfirm(amount())}
+            class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            disabled={(type() === "senior" || type() === "pwd") && !idNo().trim()}
+            onClick={apply}
           >
             Apply
           </button>

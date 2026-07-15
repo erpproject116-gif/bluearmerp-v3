@@ -116,6 +116,7 @@ func main() {
 		comms.RegisterPublicRoutes(api, pool, cfg)
 		comms.RegisterJobRoutes(api, pool, cfg)
 		portal.RegisterRoutes(api, pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret)
+		hr.RegisterPublicRoutes(api, pool)
 		demoonboard.RegisterRoutes(api, pool, cfg)
 		onboard.RegisterRoutes(api, pool, cfg)
 		api.Group(func(protected chi.Router) {

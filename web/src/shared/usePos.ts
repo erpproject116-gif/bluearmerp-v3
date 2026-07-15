@@ -172,6 +172,10 @@ export type PosSettings = {
   receivable_account_id?: number | null;
   cash_account_id?: number | null;
   card_account_id?: number | null;
+  student_discount_pct?: number;
+  privilege_senior_pct?: number;
+  privilege_pwd_pct?: number;
+  tip_enabled?: boolean;
 };
 
 export function usePosCatalogCategories() {
@@ -282,6 +286,12 @@ export async function checkoutPos(
     discount_amount?: number;
     voucher_code?: string;
     voucher_amount?: number;
+    privilege_type?: string;
+    privilege_id_no?: string;
+    privilege_name?: string;
+    tip_amount?: number;
+    table_label?: string;
+    order_type?: string;
   },
 ) {
   return apiFetch<CheckoutResult>(`/api/v1/pos/sessions/${sessionId}/checkout`, { method: "POST", body: JSON.stringify(body) });

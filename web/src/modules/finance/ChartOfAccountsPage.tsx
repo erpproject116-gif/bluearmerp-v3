@@ -1,9 +1,12 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { FinanceLayout } from "./FinanceLayout";
 
 type AccountRow = {
@@ -71,6 +74,7 @@ const emptyDefaults = (): FinanceDefaults => ({
 export default function ChartOfAccountsPage() {
   const toast = useToast();
   const client = useQueryClient();
+  const [searchParams] = useSearchParams();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, statusFilter, setStatusFilter } = useListState(
     "sort_order",
     25,
@@ -83,6 +87,7 @@ export default function ChartOfAccountsPage() {
   const [importing, setImporting] = createSignal(false);
   const [defaultsOpen, setDefaultsOpen] = createSignal(true);
   const [defaultsForm, setDefaultsForm] = createSignal<FinanceDefaults>(emptyDefaults());
+  const [mappingsDirty, setMappingsDirty] = createSignal(false);
   const [savingDefaults, setSavingDefaults] = createSignal(false);
   const [editingId, setEditingId] = createSignal<number | null>(null);
   const [form, setForm] = createSignal({
@@ -149,8 +154,13 @@ export default function ChartOfAccountsPage() {
 
   const activeAccounts = createMemo(() => parentOptions.data ?? []);
 
+  /** Posting accounts only (exclude group headers). */
   const accountsForSlot = (types: Array<AccountRow["account_type"]>) =>
-    activeAccounts().filter((a) => types.includes(a.account_type));
+    activeAccounts().filter((a) => !a.is_group && types.includes(a.account_type));
+
+  const purchaseCogsOptions = createMemo(() => accountsForSlot(["expense"]));
+  const purchaseCogsEmpty = createMemo(() => purchaseCogsOptions().length === 0);
+  const [ensuringPurchaseCogs, setEnsuringPurchaseCogs] = createSignal(false);
 
   const defaultsMappedCount = createMemo(() => {
     const d = defaultsForm();
@@ -158,6 +168,60 @@ export default function ChartOfAccountsPage() {
       const v = d[s.key];
       return v != null && v > 0;
     }).length;
+  });
+
+  const ensurePurchaseCogs = async () => {
+    setEnsuringPurchaseCogs(true);
+    const res = await apiFetch<{
+      account: AccountRow;
+      created: boolean;
+      mapped: boolean;
+      defaults: FinanceDefaults;
+    }>("/api/v1/finance/accounts/ensure-purchase-cogs", { method: "POST" });
+    setEnsuringPurchaseCogs(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not create Purchases / COGS account.");
+      return;
+    }
+    invalidate();
+    if (res.data?.defaults) {
+      setDefaultsForm({
+        cash_account_id: res.data.defaults.cash_account_id ?? null,
+        receivable_account_id: res.data.defaults.receivable_account_id ?? null,
+        payable_account_id: res.data.defaults.payable_account_id ?? null,
+        sales_account_id: res.data.defaults.sales_account_id ?? null,
+        purchase_account_id: res.data.defaults.purchase_account_id ?? null,
+        input_vat_account_id: res.data.defaults.input_vat_account_id ?? null,
+        output_vat_account_id: res.data.defaults.output_vat_account_id ?? null,
+      });
+    } else if (res.data?.account?.id) {
+      setDefaultsForm((v) => ({ ...v, purchase_account_id: res.data!.account.id }));
+    }
+    toast.success(
+      res.data?.created
+        ? "Created expense account and mapped Purchases / COGS."
+        : res.data?.mapped
+          ? "Mapped existing expense account to Purchases / COGS."
+          : "Purchases / COGS account is ready — select it and save if needed.",
+    );
+  };
+
+  const purchaseMappingMissing = createMemo(() => {
+    const id = defaultsForm().purchase_account_id;
+    return !id || id <= 0;
+  });
+
+  onMount(() => {
+    const focus = String(searchParams.focus ?? "");
+    if (focus === "purchase" || focus === "mappings") {
+      setDefaultsOpen(true);
+      queueMicrotask(() => {
+        document.getElementById("default-account-mappings")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (focus === "purchase") {
+          document.getElementById("default-slot-purchase_account_id")?.classList.add("ring-2", "ring-amber-400", "ring-offset-2");
+        }
+      });
+    }
   });
 
   const currentRows = createMemo(() => list.data?.rows ?? []);
@@ -294,6 +358,19 @@ export default function ChartOfAccountsPage() {
     invalidate();
   };
 
+  // enabled only once the user actually edits a mapping (mappingsDirty), so the freshly
+  // server-loaded defaultsForm is never mistaken for an unsaved draft on plain page load.
+  // The initial recovery load still runs unconditionally, so a prior dirty session's draft
+  // (and its Restore banner) survives a refresh even before the user touches anything.
+  const defaultsDraft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.financeDefaults,
+    draftKey: "defaults",
+    getPayload: defaultsForm,
+    onApply: setDefaultsForm,
+    enabled: () => mappingsDirty(),
+    localOnly: true,
+  });
+
   const saveDefaults = async () => {
     setSavingDefaults(true);
     const res = await apiFetch<FinanceDefaults>("/api/v1/finance/accounts/defaults", {
@@ -306,11 +383,14 @@ export default function ChartOfAccountsPage() {
       return;
     }
     toast.success("Default account mappings saved.");
+    setMappingsDirty(false);
+    await defaultsDraft.clearOnSave();
     void client.invalidateQueries({ queryKey: ["finance-account-defaults"] });
   };
 
   const setDefaultSlot = (key: keyof FinanceDefaults, value: string) => {
     const id = value ? Number(value) : null;
+    setMappingsDirty(true);
     setDefaultsForm((d) => ({ ...d, [key]: id }));
   };
 
@@ -338,6 +418,42 @@ export default function ChartOfAccountsPage() {
               onClick={() => void importTemplate()}
             >
               {importing() ? "Importing…" : "Import Philippine SME template"}
+            </button>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={!isEmpty() && purchaseMappingMissing()}>
+        <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p class="font-medium">Purchases / COGS is not mapped yet</p>
+          <p class="mt-1 text-amber-900/80">
+            Accountants set this under <span class="font-medium">Default account mappings</span> below — pick an expense
+            account (usually <span class="font-medium">5010 Cost of Goods Sold</span>). Supplier invoices use this as
+            “Purchases / COGS (Acct I)”.
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg bg-amber-700 px-3 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+              disabled={ensuringPurchaseCogs()}
+              onClick={() => {
+                setDefaultsOpen(true);
+                void ensurePurchaseCogs();
+              }}
+            >
+              {ensuringPurchaseCogs() ? "Creating…" : "Create & map Purchases / COGS (5010)"}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100"
+              onClick={() => {
+                setDefaultsOpen(true);
+                queueMicrotask(() =>
+                  document.getElementById("default-account-mappings")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                );
+              }}
+            >
+              Jump to mappings
             </button>
           </div>
         </div>
@@ -410,14 +526,14 @@ export default function ChartOfAccountsPage() {
       </div>
 
       <Show when={!isEmpty()}>
-        <div class="mb-4 rounded-xl border border-stroke bg-white shadow-sm">
+        <div id="default-account-mappings" class="mb-4 scroll-mt-4 rounded-xl border border-stroke bg-white shadow-sm">
           <button
             type="button"
             class="flex w-full items-center justify-between px-4 py-3 text-left"
             onClick={() => setDefaultsOpen((v) => !v)}
           >
             <div>
-              <p class="text-sm font-medium text-slate-800">Default account mappings</p>
+              <p class="text-sm font-medium text-slate-800">Default account mappings (incl. Purchases / COGS)</p>
               <p class="text-xs text-slate-500">
                 Used by sales, purchases, receipts, and POS auto-posting. {defaultsMappedCount()} of {DEFAULT_SLOTS.length} mapped.
               </p>
@@ -426,30 +542,68 @@ export default function ChartOfAccountsPage() {
           </button>
           <Show when={defaultsOpen()}>
             <div class="border-t border-stroke px-4 py-4">
+              <defaultsDraft.DraftBanner />
               <p class="mb-3 text-xs text-slate-500">
                 Map each role to an active account. Importing the Philippine SME template fills these automatically; adjust if needed.
+                Purchases / COGS must be an <span class="font-medium">expense</span> account (not inventory asset 1469).
               </p>
               <div class="grid gap-3 sm:grid-cols-2">
                 <For each={DEFAULT_SLOTS}>
                   {(slot) => (
-                    <label class="block text-sm">
-                      <span class="font-medium text-slate-700">{slot.label}</span>
-                      <span class="block text-xs text-slate-500">{slot.hint}</span>
-                      <select
-                        class={`${inputClass} mt-1`}
-                        value={defaultsForm()[slot.key] ? String(defaultsForm()[slot.key]) : ""}
-                        onChange={(e) => setDefaultSlot(slot.key, e.currentTarget.value)}
-                      >
-                        <option value="">— Not set —</option>
-                        <For each={accountsForSlot(slot.types)}>
-                          {(acc) => (
-                            <option value={acc.id}>
-                              {acc.account_code} - {acc.account_name}
-                            </option>
-                          )}
-                        </For>
-                      </select>
-                    </label>
+                    <div
+                      id={`default-slot-${slot.key}`}
+                      class="block rounded-lg p-1 text-sm"
+                      classList={{
+                        "bg-amber-50":
+                          slot.key === "purchase_account_id" &&
+                          (purchaseCogsEmpty() || purchaseMappingMissing() || String(searchParams.focus ?? "") === "purchase"),
+                      }}
+                    >
+                      <label class="block">
+                        <span class="font-medium text-slate-700">{slot.label}</span>
+                        <span class="block text-xs text-slate-500">{slot.hint}</span>
+                        <select
+                          class={`${inputClass} mt-1`}
+                          value={defaultsForm()[slot.key] ? String(defaultsForm()[slot.key]) : ""}
+                          onChange={(e) => setDefaultSlot(slot.key, e.currentTarget.value)}
+                        >
+                          <option value="">— Not set —</option>
+                          <For each={accountsForSlot(slot.types)}>
+                            {(acc) => (
+                              <option value={acc.id}>
+                                {acc.account_code} - {acc.account_name}
+                              </option>
+                            )}
+                          </For>
+                        </select>
+                      </label>
+                      <Show when={slot.key === "purchase_account_id" && purchaseCogsEmpty()}>
+                        <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                          <p class="font-medium">No active expense accounts available</p>
+                          <p class="mt-0.5 text-amber-900/80">
+                            Purchases / COGS must map to an expense account. Your chart has none yet — create one or import the PH template.
+                          </p>
+                          <div class="mt-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              class="rounded-md bg-amber-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+                              disabled={ensuringPurchaseCogs()}
+                              onClick={() => void ensurePurchaseCogs()}
+                            >
+                              {ensuringPurchaseCogs() ? "Creating…" : "Create Purchases / COGS (5010)"}
+                            </button>
+                            <button
+                              type="button"
+                              class="rounded-md border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                              disabled={importing()}
+                              onClick={() => void importTemplate()}
+                            >
+                              Import PH template
+                            </button>
+                          </div>
+                        </div>
+                      </Show>
+                    </div>
                   )}
                 </For>
               </div>

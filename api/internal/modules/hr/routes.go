@@ -12,5 +12,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		hr.Use(auth.RequirePermission("hr.employees", auth.AccessRead))
 		registerEmployeeRoutes(hr, pool)
 		registerPayrollRoutes(hr, pool)
+		registerPayslipDetailRoutes(hr, pool)
+		registerRemittanceRoutes(hr, pool)
+		registerAttendanceRoutes(hr, pool)
 	})
 }

@@ -3,6 +3,8 @@ import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
+import { useDocumentDraft } from "../../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { useOpenDeliveryLines, type OpenDeliveryLine } from "../../../shared/useDeliveryReceiptList";
@@ -83,6 +85,28 @@ export function DeliveryReceiptModal(props: Props) {
     void loadPreview(deliveryDate());
   });
 
+  const buildDraftPayload = () => ({
+    delivery_date: deliveryDate(),
+    notes: notes(),
+    lines: lines(),
+  });
+
+  const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
+    setDeliveryDate(payload.delivery_date);
+    setNotes(payload.notes);
+    setLines(payload.lines ?? []);
+  };
+
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.soDeliveryReceipt,
+    draftKey: () => (props.prefilterSalesOrderId ? `so-${props.prefilterSalesOrderId}` : "new"),
+    getPayload: buildDraftPayload,
+    onApply: applyDraftPayload,
+    enabled: () => props.open,
+    // No autoApply: when prefilterSalesOrderId is set, the effect above async-fills lines from
+    // openLines.data, which can resolve after draft recovery and stomp the recovered lines.
+  });
+
   const addLine = (row: OpenDeliveryLine) => {
     if (lines().some((l) => l.sales_order_line_id === row.sales_order_line_id)) {
       toast.warning("Line already added.");
@@ -136,7 +160,10 @@ export function DeliveryReceiptModal(props: Props) {
       "Delivery receipt saved.",
     );
     setSaving(false);
-    if (ok) props.onSaved();
+    if (ok) {
+      await draft.clearOnSave();
+      props.onSaved();
+    }
   };
 
   return (
@@ -147,6 +174,7 @@ export function DeliveryReceiptModal(props: Props) {
       onSave={save}
       saving={saving()}
     >
+      <draft.DraftBanner />
       <div class="grid gap-4 md:grid-cols-3">
         <Field label="Delivery date">
           <DateInput value={deliveryDate()} onChange={setDeliveryDate} class={inputClass} />

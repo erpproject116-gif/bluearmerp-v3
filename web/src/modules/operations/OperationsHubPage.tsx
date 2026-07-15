@@ -11,6 +11,7 @@ import { useDebouncedSignal } from "../../shared/useDebouncedSignal";
 import { useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { OPERATIONS_ENTITY, OPERATIONS_SETTINGS_HREF } from "../../shared/entityTypes";
 import {
@@ -271,6 +272,53 @@ export default function OperationsHubPage() {
     setItemModalOpen(true);
   };
 
+  const newItemDraft = useDocumentDraft({
+    entityType: OPERATIONS_ENTITY.workItem,
+    draftKey: "new",
+    getPayload: () => ({
+      title: itemTitle(),
+      column_id: itemColumnId(),
+      start_date: itemStartDate(),
+      end_date: itemEndDate(),
+      custom_values: customValues(),
+    }),
+    onApply: (payload) => {
+      setItemTitle(payload.title);
+      setItemColumnId(payload.column_id);
+      setItemStartDate(payload.start_date);
+      setItemEndDate(payload.end_date);
+      loadCustom(payload.custom_values ?? {});
+    },
+    enabled: () => itemModalOpen(),
+    autoApply: () => itemModalOpen(),
+  });
+
+  const editItemDraft = useDocumentDraft({
+    entityType: OPERATIONS_ENTITY.workItem,
+    draftKey: () => (editItem() ? `edit-${editItem()!.id}` : "none"),
+    getPayload: () => ({
+      title: editTitle(),
+      column_id: editColumnId(),
+      priority: editPriority(),
+      status: editStatus(),
+      start_date: editStartDate(),
+      end_date: editEndDate(),
+      custom_values: customValues(),
+    }),
+    onApply: (payload) => {
+      setEditTitle(payload.title);
+      setEditColumnId(payload.column_id);
+      setEditPriority(payload.priority);
+      setEditStatus(payload.status);
+      setEditStartDate(payload.start_date);
+      setEditEndDate(payload.end_date);
+      loadCustom(payload.custom_values ?? {});
+    },
+    enabled: () => editItem() != null,
+    // openEditItem() hydrates fields synchronously from the row already in memory, so
+    // silently overwriting with a stale draft is unnecessary risk — prefer the Restore banner.
+  });
+
   const saveItem = async () => {
     const wsId = activeWorkspaceId();
     const colId = itemColumnId();
@@ -297,6 +345,7 @@ export default function OperationsHubPage() {
       toast.warning(res.message ?? "Could not create work item.");
       return;
     }
+    await newItemDraft.clearOnSave();
     setItemModalOpen(false);
     invalidateWorkItems();
     toast.success("Work item created.");
@@ -329,6 +378,7 @@ export default function OperationsHubPage() {
       toast.warning(res.message ?? "Could not update work item.");
       return;
     }
+    await editItemDraft.clearOnSave();
     setEditItem(null);
     invalidateWorkItems();
     toast.success("Work item updated.");
@@ -575,6 +625,7 @@ export default function OperationsHubPage() {
         onSave={() => void saveItem()}
         saving={saving()}
       >
+        <newItemDraft.DraftBanner />
         <Field label="Title">
           <input class={inputClass} value={itemTitle()} onInput={(e) => setItemTitle(e.currentTarget.value)} />
         </Field>
@@ -609,6 +660,7 @@ export default function OperationsHubPage() {
         onSave={() => (canEditItem() ? void saveEditItem() : setEditItem(null))}
         saving={saving()}
       >
+        <editItemDraft.DraftBanner />
         <Field label="Title">
           <input class={inputClass} value={editTitle()} onInput={(e) => setEditTitle(e.currentTarget.value)} disabled={!canEditItem()} />
         </Field>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -46,6 +47,7 @@ type PayslipLine struct {
 	ID          int64   `json:"id"`
 	LineNo      int     `json:"line_no"`
 	LineType    string  `json:"line_type"`
+	LineCode    string  `json:"line_code,omitempty"`
 	Description string  `json:"description"`
 	Amount      float64 `json:"amount"`
 }
@@ -219,7 +221,13 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 		defer empRows.Close()
 
 		var payslips []Payslip
-		var totalGross, totalNet float64
+		var totalGross, totalNet, totalEmployer float64
+		var periodEnd time.Time
+		_ = tx.QueryRow(r.Context(), `select period_end from public.hr_pay_periods where id=$1`, periodID).Scan(&periodEnd)
+		if periodEnd.IsZero() {
+			periodEnd = time.Now()
+		}
+
 		for empRows.Next() {
 			var empID int64
 			var empNo, empName string
@@ -228,8 +236,16 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to read employee.", "ERR_INTERNAL")
 				return
 			}
-			deduction := roundMoney(baseSalary * 0.1)
+			stat, err := computeStatutoryDeductions(r.Context(), tx, periodEnd, baseSalary)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to compute statutory deductions.", "ERR_INTERNAL")
+				return
+			}
+			deduction := roundMoney(stat.EmployeeDeduct)
 			net := roundMoney(baseSalary - deduction)
+			if net < 0 {
+				net = 0
+			}
 			var payslipID int64
 			if err := tx.QueryRow(r.Context(), `
 				insert into public.hr_payslips (tenant_id, pay_period_id, employee_id, gross_pay, deductions, net_pay, status)
@@ -238,26 +254,19 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to create payslip.", "ERR_INTERNAL")
 				return
 			}
-			lines := []struct {
-				lineNo int
-				typ    string
-				desc   string
-				amt    float64
-			}{
-				{1, "earning", "Base salary", baseSalary},
-				{2, "deduction", "Withholding tax (stub 10%)", deduction},
-			}
 			var psLines []PayslipLine
-			for _, ln := range lines {
+			for _, ln := range stat.Lines {
 				var lineID int64
 				if err := tx.QueryRow(r.Context(), `
-					insert into public.hr_payslip_lines (payslip_id, line_no, line_type, description, amount)
-					values ($1,$2,$3,$4,$5) returning id`,
-					payslipID, ln.lineNo, ln.typ, ln.desc, ln.amt).Scan(&lineID); err != nil {
+					insert into public.hr_payslip_lines (payslip_id, line_no, line_type, line_code, description, amount)
+					values ($1,$2,$3,$4,$5,$6) returning id`,
+					payslipID, ln.LineNo, ln.LineType, ln.LineCode, ln.Description, ln.Amount).Scan(&lineID); err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to create payslip line.", "ERR_INTERNAL")
 					return
 				}
-				psLines = append(psLines, PayslipLine{ID: lineID, LineNo: ln.lineNo, LineType: ln.typ, Description: ln.desc, Amount: ln.amt})
+				psLines = append(psLines, PayslipLine{
+					ID: lineID, LineNo: ln.LineNo, LineType: ln.LineType, LineCode: ln.LineCode, Description: ln.Description, Amount: ln.Amount,
+				})
 			}
 			payslips = append(payslips, Payslip{
 				ID: payslipID, PayPeriodID: periodID, EmployeeID: empID, EmployeeNo: empNo, EmployeeName: empName,
@@ -265,6 +274,7 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 			})
 			totalGross += baseSalary
 			totalNet += net
+			totalEmployer += stat.EmployerShare
 		}
 		if len(payslips) == 0 {
 			response.Validation(w, map[string]string{"employees": "No active employees with base salary."})
@@ -274,7 +284,7 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 		totalNet = roundMoney(totalNet)
 
 		var journalEntryID int64
-		if journalEntryID, err = postPayrollAccrualJE(r.Context(), tx, tu.TenantID, periodID, totalGross, tu.AppUserID); err != nil {
+		if journalEntryID, err = postPayrollAccrualJE(r.Context(), tx, tu.TenantID, periodID, totalGross, totalEmployer, totalNet, tu.AppUserID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to post payroll accrual.", "ERR_INTERNAL")
 			return
 		}
@@ -309,11 +319,36 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func postPayrollAccrualJE(ctx context.Context, tx pgx.Tx, tenantID, periodID int64, totalGross float64, userID int64) (int64, error) {
+func postPayrollAccrualJE(ctx context.Context, tx pgx.Tx, tenantID, periodID int64, totalGross, totalEmployer, totalNet float64, userID int64) (int64, error) {
+	eeDeductions := roundMoney(totalGross - totalNet)
 	lines := []ledger.PostingLine{
-		{AccountCode: "5210", Debit: totalGross, Remarks: "Payroll accrual"},
-		{AccountCode: "2120", Credit: totalGross, Remarks: "Salaries payable"},
+		{AccountCode: "5210", Debit: totalGross, Remarks: "Payroll salaries"},
 	}
+	if totalEmployer > 0 {
+		lines = append(lines, ledger.PostingLine{AccountCode: "5110", Debit: totalEmployer, Remarks: "Employer SSS/PHIC/HDMF"})
+		lines = append(lines, ledger.PostingLine{AccountCode: "2050", Credit: totalEmployer, Remarks: "Employer contributions payable"})
+	}
+	if eeDeductions > 0 {
+		lines = append(lines, ledger.PostingLine{AccountCode: "2050", Credit: eeDeductions, Remarks: "EE statutory + WHT payable"})
+	}
+	lines = append(lines, ledger.PostingLine{AccountCode: "2120", Credit: totalNet, Remarks: "Net salaries payable"})
+
+	// Rebalance if WHT should hit 2051: keep simple single 2050 pool for EE+ER statutory GA-1;
+	// ensure debit == credit within tolerance.
+	var deb, cred float64
+	for _, ln := range lines {
+		deb += ln.Debit
+		cred += ln.Credit
+	}
+	diff := roundMoney(deb - cred)
+	if math.Abs(diff) >= 0.01 {
+		if diff > 0 {
+			lines = append(lines, ledger.PostingLine{AccountCode: "2120", Credit: diff, Remarks: "Payroll rounding"})
+		} else {
+			lines = append(lines, ledger.PostingLine{AccountCode: "5210", Debit: -diff, Remarks: "Payroll rounding"})
+		}
+	}
+
 	ev := ledger.PostingEvent{TenantID: tenantID, SourceType: "payroll_run", SourceID: periodID, Lines: lines}
 	if err := (ledger.AuditPoster{}).Post(ctx, tx, ev); err != nil {
 		return 0, err
@@ -337,7 +372,7 @@ func postPayrollAccrualJE(ctx context.Context, tx pgx.Tx, tenantID, periodID int
 	lineNo := 1
 	for _, ln := range lines {
 		var accountID int64
-		if err := tx.QueryRow(ctx, `select id from public.fin_accounts where tenant_id=$1 and account_code=$2`, tenantID, ln.AccountCode).Scan(&accountID); err != nil {
+		if err := tx.QueryRow(ctx, `select id from public.fin_accounts where tenant_id=$1 and account_code=$2 and deleted_at is null`, tenantID, ln.AccountCode).Scan(&accountID); err != nil {
 			return 0, fmt.Errorf("account %s not found", ln.AccountCode)
 		}
 		if _, err := tx.Exec(ctx, `

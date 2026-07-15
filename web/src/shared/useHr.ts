@@ -12,6 +12,11 @@ export type Employee = {
   base_salary: number;
   email?: string;
   notes?: string | null;
+  tin?: string;
+  sss_no?: string;
+  philhealth_no?: string;
+  pagibig_no?: string;
+  tax_status?: string;
 };
 
 export type PayPeriod = {
@@ -113,4 +118,11 @@ export async function patchEmployee(id: number, body: Record<string, unknown>) {
 
 export async function runPayroll(body: { period_start: string; period_end: string; period_label?: string }) {
   return apiFetch<PayrollRunResult>("/api/v1/hr/payroll-runs", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function createPayslipShareLink(payslipId: number) {
+  return apiFetch<{ token: string; url_path: string; expires_at: string }>(
+    `/api/v1/hr/payslips/${payslipId}/share-link`,
+    { method: "POST" },
+  );
 }

@@ -3,7 +3,9 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
 
 type JournalEntryRow = { id: number; entry_no: string; status: string; remarks?: string };
 
@@ -52,6 +54,18 @@ export default function JournalEntriesPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.finJournalEntry,
+    draftKey: "new",
+    getPayload: () => ({ remarks: remarks(), lines: lines() }),
+    onApply: (payload) => {
+      setRemarks(payload.remarks);
+      setLines(payload.lines?.length ? payload.lines : [{ account_code: "", debit: "", credit: "" }, { account_code: "", debit: "", credit: "" }]);
+    },
+    enabled: () => modalOpen(),
+    autoApply: () => modalOpen(),
+  });
+
   const createEntry = async () => {
     const parsed = lines()
       .map((ln) => ({
@@ -75,6 +89,7 @@ export default function JournalEntriesPage() {
       return;
     }
     toast.success("Draft journal entry created.");
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
   };
@@ -172,6 +187,7 @@ export default function JournalEntriesPage() {
         saving={saving()}
         wide
       >
+        <draft.DraftBanner />
         <Field label="Remarks">
           <input class={inputClass} value={remarks()} onInput={(e) => setRemarks(e.currentTarget.value)} />
         </Field>

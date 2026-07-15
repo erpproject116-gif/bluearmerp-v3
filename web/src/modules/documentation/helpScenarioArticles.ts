@@ -203,7 +203,7 @@ export const helpScenarioArticles: KbArticle[] = [
     scenario:
       "A new tenant has an empty chart of accounts, or you want to import Philippine SME default accounts.",
     intro:
-      "New businesses start without seeded GL accounts. Import the PH SME template from Chart of Accounts, or create accounts manually. Finance defaults can map cash, AR, AP, and inventory accounts afterward.",
+      "New businesses start without seeded GL accounts. Import the PH SME template from Chart of Accounts, or create accounts manually. Then open Default account mappings and set Purchases / COGS (expense 5010), sales revenue, cash, AR/AP, and VAT accounts.",
     blocks: [
       {
         type: "steps",
@@ -211,17 +211,18 @@ export const helpScenarioArticles: KbArticle[] = [
           "Open Finance → Acct I → Chart of Accounts (/app/finance/acct-i/chart-of-accounts).",
           "If the list is empty, use Import PH SME template (or equivalent import action) to load standard account codes.",
           "Review account types (asset, liability, equity, income, expense) and rename codes to match your books if needed.",
-          "Set tenant finance defaults so sales, purchases, and receipts post to the right accounts.",
-          "Soft-deleted accounts stay hidden from pickers until restored — they are not hard-deleted.",
+          "Open Default account mappings (Acct I → Account mappings). Set Purchases / COGS to an expense account — usually 5010 Cost of Goods Sold. Do not use inventory asset 1469 here.",
+          "If the Purchases / COGS dropdown is empty, use Create Purchases / COGS (5010) or import the PH template so expense accounts exist.",
+          "Click Save mappings. Soft-deleted accounts stay hidden from pickers until restored.",
         ],
       },
       {
         type: "tip",
-        text: "Do not invent random account codes mid-period. Import the template once, then adjust. Journal entries and document posting depend on a complete COA.",
+        text: "On supplier invoices the field is labeled Purchases / COGS (Acct I). It only lists expense accounts. Inventory merchandise (1469) is an asset and will not appear in that list.",
       },
     ],
-    primaryHref: "/app/finance/acct-i/chart-of-accounts",
-    primaryLabel: "Chart of Accounts",
+    primaryHref: "/app/finance/acct-i/chart-of-accounts?focus=purchase#default-account-mappings",
+    primaryLabel: "Purchases / COGS mappings",
     relatedGuideIds: ["finance-accounts-overview", "finance-je-draft-to-post", "coa-soft-delete-restore"],
   },
   {

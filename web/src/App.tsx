@@ -180,6 +180,10 @@ import {
   PosSettingsPage,
   HrEmployeesPage,
   PayrollRunsPage,
+  RemittancesPage,
+  AttendancePage,
+  PayslipPrintPage,
+  PayslipSharedPage,
   FixedAssetsPage,
   JobCostingPage,
   BomsPage,
@@ -303,7 +307,9 @@ export default function App() {
         <Route path="/auth/callback" component={AuthCallbackPage} />
         <Route path="/portal/login" component={PortalLoginPage} />
         <Route path="/portal/dashboard" component={PortalDashboardPage} />
+        <Route path="/payslip/:token" component={PayslipSharedPage} />
         <Route path="/" component={AuthEntryRedirect} />
+        <Route path="/app/hr/payslips/:payslipId/print" component={PayslipPrintPage} />
         <Route path="/app/after-sales/repair-orders/:orderId/receipt" component={RepairOrderReceiptPrintPage} />
         <Route path="/app/after-sales/repair-orders/:orderId/warranty" component={RepairOrderWarrantyPrintPage} />
         <Route path="/app/after-sales/repair-orders/status/print" component={RepairOrderStatusPrintPage} />
@@ -594,6 +600,12 @@ export default function App() {
           )} />
           <Route path="/hr/payroll-runs" component={() => (
             <HrRoute><PayrollRunsPage /></HrRoute>
+          )} />
+          <Route path="/hr/remittances" component={() => (
+            <HrRoute><RemittancesPage /></HrRoute>
+          )} />
+          <Route path="/hr/attendance" component={() => (
+            <HrRoute><AttendancePage /></HrRoute>
           )} />
           <Route path="/fixed-assets" component={() => (
             <FixedAssetsRoute><FixedAssetsPage /></FixedAssetsRoute>

@@ -224,10 +224,13 @@ export function PurchaseRequestModal(props: Props) {
 
   const draft = useDocumentDraft({
     entityType: PURCHASE_REQUEST_ENTITY.purchaseRequest,
-    draftKey: props.editing ? `edit-${props.editing.id}` : "new",
+    draftKey: () => (props.editing ? `edit-${props.editing.id}` : "new"),
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
-    enabled: () => props.open && !props.editing,
+    enabled: () => props.open,
+    // No autoApply here: the create-flow reset effect below also async-fetches a fresh
+    // date_seq/date-no preview, which can resolve after draft recovery and stomp the
+    // recovered date_seq. Banner-only avoids that overwrite race.
   });
 
   const onTaxTypeChange = async (newId: number | null) => {

@@ -12,6 +12,8 @@ import {
 } from "../../shared/useFixedAssets";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 
 const STATUS_OPTIONS: FixedAssetStatus[] = ["active", "fully_depreciated", "disposed"];
@@ -77,6 +79,31 @@ export default function FixedAssetsPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.fixedAsset,
+    draftKey: () => (selected() ? `edit-${selected()!.id}` : "new"),
+    getPayload: () => ({
+      asset_code: assetCode(),
+      asset_name: assetName(),
+      acquisition_date: acquisitionDate(),
+      acquisition_cost: acquisitionCost(),
+      salvage_value: salvageValue(),
+      useful_life_months: usefulLifeMonths(),
+      notes: notes(),
+    }),
+    onApply: (payload) => {
+      setAssetCode(payload.asset_code);
+      setAssetName(payload.asset_name);
+      setAcquisitionDate(payload.acquisition_date);
+      setAcquisitionCost(payload.acquisition_cost);
+      setSalvageValue(payload.salvage_value);
+      setUsefulLifeMonths(payload.useful_life_months);
+      setNotes(payload.notes);
+    },
+    enabled: () => modalOpen(),
+    autoApply: () => modalOpen() && !selected(),
+  });
+
   const save = async () => {
     if (!assetCode().trim() || !assetName().trim()) {
       toast.warning("Asset code and name are required.");
@@ -104,6 +131,7 @@ export default function FixedAssetsPage() {
       toast.warning(res.message ?? "Could not save asset.");
       return;
     }
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
     toast.success(row ? "Asset updated." : "Asset created.");
@@ -227,6 +255,7 @@ export default function FixedAssetsPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
       >
+        <draft.DraftBanner />
         <Field label="Asset code">
           <input class={inputClass} value={assetCode()} disabled={!!selected()} onInput={(e) => setAssetCode(e.currentTarget.value)} />
         </Field>

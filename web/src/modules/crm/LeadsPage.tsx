@@ -12,6 +12,8 @@ import {
 } from "../../shared/useCrmLeads";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { CrmLayout } from "./CrmLayout";
 
 const STATUS_OPTIONS: LeadStatus[] = ["new", "contacted", "qualified", "lost", "converted"];
@@ -56,6 +58,29 @@ export default function LeadsPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.crmLead,
+    draftKey: () => (selected() ? `edit-${selected()!.id}` : "new"),
+    getPayload: () => ({
+      lead_name: leadName(),
+      company_name: companyName(),
+      email: email(),
+      phone: phone(),
+      status: status(),
+      notes: notes(),
+    }),
+    onApply: (payload) => {
+      setLeadName(payload.lead_name);
+      setCompanyName(payload.company_name);
+      setEmail(payload.email);
+      setPhone(payload.phone);
+      setStatus(payload.status);
+      setNotes(payload.notes);
+    },
+    enabled: () => modalOpen(),
+    autoApply: () => modalOpen() && !selected(),
+  });
+
   const save = async () => {
     if (!leadName().trim()) {
       toast.warning("Lead name is required.");
@@ -78,6 +103,7 @@ export default function LeadsPage() {
       toast.warning(res.message ?? "Could not save lead.");
       return;
     }
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
   };
@@ -149,6 +175,7 @@ export default function LeadsPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
       >
+        <draft.DraftBanner />
         <Field label="Lead name">
           <input class={inputClass} value={leadName()} onInput={(e) => setLeadName(e.currentTarget.value)} />
         </Field>

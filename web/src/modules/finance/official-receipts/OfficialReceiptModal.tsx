@@ -7,6 +7,7 @@ import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { ModalField } from "../../../shared/ModalField";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
@@ -99,6 +100,38 @@ export function OfficialReceiptModal(props: Props) {
 
   const amountTotal = () =>
     applications().reduce((sum, row) => sum + (Number(row.applied_amount) || 0), 0);
+
+  const buildDraftPayload = () => ({
+    receipt_date: receiptDate(),
+    currency_id: currencyId(),
+    partner_id: partnerId(),
+    customer_label: customerLabel(),
+    payment_method: paymentMethod(),
+    reference_no: referenceNo(),
+    notes: notes(),
+    applications: applications(),
+  });
+
+  const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
+    setReceiptDate(payload.receipt_date);
+    setCurrencyId(payload.currency_id);
+    setPartnerId(payload.partner_id);
+    setCustomerLabel(payload.customer_label);
+    setPaymentMethod(payload.payment_method);
+    setReferenceNo(payload.reference_no);
+    setNotes(payload.notes);
+    setApplications(payload.applications?.length ? payload.applications : [emptyApplication()]);
+  };
+
+  const draft = useDocumentDraft({
+    entityType: FINANCE_ENTITY.officialReceipt,
+    draftKey: () => (props.editing ? `edit-${props.editing.id}` : "new"),
+    getPayload: buildDraftPayload,
+    onApply: applyDraftPayload,
+    enabled: () => props.open,
+    // No autoApply: loadLookups() below async-fetches currencies and picks a default currency
+    // for the create flow, which can resolve after draft recovery and stomp currency_id.
+  });
 
   const loadPreview = async (date: string) => {
     const res = await apiFetch<{ date_no_display: string; receipt_no: string }>(
@@ -212,7 +245,10 @@ export function OfficialReceiptModal(props: Props) {
       props.editing ? "Official receipt updated." : "Official receipt created.",
     );
     setSaving(false);
-    if (ok) props.onSaved();
+    if (ok) {
+      await draft.clearOnSave();
+      props.onSaved();
+    }
   };
 
   return (
@@ -231,6 +267,7 @@ export function OfficialReceiptModal(props: Props) {
         />
       }
     >
+      <draft.DraftBanner />
       <ModalField settings={byKey} fieldKey="receipt_date" fallbackLabel="Date" fallbackRequired>
           {(m) => (
             <DateInput

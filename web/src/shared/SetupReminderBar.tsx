@@ -29,9 +29,11 @@ export function SetupReminderBar() {
           <div class="min-w-0">
             <p class="font-medium">Workspace setup incomplete ({data()!.percent}%)</p>
             <p class="text-xs text-amber-900/80">
-              {data()!.next_step
-                ? `Next: ${data()!.next_step!.label}`
-                : "Finish foundation setup before creating transactions."}
+              {data()!.next_step?.id === "chart_of_accounts"
+                ? "Important: configure your chart of accounts (all four account types + Purchases/COGS mapping) so sales/POS posting and purchases can post correctly. Sales orders can still be saved."
+                : data()!.next_step
+                  ? `Next: ${data()!.next_step!.label}. Sales documents can be saved; finish setup for purchases, POS, and auto-posting.`
+                  : "Finish foundation setup for purchases, POS, and accounting auto-posting."}
             </p>
           </div>
           <div class="flex shrink-0 flex-wrap items-center gap-2">

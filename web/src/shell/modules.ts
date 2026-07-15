@@ -351,6 +351,8 @@ export const appModules: AppModule[] = [
     basePath: "/app/hr",
     features: [
       { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees" },
+      { label: "Attendance / DTR", href: "/app/hr/attendance", settingsHref: "/app/hr/attendance" },
+      { label: "Remittances", href: "/app/hr/remittances", settingsHref: "/app/hr/remittances" },
     ],
   },
   {
@@ -383,6 +385,7 @@ export const appModules: AppModule[] = [
       { label: "Supplier invoices", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Budgets", href: "/app/finance/budgets", settingsHref: "/app/finance/budgets" },
       { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
+      { label: "Remittances", href: "/app/hr/remittances", settingsHref: "/app/hr/remittances" },
       { label: "Assets", href: "/app/fixed-assets", settingsHref: "/app/fixed-assets" },
       { label: "Job costing", href: "/app/job-costing", settingsHref: "/app/job-costing" },
     ],
@@ -515,6 +518,8 @@ export function resolveModule(pathname: string): AppModule | undefined {
     pathname.startsWith("/app/purchases/") ||
     pathname === "/app/hr/payroll-runs" ||
     pathname.startsWith("/app/hr/payroll-runs/") ||
+    pathname === "/app/hr/remittances" ||
+    pathname.startsWith("/app/hr/remittances/") ||
     pathname === "/app/fixed-assets" ||
     pathname.startsWith("/app/fixed-assets/") ||
     pathname === "/app/job-costing" ||

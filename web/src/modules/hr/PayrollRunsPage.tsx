@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import {
+  createPayslipShareLink,
   runPayroll,
   useInvalidatePayroll,
   usePayPeriods,
@@ -20,6 +21,7 @@ export default function PayrollRunsPage() {
   const [running, setRunning] = createSignal(false);
   const [selectedPeriodId, setSelectedPeriodId] = createSignal<number | null>(null);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [sharing, setSharing] = createSignal(false);
   const payslips = usePayslips(selectedPeriodId);
 
   const run = async () => {
@@ -41,6 +43,31 @@ export default function PayrollRunsPage() {
     toast.success(`Generated ${res.data?.payslip_count ?? 0} payslips. JE #${res.data?.journal_entry_id ?? "—"}`);
     if (res.data?.pay_period_id) setSelectedPeriodId(res.data.pay_period_id);
     invalidate();
+  };
+
+  const openPrint = (row: Payslip) => {
+    window.open(`/app/hr/payslips/${row.id}/print`, "_blank", "noopener,noreferrer");
+  };
+
+  const sharePayslip = async (row: Payslip) => {
+    setSharing(true);
+    const res = await createPayslipShareLink(row.id);
+    setSharing(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Could not create share link.");
+      return;
+    }
+    const url = `${window.location.origin}${res.data.url_path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Secure payslip link copied (expires ${new Date(res.data.expires_at).toLocaleString()}).`);
+    } catch {
+      toast.action({
+        type: "success",
+        title: "Secure payslip link",
+        message: url,
+      });
+    }
   };
 
   return (
@@ -92,6 +119,30 @@ export default function PayrollRunsPage() {
       </section>
 
       <Show when={selectedPeriodId()}>
+        <div class="mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+            disabled={!selectedId()}
+            onClick={() => {
+              const row = (payslips.data ?? []).find((r) => r.id === selectedId());
+              if (row) openPrint(row);
+            }}
+          >
+            Print / PDF
+          </button>
+          <button
+            type="button"
+            class="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+            disabled={!selectedId() || sharing()}
+            onClick={() => {
+              const row = (payslips.data ?? []).find((r) => r.id === selectedId());
+              if (row) void sharePayslip(row);
+            }}
+          >
+            {sharing() ? "Creating link…" : "Copy secure employee link"}
+          </button>
+        </div>
         <SpreadsheetGrid
           columns={[
             { key: "employee_no", header: "Employee #" },
@@ -105,7 +156,7 @@ export default function PayrollRunsPage() {
           loading={payslips.isFetching}
           selectedId={selectedId()}
           onSelect={setSelectedId}
-          onEdit={() => {}}
+          onEdit={(row) => openPrint(row)}
           onNew={() => {}}
           showNew={false}
           codeKey="employee_no"

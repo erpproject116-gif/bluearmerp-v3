@@ -11,6 +11,8 @@ import {
 } from "../../shared/useCrmLeads";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { CrmLayout } from "./CrmLayout";
 
 const STAGE_OPTIONS: OpportunityStage[] = [
@@ -61,6 +63,29 @@ export default function OpportunitiesPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.crmOpportunity,
+    draftKey: () => (selected() ? `edit-${selected()!.id}` : "new"),
+    getPayload: () => ({
+      title: title(),
+      stage: stage(),
+      expected_value: expectedValue(),
+      expected_close_date: expectedClose(),
+      probability: probability(),
+      notes: notes(),
+    }),
+    onApply: (payload) => {
+      setTitle(payload.title);
+      setStage(payload.stage);
+      setExpectedValue(payload.expected_value);
+      setExpectedClose(payload.expected_close_date);
+      setProbability(payload.probability);
+      setNotes(payload.notes);
+    },
+    enabled: () => modalOpen(),
+    autoApply: () => modalOpen() && !selected(),
+  });
+
   const save = async () => {
     if (!title().trim()) {
       toast.warning("Title is required.");
@@ -82,6 +107,7 @@ export default function OpportunitiesPage() {
       toast.warning(res.message ?? "Could not save opportunity.");
       return;
     }
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
   };
@@ -126,6 +152,7 @@ export default function OpportunitiesPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
       >
+        <draft.DraftBanner />
         <Field label="Title">
           <input class={inputClass} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
         </Field>

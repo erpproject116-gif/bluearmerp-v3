@@ -2,6 +2,8 @@ import { For, Show, createEffect, createSignal } from "solid-js";
 import { WideEntityModal } from "../../shared/WideEntityModal";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { patchPack, type IndustryPack } from "../../shared/useOperations";
 
 export type PackColumnDraft = {
@@ -64,6 +66,20 @@ export function OperationsPackEditorModal(props: Props) {
     ]);
     setNewName("");
     setNewKey("");
+  });
+
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.opsPack,
+    draftKey: () => (props.pack ? `edit-${props.pack.id}` : "none"),
+    getPayload: () => ({ name: name(), description: description(), columns: columns() }),
+    onApply: (payload) => {
+      setName(payload.name);
+      setDescription(payload.description);
+      setColumns(payload.columns?.length ? payload.columns : columns());
+    },
+    enabled: () => props.open && props.canEdit,
+    // props.pack hydrates fields synchronously via createEffect above, but this is an
+    // edit-only form on an existing pack — prefer the Restore banner over a silent overwrite.
   });
 
   const sorted = () => [...columns()].sort((a, b) => a.sort_order - b.sort_order);
@@ -150,6 +166,7 @@ export function OperationsPackEditorModal(props: Props) {
       return;
     }
     toast.success("Pack updated.");
+    await draft.clearOnSave();
     props.onSaved();
     props.onClose();
   };
@@ -163,6 +180,7 @@ export function OperationsPackEditorModal(props: Props) {
       saving={saving()}
       readOnly={!props.canEdit}
     >
+      <draft.DraftBanner />
       <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
         <Field label="Pack code">
           <input class={inputClass} value={props.pack?.pack_code ?? ""} readOnly />

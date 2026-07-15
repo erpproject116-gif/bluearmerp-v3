@@ -12,6 +12,8 @@ import { useInvalidateCrmTaskSummaries } from "./useCrmTaskSummaries";
 import { useToast } from "./toast";
 import { canManageSalesTeam, useAuth } from "./auth-context";
 import { useSalesTeamMembers } from "./useSalesTeamMembers";
+import { useDocumentDraft } from "./useDocumentDraft";
+import { DRAFT_ENTITY } from "./entityTypes";
 
 export type CrmTaskContext = {
   task_type?: FollowUpTaskType;
@@ -81,6 +83,30 @@ export function CrmTaskModalProvider(props: ParentProps) {
     setCreateOpen(true);
   };
 
+  const draftKey = () => {
+    const ctx = context();
+    if (ctx.quotation_id) return `quo-${ctx.quotation_id}`;
+    if (ctx.sales_id) return `sales-${ctx.sales_id}`;
+    if (ctx.purchase_request_id) return `pr-${ctx.purchase_request_id}`;
+    if (ctx.warranty_asset_id) return `warranty-${ctx.warranty_asset_id}`;
+    if (ctx.partner_id) return `partner-${ctx.partner_id}`;
+    return "new";
+  };
+
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.crmTask,
+    draftKey,
+    getPayload: () => ({ title: title(), due_date: dueDate(), notes: notes(), assignee_id: assigneeId() }),
+    onApply: (payload) => {
+      setTitle(payload.title);
+      setDueDate(payload.due_date);
+      setNotes(payload.notes);
+      setAssigneeId(payload.assignee_id);
+    },
+    enabled: () => createOpen(),
+    autoApply: () => createOpen(),
+  });
+
   const openTask = (taskId: number) => {
     const id = Number(taskId);
     if (!Number.isFinite(id) || id <= 0) return;
@@ -126,6 +152,7 @@ export function CrmTaskModalProvider(props: ParentProps) {
     if (!res.success) {
       const existing = res.data as FollowUpTask | undefined;
       if (res.code === "ERR_CONFLICT" && existing?.id) {
+        await draft.clearOnSave();
         setCreateOpen(false);
         openTask(existing.id);
         toast.warning("An open task already exists for this record.");
@@ -134,6 +161,7 @@ export function CrmTaskModalProvider(props: ParentProps) {
       toast.warning(res.message ?? "Could not create task.");
       return;
     }
+    await draft.clearOnSave();
     setCreateOpen(false);
     invalidate();
     invalidateSummaries();
@@ -150,6 +178,7 @@ export function CrmTaskModalProvider(props: ParentProps) {
         onSave={() => void save()}
         saving={saving()}
       >
+        <draft.DraftBanner />
         <Show when={context().partner_name}>
           <p class="mb-3 text-sm text-text-secondary">
             Customer: <span class="font-medium text-text-primary">{context().partner_name}</span>

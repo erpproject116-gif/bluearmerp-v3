@@ -12,6 +12,8 @@ import {
 } from "../../shared/useSupportTickets";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { SupportLayout } from "./SupportLayout";
 import { fetchPartners, fetchRepairOrders, fetchSupportUsers, fetchWarrantyAssets } from "./supportLookups";
@@ -73,6 +75,41 @@ export default function TicketsPage() {
     navigate(`/app/support/tickets/${row.id}`);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.supportTicket,
+    draftKey: "new",
+    getPayload: () => ({
+      subject: subject(),
+      description: description(),
+      partner_id: partnerId(),
+      partner_label: partnerLabel(),
+      warranty_id: warrantyId(),
+      warranty_label: warrantyLabel(),
+      assignee_id: assigneeId(),
+      assignee_label: assigneeLabel(),
+      repair_order_id: repairOrderId(),
+      repair_order_label: repairOrderLabel(),
+      category: category(),
+      priority: priority(),
+    }),
+    onApply: (payload) => {
+      setSubject(payload.subject);
+      setDescription(payload.description);
+      setPartnerId(payload.partner_id);
+      setPartnerLabel(payload.partner_label);
+      setWarrantyId(payload.warranty_id);
+      setWarrantyLabel(payload.warranty_label);
+      setAssigneeId(payload.assignee_id);
+      setAssigneeLabel(payload.assignee_label);
+      setRepairOrderId(payload.repair_order_id);
+      setRepairOrderLabel(payload.repair_order_label);
+      setCategory(payload.category);
+      setPriority(payload.priority);
+    },
+    enabled: () => modalOpen(),
+    autoApply: () => modalOpen(),
+  });
+
   const save = async () => {
     if (!subject().trim()) {
       toast.warning("Subject is required.");
@@ -98,6 +135,7 @@ export default function TicketsPage() {
       toast.warning(res.message ?? "Could not create ticket.");
       return;
     }
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
     if (res.data?.id) navigate(`/app/support/tickets/${res.data.id}`);
@@ -158,6 +196,7 @@ export default function TicketsPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
       >
+        <draft.DraftBanner />
         <Field label="Subject">
           <input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} />
         </Field>

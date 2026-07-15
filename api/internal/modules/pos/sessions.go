@@ -100,11 +100,17 @@ type cartLinePatch struct {
 }
 
 type checkoutBody struct {
-	PartnerID      *int64       `json:"partner_id"`
-	Tenders        []tenderBody `json:"tenders"`
-	DiscountAmount float64      `json:"discount_amount"`
-	VoucherCode    string       `json:"voucher_code"`
-	VoucherAmount  float64      `json:"voucher_amount"`
+	PartnerID       *int64         `json:"partner_id"`
+	Tenders         []tenderBody   `json:"tenders"`
+	DiscountAmount  float64        `json:"discount_amount"`
+	VoucherCode     string         `json:"voucher_code"`
+	VoucherAmount   float64        `json:"voucher_amount"`
+	PrivilegeType   string         `json:"privilege_type"`
+	PrivilegeIDNo   string         `json:"privilege_id_no"`
+	PrivilegeName   string         `json:"privilege_name"`
+	TipAmount       float64        `json:"tip_amount"`
+	TableLabel      string         `json:"table_label"`
+	OrderType       string         `json:"order_type"`
 }
 
 type tenderBody struct {
@@ -522,15 +528,30 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		subtotalLines = roundMoney(subtotalLines)
 
-		// Apply order-level discount and voucher to the taxable base (never below zero).
-		discountTotal := roundMoney(body.DiscountAmount + body.VoucherAmount)
-		if discountTotal < 0 {
-			discountTotal = 0
+		privCfg := privilegeSettings{SeniorPct: 20, PwdPct: 20, StudentPct: 10}
+		_ = tx.QueryRow(r.Context(), `
+			select coalesce(privilege_senior_pct, 20)::float8,
+			       coalesce(privilege_pwd_pct, 20)::float8,
+			       coalesce(student_discount_pct, 10)::float8
+			from public.pos_settings where tenant_id = $1`, tu.TenantID).Scan(&privCfg.SeniorPct, &privCfg.PwdPct, &privCfg.StudentPct)
+
+		privType := normalizePrivilegeType(body.PrivilegeType)
+		if privType == PrivilegeNone && body.DiscountAmount > 0 {
+			privType = PrivilegeManual
 		}
-		if discountTotal > subtotalLines {
-			discountTotal = subtotalLines
+		priv, err := applyPrivilegeDiscount(subtotalLines, privilegeInput{
+			Type:           privType,
+			IDNo:           body.PrivilegeIDNo,
+			Name:           body.PrivilegeName,
+			ManualDiscount: body.DiscountAmount,
+			VoucherAmount:  body.VoucherAmount,
+		}, privCfg)
+		if err != nil {
+			response.Validation(w, map[string]string{"privilege": err.Error()})
+			return
 		}
-		subtotalLines = roundMoney(subtotalLines - discountTotal)
+		discountTotal := priv.Discount
+		subtotalLines = priv.BaseAfterDisc
 
 		lotInputs := make([]sales.SaleLotLineInput, len(lines))
 		for i, ln := range lines {
@@ -564,6 +585,10 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		if taxMode == "included" && !settingsTaxInclusive {
 			taxMode = "excluded"
 		}
+		// Strict PH privilege: senior/PWD sales are VAT-exempt on the discounted ticket.
+		if priv.VATExempted {
+			taxMode = "none"
+		}
 
 		var subtotal, taxTotal, grandTotal float64
 		templateCode := "non_vat"
@@ -582,18 +607,27 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			taxTotal = 0
 			subtotal = subtotalLines
 			grandTotal = subtotalLines
+			if priv.VATExempted {
+				templateCode = "non_vat"
+			}
 		}
+
+		tipAmount := roundMoney(body.TipAmount)
+		if tipAmount < 0 {
+			tipAmount = 0
+		}
+		amountDue := roundMoney(grandTotal + tipAmount)
 
 		var tenderTotal float64
 		for _, t := range body.Tenders {
 			tenderTotal += t.Amount
 		}
 		tenderTotal = roundMoney(tenderTotal)
-		if tenderTotal+0.01 < grandTotal {
-			response.Validation(w, map[string]string{"tenders": "Tender total is less than the amount due."})
+		if tenderTotal+0.01 < amountDue {
+			response.Validation(w, map[string]string{"tenders": "Tender total is less than the amount due (including tip)."})
 			return
 		}
-		change := roundMoney(tenderTotal - grandTotal)
+		change := roundMoney(tenderTotal - amountDue)
 		// Record the primary payment mode on the sale so receipts/reports reflect it.
 		primaryTender := normalizeTenderType(body.Tenders[0].TenderType)
 		partnerID := int64(0)
@@ -626,13 +660,44 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var salesID int64
+		notesParts := []string{}
+		if priv.Type == PrivilegeSenior || priv.Type == PrivilegePWD || priv.Type == PrivilegeStudent {
+			notesParts = append(notesParts, fmt.Sprintf("Privilege: %s", priv.Type))
+			if priv.IDNo != "" {
+				notesParts = append(notesParts, "ID: "+priv.IDNo)
+			}
+			if priv.Name != "" {
+				notesParts = append(notesParts, "Name: "+priv.Name)
+			}
+			if priv.VATExempted {
+				notesParts = append(notesParts, "VAT exempt (senior/PWD)")
+			}
+		}
+		if tipAmount > 0 {
+			notesParts = append(notesParts, fmt.Sprintf("Tip: %.2f", tipAmount))
+		}
+		if strings.TrimSpace(body.TableLabel) != "" {
+			notesParts = append(notesParts, "Table: "+strings.TrimSpace(body.TableLabel))
+		}
+		saleNotes := strings.Join(notesParts, " · ")
 		if err := tx.QueryRow(r.Context(), `
 			insert into public.sa_sales (tenant_id, order_date, date_seq, sales_no, tax_type_id, currency_id, partner_id,
-			  pic_user_id, pic_name, location_id, terms_of_payment, progress_status, template_code,
+			  pic_user_id, pic_name, location_id, terms_of_payment, progress_status, template_code, notes,
 			  subtotal, tax_total, grand_total, created_by_user_id, invoicing_status)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,$15,'completed',$10,$11,$12,$13,$14,true) returning id`,
-			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID, tu.AppUserID, locationID, templateCode, subtotal, taxTotal, grandTotal, tu.AppUserID, primaryTender).Scan(&salesID); err != nil {
+			values ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,$15,'completed',$10,$16,$11,$12,$13,$14,true) returning id`,
+			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID, tu.AppUserID, locationID, templateCode, subtotal, taxTotal, grandTotal, tu.AppUserID, primaryTender, saleNotes).Scan(&salesID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create sale.", "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `
+			insert into public.pos_sale_attrs (
+			  sales_id, tenant_id, privilege_type, privilege_id_no, privilege_name, privilege_pct,
+			  discount_amount, tip_amount, table_label, order_type, vat_exempted
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+			salesID, tu.TenantID, string(priv.Type), priv.IDNo, priv.Name, priv.Pct,
+			discountTotal, tipAmount, strings.TrimSpace(body.TableLabel), strings.TrimSpace(body.OrderType), priv.VATExempted,
+		); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save POS sale attributes.", "ERR_INTERNAL")
 			return
 		}
 		for i, ln := range lines {
@@ -687,7 +752,7 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to clear cart.", "ERR_INTERNAL")
 			return
 		}
-		if _, err := tx.Exec(r.Context(), `update public.pos_sessions set sales_total=sales_total+$3, updated_at=now() where id=$1 and tenant_id=$2`, sessionID, tu.TenantID, grandTotal); err != nil {
+		if _, err := tx.Exec(r.Context(), `update public.pos_sessions set sales_total=sales_total+$3, updated_at=now() where id=$1 and tenant_id=$2`, sessionID, tu.TenantID, amountDue); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update session.", "ERR_INTERNAL")
 			return
 		}
@@ -697,7 +762,7 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "pos.checkout", "sa_sales", &salesID, nil, body)
 		response.OK(w, checkoutResult{
-			SalesID: salesID, SalesNo: salesNo, GrandTotal: grandTotal, Change: change, Tenders: outTenders,
+			SalesID: salesID, SalesNo: salesNo, GrandTotal: amountDue, Change: change, Tenders: outTenders,
 			JournalEntryID: acct.JournalEntryID, OfficialReceiptID: acct.OfficialReceiptID,
 		}, "Checkout complete.")
 	}

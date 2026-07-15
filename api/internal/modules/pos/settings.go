@@ -31,6 +31,10 @@ type PosSettings struct {
 	// Read-only resolved fields for client-side tax preview.
 	TaxMode        string  `json:"tax_mode,omitempty"`
 	TaxRatePercent float64 `json:"tax_rate_percent"`
+	StudentDiscountPct float64 `json:"student_discount_pct"`
+	PrivilegeSeniorPct float64 `json:"privilege_senior_pct"`
+	PrivilegePwdPct    float64 `json:"privilege_pwd_pct"`
+	TipEnabled         bool    `json:"tip_enabled"`
 }
 
 type posSettingsBody struct {
@@ -66,7 +70,11 @@ func loadPosSettings(pool *pgxpool.Pool, r *http.Request, tenantID int64) (PosSe
 		select ps.default_location_id, coalesce(loc.location_name, ''), ps.default_tax_type_id, ps.tax_inclusive, ps.order_types, ps.allowed_tenders,
 		  ps.require_customer, ps.enable_barcode, ps.receipt_footer, tt.tax_mode, tt.rate_percent::float8,
 		  coalesce(ps.auto_post_accounting, true), coalesce(ps.auto_create_receipt, true),
-		  ps.sales_account_id, ps.receivable_account_id, ps.cash_account_id, ps.card_account_id
+		  ps.sales_account_id, ps.receivable_account_id, ps.cash_account_id, ps.card_account_id,
+		  coalesce(ps.student_discount_pct, 10)::float8,
+		  coalesce(ps.privilege_senior_pct, 20)::float8,
+		  coalesce(ps.privilege_pwd_pct, 20)::float8,
+		  coalesce(ps.tip_enabled, true)
 		from public.pos_settings ps
 		left join public.quo_tax_types tt on tt.id = ps.default_tax_type_id and tt.tenant_id = ps.tenant_id
 		left join public.inv_locations loc on loc.id = ps.default_location_id and loc.tenant_id = ps.tenant_id
@@ -74,7 +82,8 @@ func loadPosSettings(pool *pgxpool.Pool, r *http.Request, tenantID int64) (PosSe
 		Scan(&s.DefaultLocationID, &s.DefaultLocationName, &s.DefaultTaxTypeID, &s.TaxInclusive, &orderTypes, &allowedTenders,
 			&s.RequireCustomer, &s.EnableBarcode, &footer, &taxMode, &ratePercent,
 			&s.AutoPostAccounting, &s.AutoCreateReceipt,
-			&s.SalesAccountID, &s.ReceivableAccountID, &s.CashAccountID, &s.CardAccountID)
+			&s.SalesAccountID, &s.ReceivableAccountID, &s.CashAccountID, &s.CardAccountID,
+			&s.StudentDiscountPct, &s.PrivilegeSeniorPct, &s.PrivilegePwdPct, &s.TipEnabled)
 	if err != nil {
 		return s, err
 	}

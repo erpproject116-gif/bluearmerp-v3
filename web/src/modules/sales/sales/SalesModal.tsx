@@ -10,6 +10,7 @@ import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
+import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
@@ -423,10 +424,13 @@ export function SalesModal(props: Props) {
 
   const draft = useDocumentDraft({
     entityType: SALES_ENTITY.sales,
-    draftKey: draftKey(),
+    draftKey,
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
-    enabled: () => props.open && !props.editing,
+    enabled: () => props.open,
+    // Create-only: the reset effect below (keyed on props.open/props.editing) runs synchronously
+    // before this draft's async recovery resolves, so applying here can't be clobbered by it.
+    autoApply: () => props.open && !props.editing,
   });
 
   const onTaxTypeChange = async (newId: number | null) => {
@@ -776,6 +780,7 @@ export function SalesModal(props: Props) {
         </Show>
         <Show when={activeTab() === "details"}>
         <draft.DraftBanner />
+        <CoaSetupReminder />
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Date-no">
           <input class={inputClass} value={dateNoDisplay()} readOnly />

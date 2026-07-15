@@ -3,6 +3,8 @@ import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useListState } from "../../shared/useListState";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ManufacturingLayout } from "./ManufacturingLayout";
@@ -122,6 +124,38 @@ export default function BomsPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.mfgBom,
+    draftKey: () => (editing() ? `edit-${editing()!.id}` : "new"),
+    getPayload: () => ({
+      bom_code: bomCode(),
+      bom_name: bomName(),
+      is_active: isActive(),
+      finished_item_id: finishedItemId(),
+      finished_item_label: finishedItemLabel(),
+      location_id: locationId(),
+      location_label: locationLabel(),
+      lines: lines(),
+      line_labels: lineLabels(),
+    }),
+    onApply: (payload) => {
+      setBomCode(payload.bom_code);
+      setBomName(payload.bom_name);
+      setIsActive(payload.is_active);
+      setFinishedItemId(payload.finished_item_id);
+      setFinishedItemLabel(payload.finished_item_label);
+      setLocationId(payload.location_id);
+      setLocationLabel(payload.location_label);
+      setLines(payload.lines?.length ? payload.lines : [emptyLine()]);
+      setLineLabels(payload.line_labels ?? {});
+    },
+    enabled: () => modalOpen(),
+    // Only auto-apply for "new": openEdit() awaits the BOM detail fetch before opening, so
+    // silently overwriting an already-loaded record with a stale draft could surprise the
+    // user — prefer the Restore banner for edits.
+    autoApply: () => modalOpen() && !editing(),
+  });
+
   const addLine = () => setLines((prev) => [...prev, { ...emptyLine(), line_no: prev.length + 1 }]);
 
   const save = async () => {
@@ -157,6 +191,7 @@ export default function BomsPage() {
       return;
     }
     toast.success(ed ? "BOM updated." : "BOM created.");
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
   };
@@ -215,6 +250,7 @@ export default function BomsPage() {
         saving={saving()}
         singleColumn
       >
+        <draft.DraftBanner />
         <Field label="BOM code *">
           <input class={inputClass} value={bomCode()} onInput={(e) => setBomCode(e.currentTarget.value)} />
         </Field>

@@ -10,7 +10,8 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormF
 import { useInventoryList, useInvalidateInventoryList } from "../../shared/useInventoryList";
 import { useListState } from "../../shared/useListState";
 import { useCustomValues } from "../../shared/useCustomValues";
-import { INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY, INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
 import {
   ItemMasterModal,
   emptyItemForm,
@@ -162,6 +163,19 @@ export default function ItemsPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.invItem,
+    draftKey: () => (editing() ? `edit-${editing()!.id}` : "new"),
+    getPayload: () => ({ form: form(), custom_values: customValues() }),
+    onApply: (payload) => {
+      setForm(payload.form);
+      loadCustom(payload.custom_values ?? {});
+    },
+    enabled: () => modalOpen(),
+    // openNew() awaits a next-code fetch before the modal's initial state settles, so
+    // autoApply could race with it — prefer the Restore banner over a silent overwrite.
+  });
+
   const save = async () => {
     const ed = editing();
     const clientError =
@@ -202,6 +216,7 @@ export default function ItemsPage() {
     );
     setSaving(false);
     if (!ok) return;
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate("items");
   };
@@ -301,6 +316,7 @@ export default function ItemsPage() {
           setItemTab("default");
         }}
         onSave={() => void save()}
+        draftBanner={<draft.DraftBanner />}
       />
       <ItemsAdvancedSearch
         open={advancedOpen()}

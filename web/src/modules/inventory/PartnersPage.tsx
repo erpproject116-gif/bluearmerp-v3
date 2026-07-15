@@ -3,11 +3,12 @@ import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
-import { INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
+import { DRAFT_ENTITY, INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../shared/handleSaveResult";
 import { ModalField } from "../../shared/ModalField";
 import { useToast } from "../../shared/toast";
 import { useCustomValues } from "../../shared/useCustomValues";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useInventoryList, useInvalidateInventoryList } from "../../shared/useInventoryList";
 import { useListState } from "../../shared/useListState";
@@ -117,6 +118,20 @@ export default function PartnersPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.invPartner,
+    draftKey: () => (editing() ? `edit-${editing()!.id}` : "new"),
+    getPayload: () => ({ ...form(), custom_values: customValues() }),
+    onApply: (payload) => {
+      const { custom_values, ...rest } = payload as ReturnType<typeof form> & { custom_values?: Record<string, unknown> };
+      setForm((f) => ({ ...f, ...rest }));
+      if (custom_values) loadCustom(custom_values);
+    },
+    enabled: () => modalOpen(),
+    // openNew() awaits a next-code fetch before the modal's initial state settles, so
+    // autoApply could race with it — prefer the Restore banner over a silent overwrite.
+  });
+
   const save = async () => {
     const ed = editing();
     const clientError =
@@ -155,6 +170,7 @@ export default function PartnersPage() {
     );
     setSaving(false);
     if (!ok) return;
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate("partners");
   };
@@ -213,6 +229,7 @@ export default function PartnersPage() {
         onSave={() => void save()}
         saving={saving()}
       >
+        <draft.DraftBanner />
         <Field label="Customer/Vendor code">
           <input class={inputClass} value={nextCode()} readOnly />
         </Field>

@@ -1,6 +1,6 @@
 import { A } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import type { Accessor, Setter } from "solid-js";
+import type { Accessor, JSX, Setter } from "solid-js";
 import { DecimalInput } from "../../shared/DecimalInput";
 import { CustomFieldsSection } from "../../shared/CustomFieldsSection";
 import { INVENTORY_ENTITY } from "../../shared/entityTypes";
@@ -100,6 +100,7 @@ type Props = {
   saving: boolean;
   onClose: () => void;
   onSave: () => void;
+  draftBanner?: JSX.Element;
 };
 
 export function ItemMasterModal(props: Props) {
@@ -113,6 +114,7 @@ export function ItemMasterModal(props: Props) {
       onSave={props.onSave}
       saving={props.saving}
     >
+      {props.draftBanner}
       <div class="col-span-full mb-3 flex flex-wrap gap-2 border-b border-stroke pb-3">
         <For each={TABS}>
           {(tab) => (

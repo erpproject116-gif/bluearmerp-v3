@@ -111,3 +111,30 @@ export const CRM_SETTINGS_HREF = {
 } as const;
 
 export type CrmFeature = keyof typeof CRM_ENTITY;
+
+/** Entity type strings for the unsaved-form draft hook (`useDocumentDraft`). Reuses existing
+ * entity constants where one already exists for that record type. */
+export const DRAFT_ENTITY = {
+  hrEmployee: "hr_employee",
+  hrRemittance: "hr_remittance",
+  hrAttendance: "hr_attendance",
+  financeDefaults: "fin_account_defaults",
+  finJournalEntry: "fin_journal_entry",
+  finPaymentVoucher: "fin_payment_voucher",
+  finOfficialReceipt: FINANCE_ENTITY.officialReceipt,
+  soDeliveryReceipt: "so_delivery_receipt",
+  posOrderUi: "pos_order_ui",
+  invPartner: INVENTORY_ENTITY.partners,
+  invItem: INVENTORY_ENTITY.items,
+  invStockAdjustment: "inv_stock_adjustment",
+  crmTask: "crm_task",
+  crmLead: "crm_lead",
+  crmOpportunity: "crm_opportunity",
+  supportTicket: "support_ticket",
+  mfgWorkOrder: "mfg_work_order",
+  mfgBom: "mfg_bom",
+  qaNcr: "qa_ncr",
+  qaCapa: "qa_capa",
+  fixedAsset: "fixed_asset",
+  opsPack: "ops_pack",
+} as const;

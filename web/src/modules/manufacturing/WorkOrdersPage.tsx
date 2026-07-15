@@ -3,6 +3,8 @@ import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useListState } from "../../shared/useListState";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
@@ -93,6 +95,27 @@ export default function WorkOrdersPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.mfgWorkOrder,
+    draftKey: "new",
+    getPayload: () => ({
+      bom_id: bomId(),
+      bom_label: bomLabel(),
+      location_id: locationId(),
+      location_label: locationLabel(),
+      qty: qty(),
+    }),
+    onApply: (payload) => {
+      setBomId(payload.bom_id);
+      setBomLabel(payload.bom_label);
+      setLocationId(payload.location_id);
+      setLocationLabel(payload.location_label);
+      setQty(payload.qty);
+    },
+    enabled: () => modalOpen(),
+    autoApply: () => modalOpen(),
+  });
+
   const createWo = async () => {
     if (!bomId() || Number(qty()) <= 0) {
       toast.warning("Select BOM and quantity.");
@@ -113,6 +136,7 @@ export default function WorkOrdersPage() {
       return;
     }
     toast.success("Work order created.");
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
   };
@@ -217,6 +241,7 @@ export default function WorkOrdersPage() {
         saving={saving()}
         singleColumn
       >
+        <draft.DraftBanner />
         <LookupCombo
           label="BOM"
           required

@@ -10,6 +10,7 @@ import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { PURCHASES_ENTITY } from "../../../shared/entityTypes";
+import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
@@ -153,6 +154,63 @@ export function SupplierInvoiceModal(props: Props) {
   const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
+
+  const buildDraftPayload = () => ({
+    invoice_date: invoiceDate(),
+    tax_type_id: taxTypeId(),
+    currency_id: currencyId(),
+    partner_id: partnerId(),
+    vendor_label: vendorLabel(),
+    pic_user_id: picUserId(),
+    pic_name: picName(),
+    location_id: locationId(),
+    location_label: locationLabel(),
+    project_id: projectId(),
+    project_label: projectLabel(),
+    project_name: projectName(),
+    due_date: dueDate(),
+    terms_of_payment: termsOfPayment(),
+    payment_terms: paymentTerms(),
+    vendor_invoice_no: vendorInvoiceNo(),
+    reference: reference(),
+    notes: notes(),
+    progress_status: progressStatus(),
+    lines: lines(),
+  });
+
+  const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
+    setInvoiceDate(payload.invoice_date);
+    setTaxTypeId(payload.tax_type_id);
+    setCurrencyId(payload.currency_id);
+    setPartnerId(payload.partner_id);
+    setVendorLabel(payload.vendor_label);
+    setPicUserId(payload.pic_user_id);
+    setPicName(payload.pic_name);
+    setLocationId(payload.location_id);
+    setLocationLabel(payload.location_label);
+    setProjectId(payload.project_id);
+    setProjectLabel(payload.project_label);
+    setProjectName(payload.project_name);
+    setDueDate(payload.due_date);
+    setTermsOfPayment(payload.terms_of_payment);
+    setPaymentTerms(payload.payment_terms);
+    setVendorInvoiceNo(payload.vendor_invoice_no);
+    setReference(payload.reference);
+    setNotes(payload.notes);
+    setProgressStatus(payload.progress_status || "unconfirmed");
+    setLines(payload.lines?.length ? payload.lines : [emptyPurchaseRequestLine(1)]);
+  };
+
+  const draft = useDocumentDraft({
+    entityType: PURCHASES_ENTITY.purchases,
+    draftKey: () => (props.editing ? `edit-${props.editing.id}` : "new"),
+    getPayload: buildDraftPayload,
+    onApply: applyDraftPayload,
+    enabled: () => props.open,
+    // Create-only: the reset effect below sets fields synchronously and only fires an async
+    // preview fetch for date-no/invoice-no (not part of this payload), so autoApply can't race.
+    autoApply: () => props.open && !props.editing,
+  });
 
   const loadPreview = async (date: string) => {
     const res = await apiFetch<{ date_no_display: string; invoice_no: string }>(
@@ -396,6 +454,7 @@ export function SupplierInvoiceModal(props: Props) {
     }
     toast.success(props.editing ? "Purchase updated." : "Purchase created.");
     if (props.editing) invalidateRecordHistory(queryClient, "fin_supplier_invoice", props.editing.id);
+    await draft.clearOnSave();
     props.onSaved();
     if (props.editing) {
       props.onClose();
@@ -457,6 +516,7 @@ export function SupplierInvoiceModal(props: Props) {
           />
         </Show>
         <Show when={activeTab() === "details"}>
+          <draft.DraftBanner />
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Date-no">
               <input class={inputClass} value={dateNoDisplay()} readOnly />

@@ -3,6 +3,8 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { apiFetch } from "../../shared/api";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 
 type CapaRecord = {
   id: number;
@@ -31,6 +33,26 @@ export default function CapaPage() {
     },
   }));
 
+  const openNew = () => {
+    setTitle("");
+    setDescription("");
+    setDueDate("");
+    setModalOpen(true);
+  };
+
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.qaCapa,
+    draftKey: "new",
+    getPayload: () => ({ title: title(), description: description(), due_date: dueDate() }),
+    onApply: (payload) => {
+      setTitle(payload.title);
+      setDescription(payload.description);
+      setDueDate(payload.due_date);
+    },
+    enabled: () => modalOpen(),
+    autoApply: () => modalOpen(),
+  });
+
   const save = async () => {
     if (!title().trim()) {
       toast.warning("Title is required.");
@@ -52,6 +74,7 @@ export default function CapaPage() {
       return;
     }
     toast.success("CAPA record created.");
+    await draft.clearOnSave();
     setModalOpen(false);
     void client.invalidateQueries({ queryKey: ["capa-records"] });
   };
@@ -72,7 +95,7 @@ export default function CapaPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onNew={() => setModalOpen(true)}
+        onNew={openNew}
         onEdit={() => {}}
         codeKey="title"
         nameKey="title"
@@ -82,6 +105,7 @@ export default function CapaPage() {
         onRefresh={() => void client.invalidateQueries({ queryKey: ["capa-records"] })}
       />
       <EntityModal open={modalOpen()} title="New CAPA" onClose={() => setModalOpen(false)} onSave={() => void save()} saving={saving()} singleColumn>
+        <draft.DraftBanner />
         <Field label="Title *">
           <input class={inputClass} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
         </Field>

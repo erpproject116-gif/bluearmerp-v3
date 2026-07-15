@@ -54,6 +54,7 @@ func registerAccountRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/accounts", listAccounts(pool))
 	r.Post("/accounts", createAccount(pool))
 	r.Post("/accounts/import-template", importAccountTemplate(pool))
+	r.Post("/accounts/ensure-purchase-cogs", ensurePurchaseCogsAccount(pool))
 	r.Get("/accounts/defaults", getFinanceDefaults(pool))
 	r.Patch("/accounts/defaults", saveFinanceDefaults(pool))
 	r.Get("/accounts/{id}", getAccount(pool))
@@ -394,6 +395,105 @@ func importAccountTemplate(pool *pgxpool.Pool) http.HandlerFunc {
 			select count(*) from public.fin_accounts
 			where tenant_id = $1 and deleted_at is null`, tu.TenantID).Scan(&total)
 		response.OK(w, map[string]any{"imported": total, "template": template}, "Template imported.")
+	}
+}
+
+// ensurePurchaseCogsAccount creates (or reuses) an active expense posting account for Purchases/COGS
+// and maps it on tenant finance defaults when purchase_account_id is unset.
+func ensurePurchaseCogsAccount(pool *pgxpool.Pool) http.HandlerFunc {
+	const code = "5010"
+	const name = "Purchases / Cost of Goods Sold"
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+
+		var existingID int64
+		err := pool.QueryRow(r.Context(), `
+			select id from public.fin_accounts
+			where tenant_id = $1 and deleted_at is null and is_active
+			  and account_type = 'expense' and coalesce(is_group, false) = false
+			  and account_code = $2
+			order by id asc limit 1`, tu.TenantID, code).Scan(&existingID)
+		if err != nil {
+			_ = pool.QueryRow(r.Context(), `
+				select id from public.fin_accounts
+				where tenant_id = $1 and deleted_at is null and is_active
+				  and account_type = 'expense' and coalesce(is_group, false) = false
+				order by account_code asc, id asc limit 1`, tu.TenantID).Scan(&existingID)
+		}
+
+		created := false
+		accountID := existingID
+		if accountID <= 0 {
+			err = pool.QueryRow(r.Context(), `
+				insert into public.fin_accounts (
+				  tenant_id, account_code, account_name, account_type,
+				  parent_id, is_group, is_active, is_system, sort_order
+				) values ($1, $2, $3, 'expense', null, false, true, false, 5010)
+				returning id`, tu.TenantID, code, name).Scan(&accountID)
+			if err != nil {
+				if strings.Contains(strings.ToLower(err.Error()), "unique") {
+					// Code taken by inactive/deleted/group row — use a free 50xx code.
+					for i := 5011; i <= 5099; i++ {
+						alt := fmt.Sprintf("%d", i)
+						err = pool.QueryRow(r.Context(), `
+							insert into public.fin_accounts (
+							  tenant_id, account_code, account_name, account_type,
+							  parent_id, is_group, is_active, is_system, sort_order
+							) values ($1, $2, $3, 'expense', null, false, true, false, $4)
+							returning id`, tu.TenantID, alt, name, i).Scan(&accountID)
+						if err == nil {
+							break
+						}
+						if !strings.Contains(strings.ToLower(err.Error()), "unique") {
+							response.Err(w, http.StatusInternalServerError, "Failed to create Purchases / COGS account.", "ERR_INTERNAL")
+							return
+						}
+					}
+					if accountID <= 0 {
+						response.Err(w, http.StatusConflict, "Could not allocate an expense account code for Purchases / COGS.", "ERR_CONFLICT")
+						return
+					}
+				} else {
+					response.Err(w, http.StatusInternalServerError, "Failed to create Purchases / COGS account.", "ERR_INTERNAL")
+					return
+				}
+			}
+			created = true
+		}
+
+		d, err := financedefaults.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load defaults.", "ERR_INTERNAL")
+			return
+		}
+		mapped := false
+		if d.PurchaseAccountID == nil || *d.PurchaseAccountID <= 0 {
+			d.PurchaseAccountID = &accountID
+			if err := financedefaults.Save(r.Context(), pool, tu.TenantID, d); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Account ready but failed to save mapping.", "ERR_INTERNAL")
+				return
+			}
+			mapped = true
+		}
+
+		acct, err := fetchAccount(r, pool, tu.TenantID, accountID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Account created but failed to load record.", "ERR_INTERNAL")
+			return
+		}
+		outDefaults, _ := financedefaults.Load(r.Context(), pool, tu.TenantID)
+		outDefaults.TenantID = tu.TenantID
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.account.ensure_purchase_cogs", "fin_account", &accountID, nil, map[string]any{
+			"created": created,
+			"mapped":  mapped,
+		})
+		response.OK(w, map[string]any{
+			"account":  acct,
+			"created":  created,
+			"mapped":   mapped,
+			"defaults": outDefaults,
+		}, "Purchases / COGS account ready.")
 	}
 }
 

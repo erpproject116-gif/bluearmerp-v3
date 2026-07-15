@@ -4,6 +4,8 @@ import { useToast } from "../../shared/toast";
 import { useListState } from "../../shared/useListState";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { QualityLayout } from "./QualityLayout";
 
 type Ncr = {
@@ -65,6 +67,19 @@ export default function NcrsPage() {
     setModalOpen(true);
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.qaNcr,
+    draftKey: "new",
+    getPayload: () => ({ title: title(), description: description(), severity: severity() }),
+    onApply: (payload) => {
+      setTitle(payload.title);
+      setDescription(payload.description);
+      setSeverity(payload.severity);
+    },
+    enabled: () => modalOpen(),
+    autoApply: () => modalOpen(),
+  });
+
   const save = async () => {
     if (!title().trim()) {
       toast.warning("Title is required.");
@@ -85,6 +100,7 @@ export default function NcrsPage() {
       return;
     }
     toast.success("NCR created.");
+    await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
   };
@@ -134,6 +150,7 @@ export default function NcrsPage() {
         saving={saving()}
         singleColumn
       >
+        <draft.DraftBanner />
         <Field label="Title *">
           <input class={inputClass} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
         </Field>

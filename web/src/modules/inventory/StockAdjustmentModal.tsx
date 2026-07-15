@@ -2,8 +2,10 @@ import { createSignal } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { submitEntity } from "../../shared/handleSaveResult";
 import { useToast } from "../../shared/toast";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
 
 type Props = {
   open: boolean;
@@ -44,6 +46,29 @@ export function StockAdjustmentModal(props: Props) {
     setReason("");
   };
 
+  const draft = useDocumentDraft({
+    entityType: DRAFT_ENTITY.invStockAdjustment,
+    draftKey: "new",
+    getPayload: () => ({
+      item_id: itemId(),
+      item_label: itemLabel(),
+      location_id: locationId(),
+      location_label: locationLabel(),
+      qty_delta: qtyDelta(),
+      reason: reason(),
+    }),
+    onApply: (payload) => {
+      setItemId(payload.item_id);
+      setItemLabel(payload.item_label);
+      setLocationId(payload.location_id);
+      setLocationLabel(payload.location_label);
+      setQtyDelta(payload.qty_delta);
+      setReason(payload.reason);
+    },
+    enabled: () => props.open,
+    autoApply: () => props.open,
+  });
+
   const save = async () => {
     if (!itemId() || !locationId()) {
       toast.warning("Item and location are required.");
@@ -75,6 +100,7 @@ export function StockAdjustmentModal(props: Props) {
     );
     setSaving(false);
     if (!ok) return;
+    await draft.clearOnSave();
     reset();
     props.onSaved();
     props.onClose();
@@ -91,6 +117,7 @@ export function StockAdjustmentModal(props: Props) {
       onSave={() => void save()}
       saving={saving()}
     >
+      <draft.DraftBanner />
       <LookupCombo
         label="Item *"
         value={itemLabel}

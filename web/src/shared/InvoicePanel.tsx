@@ -1,4 +1,5 @@
 import { Show, createEffect, createSignal } from "solid-js";
+import { A } from "@solidjs/router";
 import { inputClass, Field } from "./SpreadsheetGrid";
 import { LookupCombo } from "./LookupCombo";
 import { AttachmentsField } from "./AttachmentsField";
@@ -6,6 +7,7 @@ import { InvoiceLineItemsTable } from "./InvoiceLineItemsTable";
 import type { AttachmentScope } from "./attachments";
 import type { DocumentLineRow } from "./documentLinePrint";
 import { fetchAccountOptions } from "./accounts";
+import { apiFetch } from "./api";
 import { formatPeso, bindDecimalInput } from "./money";
 import { useToast } from "./toast";
 import {
@@ -37,7 +39,7 @@ type Props = {
 const CONFIG: Record<Kind, { acctIType: string; acctILabel: string; acctIILabel: string; defaultAcctI: string; defaultAcctII: string; partyLabel: string }> = {
   sales: {
     acctIType: "income",
-    acctILabel: "Sales account (Acct I)",
+    acctILabel: "Sales revenue (Acct I)",
     acctIILabel: "Deposit account (Acct II)",
     defaultAcctI: "4019",
     defaultAcctII: "1089",
@@ -45,9 +47,11 @@ const CONFIG: Record<Kind, { acctIType: string; acctILabel: string; acctIILabel:
   },
   purchase: {
     acctIType: "expense",
-    acctILabel: "Account for purchase (Acct I)",
+    acctILabel: "Purchases / COGS (Acct I)",
     acctIILabel: "Withdrawal account (Acct II)",
-    defaultAcctI: "1469",
+    // Must be an expense account (e.g. 5010 Cost of Goods Sold). Never inventory asset 1469 —
+    // the Acct I picker is filtered to expense only.
+    defaultAcctI: "5010",
     defaultAcctII: "2519",
     partyLabel: "Vendor",
   },
@@ -83,6 +87,8 @@ export function InvoicePanel(props: Props) {
   const [jeStatus, setJeStatus] = createSignal("");
   const [jeId, setJeId] = createSignal<number | null>(null);
   const [saving, setSaving] = createSignal(false);
+  const [purchaseCogsHint, setPurchaseCogsHint] = createSignal(false);
+  const [ensuringPurchaseCogs, setEnsuringPurchaseCogs] = createSignal(false);
 
   const accountsLocked = () => jeStatus() === "posted";
   const invoiceSaved = () => Boolean(acctIId() && acctIIId());
@@ -125,13 +131,61 @@ export function InvoicePanel(props: Props) {
     if (match) {
       setLabel(match.label);
       setId(match.id);
+      return true;
     }
+    return false;
+  };
+
+  const prefillFromDefaults = async (kind: Kind) => {
+    const res = await apiFetch<{
+      sales_account_id?: number | null;
+      purchase_account_id?: number | null;
+    }>("/api/v1/finance/accounts/defaults", {}, { silent: true });
+    if (!res.success || !res.data) return false;
+    const id = kind === "sales" ? res.data.sales_account_id : res.data.purchase_account_id;
+    if (!id) return false;
+    const params = new URLSearchParams({
+      page: "1",
+      pageSize: "200",
+      status: "active",
+      sort: "account_code",
+      order: "asc",
+      account_type: cfg().acctIType,
+    });
+    const list = await apiFetch<{ id: number; account_code: string; account_name: string }[]>(
+      `/api/v1/finance/accounts?${params}`,
+      {},
+      { silent: true },
+    );
+    const found = (list.data ?? []).find((a) => a.id === id);
+    if (!found) return false;
+    setAcctILabel(`[${found.account_code}] ${found.account_name}`);
+    setAcctIId(found.id);
+    return true;
+  };
+
+  const ensurePurchaseCogsAccount = async () => {
+    setEnsuringPurchaseCogs(true);
+    const res = await apiFetch<{
+      account: { id: number; account_code: string; account_name: string };
+    }>("/api/v1/finance/accounts/ensure-purchase-cogs", { method: "POST" });
+    setEnsuringPurchaseCogs(false);
+    if (!res.success || !res.data?.account) {
+      toast.warning(res.message ?? "Could not create Purchases / COGS account.");
+      return;
+    }
+    const a = res.data.account;
+    setAcctIId(a.id);
+    setAcctILabel(`[${a.account_code}] ${a.account_name}`);
+    setPurchaseCogsHint(false);
+    toast.success("Purchases / COGS account ready.");
   };
 
   const load = async () => {
     const id = props.docId;
     if (!id) return;
     setLoading(true);
+    setPurchaseCogsHint(false);
     try {
       const data = await loadInvoiceDocumentPrint(props.kind, id, { includeAttachments: false });
       setLines(data.lines);
@@ -140,11 +194,23 @@ export function InvoicePanel(props: Props) {
       const voucher = data.voucher;
       if (props.kind === "sales") {
         const v = voucher as SalesInvoice;
-        if (!v.sales_account_id) void prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
+        if (!v.sales_account_id) {
+          const fromDefaults = await prefillFromDefaults("sales");
+          if (!fromDefaults) void prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
+        }
         if (!v.deposit_account_id) void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
       } else {
         const v = voucher as PurchaseInvoice;
-        if (!v.purchase_account_id) void prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
+        if (!v.purchase_account_id) {
+          const fromDefaults = await prefillFromDefaults("purchase");
+          if (!fromDefaults) {
+            const ok = await prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
+            if (!ok) {
+              const expenseOpts = await fetchAccountOptions("", "expense");
+              setPurchaseCogsHint(expenseOpts.length === 0);
+            }
+          }
+        }
         if (!v.withdrawal_account_id) void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
       }
     } catch (err) {
@@ -260,18 +326,53 @@ export function InvoicePanel(props: Props) {
         />
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <LookupCombo
-            label={cfg().acctILabel}
-            value={acctILabel}
-            selectedId={acctIId}
-            onInput={setAcctILabel}
-            onSelect={(o) => { setAcctIId(o.id); setAcctILabel(o.label); }}
-            onClear={() => { setAcctIId(null); setAcctILabel(""); }}
-            fetchOptions={(q) => fetchAccountOptions(q, cfg().acctIType)}
-            placeholder="Search account…"
-            required
-            disabled={accountsLocked()}
-          />
+          <div class="space-y-2">
+            <LookupCombo
+              label={cfg().acctILabel}
+              value={acctILabel}
+              selectedId={acctIId}
+              onInput={setAcctILabel}
+              onSelect={(o) => { setAcctIId(o.id); setAcctILabel(o.label); setPurchaseCogsHint(false); }}
+              onClear={() => { setAcctIId(null); setAcctILabel(""); }}
+              fetchOptions={(q) => fetchAccountOptions(q, cfg().acctIType)}
+              placeholder={props.kind === "purchase" ? "Search expense / COGS…" : "Search account…"}
+              required
+              disabled={accountsLocked()}
+            />
+            <Show when={props.kind === "purchase" && purchaseCogsHint() && !accountsLocked()}>
+              <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                <p class="font-medium">No Purchases / COGS expense account found</p>
+                <p class="mt-0.5 text-amber-900/80">
+                  Map it under Finance → Acct. I → Chart of Accounts → Default account mappings → Purchases / COGS
+                  (usually 5010 Cost of Goods Sold).
+                </p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="rounded-md bg-amber-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+                    disabled={ensuringPurchaseCogs()}
+                    onClick={() => void ensurePurchaseCogsAccount()}
+                  >
+                    {ensuringPurchaseCogs() ? "Creating…" : "Create Purchases / COGS (5010)"}
+                  </button>
+                  <A
+                    href="/app/finance/acct-i/chart-of-accounts?focus=purchase#default-account-mappings"
+                    class="rounded-md border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                  >
+                    Open account mappings
+                  </A>
+                </div>
+              </div>
+            </Show>
+            <Show when={props.kind === "purchase" && !purchaseCogsHint() && !acctIId() && !accountsLocked()}>
+              <p class="text-xs text-slate-500">
+                Prefer the mapped Purchases / COGS default (5010).{" "}
+                <A href="/app/finance/acct-i/chart-of-accounts?focus=purchase#default-account-mappings" class="underline">
+                  Review mappings
+                </A>
+              </p>
+            </Show>
+          </div>
           <LookupCombo
             label={cfg().acctIILabel}
             value={acctIILabel}

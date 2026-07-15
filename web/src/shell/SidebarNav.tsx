@@ -27,6 +27,7 @@ function isFinanceModulePath(pathname: string): boolean {
   if (isTaxMngtPath(pathname)) return true;
   if (pathname === "/app/purchases" || pathname.startsWith("/app/purchases/")) return true;
   if (pathname === "/app/hr/payroll-runs" || pathname.startsWith("/app/hr/payroll-runs/")) return true;
+  if (pathname === "/app/hr/remittances" || pathname.startsWith("/app/hr/remittances/")) return true;
   if (pathname === "/app/fixed-assets" || pathname.startsWith("/app/fixed-assets/")) return true;
   if (pathname === "/app/job-costing" || pathname.startsWith("/app/job-costing/")) return true;
   if (

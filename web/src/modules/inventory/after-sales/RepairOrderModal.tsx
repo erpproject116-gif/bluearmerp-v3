@@ -20,6 +20,7 @@ import { useToast } from "../../../shared/toast";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { type SerialTraceResult } from "../../../shared/useSerialLotList";
+import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 
 export type RepairOrderDetail = {
@@ -229,6 +230,42 @@ export function RepairOrderModal(props: Props) {
     technician_name: technicianName(),
   });
 
+  const buildDraftPayload = () => ({
+    ...formValues(),
+    customer_label: customerLabel(),
+    pic_user_id: picUserId(),
+    location_label: locationLabel(),
+    project_label: projectLabel(),
+    lines: lines(),
+  });
+
+  const draft = useDocumentDraft({
+    entityType: INVENTORY_ENTITY.repairOrder,
+    draftKey: () => (effectiveEditing() ? `edit-${effectiveEditing()!.id}` : "new"),
+    getPayload: buildDraftPayload,
+    onApply: (payload) => {
+      setOrderDate(payload.order_date);
+      setPartnerId(payload.partner_id);
+      setCustomerLabel(payload.customer_label);
+      setPicUserId(payload.pic_user_id);
+      setPicName(payload.pic_name);
+      setLocationId(payload.location_id);
+      setLocationLabel(payload.location_label);
+      setProjectId(payload.project_id);
+      setProjectLabel(payload.project_label);
+      setProjectName(payload.project_name);
+      setTechnicianName(payload.technician_name);
+      setProgressStatus(payload.progress_status || "received");
+      setScheduledDate(payload.scheduled_completion_date);
+      setLatestUpdate(payload.latest_update);
+      setRepairDetails(payload.repair_details);
+      setLines(payload.lines?.length ? payload.lines : [emptyLine(1)]);
+    },
+    enabled: () => props.open,
+    // The "new" branch above calls loadPreview() asynchronously, so autoApply could race
+    // with it — prefer the Restore banner over a silent overwrite.
+  });
+
   const onSerialLotBlur = async (index: number, serialNo: string) => {
     const trimmed = serialNo.trim();
     if (!trimmed) return;
@@ -312,6 +349,7 @@ export function RepairOrderModal(props: Props) {
       return;
     }
     toast.success(props.editing ? "Repair order updated." : "Repair order created.");
+    await draft.clearOnSave();
     props.onSaved();
     if (props.editing) {
       props.onClose();
@@ -330,6 +368,7 @@ export function RepairOrderModal(props: Props) {
       saving={saving()}
     >
       <div class="space-y-4">
+      <draft.DraftBanner />
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Field label="Date-no">
           <input class={inputClass} value={dateNoDisplay()} readOnly />

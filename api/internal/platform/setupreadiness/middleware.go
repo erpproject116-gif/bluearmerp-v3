@@ -59,11 +59,10 @@ func isSetupExempt(method, path string) bool {
 			return true
 		}
 	}
+	// Selling docs (quotation / sales order / sales invoice) are not hard-blocked by incomplete
+	// workspace setup — operators can capture orders while COA is unfinished. Reminders stay in UI.
+	// Buying + POS still require foundation ready (stock location, partners, items, COA types, etc.).
 	blocked := []string{
-		"/quotation/quotations",
-		"/sales-order/",
-		"/sales/",
-		"/selling/",
 		"/purchase-request/",
 		"/purchase-order/",
 		"/goods-receipt/",

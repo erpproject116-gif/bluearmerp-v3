@@ -256,20 +256,20 @@ func AckFoundationStep(ctx context.Context, pool *pgxpool.Pool, tenantID int64, 
 func blockingMessage(stepID string) string {
 	switch stepID {
 	case "company":
-		return "Set your company name before creating transactions."
+		return "Set your company name before creating purchase or POS transactions."
 	case "chart_of_accounts":
-		return "Set up your chart of accounts (at least one active account each for asset, liability, income, and expense) before creating transactions."
+		return "Set up your chart of accounts (at least one active account each for asset, liability, income, and expense). Sales documents can be saved now; complete COA for posting, VAT, and Purchases/COGS mapping."
 	case "currency_tax":
-		return "Configure currency and tax types before creating transactions."
+		return "Configure currency and tax types before creating purchase or POS transactions."
 	case "process_policies":
-		return "Review process policies before creating transactions."
+		return "Review process policies before creating purchase or POS transactions."
 	case "location":
-		return "Add at least one stock location before creating transactions."
+		return "Add at least one stock location before creating purchase or POS transactions."
 	case "partners":
-		return "Add at least one customer or supplier before creating transactions."
+		return "Add at least one customer or supplier before creating purchase or POS transactions."
 	case "items":
-		return "Add at least one product before creating transactions."
+		return "Add at least one product before creating purchase or POS transactions."
 	default:
-		return "Complete workspace setup before creating transactions."
+		return "Complete workspace setup before creating purchase or POS transactions."
 	}
 }

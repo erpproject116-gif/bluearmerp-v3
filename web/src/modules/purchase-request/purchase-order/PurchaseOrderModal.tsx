@@ -42,6 +42,26 @@ import {
 } from "./SupplierQuotationLinePickerModal";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 import { LoadingText } from "../../../shared/LoadingText";
+import { useDocumentDraft } from "../../../shared/useDocumentDraft";
+
+type PoDraftPayload = {
+  order_date: string;
+  tax_type_id: number | null;
+  currency_id: number | null;
+  pic_user_id: number | null;
+  pic_name: string;
+  location_id: number | null;
+  location_label: string;
+  project_id: number | null;
+  project_label: string;
+  project_name: string;
+  reference: string;
+  notes: string;
+  partner_id: number | null;
+  partner_label: string;
+  partner_code: string;
+  lines: PurchaseRequestLineRow[];
+};
 
 export type PurchaseOrderDetail = {
   id: number;
@@ -212,6 +232,55 @@ export function PurchaseOrderModal(props: Props) {
   const isDraft = () => isCreate() || detail()?.status === "draft";
   const readOnly = () => !isDraft();
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
+
+  const buildDraftPayload = (): PoDraftPayload => ({
+    order_date: orderDate(),
+    tax_type_id: taxTypeId(),
+    currency_id: currencyId(),
+    pic_user_id: picUserId(),
+    pic_name: picName(),
+    location_id: locationId(),
+    location_label: locationLabel(),
+    project_id: projectId(),
+    project_label: projectLabel(),
+    project_name: projectName(),
+    reference: reference(),
+    notes: notes(),
+    partner_id: partnerId(),
+    partner_label: partnerLabel(),
+    partner_code: partnerCode(),
+    lines: lines(),
+  });
+
+  const applyDraftPayload = (payload: PoDraftPayload) => {
+    setOrderDate(payload.order_date);
+    setTaxTypeId(payload.tax_type_id);
+    setCurrencyId(payload.currency_id);
+    setPicUserId(payload.pic_user_id);
+    setPicName(payload.pic_name);
+    setLocationId(payload.location_id);
+    setLocationLabel(payload.location_label);
+    setProjectId(payload.project_id);
+    setProjectLabel(payload.project_label);
+    setProjectName(payload.project_name);
+    setReference(payload.reference);
+    setNotes(payload.notes);
+    setPartnerId(payload.partner_id);
+    setPartnerLabel(payload.partner_label);
+    setPartnerCode(payload.partner_code);
+    setLines(payload.lines?.length ? payload.lines : [emptyPurchaseRequestLine(1)]);
+  };
+
+  const draft = useDocumentDraft({
+    entityType: PURCHASE_REQUEST_ENTITY.purchaseOrder,
+    draftKey: () => (effectivePoId() ? `edit-${effectivePoId()}` : "new"),
+    getPayload: buildDraftPayload,
+    onApply: applyDraftPayload,
+    enabled: () => props.open && isDraft(),
+    // No autoApply here: initNew()/loadDetail() above are themselves async (they await
+    // ensureQueryData/apiFetch), so there's no guaranteed ordering against this draft's own
+    // async recovery — autoApply could race and get clobbered. Banner-only avoids that.
+  });
 
   const applyDetail = (po: PurchaseOrderDetail) => {
     setDetail(po);
@@ -454,6 +523,7 @@ export function PurchaseOrderModal(props: Props) {
       return;
     }
     toast.success(isCreate() ? "Purchase order created." : "Purchase order updated.");
+    await draft.clearOnSave();
     applyDetail(res.data);
     props.onSaved();
     if (props.purchaseOrderId) {
@@ -492,6 +562,7 @@ export function PurchaseOrderModal(props: Props) {
       <Show when={loading()}>
         <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
+      <draft.DraftBanner />
       <Show when={!loading() && (isCreate() || po())}>
         <Show when={po()} keyed>
         {(d) => (
