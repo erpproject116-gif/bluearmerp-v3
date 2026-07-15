@@ -2,7 +2,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
-import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, ModalMessage, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
@@ -262,6 +262,26 @@ export default function ChartOfAccountsPage() {
     setModalOpen(true);
   };
 
+  type AccountFormDraft = {
+    account_code: string;
+    account_name: string;
+    account_type: AccountRow["account_type"];
+    parent_id: string;
+    is_group: boolean;
+    is_active: boolean;
+    sort_order: string;
+  };
+
+  const accountDraft = useDocumentDraft<AccountFormDraft>({
+    entityType: DRAFT_ENTITY.finAccount,
+    draftKey: () => (editingId() ? `edit-${editingId()}` : "new"),
+    getPayload: () => form(),
+    onApply: (payload) => setForm({ ...payload }),
+    enabled: () => modalOpen(),
+    // Banner-only: openCreate/openEdit reset the form synchronously; silent autoApply
+    // would race with that wipe. Restore banner is the safe path (same as PO/OR).
+  });
+
   const save = async () => {
     const editId = editingId();
     const body = {
@@ -283,6 +303,7 @@ export default function ChartOfAccountsPage() {
       toast.warning(res.message ?? "Failed to save account.");
       return;
     }
+    await accountDraft.clearOnSave();
     setModalOpen(false);
     invalidate();
   };
@@ -658,6 +679,9 @@ export default function ChartOfAccountsPage() {
         onSave={() => void save()}
         saving={saving()}
       >
+        <ModalMessage>
+          <accountDraft.DraftBanner />
+        </ModalMessage>
         <Field label="Account code">
           <input
             class={inputClass}

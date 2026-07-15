@@ -137,4 +137,5 @@ export const DRAFT_ENTITY = {
   qaCapa: "qa_capa",
   fixedAsset: "fixed_asset",
   opsPack: "ops_pack",
+  finAccount: "fin_account",
 } as const;

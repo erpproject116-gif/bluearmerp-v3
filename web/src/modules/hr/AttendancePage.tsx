@@ -1,10 +1,11 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useEmployees } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
+import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
 
 type Holiday = {
@@ -55,6 +56,7 @@ export default function AttendancePage() {
   const [dtrStatus, setDtrStatus] = createSignal("present");
   const [dtrHours, setDtrHours] = createSignal("8");
   const [dtrOt, setDtrOt] = createSignal("0");
+  const [selectedDtrId, setSelectedDtrId] = createSignal<number | null>(null);
 
   const holidays = createQuery(() => ({
     queryKey: ["hr-holidays", year],
@@ -186,32 +188,32 @@ export default function AttendancePage() {
   return (
     <HrLayout>
       <div class="grid gap-6 lg:grid-cols-2">
-        <section class="rounded-lg border border-stroke bg-surface p-4">
+        <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
           <h2 class="mb-2 text-lg font-medium">Holiday calendar ({year})</h2>
-          <p class="mb-3 text-sm text-muted">
+          <p class="mb-3 text-sm text-text-secondary">
             Regular / special holidays drive DTR auto-tagging and future holiday premium multipliers on payroll.
           </p>
           <holidayDraft.DraftBanner />
-          <div class="mb-3 grid gap-2 sm:grid-cols-3">
-            <input type="date" class="rounded border px-2 py-1.5" value={holDate()} onInput={(e) => setHolDate(e.currentTarget.value)} />
-            <input class="rounded border px-2 py-1.5" placeholder="Holiday name" value={holName()} onInput={(e) => setHolName(e.currentTarget.value)} />
-            <select class="rounded border px-2 py-1.5" value={holType()} onChange={(e) => setHolType(e.currentTarget.value)}>
+          <div class="mb-3 grid gap-3 sm:grid-cols-3">
+            <Field label="Date"><input type="date" class={inputClass} value={holDate()} onInput={(e) => setHolDate(e.currentTarget.value)} /></Field>
+            <Field label="Holiday name"><input class={inputClass} value={holName()} onInput={(e) => setHolName(e.currentTarget.value)} /></Field>
+            <Field label="Holiday type"><select class={inputClass} value={holType()} onChange={(e) => setHolType(e.currentTarget.value)}>
               <option value="regular">Regular (×2)</option>
               <option value="special_non_working">Special non-working</option>
               <option value="special_working">Special working</option>
-            </select>
+            </select></Field>
           </div>
-          <button type="button" class="mb-3 rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={() => void addHoliday()}>
+          <button type="button" class="mb-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => void addHoliday()}>
             Add holiday
           </button>
           <ul class="max-h-56 space-y-1 overflow-auto text-sm">
-            <For each={holidays.data ?? []} fallback={<li class="text-muted">No holidays yet.</li>}>
+            <For each={holidays.data ?? []} fallback={<li class="text-text-secondary">No holidays yet.</li>}>
               {(h) => (
                 <li class="flex justify-between border-b border-slate-100 py-1">
                   <span>
                     {h.holiday_date} — {h.name}
                   </span>
-                  <span class="text-muted">
+                  <span class="text-text-secondary">
                     {h.holiday_type} ×{h.pay_multiplier}
                   </span>
                 </li>
@@ -220,23 +222,23 @@ export default function AttendancePage() {
           </ul>
         </section>
 
-        <section class="rounded-lg border border-stroke bg-surface p-4">
+        <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
           <h2 class="mb-2 text-lg font-medium">Pay cut-offs</h2>
-          <p class="mb-3 text-sm text-muted">Defines the attendance window that should feed the next payroll run.</p>
-          <div class="mb-3 grid gap-2 sm:grid-cols-3">
-            <input type="date" class="rounded border px-2 py-1.5" value={cutoffStart()} onInput={(e) => setCutoffStart(e.currentTarget.value)} />
-            <input type="date" class="rounded border px-2 py-1.5" value={cutoffEnd()} onInput={(e) => setCutoffEnd(e.currentTarget.value)} />
-            <input class="rounded border px-2 py-1.5" placeholder="Label (optional)" value={cutoffLabel()} onInput={(e) => setCutoffLabel(e.currentTarget.value)} />
+          <p class="mb-3 text-sm text-text-secondary">Defines the attendance window that should feed the next payroll run.</p>
+          <div class="mb-3 grid gap-3 sm:grid-cols-3">
+            <Field label="Start date"><input type="date" class={inputClass} value={cutoffStart()} onInput={(e) => setCutoffStart(e.currentTarget.value)} /></Field>
+            <Field label="End date"><input type="date" class={inputClass} value={cutoffEnd()} onInput={(e) => setCutoffEnd(e.currentTarget.value)} /></Field>
+            <Field label="Label (optional)"><input class={inputClass} value={cutoffLabel()} onInput={(e) => setCutoffLabel(e.currentTarget.value)} /></Field>
           </div>
-          <button type="button" class="mb-3 rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={() => void addCutoff()}>
+          <button type="button" class="mb-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => void addCutoff()}>
             Add cut-off
           </button>
           <ul class="max-h-56 space-y-1 overflow-auto text-sm">
-            <For each={cutoffs.data ?? []} fallback={<li class="text-muted">No cut-offs yet.</li>}>
+            <For each={cutoffs.data ?? []} fallback={<li class="text-text-secondary">No cut-offs yet.</li>}>
               {(c) => (
                 <li class="flex justify-between border-b border-slate-100 py-1">
                   <span>{c.label}</span>
-                  <span class="text-muted">
+                  <span class="text-text-secondary">
                     {c.cutoff_start} → {c.cutoff_end} ({c.status})
                   </span>
                 </li>
@@ -246,73 +248,63 @@ export default function AttendancePage() {
         </section>
       </div>
 
-      <section class="mt-6 rounded-lg border border-stroke bg-surface p-4">
+      <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="mb-2 text-lg font-medium">DTR entry (manual)</h2>
-        <p class="mb-3 text-sm text-muted">
+        <p class="mb-3 text-sm text-text-secondary">
           Punch/import sources can fill the same table later. If the date is a holiday, status auto-tags to holiday.
         </p>
         <dtrDraft.DraftBanner />
-        <div class="mb-3 grid gap-2 sm:grid-cols-5">
-          <select
-            class="rounded border px-2 py-1.5 sm:col-span-2"
-            value={dtrEmp() ?? ""}
-            onChange={(e) => setDtrEmp(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
-          >
-            <option value="">Employee…</option>
-            <For each={emps.data?.rows ?? []}>
-              {(e) => (
-                <option value={e.id}>
-                  {e.employee_no} — {e.full_name}
-                </option>
-              )}
-            </For>
-          </select>
-          <input type="date" class="rounded border px-2 py-1.5" value={dtrDate()} onInput={(e) => setDtrDate(e.currentTarget.value)} />
-          <select class="rounded border px-2 py-1.5" value={dtrStatus()} onChange={(e) => setDtrStatus(e.currentTarget.value)}>
-            <For each={["present", "absent", "leave", "rest", "awol", "holiday"]}>{(s) => <option value={s}>{s}</option>}</For>
-          </select>
-          <div class="flex gap-2">
-            <input class="w-full rounded border px-2 py-1.5" value={dtrHours()} onInput={(e) => setDtrHours(e.currentTarget.value)} placeholder="Hours" />
-            <input class="w-full rounded border px-2 py-1.5" value={dtrOt()} onInput={(e) => setDtrOt(e.currentTarget.value)} placeholder="OT" />
+        <div class="mb-3 grid gap-3 sm:grid-cols-6">
+          <div class="sm:col-span-2">
+            <Field label="Employee">
+              <select
+                class={inputClass}
+                value={dtrEmp() ?? ""}
+                onChange={(e) => setDtrEmp(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+              >
+                <option value="">Employee…</option>
+                <For each={emps.data?.rows ?? []}>
+                  {(e) => (
+                    <option value={e.id}>
+                      {e.employee_no} — {e.full_name}
+                    </option>
+                  )}
+                </For>
+              </select>
+            </Field>
           </div>
+          <Field label="Work date"><input type="date" class={inputClass} value={dtrDate()} onInput={(e) => setDtrDate(e.currentTarget.value)} /></Field>
+          <Field label="Status"><select class={inputClass} value={dtrStatus()} onChange={(e) => setDtrStatus(e.currentTarget.value)}>
+            <For each={["present", "absent", "leave", "rest", "awol", "holiday"]}>{(s) => <option value={s}>{s}</option>}</For>
+          </select></Field>
+          <Field label="Hours"><input class={inputClass} value={dtrHours()} onInput={(e) => setDtrHours(e.currentTarget.value)} /></Field>
+          <Field label="OT hours"><input class={inputClass} value={dtrOt()} onInput={(e) => setDtrOt(e.currentTarget.value)} /></Field>
         </div>
-        <button type="button" class="mb-4 rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={() => void saveDtr()}>
+        <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => void saveDtr()}>
           Save DTR
         </button>
-        <div class="overflow-auto rounded border">
-          <table class="min-w-full text-sm">
-            <thead class="bg-slate-50 text-left">
-              <tr>
-                <th class="px-3 py-2">Date</th>
-                <th class="px-3 py-2">Employee</th>
-                <th class="px-3 py-2">Status</th>
-                <th class="px-3 py-2 text-right">Hours</th>
-                <th class="px-3 py-2 text-right">OT</th>
-                <th class="px-3 py-2">Holiday</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={dtr.data ?? []} fallback={<tr><td class="px-3 py-3 text-muted" colspan="6">No DTR rows yet.</td></tr>}>
-                {(row) => (
-                  <tr class="border-t">
-                    <td class="px-3 py-2">{row.work_date}</td>
-                    <td class="px-3 py-2">
-                      {row.employee_no} — {row.employee_name}
-                    </td>
-                    <td class="px-3 py-2">{row.status}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{row.hours_worked}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{row.ot_hours}</td>
-                    <td class="px-3 py-2">
-                      <Show when={row.holiday_name} fallback="—">
-                        {row.holiday_name} ({row.holiday_type})
-                      </Show>
-                    </td>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-        </div>
+        <SpreadsheetGrid
+          columns={[
+            { key: "work_date", header: "Date" },
+            { key: "employee_name", header: "Employee", render: (row) => <span>{row.employee_no} — {row.employee_name}</span> },
+            { key: "status", header: "Status" },
+            { key: "hours_worked", header: "Hours", render: (row) => <span class="tabular-nums">{row.hours_worked}</span> },
+            { key: "ot_hours", header: "OT", render: (row) => <span class="tabular-nums">{row.ot_hours}</span> },
+            { key: "holiday_name", header: "Holiday", render: (row) => <span>{row.holiday_name ? `${row.holiday_name} (${row.holiday_type})` : "—"}</span> },
+          ]}
+          rows={dtr.data ?? []}
+          loading={dtr.isFetching}
+          selectedId={selectedDtrId()}
+          onSelect={setSelectedDtrId}
+          onEdit={() => {}}
+          onNew={() => {}}
+          showNew={false}
+          codeKey="work_date"
+          nameKey="employee_name"
+          page={1}
+          pageSize={100}
+          total={(dtr.data ?? []).length}
+        />
       </section>
     </HrLayout>
   );

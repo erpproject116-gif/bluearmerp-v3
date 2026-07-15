@@ -5,6 +5,7 @@ import { usePayPeriods } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
+import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
 
 type RemittanceBatch = {
@@ -134,18 +135,17 @@ export default function RemittancesPage() {
 
   return (
     <HrLayout>
-      <section class="mb-6 rounded-lg border border-stroke bg-surface p-4">
+      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="mb-2 text-lg font-medium">Build remittance batch</h2>
-        <p class="mb-3 text-sm text-muted">
+        <p class="mb-3 text-sm text-text-secondary">
           Creates or refreshes an agency remittance file from posted payslips for the selected period (SSS, PhilHealth,
           Pag-IBIG, or BIR withholding).
         </p>
         <draft.DraftBanner />
         <div class="grid gap-3 sm:grid-cols-4">
-          <div>
-            <label class="mb-1 block text-sm">Pay period</label>
+          <Field label="Pay period">
             <select
-              class="w-full rounded border px-3 py-2"
+              class={inputClass}
               value={periodId() ?? ""}
               onChange={(e) => setPeriodId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
             >
@@ -158,17 +158,16 @@ export default function RemittancesPage() {
                 )}
               </For>
             </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-sm">Agency</label>
-            <select class="w-full rounded border px-3 py-2" value={agency()} onChange={(e) => setAgency(e.currentTarget.value)}>
+          </Field>
+          <Field label="Agency">
+            <select class={inputClass} value={agency()} onChange={(e) => setAgency(e.currentTarget.value)}>
               <For each={[...AGENCIES]}>{(a) => <option value={a.id}>{a.label}</option>}</For>
             </select>
-          </div>
+          </Field>
           <div class="flex items-end sm:col-span-2">
             <button
               type="button"
-              class="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               disabled={building()}
               onClick={() => void build()}
             >
@@ -180,60 +179,50 @@ export default function RemittancesPage() {
 
       <section class="mb-6">
         <h2 class="mb-2 text-lg font-medium">Batches</h2>
-        <div class="overflow-auto rounded border">
-          <table class="min-w-full text-sm">
-            <thead class="bg-slate-50 text-left">
-              <tr>
-                <th class="px-3 py-2">Agency</th>
-                <th class="px-3 py-2">Period</th>
-                <th class="px-3 py-2">Status</th>
-                <th class="px-3 py-2 text-right">EE</th>
-                <th class="px-3 py-2 text-right">ER</th>
-                <th class="px-3 py-2 text-right">Total</th>
-                <th class="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={list.data ?? []} fallback={<tr><td class="px-3 py-3 text-muted" colspan="7">No batches yet.</td></tr>}>
-                {(b) => (
-                  <tr class="border-t" classList={{ "bg-blue-50": selectedId() === b.id }}>
-                    <td class="px-3 py-2 uppercase">{b.agency}</td>
-                    <td class="px-3 py-2">{b.period_label}</td>
-                    <td class="px-3 py-2">{b.status}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{b.total_employee.toFixed(2)}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{b.total_employer.toFixed(2)}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{b.total_amount.toFixed(2)}</td>
-                    <td class="px-3 py-2">
-                      <div class="flex flex-wrap gap-2">
-                        <button type="button" class="text-blue-700 underline" onClick={() => setSelectedId(b.id)}>
-                          View
-                        </button>
-                        <button type="button" class="text-blue-700 underline" onClick={() => void exportCsv(b.id)}>
-                          CSV
-                        </button>
-                        <button type="button" class="text-slate-600 underline" onClick={() => void markStatus(b.id, "filed")}>
-                          Filed
-                        </button>
-                        <button type="button" class="text-slate-600 underline" onClick={() => void markStatus(b.id, "paid")}>
-                          Paid
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-        </div>
+        <SpreadsheetGrid
+          columns={[
+            { key: "agency", header: "Agency", render: (batch) => <span class="uppercase">{batch.agency}</span> },
+            { key: "period_label", header: "Period" },
+            { key: "status", header: "Status" },
+            { key: "total_employee", header: "EE", render: (batch) => <span class="tabular-nums">{batch.total_employee.toFixed(2)}</span> },
+            { key: "total_employer", header: "ER", render: (batch) => <span class="tabular-nums">{batch.total_employer.toFixed(2)}</span> },
+            { key: "total_amount", header: "Total", render: (batch) => <span class="tabular-nums">{batch.total_amount.toFixed(2)}</span> },
+            {
+              key: "actions",
+              header: "Actions",
+              clickable: false,
+              render: (batch) => (
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" class="text-brand-700 underline" onClick={() => setSelectedId(batch.id)}>View</button>
+                  <button type="button" class="text-brand-700 underline" onClick={() => void exportCsv(batch.id)}>CSV</button>
+                  <button type="button" class="text-text-secondary underline" onClick={() => void markStatus(batch.id, "filed")}>Filed</button>
+                  <button type="button" class="text-text-secondary underline" onClick={() => void markStatus(batch.id, "paid")}>Paid</button>
+                </div>
+              ),
+            },
+          ]}
+          rows={list.data ?? []}
+          loading={list.isFetching}
+          selectedId={selectedId()}
+          onSelect={setSelectedId}
+          onEdit={(batch) => setSelectedId(batch.id)}
+          onNew={() => {}}
+          showNew={false}
+          codeKey="agency"
+          nameKey="period_label"
+          page={1}
+          pageSize={50}
+          total={(list.data ?? []).length}
+        />
       </section>
 
       <Show when={detail.data}>
         {(d) => (
-          <section>
+          <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
             <h2 class="mb-2 text-lg font-medium">
               Lines — {d().batch.agency.toUpperCase()} ({d().lines.length})
             </h2>
-            <div class="overflow-auto rounded border">
+            <div class="overflow-auto rounded-lg border border-stroke">
               <table class="min-w-full text-sm">
                 <thead class="bg-slate-50 text-left">
                   <tr>

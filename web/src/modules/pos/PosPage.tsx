@@ -1268,9 +1268,27 @@ function DiscountModal(props: {
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
       <div class="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h3 class="mb-1 text-lg font-semibold">Discount</h3>
-        <p class="mb-4 text-sm text-slate-500">
-          Senior / PWD use statutory % and VAT exemption. Student is commercial policy. Manual is a fixed peso amount.
+        <p class="mb-2 text-sm text-slate-500">
+          Choose <span class="font-medium text-slate-700">one</span> type per ticket. Senior / PWD and student / promo
+          discounts do not stack — pick the privilege that applies to this sale.
         </p>
+        <ul class="mb-4 list-disc space-y-1 pl-5 text-xs text-slate-500">
+          <li>
+            <span class="font-medium text-slate-600">Senior or PWD:</span> statutory % + VAT exempt (ID required). Not
+            combined with each other or with student/manual.
+          </li>
+          <li>
+            <span class="font-medium text-slate-600">Student:</span> commercial % (VAT stays). Not combined with senior/PWD.
+          </li>
+          <li>
+            <span class="font-medium text-slate-600">Manual:</span> fixed ₱ amount for store promos when no privilege card
+            applies.
+          </li>
+          <li>
+            Split guest check (some senior / some regular)? Ring separate tickets — order-level discount applies to the
+            whole cart.
+          </li>
+        </ul>
         <label class="mb-1 block text-xs font-medium text-slate-500">Type</label>
         <select
           class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"

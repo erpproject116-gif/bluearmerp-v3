@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
-import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import {
   createPayslipShareLink,
   runPayroll,
@@ -72,25 +72,16 @@ export default function PayrollRunsPage() {
 
   return (
     <HrLayout>
-      <section class="mb-6 rounded-lg border border-stroke bg-surface p-4">
+      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">New payroll run</h2>
         <div class="grid gap-3 sm:grid-cols-4">
-          <div>
-            <label class="mb-1 block text-sm text-muted">Period start</label>
-            <input type="date" class="w-full rounded border px-3 py-2" value={periodStart()} onInput={(e) => setPeriodStart(e.currentTarget.value)} />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-muted">Period end</label>
-            <input type="date" class="w-full rounded border px-3 py-2" value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-muted">Label (optional)</label>
-            <input class="w-full rounded border px-3 py-2" value={periodLabel()} onInput={(e) => setPeriodLabel(e.currentTarget.value)} />
-          </div>
+          <Field label="Period start"><input type="date" class={inputClass} value={periodStart()} onInput={(e) => setPeriodStart(e.currentTarget.value)} /></Field>
+          <Field label="Period end"><input type="date" class={inputClass} value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} /></Field>
+          <Field label="Label (optional)"><input class={inputClass} value={periodLabel()} onInput={(e) => setPeriodLabel(e.currentTarget.value)} /></Field>
           <div class="flex items-end">
             <button
               type="button"
-              class="w-full rounded bg-blue-600 py-2 text-white disabled:opacity-50"
+              class="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               disabled={running()}
               onClick={() => void run()}
             >
@@ -107,8 +98,8 @@ export default function PayrollRunsPage() {
             {(p) => (
               <button
                 type="button"
-                class="rounded border px-3 py-1.5 text-sm"
-                classList={{ "border-blue-500 bg-blue-50": selectedPeriodId() === p.id }}
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+                classList={{ "border-brand-500 bg-brand-50 text-brand-700": selectedPeriodId() === p.id }}
                 onClick={() => setSelectedPeriodId(p.id)}
               >
                 {p.period_label} ({p.status})
@@ -122,7 +113,7 @@ export default function PayrollRunsPage() {
         <div class="mb-3 flex flex-wrap gap-2">
           <button
             type="button"
-            class="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel disabled:opacity-50"
             disabled={!selectedId()}
             onClick={() => {
               const row = (payslips.data ?? []).find((r) => r.id === selectedId());
@@ -133,7 +124,7 @@ export default function PayrollRunsPage() {
           </button>
           <button
             type="button"
-            class="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel disabled:opacity-50"
             disabled={!selectedId() || sharing()}
             onClick={() => {
               const row = (payslips.data ?? []).find((r) => r.id === selectedId());

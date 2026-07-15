@@ -518,8 +518,6 @@ export function resolveModule(pathname: string): AppModule | undefined {
     pathname.startsWith("/app/purchases/") ||
     pathname === "/app/hr/payroll-runs" ||
     pathname.startsWith("/app/hr/payroll-runs/") ||
-    pathname === "/app/hr/remittances" ||
-    pathname.startsWith("/app/hr/remittances/") ||
     pathname === "/app/fixed-assets" ||
     pathname.startsWith("/app/fixed-assets/") ||
     pathname === "/app/job-costing" ||
