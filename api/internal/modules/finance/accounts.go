@@ -73,6 +73,16 @@ func listAccounts(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		p := httputil.ParseListParams(r, "sort_order", allowed)
+		// Mapping dropdowns / parent pickers need the full active chart (often >100 rows).
+		// Global list clamp is 100; allow up to 2000 for this endpoint only.
+		if raw := strings.TrimSpace(r.URL.Query().Get("pageSize")); raw != "" {
+			if n, err := strconv.Atoi(raw); err == nil && n > p.PageSize {
+				if n > 2000 {
+					n = 2000
+				}
+				p.PageSize = n
+			}
+		}
 		offset := httputil.Offset(p)
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
 		accountType := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("account_type")))
@@ -380,7 +390,9 @@ func importAccountTemplate(pool *pgxpool.Pool) http.HandlerFunc {
 			select count(*)::int from public.fin_accounts
 			where tenant_id = $1 and deleted_at is null`, tu.TenantID).Scan(&existing)
 		if existing > 0 {
-			response.Validation(w, map[string]string{"template": "Chart of accounts is not empty. Import is only available for a blank chart."})
+			response.Validation(w, map[string]string{
+				"template": "Chart already has accounts. Import PH template only works on an empty chart. Use Create Purchases / COGS (5010) to add the expense account, or clear/delete accounts first.",
+			})
 			return
 		}
 
@@ -468,7 +480,22 @@ func ensurePurchaseCogsAccount(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		mapped := false
-		if d.PurchaseAccountID == nil || *d.PurchaseAccountID <= 0 {
+		needMap := d.PurchaseAccountID == nil || *d.PurchaseAccountID <= 0
+		if !needMap && d.PurchaseAccountID != nil {
+			// Remap when the stored id is missing, inactive, or not an expense posting account
+			// (common on legacy charts where purchase_account_id pointed at inventory/asset).
+			var acctType string
+			var isGroup bool
+			verr := pool.QueryRow(r.Context(), `
+				select account_type, coalesce(is_group, false)
+				from public.fin_accounts
+				where id = $1 and tenant_id = $2 and deleted_at is null and is_active`,
+				*d.PurchaseAccountID, tu.TenantID).Scan(&acctType, &isGroup)
+			if verr != nil || acctType != "expense" || isGroup {
+				needMap = true
+			}
+		}
+		if needMap {
 			d.PurchaseAccountID = &accountID
 			if err := financedefaults.Save(r.Context(), pool, tu.TenantID, d); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Account ready but failed to save mapping.", "ERR_INTERNAL")

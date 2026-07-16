@@ -123,7 +123,9 @@ export default function ChartOfAccountsPage() {
   const parentOptions = createQuery(() => ({
     queryKey: ["finance-accounts-parent-options"],
     queryFn: async () => {
-      const res = await apiFetch<AccountRow[]>("/api/v1/finance/accounts?page=1&pageSize=500&status=active&sort=account_code&order=asc");
+      const res = await apiFetch<AccountRow[]>(
+        "/api/v1/finance/accounts?page=1&pageSize=2000&status=active&sort=account_code&order=asc",
+      );
       if (!res.success) throw new Error(res.message ?? "Failed to load account options");
       return res.data ?? [];
     },
@@ -177,13 +179,24 @@ export default function ChartOfAccountsPage() {
       created: boolean;
       mapped: boolean;
       defaults: FinanceDefaults;
-    }>("/api/v1/finance/accounts/ensure-purchase-cogs", { method: "POST" });
+    }>("/api/v1/finance/accounts/ensure-purchase-cogs", { method: "POST" }, { silent: true });
     setEnsuringPurchaseCogs(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not create Purchases / COGS account.");
+      const detail = res.errors ? Object.values(res.errors).filter(Boolean).join(" · ") : "";
+      toast.warning(detail || res.message || "Could not create Purchases / COGS account.");
       return;
     }
-    invalidate();
+    // Merge the ensured expense account into the options cache immediately so the
+    // Purchases / COGS dropdown is not stuck empty while list refetch is in flight
+    // (list API previously capped pageSize at 100 and omitted 5xxx expense codes).
+    if (res.data?.account) {
+      const acct = res.data.account;
+      client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], (prev) => {
+        const rows = prev ?? [];
+        if (rows.some((a) => a.id === acct.id)) return rows;
+        return [...rows, acct].sort((a, b) => a.account_code.localeCompare(b.account_code));
+      });
+    }
     if (res.data?.defaults) {
       setDefaultsForm({
         cash_account_id: res.data.defaults.cash_account_id ?? null,
@@ -194,16 +207,27 @@ export default function ChartOfAccountsPage() {
         input_vat_account_id: res.data.defaults.input_vat_account_id ?? null,
         output_vat_account_id: res.data.defaults.output_vat_account_id ?? null,
       });
+      setMappingsDirty(true);
     } else if (res.data?.account?.id) {
       setDefaultsForm((v) => ({ ...v, purchase_account_id: res.data!.account.id }));
+      setMappingsDirty(true);
     }
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ["finance-accounts"] }),
+      client.invalidateQueries({ queryKey: ["finance-accounts-parent-options"] }),
+      client.invalidateQueries({ queryKey: ["finance-account-defaults"] }),
+    ]);
     toast.success(
       res.data?.created
         ? "Created expense account and mapped Purchases / COGS."
         : res.data?.mapped
-          ? "Mapped existing expense account to Purchases / COGS."
-          : "Purchases / COGS account is ready — select it and save if needed.",
+          ? "Mapped Purchases / COGS to an expense account."
+          : "Purchases / COGS account is ready.",
     );
+    // Mapping is persisted by the ensure API when created/remapped.
+    if (res.data?.mapped || res.data?.created) {
+      setMappingsDirty(false);
+    }
   };
 
   const purchaseMappingMissing = createMemo(() => {
@@ -369,10 +393,11 @@ export default function ChartOfAccountsPage() {
     const res = await apiFetch<{ imported: number }>("/api/v1/finance/accounts/import-template", {
       method: "POST",
       body: JSON.stringify({ template: "ph_sme" }),
-    });
+    }, { silent: true });
     setImporting(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to import template.");
+      const detail = res.errors?.template || (res.errors ? Object.values(res.errors).filter(Boolean).join(" · ") : "");
+      toast.warning(detail || res.message || "Failed to import template.");
       return;
     }
     toast.success(`Imported ${res.data?.imported ?? 0} accounts.`);
