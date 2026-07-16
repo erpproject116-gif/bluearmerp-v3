@@ -693,7 +693,7 @@ export default function ChartOfAccountsPage() {
                       <LookupCombo
                         label={slot.label}
                         value={() => mapLabels()[slot.key] ?? ""}
-                        selectedId={() => defaultsForm()[slot.key]}
+                        selectedId={() => defaultsForm()[slot.key] ?? null}
                         onInput={(text) => {
                           setMapLabels((m) => ({ ...m, [slot.key]: text }));
                           if (defaultsForm()[slot.key] != null) {
