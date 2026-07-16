@@ -487,6 +487,10 @@ export default function App() {
           <Route path="/finance/acct-i/journal-entries" component={JournalEntriesPage} />
           <Route path="/purchases/purchases/new" component={SupplierInvoiceNewPage} />
           <Route path="/purchases/purchases/settings" component={SupplierInvoiceSettingsPage} />
+          <Route path="/purchases/purchases/status" component={PurchaseStatusPage} />
+          <Route path="/purchases/purchases/pre-invoicing" component={PurchasePreInvoicingPage} />
+          <Route path="/purchases/purchases/payment-status" component={SupplierPaymentStatusPage} />
+          <Route path="/purchases/purchases/ap-by-vendor" component={ApByVendorPage} />
           <Route path="/purchases/purchases" component={SupplierInvoiceListPage} />
           <Route path="/finance/supplier-invoices/new" component={() => <Navigate href="/app/purchases/purchases/new" />} />
           <Route path="/finance/supplier-invoices/settings" component={() => <Navigate href="/app/purchases/purchases/settings" />} />

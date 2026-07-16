@@ -11,6 +11,9 @@ export type SupplierInvoiceRow = {
   currency_code: string;
   vendor_invoice_no?: string | null;
   grand_total: number;
+  paid_amount?: number;
+  balance?: number;
+  payment_status?: string;
   progress_status: string;
   created_by_name?: string;
 };

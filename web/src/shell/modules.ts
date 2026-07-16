@@ -98,8 +98,8 @@ export const appModules: AppModule[] = [
     basePath: "/app/buying",
     features: [
       { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying" },
-      { label: "Purchase Status", href: "/app/buying/reports/purchase-status", settingsHref: "/app/purchases/purchases/settings" },
-      { label: "Pre-Invoicing (Purchases)", href: "/app/buying/reports/pre-invoicing", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Purchase Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Pre-Invoicing (Purchases)", href: "/app/purchases/purchases/pre-invoicing", settingsHref: "/app/purchases/purchases/settings" },
     ],
   },
   {
@@ -278,6 +278,22 @@ export const appModules: AppModule[] = [
     basePath: "/app/purchases",
     features: [
       { label: "List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
+      {
+        label: "Pre-invoicing",
+        href: "/app/purchases/purchases/pre-invoicing",
+        settingsHref: "/app/purchases/purchases/settings",
+      },
+      {
+        label: "Payment status",
+        href: "/app/purchases/purchases/payment-status",
+        settingsHref: "/app/purchases/purchases/settings",
+      },
+      {
+        label: "A/P by vendor",
+        href: "/app/purchases/purchases/ap-by-vendor",
+        settingsHref: "/app/purchases/purchases/settings",
+      },
     ],
   },
   {

@@ -113,7 +113,15 @@ export default function GoodsReceiptListPage() {
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-text-secondary">
           {uiLabel("goods_receipt.list_description")} Select a posted GR, then{" "}
-          <span class="font-medium">Generate slip → Purchase</span> to create the AP invoice.
+          <span class="font-medium">Generate slip → Purchase</span> to create the AP invoice. Track open GR lines on{" "}
+          <A href="/app/purchases/purchases/pre-invoicing" class="text-brand-600 hover:underline">
+            Purchases → Pre-invoicing
+          </A>
+          , then pay unpaid purchases from{" "}
+          <A href="/app/purchases/purchases?payment=unpaid" class="text-brand-600 hover:underline">
+            Purchases → Unpaid
+          </A>
+          .
         </p>
         <div class="flex flex-wrap gap-2">
           <A

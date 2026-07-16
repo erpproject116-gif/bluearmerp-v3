@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
-import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
@@ -23,6 +23,8 @@ import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
+import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
+import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import { ProgressStatusMenu } from "../../sales/sales/ProgressStatusMenu";
 import type { OpenGRLine, OpenPOLine, OpenSupplierQuotationInvoiceLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
 import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
@@ -258,8 +260,9 @@ export function SupplierInvoiceModal(props: Props) {
       setVendorLabel("");
       setPicUserId(null);
       setPicName("");
-      setLocationId(null);
-      setLocationLabel("");
+      const branch = getActiveBranchCurrent();
+      setLocationId(branch?.id ?? null);
+      setLocationLabel(branch?.name ?? "");
       setProjectId(null);
       setProjectLabel("");
       setProjectName("");
@@ -517,6 +520,7 @@ export function SupplierInvoiceModal(props: Props) {
         </Show>
         <Show when={activeTab() === "details"}>
           <draft.DraftBanner />
+          <CoaSetupReminder />
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Date-no">
               <input class={inputClass} value={dateNoDisplay()} readOnly />
@@ -524,14 +528,16 @@ export function SupplierInvoiceModal(props: Props) {
             <Field label="Purchase No.">
               <input class={inputClass} value={invoiceNo()} readOnly />
             </Field>
-            <ModalField settings={byKey} fieldKey="invoice_date" fallbackLabel="Invoice date" fallbackRequired>
+            <ModalField settings={byKey} fieldKey="invoice_date" fallbackLabel="Date" fallbackRequired>
               {(m) => (
                 <DateInput value={invoiceDate()} disabled={m.disabled} onInput={(e) => setInvoiceDate(e.currentTarget.value)} />
               )}
             </ModalField>
-            <Field label="Due date">
-              <DateInput value={dueDate()} onInput={(e) => setDueDate(e.currentTarget.value)} />
-            </Field>
+            <ModalField settings={byKey} fieldKey="due_date" fallbackLabel="Due date">
+              {(m) => (
+                <DateInput value={dueDate()} disabled={m.disabled} onInput={(e) => setDueDate(e.currentTarget.value)} />
+              )}
+            </ModalField>
             <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
               {(m) => (
                 <>
@@ -583,8 +589,10 @@ export function SupplierInvoiceModal(props: Props) {
               }}
               fetchOptions={fetchVendors}
             />
-            <LookupCombo
-              label="PIC"
+            <ModalLookupField
+              settings={byKey}
+              fieldKey="pic_name"
+              fallbackLabel="PIC"
               value={picName}
               selectedId={picUserId}
               onInput={setPicName}
@@ -616,13 +624,15 @@ export function SupplierInvoiceModal(props: Props) {
               }}
               fetchOptions={fetchLocations}
             />
-            <Field label="Progress status">
-              <ProgressStatusMenu
-                value={progressStatus()}
-                onChange={setProgressStatus}
-                disabled={progressStatus() === "e_approval"}
-              />
-            </Field>
+            <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
+              {(m) => (
+                <ProgressStatusMenu
+                  value={progressStatus()}
+                  disabled={m.disabled || progressStatus() === "e_approval"}
+                  onChange={setProgressStatus}
+                />
+              )}
+            </ModalField>
             <ModalField settings={byKey} fieldKey="vendor_invoice_no" fallbackLabel="Vendor invoice no.">
               {(m) => (
                 <input
@@ -641,12 +651,28 @@ export function SupplierInvoiceModal(props: Props) {
                 <option value="cash">Cash</option>
               </select>
             </Field>
-            <Field label="Payment terms">
-              <input class={inputClass} value={paymentTerms()} onInput={(e) => setPaymentTerms(e.currentTarget.value)} />
-            </Field>
-            <Field label="PO Number">
-              <input class={inputClass} value={reference()} onInput={(e) => setReference(e.currentTarget.value)} />
-            </Field>
+            <ModalField settings={byKey} fieldKey="payment_terms" fallbackLabel="Payment terms">
+              {(m) => (
+                <input
+                  class={inputClass}
+                  value={paymentTerms()}
+                  placeholder={m.placeholder}
+                  disabled={m.disabled}
+                  onInput={(e) => setPaymentTerms(e.currentTarget.value)}
+                />
+              )}
+            </ModalField>
+            <ModalField settings={byKey} fieldKey="reference" fallbackLabel="PO Number">
+              {(m) => (
+                <input
+                  class={inputClass}
+                  value={reference()}
+                  placeholder={m.placeholder}
+                  disabled={m.disabled}
+                  onInput={(e) => setReference(e.currentTarget.value)}
+                />
+              )}
+            </ModalField>
             <AttachmentsField
               scope="finance/supplier-invoices"
               formOpen={props.open}
@@ -667,8 +693,10 @@ export function SupplierInvoiceModal(props: Props) {
                 />
               )}
             </ModalField>
-            <LookupCombo
-              label="Project"
+            <ModalLookupField
+              settings={byKey}
+              fieldKey="project_id"
+              fallbackLabel="Project"
               value={projectLabel}
               selectedId={projectId}
               onInput={setProjectLabel}
@@ -692,7 +720,7 @@ export function SupplierInvoiceModal(props: Props) {
               </Field>
             </Show>
           </div>
-          <div class="col-span-full mb-2 mt-2">
+          <div class="col-span-full mb-2 mt-2 flex flex-wrap items-center gap-2">
             <LoadSlipMenu
               disabled={!partnerId()}
               options={PURCHASE_LOAD_SLIP_OPTIONS}

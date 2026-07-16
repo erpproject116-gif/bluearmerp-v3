@@ -67,6 +67,9 @@ type SupplierInvoice struct {
 	Subtotal        float64               `json:"subtotal"`
 	TaxTotal        float64               `json:"tax_total"`
 	GrandTotal      float64               `json:"grand_total"`
+	PaidAmount      float64               `json:"paid_amount,omitempty"`
+	Balance         float64               `json:"balance,omitempty"`
+	PaymentStatus   string                `json:"payment_status,omitempty"`
 	ProgressStatus  string                `json:"progress_status"`
 	CreatedByName   string                `json:"created_by_name,omitempty"`
 	Lines           []SupplierInvoiceLine `json:"lines,omitempty"`
@@ -429,41 +432,29 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, "completed")
 			argN++
 		}
-		paymentJoin := ""
+		paymentJoin := `
+			left join (
+			  select a.supplier_invoice_id, coalesce(sum(a.applied_amount), 0) as applied
+			  from public.fin_payment_applications a
+			  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id and pv.deleted_at is null
+			  group by a.supplier_invoice_id
+			) pay on pay.supplier_invoice_id = si.id`
 		switch strings.TrimSpace(r.URL.Query().Get("payment_status")) {
 		case "unpaid":
-			paymentJoin = `
-			left join (
-			  select a.supplier_invoice_id, coalesce(sum(a.applied_amount), 0) as applied
-			  from public.fin_payment_applications a
-			  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id and pv.deleted_at is null
-			  group by a.supplier_invoice_id
-			) pay on pay.supplier_invoice_id = si.id`
 			where += " and coalesce(pay.applied, 0) < si.grand_total - 0.0001"
 		case "partial":
-			paymentJoin = `
-			left join (
-			  select a.supplier_invoice_id, coalesce(sum(a.applied_amount), 0) as applied
-			  from public.fin_payment_applications a
-			  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id and pv.deleted_at is null
-			  group by a.supplier_invoice_id
-			) pay on pay.supplier_invoice_id = si.id`
 			where += " and coalesce(pay.applied, 0) > 0.0001 and coalesce(pay.applied, 0) < si.grand_total - 0.0001"
 		case "paid":
-			paymentJoin = `
-			left join (
-			  select a.supplier_invoice_id, coalesce(sum(a.applied_amount), 0) as applied
-			  from public.fin_payment_applications a
-			  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id and pv.deleted_at is null
-			  group by a.supplier_invoice_id
-			) pay on pay.supplier_invoice_id = si.id`
 			where += " and coalesce(pay.applied, 0) >= si.grand_total - 0.0001"
 		}
 
 		q := fmt.Sprintf(`
 			select si.id, si.invoice_date, si.date_seq, si.invoice_no,
 			  si.partner_id, p.company_name, si.currency_id, c.currency_code,
-			  si.vendor_invoice_no, si.progress_status, si.grand_total::float8, count(*) over()
+			  si.vendor_invoice_no, si.progress_status, si.grand_total::float8,
+			  coalesce(pay.applied, 0)::float8 as paid_amount,
+			  (si.grand_total - coalesce(pay.applied, 0))::float8 as balance,
+			  count(*) over()
 			from public.fin_supplier_invoices si
 			join public.inv_partners p on p.id = si.partner_id
 			join public.quo_currencies c on c.id = si.currency_id%s
@@ -488,7 +479,8 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 			if err := rows.Scan(
 				&row.ID, &invoiceDate, &row.DateSeq, &row.InvoiceNo,
 				&row.PartnerID, &row.VendorName, &row.CurrencyID, &row.CurrencyCode,
-				&vendorInvNo, &row.ProgressStatus, &row.GrandTotal, &total,
+				&vendorInvNo, &row.ProgressStatus, &row.GrandTotal,
+				&row.PaidAmount, &row.Balance, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read supplier invoices.", "ERR_INTERNAL")
 				return
@@ -496,6 +488,14 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 			row.InvoiceDate = dateToStr(invoiceDate)
 			row.DateNoDisplay = formatDateNoDisplay(invoiceDate, row.DateSeq)
 			row.VendorInvoiceNo = vendorInvNo
+			switch {
+			case row.PaidAmount >= row.GrandTotal-0.0001:
+				row.PaymentStatus = "paid"
+			case row.PaidAmount > 0.0001:
+				row.PaymentStatus = "partial"
+			default:
+				row.PaymentStatus = "unpaid"
+			}
 			out = append(out, row)
 		}
 		if out == nil {

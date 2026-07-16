@@ -1,6 +1,6 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
+import { A, useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { formatPeso } from "../../../shared/money";
-import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { PURCHASES_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
@@ -24,6 +24,19 @@ import { hasPermission, useAuth } from "../../../shared/auth-context";
 
 type PageOptions = { openNewOnMount?: boolean };
 
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "", label: "All payments" },
+  { value: "unpaid", label: "Unpaid" },
+  { value: "partial", label: "Partial" },
+  { value: "paid", label: "Paid" },
+];
+
+function paymentStatusLabel(status?: string) {
+  if (status === "paid") return "Paid";
+  if (status === "partial") return "Partial";
+  return "Unpaid";
+}
+
 function listBasePath(pathname: string) {
   return pathname.startsWith("/app/purchases") ? "/app/purchases/purchases" : "/app/finance/supplier-invoices";
 }
@@ -41,6 +54,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
     defaultOrder: "desc",
     defaultStatus: "",
   });
+  const [paymentStatus, setPaymentStatus] = createSignal(typeof searchParams.payment === "string" ? searchParams.payment : "");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<SupplierInvoiceDetail | null>(null);
@@ -68,6 +82,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
     order: order(),
     q: q() || undefined,
     progressStatus: statusFilter() || undefined,
+    paymentStatus: paymentStatus() || undefined,
   }));
 
   const openNew = () => {
@@ -87,6 +102,12 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
     if (loc.pathname.endsWith("/new")) navigate(basePath(), { replace: true });
   };
 
+  const setPaymentFilter = (value: string) => {
+    setPaymentStatus(value);
+    setPage(1);
+    setSearchParams({ payment: value || undefined }, { replace: true });
+  };
+
   onMount(() => {
     if (props.openNewOnMount || loc.pathname.endsWith("/new")) openNew();
     const openId = Number(searchParams.openId ?? "");
@@ -104,6 +125,16 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
 
   return (
     <PurchasesLayout>
+      <div class="mb-4 rounded-xl border border-stroke bg-slate-50 px-4 py-3 text-sm text-text-secondary">
+        <p>
+          AP path: receive on GR → <span class="font-medium text-text-primary">Generate slip → Purchase</span> → confirm → pay via Cash Payment or Payment Voucher.
+          Use <A href="/app/purchases/purchases/pre-invoicing" class="text-brand-600 hover:underline">Pre-invoicing</A> for received lines not yet invoiced, and{" "}
+          <button type="button" class="text-brand-600 hover:underline" onClick={() => setPaymentFilter("unpaid")}>
+            Unpaid
+          </button>{" "}
+          to focus open balances.
+        </p>
+      </div>
       <SpreadsheetGrid<SupplierInvoiceRow>
         columns={[
           { key: "date_no_display", header: "Date-no", clickable: true },
@@ -117,6 +148,18 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
             render: (r) => <span>{docProgressStatusLabel(r.progress_status)}</span>,
           },
           { key: "grand_total", header: "Amount", render: (r) => formatPeso(r.grand_total) },
+          {
+            key: "balance",
+            header: "Balance",
+            sortable: false,
+            render: (r) => formatPeso(r.balance ?? r.grand_total),
+          },
+          {
+            key: "payment_status",
+            header: "Payment",
+            sortable: false,
+            render: (r) => paymentStatusLabel(r.payment_status),
+          },
           {
             key: "qc",
             header: "QC",
@@ -175,6 +218,18 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         }}
         statusLabel="Progress"
         statusOptions={[...DOC_PROGRESS_STATUS_TABS]}
+        toolbarExtra={
+          <label class="shrink-0">
+            <span class="mb-1 block text-xs font-medium text-text-primary">Payment</span>
+            <select
+              class="h-10 rounded-lg border border-stroke bg-white px-3 text-sm text-text-primary"
+              value={paymentStatus()}
+              onChange={(e) => setPaymentFilter(e.currentTarget.value)}
+            >
+              <For each={PAYMENT_STATUS_OPTIONS}>{(opt) => <option value={opt.value}>{opt.label}</option>}</For>
+            </select>
+          </label>
+        }
         onRefresh={invalidate}
         settingsHref={PURCHASES_SETTINGS_HREF.purchases}
       />
