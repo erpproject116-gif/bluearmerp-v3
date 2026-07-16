@@ -2,6 +2,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { useToast } from "../../shared/toast";
 
 type PriceListRow = { id: number; name: string; is_selling: boolean; is_buying: boolean; is_active: boolean };
@@ -167,7 +168,15 @@ export default function PriceListsPage() {
 
         <Show when={selectedId()}>
           <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 class="mb-3 text-sm font-semibold">Item rates</h2>
+            <div class="mb-3 flex items-center justify-between">
+              <h2 class="text-sm font-semibold">Item rates</h2>
+              <RecordHistoryButton
+                variant="button"
+                targetType="inv_price_list"
+                targetId={selectedId()}
+                title={`History — ${filteredLists().find((pl) => pl.id === selectedId())?.name ?? "Price list"}`}
+              />
+            </div>
             <div class="mb-3 flex flex-wrap items-end gap-2">
               <div class="min-w-[220px] flex-1">
                 <LookupCombo

@@ -130,3 +130,11 @@ psql "$DATABASE_URL" -f scripts/backfill-serial-units-from-sales.sql
 10. **Reversals:** release undo restores qty; GR reverse blocked when serials sold
 11. **Lot:** GR lot entry + sales `lot_batch_id` decrements batch qty
 12. **Dashboard:** red flags panel shows serial mismatch and open PO categories
+13. **History:** Serial Registry / Lot Batches rows open scoped Activity History; adjustments/transfers write `audit_logs` with `target_id` set to the unit/lot
+
+## History vs Trace
+
+| Control | Question it answers |
+|---------|---------------------|
+| **Serial Trace** | Operational path of one serial (receive, transfer, reserve, issue) |
+| **History** on registry / lot row | Who performed register / adjust / transfer in the app (`audit_logs`) |

@@ -651,7 +651,17 @@ func transferSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to commit transfer.", "ERR_INTERNAL")
 			return
 		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.serial.transfer", "inv_serial_unit", nil, nil, body)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.serial.transfer", "inv_serial_unit", nil, nil, map[string]any{
+			"transferred_count": transferred,
+			"to_location_id":    body.ToLocationID,
+		})
+		for _, unitID := range body.SerialUnitIDs {
+			id := unitID
+			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.serial.transfer", "inv_serial_unit", &id, nil, map[string]any{
+				"to_location_id": body.ToLocationID,
+				"notes":          body.Notes,
+			})
+		}
 		response.OK(w, map[string]any{"transferred_count": transferred}, "Transferred.")
 	}
 }

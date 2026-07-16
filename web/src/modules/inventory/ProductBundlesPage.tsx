@@ -2,6 +2,8 @@ import { createSignal, For } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { useToast } from "../../shared/toast";
 import { useInventoryList, useInvalidateInventoryList } from "../../shared/useInventoryList";
 import { useListState } from "../../shared/useListState";
@@ -188,6 +190,14 @@ export default function ProductBundlesPage() {
               </button>
             ),
           },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="inventory" targetType="inv_product_bundle" targetId={r.id} title={`History — ${r.bundle_name}`} />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -217,6 +227,14 @@ export default function ProductBundlesPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
         saving={saving()}
+        headerActions={
+          <RecordHistoryButton
+            variant="button"
+            targetType="inv_product_bundle"
+            targetId={editing()?.id}
+            title={`History — ${editing()?.bundle_name ?? "Product bundle"}`}
+          />
+        }
       >
         <Field label="Bundle code *">
           <input class={inputClass} value={bundleCode()} onInput={(e) => setBundleCode(e.currentTarget.value)} />

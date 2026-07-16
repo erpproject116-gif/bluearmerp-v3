@@ -2,6 +2,7 @@ import { createSignal, onMount, Show } from "solid-js";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { INVENTORY_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
 import { useInvalidateRepairOrders, useRepairOrderList, type RepairOrderRow } from "../../../shared/useRepairOrderList";
@@ -121,6 +122,14 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
             key: "progress_status",
             header: "Progress",
             render: (r) => (r.progress_status === "finished" ? "Finished" : "Received"),
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="after-sales" targetType="inv_repair_order" targetId={r.id} title={`History — ${r.repair_order_no}`} />
+            ),
           },
         ]}
         rows={list.data?.rows ?? []}

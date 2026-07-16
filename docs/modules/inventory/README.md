@@ -50,6 +50,17 @@ Five-digit `char(5)` per tenant via `allocate_tenant_code(tenant_id, entity_type
 
 Shared `SpreadsheetGrid`: F2 new, Enter edit, arrows navigate, click code/name for modal. **Resizable columns**, **horizontal scroll**, and **subtle grid borders** — see `docs/golden-rules.md`.
 
+### Per-record History
+
+Lists and edit modals for partners, locations, projects, departments, items, product bundles, price lists, stock movements, and stock entries expose **History** (same pattern as Sales / Purchases). Data comes from `audit_logs` via `GET /api/v1/activity-logs?target_type=&target_id=`. After-Sales repair orders / registrations and Serial Registry / Lot Batches use the same control.
+
+| Area | `target_type` examples |
+|------|------------------------|
+| Masters | `inv_partner`, `inv_item`, `inv_location`, `inv_project`, `inv_department`, `inv_product_bundle`, `inv_price_list` |
+| Stock | `inv_stock_movement`, `inv_stock_entry` |
+| After-Sales | `inv_repair_order`, `inv_repair_registration` (attachments roll up via `repair_order_id` in `new_values`) |
+| Serial & Lot | `inv_serial_unit`, `inv_lot_batch` |
+
 ## List SQL
 
 Narrow SELECT + `COUNT(*) OVER()` on page 1; partial indexes on `(tenant_id, *_code) WHERE deleted_at IS NULL`.

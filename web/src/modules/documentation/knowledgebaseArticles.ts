@@ -202,6 +202,7 @@ export const knowledgebaseArticles: KbArticle[] = [
           "Choose Receipt as the entry type.",
           "Select the destination location (to) and the item with quantity received.",
           "Save, then Post the entry to update stock.",
+          "Open History on the entry row to see who created or posted it.",
         ],
       },
       {
@@ -211,7 +212,7 @@ export const knowledgebaseArticles: KbArticle[] = [
     ],
     primaryHref: "/app/inventory/stock-entries",
     primaryLabel: "Open stock entries",
-    relatedGuideIds: ["inventory", "purchase-request"],
+    relatedGuideIds: ["inventory", "purchase-request", "activity-logs-audit"],
   },
   {
     id: "issue-stock-from-branch",
@@ -436,7 +437,7 @@ export const knowledgebaseArticles: KbArticle[] = [
     ],
     primaryHref: "/app/inventory/serial-lot/receive",
     primaryLabel: "Open serial receive",
-    relatedGuideIds: ["inventory", "sales"],
+    relatedGuideIds: ["inventory", "sales", "activity-logs-audit", "serial-lot-registry"],
   },
   ...moduleKbArticles,
   ...helpScenarioArticles,

@@ -101,6 +101,11 @@ var entityLabels = map[string]string{
 	"inv_repair_order":          "Repair order",
 	"inv_repair_registration":   "Register repair",
 	"inv_stock_movement":        "Stock movement",
+	"inv_stock_entry":           "Stock entry",
+	"inv_serial_unit":           "Serial unit",
+	"inv_lot_batch":             "Lot batch",
+	"inv_product_bundle":        "Product bundle",
+	"inv_price_list":            "Price list",
 	"quo_tax_type":              "Tax type",
 	"quo_currency":              "Currency",
 	"tenant_role":               "User role",
@@ -133,6 +138,14 @@ var referenceLabels = map[string]string{
 	"inv_repair_registration": "Registration No.",
 	"inv_item":                "Item Code",
 	"inv_partner":             "Partner Code",
+	"inv_location":            "Location Code",
+	"inv_project":             "Project Code",
+	"inv_department":          "Department Code",
+	"inv_stock_entry":         "Entry No.",
+	"inv_serial_unit":         "Serial No.",
+	"inv_lot_batch":           "Lot No.",
+	"inv_product_bundle":      "Bundle",
+	"inv_price_list":          "Price List",
 }
 
 func entityLabel(targetType string) string {
@@ -504,6 +517,26 @@ func describeCreatePayload(targetType string, newM map[string]any) []string {
 		pick("company_name", "partner_code")
 	case "inv_item":
 		pick("item_code", "item_name")
+	case "inv_location":
+		pick("location_code", "location_name")
+	case "inv_project":
+		pick("project_code", "project_name")
+	case "inv_department":
+		pick("department_code", "department_name")
+	case "inv_repair_order":
+		pick("repair_order_no", "progress_status")
+	case "inv_repair_registration":
+		pick("registration_no", "status")
+	case "inv_stock_entry":
+		pick("entry_no", "entry_type", "status")
+	case "inv_serial_unit":
+		pick("serial_no", "status")
+	case "inv_lot_batch":
+		pick("lot_no", "qty_on_hand")
+	case "inv_product_bundle":
+		pick("bundle_code", "bundle_name")
+	case "inv_price_list":
+		pick("name", "is_selling", "is_buying")
 	case "user":
 		pick("email", "full_name")
 	case "tenant_custom_field":

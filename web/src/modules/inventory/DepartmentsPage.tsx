@@ -1,6 +1,8 @@
 import { createSignal } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
 import { INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
 import { ModalField } from "../../shared/ModalField";
@@ -85,6 +87,14 @@ export default function DepartmentsPage() {
           { key: "department_code", header: "Code", clickable: true },
           { key: "department_name", header: "Name", clickable: true },
           { key: "status", header: "Status" },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="inventory" targetType="inv_department" targetId={r.id} title={`History — ${r.department_code}`} />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -108,7 +118,21 @@ export default function DepartmentsPage() {
         onStatusChange={setStatusFilter}
         settingsHref={INVENTORY_SETTINGS_HREF.departments}
       />
-      <EntityModal open={modalOpen()} title={editing() ? "Edit department" : "New department"} onClose={() => setModalOpen(false)} onSave={() => void save()} saving={saving()}>
+      <EntityModal
+        open={modalOpen()}
+        title={editing() ? "Edit department" : "New department"}
+        onClose={() => setModalOpen(false)}
+        onSave={() => void save()}
+        saving={saving()}
+        headerActions={
+          <RecordHistoryButton
+            variant="button"
+            targetType="inv_department"
+            targetId={editing()?.id}
+            title={`History — ${editing()?.department_code ?? "Department"}`}
+          />
+        }
+      >
         <Field label="Dept. code"><input class={inputClass} value={nextCode()} readOnly /></Field>
         <ModalField settings={byKey} fieldKey="department_name" fallbackLabel="Department name" fallbackRequired>
           {(m) => (

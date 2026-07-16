@@ -5,6 +5,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { Modal } from "../../../shared/Modal";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { parseNum } from "../../../shared/money";
 import { useToast } from "../../../shared/toast";
@@ -236,6 +237,14 @@ export default function LotBatchesListPage() {
               },
               { key: "expiry_date", header: "Expiry", render: (r) => r.expiry_date?.slice(0, 10) ?? "—" },
               { key: "updated_at", header: "Updated", render: (r) => r.updated_at.slice(0, 10) },
+              {
+                key: "history",
+                header: "History",
+                sortable: false,
+                render: (r) => (
+                  <ActivityHistoryLink module="serial-lot" targetType="inv_lot_batch" targetId={r.id} title={`History — ${r.lot_no}`} />
+                ),
+              },
             ]}
             rows={list.data?.rows ?? []}
             loading={list.isFetching}

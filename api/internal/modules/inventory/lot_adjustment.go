@@ -240,7 +240,17 @@ func applyLotAdjustments(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.lot.adjustment", "inv_lot_batch", nil, nil, body)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.lot.adjustment", "inv_lot_batch", nil, nil, map[string]any{
+			"adjusted_count": adjusted,
+			"reason":         reason,
+		})
+		for _, line := range body.Lines {
+			if line.QtyDelta == 0 || line.LotBatchID <= 0 {
+				continue
+			}
+			lotID := line.LotBatchID
+			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.lot.adjustment", "inv_lot_batch", &lotID, nil, line)
+		}
 		response.OK(w, map[string]any{"adjusted_count": adjusted}, "Lots adjusted.")
 	}
 }

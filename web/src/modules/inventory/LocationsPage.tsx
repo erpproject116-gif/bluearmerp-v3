@@ -1,6 +1,8 @@
 import { createSignal } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
 import { INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
 import { ModalField } from "../../shared/ModalField";
@@ -95,6 +97,14 @@ export default function LocationsPage() {
           { key: "location_type", header: "Type" },
           { key: "production_process", header: "Production" },
           { key: "status", header: "Status" },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="inventory" targetType="inv_location" targetId={r.id} title={`History — ${r.location_code}`} />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -118,7 +128,21 @@ export default function LocationsPage() {
         onStatusChange={setStatusFilter}
         settingsHref={INVENTORY_SETTINGS_HREF.locations}
       />
-      <EntityModal open={modalOpen()} title={editing() ? "Edit location" : "New location"} onClose={() => setModalOpen(false)} onSave={() => void save()} saving={saving()}>
+      <EntityModal
+        open={modalOpen()}
+        title={editing() ? "Edit location" : "New location"}
+        onClose={() => setModalOpen(false)}
+        onSave={() => void save()}
+        saving={saving()}
+        headerActions={
+          <RecordHistoryButton
+            variant="button"
+            targetType="inv_location"
+            targetId={editing()?.id}
+            title={`History — ${editing()?.location_code ?? "Location"}`}
+          />
+        }
+      >
         <Field label="Location code"><input class={inputClass} value={nextCode()} readOnly /></Field>
         <ModalField settings={byKey} fieldKey="location_name" fallbackLabel="Location name" fallbackRequired>
           {(m) => (

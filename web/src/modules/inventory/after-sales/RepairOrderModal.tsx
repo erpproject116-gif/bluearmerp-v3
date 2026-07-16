@@ -1,5 +1,9 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
+import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
+import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { EditableLineGrid, emptyLine, type RepairLineRow } from "../../../shared/EditableLineGrid";
 import { INVENTORY_ENTITY } from "../../../shared/entityTypes";
@@ -116,6 +120,7 @@ function linesFromDetail(lines?: RepairOrderDetail["lines"]): RepairLineRow[] {
 
 export function RepairOrderModal(props: Props) {
   const toast = useToast();
+  const queryClient = useQueryClient();
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { fields, byKey, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.repairOrder);
 
@@ -349,6 +354,7 @@ export function RepairOrderModal(props: Props) {
       return;
     }
     toast.success(props.editing ? "Repair order updated." : "Repair order created.");
+    if (props.editing) invalidateRecordHistory(queryClient, "inv_repair_order", props.editing.id);
     await draft.clearOnSave();
     props.onSaved();
     if (props.editing) {
@@ -366,6 +372,16 @@ export function RepairOrderModal(props: Props) {
       onClose={() => props.onClose()}
       onSave={() => void save()}
       saving={saving()}
+      headerActions={
+        <Show when={effectiveEditing()}>
+          <RecordHistoryButton
+            variant="button"
+            targetType="inv_repair_order"
+            targetId={effectiveEditing()?.id}
+            title={`History — ${effectiveEditing()?.repair_order_no ?? "Repair Order"}`}
+          />
+        </Show>
+      }
     >
       <div class="space-y-4">
       <draft.DraftBanner />
@@ -569,6 +585,7 @@ export function RepairOrderModal(props: Props) {
       </div>
       <EditableLineGrid lines={lines} onChange={setLines} onSerialLotBlur={onSerialLotBlur} />
       <CustomFieldsSection entityType={INVENTORY_ENTITY.repairOrder} values={customValues} onChange={setCustom} />
+      <ChangeLogPanel targetType="inv_repair_order" targetId={effectiveEditing()?.id} />
       </div>
     </WideEntityModal>
   );

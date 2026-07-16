@@ -18,6 +18,7 @@ import {
   type StandardCosts,
 } from "../../shared/itemMasterConstants";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { parseNum } from "../../shared/money";
 import type { FormFieldSetting } from "../../shared/useFormFieldSettings";
 
@@ -88,6 +89,7 @@ export type ItemTab = (typeof TABS)[number]["id"];
 type Props = {
   open: boolean;
   editing: boolean;
+  editingId?: number | null;
   nextCode: string;
   itemTab: ItemTab;
   setItemTab: Setter<ItemTab>;
@@ -113,6 +115,14 @@ export function ItemMasterModal(props: Props) {
       onClose={props.onClose}
       onSave={props.onSave}
       saving={props.saving}
+      headerActions={
+        <RecordHistoryButton
+          variant="button"
+          targetType="inv_item"
+          targetId={props.editingId}
+          title={`History — ${props.nextCode || "Item"}`}
+        />
+      }
     >
       {props.draftBanner}
       <div class="col-span-full mb-3 flex flex-wrap gap-2 border-b border-stroke pb-3">

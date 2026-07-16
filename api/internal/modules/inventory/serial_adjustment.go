@@ -278,7 +278,17 @@ func applySerialAdjustments(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.serial.adjustment", "inv_serial_unit", nil, nil, body)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.serial.adjustment", "inv_serial_unit", nil, nil, map[string]any{
+			"adjusted_count": adjusted,
+			"reason":         reason,
+		})
+		for _, line := range body.Lines {
+			if line.QtyDelta == 0 || line.SerialUnitID <= 0 {
+				continue
+			}
+			unitID := line.SerialUnitID
+			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.serial.adjustment", "inv_serial_unit", &unitID, nil, line)
+		}
 		response.OK(w, map[string]any{"adjusted_count": adjusted}, "Serials adjusted.")
 	}
 }

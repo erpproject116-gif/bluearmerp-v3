@@ -24,6 +24,8 @@ func recordHistoryParentKey(targetType string) string {
 		return "supplier_quotation_id"
 	case "fin_official_receipt":
 		return "official_receipt_id"
+	case "inv_repair_order":
+		return "repair_order_id"
 	default:
 		return ""
 	}

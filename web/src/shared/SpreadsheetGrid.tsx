@@ -477,6 +477,8 @@ export function EntityModal(props: {
   singleColumn?: boolean;
   /** Render above another modal (e.g. email over a transaction window). */
   stacked?: boolean;
+  /** Optional controls at the right of the title (e.g. History). */
+  headerActions?: JSX.Element;
   children: JSX.Element;
 }) {
   return (
@@ -489,7 +491,12 @@ export function EntityModal(props: {
             class="erp-surface w-full rounded-2xl border border-stroke p-6 shadow-xl"
             classList={{ "max-w-6xl": props.wide, "max-w-4xl": !props.wide }}
           >
-            <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
+              <Show when={props.headerActions}>
+                <div class="flex items-center gap-2">{props.headerActions}</div>
+              </Show>
+            </div>
             <div
               class="mt-5"
               classList={{

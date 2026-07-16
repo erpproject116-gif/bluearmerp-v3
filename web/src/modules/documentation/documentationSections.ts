@@ -153,6 +153,10 @@ export const documentationSections: DocSection[] = [
         text: "Product Bundles let you sell a kit as one line on a sales order; when you pick a bundle item, you can explode it into component lines with prices from your price list. Price Lists support selling lists (customers) and buying lists (suppliers)—use the Selling / Buying filter when maintaining rates.",
       },
       {
+        type: "paragraph",
+        text: "Every master and stock list includes a History link (and edit modals show a History button). Open it to see who created or changed that partner, item, location, project, department, bundle, stock entry, or movement—same audit trail pattern used on Sales and Purchases. Global Activity Logs remain available for administrators.",
+      },
+      {
         type: "tip",
         text: "Open Stock → Workspace for a quick view of stock KPIs. Use settings on each list screen to choose which columns appear on forms.",
       },
@@ -194,8 +198,13 @@ export const documentationSections: DocSection[] = [
           "Create a Sales Order, then use Release Sales Order to allocate stock (and pick serials if needed).",
           "Post a Delivery Receipt when goods leave the warehouse (split release mode).",
           "Create a Sales invoice from released or delivered lines.",
-          "Use Serial Trace to look up the full history of one serial number.",
+          "Use Serial Trace to look up the full operational history of one serial number (receive, transfer, reserve, issue).",
+          "On Serial Registry and Lot Batches, use History for the audit trail of who registered or adjusted that unit or lot.",
         ],
+      },
+      {
+        type: "tip",
+        text: "Serial Trace answers “what happened to this unit in stock?” History answers “who changed the record in the system?” Use both when investigating discrepancies.",
       },
       {
         type: "tip",
@@ -850,7 +859,12 @@ export const documentationSections: DocSection[] = [
           "Use Repair Order Status to monitor progress across all open jobs.",
           "Register Repair screens handle day-to-day repair logging and consumption of parts.",
           "Open Warranty coverage when you need coverage end dates or CRM warranty follow-ups (not repair intake).",
+          "Use History on a repair order or registration row (or the History button on the repair modal) to see who changed progress, parts, or attachments.",
         ],
+      },
+      {
+        type: "tip",
+        text: "Attachment uploads and progress updates roll into the same repair-order History timeline so technicians and supervisors share one audit view.",
       },
     ],
   },
@@ -873,7 +887,8 @@ export const documentationSections: DocSection[] = [
           "User Management → Roles: control which areas each role can view or edit.",
           "User Management → Process Policies: require quotations, SO, PR approval, GR before supplier invoice, and legacy vs split SO release.",
           "User Management → Demo Data: populate or purge sample documents on DEMO000 / BLUEARM tenants.",
-          "Activity Logs: see who changed important records.",
+          "Activity Logs: see who changed important records across the tenant.",
+          "On Inventory, After-Sales, Serial & Lot, and trading documents, open History on a single row or modal for a scoped timeline (no special global permission required for that record).",
           "Branding (from your account menu): upload your logo, set print names, and under Navigation rename sidebar modules and header tabs for your store.",
           "Use the floating Support ticket button (above Help) to open a new ticket from any screen — drag the pair out of the way if they cover content.",
         ],

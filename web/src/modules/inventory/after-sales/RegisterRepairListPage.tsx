@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { useListState } from "../../../shared/useListState";
 import { useToast } from "../../../shared/toast";
 import { AfterSalesLayout } from "./AfterSalesLayout";
@@ -107,6 +108,14 @@ export default function RegisterRepairListPage() {
                   {convertingId() === r.id ? "…" : "→ RO"}
                 </button>
               ) : null,
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="after-sales" targetType="inv_repair_registration" targetId={r.id} title={`History — ${r.registration_no}`} />
+            ),
           },
         ]}
         rows={list.data?.rows ?? []}

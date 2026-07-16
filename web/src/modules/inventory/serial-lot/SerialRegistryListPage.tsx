@@ -1,5 +1,6 @@
 import { createSignal, Show } from "solid-js";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import {
   useInvalidateSerialLotLists,
   useSerialUnitList,
@@ -89,6 +90,14 @@ export default function SerialRegistryListPage() {
               { key: "warranty_end", header: "Warranty end", render: (r) => fmtDate(r.warranty_end) },
               { key: "purchase_order_no", header: "PO no.", render: (r) => r.purchase_order_no ?? "—" },
               { key: "received_at", header: "Received", render: (r) => fmtDate(r.received_at) },
+              {
+                key: "history",
+                header: "History",
+                sortable: false,
+                render: (r) => (
+                  <ActivityHistoryLink module="serial-lot" targetType="inv_serial_unit" targetId={r.id} title={`History — ${r.serial_no}`} />
+                ),
+              },
             ]}
             rows={list.data?.rows ?? []}
             loading={list.isFetching}

@@ -5,6 +5,7 @@ import { statusExportUrl, statusPrintPath } from "./repairOrderStatusFilters";
 import type { RepairOrderStatusFilters } from "./repairOrderStatusFilters";
 import type { StatusReportRow } from "../../../shared/useRepairOrderStatusReport";
 import { getAccessToken } from "../../../shared/api";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
 
 type Props = {
@@ -73,14 +74,15 @@ export function RepairOrderStatusReport(props: Props) {
               <th class="px-3 py-2">Item Name [Spec]</th>
               <th class="px-3 py-2 text-right">Qty</th>
               <th class="px-3 py-2">Remark</th>
+              <th class="px-3 py-2">History</th>
             </tr>
           </thead>
           <tbody>
             <Show when={props.loading}>
-              <ReportLoadingRow colSpan={11} />
+              <ReportLoadingRow colSpan={12} />
             </Show>
             <Show when={!props.loading && props.rows.length === 0}>
-              <ReportEmptyRow colSpan={11} />
+              <ReportEmptyRow colSpan={12} />
             </Show>
             <For each={props.rows}>
               {(row) => (
@@ -117,6 +119,14 @@ export function RepairOrderStatusReport(props: Props) {
                   <td class="px-3 py-2">{row.item_name_display}</td>
                   <td class="px-3 py-2 text-right">{row.qty}</td>
                   <td class="px-3 py-2">{row.remark ?? ""}</td>
+                  <td class="px-3 py-2">
+                    <ActivityHistoryLink
+                      module="after-sales"
+                      targetType="inv_repair_order"
+                      targetId={row.repair_order_id}
+                      title={`History — ${row.repair_order_no}`}
+                    />
+                  </td>
                 </tr>
               )}
             </For>
@@ -127,6 +137,7 @@ export function RepairOrderStatusReport(props: Props) {
                 Total
               </td>
               <td class="px-3 py-2 text-right">{props.totalQty}</td>
+              <td />
               <td />
             </tr>
           </tfoot>

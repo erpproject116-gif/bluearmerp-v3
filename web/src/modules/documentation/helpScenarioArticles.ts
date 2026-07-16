@@ -1299,4 +1299,31 @@ export const helpScenarioArticles: KbArticle[] = [
     primaryLabel: "Operations calendar",
     relatedGuideIds: ["operations-calendar-day-today", "operations-hub-intro", "work-item-link-erp-doc"],
   },
+  {
+    id: "find-inventory-record-history",
+    title: "Where is History for inventory, repairs, and serials?",
+    scenario:
+      "You need to know who changed a partner, item, repair order, serial unit, or lot — not the global Activity Logs screen.",
+    intro:
+      "Per-record History is on every Inventory master list, Stock entries/movements, Price lists, After-Sales repair screens, and Serial Registry / Lot Batches. It uses the same audit trail as Activity Logs, scoped to one record.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open the list (Partners, Items, Repair Orders, Serial Registry, etc.).",
+          "Click History on the row — or open the edit modal and use the History button in the header.",
+          "Review When / PIC / Activity. Edits after save refresh the timeline automatically.",
+          "For serials: use Serial Trace for operational stock events, and History for who registered or adjusted the unit in the system.",
+          "Administrators can still open Activity Logs for a tenant-wide search by date, user, or action.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "You do not need global Activity Log permission to open History on a record you can already view. Change Logs (field-level before/after) still require change-log permission when shown inside modals.",
+      },
+    ],
+    primaryHref: "/app/inventory/items",
+    primaryLabel: "Items",
+    relatedGuideIds: ["activity-logs-audit", "inventory-master-data", "after-sales-repair", "serial-lot-registry"],
+  },
 ];

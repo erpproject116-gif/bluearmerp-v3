@@ -959,11 +959,13 @@ export const moduleKbArticles: KbArticle[] = [
           "Set customer, location, and progress status.",
           "Add parts lines and post consumption when parts are used from stock.",
           "Print receipt or warranty documents from the repair order actions.",
+          "Open History on the list or repair modal to review progress changes, edits, and attachment uploads.",
         ],
       },
     ],
     primaryHref: "/app/after-sales/repair-orders/new",
     primaryLabel: "New repair order",
+    relatedGuideIds: ["activity-logs-audit"],
   },
   {
     id: "wms-and-shipping",
@@ -1165,12 +1167,17 @@ export const moduleKbArticles: KbArticle[] = [
           "Lots tracks batch numbers when items use lot tracking instead of individual serials.",
           "Receive (under Serial & Lot) is an alternate path to scan serials against open PO lines.",
           "Bills of Material and Work Orders build finished goods and backflush components on completion.",
+          "Open History on a registry or lot-batch row to see who registered, transferred, or adjusted that unit or lot (system audit).",
         ],
+      },
+      {
+        type: "tip",
+        text: "Serial Trace shows operational events for one serial. History shows PIC and timestamps from Activity Logs for that unit. Use both when qty and serial counts disagree.",
       },
     ],
     primaryHref: "/app/inventory/serial-lot/registry",
     primaryLabel: "Serial registry",
-    relatedGuideIds: ["serial-barcode-scanning", "item-serial-lot-tab", "sales-lot-batch-pick"],
+    relatedGuideIds: ["serial-barcode-scanning", "item-serial-lot-tab", "sales-lot-batch-pick", "activity-logs-audit"],
   },
   {
     id: "item-serial-lot-tab",
@@ -1379,19 +1386,26 @@ export const moduleKbArticles: KbArticle[] = [
     id: "activity-logs-audit",
     title: "Activity and change logs",
     scenario: "You need to see who changed important records.",
-    intro: "Activity Logs show user actions; Change Logs drill into field-level edits on key documents.",
+    intro:
+      "Activity Logs show user actions across the tenant. Change Logs drill into field-level edits. Per-record History on lists and modals scopes the same audit trail to one partner, item, repair order, serial, sale, or purchase.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Activity Logs for a chronological audit trail.",
-          "Open Change Logs for before/after values on transactions.",
-          "Use History on individual document modals for record-specific timelines.",
+          "Open Activity Logs for a chronological tenant-wide audit trail (requires activity-log permission).",
+          "Open Change Logs for before/after values on key documents (requires change-log permission).",
+          "On Selling, Buying, Finance, Inventory masters, Stock entries/movements, Price lists, After-Sales repairs, and Serial Registry / Lot Batches, click History on a row or the History button in an edit modal.",
+          "Per-record History is available to users who can open the document—even without global Activity Log access.",
         ],
+      },
+      {
+        type: "tip",
+        text: "Serial Trace (Serial & Lot) is operational unit history (receive → issue). History on the registry is the system audit of who registered or adjusted that serial. Use both when investigating stock vs serial mismatches.",
       },
     ],
     primaryHref: "/app/activity-logs",
     primaryLabel: "Activity logs",
+    relatedGuideIds: ["inventory-master-data", "after-sales-repair", "serial-lot-registry"],
   },
   {
     id: "demo-data-training",
@@ -1416,7 +1430,7 @@ export const moduleKbArticles: KbArticle[] = [
     id: "inventory-master-data",
     title: "Partners, items, and price lists",
     scenario: "You are setting up customers, products, and selling prices.",
-    intro: "Stock master data underpins every module — partners, locations, items, bundles, and price lists.",
+    intro: "Stock master data underpins every module — partners, locations, items, projects, departments, bundles, and price lists.",
     blocks: [
       {
         type: "steps",
@@ -1425,11 +1439,16 @@ export const moduleKbArticles: KbArticle[] = [
           "Create items with SKU, prices, and Track serial / Track lot flags as needed.",
           "Maintain selling and buying price lists for automatic rate resolution.",
           "Use Product Bundles to sell kits that explode into component lines.",
+          "Open History on any master row (or History in the edit modal) to see who created or changed that record.",
         ],
+      },
+      {
+        type: "tip",
+        text: "Stock Movements and Stock Entries also expose History so quantity adjustments and transfers stay auditable alongside commercial documents.",
       },
     ],
     primaryHref: "/app/inventory/items",
     primaryLabel: "Items",
-    relatedGuideIds: ["setup-wizard"],
+    relatedGuideIds: ["setup-wizard", "activity-logs-audit", "serial-lot-registry"],
   },
 ];

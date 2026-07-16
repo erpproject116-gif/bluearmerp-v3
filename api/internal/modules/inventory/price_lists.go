@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -83,6 +84,9 @@ func createPriceList(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create price list.", "ERR_INTERNAL")
 			return
 		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.price_list.create", "inv_price_list", &id, nil, map[string]any{
+			"name": body.Name, "is_selling": isSelling, "is_buying": isBuying,
+		})
 		response.OK(w, PriceList{ID: id, Name: body.Name, IsSelling: isSelling, IsBuying: isBuying, IsActive: true}, "Created.")
 	}
 }
@@ -162,6 +166,10 @@ func upsertPriceListItems(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 		}
+		listID, _ := strconv.ParseInt(id, 10, 64)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.price_list.items_upsert", "inv_price_list", &listID, nil, map[string]any{
+			"item_count": len(body.Items),
+		})
 		response.OK(w, nil, "Saved.")
 	}
 }

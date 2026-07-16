@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { modalDismissClass } from "../../shared/Modal";
 import { useToast } from "../../shared/toast";
@@ -146,6 +147,7 @@ export default function StockEntriesPage() {
               <th class="px-3 py-2 text-left">To</th>
               <th class="px-3 py-2 text-left">Status</th>
               <th class="px-3 py-2 text-left">Actions</th>
+              <th class="px-3 py-2 text-left">History</th>
             </tr>
           </thead>
           <tbody>
@@ -169,6 +171,9 @@ export default function StockEntriesPage() {
                         {postingId() === row.id ? "Posting…" : "Post"}
                       </button>
                     </Show>
+                  </td>
+                  <td class="px-3 py-2">
+                    <ActivityHistoryLink module="inventory" targetType="inv_stock_entry" targetId={row.id} title={`History — ${row.entry_no}`} />
                   </td>
                 </tr>
               )}

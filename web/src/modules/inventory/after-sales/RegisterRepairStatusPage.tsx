@@ -4,6 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass, SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { AfterSalesLayout } from "./AfterSalesLayout";
 
 function todayISO() {
@@ -151,6 +152,14 @@ export default function RegisterRepairStatusPage() {
             },
             { key: "status", header: "Status" },
             { key: "repair_order_no", header: "Repair Order" },
+            {
+              key: "history",
+              header: "History",
+              sortable: false,
+              render: (r) => (
+                <ActivityHistoryLink module="after-sales" targetType="inv_repair_registration" targetId={r.id} title={`History — ${r.registration_no}`} />
+              ),
+            },
           ]}
           rows={report.data?.rows ?? []}
           loading={report.isFetching}

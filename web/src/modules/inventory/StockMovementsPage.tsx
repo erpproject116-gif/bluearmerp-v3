@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
 
@@ -95,6 +96,12 @@ export default function StockMovementsPage() {
           { key: "qty_delta", header: "Qty Δ", render: (r) => r.qty_delta.toFixed(4) },
           { key: "movement_type", header: "Type" },
           { key: "reason", header: "Reason", render: (r) => r.reason ?? "" },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => <ActivityHistoryLink module="inventory" targetType="inv_stock_movement" targetId={r.id} />,
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}

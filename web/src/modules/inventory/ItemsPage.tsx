@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { formatAmount } from "../../shared/money";
 import { PRICE_LEVEL_KEYS, SAFETY_DOC_TYPES } from "../../shared/itemMasterConstants";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { validateCustomFields } from "../../shared/CustomFieldsSection";
 import { requireFields, submitEntity } from "../../shared/handleSaveResult";
 import { useToast } from "../../shared/toast";
@@ -255,6 +256,14 @@ export default function ItemsPage() {
           { key: "track_serial", header: "Serial", render: (r) => (r.track_serial ? "Yes" : "—") },
           { key: "track_lot", header: "Lot", render: (r) => (r.track_lot ? "Yes" : "—") },
           { key: "status", header: "Status" },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="inventory" targetType="inv_item" targetId={r.id} title={`History — ${r.item_code}`} />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -301,6 +310,7 @@ export default function ItemsPage() {
       <ItemMasterModal
         open={modalOpen()}
         editing={Boolean(editing())}
+        editingId={editing()?.id ?? null}
         nextCode={nextCode()}
         itemTab={itemTab()}
         setItemTab={setItemTab}

@@ -2,6 +2,8 @@ import { createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
 import { DRAFT_ENTITY, INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../shared/handleSaveResult";
@@ -198,6 +200,14 @@ export default function PartnersPage() {
             render: (r) => <span>{r.credit_limit_on_hold ? "Yes" : "No"}</span>,
           },
           { key: "status", header: "Status" },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink module="inventory" targetType="inv_partner" targetId={r.id} title={`History — ${r.partner_code}`} />
+            ),
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -228,6 +238,14 @@ export default function PartnersPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
         saving={saving()}
+        headerActions={
+          <RecordHistoryButton
+            variant="button"
+            targetType="inv_partner"
+            targetId={editing()?.id}
+            title={`History — ${editing()?.partner_code ?? "Partner"}`}
+          />
+        }
       >
         <draft.DraftBanner />
         <Field label="Customer/Vendor code">
