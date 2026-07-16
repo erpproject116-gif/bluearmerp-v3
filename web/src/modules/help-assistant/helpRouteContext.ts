@@ -31,7 +31,8 @@ export function routeTagsFromPath(pathname: string): string[] {
   // Longer prefixes first so more specific rules win alongside general ones.
   const sorted = [...ROUTE_TAG_RULES].sort((a, b) => b.prefix.length - a.prefix.length);
   for (const rule of sorted) {
-    if (pathname.startsWith(rule.prefix)) {
+    // Boundary-safe: "/app/finance/acct-i" must not match "/app/finance/acct-ii/..."
+    if (pathname === rule.prefix || pathname.startsWith(`${rule.prefix}/`)) {
       for (const t of rule.tags) tags.add(t);
     }
   }
@@ -56,7 +57,11 @@ export function suggestedPrompts(pathname: string): string[] {
       "How do I link a work item to an ERP document?",
     ];
   }
-  if (pathname.includes("/chart-of-accounts") || pathname.includes("/acct-i")) {
+  if (
+    pathname.includes("/chart-of-accounts") ||
+    pathname === "/app/finance/acct-i" ||
+    pathname.startsWith("/app/finance/acct-i/")
+  ) {
     return [
       "How do I import the PH chart of accounts?",
       "How do I soft-delete a GL account?",

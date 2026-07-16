@@ -19,7 +19,7 @@ export const acctINavLinks: AcctNavLink[] = [
 ];
 
 export function isAcctIPath(pathname: string): boolean {
-  return pathname.startsWith(ACCT_I_PREFIX);
+  return pathname === ACCT_I_PREFIX || pathname.startsWith(`${ACCT_I_PREFIX}/`);
 }
 
 export function isAcctINavLinkActive(pathname: string, link: AcctNavLink): boolean {

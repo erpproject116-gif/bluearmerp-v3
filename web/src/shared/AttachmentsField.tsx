@@ -114,27 +114,38 @@ export function AttachmentsField(props: Props) {
   });
 
   const onPick = (e: Event & { currentTarget: HTMLInputElement }) => {
-    const file = e.currentTarget.files?.[0];
+    const files = Array.from(e.currentTarget.files ?? []);
     e.currentTarget.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
 
     const id = props.docId;
     if (!id) {
-      setPending((prev) => [...prev, { key: `${file.name}-${file.size}-${Date.now()}`, file }]);
+      const stamp = Date.now();
+      setPending((prev) => [
+        ...prev,
+        ...files.map((file, i) => ({ key: `${file.name}-${file.size}-${stamp}-${i}`, file })),
+      ]);
       notifyCount();
       return;
     }
 
     setUploading(true);
-    void uploadAttachment(props.scope, id, file).then((res) => {
-      setUploading(false);
-      if (!res.success) {
-        toast.warning(res.message ?? "Upload failed.");
-        return;
+    void (async () => {
+      let okCount = 0;
+      for (const file of files) {
+        const res = await uploadAttachment(props.scope, id, file);
+        if (!res.success) {
+          toast.warning(res.message ?? `Failed to upload ${file.name}.`);
+          continue;
+        }
+        okCount += 1;
       }
-      toast.success("File uploaded.");
-      void load();
-    });
+      setUploading(false);
+      if (okCount > 0) {
+        toast.success(okCount === 1 ? "File uploaded." : `${okCount} files uploaded.`);
+        void load();
+      }
+    })();
   };
 
   const removePending = (key: string) => {
@@ -170,8 +181,8 @@ export function AttachmentsField(props: Props) {
           </Show>
         </span>
         <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
-          {uploading() ? "Uploading…" : "Upload file"}
-          <input type="file" class="hidden" disabled={uploading()} onChange={onPick} />
+          {uploading() ? "Uploading…" : "Upload files"}
+          <input type="file" multiple class="hidden" disabled={uploading()} onChange={onPick} />
         </label>
       </div>
       <Show

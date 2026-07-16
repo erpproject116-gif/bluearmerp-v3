@@ -2,6 +2,8 @@ import type { MeData } from "./auth-context";
 import { canManageUsers, canViewActivityLogs, canViewCrm, hasModuleAccess } from "./auth-context";
 
 export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: string): boolean {
+  // Product kill-switch: keep routes/code but hide from nav and ModuleAccessGate.
+  if (moduleId === "data_center") return false;
   if (moduleId === "documentation") return true;
   if (moduleId === "buying") return isTenantModuleEnabled(me, "purchase_order");
   if (moduleId === "selling") {

@@ -107,7 +107,6 @@ export const belowGroupModuleIds = [
   "support",
   "pos",
   "hr",
-  "data_center",
 ] as const;
 
 /** Modules shown above collapsible groups. */

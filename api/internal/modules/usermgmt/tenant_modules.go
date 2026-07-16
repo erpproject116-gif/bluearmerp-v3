@@ -120,6 +120,7 @@ func listTenantModuleRows(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		left join public.tenant_modules tm
 		  on tm.module_code = mr.module_code and tm.tenant_id = $1
 		where mr.is_core = false and mr.module_code <> 'core'
+		  and mr.module_code <> 'data_center'
 		order by mr.sort_order, mr.module_code`, tu.TenantID)
 	if err != nil {
 		return nil, err
