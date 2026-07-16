@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "../../shared/api";
 import { setActiveTenantId } from "../../shared/activeContext";
 import { useAuth, type MeData } from "../../shared/auth-context";
+import { resolveAppEntryPath } from "../../shared/resolveAppEntryPath";
 
 async function fetchMeWithRetry(maxAttempts = 4): Promise<Awaited<ReturnType<typeof apiFetch<MeData>>>> {
   let lastErr: unknown;
@@ -64,7 +65,8 @@ export default function AuthCallbackPage() {
       }
 
       await auth.refresh();
-      navigate("/app/inventory/partners", { replace: true });
+      const href = await resolveAppEntryPath(auth.me);
+      navigate(href, { replace: true });
     } catch {
       navigate(
         `/signin?error=${encodeURIComponent(apiNetworkErrorMessage())}`,

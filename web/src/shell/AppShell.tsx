@@ -41,6 +41,7 @@ import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBa
 import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
 import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
+import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -302,7 +303,10 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
   return (
     <Show when={auth.me} fallback={layout}>
-      <HelpAssistantProvider>{layout}</HelpAssistantProvider>
+      <HelpAssistantProvider>
+        {layout}
+        <OnboardingProminentPanel />
+      </HelpAssistantProvider>
     </Show>
   );
 }

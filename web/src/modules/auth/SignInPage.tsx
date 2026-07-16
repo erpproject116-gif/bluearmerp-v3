@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { supabase, supabaseConfigured } from "../../shared/api";
 import { useAuth } from "../../shared/auth-context";
 import { SessionLoading } from "../../shared/AuthRedirect";
+import { resolveAppEntryPath } from "../../shared/resolveAppEntryPath";
 import { AuthAlert, AuthShell, authInputClass } from "./AuthShell";
 
 const demoSignInEnabled = import.meta.env.VITE_DEMO_SIGNIN_ENABLED === true;
@@ -26,7 +27,7 @@ export default function SignInPage() {
 
   createEffect(() => {
     if (!auth.bootstrapping && auth.me) {
-      navigate("/app/inventory/partners", { replace: true });
+      void resolveAppEntryPath(auth.me).then((href) => navigate(href, { replace: true }));
     }
   });
 
@@ -66,7 +67,8 @@ export default function SignInPage() {
       return;
     }
     await auth.refresh();
-    navigate("/app/inventory/partners", { replace: true });
+    const href = await resolveAppEntryPath(auth.me);
+    navigate(href, { replace: true });
     setLoading(false);
   };
 
