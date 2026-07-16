@@ -27,6 +27,7 @@ export default function DemoDataPage() {
   const [status, setStatus] = createSignal<DemoStatus | null>(null);
   const [steps, setSteps] = createSignal<StepResult[]>([]);
   const [purgeFirst, setPurgeFirst] = createSignal(true);
+  const [includeMasters, setIncludeMasters] = createSignal(false);
 
   const load = async () => {
     setLoading(true);
@@ -44,13 +45,22 @@ export default function DemoDataPage() {
   });
 
   const runPurge = async () => {
-    if (!confirm("Remove all demo transactional data for DEMO000 and BLUEARM? Master inventory (partners, items, locations) is kept.")) {
+    const mastersNote = includeMasters()
+      ? " Also soft-delete sample partners, items, locations, projects, and departments (lists hide them)."
+      : " Master inventory (partners, items, locations) is kept.";
+    if (
+      !confirm(
+        `Remove demo transactional data for this demo tenant?${mastersNote}\n\nUsers, tax types, and chart of accounts are not changed.`,
+      )
+    ) {
       return;
     }
     setBusy("purge");
     setSteps([]);
     const res = await apiFetch<{ steps: StepResult[]; status: DemoStatus }>("/api/v1/settings/demo-data/purge", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ include_masters: includeMasters() }),
     });
     setBusy(null);
     if (res.success && res.data) {
@@ -64,7 +74,9 @@ export default function DemoDataPage() {
 
   const runPopulate = async () => {
     const msg = purgeFirst()
-      ? "Purge demo data, then load the full demo chain (quotations through golden scenarios)? This may take a minute."
+      ? includeMasters()
+        ? "Purge transactions + sample masters, then reload the full demo chain? This may take a minute."
+        : "Purge demo transactions, then load the full demo chain? Master inventory is kept. This may take a minute."
       : "Load demo data on top of existing records (idempotent seeds)? This may take a minute.";
     if (!confirm(msg)) return;
 
@@ -73,7 +85,11 @@ export default function DemoDataPage() {
     const res = await apiFetch<{ steps: StepResult[]; status: DemoStatus }>("/api/v1/settings/demo-data/populate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ purge_first: purgeFirst(), include_verify: true }),
+      body: JSON.stringify({
+        purge_first: purgeFirst(),
+        include_verify: true,
+        include_masters: purgeFirst() && includeMasters(),
+      }),
     });
     setBusy(null);
     if (res.success && res.data) {
@@ -104,9 +120,12 @@ export default function DemoDataPage() {
       <div>
         <h1 class="text-xl font-semibold text-slate-900">Demo data</h1>
         <p class="mt-1 text-sm text-slate-600">
-          Populate or purge sample documents for training and QA. Available on{" "}
-          <strong>DEMO000</strong> and <strong>BLUEARM</strong> tenants only. Actions affect both demo tenants
-          because seeds are shared.
+          Manage sample documents for training and QA on <strong>demo tenants</strong> only (
+          <code class="text-xs">is_demo</code>, e.g. DEMO000). Real production tenants should not use Populate.
+        </p>
+        <p class="mt-2 text-sm text-slate-600">
+          Chart of accounts is separate: leave it empty or import the <strong>Philippine SME (PH market)</strong>{" "}
+          template from Finance — demo populate does not load the old full pre-filled chart.
         </p>
       </div>
 
@@ -157,19 +176,38 @@ export default function DemoDataPage() {
                   </button>
                 </div>
 
-                <label class="flex items-center gap-2 text-sm text-slate-700">
+                <label class="flex items-start gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"
+                    class="mt-0.5"
                     checked={purgeFirst()}
                     onChange={(e) => setPurgeFirst(e.currentTarget.checked)}
                   />
-                  Purge before populate (recommended for a clean start)
+                  <span>
+                    <span class="font-medium">Purge before populate</span>
+                    <span class="block text-xs text-slate-500">Recommended for a clean transactional slate.</span>
+                  </span>
+                </label>
+
+                <label class="flex items-start gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="mt-0.5"
+                    checked={includeMasters()}
+                    onChange={(e) => setIncludeMasters(e.currentTarget.checked)}
+                  />
+                  <span>
+                    <span class="font-medium">Also purge sample masters</span>
+                    <span class="block text-xs text-slate-500">
+                      Soft-deletes partners, items, locations, projects, and departments so pickers stay empty until
+                      you Populate again or enter real masters. Does not clear CoA.
+                    </span>
+                  </span>
                 </label>
 
                 <p class="text-xs text-slate-500">
-                  Populate runs inventory baseline, quotations, purchase/sales chains, golden scenarios S2–S10,
-                  finance AP, CRM fixtures, Operations Hub (Riverside renovation), Communications sent/inbox stubs,
-                  dashboard red flags, then verifies the full chain.
+                  Populate runs inventory baseline, quotations, purchase/sales chains, golden scenarios, finance AP,
+                  CRM fixtures, Operations Hub, Communications stubs, dashboard red flags, then verifies the chain.
                 </p>
               </div>
             </Show>

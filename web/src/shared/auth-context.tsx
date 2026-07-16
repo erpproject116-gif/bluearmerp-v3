@@ -39,6 +39,7 @@ export type MeData = {
     company_code: string;
     status: string;
     auto_enable_all_modules?: boolean;
+    is_demo?: boolean;
   };
   active_tenant_id?: number;
   memberships?: TenantMembership[];

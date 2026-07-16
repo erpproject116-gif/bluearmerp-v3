@@ -50,14 +50,24 @@ func withDemoConn(ctx context.Context, pool *pgxpool.Pool, targetTenant int64, i
 	return fn(conn)
 }
 
-func runPurge(ctx context.Context, pool *pgxpool.Pool, industry string, targetTenant int64) ([]StepResult, error) {
+func runPurge(ctx context.Context, pool *pgxpool.Pool, industry string, targetTenant int64, includeMasters bool) ([]StepResult, error) {
 	var results []StepResult
 	err := withDemoConn(ctx, pool, targetTenant, industry, func(conn *pgxpool.Conn) error {
 		sql, err := readSQL(industry, purgeScript)
 		if err != nil {
 			return err
 		}
-		results = append(results, execScript(ctx, conn, purgeScript, sql))
+		step := execScript(ctx, conn, purgeScript, sql)
+		results = append(results, step)
+		if !step.OK || !includeMasters {
+			return nil
+		}
+		mastersSQL, err := readSQL(industry, purgeMastersScript)
+		if err != nil {
+			results = append(results, StepResult{Script: purgeMastersScript, OK: false, Message: err.Error()})
+			return nil
+		}
+		results = append(results, execScript(ctx, conn, purgeMastersScript, mastersSQL))
 		return nil
 	})
 	return results, err

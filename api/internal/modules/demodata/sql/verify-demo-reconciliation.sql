@@ -73,7 +73,8 @@ begin
       raise exception 'verify-reconciliation [%]: dr without invoice gaps %', v_code, v_count;
     end if;
 
-    -- GR not fully billed (exclude open PO receive demo)
+    -- GR not fully billed.
+    -- Exclude: open-receive demos (DEMOGR*), S2 (stock→sales chain, no AP), S3 (billed by finance-ap; keep defensive).
     select count(*) into v_count
     from public.gr_goods_receipt_lines grl
     join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
@@ -85,7 +86,8 @@ begin
       group by goods_receipt_line_id
     ) sl on sl.goods_receipt_line_id = grl.id
     where gr.tenant_id = v_tenant and gr.status = 'posted'
-      and po.purchase_order_no not in ('DEMOGR902', 'DEMO-S3-PO')
+      and po.purchase_order_no not like 'DEMOGR%'
+      and po.purchase_order_no not in ('DEMO-S2-PO', 'DEMO-S3-PO')
       and (grl.received_qty - coalesce(sl.billed, 0)) > 0.0001;
     if v_count > 0 then
       raise exception 'verify-reconciliation [%]: gr without supplier invoice gaps %', v_code, v_count;

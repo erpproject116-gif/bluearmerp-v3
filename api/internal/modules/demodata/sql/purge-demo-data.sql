@@ -1,6 +1,7 @@
--- Purge demo transactional data for DEMO000 + BLUEARM (keeps inventory master).
+-- Purge demo transactional data for DEMO000 + BLUEARM (keeps inventory master by default).
 -- Safe to re-run. Run before populate for a clean slate.
 -- Does NOT delete partners, items, locations, tax types, or users.
+-- Optional follow-up: purge-demo-masters.sql (soft-deletes inventory masters).
 begin;
 
 do $$
@@ -39,7 +40,12 @@ begin
     delete from public.fin_supplier_invoices where tenant_id = v_tenant;
 
     -- Finance AR
-    delete from public.fin_or_applications
+    delete from public.fin_receipt_applications
+    where official_receipt_id in (
+      select id from public.fin_official_receipts where tenant_id = v_tenant
+    );
+
+    delete from public.fin_receipt_journal_lines
     where official_receipt_id in (
       select id from public.fin_official_receipts where tenant_id = v_tenant
     );
@@ -77,6 +83,11 @@ begin
 
     delete from public.dr_delivery_receipts where tenant_id = v_tenant;
 
+    -- CRM rows that FK into sales lines / sales (must clear before sa_sales_lines)
+    delete from public.crm_notifications where tenant_id = v_tenant;
+    delete from public.crm_follow_up_tasks where tenant_id = v_tenant;
+    delete from public.crm_warranty_assets where tenant_id = v_tenant;
+
     -- Sales
     delete from public.sa_sales_lines
     where sales_id in (select id from public.sa_sales where tenant_id = v_tenant);
@@ -84,6 +95,23 @@ begin
     delete from public.sa_sales where tenant_id = v_tenant;
 
     -- Sales orders
+    -- Clear FKs into SO headers/lines before deleting them
+    update public.quo_quotation_slip_lines
+    set sales_order_id = null
+    where sales_order_id in (select id from public.so_sales_orders where tenant_id = v_tenant);
+
+    update public.pr_purchase_requests
+    set source_sales_order_id = null
+    where tenant_id = v_tenant
+      and source_sales_order_id in (select id from public.so_sales_orders where tenant_id = v_tenant);
+
+    delete from public.sh_shipping_order_lines
+    where shipping_order_id in (
+      select id from public.sh_shipping_orders where tenant_id = v_tenant
+    );
+
+    delete from public.sh_shipping_orders where tenant_id = v_tenant;
+
     delete from public.so_sales_order_release_lines
     where sales_order_line_id in (
       select ln.id from public.so_sales_order_lines ln
@@ -166,10 +194,8 @@ begin
 
     delete from public.quo_quotations where tenant_id = v_tenant;
 
-    -- CRM demo records (keep alert rules — seeds use on conflict)
-    delete from public.crm_notifications where tenant_id = v_tenant;
-
     -- Operations Hub (before CRM tasks — wm_work_items may reference legacy_crm_task_id)
+    -- CRM warranty / follow-ups / notifications already cleared above (FK into sales).
     delete from public.wm_links
     where work_item_id in (select id from public.wm_work_items where tenant_id = v_tenant);
 
@@ -199,20 +225,14 @@ begin
     delete from public.com_sent_messages where tenant_id = v_tenant;
     delete from public.com_gmail_connections where tenant_id = v_tenant;
 
-    delete from public.crm_follow_up_tasks where tenant_id = v_tenant;
-    delete from public.crm_warranty_assets where tenant_id = v_tenant;
-
     -- Stock movements
     delete from public.inv_stock_movements where tenant_id = v_tenant;
 
-    -- Serial / lot demo rows (before GR lines that reference serials)
+    -- Serial / lot demo rows (GR receipt serials already cleared with goods receipts above)
     delete from public.inv_serial_unit_sales_lines
     where serial_unit_id in (select id from public.inv_serial_units where tenant_id = v_tenant);
 
     delete from public.inv_serial_events
-    where serial_unit_id in (select id from public.inv_serial_units where tenant_id = v_tenant);
-
-    delete from public.gr_goods_receipt_serials
     where serial_unit_id in (select id from public.inv_serial_units where tenant_id = v_tenant);
 
     delete from public.inv_serial_units where tenant_id = v_tenant;

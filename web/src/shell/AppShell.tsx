@@ -36,6 +36,7 @@ import { UserAccountMenu } from "./UserAccountMenu";
 import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
 import { SidebarNav } from "./SidebarNav";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
+import { DemoTenantBanner } from "../shared/DemoTenantBanner";
 import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBar";
 import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
 import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
@@ -291,6 +292,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <AcctIIHeaderNav />
         </header>
         <main class="flex-1 p-6">
+          <DemoTenantBanner />
           <EntitlementBanner />
           <ModuleAccessGate>{props.children}</ModuleAccessGate>
         </main>

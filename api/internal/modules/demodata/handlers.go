@@ -41,9 +41,14 @@ func getStatus(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 type populateRequest struct {
-	PurgeFirst    bool   `json:"purge_first"`
-	IncludeVerify bool   `json:"include_verify"`
-	Industry      string `json:"industry"`
+	PurgeFirst     bool   `json:"purge_first"`
+	IncludeVerify  bool   `json:"include_verify"`
+	IncludeMasters bool   `json:"include_masters"`
+	Industry       string `json:"industry"`
+}
+
+type purgeRequest struct {
+	IncludeMasters bool `json:"include_masters"`
 }
 
 func postPopulate(pool *pgxpool.Pool) http.HandlerFunc {
@@ -82,7 +87,7 @@ func postPopulate(pool *pgxpool.Pool) http.HandlerFunc {
 
 		steps := make([]StepResult, 0, len(PopulateScripts)+3)
 		if body.PurgeFirst {
-			purgeSteps, err := runPurge(r.Context(), pool, industry, tu.TenantID)
+			purgeSteps, err := runPurge(r.Context(), pool, industry, tu.TenantID, body.IncludeMasters)
 			steps = append(steps, purgeSteps...)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, err.Error(), "ERR_INTERNAL")
@@ -91,6 +96,12 @@ func postPopulate(pool *pgxpool.Pool) http.HandlerFunc {
 			if len(purgeSteps) > 0 && !purgeSteps[0].OK {
 				response.OK(w, map[string]any{"steps": steps, "company_code": code}, "Purge failed.")
 				return
+			}
+			for _, s := range purgeSteps {
+				if !s.OK {
+					response.OK(w, map[string]any{"steps": steps, "company_code": code}, "Purge failed.")
+					return
+				}
 			}
 		}
 
@@ -106,10 +117,11 @@ func postPopulate(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.demo_data.populate", "demo_data", nil, map[string]any{
-			"company_code":   code,
-			"purge_first":    body.PurgeFirst,
-			"include_verify": body.IncludeVerify,
-			"steps":          len(steps),
+			"company_code":    code,
+			"purge_first":     body.PurgeFirst,
+			"include_verify":  body.IncludeVerify,
+			"include_masters": body.IncludeMasters,
+			"steps":           len(steps),
 		}, nil)
 
 		status, _ := loadStatus(r.Context(), pool, tu.TenantID, true)
@@ -140,25 +152,40 @@ func postPurge(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		steps, err := runPurge(r.Context(), pool, industry, tu.TenantID)
+		var body purgeRequest
+		if r.Body != nil && r.ContentLength != 0 {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				response.Validation(w, map[string]string{"body": "Invalid JSON."})
+				return
+			}
+		}
+
+		steps, err := runPurge(r.Context(), pool, industry, tu.TenantID, body.IncludeMasters)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, err.Error(), "ERR_INTERNAL")
 			return
 		}
-		if len(steps) > 0 && !steps[0].OK {
-			response.Err(w, http.StatusInternalServerError, steps[0].Message, "ERR_DEMO_PURGE")
-			return
+		for _, s := range steps {
+			if !s.OK {
+				response.Err(w, http.StatusInternalServerError, s.Message, "ERR_DEMO_PURGE")
+				return
+			}
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.demo_data.purge", "demo_data", nil, map[string]any{
-			"company_code": code,
+			"company_code":    code,
+			"include_masters": body.IncludeMasters,
 		}, nil)
 
 		status, _ := loadStatus(r.Context(), pool, tu.TenantID, true)
+		msg := "Demo transactional data purged."
+		if body.IncludeMasters {
+			msg = "Demo transactional data and inventory masters purged."
+		}
 		response.OK(w, map[string]any{
 			"steps":        steps,
 			"company_code": code,
 			"status":       status,
-		}, "Demo transactional data purged.")
+		}, msg)
 	}
 }

@@ -59,11 +59,11 @@ func MeHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 
 func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.Config) (MePayload, error) {
 	var companyName, companyCode, tenantStatus string
-	var autoEnableAll bool
+	var autoEnableAll, isDemo bool
 	err := pool.QueryRow(ctx, `
-		select company_name, company_code, status, auto_enable_all_modules
+		select company_name, company_code, status, auto_enable_all_modules, is_demo
 		from public.tenants where id = $1`, tu.TenantID).
-		Scan(&companyName, &companyCode, &tenantStatus, &autoEnableAll)
+		Scan(&companyName, &companyCode, &tenantStatus, &autoEnableAll, &isDemo)
 	if err != nil {
 		return MePayload{}, err
 	}
@@ -155,11 +155,12 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 	return MePayload{
 		User: user,
 		Tenant: map[string]any{
-			"id":                       tu.TenantID,
-			"company_name":             companyName,
-			"company_code":             companyCode,
-			"status":                   tenantStatus,
-			"auto_enable_all_modules":  autoEnableAll,
+			"id":                      tu.TenantID,
+			"company_name":            companyName,
+			"company_code":            companyCode,
+			"status":                  tenantStatus,
+			"auto_enable_all_modules": autoEnableAll,
+			"is_demo":                 isDemo,
 		},
 		ActiveTenantID:     tu.TenantID,
 		Memberships:        memberships,

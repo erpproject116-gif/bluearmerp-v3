@@ -21,11 +21,12 @@ declare
   v_grid bigint;
   v_grline bigint;
   v_d date;
+  v_date_seq int;
   v_serial text;
   v_marker text := 'SEED-PO-GR-OPEN';
   v_line_count int;
 begin
-  foreach v_code in array array['DEMO000', 'BLUEARM']
+  foreach v_code in array (case when nullif(current_setting('app.demo_tenant', true), '') is null then array['DEMO000', 'BLUEARM'] else array(select company_code from public.tenants where id = nullif(current_setting('app.demo_tenant', true), '')::bigint) end)
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then continue; end if;
@@ -37,9 +38,9 @@ begin
     limit 1;
     select id into v_currency_id from public.quo_currencies
     where tenant_id = v_tenant and is_default = true and deleted_at is null limit 1;
-    select id into v_loc_hq from public.inv_locations where tenant_id = v_tenant and location_code = '00001' limit 1;
-    select id into v_partner from public.inv_partners where tenant_id = v_tenant and partner_code = '00004' limit 1;
-    select id into v_item from public.inv_items where tenant_id = v_tenant and item_code = '00002' limit 1;
+    select id into v_loc_hq from public.inv_locations where tenant_id = v_tenant and location_code = '00001' and deleted_at is null limit 1;
+    select id into v_partner from public.inv_partners where tenant_id = v_tenant and partner_code = '00004' and deleted_at is null limit 1;
+    select id into v_item from public.inv_items where tenant_id = v_tenant and item_code = '00002' and deleted_at is null limit 1;
 
     if v_user_id is null then
       raise warning 'seed-demo-po-gr-open: no active user for % — skip', v_code;
@@ -62,6 +63,10 @@ begin
 
     -- Dedicated PR (stable number, not date-based)
     if not exists (select 1 from public.pr_purchase_requests where tenant_id = v_tenant and purchase_request_no = 'DEMOPRGR01') then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.pr_purchase_requests
+      where tenant_id = v_tenant and request_date = v_d and deleted_at is null;
+
       insert into public.pr_purchase_requests (
         tenant_id, request_date, date_seq, purchase_request_no,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
@@ -69,7 +74,7 @@ begin
         total_qty, notes, subtotal, tax_total, grand_total, created_by_user_id
       )
       select
-        v_tenant, v_d, 1, 'DEMOPRGR01',
+        v_tenant, v_d, v_date_seq, 'DEMOPRGR01',
         v_tax_vat, v_currency_id, v_partner, v_user_id,
         coalesce(u.full_name, 'Demo User'),
         v_loc_hq, 'domestic', 'sent', 'confirmed',
@@ -104,12 +109,16 @@ begin
     -- Helper: ensure PO exists with at least one line (repair header-only rows from partial runs)
     -- PO DEMOGR902: confirmed, 5 open — primary target for Receive / Scan
     if not exists (select 1 from public.po_purchase_orders where tenant_id = v_tenant and purchase_order_no = 'DEMOGR902') then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.po_purchase_orders
+      where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
+
       insert into public.po_purchase_orders (
         tenant_id, order_date, date_seq, purchase_order_no, purchase_request_id,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
         status, notes, subtotal, tax_total, grand_total, created_by_user_id
       )
-      select v_tenant, v_d, 1, 'DEMOGR902', v_prid,
+      select v_tenant, v_d, v_date_seq, 'DEMOGR902', v_prid,
         v_tax_vat, v_currency_id, v_partner, v_user_id,
         coalesce(u.full_name, 'Demo User'), v_loc_hq,
         'confirmed', v_marker || ' Open PO — scan 5 serials on Receive / Scan.',
@@ -236,12 +245,16 @@ begin
 
     -- PO DEMOGR903: confirmed, 3 open (second PO for receive testing)
     if not exists (select 1 from public.po_purchase_orders where tenant_id = v_tenant and purchase_order_no = 'DEMOGR903') then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.po_purchase_orders
+      where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
+
       insert into public.po_purchase_orders (
         tenant_id, order_date, date_seq, purchase_order_no, purchase_request_id,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
         status, notes, subtotal, tax_total, grand_total, created_by_user_id
       )
-      select v_tenant, v_d, 2, 'DEMOGR903', v_prid,
+      select v_tenant, v_d, v_date_seq, 'DEMOGR903', v_prid,
         v_tax_vat, v_currency_id, v_partner, v_user_id,
         coalesce(u.full_name, 'Demo User'), v_loc_hq,
         'confirmed', v_marker || ' Second open PO — scan 3 serials.',
@@ -272,12 +285,16 @@ begin
 
     -- PO DEMOGR904: partially received (2 posted, 3 still open)
     if not exists (select 1 from public.po_purchase_orders where tenant_id = v_tenant and purchase_order_no = 'DEMOGR904') then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.po_purchase_orders
+      where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
+
       insert into public.po_purchase_orders (
         tenant_id, order_date, date_seq, purchase_order_no, purchase_request_id,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
         status, notes, subtotal, tax_total, grand_total, created_by_user_id
       )
-      select v_tenant, v_d, 3, 'DEMOGR904', v_prid,
+      select v_tenant, v_d, v_date_seq, 'DEMOGR904', v_prid,
         v_tax_vat, v_currency_id, v_partner, v_user_id,
         coalesce(u.full_name, 'Demo User'), v_loc_hq,
         'partially_received', v_marker || ' Partial receive — 3 units still open.',
@@ -341,12 +358,16 @@ begin
 
     -- PO DEMOGR905: draft (Purchase Order List — draft tab)
     if not exists (select 1 from public.po_purchase_orders where tenant_id = v_tenant and purchase_order_no = 'DEMOGR905') then
+      select coalesce(max(date_seq), 0) + 1 into v_date_seq
+      from public.po_purchase_orders
+      where tenant_id = v_tenant and order_date = v_d and deleted_at is null;
+
       insert into public.po_purchase_orders (
         tenant_id, order_date, date_seq, purchase_order_no, purchase_request_id,
         tax_type_id, currency_id, partner_id, pic_user_id, pic_name, location_id,
         status, notes, subtotal, tax_total, grand_total, created_by_user_id
       )
-      select v_tenant, v_d, 4, 'DEMOGR905', v_prid,
+      select v_tenant, v_d, v_date_seq, 'DEMOGR905', v_prid,
         v_tax_vat, v_currency_id, v_partner, v_user_id,
         coalesce(u.full_name, 'Demo User'), v_loc_hq,
         'draft', v_marker || ' Draft PO — confirm before receive.',

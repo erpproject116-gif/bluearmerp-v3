@@ -31,7 +31,17 @@ begin
       (v_tenant, '00010', 'customer', 'Robinsons Retail Projects', 'Andrea Flores', '+632-8635-5500', '+639360123010', 'capex.robinsons@example.ph', null, 'active'),
       (v_tenant, '00011', 'both', 'Davao Furniture Distributors', 'Benito Garces', '+6382-305-6600', '+639371234011', 'ops@davaofurn.example.ph', null, 'active'),
       (v_tenant, '00012', 'vendor', 'Inactive Supplier (DO NOT USE)', null, null, null, null, null, 'inactive')
-    on conflict (tenant_id, partner_code) do nothing;
+    on conflict (tenant_id, partner_code) do update set
+      partner_kind = excluded.partner_kind,
+      company_name = excluded.company_name,
+      ceo_name = excluded.ceo_name,
+      phone = excluded.phone,
+      mobile = excluded.mobile,
+      email = excluded.email,
+      address = excluded.address,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.inv_locations (tenant_id, location_code, location_name, location_type, production_process, status) values
       (v_tenant, '00001', 'Head Office — Makati', 'location', 'service', 'active'),
@@ -42,7 +52,13 @@ begin
       (v_tenant, '00006', 'Clark Freeport Showroom', 'location', 'service', 'active'),
       (v_tenant, '00007', 'Mobile Install Crew (NCR)', 'location', 'service', 'active'),
       (v_tenant, '00008', 'Closed — Cavite Pilot Line', 'factory', 'bundle', 'inactive')
-    on conflict (tenant_id, location_code) do nothing;
+    on conflict (tenant_id, location_code) do update set
+      location_name = excluded.location_name,
+      location_type = excluded.location_type,
+      production_process = excluded.production_process,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.inv_projects (tenant_id, project_code, project_name, status) values
       (v_tenant, '00001', 'SM North EDSA — Kiosk Batch 2026', 'active'),
@@ -52,7 +68,11 @@ begin
       (v_tenant, '00005', 'Seda Vertis — Guest Room FF&E Phase 1', 'active'),
       (v_tenant, '00006', 'Robinsons Galleria — Seasonal Display', 'active'),
       (v_tenant, '00007', 'Cancelled — Ortigas Pop-Up 2025', 'inactive')
-    on conflict (tenant_id, project_code) do nothing;
+    on conflict (tenant_id, project_code) do update set
+      project_name = excluded.project_name,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.inv_departments (tenant_id, department_code, department_name, status) values
       (v_tenant, '00001', 'Production Planning', 'active'),
@@ -63,7 +83,11 @@ begin
       (v_tenant, '00006', 'Procurement', 'active'),
       (v_tenant, '00007', 'Sales & Estimating', 'active'),
       (v_tenant, '00008', 'Legacy — R&D Lab', 'inactive')
-    on conflict (tenant_id, department_code) do nothing;
+    on conflict (tenant_id, department_code) do update set
+      department_name = excluded.department_name,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, status) values
       (v_tenant, '00001', 'Modular Sofa Frame — 3-Seater', 4200, 7800, 7200, 'active'),
@@ -81,7 +105,14 @@ begin
       (v_tenant, '00013', 'Glass Top — Tempered 10mm', 1400, 2600, 2400, 'active'),
       (v_tenant, '00014', 'Discontinued — PU Leather Roll', 1100, 0, 0, 'inactive'),
       (v_tenant, '00015', 'Promo — Outlet Floor Sample Chair', 800, 1999, 1499, 'active')
-    on conflict (tenant_id, item_code) do nothing;
+    on conflict (tenant_id, item_code) do update set
+      item_name = excluded.item_name,
+      purchase_price = excluded.purchase_price,
+      sales_price = excluded.sales_price,
+      vip_price = excluded.vip_price,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     -- Bulk rows for pagination / cache boundary testing (idempotent via on conflict)
     insert into public.inv_partners (tenant_id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, status)
@@ -96,7 +127,16 @@ begin
       'partner' || gs || '@example.ph',
       case when gs % 17 = 0 then 'inactive' else 'active' end
     from generate_series(16, 120) gs
-    on conflict (tenant_id, partner_code) do nothing;
+    on conflict (tenant_id, partner_code) do update set
+      partner_kind = excluded.partner_kind,
+      company_name = excluded.company_name,
+      ceo_name = excluded.ceo_name,
+      phone = excluded.phone,
+      mobile = excluded.mobile,
+      email = excluded.email,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.inv_locations (tenant_id, location_code, location_name, location_type, production_process, status)
     select
@@ -107,7 +147,13 @@ begin
       (array['bundle', 'service'])[1 + (gs % 2)],
       case when gs % 19 = 0 then 'inactive' else 'active' end
     from generate_series(9, 88) gs
-    on conflict (tenant_id, location_code) do nothing;
+    on conflict (tenant_id, location_code) do update set
+      location_name = excluded.location_name,
+      location_type = excluded.location_type,
+      production_process = excluded.production_process,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.inv_projects (tenant_id, project_code, project_name, status)
     select
@@ -116,7 +162,11 @@ begin
       'Fit-Out Project ' || gs || ' — Batch ' || (2020 + (gs % 7)),
       case when gs % 23 = 0 then 'inactive' else 'active' end
     from generate_series(8, 87) gs
-    on conflict (tenant_id, project_code) do nothing;
+    on conflict (tenant_id, project_code) do update set
+      project_name = excluded.project_name,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.inv_departments (tenant_id, department_code, department_name, status)
     select
@@ -125,7 +175,11 @@ begin
       'Operations Unit ' || gs,
       case when gs % 21 = 0 then 'inactive' else 'active' end
     from generate_series(9, 88) gs
-    on conflict (tenant_id, department_code) do nothing;
+    on conflict (tenant_id, department_code) do update set
+      department_name = excluded.department_name,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.inv_items (tenant_id, item_code, item_name, purchase_price, sales_price, vip_price, status)
     select
@@ -137,7 +191,14 @@ begin
       round((gs * 55.0)::numeric, 2),
       case when gs % 25 = 0 then 'inactive' else 'active' end
     from generate_series(16, 150) gs
-    on conflict (tenant_id, item_code) do nothing;
+    on conflict (tenant_id, item_code) do update set
+      item_name = excluded.item_name,
+      purchase_price = excluded.purchase_price,
+      sales_price = excluded.sales_price,
+      vip_price = excluded.vip_price,
+      status = excluded.status,
+      deleted_at = null,
+      updated_at = now();
 
     insert into public.tenant_code_sequences (tenant_id, entity_type, last_value) values
       (v_tenant, 'partner', 120),

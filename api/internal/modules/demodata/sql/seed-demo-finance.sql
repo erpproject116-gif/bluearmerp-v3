@@ -82,7 +82,7 @@ begin
     where id = v_receipt_id;
 
     insert into public.fin_bank_accounts (tenant_id, bank_account_code, bank_account_name, gl_account_code, keyword)
-    values (v_tenant, 'DEMO-BDO', 'BDO Demo Account', '1026', 'demo')
+    values (v_tenant, 'DEMO-BDO', 'BDO Demo Account', '1031', 'demo')
     on conflict (tenant_id, bank_account_code) do update set bank_account_name = excluded.bank_account_name
     returning id into v_bank_id;
 

@@ -14,7 +14,7 @@ const STEP_COPY: Record<string, { title: string; why: string; action: string; li
   },
   chart_of_accounts: {
     title: "Chart of accounts",
-    why: "Your chart starts empty. Add at least one asset, liability, income, and expense account (or import the SME starter template), then continue.",
+    why: "Your chart starts empty. Import the Philippine SME (PH market) template, or add accounts manually, then continue.",
     action: "Set up accounts",
     link: "/app/finance/acct-i/chart-of-accounts",
     ackStep: "chart_of_accounts",

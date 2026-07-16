@@ -41,6 +41,7 @@ var PopulateScripts = []string{
 const verifyScript = "verify-demo-full-chain.sql"
 const verifyReconciliationScript = "verify-demo-reconciliation.sql"
 const purgeScript = "purge-demo-data.sql"
+const purgeMastersScript = "purge-demo-masters.sql"
 
 // DemoTenantCodes are the legacy built-in demo tenants. Eligibility is now driven
 // by tenants.is_demo (see status.go); this set is kept only as a backward-compatible

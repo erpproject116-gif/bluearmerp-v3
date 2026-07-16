@@ -88,15 +88,18 @@ func loadStatus(ctx context.Context, pool *pgxpool.Pool, tenantID int64, canMana
 	payload.Checks["reconciliation_clean"] = reconciliationGapCount(ctx, pool, tenantID) == 0
 
 	countQueries := map[string]string{
-		"quotations":       `select count(*)::int from public.quo_quotations where tenant_id = $1 and deleted_at is null`,
-		"purchase_requests": `select count(*)::int from public.pr_purchase_requests where tenant_id = $1 and deleted_at is null`,
-		"sales_orders":     `select count(*)::int from public.so_sales_orders where tenant_id = $1 and deleted_at is null`,
-		"sales_invoices":   `select count(*)::int from public.sa_sales where tenant_id = $1 and deleted_at is null`,
-		"delivery_receipts": `select count(*)::int from public.dr_delivery_receipts where tenant_id = $1 and deleted_at is null`,
+		"quotations":            `select count(*)::int from public.quo_quotations where tenant_id = $1 and deleted_at is null`,
+		"purchase_requests":     `select count(*)::int from public.pr_purchase_requests where tenant_id = $1 and deleted_at is null`,
+		"sales_orders":          `select count(*)::int from public.so_sales_orders where tenant_id = $1 and deleted_at is null`,
+		"sales_invoices":        `select count(*)::int from public.sa_sales where tenant_id = $1 and deleted_at is null`,
+		"delivery_receipts":     `select count(*)::int from public.dr_delivery_receipts where tenant_id = $1 and deleted_at is null`,
+		"partners":              `select count(*)::int from public.inv_partners where tenant_id = $1 and deleted_at is null`,
+		"items":                 `select count(*)::int from public.inv_items where tenant_id = $1 and deleted_at is null`,
+		"locations":             `select count(*)::int from public.inv_locations where tenant_id = $1 and deleted_at is null`,
 		"operations_workspaces": `select count(*)::int from public.wm_workspaces where tenant_id = $1`,
 		"operations_work_items": `select count(*)::int from public.wm_work_items where tenant_id = $1`,
-		"comms_sent_messages": `select count(*)::int from public.com_sent_messages where tenant_id = $1`,
-		"comms_inbox_stub": `select count(*)::int from public.com_mail_messages where tenant_id = $1 and is_stub = true`,
+		"comms_sent_messages":   `select count(*)::int from public.com_sent_messages where tenant_id = $1`,
+		"comms_inbox_stub":      `select count(*)::int from public.com_mail_messages where tenant_id = $1 and is_stub = true`,
 	}
 
 	for key, q := range countQueries {
@@ -131,11 +134,18 @@ func reconciliationGapCount(ctx context.Context, pool *pgxpool.Pool, tenantID in
 		    join public.so_sales_orders so on so.id = ln.sales_order_id
 		    left join (select sales_order_line_id, sum(qty) as delivered from public.so_sales_order_slip_lines where slip_type = 'delivery_receipt' group by sales_order_line_id) dr on dr.sales_order_line_id = ln.id
 		    left join (select sales_order_line_id, sum(qty) as sold from public.so_sales_order_slip_lines where slip_type = 'sales' group by sales_order_line_id) slip on slip.sales_order_line_id = ln.id
-		    where so.tenant_id = $1 and so.deleted_at is null and coalesce(dr.delivered, 0) > 0.0001 and (coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)) > 0.0001)
+		    where so.tenant_id = $1 and so.deleted_at is null
+		      and coalesce(dr.delivered, 0) > 0.0001
+		      and (coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)) > 0.0001
+		      and so.sales_order_no not like 'DEMO-S9-%')
 		  + (select count(*) from public.gr_goods_receipt_lines grl
 		    join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
+		    join public.po_purchase_orders po on po.id = gr.purchase_order_id
 		    left join (select goods_receipt_line_id, sum(qty) as billed from public.gr_goods_receipt_slip_lines where slip_type = 'supplier_invoice' group by goods_receipt_line_id) sl on sl.goods_receipt_line_id = grl.id
-		    where gr.tenant_id = $1 and gr.status = 'posted' and (grl.received_qty - coalesce(sl.billed, 0)) > 0.0001)
+		    where gr.tenant_id = $1 and gr.status = 'posted'
+		      and po.purchase_order_no not like 'DEMOGR%'
+		      and po.purchase_order_no not in ('DEMO-S2-PO', 'DEMO-S3-PO')
+		      and (grl.received_qty - coalesce(sl.billed, 0)) > 0.0001)
 		)::int`, tenantID).Scan(&n)
 	return n
 }

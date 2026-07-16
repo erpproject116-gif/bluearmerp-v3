@@ -708,7 +708,7 @@ export default function ChartOfAccountsPage() {
             Restore selected
           </button>
         </Show>
-        <Show when={!isEmpty()}>
+        <Show when={isEmpty()}>
           <button
             type="button"
             class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
