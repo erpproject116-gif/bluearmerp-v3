@@ -8,6 +8,12 @@ import { useAuth, hasPermission } from "../../shared/auth-context";
 import { sanitizeIntegerInput, bindDecimalInput } from "../../shared/money";
 import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
 import { uiLabel } from "../../shared/branding/uiLabel";
+import {
+  POS_LABEL_FIELDS,
+  POS_THEME_DEFAULTS,
+  POS_UI_LABEL_DEFAULTS,
+  resolvePosTheme,
+} from "./posBranding";
 
 type ItemRow = {
   id: number;
@@ -91,7 +97,9 @@ export default function PosSettingsPage() {
     >
     <div class="mx-auto max-w-6xl p-6">
       <h1 class="text-xl font-semibold text-text-primary">POS management</h1>
-      <p class="mt-1 text-sm text-text-secondary">Manage products, categories, and register behavior for this store.</p>
+      <p class="mt-1 text-sm text-text-secondary">
+        Manage products, categories, register behavior, terminology, and branding for this store.
+      </p>
 
       <div class="mt-5 flex gap-1 border-b border-stroke">
         <For each={TAB_LABELS}>
@@ -754,6 +762,8 @@ function SettingsTab() {
       enable_barcode: false,
       auto_post_accounting: true,
       auto_create_receipt: true,
+      ui_labels: {},
+      theme: {},
     };
 
   const update = (patch: Partial<PosSettings>) => setDraft({ ...current(), ...patch });
@@ -762,7 +772,12 @@ function SettingsTab() {
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
   const save = async () => {
-    const res = await savePosSettings(current());
+    const body: PosSettings = {
+      ...current(),
+      ui_labels: current().ui_labels ?? {},
+      theme: current().theme ?? {},
+    };
+    const res = await savePosSettings(body);
     if (!res.success) {
       toast.warning(res.message ?? "Could not save settings.");
       return;
@@ -774,7 +789,7 @@ function SettingsTab() {
 
   return (
     <Show when={!settings.isLoading} fallback={<p class="text-sm text-text-secondary">Loading settings…</p>}>
-      <div class="max-w-2xl space-y-6">
+      <div class="max-w-4xl space-y-6">
         <div class="rounded-xl border border-stroke bg-white p-5">
           <h3 class="mb-4 text-sm font-semibold text-text-primary">Tax &amp; pricing</h3>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -883,6 +898,54 @@ function SettingsTab() {
           </p>
         </div>
 
+        <div class="rounded-xl border border-stroke bg-white p-5">
+          <h3 class="mb-1 text-sm font-semibold text-text-primary">Terminology &amp; button text</h3>
+          <p class="mb-4 text-xs text-text-secondary">
+            Customize labels shown on the POS register (header buttons, order panel, forms). Leave blank to use the default.
+          </p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <For each={POS_LABEL_FIELDS}>
+              {(f) => (
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-text-secondary">{f.label}</label>
+                  <input
+                    type="text"
+                    class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                    placeholder={POS_UI_LABEL_DEFAULTS[f.key] ?? ""}
+                    value={current().ui_labels?.[f.key] ?? ""}
+                    onInput={(e) => {
+                      const next = { ...(current().ui_labels ?? {}) };
+                      const v = e.currentTarget.value;
+                      if (v.trim()) next[f.key] = v;
+                      else delete next[f.key];
+                      update({ ui_labels: next });
+                    }}
+                  />
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-stroke bg-white p-5">
+          <h3 class="mb-1 text-sm font-semibold text-text-primary">Branding &amp; colors</h3>
+          <p class="mb-4 text-xs text-text-secondary">
+            Color palette for the POS shell (header, primary actions, background). Company name still comes from tenant branding.
+          </p>
+          <PosThemeEditor
+            theme={current().theme ?? {}}
+            payLabel={current().ui_labels?.pay?.trim() || POS_UI_LABEL_DEFAULTS.pay}
+            onChange={(theme) => update({ theme })}
+          />
+          <button
+            type="button"
+            class="mt-3 text-xs font-medium text-brand-700 hover:underline"
+            onClick={() => update({ theme: {} })}
+          >
+            Reset colors to defaults
+          </button>
+        </div>
+
         <div class="flex justify-end">
           <button type="button" class="rounded-lg bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-40" disabled={!draft()} onClick={save}>
             Save settings
@@ -890,6 +953,74 @@ function SettingsTab() {
         </div>
       </div>
     </Show>
+  );
+}
+
+function PosThemeEditor(props: {
+  theme: Record<string, string>;
+  payLabel: string;
+  onChange: (theme: Record<string, string>) => void;
+}) {
+  const resolved = () => resolvePosTheme(props.theme);
+  const fields: { key: keyof typeof POS_THEME_DEFAULTS; label: string }[] = [
+    { key: "primary", label: "Primary (buttons)" },
+    { key: "accent", label: "Accent" },
+    { key: "header_bg", label: "Header background" },
+    { key: "header_text", label: "Header text" },
+    { key: "surface", label: "Page background" },
+    { key: "button_text", label: "Primary button text" },
+  ];
+  const setThemeKey = (key: string, value: string) => {
+    const next = { ...props.theme };
+    if (value.trim()) next[key] = value.trim();
+    else delete next[key];
+    props.onChange(next);
+  };
+  return (
+    <>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <For each={fields}>
+          {(f) => (
+            <div>
+              <label class="mb-1 block text-xs font-medium text-text-secondary">{f.label}</label>
+              <div class="flex items-center gap-2">
+                <input
+                  type="color"
+                  class="h-9 w-12 cursor-pointer rounded border border-stroke bg-white p-0.5"
+                  value={resolved()[f.key]}
+                  onInput={(e) => setThemeKey(f.key, e.currentTarget.value)}
+                />
+                <input
+                  type="text"
+                  class="min-w-0 flex-1 rounded-lg border border-stroke px-3 py-2 font-mono text-sm focus:border-brand-500 focus:outline-none"
+                  value={props.theme[f.key] ?? resolved()[f.key]}
+                  onInput={(e) => setThemeKey(f.key, e.currentTarget.value)}
+                  placeholder={POS_THEME_DEFAULTS[f.key]}
+                />
+              </div>
+            </div>
+          )}
+        </For>
+      </div>
+      <div
+        class="mt-4 flex items-center justify-between rounded-lg border border-stroke px-4 py-3"
+        style={{
+          "background-color": resolved().header_bg,
+          color: resolved().header_text,
+        }}
+      >
+        <span class="text-sm font-semibold">POS header preview</span>
+        <span
+          class="rounded-md px-3 py-1.5 text-xs font-medium"
+          style={{
+            "background-color": resolved().primary,
+            color: resolved().button_text,
+          }}
+        >
+          {props.payLabel}
+        </span>
+      </div>
+    </>
   );
 }
 

@@ -18,6 +18,7 @@ import {
   type PosGuestDraft,
   type PosPrivilegeKind,
 } from "./posGuests";
+import { resolvePosLabel, resolvePosTheme } from "./posBranding";
 import {
   addPosCartLine,
   checkoutPos,
@@ -87,6 +88,10 @@ export default function PosPage() {
   const session = usePosCurrentSession();
   const settings = usePosSettings();
   const categories = usePosCatalogCategories();
+
+  const posLabel = (key: string, fallback?: string) =>
+    resolvePosLabel(settings.data?.ui_labels, key, fallback);
+  const theme = createMemo(() => resolvePosTheme(settings.data?.theme));
 
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
@@ -692,10 +697,26 @@ export default function PosPage() {
   };
 
   return (
-    <div class="flex h-screen flex-col bg-slate-100 text-slate-900">
-      <header class="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
+    <div
+      class="flex h-screen flex-col text-slate-900"
+      style={{
+        "background-color": theme().surface,
+        "--pos-primary": theme().primary,
+        "--pos-accent": theme().accent,
+        "--pos-header-bg": theme().header_bg,
+        "--pos-header-text": theme().header_text,
+        "--pos-btn-text": theme().button_text,
+      }}
+    >
+      <header
+        class="flex items-center justify-between border-b border-slate-200 px-5 py-3"
+        style={{ "background-color": "var(--pos-header-bg)", color: "var(--pos-header-text)" }}
+      >
         <div class="flex items-center gap-3">
-          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white">
+          <span
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-white"
+            style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
+          >
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
@@ -703,30 +724,49 @@ export default function PosPage() {
           <div>
             <h1 class="text-base font-semibold leading-tight">{auth.me?.tenant.company_name ?? "Point of Sale"}</h1>
             <Show when={session.data}>
-              {(s) => <p class="text-xs text-slate-500">{s().session_no} · {s().location_name}</p>}
+              {(s) => <p class="text-xs opacity-70">{s().session_no} · {s().location_name}</p>}
             </Show>
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <Show when={session.data}>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+              onClick={applyDiscount}
+            >
+              {guests().length > 0 ? `${posLabel("guests")} (${guests().length})` : posLabel("discount")}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+              onClick={openCommission}
+            >
+              {(() => {
+                const n = commissions().filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0).length;
+                return n > 0 ? `${posLabel("commission")} (${n})` : posLabel("commission");
+              })()}
+            </button>
+          </Show>
           <Show when={hasPermission(auth.me, "pos.manage", "read")}>
             <A
               href="/app/pos/manage"
-              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
             >
-              Manage
+              {posLabel("manage")}
             </A>
           </Show>
           <Show when={session.data}>
             <button
               type="button"
-              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
               onClick={openClose}
             >
-              Close shift
+              {posLabel("close_shift")}
             </button>
           </Show>
-          <A href="/app/dashboard" class="rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800">
-            Exit POS
+          <A href="/app/dashboard" class="rounded-lg px-3 py-1.5 text-sm opacity-70 hover:bg-black/5 hover:opacity-100">
+            {posLabel("exit_pos")}
           </A>
         </div>
       </header>
@@ -757,12 +797,12 @@ export default function PosPage() {
         fallback={
           <div class="flex flex-1 items-center justify-center p-6">
             <section class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 class="mb-1 text-lg font-semibold">Open shift</h2>
-              <p class="mb-5 text-sm text-slate-500">Pick your register location and starting cash to begin selling.</p>
+              <h2 class="mb-1 text-lg font-semibold">{posLabel("open_shift")}</h2>
+              <p class="mb-5 text-sm text-slate-500">{posLabel("open_shift_hint")}</p>
               <div class="space-y-4">
                 <div>
                   <LookupCombo
-                    label="Location"
+                    label={posLabel("location")}
                     value={locationLabel}
                     selectedId={locationId}
                     onInput={setLocationLabel}
@@ -790,7 +830,7 @@ export default function PosPage() {
                   </div>
                 </div>
                 <div>
-                  <label class="mb-1 block text-sm font-medium text-slate-600">Starting cash</label>
+                  <label class="mb-1 block text-sm font-medium text-slate-600">{posLabel("opening_cash")}</label>
                   <input
                     type="text"
                     inputmode="decimal"
@@ -801,7 +841,9 @@ export default function PosPage() {
                 </div>
                 <button
                   type="button"
-                  class="w-full rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                  class="w-full rounded-lg py-2.5 font-medium disabled:opacity-50"
+                  style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
+
                   disabled={opening()}
                   onClick={openShift}
                 >
@@ -828,7 +870,11 @@ export default function PosPage() {
                 <input
                   type="search"
                   class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm focus:border-emerald-500 focus:bg-white focus:outline-none"
-                  placeholder={settings.data?.enable_barcode ? "Search or scan barcode…" : "Search product…"}
+                  placeholder={
+                    settings.data?.enable_barcode
+                      ? "Search or scan barcode…"
+                      : posLabel("search_placeholder")
+                  }
                   value={search()}
                   onInput={(e) => setSearch(e.currentTarget.value)}
                   onKeyDown={handleSearchKey}
@@ -888,9 +934,6 @@ export default function PosPage() {
             total={taxPreview().total}
             customerLabel={customerLabel()}
             onCustomer={() => setShowCustomer(true)}
-            onDiscount={applyDiscount}
-            onCommission={openCommission}
-            commissionCount={commissions().filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0).length}
             onSaveBill={saveBill}
             onBills={openBills}
             onQty={changeQty}
@@ -901,6 +944,7 @@ export default function PosPage() {
             checkingOut={checkingOut()}
             guests={guests()}
             onAssignGuest={setLineGuest}
+            labels={settings.data?.ui_labels}
           />
         </div>
       </Show>
@@ -922,6 +966,7 @@ export default function PosPage() {
           checkingOut={checkingOut()}
           commissions={commissions()}
           onCommissionsChange={setCommissions}
+          labels={settings.data?.ui_labels}
           onCancel={() => setShowPayment(false)}
           onConfirm={checkout}
         />
@@ -1143,9 +1188,11 @@ function PaymentModal(props: {
   checkingOut: boolean;
   commissions: PosCommissionDraft[];
   onCommissionsChange: (rows: PosCommissionDraft[]) => void;
+  labels?: Record<string, string>;
   onCancel: () => void;
   onConfirm: (tenders: { tender_type: string; amount: number }[]) => void;
 }) {
+  const L = (key: string, fallback?: string) => resolvePosLabel(props.labels, key, fallback);
   const first = () => props.tenders[0] ?? "cash";
   const [lines, setLines] = createSignal<PayLine[]>([{ type: first(), amount: props.total.toFixed(2) }]);
   const [tipRaw, setTipRaw] = createSignal(props.tip && props.tip > 0 ? props.tip.toFixed(2) : "");
@@ -1210,10 +1257,10 @@ function PaymentModal(props: {
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
       <div class="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 class="mb-1 text-lg font-semibold">Payment</h3>
+        <h3 class="mb-1 text-lg font-semibold">{L("payment")}</h3>
         <p class="mb-4 text-sm text-slate-500">Amount due <span class="font-semibold text-slate-900">{money(props.total)}</span></p>
         <Show when={props.showTable}>
-          <label class="mb-1 block text-xs font-medium text-slate-500">Table / seat</label>
+          <label class="mb-1 block text-xs font-medium text-slate-500">{L("table")}</label>
           <input
             class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             value={props.tableLabel ?? ""}
@@ -1222,7 +1269,7 @@ function PaymentModal(props: {
           />
         </Show>
         <Show when={props.tipEnabled !== false}>
-          <label class="mb-1 block text-xs font-medium text-slate-500">Tip (optional)</label>
+          <label class="mb-1 block text-xs font-medium text-slate-500">{L("tip")}</label>
           <input
             type="text"
             inputmode="decimal"
@@ -1245,7 +1292,7 @@ function PaymentModal(props: {
             Commission set on this ticket (
             {props.commissions.filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0).length} person
             {props.commissions.filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0).length === 1 ? "" : "s"}). Edit via
-            the Commission button on the order panel.
+            the {L("commission")} button in the header.
           </p>
         </Show>
 
@@ -1338,15 +1385,16 @@ function PaymentModal(props: {
 
         <div class="mt-4 flex gap-2">
           <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
-            Cancel
+            {L("cancel")}
           </button>
           <button
             type="button"
-            class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            class="flex-1 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50"
+            style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
             disabled={props.checkingOut || !canConfirm()}
             onClick={confirm}
           >
-            {props.checkingOut ? "Processing…" : "Confirm"}
+            {props.checkingOut ? "Processing…" : L("confirm_pay")}
           </button>
         </div>
       </div>
@@ -2001,9 +2049,6 @@ function OrderPanel(props: {
   total: number;
   customerLabel: string;
   onCustomer: () => void;
-  onDiscount: () => void;
-  onCommission: () => void;
-  commissionCount: number;
   onSaveBill: () => void;
   onBills: () => void;
   onQty: (ln: PosCartLine, delta: number) => void;
@@ -2014,31 +2059,27 @@ function OrderPanel(props: {
   checkingOut: boolean;
   guests: PosGuestDraft[];
   onAssignGuest: (ln: PosCartLine, guestNo: number) => void;
+  labels?: Record<string, string>;
 }) {
+  const L = (key: string, fallback?: string) => resolvePosLabel(props.labels, key, fallback);
   const actionBtn = "flex flex-col items-center gap-1 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50";
   return (
     <aside class="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div class="border-b border-slate-100 p-4">
-        <div class="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+        <div class="mb-3 grid grid-cols-3 gap-2">
           <button type="button" class={actionBtn} onClick={props.onCustomer}>
-            <span>Customer</span>
-          </button>
-          <button type="button" class={actionBtn} onClick={props.onDiscount}>
-            <span>{props.guests.length > 0 ? `Guests (${props.guests.length})` : "Discount"}</span>
-          </button>
-          <button type="button" class={actionBtn} onClick={props.onCommission}>
-            <span>{props.commissionCount > 0 ? `Comm (${props.commissionCount})` : "Commission"}</span>
+            <span>{L("customer")}</span>
           </button>
           <button type="button" class={actionBtn} onClick={props.onSaveBill}>
-            <span>Save Bill</span>
+            <span>{L("save_bill")}</span>
           </button>
           <button type="button" class={actionBtn} onClick={props.onBills}>
-            <span>Bills</span>
+            <span>{L("bills")}</span>
           </button>
         </div>
-        <h2 class="mb-2 text-sm font-semibold text-slate-700">Order Details</h2>
+        <h2 class="mb-2 text-sm font-semibold text-slate-700">{L("order_details")}</h2>
         <Show when={props.customerLabel}>
-          <p class="mb-2 text-xs text-slate-500">Customer: <span class="font-medium text-slate-700">{props.customerLabel}</span></p>
+          <p class="mb-2 text-xs text-slate-500">{L("customer")}: <span class="font-medium text-slate-700">{props.customerLabel}</span></p>
         </Show>
         <div class="flex rounded-lg bg-slate-100 p-1">
           <For each={props.orderTypes}>
@@ -2067,8 +2108,8 @@ function OrderPanel(props: {
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </span>
-              <p class="text-sm font-medium">No Order</p>
-              <p class="text-xs">Tap a product to add it to the order</p>
+              <p class="text-sm font-medium">{L("no_order")}</p>
+              <p class="text-xs">{L("no_order_hint")}</p>
             </div>
           }
         >
@@ -2132,36 +2173,37 @@ function OrderPanel(props: {
       <div class="border-t border-slate-100 p-4">
         <Show when={props.lines.length > 0}>
           <button type="button" class="mb-3 w-full rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={props.onClear}>
-            Clear All Order
+            {L("clear_order")}
           </button>
         </Show>
         <div class="space-y-1.5 rounded-xl bg-slate-50 p-3 text-sm">
           <div class="flex justify-between text-slate-500">
-            <span>Subtotal</span>
+            <span>{L("subtotal")}</span>
             <span class="tabular-nums">{money(props.subtotal)}</span>
           </div>
           <Show when={props.discount > 0}>
             <div class="flex justify-between text-emerald-600">
-              <span>Discount</span>
+              <span>{L("discount")}</span>
               <span class="tabular-nums">-{money(props.discount)}</span>
             </div>
           </Show>
           <div class="flex justify-between text-slate-500">
-            <span>Tax</span>
+            <span>{L("tax")}</span>
             <span class="tabular-nums">{money(props.tax)}</span>
           </div>
           <div class="mt-1 flex justify-between border-t border-slate-200 pt-2 text-base font-semibold">
-            <span>Total</span>
+            <span>{L("total")}</span>
             <span class="tabular-nums">{money(props.total)}</span>
           </div>
         </div>
         <button
           type="button"
-          class="mt-3 w-full rounded-lg bg-emerald-600 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          class="mt-3 w-full rounded-lg py-3 text-base font-semibold disabled:opacity-50"
+          style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
           disabled={props.checkingOut || props.lines.length === 0}
           onClick={props.onCheckout}
         >
-          {props.checkingOut ? "Processing…" : "Process Transaction"}
+          {props.checkingOut ? "Processing…" : L("pay")}
         </button>
       </div>
     </aside>

@@ -177,6 +177,10 @@ export type PosSettings = {
   privilege_senior_pct?: number;
   privilege_pwd_pct?: number;
   tip_enabled?: boolean;
+  /** Tenant overrides for POS button / form copy. */
+  ui_labels?: Record<string, string>;
+  /** POS color palette (primary, accent, header_bg, …). */
+  theme?: Record<string, string>;
 };
 
 export function usePosCatalogCategories() {
