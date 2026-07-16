@@ -16,6 +16,7 @@ const GROUP_LABELS: Record<string, string> = {
   sales_order: "Sales Order",
   purchase_request: "Purchase Request",
   purchase_order: "Purchase Order",
+  purchases: "Purchases",
   crm: "CRM",
   finance: "Accounting Dept",
   activity_logs: "Activity Logs",
@@ -39,7 +40,7 @@ function groupFor(row: TenantModuleRow): string {
   ) {
     return "Sales Process";
   }
-  if (row.module_code === "purchase_request" || row.module_code === "purchase_order") {
+  if (row.module_code === "purchase_request" || row.module_code === "purchase_order" || row.module_code === "purchases") {
     return "Procurement Process";
   }
   if (

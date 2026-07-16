@@ -273,7 +273,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "purchases",
-    label: "Supplier Invoices",
+    label: "Purchases",
     href: "/app/purchases/purchases",
     basePath: "/app/purchases",
     features: [
@@ -392,7 +392,7 @@ export const appModules: AppModule[] = [
       { label: "Workspace", href: "/app/finance", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Receipts", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Vouchers", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Supplier invoices", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Purchases", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Budgets", href: "/app/finance/budgets", settingsHref: "/app/finance/budgets" },
       { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
       { label: "Remittances", href: "/app/hr/remittances", settingsHref: "/app/hr/remittances" },
@@ -524,8 +524,6 @@ export function resolveModule(pathname: string): AppModule | undefined {
   if (
     isReviewPurchasesPath(pathname) ||
     isTaxMngtPath(pathname) ||
-    pathname === "/app/purchases" ||
-    pathname.startsWith("/app/purchases/") ||
     pathname === "/app/hr/payroll-runs" ||
     pathname.startsWith("/app/hr/payroll-runs/") ||
     pathname === "/app/fixed-assets" ||

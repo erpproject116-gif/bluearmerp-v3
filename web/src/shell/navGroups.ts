@@ -11,9 +11,8 @@ import { ACCT_II_PREFIX } from "./acct-ii-nav";
 export type NavGroupEntry =
   | { kind: "module"; moduleId: string }
   | { kind: "subBranch"; moduleId: string; featureCode: string; branchLabel: string }
-  // A direct link to a feature that lives under another module (e.g. Purchases,
-  // which is the Supplier Invoices page under the Accounts module). moduleId is
-  // used only for tenant-enablement gating.
+  // A direct link to a feature that lives under another module (optional shortcut).
+  // moduleId is used only for tenant-enablement gating.
   | { kind: "link"; moduleId: string; label: string; href: string; basePath: string };
 
 export type NavGroup = {
@@ -71,6 +70,7 @@ export const navGroups: NavGroup[] = [
       { kind: "module", moduleId: "buying" },
       { kind: "module", moduleId: "purchase_request" },
       { kind: "module", moduleId: "purchase_order" },
+      { kind: "module", moduleId: "purchases" },
     ],
   },
   {

@@ -33,6 +33,7 @@ type FinanceDefaults = {
   purchase_account_id?: number | null;
   input_vat_account_id?: number | null;
   output_vat_account_id?: number | null;
+  disabled_account_types?: string[];
 };
 
 type DefaultSlot = {
@@ -70,7 +71,11 @@ const emptyDefaults = (): FinanceDefaults => ({
   purchase_account_id: null,
   input_vat_account_id: null,
   output_vat_account_id: null,
+  disabled_account_types: [],
 });
+
+const CORE_ACCOUNT_TYPES: Array<AccountRow["account_type"]> = ["asset", "liability", "income", "expense"];
+const OPTIONAL_ACCOUNT_TYPES: Array<AccountRow["account_type"]> = ["equity"];
 
 export default function ChartOfAccountsPage() {
   const toast = useToast();
@@ -166,14 +171,21 @@ export default function ChartOfAccountsPage() {
       purchase_account_id: d.purchase_account_id ?? null,
       input_vat_account_id: d.input_vat_account_id ?? null,
       output_vat_account_id: d.output_vat_account_id ?? null,
+      disabled_account_types: d.disabled_account_types ?? [],
     });
   });
 
   const activeAccounts = createMemo(() => parentOptions.data ?? []);
 
-  /** Posting accounts only (exclude group headers). */
+  const disabledTypes = createMemo(() => new Set((defaultsForm().disabled_account_types ?? []).map((t) => t.toLowerCase())));
+  const enabledAccountTypes = createMemo(() => accountTypeOptions.filter((t) => !disabledTypes().has(t)));
+  const isTypeEnabled = (t: AccountRow["account_type"]) => !disabledTypes().has(t);
+
+  /** Posting accounts only (exclude group headers and disabled types). */
   const accountsForSlot = (types: Array<AccountRow["account_type"]>) =>
-    activeAccounts().filter((a) => !a.is_group && types.includes(a.account_type));
+    activeAccounts().filter(
+      (a) => !a.is_group && types.includes(a.account_type) && isTypeEnabled(a.account_type),
+    );
 
   createEffect(() => {
     const d = defaultsForm();
@@ -528,6 +540,47 @@ export default function ChartOfAccountsPage() {
     setMapLabels((m) => ({ ...m, [key]: label }));
   };
 
+  const setTypeEnabled = (type: AccountRow["account_type"], enabled: boolean) => {
+    if (CORE_ACCOUNT_TYPES.includes(type) && !enabled) {
+      toast.warning("Asset, liability, income, and expense stay available for posting.");
+      return;
+    }
+    setMappingsDirty(true);
+    setDefaultsForm((d) => {
+      const current = new Set((d.disabled_account_types ?? []).map((t) => t.toLowerCase()));
+      if (enabled) current.delete(type);
+      else current.add(type);
+      return { ...d, disabled_account_types: [...current] };
+    });
+  };
+
+  const deactivateAllOfType = async () => {
+    const t = typeFilter() as AccountRow["account_type"];
+    if (!t || !accountTypeOptions.includes(t)) {
+      toast.warning("Filter by an account type first, then deactivate all of that type.");
+      return;
+    }
+    if (!window.confirm(`Deactivate all active ${t} accounts? They will leave mapping dropdowns until reactivated.`)) return;
+    const res = await apiFetch<AccountRow[]>(
+      `/api/v1/finance/accounts?page=1&pageSize=2000&status=active&account_type=${t}&sort=account_code&order=asc`,
+    );
+    if (!res.success || !res.data?.length) {
+      toast.warning(res.message ?? "No active accounts of that type.");
+      return;
+    }
+    let failed = 0;
+    for (const row of res.data) {
+      const patch = await apiFetch(`/api/v1/finance/accounts/${row.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: false }),
+      });
+      if (!patch.success) failed += 1;
+    }
+    invalidate();
+    if (failed) toast.warning(`Deactivated with ${failed} failure(s).`);
+    else toast.success(`Deactivated ${res.data.length} ${t} account(s).`);
+  };
+
   return (
     <FinanceLayout>
       <Show when={isEmpty()}>
@@ -633,6 +686,13 @@ export default function ChartOfAccountsPage() {
         <button
           type="button"
           class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+          onClick={() => void deactivateAllOfType()}
+        >
+          Deactivate all of filtered type
+        </button>
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
           onClick={() => void remove()}
         >
           Remove selected
@@ -676,6 +736,33 @@ export default function ChartOfAccountsPage() {
           <Show when={defaultsOpen()}>
             <div class="border-t border-stroke px-4 py-4">
               <defaultsDraft.DraftBanner />
+              <div class="mb-4 rounded-lg border border-stroke bg-slate-50 px-3 py-3">
+                <p class="text-sm font-medium text-slate-800">Account types in use</p>
+                <p class="mt-1 text-xs text-slate-500">
+                  Uncheck types you do not need. They leave create/mapping pickers so lists stay short. Existing accounts
+                  remain on the chart (filter by type or Inactive). Equity is optional; core types stay on for posting.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-4">
+                  <For each={accountTypeOptions}>
+                    {(t) => (
+                      <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={isTypeEnabled(t)}
+                          disabled={CORE_ACCOUNT_TYPES.includes(t)}
+                          onChange={(e) => setTypeEnabled(t, e.currentTarget.checked)}
+                        />
+                        <span class="capitalize">
+                          {t}
+                          <Show when={OPTIONAL_ACCOUNT_TYPES.includes(t)}>
+                            <span class="text-slate-400"> (optional)</span>
+                          </Show>
+                        </span>
+                      </label>
+                    )}
+                  </For>
+                </div>
+              </div>
               <p class="mb-3 text-xs text-slate-500">
                 Map each role to an active account. Importing the Philippine SME template fills these automatically; adjust if needed.
                 Purchases / COGS must be an <span class="font-medium">expense</span> account (not inventory asset 1469).
@@ -817,7 +904,15 @@ export default function ChartOfAccountsPage() {
             value={form().account_type}
             onChange={(e) => setForm((v) => ({ ...v, account_type: e.currentTarget.value as AccountRow["account_type"] }))}
           >
-            <For each={accountTypeOptions}>{(t) => <option value={t}>{t} ({PH_BANDS[t]})</option>}</For>
+            <For
+              each={
+                enabledAccountTypes().includes(form().account_type)
+                  ? enabledAccountTypes()
+                  : [...enabledAccountTypes(), form().account_type]
+              }
+            >
+              {(t) => <option value={t}>{t} ({PH_BANDS[t]})</option>}
+            </For>
           </select>
         </Field>
         <Field label="Parent account">

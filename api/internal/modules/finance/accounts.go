@@ -540,6 +540,7 @@ func saveFinanceDefaults(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
+		body.DisabledAccountTypes = sanitizeDisabledAccountTypes(body.DisabledAccountTypes)
 		if errs := validateFinanceDefaults(r, pool, tu.TenantID, body); len(errs) > 0 {
 			response.Validation(w, errs)
 			return
@@ -555,8 +556,38 @@ func saveFinanceDefaults(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func sanitizeDisabledAccountTypes(raw []string) []string {
+	allowed := map[string]struct{}{
+		"asset": {}, "liability": {}, "equity": {}, "income": {}, "expense": {},
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		t := strings.ToLower(strings.TrimSpace(item))
+		if _, ok := allowed[t]; !ok {
+			continue
+		}
+		if _, dup := seen[t]; dup {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	return out
+}
+
 func validateFinanceDefaults(r *http.Request, pool *pgxpool.Pool, tenantID int64, body financedefaults.Defaults) map[string]string {
 	errs := map[string]string{}
+	disabled := map[string]struct{}{}
+	for _, t := range body.DisabledAccountTypes {
+		disabled[t] = struct{}{}
+	}
+	for _, required := range []string{"asset", "liability", "income", "expense"} {
+		if _, off := disabled[required]; off {
+			errs["disabled_account_types"] = "Asset, liability, income, and expense cannot be disabled (needed for posting)."
+			break
+		}
+	}
 	checks := []struct {
 		field string
 		id    *int64

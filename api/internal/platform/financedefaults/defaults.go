@@ -23,14 +23,15 @@ const (
 
 // Defaults holds tenant finance default account ids.
 type Defaults struct {
-	TenantID            int64  `json:"tenant_id"`
-	CashAccountID       *int64 `json:"cash_account_id,omitempty"`
-	ReceivableAccountID *int64 `json:"receivable_account_id,omitempty"`
-	PayableAccountID    *int64 `json:"payable_account_id,omitempty"`
-	SalesAccountID      *int64 `json:"sales_account_id,omitempty"`
-	PurchaseAccountID   *int64 `json:"purchase_account_id,omitempty"`
-	InputVATAccountID   *int64 `json:"input_vat_account_id,omitempty"`
-	OutputVATAccountID  *int64 `json:"output_vat_account_id,omitempty"`
+	TenantID             int64    `json:"tenant_id"`
+	CashAccountID        *int64   `json:"cash_account_id,omitempty"`
+	ReceivableAccountID  *int64   `json:"receivable_account_id,omitempty"`
+	PayableAccountID     *int64   `json:"payable_account_id,omitempty"`
+	SalesAccountID       *int64   `json:"sales_account_id,omitempty"`
+	PurchaseAccountID    *int64   `json:"purchase_account_id,omitempty"`
+	InputVATAccountID    *int64   `json:"input_vat_account_id,omitempty"`
+	OutputVATAccountID   *int64   `json:"output_vat_account_id,omitempty"`
+	DisabledAccountTypes []string `json:"disabled_account_types,omitempty"`
 }
 
 var fallbackCodes = map[Role]string{
@@ -84,25 +85,35 @@ func Load(ctx context.Context, q querier, tenantID int64) (Defaults, error) {
 	d.TenantID = tenantID
 	err := q.QueryRow(ctx, `
 		select cash_account_id, receivable_account_id, payable_account_id,
-		  sales_account_id, purchase_account_id, input_vat_account_id, output_vat_account_id
+		  sales_account_id, purchase_account_id, input_vat_account_id, output_vat_account_id,
+		  coalesce(disabled_account_types, '{}')
 		from public.tenant_finance_defaults
 		where tenant_id = $1`, tenantID).Scan(
 		&d.CashAccountID, &d.ReceivableAccountID, &d.PayableAccountID,
 		&d.SalesAccountID, &d.PurchaseAccountID, &d.InputVATAccountID, &d.OutputVATAccountID,
+		&d.DisabledAccountTypes,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return d, nil
+	}
+	if d.DisabledAccountTypes == nil {
+		d.DisabledAccountTypes = []string{}
 	}
 	return d, err
 }
 
 // Save upserts tenant finance defaults.
 func Save(ctx context.Context, pool *pgxpool.Pool, tenantID int64, d Defaults) error {
+	types := d.DisabledAccountTypes
+	if types == nil {
+		types = []string{}
+	}
 	_, err := pool.Exec(ctx, `
 		insert into public.tenant_finance_defaults (
 		  tenant_id, cash_account_id, receivable_account_id, payable_account_id,
-		  sales_account_id, purchase_account_id, input_vat_account_id, output_vat_account_id
-		) values ($1,$2,$3,$4,$5,$6,$7,$8)
+		  sales_account_id, purchase_account_id, input_vat_account_id, output_vat_account_id,
+		  disabled_account_types
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		on conflict (tenant_id) do update set
 		  cash_account_id = excluded.cash_account_id,
 		  receivable_account_id = excluded.receivable_account_id,
@@ -111,9 +122,11 @@ func Save(ctx context.Context, pool *pgxpool.Pool, tenantID int64, d Defaults) e
 		  purchase_account_id = excluded.purchase_account_id,
 		  input_vat_account_id = excluded.input_vat_account_id,
 		  output_vat_account_id = excluded.output_vat_account_id,
+		  disabled_account_types = excluded.disabled_account_types,
 		  updated_at = now()`,
 		tenantID, d.CashAccountID, d.ReceivableAccountID, d.PayableAccountID,
 		d.SalesAccountID, d.PurchaseAccountID, d.InputVATAccountID, d.OutputVATAccountID,
+		types,
 	)
 	return err
 }
