@@ -170,10 +170,6 @@ export default function ChartOfAccountsPage() {
 
   const purchaseCogsOptions = createMemo(() => accountsForSlot(["expense"]));
   const purchaseCogsEmpty = createMemo(() => purchaseCogsOptions().length === 0);
-  const purchaseMappingMissing = createMemo(() => {
-    const id = defaultsForm().purchase_account_id;
-    return !id || id <= 0;
-  });
   const purchaseNeedsEnsure = createMemo(() => {
     if (purchaseCogsEmpty()) return true;
     const id = defaultsForm().purchase_account_id;
