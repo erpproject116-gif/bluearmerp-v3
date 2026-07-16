@@ -1,4 +1,4 @@
-import { type JSX, For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { type JSX, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { Portal } from "solid-js/web";
 import { A } from "@solidjs/router";
 import {
@@ -69,20 +69,29 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let lastEmittedSearch = props.search ?? "";
 
-  // Keep last rows visible while a search/page refetch returns empty interim data
-  // (TanStack Query drops cache on queryKey change unless placeholderData is set).
-  const [displayRows, setDisplayRows] = createSignal<T[]>(props.rows);
-  const [displayTotal, setDisplayTotal] = createSignal<number | undefined>(props.total);
+  // Keep last rows visible while a search/page refetch returns empty interim data.
+  const [staleRows, setStaleRows] = createSignal<T[]>(props.rows);
+  const [staleTotal, setStaleTotal] = createSignal<number | undefined>(props.total);
 
   createEffect(() => {
     const rows = props.rows;
+    if (rows.length > 0) setStaleRows(rows);
     const total = props.total;
-    const loading = !!props.loading;
-    if (loading && rows.length === 0 && displayRows().length > 0) {
-      return;
-    }
-    setDisplayRows(rows);
-    if (total !== undefined) setDisplayTotal(total);
+    if (total !== undefined) setStaleTotal(total);
+  });
+
+  const displayRows = createMemo(() => {
+    const rows = props.rows;
+    if (rows.length > 0) return rows;
+    if (props.loading && staleRows().length > 0) return staleRows();
+    return rows;
+  });
+
+  const displayTotal = createMemo(() => {
+    const total = props.total;
+    if (total !== undefined) return total;
+    if (props.loading) return staleTotal();
+    return total;
   });
 
   createEffect(() => {
@@ -113,7 +122,8 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
     searchTimer = setTimeout(() => commitSearch(value), ms);
   };
 
-  const isInitialLoading = () => !!props.loading && displayRows().length === 0;
+  const isInitialLoading = () =>
+    !!props.loading && props.rows.length === 0 && displayRows().length === 0;
   const isRefreshing = () => !!props.loading && displayRows().length > 0;
 
   const columnDefs = () =>

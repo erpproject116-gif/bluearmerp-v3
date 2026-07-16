@@ -121,7 +121,7 @@ const BOOLEAN_FIELDS: PolicyField[] = [
   {
     key: "quotation_require_attachment",
     label: "Require attachment on quotation confirm",
-    help: "When on, quotations must have at least one uploaded file before In Progress or Completed.",
+    help: "Off by default (attachments are optional). Turn on only if your process must block confirm without a file.",
   },
   {
     key: "sales_order_require_attachment",

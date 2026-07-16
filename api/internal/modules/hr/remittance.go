@@ -2,7 +2,6 @@ package hr
 
 import (
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -401,12 +400,16 @@ func exportRemittanceCSV(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
 		var agency, label string
 		if err := pool.QueryRow(r.Context(), `
 			select agency, period_label from public.hr_remittance_batches where id=$1 and tenant_id=$2`,
 			id, tu.TenantID).Scan(&agency, &label); err != nil {
 			response.Err(w, http.StatusNotFound, "Remittance batch not found.", "ERR_NOT_FOUND")
 			return
+		}
+		if format == "" {
+			format = agency
 		}
 		rows, err := pool.Query(r.Context(), `
 			select employee_no, employee_name, gov_id, ee_amount::float8, er_amount::float8, other_amount::float8
@@ -417,22 +420,17 @@ func exportRemittanceCSV(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-remittance-%d.csv"`, agency, id))
-		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"agency", "period", "employee_no", "employee_name", "gov_id", "ee_amount", "er_amount", "other_amount", "total"})
+		headers := remittanceExportHeaders(agency, format)
+		var data [][]string
 		for rows.Next() {
 			var no, name, gov string
 			var ee, er, other float64
 			if err := rows.Scan(&no, &name, &gov, &ee, &er, &other); err != nil {
 				return
 			}
-			_ = cw.Write([]string{
-				agency, label, no, name, gov,
-				fmt.Sprintf("%.2f", ee), fmt.Sprintf("%.2f", er), fmt.Sprintf("%.2f", other),
-				fmt.Sprintf("%.2f", ee+er+other),
-			})
+			data = append(data, remittanceExportRow(agency, label, format, no, name, gov, ee, er, other))
 		}
-		cw.Flush()
+		filename := fmt.Sprintf("%s-remittance-%d.csv", format, id)
+		writeRemittanceCSV(w, filename, headers, data)
 	}
 }

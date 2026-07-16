@@ -194,7 +194,7 @@ export const appModules: AppModule[] = [
       { label: "Discount status", href: "/app/sales/reports/discount-status", settingsHref: "/app/sales/sales/settings" },
       { label: "Print slips", href: "/app/sales/reports/print-slips", settingsHref: "/app/sales/sales/settings" },
       { label: "Returns", href: "/app/sales/sales-returns", settingsHref: "/app/sales/sales/settings" },
-      { label: "Commissions", href: "/app/sales/commission-rules", settingsHref: "/app/sales/sales/settings" },
+      { label: "Commissions", href: "/app/sales/commission-rules", settingsHref: "/app/sales/commission-rules?tab=accounting" },
       { label: "SI receipts", href: "/app/sales/reports/si-receipt-status", settingsHref: "/app/sales/sales/settings" },
       { label: "Customer credit", href: "/app/sales/reports/customer-credit-balance", settingsHref: "/app/sales/sales/settings" },
       { label: "AR by customer", href: "/app/sales/reports/ar-by-customer", settingsHref: "/app/sales/sales/settings" },
@@ -378,7 +378,11 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees" },
       { label: "Attendance / DTR", href: "/app/hr/attendance", settingsHref: "/app/hr/attendance" },
+      { label: "Pay items", href: "/app/hr/pay-items", settingsHref: "/app/hr/pay-items" },
+      { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
+      { label: "13th / Final pay", href: "/app/hr/special-runs", settingsHref: "/app/hr/special-runs" },
       { label: "Remittances", href: "/app/hr/remittances", settingsHref: "/app/hr/remittances" },
+      { label: "My HR (ESS)", href: "/app/hr/ess", settingsHref: "/app/hr/ess" },
     ],
   },
   {

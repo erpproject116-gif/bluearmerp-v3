@@ -20,6 +20,28 @@ async function fetchMeWithRetry(maxAttempts = 4): Promise<Awaited<ReturnType<typ
   throw lastErr;
 }
 
+function profileFromSession(session: { user: { email?: string; user_metadata?: Record<string, unknown> } }) {
+  const email = session.user.email?.trim() ?? "";
+  const meta = session.user.user_metadata ?? {};
+  const fullName =
+    (typeof meta.full_name === "string" && meta.full_name.trim()) ||
+    (typeof meta.name === "string" && meta.name.trim()) ||
+    email;
+  return { email, fullName };
+}
+
+async function recordIntake(email: string, fullName: string) {
+  if (!email) return;
+  await apiFetch(
+    "/api/v1/platform/intake",
+    {
+      method: "POST",
+      body: JSON.stringify({ full_name: fullName, email }),
+    },
+    { silent: true },
+  );
+}
+
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
   const auth = useAuth();
@@ -51,17 +73,32 @@ export default function AuthCallbackPage() {
 
     window.history.replaceState({}, document.title, "/auth/callback");
 
+    const { email, fullName } = profileFromSession(data.session);
+    void recordIntake(email, fullName);
+
     try {
-      const me = await fetchMeWithRetry();
+      let me = await fetchMeWithRetry();
       if (!me.success && (me.status === 403 || me.code === "ERR_FORBIDDEN")) {
-        const prov = await apiFetch<{ tenant_id: number }>(
-          "/api/v1/demo/provision",
-          { method: "POST", body: "{}" },
+        const trial = await apiFetch<{ tenant_id: number }>(
+          "/api/v1/platform/trial/provision",
+          { method: "POST" },
           { silent: true },
         );
-        if (prov.success && prov.data?.tenant_id) {
-          setActiveTenantId(prov.data.tenant_id);
+        if (trial.success && trial.data?.tenant_id) {
+          setActiveTenantId(trial.data.tenant_id);
+          me = await fetchMeWithRetry();
+        } else {
+          navigate("/welcome", { replace: true });
+          return;
         }
+      }
+
+      if (!me.success) {
+        navigate(
+          `/signin?error=${encodeURIComponent(me.message ?? "Account not provisioned yet.")}`,
+          { replace: true },
+        );
+        return;
       }
 
       await auth.refresh();

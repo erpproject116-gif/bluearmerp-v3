@@ -1,6 +1,7 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
 import { ScannedSerialTable } from "./ScannedSerialTable";
+import { dedupeSerials, parseSerialBulkInput } from "./serialBulkParse";
 import {
   serialUnitsToChange,
   unitsFromIdsAndLabels,
@@ -161,10 +162,7 @@ export function SerialSaleScanner(props: Props) {
   };
 
   const importPasted = async () => {
-    const lines = pasteText()
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const lines = dedupeSerials(parseSerialBulkInput(pasteText()));
     if (lines.length === 0) {
       toast.warning("Paste at least one serial number.");
       return;
@@ -251,7 +249,7 @@ export function SerialSaleScanner(props: Props) {
 
       <Show when={pasteOpen()}>
         <div class="rounded-lg border border-stroke bg-slate-50 p-3">
-          <p class="mb-2 text-sm text-text-secondary">One serial number per line.</p>
+          <p class="mb-2 text-sm text-text-secondary">Comma-separated or one serial per line.</p>
           <textarea
             class={`${inputClass} mb-2 min-h-[100px] w-full font-mono text-sm`}
             value={pasteText()}

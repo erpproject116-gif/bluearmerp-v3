@@ -182,6 +182,9 @@ import {
   PayrollRunsPage,
   RemittancesPage,
   AttendancePage,
+  PayItemsPage,
+  SpecialRunsPage,
+  EssSelfServicePage,
   PayslipPrintPage,
   PayslipSharedPage,
   FixedAssetsPage,
@@ -605,6 +608,13 @@ export default function App() {
           <Route path="/hr/payroll-runs" component={() => (
             <HrRoute><PayrollRunsPage /></HrRoute>
           )} />
+          <Route path="/hr/pay-items" component={() => (
+            <HrRoute><PayItemsPage /></HrRoute>
+          )} />
+          <Route path="/hr/special-runs" component={() => (
+            <HrRoute><SpecialRunsPage /></HrRoute>
+          )} />
+          <Route path="/hr/ess" component={EssSelfServicePage} />
           <Route path="/hr/remittances" component={() => (
             <HrRoute><RemittancesPage /></HrRoute>
           )} />

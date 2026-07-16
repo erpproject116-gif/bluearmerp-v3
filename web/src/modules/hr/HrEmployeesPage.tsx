@@ -7,11 +7,17 @@ import {
   useInvalidateEmployees,
   type Employee,
 } from "../../shared/useHr";
+import {
+  downloadEmployeesImportTemplate,
+  exportEmployeesCsv,
+  importEmployeesCsv,
+} from "../../shared/hrCsvImport";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { HrLayout } from "./HrLayout";
+import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
 
 const STATUS_OPTIONS = ["active", "inactive", "terminated"];
 
@@ -35,6 +41,7 @@ export default function HrEmployeesPage() {
   const [pagibigNo, setPagibigNo] = createSignal("");
   const [taxStatus, setTaxStatus] = createSignal("S");
   const [saving, setSaving] = createSignal(false);
+  const [importing, setImporting] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateEmployees();
 
@@ -155,8 +162,67 @@ export default function HrEmployeesPage() {
     invalidate();
   };
 
+  const onImportFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const result = await importEmployeesCsv(file);
+      if (!result.ok || !result.data) {
+        toast.error(result.message ?? "Import failed.");
+        return;
+      }
+      const { created, updated = 0, failed, row_errors: rowErrors } = result.data;
+      if (failed > 0) {
+        const detail =
+          rowErrors
+            ?.slice(0, 6)
+            .map((e) => `Row ${e.row}: ${e.message}`)
+            .join(" · ") ?? "";
+        toast.warning(`Imported ${created}, updated ${updated}; ${failed} failed.${detail ? ` ${detail}` : ""}`);
+      } else {
+        toast.success(`Imported ${created}, updated ${updated} employee(s).`);
+      }
+      if (created > 0 || updated > 0) invalidate();
+    } catch {
+      toast.error("Import failed.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <HrLayout>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+          onClick={() => void downloadEmployeesImportTemplate().catch(() => toast.error("Could not download template."))}
+        >
+          Download template
+        </button>
+        <label class="cursor-pointer rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel">
+          {importing() ? "Importing…" : "Import CSV"}
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            class="hidden"
+            disabled={importing()}
+            onChange={(e) => {
+              const f = e.currentTarget.files?.[0];
+              e.currentTarget.value = "";
+              if (f) void onImportFile(f);
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+          onClick={() =>
+            void exportEmployeesCsv(q() || undefined).catch(() => toast.error("Export failed."))
+          }
+        >
+          Export CSV
+        </button>
+      </div>
       <SpreadsheetGrid
         columns={[
           { key: "employee_no", header: "Employee #", clickable: true },
@@ -247,6 +313,9 @@ export default function HrEmployeesPage() {
         <Field label="Notes">
           <textarea class={inputClass} rows={3} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
         </Field>
+        <Show when={selected()?.id}>
+          {(id) => <EmployeeExtrasPanel employeeId={id()} />}
+        </Show>
       </EntityModal>
     </HrLayout>
   );

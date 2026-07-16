@@ -93,8 +93,9 @@ type Sale struct {
 	GrandTotal          float64    `json:"grand_total"`
 	CreatedByUserID     *int64     `json:"created_by_user_id,omitempty"`
 	CreatedByName       string     `json:"created_by_name,omitempty"`
-	ItemNameSummary     string     `json:"item_name_summary,omitempty"`
-	Lines               []SaleLine `json:"lines,omitempty"`
+	ItemNameSummary     string               `json:"item_name_summary,omitempty"`
+	Lines               []SaleLine           `json:"lines,omitempty"`
+	Commissions         []SaleCommissionLine `json:"commissions,omitempty"`
 }
 
 type saleLineBody struct {
@@ -132,8 +133,9 @@ type saleBody struct {
 	ProgressStatus     string         `json:"progress_status"`
 	TemplateCode       string         `json:"template_code"`
 	SalesCategory      *string        `json:"sales_category"`
-	SourceSalesOrderID *int64         `json:"source_sales_order_id"`
-	Lines              []saleLineBody `json:"lines"`
+	SourceSalesOrderID *int64                   `json:"source_sales_order_id"`
+	Lines              []saleLineBody           `json:"lines"`
+	Commissions        []saleCommissionLineBody `json:"commissions"`
 }
 
 type computedLine struct {
@@ -410,6 +412,11 @@ func loadSale(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Sale
 		return Sale{}, err
 	}
 	sale.Lines = lines
+	comms, err := loadSaleCommissions(ctx, pool, tenantID, id)
+	if err != nil {
+		return Sale{}, err
+	}
+	sale.Commissions = comms
 	return sale, nil
 }
 
@@ -596,6 +603,15 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if v := validateCommissionBodies(body.Commissions); v != nil {
+			response.Validation(w, v)
+			return
+		}
+		if err := replaceSaleCommissions(r.Context(), tx, tu.TenantID, id, grandTotal, body.Commissions); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save commissions.", "ERR_INTERNAL")
+			return
+		}
+
 		if err := validateSaleSerialRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
 			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
@@ -632,6 +648,14 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		if defaultProgress(body.ProgressStatus) == "completed" {
 			if err := accrueCommissionForSale(r.Context(), tx, tu.TenantID, id); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to accrue commission.", "ERR_INTERNAL")
+				return
+			}
+			if err := accrueSaleLineCommissions(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to accrue TIC commissions.", "ERR_INTERNAL")
+				return
+			}
+			if err := postCommissionJournalForSale(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to post commission journal.", "ERR_INTERNAL")
 				return
 			}
 		}
@@ -757,6 +781,15 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if v := validateCommissionBodies(body.Commissions); v != nil {
+			response.Validation(w, v)
+			return
+		}
+		if err := replaceSaleCommissions(r.Context(), tx, tu.TenantID, id, grandTotal, body.Commissions); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save commissions.", "ERR_INTERNAL")
+			return
+		}
+
 		if err := validateSaleSerialRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
 			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
@@ -787,6 +820,24 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		if newStatus == "completed" && before.ProgressStatus != "completed" {
 			if err := accrueCommissionForSale(r.Context(), tx, tu.TenantID, id); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to accrue commission.", "ERR_INTERNAL")
+				return
+			}
+			if err := accrueSaleLineCommissions(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to accrue TIC commissions.", "ERR_INTERNAL")
+				return
+			}
+			if err := postCommissionJournalForSale(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to post commission journal.", "ERR_INTERNAL")
+				return
+			}
+		} else if newStatus == "completed" {
+			// Re-save may add/change TIC lines after already completed.
+			if err := accrueSaleLineCommissions(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to accrue TIC commissions.", "ERR_INTERNAL")
+				return
+			}
+			if err := postCommissionJournalForSale(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to post commission journal.", "ERR_INTERNAL")
 				return
 			}
 		}

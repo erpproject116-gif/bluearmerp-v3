@@ -84,7 +84,7 @@ const selectCols = `
   coalesce(purchase_require_po_approval, false),
   coalesce(finance_require_je_approval, false),
   coalesce(budget_control_mode, 'off'),
-  coalesce(quotation_require_attachment, true),
+  coalesce(quotation_require_attachment, false),
   coalesce(sales_order_require_attachment, true),
   coalesce(sales_require_attachment, true),
   coalesce(purchase_order_require_attachment, true),

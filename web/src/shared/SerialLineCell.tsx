@@ -1,30 +1,21 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "./api";
+import { InlineSerialBulkField } from "./InlineSerialBulkField";
 import { Modal } from "./Modal";
 import { inputClass } from "./SpreadsheetGrid";
+import { resolveSerialBulk } from "./resolveSerialBulk";
 import { ScannedSerialTable } from "./ScannedSerialTable";
 import { SerialPickModal } from "./SerialPickModal";
 import { SerialSaleScanner } from "./SerialSaleScanner";
+import { dedupeSerials, formatSerialBulkList, parseSerialBulkInput } from "./serialBulkParse";
 import type { ResolvedSerialUnit } from "./serialScanTypes";
+import { serialUnitsToChange } from "./serialScanTypes";
 import { useToast } from "./toast";
 import { useSerialScanQueue } from "./useSerialScanQueue";
 
 export type SerialLineCellMode = "units" | "receive" | "planned";
 
 type SerialEntry = { id: number; serial_no: string };
-
-function truncateLabels(labels: string[], max = 3): string {
-  if (labels.length === 0) return "";
-  const shown = labels.slice(0, max).join(", ");
-  if (labels.length <= max) return shown;
-  return `${shown}, …`;
-}
-
-function summaryText(count: number, labels: string[]): string {
-  if (count === 0) return "—";
-  const text = truncateLabels(labels);
-  return `${count} serial${count === 1 ? "" : "s"}: ${text}`;
-}
 
 type UnitsProps = {
   mode: "units";
@@ -102,7 +93,7 @@ function UnitsSerialModal(props: UnitsProps & { open: boolean; onClose: () => vo
     <>
       <Modal open={props.open} title="Serial numbers" onClose={props.onClose} wide>
         <p class="mb-3 text-sm text-text-secondary">
-          Assign {targetQty()} serial{targetQty() === 1 ? "" : "s"} ({props.serialUnitIds.length} selected).
+          Scan or pick serials — {props.serialUnitIds.length} / {targetQty()} assigned.
         </p>
         <div class="mb-3 flex flex-wrap gap-2">
           <button
@@ -199,6 +190,18 @@ function ReceiveSerialModal(props: ReceiveProps & { open: boolean; onClose: () =
     }
   });
 
+  const enqueueSerials = async (serialNos: string[]) => {
+    const existing = new Set(props.serials.map((s) => s.serial_no.toLowerCase()));
+    let queued = 0;
+    for (const sn of serialNos) {
+      if (props.serials.length + scanQueue.pendingCount() + queued >= targetQty()) break;
+      if (existing.has(sn.toLowerCase())) continue;
+      scanQueue.enqueue(props.lineId, sn);
+      queued++;
+    }
+    if (queued > 0) await scanQueue.flushNow();
+  };
+
   const submitScan = () => {
     const value = scanInput().trim();
     if (!value || props.status !== "draft" || props.disabled) return;
@@ -211,20 +214,13 @@ function ReceiveSerialModal(props: ReceiveProps & { open: boolean; onClose: () =
   };
 
   const importPasted = async () => {
-    const lines = pasteText()
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const lines = dedupeSerials(parseSerialBulkInput(pasteText()));
     if (lines.length === 0) {
       toast.warning("Paste at least one serial number.");
       return;
     }
     setPasteBusy(true);
-    for (const sn of lines) {
-      if (props.serials.length + scanQueue.pendingCount() >= targetQty()) break;
-      scanQueue.enqueue(props.lineId, sn);
-    }
-    await scanQueue.flushNow();
+    await enqueueSerials(lines);
     setPasteBusy(false);
     setPasteText("");
     setPasteOpen(false);
@@ -249,8 +245,6 @@ function ReceiveSerialModal(props: ReceiveProps & { open: boolean; onClose: () =
     props.onAfterScan?.();
     toast.success(`Removed ${last.serial_no}`);
   };
-
-  const tableRows = () => receiveRowsFromSerials(props.serials, props.itemCode, props.itemName);
 
   const rejectedRows = (): (ResolvedSerialUnit & { error: string })[] => {
     const q = scanQueue.queue().filter(
@@ -315,7 +309,7 @@ function ReceiveSerialModal(props: ReceiveProps & { open: boolean; onClose: () =
       </Show>
 
       <ScannedSerialTable
-        units={[...rejectedRows(), ...tableRows()]}
+        units={[...rejectedRows(), ...receiveRowsFromSerials(props.serials, props.itemCode, props.itemName)]}
         maxQty={targetQty()}
         disabled={props.disabled || props.status !== "draft"}
         showItemDetails
@@ -323,7 +317,7 @@ function ReceiveSerialModal(props: ReceiveProps & { open: boolean; onClose: () =
 
       <Show when={pasteOpen()}>
         <div class="mt-3 rounded-lg border border-stroke bg-slate-50 p-3">
-          <p class="mb-2 text-sm text-text-secondary">One serial number per line.</p>
+          <p class="mb-2 text-sm text-text-secondary">Comma-separated or one serial per line.</p>
           <textarea
             class={`${inputClass} mb-2 min-h-[100px] w-full font-mono text-sm`}
             value={pasteText()}
@@ -357,51 +351,14 @@ function ReceiveSerialModal(props: ReceiveProps & { open: boolean; onClose: () =
 
 function PlannedSerialModal(props: PlannedProps & { open: boolean; onClose: () => void }) {
   const [text, setText] = createSignal("");
-  const [scanInput, setScanInput] = createSignal("");
-  const [filter, setFilter] = createSignal("");
-
-  createEffect(() => {
-    if (props.open) {
-      setText((props.plannedSerials ?? []).join("\n"));
-      setScanInput("");
-      setFilter("");
-    }
-  });
-
   const targetQty = () => Math.max(1, Math.floor(props.qty));
 
-  const serialList = () =>
-    text()
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-  const filteredList = () => {
-    const q = filter().trim().toLowerCase();
-    const list = serialList();
-    if (!q) return list;
-    return list.filter((s) => s.toLowerCase().includes(q));
-  };
-
-  const appendScan = () => {
-    const sn = scanInput().trim();
-    if (!sn || props.disabled) return;
-    const existing = serialList();
-    if (existing.some((s) => s.toLowerCase() === sn.toLowerCase())) return;
-    if (existing.length >= targetQty()) return;
-    setText([...existing, sn].join("\n"));
-    setScanInput("");
-  };
+  createEffect(() => {
+    if (props.open) setText(formatSerialBulkList(props.plannedSerials ?? []));
+  });
 
   const apply = () => {
-    const seen = new Set<string>();
-    const unique: string[] = [];
-    for (const s of serialList()) {
-      const key = s.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      unique.push(s);
-    }
+    const unique = dedupeSerials(parseSerialBulkInput(text()));
     props.onChange?.(unique.slice(0, targetQty()));
     props.onClose();
   };
@@ -409,43 +366,15 @@ function PlannedSerialModal(props: PlannedProps & { open: boolean; onClose: () =
   return (
     <Modal open={props.open} title="Planned serial numbers" onClose={props.onClose} wide>
       <p class="mb-3 text-sm text-amber-800">
-        Planned only — enter up to {targetQty()} expected serial{targetQty() === 1 ? "" : "s"}. Real units are assigned at goods receipt or sale.
+        Planned only — up to {targetQty()} expected serial{targetQty() === 1 ? "" : "s"}. Comma-separated or one per line.
       </p>
-      <div class="mb-3 flex gap-2">
-        <input
-          class={`${inputClass} flex-1`}
-          value={scanInput()}
-          disabled={props.disabled}
-          placeholder="Scan serial (Enter)…"
-          onInput={(e) => setScanInput(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              appendScan();
-            }
-          }}
-        />
-        <span class="self-center text-xs text-text-secondary">
-          {serialList().length} / {targetQty()}
-        </span>
-      </div>
-      <input
-        class={`${inputClass} mb-2 w-full`}
-        value={filter()}
-        disabled={props.disabled}
-        placeholder="Search planned serials…"
-        onInput={(e) => setFilter(e.currentTarget.value)}
-      />
       <textarea
         class={`${inputClass} mb-3 min-h-[120px] w-full font-mono text-sm`}
         value={text()}
         disabled={props.disabled}
-        placeholder="SN001&#10;SN002"
+        placeholder="SN001, SN002, SN003"
         onInput={(e) => setText(e.currentTarget.value)}
       />
-      <Show when={filter().trim() && filteredList().length > 0}>
-        <p class="mb-2 text-xs text-text-secondary">{filteredList().length} match(es)</p>
-      </Show>
       <div class="flex justify-end gap-2">
         <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={props.onClose}>
           Cancel
@@ -463,67 +392,170 @@ function PlannedSerialModal(props: PlannedProps & { open: boolean; onClose: () =
   );
 }
 
-export function SerialLineCell(props: SerialLineCellProps) {
+function PlannedSerialCell(props: PlannedProps) {
   const [open, setOpen] = createSignal(false);
+  const targetQty = () => Math.max(1, Math.floor(props.qty));
+  const serials = () => props.plannedSerials ?? [];
 
-  const labels = () => {
-    if (props.mode === "units") {
-      return (props.serialLabels ?? "").split(/,\s*/).filter(Boolean);
+  return (
+    <>
+      <InlineSerialBulkField
+        serials={serials()}
+        targetQty={targetQty()}
+        disabled={props.disabled}
+        placeholder="SN001, SN002, …"
+        onCommit={async (next) => {
+          props.onChange?.(next.slice(0, targetQty()));
+        }}
+        onOpenAdvanced={() => setOpen(true)}
+      />
+      <PlannedSerialModal {...props} open={open()} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+function UnitsSerialCell(props: UnitsProps) {
+  const toast = useToast();
+  const [open, setOpen] = createSignal(false);
+  const [resolving, setResolving] = createSignal(false);
+  const targetQty = () => Math.max(1, Math.floor(props.qty));
+
+  const labels = () =>
+    (props.serialLabels ?? "")
+      .split(/,\s*/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const commitResolved = async (serialNos: string[]) => {
+    const capped = serialNos.slice(0, targetQty());
+    if (capped.length === 0) {
+      props.onChange([], "", undefined);
+      return;
     }
-    if (props.mode === "receive") {
-      return props.serials.map((s) => s.serial_no);
+    setResolving(true);
+    const { units, errors } = await resolveSerialBulk(capped, {
+      locationId: props.locationId,
+      itemId: props.itemId,
+      context: props.context ?? "sale",
+    });
+    setResolving(false);
+    if (errors.length > 0) {
+      toast.warning(errors.slice(0, 3).join(" · ") + (errors.length > 3 ? ` (+${errors.length - 3} more)` : ""));
     }
-    return props.plannedSerials ?? [];
-  };
-
-  const count = () => {
-    if (props.mode === "units") return props.serialUnitIds.length;
-    if (props.mode === "receive") return props.serials.length;
-    return (props.plannedSerials ?? []).length;
-  };
-
-  const targetQty = () => {
-    if (props.mode === "units") return Math.max(1, Math.floor(props.qty));
-    if (props.mode === "receive") return Math.max(1, Math.floor(props.expectedQty));
-    return Math.max(1, Math.floor(props.qty));
-  };
-
-  const mismatch = () => count() > 0 && count() !== targetQty();
-
-  const cellClass = () =>
-    `w-full cursor-pointer rounded border px-2 py-1 text-left text-xs hover:bg-slate-50 ${
-      mismatch() ? "border-amber-400 bg-amber-50 text-amber-900" : "border-stroke bg-white text-text-primary"
-    } ${props.disabled ? "cursor-not-allowed opacity-50" : ""}`;
-
-  const openModal = () => {
-    if (props.disabled) return;
-    setOpen(true);
-  };
-
-  const plannedSummary = () => {
-    const n = count();
-    if (n === 0) return "Planned: —";
-    return `Planned: ${summaryText(n, labels())}`;
+    const { ids, labels: lbls, qty } = serialUnitsToChange(units);
+    props.onChange(ids, lbls, qty);
   };
 
   return (
     <>
-      <button type="button" class={cellClass()} disabled={props.disabled} onClick={openModal} title="Click to manage serials">
-        <Show when={props.mode === "planned"} fallback={<span>{summaryText(count(), labels())}</span>}>
-          <span>{plannedSummary()}</span>
-        </Show>
-      </button>
+      <InlineSerialBulkField
+        serials={labels()}
+        targetQty={targetQty()}
+        disabled={props.disabled}
+        busy={resolving()}
+        placeholder="Scan or type serials, comma-separated"
+        onCommit={commitResolved}
+        onOpenAdvanced={() => setOpen(true)}
+      />
+      <UnitsSerialModal {...props} open={open()} onClose={() => setOpen(false)} />
+    </>
+  );
+}
 
-      <Show when={props.mode === "units"}>
-        <UnitsSerialModal {...(props as UnitsProps)} open={open()} onClose={() => setOpen(false)} />
-      </Show>
+function ReceiveSerialCell(props: ReceiveProps) {
+  const toast = useToast();
+  const [open, setOpen] = createSignal(false);
+  const targetQty = () => Math.max(1, Math.floor(props.expectedQty));
+  const serialNos = () => props.serials.map((s) => s.serial_no);
+  const readOnly = () => props.status !== "draft";
 
-      <Show when={props.mode === "receive"}>
-        <ReceiveSerialModal {...(props as ReceiveProps)} open={open()} onClose={() => setOpen(false)} />
-      </Show>
+  const scanQueue = useSerialScanQueue(() => props.grId);
+  const appliedScanIds = new Set<string>();
 
+  createEffect(() => {
+    scanQueue.initFromStorage(props.grId);
+  });
+
+  createEffect(() => {
+    const q = scanQueue.queue();
+    const done = q.filter(
+      (item) =>
+        item.goods_receipt_line_id === props.lineId &&
+        (item.status === "accepted" || item.status === "replay") &&
+        !appliedScanIds.has(item.client_scan_id),
+    );
+    if (done.length === 0) return;
+
+    let serials = props.serials;
+    let receivedQty = props.receivedQty;
+    for (const item of done) {
+      appliedScanIds.add(item.client_scan_id);
+      const patched = patchReceiveLine(serials, receivedQty, props.expectedQty, {
+        serial_id: item.serial_id,
+        serial_no: item.serial_no,
+        status: item.status === "replay" ? "idempotent_replay" : "accepted",
+      });
+      if (patched) {
+        serials = patched.serials;
+        receivedQty = patched.receivedQty;
+      }
+    }
+    if (serials !== props.serials || receivedQty !== props.receivedQty) {
+      props.onSerialsChange(serials, receivedQty);
+      props.onAfterScan?.();
+    }
+  });
+
+  const appendReceiveSerials = async (incoming: string[]) => {
+    if (readOnly() || props.disabled) return;
+    const existing = new Set(props.serials.map((s) => s.serial_no.toLowerCase()));
+    const toAdd = dedupeSerials(incoming).filter((sn) => !existing.has(sn.toLowerCase()));
+    if (toAdd.length === 0) return;
+    if (props.serials.length >= targetQty()) {
+      toast.warning(`Line already has ${targetQty()} serial(s).`);
+      return;
+    }
+    for (const sn of toAdd) {
+      if (props.serials.length + scanQueue.pendingCount() >= targetQty()) break;
+      scanQueue.enqueue(props.lineId, sn);
+    }
+    await scanQueue.flushNow();
+  };
+
+  return (
+    <>
+      <InlineSerialBulkField
+        serials={serialNos()}
+        targetQty={targetQty()}
+        disabled={props.disabled || scanQueue.flushing()}
+        readOnly={readOnly()}
+        busy={scanQueue.flushing()}
+        placeholder="Scan serial, or paste comma-separated"
+        onCommit={async (next) => {
+          if (next.length < serialNos().length) {
+            toast.warning("To remove serials, open ⋯ and use Remove last.");
+            return;
+          }
+          await appendReceiveSerials(next);
+        }}
+        onOpenAdvanced={() => setOpen(true)}
+      />
+      <ReceiveSerialModal {...props} open={open()} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+export function SerialLineCell(props: SerialLineCellProps) {
+  return (
+    <>
       <Show when={props.mode === "planned"}>
-        <PlannedSerialModal {...(props as PlannedProps)} open={open()} onClose={() => setOpen(false)} />
+        <PlannedSerialCell {...(props as PlannedProps)} />
+      </Show>
+      <Show when={props.mode === "units"}>
+        <UnitsSerialCell {...(props as UnitsProps)} />
+      </Show>
+      <Show when={props.mode === "receive"}>
+        <ReceiveSerialCell {...(props as ReceiveProps)} />
       </Show>
     </>
   );

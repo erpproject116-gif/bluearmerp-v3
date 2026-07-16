@@ -2,6 +2,7 @@ import { createSignal, For } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useEmployees } from "../../shared/useHr";
+import { downloadDtrImportTemplate, importDtrCsv } from "../../shared/hrCsvImport";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
@@ -57,6 +58,7 @@ export default function AttendancePage() {
   const [dtrHours, setDtrHours] = createSignal("8");
   const [dtrOt, setDtrOt] = createSignal("0");
   const [selectedDtrId, setSelectedDtrId] = createSignal<number | null>(null);
+  const [importingDtr, setImportingDtr] = createSignal(false);
 
   const holidays = createQuery(() => ({
     queryKey: ["hr-holidays", year],
@@ -185,13 +187,41 @@ export default function AttendancePage() {
     void qc.invalidateQueries({ queryKey: ["hr-dtr"] });
   };
 
+  const onImportDtr = async (file: File) => {
+    setImportingDtr(true);
+    try {
+      const result = await importDtrCsv(file);
+      if (!result.ok || !result.data) {
+        toast.error(result.message ?? "Import failed.");
+        return;
+      }
+      const { created, failed, row_errors: rowErrors } = result.data;
+      if (failed > 0) {
+        const detail =
+          rowErrors
+            ?.slice(0, 6)
+            .map((e) => `Row ${e.row}: ${e.message}`)
+            .join(" · ") ?? "";
+        toast.warning(`Imported ${created} row(s); ${failed} failed.${detail ? ` ${detail}` : ""}`);
+      } else {
+        toast.success(`Imported ${created} DTR row(s).`);
+      }
+      if (created > 0) void qc.invalidateQueries({ queryKey: ["hr-dtr"] });
+    } catch {
+      toast.error("Import failed.");
+    } finally {
+      setImportingDtr(false);
+    }
+  };
+
   return (
     <HrLayout>
       <div class="grid gap-6 lg:grid-cols-2">
         <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
           <h2 class="mb-2 text-lg font-medium">Holiday calendar ({year})</h2>
           <p class="mb-3 text-sm text-text-secondary">
-            Regular / special holidays drive DTR auto-tagging and future holiday premium multipliers on payroll.
+            Regular / special holidays drive DTR holiday premiums. Mark days as absent/awol to auto-deduct
+            unpaid absence (daily rate) on the next payroll run.
           </p>
           <holidayDraft.DraftBanner />
           <div class="mb-3 grid gap-3 sm:grid-cols-3">
@@ -249,7 +279,32 @@ export default function AttendancePage() {
       </div>
 
       <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
-        <h2 class="mb-2 text-lg font-medium">DTR entry (manual)</h2>
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-lg font-medium">DTR entry (manual)</h2>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+              onClick={() => void downloadDtrImportTemplate().catch(() => toast.error("Could not download template."))}
+            >
+              DTR template
+            </button>
+            <label class="cursor-pointer rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel">
+              {importingDtr() ? "Importing…" : "Import DTR CSV"}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                class="hidden"
+                disabled={importingDtr()}
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  e.currentTarget.value = "";
+                  if (f) void onImportDtr(f);
+                }}
+              />
+            </label>
+          </div>
+        </div>
         <p class="mb-3 text-sm text-text-secondary">
           Punch/import sources can fill the same table later. If the date is a holiday, status auto-tags to holiday.
         </p>

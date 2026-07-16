@@ -55,6 +55,10 @@ import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
 import { SalesHoldListModal, type SalesHoldPayload } from "./SalesHoldListModal";
 import { ReturnSaleLinesModal } from "./ReturnSaleLinesModal";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
+import {
+  SalesCommissionPanel,
+  type SaleCommissionRow,
+} from "./SalesCommissionPanel";
 
 export type SalesDetail = {
   id: number;
@@ -106,6 +110,17 @@ export type SalesDetail = {
     serial_unit_ids?: number[];
     track_serial?: boolean;
     source_sales_order_line_id?: number | null;
+  }>;
+  commissions?: Array<{
+    id?: number;
+    line_no: number;
+    tic_user_id?: number | null;
+    tic_name: string;
+    calc_mode: "percent" | "fixed";
+    rate_value: number;
+    base_amount?: number;
+    commission_amount?: number;
+    notes?: string | null;
   }>;
 };
 
@@ -230,6 +245,7 @@ export function SalesModal(props: Props) {
   const [salesCategory, setSalesCategory] = createSignal("");
   const [sourceSalesOrderId, setSourceSalesOrderId] = createSignal<number | null>(null);
   const [lines, setLines] = createSignal<SalesLineRow[]>([emptySalesLine(1)]);
+  const [commissions, setCommissions] = createSignal<SaleCommissionRow[]>([]);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
   const templateCode = () => (props.editing?.template_code ?? props.templateCode) as SalesTemplateCode;
@@ -259,6 +275,7 @@ export function SalesModal(props: Props) {
     source_sales_order_id: sourceSalesOrderId(),
     template_code: templateCode(),
     lines: lines(),
+    commissions: commissions(),
   });
 
   const buildHoldPayload = (): SalesHoldPayload => {
@@ -331,6 +348,16 @@ export function SalesModal(props: Props) {
     setSourceSalesOrderId(ed.source_sales_order_id ?? null);
     setLines(linesFromDetail(ed.lines));
     setDetailLines(ed.lines ?? []);
+    setCommissions(
+      (ed.commissions ?? []).map((c, i) => ({
+        line_no: c.line_no || i + 1,
+        tic_user_id: c.tic_user_id ?? null,
+        tic_name: c.tic_name ?? "",
+        calc_mode: c.calc_mode === "fixed" ? "fixed" : "percent",
+        rate_value: c.rate_value != null ? String(c.rate_value) : "",
+        notes: c.notes ?? "",
+      })),
+    );
   };
 
   const returnSelectedLines = async (lineIds: number[]) => {
@@ -366,6 +393,7 @@ export function SalesModal(props: Props) {
       customer_label: payload.customer_label,
       location_label: payload.location_label ?? "",
       project_label: payload.project_label ?? "",
+      commissions: [],
     });
   };
 
@@ -421,6 +449,7 @@ export function SalesModal(props: Props) {
     setSalesCategory(payload.sales_category);
     setSourceSalesOrderId(payload.source_sales_order_id);
     setLines(payload.lines);
+    setCommissions((payload.commissions as SaleCommissionRow[] | undefined) ?? []);
   };
 
   const draft = useDocumentDraft({
@@ -483,6 +512,7 @@ export function SalesModal(props: Props) {
       setSalesCategory("");
       setSourceSalesOrderId(null);
       setLines([emptySalesLine(1)]);
+      setCommissions([]);
       void loadPreview(todayISO());
     }
   });
@@ -695,6 +725,16 @@ export function SalesModal(props: Props) {
         lot_batch_id: ln.lot_batch_id ?? null,
         source_sales_order_line_id: ln.source_sales_order_line_id || null,
       })),
+      commissions: commissions()
+        .filter((c) => c.tic_name.trim() || (c.tic_user_id != null && c.tic_user_id > 0))
+        .map((c, i) => ({
+          line_no: i + 1,
+          tic_user_id: c.tic_user_id || null,
+          tic_name: c.tic_name.trim(),
+          calc_mode: c.calc_mode,
+          rate_value: c.rate_value === "" ? 0 : Number(c.rate_value),
+          notes: c.notes || null,
+        })),
     };
 
     setSaving(true);
@@ -874,7 +914,7 @@ export function SalesModal(props: Props) {
         <ModalLookupField
           settings={byKey}
           fieldKey="pic_name"
-          fallbackLabel="PIC"
+          fallbackLabel="PIC (document)"
           value={picName}
           selectedId={picUserId}
           onInput={setPicName}
@@ -1030,6 +1070,13 @@ export function SalesModal(props: Props) {
           templateCode={templateCode}
           partnerId={partnerId}
           onCreateShippingOrder={(line) => void createShippingFromLine(line)}
+        />
+        <SalesCommissionPanel
+          rows={commissions}
+          onChange={setCommissions}
+          grandTotal={() => lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0)}
+          fetchUsers={fetchUsers}
+          disabled={progressStatus() === "e_approval"}
         />
         <Show when={effectiveEditing()?.id}>
           <SalesApprovalPanel

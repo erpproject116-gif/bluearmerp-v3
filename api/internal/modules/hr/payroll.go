@@ -71,7 +71,9 @@ type payrollRunResult struct {
 func registerPayrollRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessRead)).Get("/pay-periods", listPayPeriods(pool))
 	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessRead)).Get("/payslips", listPayslips(pool))
+	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessRead)).Post("/payroll-runs/preview", previewPayroll(pool))
 	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessWrite)).Post("/payroll-runs", runPayroll(pool))
+	registerPayrollCSVRoutes(r, pool)
 }
 
 func listPayPeriods(pool *pgxpool.Pool) http.HandlerFunc {
@@ -153,6 +155,102 @@ func listPayslips(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+type payrollPreviewRow struct {
+	EmployeeID     int64   `json:"employee_id"`
+	EmployeeNo     string  `json:"employee_no"`
+	EmployeeName   string  `json:"employee_name"`
+	BaseSalary     float64 `json:"base_salary"`
+	PremiumTotal   float64 `json:"premium_total"`
+	DTRDays        int     `json:"dtr_days"`
+	GrossPay       float64 `json:"gross_pay"`
+	Deductions     float64 `json:"deductions"`
+	NetPay         float64 `json:"net_pay"`
+}
+
+type payrollPreviewResult struct {
+	PeriodStart  string              `json:"period_start"`
+	PeriodEnd    string              `json:"period_end"`
+	EmployeeCount int                `json:"employee_count"`
+	TotalGross   float64             `json:"total_gross"`
+	TotalNet     float64             `json:"total_net"`
+	Employees    []payrollPreviewRow `json:"employees"`
+}
+
+func previewPayroll(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		var body payrollRunBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		start, err := parseDate(body.PeriodStart)
+		if err != nil {
+			response.Validation(w, map[string]string{"period_start": "Invalid period start."})
+			return
+		}
+		end, err := parseDate(body.PeriodEnd)
+		if err != nil {
+			response.Validation(w, map[string]string{"period_end": "Invalid period end."})
+			return
+		}
+		if end.Before(start) {
+			response.Validation(w, map[string]string{"period_end": "Period end must be on or after start."})
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to preview payroll.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		empRows, err := tx.Query(r.Context(), `
+			select id, employee_no, full_name, base_salary::float8
+			from public.hr_employees
+			where tenant_id = $1 and status = 'active' and base_salary > 0
+			order by full_name`, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load employees.", "ERR_INTERNAL")
+			return
+		}
+		defer empRows.Close()
+
+		var rows []payrollPreviewRow
+		var totalGross, totalNet float64
+		for empRows.Next() {
+			var empID int64
+			var empNo, empName string
+			var baseSalary float64
+			if err := empRows.Scan(&empID, &empNo, &empName, &baseSalary); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read employee.", "ERR_INTERNAL")
+				return
+			}
+			draft, err := buildEmployeePayslipDraft(r.Context(), tx, tu.TenantID, empID, empNo, empName, baseSalary, start, end)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to compute payslip preview.", "ERR_INTERNAL")
+				return
+			}
+			rows = append(rows, payrollPreviewRow{
+				EmployeeID: empID, EmployeeNo: empNo, EmployeeName: empName,
+				BaseSalary: baseSalary, PremiumTotal: draft.PremiumTotal, DTRDays: draft.DTRDays,
+				GrossPay: draft.GrossPay, Deductions: draft.Deductions, NetPay: draft.NetPay,
+			})
+			totalGross += draft.GrossPay
+			totalNet += draft.NetPay
+		}
+		if rows == nil {
+			rows = []payrollPreviewRow{}
+		}
+		response.OK(w, payrollPreviewResult{
+			PeriodStart: start.Format("2006-01-02"), PeriodEnd: end.Format("2006-01-02"),
+			EmployeeCount: len(rows), TotalGross: roundMoney(totalGross), TotalNet: roundMoney(totalNet),
+			Employees: rows,
+		}, "Payroll preview (includes DTR OT, night diff, and holiday premiums).")
+	}
+}
+
 func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -222,10 +320,13 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var payslips []Payslip
 		var totalGross, totalNet, totalEmployer float64
-		var periodEnd time.Time
-		_ = tx.QueryRow(r.Context(), `select period_end from public.hr_pay_periods where id=$1`, periodID).Scan(&periodEnd)
+		var periodStart, periodEnd time.Time
+		_ = tx.QueryRow(r.Context(), `select period_start, period_end from public.hr_pay_periods where id=$1`, periodID).Scan(&periodStart, &periodEnd)
 		if periodEnd.IsZero() {
 			periodEnd = time.Now()
+		}
+		if periodStart.IsZero() {
+			periodStart = periodEnd
 		}
 
 		for empRows.Next() {
@@ -236,26 +337,24 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to read employee.", "ERR_INTERNAL")
 				return
 			}
-			stat, err := computeStatutoryDeductions(r.Context(), tx, periodEnd, baseSalary)
+			draft, err := buildEmployeePayslipDraft(r.Context(), tx, tu.TenantID, empID, empNo, empName, baseSalary, periodStart, periodEnd)
 			if err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to compute statutory deductions.", "ERR_INTERNAL")
+				response.Err(w, http.StatusInternalServerError, "Failed to compute payslip.", "ERR_INTERNAL")
 				return
 			}
-			deduction := roundMoney(stat.EmployeeDeduct)
-			net := roundMoney(baseSalary - deduction)
-			if net < 0 {
-				net = 0
-			}
+			grossPay := draft.GrossPay
+			deduction := draft.Deductions
+			net := draft.NetPay
 			var payslipID int64
 			if err := tx.QueryRow(r.Context(), `
 				insert into public.hr_payslips (tenant_id, pay_period_id, employee_id, gross_pay, deductions, net_pay, status)
 				values ($1,$2,$3,$4,$5,$6,'draft') returning id`,
-				tu.TenantID, periodID, empID, baseSalary, deduction, net).Scan(&payslipID); err != nil {
+				tu.TenantID, periodID, empID, grossPay, deduction, net).Scan(&payslipID); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to create payslip.", "ERR_INTERNAL")
 				return
 			}
 			var psLines []PayslipLine
-			for _, ln := range stat.Lines {
+			for _, ln := range draft.Lines {
 				var lineID int64
 				if err := tx.QueryRow(r.Context(), `
 					insert into public.hr_payslip_lines (payslip_id, line_no, line_type, line_code, description, amount)
@@ -270,11 +369,11 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			payslips = append(payslips, Payslip{
 				ID: payslipID, PayPeriodID: periodID, EmployeeID: empID, EmployeeNo: empNo, EmployeeName: empName,
-				GrossPay: baseSalary, Deductions: deduction, NetPay: net, Status: "draft", Lines: psLines,
+				GrossPay: grossPay, Deductions: deduction, NetPay: net, Status: "draft", Lines: psLines,
 			})
-			totalGross += baseSalary
+			totalGross += grossPay
 			totalNet += net
-			totalEmployer += stat.EmployerShare
+			totalEmployer += draft.EmployerShare
 		}
 		if len(payslips) == 0 {
 			response.Validation(w, map[string]string{"employees": "No active employees with base salary."})

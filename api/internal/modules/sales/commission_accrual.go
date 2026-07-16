@@ -130,6 +130,12 @@ func accrueCommissionForSalePool(ctx context.Context, pool *pgxpool.Pool, tenant
 	if err := accrueCommissionForSale(ctx, tx, tenantID, salesID); err != nil {
 		return err
 	}
+	if err := accrueSaleLineCommissions(ctx, tx, tenantID, salesID); err != nil {
+		return err
+	}
+	if err := postCommissionJournalForSale(ctx, tx, tenantID, 0, salesID); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 

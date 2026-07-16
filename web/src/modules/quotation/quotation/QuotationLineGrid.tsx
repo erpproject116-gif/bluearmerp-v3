@@ -69,7 +69,7 @@ const QUOTATION_LINE_COLUMNS = [
   { key: "tax", header: "Tax", width: 90 },
   { key: "unit_vat_inc", header: "Unit (VAT inc.)", width: 110 },
   { key: "line_total", header: "Line Total", width: 110 },
-  { key: "serials", header: "Planned Serials", width: 150 },
+  { key: "serials", header: "Serials", width: 180 },
   { key: "remark", header: "Remark", width: 120 },
   { key: "actions", header: "", width: 72 },
 ] as const;
@@ -327,7 +327,12 @@ export function QuotationLineGrid(props: Props) {
                           mode="planned"
                           qty={parseNum(line().qty)}
                           plannedSerials={line().planned_serial_nos ?? []}
-                          onChange={(serials) => void updateLine(idx, { planned_serial_nos: serials })}
+                          onChange={(serials) =>
+                            void updateLine(idx, {
+                              planned_serial_nos: serials,
+                              qty: serials.length > 0 ? String(serials.length) : line().qty,
+                            })
+                          }
                         />
                       </div>
                     </Show>

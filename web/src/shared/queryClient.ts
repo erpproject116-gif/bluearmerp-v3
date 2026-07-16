@@ -12,6 +12,7 @@ export const queryClient = new QueryClient({
       refetchOnReconnect: true,
       refetchOnMount: true,
       retry: shouldRetryQuery,
+      placeholderData: (prev: unknown) => prev,
     },
   },
 });

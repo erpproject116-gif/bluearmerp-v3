@@ -38,6 +38,9 @@ export function NewSupportTicketModal(props: Props) {
   const [saving, setSaving] = createSignal(false);
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [newCustomerName, setNewCustomerName] = createSignal("");
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string>>({});
+
+  const fieldError = (key: string) => fieldErrors()[key];
 
   const reset = () => {
     setSubject("");
@@ -51,6 +54,7 @@ export function NewSupportTicketModal(props: Props) {
     setCategory("general");
     setCreatedTicketId(undefined);
     setAttachmentCount(0);
+    setFieldErrors({});
   };
 
   const draft = useDocumentDraft({
@@ -88,8 +92,9 @@ export function NewSupportTicketModal(props: Props) {
   };
 
   const save = async () => {
+    setFieldErrors({});
     if (!subject().trim()) {
-      toast.warning("Subject is required.");
+      setFieldErrors({ subject: "Subject is required." });
       return;
     }
     setSaving(true);
@@ -104,8 +109,15 @@ export function NewSupportTicketModal(props: Props) {
     });
     setSaving(false);
     if (!res.success || !res.data) {
-      const fieldErrors = res.errors ? Object.values(res.errors).filter(Boolean).join(" · ") : "";
-      toast.warning(fieldErrors || res.message || "Could not create ticket.");
+      if (res.errors && Object.keys(res.errors).length > 0) {
+        setFieldErrors(res.errors);
+      }
+      const fieldMsg = res.errors ? Object.values(res.errors).filter(Boolean).join(" · ") : "";
+      if (!res.errors || Object.keys(res.errors).length === 0) {
+        toast.warning(res.message || "Could not create ticket.");
+      } else if (fieldMsg) {
+        toast.warning(fieldMsg);
+      }
       return;
     }
     // Keep modal open briefly so AttachmentsField can flush staged files to the new id.
@@ -136,7 +148,21 @@ export function NewSupportTicketModal(props: Props) {
         <Show when={props.open}>
           <draft.DraftBanner />
           <Field label="Subject">
-            <input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} />
+            <input
+              class={inputClass}
+              value={subject()}
+              onInput={(e) => {
+                setSubject(e.currentTarget.value);
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.subject;
+                  return next;
+                });
+              }}
+            />
+            <Show when={fieldError("subject")}>
+              <p class="mt-1 text-xs text-red-600">{fieldError("subject")}</p>
+            </Show>
           </Field>
           <LookupCombo
             label="Customer (optional)"
@@ -212,6 +238,9 @@ export function NewSupportTicketModal(props: Props) {
               value={description()}
               onInput={(e) => setDescription(e.currentTarget.value)}
             />
+            <Show when={fieldError("description")}>
+              <p class="mt-1 text-xs text-red-600">{fieldError("description")}</p>
+            </Show>
           </Field>
         </Show>
       </EntityModal>

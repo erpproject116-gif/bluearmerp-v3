@@ -1,7 +1,8 @@
 import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { apiFetch, getAccessToken } from "../../shared/api";
+import { apiFetch } from "../../shared/api";
 import { usePayPeriods } from "../../shared/useHr";
+import { exportRemittanceCsv } from "../../shared/hrCsvImport";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
@@ -35,6 +36,7 @@ export default function RemittancesPage() {
   const [agency, setAgency] = createSignal("sss");
   const [building, setBuilding] = createSignal(false);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [exportFormat, setExportFormat] = createSignal("sss");
 
   const list = createQuery(() => ({
     queryKey: ["hr-remittances"],
@@ -102,21 +104,11 @@ export default function RemittancesPage() {
   };
 
   const exportCsv = async (id: number) => {
-    const token = await getAccessToken();
-    const res = await fetch(`/api/v1/hr/remittances/${id}/export.csv`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) {
+    try {
+      await exportRemittanceCsv(id, exportFormat());
+    } catch {
       toast.warning("CSV export failed.");
-      return;
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `remittance-${id}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const markStatus = async (id: number, status: string) => {
@@ -178,7 +170,23 @@ export default function RemittancesPage() {
       </section>
 
       <section class="mb-6">
-        <h2 class="mb-2 text-lg font-medium">Batches</h2>
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-lg font-medium">Batches</h2>
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-text-secondary">Export format</span>
+            <select
+              class="rounded-lg border border-stroke px-2 py-1 text-sm"
+              value={exportFormat()}
+              onChange={(e) => setExportFormat(e.currentTarget.value)}
+            >
+              <option value="sss_r3">SSS R3-style</option>
+              <option value="philhealth_erf">PhilHealth ERF-style</option>
+              <option value="pagibig_mcrf">Pag-IBIG MCRF-style</option>
+              <option value="bir_1601c">BIR 1601-C style</option>
+              <option value="generic">Generic</option>
+            </select>
+          </div>
+        </div>
         <SpreadsheetGrid
           columns={[
             { key: "agency", header: "Agency", render: (batch) => <span class="uppercase">{batch.agency}</span> },

@@ -96,7 +96,7 @@ const BASE_COLUMNS: GridColumn[] = [
 
 const DISCOUNT_COLUMNS: GridColumn[] = [{ key: "discount_amount", header: "Discount", width: 100 }];
 
-const SERIAL_LOT_COLUMN: GridColumn = { key: "serials", header: "Serial / Lot", width: 160 };
+const SERIAL_LOT_COLUMN: GridColumn = { key: "serials", header: "Serial / Lot", width: 200 };
 
 const TAIL_COLUMNS: GridColumn[] = [
   { key: "remark", header: "Remark", width: 120 },

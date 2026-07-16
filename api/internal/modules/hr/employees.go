@@ -72,6 +72,7 @@ type employeePatch struct {
 }
 
 func registerEmployeeRoutes(r chi.Router, pool *pgxpool.Pool) {
+	registerEmployeeCSVRoutes(r, pool)
 	r.Get("/employees", listEmployees(pool))
 	r.With(auth.RequirePermission("hr.employees_new", auth.AccessWrite)).Post("/employees", createEmployee(pool))
 	r.Get("/employees/{id}", getEmployee(pool))

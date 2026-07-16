@@ -64,6 +64,7 @@ func registerAttendanceRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/dtr", listDTR(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/dtr", upsertDTR(pool))
+	registerAttendanceCSVRoutes(r, pool)
 }
 
 func listHolidays(pool *pgxpool.Pool) http.HandlerFunc {

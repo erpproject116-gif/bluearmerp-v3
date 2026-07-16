@@ -183,6 +183,12 @@ func CreateFromContractMilestone(ctx context.Context, pool *pgxpool.Pool, tenant
 		if err := accrueCommissionForSale(ctx, tx, tenantID, id); err != nil {
 			return 0, err
 		}
+		if err := accrueSaleLineCommissions(ctx, tx, tenantID, id); err != nil {
+			return 0, err
+		}
+		if err := postCommissionJournalForSale(ctx, tx, tenantID, derefInt64(userID), id); err != nil {
+			return 0, err
+		}
 	}
 
 	policy, _ := processpolicy.LoadTx(ctx, tx, tenantID)

@@ -4,6 +4,7 @@ import { supabase, supabaseConfigured } from "../../shared/api";
 import { useAuth } from "../../shared/auth-context";
 import { AuthAlert, AuthShell, authInputClass } from "./AuthShell";
 import { authRedirectUrl } from "./authRedirect";
+import { GoogleAuthButton } from "./GoogleAuthButton";
 
 export default function SignUpPage() {
   const navigate = useNavigate();
@@ -83,7 +84,7 @@ export default function SignUpPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Register with email and password. Your admin can invite you to a company workspace afterward."
+      subtitle="Register with Google or email. Your admin can also invite you to a company workspace."
       heroTitle="Start with a workspace you can trust."
       heroBody="Create your login in minutes. Launch a free trial or demo on your own—or join your company when an admin invites you with the same email."
       trustPoints={[
@@ -99,23 +100,40 @@ export default function SignUpPage() {
           </button>
         </p>
       }
-    >
-      <Show
-        when={!done()}
-        fallback={
-          <div class="mt-8 space-y-4">
-            <AuthAlert info={info()} />
-            <button
-              type="button"
-              class="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white hover:bg-brand-700"
-              onClick={() => navigate("/signin")}
-            >
-              Go to sign in
-            </button>
-          </div>
-        }
       >
-        <form class="mt-8 space-y-4" onSubmit={(e) => void submit(e)}>
+        <Show
+          when={!done()}
+          fallback={
+            <div class="mt-8 space-y-4">
+              <AuthAlert info={info()} />
+              <button
+                type="button"
+                class="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white hover:bg-brand-700"
+                onClick={() => navigate("/signin")}
+              >
+                Go to sign in
+              </button>
+            </div>
+          }
+        >
+          <div class="mt-8 space-y-3">
+            <GoogleAuthButton
+              label="Sign up with Google"
+              disabled={loading()}
+              onError={setError}
+            />
+            <p class="text-center text-xs text-text-secondary">
+              Starts a 90-day trial workspace after you pick your Google account.
+            </p>
+          </div>
+
+          <div class="mt-6 flex items-center gap-3 text-xs text-text-secondary">
+            <span class="h-px flex-1 bg-stroke" />
+            <span>or register with email</span>
+            <span class="h-px flex-1 bg-stroke" />
+          </div>
+
+          <form class="mt-4 space-y-4" onSubmit={(e) => void submit(e)}>
           <div>
             <label class="mb-1 block text-sm font-medium text-text-primary">Full name</label>
             <input
@@ -173,10 +191,11 @@ export default function SignUpPage() {
             {loading() ? "Creating account…" : "Create account"}
           </button>
         </form>
-      </Show>
+        </Show>
 
       <AuthAlert error={error()} info={done() ? null : info()} />
 
+      <Show when={!done()}>
       <div class="mt-6 flex items-center gap-3 text-xs text-text-secondary">
         <span class="h-px flex-1 bg-stroke" />
         <span>or</span>
@@ -189,6 +208,7 @@ export default function SignUpPage() {
       >
         Start a free demo instead
       </button>
+      </Show>
     </AuthShell>
   );
 }

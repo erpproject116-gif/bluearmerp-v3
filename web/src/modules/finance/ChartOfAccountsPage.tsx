@@ -33,10 +33,13 @@ type FinanceDefaults = {
   purchase_account_id?: number | null;
   input_vat_account_id?: number | null;
   output_vat_account_id?: number | null;
+  commission_expense_account_id?: number | null;
+  commission_payable_account_id?: number | null;
+  auto_post_commission_journal?: boolean;
   disabled_account_types?: string[];
 };
 
-type DefaultAccountSlotKey = Exclude<keyof FinanceDefaults, "disabled_account_types">;
+type DefaultAccountSlotKey = Exclude<keyof FinanceDefaults, "disabled_account_types" | "auto_post_commission_journal">;
 
 type DefaultSlot = {
   key: DefaultAccountSlotKey;
@@ -63,6 +66,8 @@ const DEFAULT_SLOTS: DefaultSlot[] = [
   { key: "purchase_account_id", label: "Purchases / COGS", hint: "Supplier invoices, inventory cost", types: ["expense"] },
   { key: "input_vat_account_id", label: "Input VAT", hint: "VAT paid to vendors (BIR)", types: ["asset"] },
   { key: "output_vat_account_id", label: "Output VAT", hint: "VAT collected on sales (BIR)", types: ["liability"] },
+  { key: "commission_expense_account_id", label: "Sales commissions (expense)", hint: "Debit when commissions accrue", types: ["expense"] },
+  { key: "commission_payable_account_id", label: "Commissions payable", hint: "Credit until commissions are paid", types: ["liability"] },
 ];
 
 const emptyDefaults = (): FinanceDefaults => ({
@@ -73,6 +78,8 @@ const emptyDefaults = (): FinanceDefaults => ({
   purchase_account_id: null,
   input_vat_account_id: null,
   output_vat_account_id: null,
+  commission_expense_account_id: null,
+  commission_payable_account_id: null,
   disabled_account_types: [],
 });
 
@@ -173,6 +180,8 @@ export default function ChartOfAccountsPage() {
       purchase_account_id: d.purchase_account_id ?? null,
       input_vat_account_id: d.input_vat_account_id ?? null,
       output_vat_account_id: d.output_vat_account_id ?? null,
+      commission_expense_account_id: d.commission_expense_account_id ?? null,
+      commission_payable_account_id: d.commission_payable_account_id ?? null,
       disabled_account_types: d.disabled_account_types ?? [],
     });
   });
@@ -282,6 +291,8 @@ export default function ChartOfAccountsPage() {
         purchase_account_id: res.data.defaults.purchase_account_id ?? acct?.id ?? null,
         input_vat_account_id: res.data.defaults.input_vat_account_id ?? null,
         output_vat_account_id: res.data.defaults.output_vat_account_id ?? null,
+        commission_expense_account_id: res.data.defaults.commission_expense_account_id ?? null,
+        commission_payable_account_id: res.data.defaults.commission_payable_account_id ?? null,
       });
     } else if (acct?.id) {
       setDefaultsForm((v) => ({ ...v, purchase_account_id: acct.id }));

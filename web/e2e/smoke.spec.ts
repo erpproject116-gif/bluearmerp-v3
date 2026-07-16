@@ -6,7 +6,7 @@ test.describe("Bluearm ERP v3 smoke", () => {
   test("sign-in page loads", async ({ page }) => {
     await page.goto("/signin");
     await expect(page.getByRole("heading", { name: /^Sign in$/i })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole("button", { name: /Continue with Google/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Sign up or continue with Google/i })).toBeVisible();
     const demo = page.getByRole("button", { name: /Try free demo/i });
     if (await demo.count()) {
       await expect(demo).toBeVisible();

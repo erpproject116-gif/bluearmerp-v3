@@ -182,6 +182,9 @@ export const HrEmployeesPage = lazy(() => import("../modules/hr/HrEmployeesPage"
 export const PayrollRunsPage = lazy(() => import("../modules/hr/PayrollRunsPage"));
 export const RemittancesPage = lazy(() => import("../modules/hr/RemittancesPage"));
 export const AttendancePage = lazy(() => import("../modules/hr/AttendancePage"));
+export const PayItemsPage = lazy(() => import("../modules/hr/PayItemsPage"));
+export const SpecialRunsPage = lazy(() => import("../modules/hr/SpecialRunsPage"));
+export const EssSelfServicePage = lazy(() => import("../modules/hr/EssSelfServicePage"));
 export const PayslipPrintPage = lazy(() => import("../modules/hr/PayslipPrintPage"));
 export const PayslipSharedPage = lazy(() => import("../modules/hr/PayslipSharedPage"));
 export const FixedAssetsPage = lazy(() => import("../modules/fixedassets/FixedAssetsPage"));

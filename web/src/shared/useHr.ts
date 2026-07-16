@@ -116,6 +116,31 @@ export async function patchEmployee(id: number, body: Record<string, unknown>) {
   return apiFetch<Employee>(`/api/v1/hr/employees/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
+export type PayrollPreviewRow = {
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  base_salary: number;
+  premium_total: number;
+  dtr_days: number;
+  gross_pay: number;
+  deductions: number;
+  net_pay: number;
+};
+
+export type PayrollPreviewResult = {
+  period_start: string;
+  period_end: string;
+  employee_count: number;
+  total_gross: number;
+  total_net: number;
+  employees: PayrollPreviewRow[];
+};
+
+export async function previewPayroll(body: { period_start: string; period_end: string }) {
+  return apiFetch<PayrollPreviewResult>("/api/v1/hr/payroll-runs/preview", { method: "POST", body: JSON.stringify(body) });
+}
+
 export async function runPayroll(body: { period_start: string; period_end: string; period_label?: string }) {
   return apiFetch<PayrollRunResult>("/api/v1/hr/payroll-runs", { method: "POST", body: JSON.stringify(body) });
 }

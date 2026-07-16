@@ -12,46 +12,55 @@ import (
 type Role string
 
 const (
-	RoleCash       Role = "cash"
-	RoleReceivable Role = "receivable"
-	RolePayable    Role = "payable"
-	RoleSales      Role = "sales"
-	RolePurchase   Role = "purchase"
-	RoleInputVAT   Role = "input_vat"
-	RoleOutputVAT  Role = "output_vat"
+	RoleCash               Role = "cash"
+	RoleReceivable         Role = "receivable"
+	RolePayable            Role = "payable"
+	RoleSales              Role = "sales"
+	RolePurchase           Role = "purchase"
+	RoleInputVAT           Role = "input_vat"
+	RoleOutputVAT          Role = "output_vat"
+	RoleCommissionExpense  Role = "commission_expense"
+	RoleCommissionPayable  Role = "commission_payable"
 )
 
 // Defaults holds tenant finance default account ids.
 type Defaults struct {
-	TenantID             int64    `json:"tenant_id"`
-	CashAccountID        *int64   `json:"cash_account_id,omitempty"`
-	ReceivableAccountID  *int64   `json:"receivable_account_id,omitempty"`
-	PayableAccountID     *int64   `json:"payable_account_id,omitempty"`
-	SalesAccountID       *int64   `json:"sales_account_id,omitempty"`
-	PurchaseAccountID    *int64   `json:"purchase_account_id,omitempty"`
-	InputVATAccountID    *int64   `json:"input_vat_account_id,omitempty"`
-	OutputVATAccountID   *int64   `json:"output_vat_account_id,omitempty"`
-	DisabledAccountTypes []string `json:"disabled_account_types,omitempty"`
+	TenantID                    int64    `json:"tenant_id"`
+	CashAccountID               *int64   `json:"cash_account_id,omitempty"`
+	ReceivableAccountID         *int64   `json:"receivable_account_id,omitempty"`
+	PayableAccountID            *int64   `json:"payable_account_id,omitempty"`
+	SalesAccountID              *int64   `json:"sales_account_id,omitempty"`
+	PurchaseAccountID           *int64   `json:"purchase_account_id,omitempty"`
+	InputVATAccountID           *int64   `json:"input_vat_account_id,omitempty"`
+	OutputVATAccountID          *int64   `json:"output_vat_account_id,omitempty"`
+	CommissionExpenseAccountID  *int64   `json:"commission_expense_account_id,omitempty"`
+	CommissionPayableAccountID  *int64   `json:"commission_payable_account_id,omitempty"`
+	AutoPostCommissionJournal   bool     `json:"auto_post_commission_journal"`
+	DisabledAccountTypes        []string `json:"disabled_account_types,omitempty"`
 }
 
 var fallbackCodes = map[Role]string{
-	RoleCash:       "1020",
-	RoleReceivable: "1089",
-	RolePayable:    "2519",
-	RoleSales:      "4019",
-	RolePurchase:   "310",
-	RoleInputVAT:   "1359",
-	RoleOutputVAT:  "2559",
+	RoleCash:              "1020",
+	RoleReceivable:        "1089",
+	RolePayable:           "2519",
+	RoleSales:             "4019",
+	RolePurchase:          "310",
+	RoleInputVAT:          "1359",
+	RoleOutputVAT:         "2559",
+	RoleCommissionExpense: "5105",
+	RoleCommissionPayable: "2020",
 }
 
 var phCodes = map[Role]string{
-	RoleCash:       "1010",
-	RoleReceivable: "1100",
-	RolePayable:    "2010",
-	RoleSales:      "4010",
-	RolePurchase:   "5010",
-	RoleInputVAT:   "1310",
-	RoleOutputVAT:  "2030",
+	RoleCash:              "1010",
+	RoleReceivable:        "1100",
+	RolePayable:           "2010",
+	RoleSales:             "4010",
+	RolePurchase:          "5010",
+	RoleInputVAT:          "1310",
+	RoleOutputVAT:         "2030",
+	RoleCommissionExpense: "5105",
+	RoleCommissionPayable: "2020",
 }
 
 func roleID(d Defaults, role Role) *int64 {
@@ -70,6 +79,10 @@ func roleID(d Defaults, role Role) *int64 {
 		return d.InputVATAccountID
 	case RoleOutputVAT:
 		return d.OutputVATAccountID
+	case RoleCommissionExpense:
+		return d.CommissionExpenseAccountID
+	case RoleCommissionPayable:
+		return d.CommissionPayableAccountID
 	default:
 		return nil
 	}
@@ -86,11 +99,14 @@ func Load(ctx context.Context, q querier, tenantID int64) (Defaults, error) {
 	err := q.QueryRow(ctx, `
 		select cash_account_id, receivable_account_id, payable_account_id,
 		  sales_account_id, purchase_account_id, input_vat_account_id, output_vat_account_id,
+		  commission_expense_account_id, commission_payable_account_id,
+		  coalesce(auto_post_commission_journal, false),
 		  coalesce(disabled_account_types, '{}')
 		from public.tenant_finance_defaults
 		where tenant_id = $1`, tenantID).Scan(
 		&d.CashAccountID, &d.ReceivableAccountID, &d.PayableAccountID,
 		&d.SalesAccountID, &d.PurchaseAccountID, &d.InputVATAccountID, &d.OutputVATAccountID,
+		&d.CommissionExpenseAccountID, &d.CommissionPayableAccountID, &d.AutoPostCommissionJournal,
 		&d.DisabledAccountTypes,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -112,8 +128,9 @@ func Save(ctx context.Context, pool *pgxpool.Pool, tenantID int64, d Defaults) e
 		insert into public.tenant_finance_defaults (
 		  tenant_id, cash_account_id, receivable_account_id, payable_account_id,
 		  sales_account_id, purchase_account_id, input_vat_account_id, output_vat_account_id,
+		  commission_expense_account_id, commission_payable_account_id, auto_post_commission_journal,
 		  disabled_account_types
-		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		on conflict (tenant_id) do update set
 		  cash_account_id = excluded.cash_account_id,
 		  receivable_account_id = excluded.receivable_account_id,
@@ -122,10 +139,14 @@ func Save(ctx context.Context, pool *pgxpool.Pool, tenantID int64, d Defaults) e
 		  purchase_account_id = excluded.purchase_account_id,
 		  input_vat_account_id = excluded.input_vat_account_id,
 		  output_vat_account_id = excluded.output_vat_account_id,
+		  commission_expense_account_id = excluded.commission_expense_account_id,
+		  commission_payable_account_id = excluded.commission_payable_account_id,
+		  auto_post_commission_journal = excluded.auto_post_commission_journal,
 		  disabled_account_types = excluded.disabled_account_types,
 		  updated_at = now()`,
 		tenantID, d.CashAccountID, d.ReceivableAccountID, d.PayableAccountID,
 		d.SalesAccountID, d.PurchaseAccountID, d.InputVATAccountID, d.OutputVATAccountID,
+		d.CommissionExpenseAccountID, d.CommissionPayableAccountID, d.AutoPostCommissionJournal,
 		types,
 	)
 	return err
