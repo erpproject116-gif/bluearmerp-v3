@@ -1272,10 +1272,11 @@ export const moduleKbArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Create a ticket under Support → Tickets with customer and subject.",
+          "Create a ticket under Support → Tickets with a subject (customer is optional).",
           "Link a warranty asset from CRM when applicable.",
           "Update status and add internal comments as you work.",
           "Assign an agent or link an After-Sales repair order.",
+          "Use the floating ticket button from any screen — only Subject is required for quick internal reports.",
         ],
       },
     ],

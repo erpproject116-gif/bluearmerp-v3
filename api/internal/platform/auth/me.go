@@ -143,8 +143,9 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 			"can_manage_crm_rules":     tu.CanManageCrmRules(),
 			"can_view_all_crm":         tu.CanViewAllCRM(),
 			"can_manage_sales_team":    tu.CanManageSalesTeam(),
-			"can_view_crm_analytics":   tu.CanViewCrmAnalytics(),
-			"permissions":              tu.PermissionsMap(),
+			"can_view_crm_analytics":        tu.CanViewCrmAnalytics(),
+			"can_manage_all_support_tickets": tu.CanManageAllSupportTickets(),
+			"permissions":                   tu.PermissionsMap(),
 	}
 	if avatarURL != nil && strings.TrimSpace(*avatarURL) != "" {
 		user["avatar_url"] = resolveBrandingAvatarURL(strings.TrimSpace(*avatarURL))

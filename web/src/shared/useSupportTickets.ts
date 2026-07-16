@@ -18,7 +18,7 @@ export type Ticket = {
   ticket_date: string;
   subject: string;
   description?: string | null;
-  partner_id: number;
+  partner_id?: number | null;
   partner_name?: string;
   warranty_asset_id?: number | null;
   repair_order_id?: number | null;
@@ -27,6 +27,7 @@ export type Ticket = {
   status: TicketStatus;
   assigned_user_id?: number | null;
   assigned_name?: string;
+  created_by_user_id?: number | null;
   created_by_name?: string;
   resolved_at?: string | null;
   comments?: TicketComment[];
@@ -83,7 +84,7 @@ export function useSupportTicket(id: () => number | null) {
 export async function createTicket(body: {
   subject: string;
   description?: string;
-  partner_id: number;
+  partner_id?: number | null;
   warranty_asset_id?: number | null;
   repair_order_id?: number | null;
   category?: string;

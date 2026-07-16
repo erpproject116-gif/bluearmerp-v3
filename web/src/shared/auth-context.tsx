@@ -31,6 +31,7 @@ export type MeData = {
     can_view_all_crm?: boolean;
     can_manage_sales_team?: boolean;
     can_view_crm_analytics?: boolean;
+    can_manage_all_support_tickets?: boolean;
     permissions?: Record<string, string> | null;
   };
   tenant: {
@@ -150,6 +151,18 @@ export function canViewCrmAnalytics(me: MeData | null | undefined): boolean {
     return hasPermission(me, "crm.reports_customer_quotations", "read");
   }
   return Boolean(u.can_view_crm_analytics || u.is_platform_superadmin || u.is_tenant_owner);
+}
+
+/** IT desk / superadmin — may view and manage every support ticket in the tenant. */
+export function canManageAllSupportTickets(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  const u = me.user;
+  return Boolean(
+    u.can_manage_all_support_tickets ||
+      u.is_platform_superadmin ||
+      u.is_tenant_owner ||
+      hasPermission(me, "support.tickets_assign", "write"),
+  );
 }
 
 export type AccessLevel = "deny" | "read" | "write";

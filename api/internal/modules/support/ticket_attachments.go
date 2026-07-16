@@ -32,8 +32,7 @@ type TicketAttachment struct {
 }
 
 func registerTicketAttachmentRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.With(auth.RequirePermission("support.tickets", auth.AccessWrite)).
-		Post("/tickets/{id}/attachments", uploadTicketAttachment(pool))
+	r.Post("/tickets/{id}/attachments", uploadTicketAttachment(pool))
 	r.Get("/tickets/{id}/attachments", listTicketAttachments(pool))
 	r.Get("/tickets/{id}/attachments/{attachmentId}/download", downloadTicketAttachment(pool))
 }
@@ -53,18 +52,28 @@ func allowedTicketMime(mime, name string) bool {
 		return true
 	case strings.HasPrefix(m, "video/"):
 		return true
+	case strings.HasPrefix(m, "audio/"):
+		return true
 	case m == "application/pdf", m == "application/msword",
 		m == "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 		m == "application/vnd.ms-excel",
 		m == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-		m == "text/plain", m == "text/csv":
+		m == "application/vnd.ms-powerpoint",
+		m == "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		m == "application/zip", m == "application/x-zip-compressed",
+		m == "application/octet-stream",
+		m == "text/plain", m == "text/csv", m == "text/markdown":
 		return true
 	case ext == ".pdf", ext == ".doc", ext == ".docx", ext == ".xls", ext == ".xlsx",
-		ext == ".txt", ext == ".csv", ext == ".png", ext == ".jpg", ext == ".jpeg",
-		ext == ".gif", ext == ".webp", ext == ".mp4", ext == ".webm", ext == ".mov":
+		ext == ".ppt", ext == ".pptx", ext == ".txt", ext == ".csv", ext == ".md",
+		ext == ".png", ext == ".jpg", ext == ".jpeg", ext == ".gif", ext == ".webp",
+		ext == ".heic", ext == ".bmp",
+		ext == ".mp4", ext == ".webm", ext == ".mov", ext == ".m4a", ext == ".mp3",
+		ext == ".zip", ext == ".rar", ext == ".7z":
 		return true
 	default:
-		return false
+		// Unknown MIME with a normal file extension — still allow (browsers often send octet-stream).
+		return ext != "" && len(ext) <= 8
 	}
 }
 
@@ -81,6 +90,10 @@ func uploadTicketAttachment(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := pool.QueryRow(r.Context(),
 			`select exists(select 1 from public.sup_support_tickets where id = $1 and tenant_id = $2)`,
 			ticketID, tu.TenantID).Scan(&exists); err != nil || !exists {
+			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if !ticketAccessOK(r.Context(), pool, tu, tu.TenantID, ticketID) {
 			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
 			return
 		}
@@ -191,6 +204,10 @@ func listTicketAttachments(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		if !ticketAccessOK(r.Context(), pool, tu, tu.TenantID, ticketID) {
+			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
+			return
+		}
 		rows, err := pool.Query(r.Context(), `
 			select a.id, a.file_name, coalesce(a.mime_type, ''), a.size_bytes, a.uploaded_by_user_id, a.created_at
 			from public.sup_support_ticket_attachments a
@@ -233,6 +250,10 @@ func downloadTicketAttachment(pool *pgxpool.Pool) http.HandlerFunc {
 		attachmentID, err := strconv.ParseInt(chi.URLParam(r, "attachmentId"), 10, 64)
 		if err != nil {
 			response.Validation(w, map[string]string{"attachmentId": "Invalid attachment id."})
+			return
+		}
+		if !ticketAccessOK(r.Context(), pool, tu, tu.TenantID, ticketID) {
+			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
 			return
 		}
 		var fileName, storagePath, mime string

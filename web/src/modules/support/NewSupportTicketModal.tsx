@@ -92,15 +92,11 @@ export function NewSupportTicketModal(props: Props) {
       toast.warning("Subject is required.");
       return;
     }
-    if (!partnerId()) {
-      toast.warning("Customer is required.");
-      return;
-    }
     setSaving(true);
     const res = await createTicket({
       subject: subject().trim(),
       description: description().trim() || undefined,
-      partner_id: partnerId()!,
+      partner_id: partnerId() ?? null,
       warranty_asset_id: warrantyId(),
       repair_order_id: repairOrderId(),
       category: category(),
@@ -108,7 +104,8 @@ export function NewSupportTicketModal(props: Props) {
     });
     setSaving(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Could not create ticket.");
+      const fieldErrors = res.errors ? Object.values(res.errors).filter(Boolean).join(" · ") : "";
+      toast.warning(fieldErrors || res.message || "Could not create ticket.");
       return;
     }
     // Keep modal open briefly so AttachmentsField can flush staged files to the new id.
@@ -142,8 +139,7 @@ export function NewSupportTicketModal(props: Props) {
             <input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} />
           </Field>
           <LookupCombo
-            label="Customer"
-            required
+            label="Customer (optional)"
             value={() => partnerLabel()}
             selectedId={() => partnerId()}
             onInput={setPartnerLabel}

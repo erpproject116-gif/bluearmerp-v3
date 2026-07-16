@@ -2,10 +2,16 @@ import { apiFetch } from "../../shared/api";
 import type { LookupOption } from "../../shared/LookupCombo";
 
 export async function fetchPartners(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ pageSize: "20", q, status: "active", partner_kind: "customer" });
-  const res = await apiFetch<{ id: number; company_name: string }[]>(`/api/v1/inventory/partners?${qs}`);
+  // Include customers and vendors — tickets may reference either.
+  const qs = new URLSearchParams({ pageSize: "20", q, status: "active" });
+  const res = await apiFetch<{ id: number; company_name: string; partner_kind?: string }[]>(
+    `/api/v1/inventory/partners?${qs}`,
+  );
   if (!res.success || !res.data) return [];
-  return res.data.map((p) => ({ id: p.id, label: p.company_name }));
+  return res.data.map((p) => ({
+    id: p.id,
+    label: p.partner_kind ? `${p.company_name} (${p.partner_kind})` : p.company_name,
+  }));
 }
 
 export async function fetchWarrantyAssets(q: string, partnerId: number | null): Promise<LookupOption[]> {

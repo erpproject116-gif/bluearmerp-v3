@@ -1,4 +1,4 @@
-import { createSignal, For } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import {
@@ -7,7 +7,7 @@ import {
   type TicketStatus,
 } from "../../shared/useSupportTickets";
 import { useListState } from "../../shared/useListState";
-import { hasPermission, useAuth } from "../../shared/auth-context";
+import { canManageAllSupportTickets, hasPermission, useAuth } from "../../shared/auth-context";
 import { SupportLayout } from "./SupportLayout";
 import { NewSupportTicketModal } from "./NewSupportTicketModal";
 
@@ -17,6 +17,7 @@ export default function TicketsPage() {
   const navigate = useNavigate();
   const auth = useAuth();
   const canCreate = () => hasPermission(auth.me, "support.tickets_new", "write");
+  const scopedToMine = () => !canManageAllSupportTickets(auth.me);
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
     useListState("ticket_date", 25, { defaultStatus: "", defaultOrder: "desc" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -39,6 +40,9 @@ export default function TicketsPage() {
 
   return (
     <SupportLayout>
+      <Show when={scopedToMine()}>
+        <p class="mb-3 text-sm text-text-secondary">Showing tickets you opened.</p>
+      </Show>
       <div class="mb-3 flex flex-wrap items-center gap-2">
         <label class="text-sm text-text-secondary">
           Status

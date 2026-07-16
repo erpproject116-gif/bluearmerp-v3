@@ -13,12 +13,12 @@ import (
 )
 
 type ticketCreatedPayload struct {
-	TicketID        int64  `json:"ticket_id"`
-	TicketNo        string `json:"ticket_no"`
-	Subject         string `json:"subject"`
-	PartnerID       int64  `json:"partner_id"`
-	AssignedUserID  *int64 `json:"assigned_user_id,omitempty"`
-	NotifyStub      bool   `json:"notify_stub"`
+	TicketID       int64  `json:"ticket_id"`
+	TicketNo       string `json:"ticket_no"`
+	Subject        string `json:"subject"`
+	PartnerID      *int64 `json:"partner_id,omitempty"`
+	AssignedUserID *int64 `json:"assigned_user_id,omitempty"`
+	NotifyStub     bool   `json:"notify_stub"`
 }
 
 // HandleOutboxEvent processes support outbox events and sends assignee email when SMTP is configured.

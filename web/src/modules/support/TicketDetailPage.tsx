@@ -18,7 +18,7 @@ import {
   type SupportTicketAttachment,
 } from "../../shared/supportTicketAttachments";
 import { useToast } from "../../shared/toast";
-import { hasPermission, useAuth } from "../../shared/auth-context";
+import { canManageAllSupportTickets, useAuth } from "../../shared/auth-context";
 import { SupportLayout } from "./SupportLayout";
 import { fetchRepairOrders, fetchSupportUsers, fetchWarrantyAssets } from "./supportLookups";
 import { LoadingText } from "../../shared/LoadingText";
@@ -43,9 +43,14 @@ export default function TicketDetailPage() {
   const [attachments, setAttachments] = createSignal<SupportTicketAttachment[]>([]);
   const [uploading, setUploading] = createSignal(false);
 
-  const canWrite = () => hasPermission(auth.me, "support.tickets", "write");
-  const canAssign = () =>
-    hasPermission(auth.me, "support.tickets_assign", "write") || canWrite();
+  const canManage = () => canManageAllSupportTickets(auth.me);
+  const canInteract = () => {
+    const me = auth.me;
+    const t = ticket.data;
+    if (!me || !t) return false;
+    if (canManage()) return true;
+    return t.created_by_user_id != null && t.created_by_user_id === me.user.id;
+  };
 
   const attachmentBytesUsed = () => attachments().reduce((sum, a) => sum + (a.size_bytes || 0), 0);
 
@@ -108,7 +113,10 @@ export default function TicketDetailPage() {
                   <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">{t().ticket_no}</p>
                   <h1 class="text-xl font-semibold text-text-primary">{t().subject}</h1>
                   <p class="mt-1 text-sm text-text-secondary">
-                    {t().partner_name} · opened {t().ticket_date}
+                    <Show when={t().partner_name} fallback={<span>No customer linked</span>}>
+                      {t().partner_name}
+                    </Show>
+                    {" · "}opened {t().ticket_date}
                     <Show when={t().created_by_name}> by {t().created_by_name}</Show>
                   </p>
                 </div>
@@ -145,7 +153,7 @@ export default function TicketDetailPage() {
                 <p class="mb-2 text-xs text-text-secondary">
                   Images, documents, and short videos. Combined size must stay under 25 MB.
                 </p>
-                <Show when={canWrite()}>
+                <Show when={canInteract()}>
                   <label class="inline-block cursor-pointer rounded border border-stroke bg-white px-3 py-1.5 text-sm hover:bg-slate-50">
                     {uploading() ? "Uploading…" : "Upload file"}
                     <input
@@ -211,7 +219,7 @@ export default function TicketDetailPage() {
                 </Show>
               </div>
 
-              <Show when={canWrite()}>
+              <Show when={canInteract()}>
                 <div class="mt-4">
                   <textarea
                     class={inputClass}
@@ -237,7 +245,7 @@ export default function TicketDetailPage() {
                 <select
                   class={inputClass}
                   value={t().status}
-                  disabled={!canWrite() || saving()}
+                  disabled={!canManage() || saving()}
                   onChange={(e) => void updateField({ status: e.currentTarget.value as TicketStatus })}
                 >
                   <For each={STATUS_OPTIONS}>{(s) => <option value={s}>{s.replace("_", " ")}</option>}</For>
@@ -247,7 +255,7 @@ export default function TicketDetailPage() {
                 <select
                   class={inputClass}
                   value={t().priority}
-                  disabled={!canWrite() || saving()}
+                  disabled={!canManage() || saving()}
                   onChange={(e) => void updateField({ priority: e.currentTarget.value as TicketPriority })}
                 >
                   <For each={PRIORITY_OPTIONS}>{(p) => <option value={p}>{p}</option>}</For>
@@ -257,11 +265,11 @@ export default function TicketDetailPage() {
                 <input
                   class={inputClass}
                   value={t().category}
-                  disabled={!canWrite() || saving()}
+                  disabled={!canManage() || saving()}
                   onChange={(e) => void updateField({ category: e.currentTarget.value })}
                 />
               </Field>
-              <Show when={canWrite()}>
+              <Show when={canManage()}>
                 <LookupCombo
                   label="Warranty asset"
                   value={() => warrantyLabel() || (t().warranty_asset_id ? "Linked asset" : "")}
@@ -269,10 +277,10 @@ export default function TicketDetailPage() {
                   onInput={setWarrantyLabel}
                   onSelect={(o) => void updateField({ warranty_asset_id: o.id })}
                   onClear={() => void updateField({ warranty_asset_id: null })}
-                  fetchOptions={(q) => fetchWarrantyAssets(q, t().partner_id)}
+                  fetchOptions={(q) => fetchWarrantyAssets(q, t().partner_id ?? null)}
                 />
               </Show>
-              <Show when={canAssign()}>
+              <Show when={canManage()}>
                 <LookupCombo
                   label="Assigned to"
                   value={() => assigneeLabel() || t().assigned_name || ""}
@@ -283,7 +291,7 @@ export default function TicketDetailPage() {
                   fetchOptions={fetchSupportUsers}
                 />
               </Show>
-              <Show when={canWrite()}>
+              <Show when={canManage()}>
                 <LookupCombo
                   label="Repair order"
                   value={() => repairOrderLabel() || (t().repair_order_id ? `RO #${t().repair_order_id}` : "")}
@@ -291,11 +299,11 @@ export default function TicketDetailPage() {
                   onInput={setRepairOrderLabel}
                   onSelect={(o) => void updateField({ repair_order_id: o.id })}
                   onClear={() => void updateField({ repair_order_id: null })}
-                  fetchOptions={(q) => fetchRepairOrders(q, t().partner_id)}
+                  fetchOptions={(q) => fetchRepairOrders(q, t().partner_id ?? null)}
                 />
               </Show>
               <div class="text-sm text-text-secondary">
-                <Show when={!canAssign() && t().assigned_name}>
+                <Show when={!canManage() && t().assigned_name}>
                   <p>
                     <span class="font-medium text-text-primary">Assigned:</span> {t().assigned_name}
                   </p>

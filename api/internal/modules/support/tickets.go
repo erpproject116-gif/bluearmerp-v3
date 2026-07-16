@@ -25,7 +25,7 @@ type Ticket struct {
 	TicketDate      string           `json:"ticket_date"`
 	Subject         string           `json:"subject"`
 	Description     *string          `json:"description,omitempty"`
-	PartnerID       int64            `json:"partner_id"`
+	PartnerID       *int64           `json:"partner_id,omitempty"`
 	PartnerName     string           `json:"partner_name,omitempty"`
 	WarrantyAssetID *int64           `json:"warranty_asset_id,omitempty"`
 	RepairOrderID   *int64           `json:"repair_order_id,omitempty"`
@@ -34,6 +34,7 @@ type Ticket struct {
 	Status          string           `json:"status"`
 	AssignedUserID  *int64           `json:"assigned_user_id,omitempty"`
 	AssignedName    string           `json:"assigned_name,omitempty"`
+	CreatedByUserID *int64           `json:"created_by_user_id,omitempty"`
 	CreatedByName   string           `json:"created_by_name,omitempty"`
 	ResolvedAt      *string          `json:"resolved_at,omitempty"`
 	Comments        []TicketComment  `json:"comments,omitempty"`
@@ -50,7 +51,7 @@ type TicketComment struct {
 type ticketBody struct {
 	Subject         string  `json:"subject"`
 	Description     *string `json:"description"`
-	PartnerID       int64   `json:"partner_id"`
+	PartnerID       *int64  `json:"partner_id"`
 	WarrantyAssetID *int64  `json:"warranty_asset_id"`
 	RepairOrderID   *int64  `json:"repair_order_id"`
 	Category        string  `json:"category"`
@@ -77,8 +78,8 @@ func registerTicketRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/tickets", listTickets(pool))
 	r.With(auth.RequirePermission("support.tickets_new", auth.AccessWrite)).Post("/tickets", createTicket(pool))
 	r.Get("/tickets/{id}", getTicket(pool))
-	r.With(auth.RequirePermission("support.tickets", auth.AccessWrite)).Patch("/tickets/{id}", patchTicket(pool))
-	r.With(auth.RequirePermission("support.tickets", auth.AccessWrite)).Post("/tickets/{id}/comments", addTicketComment(pool))
+	r.With(auth.RequirePermission("support.tickets_assign", auth.AccessWrite)).Patch("/tickets/{id}", patchTicket(pool))
+	r.Post("/tickets/{id}/comments", addTicketComment(pool))
 	registerTicketAttachmentRoutes(r, pool)
 }
 
@@ -97,7 +98,7 @@ func listTickets(pool *pgxpool.Pool) http.HandlerFunc {
 		args := []any{tu.TenantID}
 		n := 2
 		if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
-			where += fmt.Sprintf(" and (t.ticket_no ilike $%d or t.subject ilike $%d or p.company_name ilike $%d)", n, n, n)
+			where += fmt.Sprintf(" and (t.ticket_no ilike $%d or t.subject ilike $%d or coalesce(p.company_name, '') ilike $%d)", n, n, n)
 			args = append(args, "%"+q+"%")
 			n++
 		}
@@ -110,6 +111,11 @@ func listTickets(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, p.Status)
 			n++
 		}
+		if !tu.CanManageAllSupportTickets() {
+			where += fmt.Sprintf(" and t.created_by_user_id = $%d", n)
+			args = append(args, tu.AppUserID)
+			n++
+		}
 
 		sortCol := allowed[p.Sort]
 		if sortCol == "" {
@@ -117,14 +123,14 @@ func listTickets(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		q := fmt.Sprintf(`
 			select t.id, t.ticket_no, t.ticket_date::text, t.subject, t.description,
-			  t.partner_id, p.company_name, t.warranty_asset_id, t.repair_order_id,
+			  t.partner_id, coalesce(p.company_name, ''), t.warranty_asset_id, t.repair_order_id,
 			  t.category, t.priority, t.status,
 			  t.assigned_user_id, coalesce(au.full_name, ''),
-			  coalesce(cu.full_name, ''),
+			  t.created_by_user_id, coalesce(cu.full_name, ''),
 			  t.resolved_at::text,
 			  count(*) over()
 			from public.sup_support_tickets t
-			join public.inv_partners p on p.id = t.partner_id
+			left join public.inv_partners p on p.id = t.partner_id
 			left join public.users au on au.id = t.assigned_user_id
 			left join public.users cu on cu.id = t.created_by_user_id
 			where %s
@@ -150,7 +156,7 @@ func listTickets(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.ID, &row.TicketNo, &row.TicketDate, &row.Subject, &desc,
 				&row.PartnerID, &row.PartnerName, &row.WarrantyAssetID, &row.RepairOrderID,
 				&row.Category, &row.Priority, &row.Status,
-				&row.AssignedUserID, &row.AssignedName, &row.CreatedByName, &resolved, &total,
+				&row.AssignedUserID, &row.AssignedName, &row.CreatedByUserID, &row.CreatedByName, &resolved, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read ticket.", "ERR_INTERNAL")
 				return
@@ -179,6 +185,10 @@ func getTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
 			return
 		}
+		if !tu.CanAccessSupportTicket(ticket.CreatedByUserID) {
+			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
+			return
+		}
 		comments, err := loadTicketComments(r.Context(), pool, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load comments.", "ERR_INTERNAL")
@@ -197,8 +207,17 @@ func createTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if errs := validateTicketBody(body); errs != nil {
+		if errs := validateTicketBody(body); len(errs) > 0 {
 			response.Validation(w, errs)
+			return
+		}
+
+		partnerID := optionalPositiveID(body.PartnerID)
+		warrantyID := optionalPositiveID(body.WarrantyAssetID)
+		repairID := optionalPositiveID(body.RepairOrderID)
+		assignedID := optionalPositiveID(body.AssignedUserID)
+		if assignedID != nil && !tu.CanManageAllSupportTickets() {
+			response.Err(w, http.StatusForbidden, "Only IT staff may assign tickets.", "ERR_FORBIDDEN")
 			return
 		}
 
@@ -225,10 +244,10 @@ func createTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			) values ($1,$2::date,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 			returning id`,
 			tu.TenantID, ticketDate.Format("2006-01-02"), seq, ticketNo,
-			strings.TrimSpace(body.Subject), body.Description,
-			body.PartnerID, body.WarrantyAssetID, body.RepairOrderID,
+			strings.TrimSpace(body.Subject), nullIfBlankPtr(body.Description),
+			partnerID, warrantyID, repairID,
 			normalizeCategory(body.Category), normalizePriority(body.Priority),
-			body.AssignedUserID, tu.AppUserID,
+			assignedID, tu.AppUserID,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to insert ticket.", "ERR_INTERNAL")
@@ -237,12 +256,12 @@ func createTicket(pool *pgxpool.Pool) http.HandlerFunc {
 
 		payload := ticketCreatedPayload{
 			TicketID: id, TicketNo: ticketNo, Subject: strings.TrimSpace(body.Subject),
-			PartnerID: body.PartnerID, AssignedUserID: body.AssignedUserID, NotifyStub: true,
+			PartnerID: partnerID, AssignedUserID: assignedID, NotifyStub: true,
 		}
 		idemKey := fmt.Sprintf("support.ticket_created:%d:%d", tu.TenantID, id)
+		// Never block ticket create on notification enqueue failures.
 		if err := outbox.EnqueueTx(r.Context(), tx, tu.TenantID, "support.ticket_created", idemKey, payload); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to enqueue notification.", "ERR_INTERNAL")
-			return
+			// continue without outbox row
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
@@ -269,6 +288,11 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 		var body ticketPatchBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+
+		if !tu.CanManageAllSupportTickets() {
+			response.Err(w, http.StatusForbidden, "Only IT staff may update ticket status and fields.", "ERR_FORBIDDEN")
 			return
 		}
 
@@ -344,6 +368,18 @@ func addTicketComment(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		var createdBy *int64
+		if err := pool.QueryRow(r.Context(), `
+			select created_by_user_id from public.sup_support_tickets where id = $1 and tenant_id = $2`,
+			id, tu.TenantID).Scan(&createdBy); err != nil {
+			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if !tu.CanAccessSupportTicket(createdBy) {
+			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
+			return
+		}
+
 		var body commentBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
@@ -352,15 +388,6 @@ func addTicketComment(pool *pgxpool.Pool) http.HandlerFunc {
 		text := strings.TrimSpace(body.Body)
 		if text == "" {
 			response.Validation(w, map[string]string{"body": "Comment is required."})
-			return
-		}
-
-		var exists bool
-		_ = pool.QueryRow(r.Context(), `
-			select exists(select 1 from public.sup_support_tickets where id = $1 and tenant_id = $2)`,
-			id, tu.TenantID).Scan(&exists)
-		if !exists {
-			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
 			return
 		}
 
@@ -393,19 +420,19 @@ func loadTicket(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Ti
 	var resolved *string
 	err := pool.QueryRow(ctx, `
 		select t.id, t.ticket_no, t.ticket_date::text, t.subject, t.description,
-		  t.partner_id, p.company_name, t.warranty_asset_id, t.repair_order_id,
+		  t.partner_id, coalesce(p.company_name, ''), t.warranty_asset_id, t.repair_order_id,
 		  t.category, t.priority, t.status,
 		  t.assigned_user_id, coalesce(au.full_name, ''),
-		  coalesce(cu.full_name, ''), t.resolved_at::text
+		  t.created_by_user_id, coalesce(cu.full_name, ''), t.resolved_at::text
 		from public.sup_support_tickets t
-		join public.inv_partners p on p.id = t.partner_id
+		left join public.inv_partners p on p.id = t.partner_id
 		left join public.users au on au.id = t.assigned_user_id
 		left join public.users cu on cu.id = t.created_by_user_id
 		where t.id = $1 and t.tenant_id = $2`, id, tenantID).Scan(
 		&row.ID, &row.TicketNo, &row.TicketDate, &row.Subject, &desc,
 		&row.PartnerID, &row.PartnerName, &row.WarrantyAssetID, &row.RepairOrderID,
 		&row.Category, &row.Priority, &row.Status,
-		&row.AssignedUserID, &row.AssignedName, &row.CreatedByName, &resolved,
+		&row.AssignedUserID, &row.AssignedName, &row.CreatedByUserID, &row.CreatedByName, &resolved,
 	)
 	if err != nil {
 		return Ticket{}, err
@@ -443,13 +470,31 @@ func validateTicketBody(b ticketBody) map[string]string {
 	if strings.TrimSpace(b.Subject) == "" {
 		errs["subject"] = "Subject is required."
 	}
-	if b.PartnerID <= 0 {
-		errs["partner_id"] = "Customer is required."
-	}
 	if b.Priority != "" && normalizePriority(b.Priority) == "" {
-		errs["priority"] = "Invalid priority."
+		errs["priority"] = "Invalid priority (use low, normal, high, or urgent)."
 	}
-	return errs
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
+}
+
+func optionalPositiveID(id *int64) *int64 {
+	if id == nil || *id <= 0 {
+		return nil
+	}
+	return id
+}
+
+func nullIfBlankPtr(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*s)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func normalizePriority(p string) string {
@@ -485,4 +530,14 @@ func orderSQL(order string) string {
 		return "desc"
 	}
 	return "asc"
+}
+
+func ticketAccessOK(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, tenantID, ticketID int64) bool {
+	var createdBy *int64
+	if err := pool.QueryRow(ctx, `
+		select created_by_user_id from public.sup_support_tickets where id = $1 and tenant_id = $2`,
+		ticketID, tenantID).Scan(&createdBy); err != nil {
+		return false
+	}
+	return tu.CanAccessSupportTicket(createdBy)
 }
