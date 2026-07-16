@@ -17,8 +17,16 @@ export function thisMonthRange(): { from: string; to: string } {
   return { from: from.toISOString().slice(0, 10), to: todayISO() };
 }
 
+/** Wider default so demo / recent history appears without hunting dates. */
+export function last90DaysRange(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - 90);
+  return { from: from.toISOString().slice(0, 10), to: todayISO() };
+}
+
 export function defaultPartnerBookFilters(bookType: PartnerBookType): PartnerBookFilters {
-  const { from, to } = thisMonthRange();
+  const { from, to } = last90DaysRange();
   return { book_type: bookType, date_from: from, date_to: to };
 }
 

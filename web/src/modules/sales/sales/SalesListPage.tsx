@@ -132,6 +132,8 @@ export function SalesListPageInner(props: PageOptions = {}) {
         if (res.success && res.data) {
           setEditing(res.data);
           setModalOpen(true);
+        } else {
+          toast.warning(res.message ?? "Could not open that sale.");
         }
         setSearchParams({ openId: undefined }, { replace: true });
       })();

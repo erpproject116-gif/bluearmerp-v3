@@ -53,18 +53,19 @@ export function policyRequiresAttachment(
   policy: ProcessPolicy | undefined,
   kind: AttachmentDocKind,
 ): boolean {
-  if (!policy) return true;
+  // Until policy loads, do not block confirm (settings page is source of truth).
+  if (!policy) return false;
   switch (kind) {
     case "quotation":
-      return policy.quotation_require_attachment !== false;
+      return Boolean(policy.quotation_require_attachment);
     case "sales_order":
-      return policy.sales_order_require_attachment !== false;
+      return Boolean(policy.sales_order_require_attachment);
     case "sales":
-      return policy.sales_require_attachment !== false;
+      return Boolean(policy.sales_require_attachment);
     case "purchase_order":
-      return policy.purchase_order_require_attachment !== false;
+      return Boolean(policy.purchase_order_require_attachment);
     case "supplier_invoice":
-      return policy.supplier_invoice_require_attachment !== false;
+      return Boolean(policy.supplier_invoice_require_attachment);
     default:
       return false;
   }

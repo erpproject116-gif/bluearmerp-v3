@@ -236,9 +236,9 @@ func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
 		q := `
 			select s.id, s.sales_no, s.order_date, s.date_seq, s.due_date,
 			  (s.grand_total - coalesce(applied.total, 0))::float8 as balance,
-			  loc.name, proj.name, dept.name
+			  coalesce(loc.location_name, ''), coalesce(proj.project_name, ''), coalesce(dept.department_name, '')
 			from public.sa_sales s
-			join public.inv_locations loc on loc.id = s.location_id
+			left join public.inv_locations loc on loc.id = s.location_id
 			left join public.inv_projects proj on proj.id = s.project_id
 			left join public.inv_departments dept on dept.id = s.department_id
 			left join lateral (

@@ -16,15 +16,17 @@ import (
 )
 
 type partnerBookRow struct {
-	TxnDate      string  `json:"txn_date"`
-	SlipType     string  `json:"slip_type"`
-	SlipNo       string  `json:"slip_no"`
-	DateNoDisplay string `json:"date_no_display"`
-	PartnerID    int64   `json:"partner_id"`
-	PartnerName  string  `json:"partner_name"`
-	Description  string  `json:"description"`
-	Debit        float64 `json:"debit"`
-	Credit       float64 `json:"credit"`
+	TxnDate       string  `json:"txn_date"`
+	SlipType      string  `json:"slip_type"`
+	SlipNo        string  `json:"slip_no"`
+	DateNoDisplay string  `json:"date_no_display"`
+	PartnerID     int64   `json:"partner_id"`
+	PartnerName   string  `json:"partner_name"`
+	Description   string  `json:"description"`
+	Debit         float64 `json:"debit"`
+	Credit        float64 `json:"credit"`
+	DocKind       string  `json:"doc_kind,omitempty"`
+	DocID         int64   `json:"doc_id,omitempty"`
 }
 
 type partnerBookFilters struct {
@@ -85,13 +87,14 @@ func partnerBookARSQL(tenantID int64, f partnerBookFilters) (string, []any) {
 		args = append(args, *f.PartnerID)
 	}
 	q := fmt.Sprintf(`
-		select txn_date, slip_type, slip_no, date_no_display, partner_id, partner_name, description, debit, credit
+		select txn_date, slip_type, slip_no, date_no_display, partner_id, partner_name, description, debit, credit, doc_kind, doc_id
 		from (
 		  select s.order_date as txn_date, 'Sales Invoice' as slip_type, s.sales_no as slip_no,
 		    to_char(s.order_date, 'MM/DD/YYYY') || '-' || s.date_seq as date_no_display,
 		    s.partner_id, p.company_name as partner_name,
 		    coalesce(s.si_dr_no, s.sales_no) as description,
-		    s.grand_total::float8 as debit, 0::float8 as credit
+		    s.grand_total::float8 as debit, 0::float8 as credit,
+		    'sales'::text as doc_kind, s.id as doc_id
 		  from public.sa_sales s
 		  join public.inv_partners p on p.id = s.partner_id
 		  where s.tenant_id = $1 and s.deleted_at is null
@@ -101,7 +104,8 @@ func partnerBookARSQL(tenantID int64, f partnerBookFilters) (string, []any) {
 		    to_char(r.receipt_date, 'MM/DD/YYYY') || '-' || r.date_seq,
 		    r.partner_id, p.company_name,
 		    coalesce(r.reference, r.receipt_no),
-		    0::float8, a.applied_amount::float8
+		    0::float8, a.applied_amount::float8,
+		    'official_receipt', r.id
 		  from public.fin_receipt_applications a
 		  join public.fin_official_receipts r on r.id = a.official_receipt_id
 		  join public.inv_partners p on p.id = r.partner_id
@@ -121,13 +125,14 @@ func partnerBookAPSQL(tenantID int64, f partnerBookFilters) (string, []any) {
 		args = append(args, *f.PartnerID)
 	}
 	q := fmt.Sprintf(`
-		select txn_date, slip_type, slip_no, date_no_display, partner_id, partner_name, description, debit, credit
+		select txn_date, slip_type, slip_no, date_no_display, partner_id, partner_name, description, debit, credit, doc_kind, doc_id
 		from (
 		  select si.invoice_date as txn_date, 'Supplier Invoice' as slip_type, si.invoice_no as slip_no,
 		    to_char(si.invoice_date, 'MM/DD/YYYY') || '-' || si.date_seq as date_no_display,
 		    si.partner_id, p.company_name as partner_name,
 		    coalesce(si.vendor_invoice_no, si.invoice_no) as description,
-		    0::float8 as debit, si.grand_total::float8 as credit
+		    0::float8 as debit, si.grand_total::float8 as credit,
+		    'supplier_invoice'::text as doc_kind, si.id as doc_id
 		  from public.fin_supplier_invoices si
 		  join public.inv_partners p on p.id = si.partner_id
 		  where si.tenant_id = $1 and si.deleted_at is null
@@ -137,7 +142,8 @@ func partnerBookAPSQL(tenantID int64, f partnerBookFilters) (string, []any) {
 		    to_char(pv.payment_date, 'MM/DD/YYYY') || '-' || pv.date_seq,
 		    pv.partner_id, p.company_name,
 		    coalesce(pv.reference, pv.payment_no),
-		    a.applied_amount::float8, 0::float8
+		    a.applied_amount::float8, 0::float8,
+		    'payment_voucher', pv.id
 		  from public.fin_payment_applications a
 		  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
 		  join public.inv_partners p on p.id = pv.partner_id
@@ -180,7 +186,7 @@ func listCustomerVendorBook(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		args = append(args, p.PageSize, offset)
-		q := fmt.Sprintf("select txn_date::text, slip_type, slip_no, date_no_display, partner_id, partner_name, description, debit, credit from (%s) sub limit $%d offset $%d",
+		q := fmt.Sprintf("select txn_date::text, slip_type, slip_no, date_no_display, partner_id, partner_name, description, debit, credit, doc_kind, doc_id from (%s) sub limit $%d offset $%d",
 			base, len(args)-1, len(args))
 
 		rows, err := pool.Query(r.Context(), q, args...)
@@ -193,7 +199,7 @@ func listCustomerVendorBook(pool *pgxpool.Pool) http.HandlerFunc {
 		var out []partnerBookRow
 		for rows.Next() {
 			var row partnerBookRow
-			if err := rows.Scan(&row.TxnDate, &row.SlipType, &row.SlipNo, &row.DateNoDisplay, &row.PartnerID, &row.PartnerName, &row.Description, &row.Debit, &row.Credit); err != nil {
+			if err := rows.Scan(&row.TxnDate, &row.SlipType, &row.SlipNo, &row.DateNoDisplay, &row.PartnerID, &row.PartnerName, &row.Description, &row.Debit, &row.Credit, &row.DocKind, &row.DocID); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read partner book.", "ERR_INTERNAL")
 				return
 			}

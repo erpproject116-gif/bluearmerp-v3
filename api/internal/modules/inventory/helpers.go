@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -49,23 +50,67 @@ func boolOrFalse(v *bool) bool {
 
 func createWithCode[T any](ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, entity string, insert func(context.Context, pgxpoolConn, string) (int64, T, error)) (int64, T, error) {
 	var zero T
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return 0, zero, err
+	const maxAttempts = 5
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return 0, zero, err
+		}
+		var code string
+		if err := tx.QueryRow(ctx, `select public.allocate_tenant_code($1, $2)`, tu.TenantID, entity).Scan(&code); err != nil {
+			_ = tx.Rollback(ctx)
+			return 0, zero, err
+		}
+		id, row, err := insert(ctx, tx, code)
+		if err != nil {
+			_ = tx.Rollback(ctx)
+			if isUniqueViolation(err) && attempt+1 < maxAttempts {
+				syncCodeSequence(ctx, pool, tu.TenantID, entity)
+				continue
+			}
+			return 0, zero, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return 0, zero, err
+		}
+		return id, row, nil
 	}
-	defer tx.Rollback(ctx)
-	var code string
-	if err := tx.QueryRow(ctx, `select public.allocate_tenant_code($1, $2)`, tu.TenantID, entity).Scan(&code); err != nil {
-		return 0, zero, err
+	return 0, zero, fmt.Errorf("could not allocate a unique %s code", entity)
+}
+
+func syncCodeSequence(ctx context.Context, pool *pgxpool.Pool, tenantID int64, entity string) {
+	table, col := "", ""
+	switch entity {
+	case "partner":
+		table, col = "inv_partners", "partner_code"
+	case "location":
+		table, col = "inv_locations", "location_code"
+	case "project":
+		table, col = "inv_projects", "project_code"
+	case "department":
+		table, col = "inv_departments", "department_code"
+	case "item":
+		table, col = "inv_items", "item_code"
+	default:
+		return
 	}
-	id, row, err := insert(ctx, tx, code)
-	if err != nil {
-		return 0, zero, err
+	q := fmt.Sprintf(`
+		insert into public.tenant_code_sequences (tenant_id, entity_type, last_value)
+		select $1, $2, coalesce((
+		  select max(nullif(regexp_replace(%s, '[^0-9]', '', 'g'), '')::int)
+		  from public.%s where tenant_id = $1
+		), 0)
+		on conflict (tenant_id, entity_type) do update
+		  set last_value = greatest(tenant_code_sequences.last_value, excluded.last_value)`, col, table)
+	_, _ = pool.Exec(ctx, q, tenantID, entity)
+}
+
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return 0, zero, err
-	}
-	return id, row, nil
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique constraint") || strings.Contains(msg, "23505")
 }
 
 func softDeleteHandler(pool *pgxpool.Pool, table, action, targetType string) http.HandlerFunc {

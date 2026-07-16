@@ -26,6 +26,7 @@ export default function ArAgingReportPage() {
   }));
 
   onMount(() => {
+    search();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
         e.preventDefault();
@@ -49,7 +50,7 @@ export default function ArAgingReportPage() {
     <FinanceLayout>
       <ReportPageLayout
         title="A/R Aging"
-        description="Receivables balances grouped by aging bucket - Search (F8). Click a sales no. to open the sale."
+        description="Receivables balances grouped by aging bucket — loads as of today (Search / F8 to refresh). Click any row to open the sale."
         dateFrom={() => filters().as_of ?? ""}
         dateTo={() => filters().as_of ?? ""}
         onDateFromChange={(v) => setFilters({ as_of: v })}
@@ -92,11 +93,17 @@ export default function ArAgingReportPage() {
           <tbody>
             <For each={report.data?.rows ?? []}>
               {(row) => (
-                <tr class="border-t border-stroke/60 hover:bg-brand-50/40">
+                <tr
+                  class="border-t border-stroke/60 hover:bg-brand-50/40 cursor-pointer"
+                  onClick={() => {
+                    window.location.href = `/app/sales/sales?openId=${row.sales_id}`;
+                  }}
+                >
                   <td class="px-3 py-2">
                     <A
                       href={`/app/sales/sales?openId=${row.sales_id}`}
                       class="font-medium text-brand-600 underline-offset-2 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       {row.sales_no}
                     </A>

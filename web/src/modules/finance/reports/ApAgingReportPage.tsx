@@ -26,6 +26,7 @@ export default function ApAgingReportPage() {
   }));
 
   onMount(() => {
+    search();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
         e.preventDefault();
@@ -49,7 +50,7 @@ export default function ApAgingReportPage() {
     <FinanceLayout>
       <ReportPageLayout
         title="A/P Aging"
-        description="Payables balances grouped by aging bucket - Search (F8). Click an invoice no. to open the purchase."
+        description="Payables balances grouped by aging bucket — loads as of today (Search / F8 to refresh). Click any row to open the purchase."
         dateFrom={() => filters().as_of ?? ""}
         dateTo={() => filters().as_of ?? ""}
         onDateFromChange={(v) => setFilters({ as_of: v })}
@@ -92,11 +93,17 @@ export default function ApAgingReportPage() {
           <tbody>
             <For each={report.data?.rows ?? []}>
               {(row) => (
-                <tr class="border-t border-stroke/60 hover:bg-brand-50/40">
+                <tr
+                  class="border-t border-stroke/60 hover:bg-brand-50/40 cursor-pointer"
+                  onClick={() => {
+                    window.location.href = `/app/purchases/purchases?openId=${row.supplier_invoice_id}`;
+                  }}
+                >
                   <td class="px-3 py-2">
                     <A
                       href={`/app/purchases/purchases?openId=${row.supplier_invoice_id}`}
                       class="font-medium text-brand-600 underline-offset-2 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       {row.invoice_no}
                     </A>

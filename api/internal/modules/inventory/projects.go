@@ -98,7 +98,11 @@ func createProject(pool *pgxpool.Pool) http.HandlerFunc {
 			return row.ID, row, err
 		})
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
+			if isUniqueViolation(err) {
+				response.Err(w, http.StatusConflict, "A project with that code already exists. Try again.", "ERR_CONFLICT")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to create project.", "ERR_INTERNAL")
 			return
 		}
 		if errs := persistCustom(r.Context(), pool, tu.TenantID, entityProject, id, body.CustomValues); errs != nil {

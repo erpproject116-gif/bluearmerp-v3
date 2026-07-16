@@ -367,6 +367,7 @@ func restoreAccount(pool *pgxpool.Pool) http.HandlerFunc {
 
 type importTemplateBody struct {
 	Template string `json:"template"`
+	Replace  bool   `json:"replace"`
 }
 
 func importAccountTemplate(pool *pgxpool.Pool) http.HandlerFunc {
@@ -389,11 +390,21 @@ func importAccountTemplate(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = pool.QueryRow(r.Context(), `
 			select count(*)::int from public.fin_accounts
 			where tenant_id = $1 and deleted_at is null`, tu.TenantID).Scan(&existing)
-		if existing > 0 {
+		if existing > 0 && !body.Replace {
 			response.Validation(w, map[string]string{
-				"template": "Chart already has accounts. Import PH template only works on an empty chart. Use Create Purchases / COGS (5010) to add the expense account, or clear/delete accounts first.",
+				"template": "Chart already has accounts. Import PH template only works on an empty chart, or use Replace to soft-delete current accounts and load the PH SME template.",
 			})
 			return
+		}
+
+		if body.Replace && existing > 0 {
+			if _, err := pool.Exec(r.Context(), `
+				update public.fin_accounts
+				set deleted_at = now(), is_active = false
+				where tenant_id = $1 and deleted_at is null`, tu.TenantID); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to clear existing accounts.", "ERR_INTERNAL")
+				return
+			}
 		}
 
 		if _, err := pool.Exec(r.Context(), `select public.seed_ph_sme_chart_of_accounts($1)`, tu.TenantID); err != nil {
@@ -406,7 +417,11 @@ func importAccountTemplate(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = pool.QueryRow(r.Context(), `
 			select count(*) from public.fin_accounts
 			where tenant_id = $1 and deleted_at is null`, tu.TenantID).Scan(&total)
-		response.OK(w, map[string]any{"imported": total, "template": template}, "Template imported.")
+		msg := "Template imported."
+		if body.Replace {
+			msg = "Legacy accounts soft-deleted; PH SME template imported."
+		}
+		response.OK(w, map[string]any{"imported": total, "template": template, "replaced": body.Replace}, msg)
 	}
 }
 
@@ -436,7 +451,7 @@ func ensurePurchaseCogsAccount(pool *pgxpool.Pool) http.HandlerFunc {
 			err = pool.QueryRow(r.Context(), `
 				update public.fin_accounts
 				set deleted_at = null, is_active = true, is_group = false,
-				    account_type = 'expense', account_name = $3, updated_at = now()
+				    account_type = 'expense', account_name = $3
 				where tenant_id = $1 and account_code = $2
 				returning id`, tu.TenantID, code, name).Scan(&id)
 			if err == nil && id > 0 {

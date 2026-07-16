@@ -1,4 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
+import { A } from "@solidjs/router";
+import { createSignal, For, onMount, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { getAccessToken } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
@@ -9,6 +10,22 @@ import { usePartnerBookReport } from "../../../shared/usePartnerBookReport";
 import { FinanceLayout } from "../FinanceLayout";
 
 type Props = { bookType: PartnerBookType };
+
+function slipHref(docKind?: string, docId?: number): string | null {
+  if (!docKind || !docId) return null;
+  switch (docKind) {
+    case "sales":
+      return `/app/sales/sales?openId=${docId}`;
+    case "supplier_invoice":
+      return `/app/purchases/purchases?openId=${docId}`;
+    case "official_receipt":
+      return `/app/finance/official-receipts?openId=${docId}`;
+    case "payment_voucher":
+      return `/app/finance/payment-vouchers?openId=${docId}`;
+    default:
+      return null;
+  }
+}
 
 export default function CustomerVendorBookPage(props: Props) {
   const title = () => (props.bookType === "ar" ? "Customer/Vendor Book I (AR)" : "Customer/Vendor Book I (AP)");
@@ -28,6 +45,11 @@ export default function CustomerVendorBookPage(props: Props) {
     setSubmittedFilters({ ...draftFilters() });
     setPage(1);
   };
+
+  onMount(() => {
+    // Auto-load last 90 days so the book is usable without hunting for Search.
+    search();
+  });
 
   const reset = () => {
     setDraftFilters(defaultPartnerBookFilters(props.bookType));
@@ -68,19 +90,20 @@ export default function CustomerVendorBookPage(props: Props) {
         <h2 class="text-lg font-semibold text-text-primary">{title()}</h2>
         <p class="mt-1 text-sm text-text-secondary">
           {props.bookType === "ar"
-            ? "Customer ledger from Sales (debit) and Official Receipts (credit). Set a date range, then Search (F8)."
-            : "Vendor ledger from Purchases / supplier invoices (credit) and Payment Vouchers (debit). Set a date range, then Search (F8)."}
+            ? "Customer ledger from Sales (debit) and Official Receipt applications (credit). Defaults to the last 90 days — adjust and Search (F8) if needed."
+            : "Vendor ledger from Purchases / supplier invoices (credit) and Payment Voucher applications (debit). Defaults to the last 90 days — adjust and Search (F8) if needed."}
         </p>
         <div class="mt-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
           {props.bookType === "ar" ? (
             <p>
-              No rows until you search. Data appears after you save <span class="font-medium">Sales</span> invoices
-              under Selling → Sales, and apply receipts under Finance → Official Receipts.
+              Rows come from <span class="font-medium">Sales</span> (Selling → Sales) and applied{" "}
+              <span class="font-medium">Official Receipts</span>. Accounting invoice mapping is optional for this book;
+              open balances also appear under Finance → A/R Aging after Search.
             </p>
           ) : (
             <p>
-              No rows until you search. Data appears after you save <span class="font-medium">Purchases</span>
-              (supplier invoices) under Buying → Purchases, and apply payments under Finance → Payment Vouchers.
+              Rows come from <span class="font-medium">Purchases</span> (supplier invoices) and applied{" "}
+              <span class="font-medium">Payment Vouchers</span>. Open balances also appear under Finance → A/P Aging.
             </p>
           )}
         </div>
@@ -153,24 +176,35 @@ export default function CustomerVendorBookPage(props: Props) {
                     <td colSpan={8} class="px-3 py-8 text-center text-sm text-text-secondary">
                       No slips in this date range.
                       {props.bookType === "ar"
-                        ? " Create a Sales invoice first, then search again."
+                        ? " Create a Sales invoice first (any date in range), then search again."
                         : " Create a Purchase (supplier invoice) first, then search again."}
                     </td>
                   </tr>
                 </Show>
                 <For each={rowsWithBalance()}>
-                  {(row) => (
-                    <tr class="border-b border-stroke/60">
-                      <td class="px-3 py-2">{formatDisplayDate(row.txn_date)}</td>
-                      <td class="px-3 py-2">{row.slip_type}</td>
-                      <td class="px-3 py-2">{row.date_no_display || row.slip_no}</td>
-                      <td class="px-3 py-2">{row.partner_name}</td>
-                      <td class="px-3 py-2">{row.description}</td>
-                      <td class="px-3 py-2 text-right">{row.debit ? formatPeso(row.debit) : ""}</td>
-                      <td class="px-3 py-2 text-right">{row.credit ? formatPeso(row.credit) : ""}</td>
-                      <td class="px-3 py-2 text-right">{formatPeso(row.balance)}</td>
-                    </tr>
-                  )}
+                  {(row) => {
+                    const href = () => slipHref(row.doc_kind, row.doc_id);
+                    return (
+                      <tr class="border-b border-stroke/60 hover:bg-brand-50/40">
+                        <td class="px-3 py-2">{formatDisplayDate(row.txn_date)}</td>
+                        <td class="px-3 py-2">{row.slip_type}</td>
+                        <td class="px-3 py-2">
+                          <Show when={href()} fallback={<span>{row.date_no_display || row.slip_no}</span>}>
+                            {(h) => (
+                              <A href={h()} class="font-medium text-brand-600 underline-offset-2 hover:underline">
+                                {row.date_no_display || row.slip_no}
+                              </A>
+                            )}
+                          </Show>
+                        </td>
+                        <td class="px-3 py-2">{row.partner_name}</td>
+                        <td class="px-3 py-2">{row.description}</td>
+                        <td class="px-3 py-2 text-right">{row.debit ? formatPeso(row.debit) : ""}</td>
+                        <td class="px-3 py-2 text-right">{row.credit ? formatPeso(row.credit) : ""}</td>
+                        <td class="px-3 py-2 text-right">{formatPeso(row.balance)}</td>
+                      </tr>
+                    );
+                  }}
                 </For>
               </tbody>
             </table>

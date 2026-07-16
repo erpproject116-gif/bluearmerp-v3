@@ -684,8 +684,10 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			insert into public.sa_sales (tenant_id, order_date, date_seq, sales_no, tax_type_id, currency_id, partner_id,
 			  pic_user_id, pic_name, location_id, terms_of_payment, progress_status, template_code, notes,
 			  subtotal, tax_total, grand_total, created_by_user_id, invoicing_status)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,$15,'completed',$10,$16,$11,$12,$13,$14,true) returning id`,
-			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID, tu.AppUserID, locationID, templateCode, subtotal, taxTotal, grandTotal, tu.AppUserID, primaryTender, saleNotes).Scan(&salesID); err != nil {
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'completed',$12,$13,$14,$15,$16,$17,true) returning id`,
+			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID,
+			tu.AppUserID, tu.FullName, locationID, primaryTender, templateCode, saleNotes,
+			subtotal, taxTotal, grandTotal, tu.AppUserID).Scan(&salesID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create sale.", "ERR_INTERNAL")
 			return
 		}

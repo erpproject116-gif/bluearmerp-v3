@@ -12,6 +12,8 @@ export type PartnerBookRow = {
   description: string;
   debit: number;
   credit: number;
+  doc_kind?: string;
+  doc_id?: number;
 };
 
 export type PartnerBookParams = {

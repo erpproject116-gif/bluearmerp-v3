@@ -714,14 +714,21 @@ export function SalesModal(props: Props) {
     await draft.clearOnSave();
     props.onSaved();
     if (ed) {
-      void tryAutoSaveSalesInvoice(ed.id);
+      const autoOk = await tryAutoSaveSalesInvoice(ed.id);
+      if (autoOk) {
+        toast.success("Accounting invoice ready — open balance shows in A/R Aging & Customer Book (AR) after Search.");
+      } else {
+        toast.warning("Map Sales + Receivable accounts under Chart of Accounts defaults to post the A/R invoice.");
+      }
       props.onClose();
       return;
     }
     setCreatedSale(res.data);
     const autoOk = await tryAutoSaveSalesInvoice(res.data.id);
     if (autoOk) {
-      toast.success("Accounting invoice prepared from CoA defaults.");
+      toast.success("Accounting invoice prepared — receivable is open for Official Receipts / A/R reports.");
+    } else {
+      toast.warning("Sale saved. Map CoA defaults (Sales + Receivable) to auto-prepare the accounting invoice.");
     }
     setPostSaveOpen(true);
   };

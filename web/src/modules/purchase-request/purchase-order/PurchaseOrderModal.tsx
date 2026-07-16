@@ -42,6 +42,7 @@ import {
 } from "./SupplierQuotationLinePickerModal";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 import { LoadingText } from "../../../shared/LoadingText";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 
 type PoDraftPayload = {
@@ -207,6 +208,8 @@ export function PurchaseOrderModal(props: Props) {
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [prPickerOpen, setPrPickerOpen] = createSignal(false);
   const [sqPickerOpen, setSqPickerOpen] = createSignal(false);
+  const [showNewVendor, setShowNewVendor] = createSignal(false);
+  const [newVendorName, setNewVendorName] = createSignal("");
   const [detail, setDetail] = createSignal<PurchaseOrderDetail | null>(null);
   const [savedPoId, setSavedPoId] = createSignal<number | null>(null);
   const effectivePoId = () => props.purchaseOrderId ?? savedPoId();
@@ -644,7 +647,7 @@ export function PurchaseOrderModal(props: Props) {
               <Show
                 when={isDraft()}
                 fallback={
-                  <ModalField settings={byKey} fieldKey="partner_id" fallbackLabel="Supplier" fallbackRequired>
+                  <ModalField settings={byKey} fieldKey="partner_id" fallbackLabel="Vendor / Supplier" fallbackRequired>
                     {(m) => <input class={inputClass} value={partnerLabel()} readOnly disabled={m.disabled} />}
                   </ModalField>
                 }
@@ -652,7 +655,7 @@ export function PurchaseOrderModal(props: Props) {
                 <ModalLookupField
                   settings={byKey}
                   fieldKey="partner_id"
-                  fallbackLabel="Supplier"
+                  fallbackLabel="Vendor / Supplier"
                   fallbackRequired
                   value={partnerLabel}
                   selectedId={partnerId}
@@ -668,6 +671,11 @@ export function PurchaseOrderModal(props: Props) {
                     setPartnerCode("");
                   }}
                   fetchOptions={fetchPartners}
+                  createLabel="Add vendor"
+                  onCreate={(q) => {
+                    setNewVendorName(q);
+                    setShowNewVendor(true);
+                  }}
                 />
               </Show>
               <Show
@@ -862,6 +870,17 @@ export function PurchaseOrderModal(props: Props) {
       open={sqPickerOpen()}
       onClose={() => setSqPickerOpen(false)}
       onConfirm={(picked) => void applySupplierQuotationLines(picked)}
+    />
+    <QuickCustomerModal
+      open={showNewVendor()}
+      partnerKind="vendor"
+      initialName={newVendorName()}
+      onClose={() => setShowNewVendor(false)}
+      onCreated={(p) => {
+        setPartnerId(p.id);
+        setPartnerLabel(p.company_name);
+        setPartnerCode("");
+      }}
     />
     </>
   );

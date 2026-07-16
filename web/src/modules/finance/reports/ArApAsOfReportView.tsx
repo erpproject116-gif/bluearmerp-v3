@@ -37,6 +37,7 @@ export function ArApAsOfReportView(props: Props) {
   }));
 
   onMount(() => {
+    search();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
         e.preventDefault();
@@ -68,7 +69,11 @@ export function ArApAsOfReportView(props: Props) {
     <div class="space-y-6">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
-        <p class="text-sm text-text-secondary">{props.subtitle}</p>
+        <p class="mt-1 text-sm text-text-secondary">
+          {props.mode === "receivable"
+            ? "Open customer balances as of the date below. Balances come from Sales minus Official Receipt applications (CoA invoice mapping is optional for this report)."
+            : "Open vendor balances as of the date below. Balances come from Purchases minus Payment Voucher applications."}
+        </p>
         <div class="mt-4 grid gap-4 md:grid-cols-2">
           <Field label="As-of date">
             <input

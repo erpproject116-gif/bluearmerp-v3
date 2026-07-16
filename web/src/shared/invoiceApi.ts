@@ -97,12 +97,18 @@ export async function tryAutoSavePurchaseInvoice(supplierInvoiceId: number): Pro
  */
 export async function tryAutoSaveSalesInvoice(salesId: number): Promise<boolean> {
   const existing = await getSalesInvoice(salesId);
-  if (existing.success && existing.data?.sales_account_id && existing.data?.deposit_account_id) {
+  // Already mapped with a journal — nothing to do.
+  if (
+    existing.success &&
+    existing.data?.sales_account_id &&
+    existing.data?.deposit_account_id &&
+    existing.data?.journal_entry_id
+  ) {
     return true;
   }
   const defaults = await apiFetch<FinanceAccountDefaults>("/api/v1/finance/accounts/defaults", {}, { silent: true });
-  const salesAcct = defaults.data?.sales_account_id;
-  const arAcct = defaults.data?.receivable_account_id;
+  const salesAcct = defaults.data?.sales_account_id ?? existing.data?.sales_account_id ?? null;
+  const arAcct = defaults.data?.receivable_account_id ?? existing.data?.deposit_account_id ?? null;
   if (!salesAcct || !arAcct) return false;
   const res = await saveSalesInvoice(salesId, {
     sales_account_id: salesAcct,

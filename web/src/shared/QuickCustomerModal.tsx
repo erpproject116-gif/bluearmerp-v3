@@ -6,21 +6,27 @@ import { useToast } from "./toast";
 
 type CreatedPartner = { id: number; company_name: string };
 
+export type QuickPartnerKind = "customer" | "vendor";
+
 type Props = {
   open: boolean;
+  /** Defaults to customer (sales/quotation/POS). Use vendor for PO / purchases. */
+  partnerKind?: QuickPartnerKind;
   initialName?: string;
   onClose: () => void;
   onCreated: (partner: CreatedPartner) => void;
 };
 
 /**
- * Lightweight "create customer" dialog for use inside document modals (Sales,
- * Sales Order, Quotation, POS). Creates a minimal partner (kind = customer) via
- * the standard partner endpoint and hands the new record back to the caller so it
- * can be selected immediately. Full editing lives in the Partners page.
+ * Lightweight create-partner dialog for document modals.
+ * Full editing lives on the Partners page.
  */
 export function QuickCustomerModal(props: Props) {
   const toast = useToast();
+  const kind = () => props.partnerKind ?? "customer";
+  const noun = () => (kind() === "vendor" ? "vendor" : "customer");
+  const title = () => (kind() === "vendor" ? "New vendor" : "New customer");
+
   const [companyName, setCompanyName] = createSignal("");
   const [mobile, setMobile] = createSignal("");
   const [phone, setPhone] = createSignal("");
@@ -30,7 +36,6 @@ export function QuickCustomerModal(props: Props) {
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal("");
 
-  // Reset the form whenever the dialog opens, prefilling the name the user typed.
   createEffect(() => {
     if (props.open) {
       setCompanyName(props.initialName ?? "");
@@ -54,7 +59,7 @@ export function QuickCustomerModal(props: Props) {
     const res = await apiFetch<CreatedPartner>("/api/v1/inventory/partners", {
       method: "POST",
       body: JSON.stringify({
-        partner_kind: "customer",
+        partner_kind: kind(),
         status: "active",
         company_name: name,
         mobile: mobile().trim() || null,
@@ -66,7 +71,7 @@ export function QuickCustomerModal(props: Props) {
     });
     setSaving(false);
     if (!res.success || !res.data) {
-      const msg = res.errors?.company_name ?? res.message ?? "Failed to create customer.";
+      const msg = res.errors?.company_name ?? res.message ?? `Failed to create ${noun()}.`;
       setError(msg);
       toast.warning(msg);
       return;
@@ -76,14 +81,14 @@ export function QuickCustomerModal(props: Props) {
   };
 
   return (
-    <Modal open={props.open} title="New customer" onClose={props.onClose} stacked>
+    <Modal open={props.open} title={title()} onClose={props.onClose} stacked>
       <div class="space-y-4">
         <Field label="Company name *">
           <input
             class={inputClass}
             value={companyName()}
             onInput={(e) => setCompanyName(e.currentTarget.value)}
-            placeholder="Customer name"
+            placeholder={kind() === "vendor" ? "Vendor / supplier name" : "Customer name"}
             autofocus
           />
         </Field>
@@ -122,7 +127,7 @@ export function QuickCustomerModal(props: Props) {
           disabled={saving() || companyName().trim() === ""}
           onClick={() => void save()}
         >
-          {saving() ? "Creating…" : "Create customer"}
+          {saving() ? "Creating…" : `Create ${noun()}`}
         </button>
       </div>
     </Modal>

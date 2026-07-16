@@ -134,7 +134,7 @@ var standardRegistry = map[string][]StandardField{
 	},
 	"po_purchase_order": {
 		{FieldKey: "order_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
-		{FieldKey: "partner_id", Label: "Supplier", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "partner_id", Label: "Vendor / Supplier", FieldType: "select", DefaultRequired: true, SortOrder: 20},
 		{FieldKey: "location_id", Label: "Location", FieldType: "select", DefaultRequired: true, SortOrder: 30},
 		{FieldKey: "tax_type_id", Label: "Transaction type", FieldType: "select", DefaultRequired: true, SortOrder: 40},
 		{FieldKey: "currency_id", Label: "Currency", FieldType: "select", DefaultRequired: true, SortOrder: 50},
@@ -155,7 +155,13 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "tax_type_id", Label: "Transaction type", FieldType: "select", DefaultRequired: true, SortOrder: 25},
 		{FieldKey: "currency_id", Label: "Currency", FieldType: "select", DefaultRequired: true, SortOrder: 30},
 		{FieldKey: "location_id", Label: "Location", FieldType: "select", DefaultRequired: true, SortOrder: 35},
+		{FieldKey: "pic_name", Label: "PIC", FieldType: "text", SortOrder: 36},
+		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", SortOrder: 37},
+		{FieldKey: "due_date", Label: "Due date", FieldType: "date", SortOrder: 38},
+		{FieldKey: "payment_terms", Label: "Payment terms", FieldType: "text", SortOrder: 39},
 		{FieldKey: "vendor_invoice_no", Label: "Vendor invoice no.", FieldType: "text", SortOrder: 40},
+		{FieldKey: "reference", Label: "Reference", FieldType: "text", SortOrder: 45},
+		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 48},
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 50},
 	},
 	"ops_work_item": {

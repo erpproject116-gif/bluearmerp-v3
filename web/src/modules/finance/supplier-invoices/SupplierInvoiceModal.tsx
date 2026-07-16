@@ -32,6 +32,7 @@ import { OpenPOLinePickerModal } from "./OpenPOLinePickerModal";
 import { OpenSupplierQuotationLinePickerModal } from "./OpenSupplierQuotationLinePickerModal";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -132,6 +133,8 @@ export function SupplierInvoiceModal(props: Props) {
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [rfqPickerOpen, setRfqPickerOpen] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [showNewVendor, setShowNewVendor] = createSignal(false);
+  const [newVendorName, setNewVendorName] = createSignal("");
   const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
   const [invoiceDate, setInvoiceDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
@@ -595,6 +598,11 @@ export function SupplierInvoiceModal(props: Props) {
                 setVendorLabel("");
               }}
               fetchOptions={fetchVendors}
+              createLabel="Add vendor"
+              onCreate={(q) => {
+                setNewVendorName(q);
+                setShowNewVendor(true);
+              }}
             />
             <ModalLookupField
               settings={byKey}
@@ -825,6 +833,17 @@ export function SupplierInvoiceModal(props: Props) {
           />
         )}
       </Show>
+
+      <QuickCustomerModal
+        open={showNewVendor()}
+        partnerKind="vendor"
+        initialName={newVendorName()}
+        onClose={() => setShowNewVendor(false)}
+        onCreated={(p) => {
+          setPartnerId(p.id);
+          setVendorLabel(p.company_name);
+        }}
+      />
     </>
   );
 }

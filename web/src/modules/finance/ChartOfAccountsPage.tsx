@@ -487,12 +487,15 @@ export default function ChartOfAccountsPage() {
     invalidate();
   };
 
-  const importTemplate = async () => {
-    if (!window.confirm("Import the Philippine SME starter chart (~35 accounts, codes 1000–5999)?")) return;
+  const importTemplate = async (replace = false) => {
+    const msg = replace
+      ? "Soft-delete all current accounts and replace with the Philippine SME chart (~35 accounts)? Journal history stays linked to soft-deleted codes."
+      : "Import the Philippine SME starter chart (~35 accounts, codes 1000–5999)?";
+    if (!window.confirm(msg)) return;
     setImporting(true);
     const res = await apiFetch<{ imported: number }>("/api/v1/finance/accounts/import-template", {
       method: "POST",
-      body: JSON.stringify({ template: "ph_sme" }),
+      body: JSON.stringify({ template: "ph_sme", replace }),
     }, { silent: true });
     setImporting(false);
     if (!res.success) {
@@ -500,7 +503,7 @@ export default function ChartOfAccountsPage() {
       toast.warning(detail || res.message || "Failed to import template.");
       return;
     }
-    toast.success(`Imported ${res.data?.imported ?? 0} accounts.`);
+    toast.success(replace ? `Replaced with PH template (${res.data?.imported ?? 0} accounts).` : `Imported ${res.data?.imported ?? 0} accounts.`);
     invalidate();
   };
 
@@ -604,7 +607,7 @@ export default function ChartOfAccountsPage() {
               type="button"
               class="rounded-lg border border-stroke bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
               disabled={importing()}
-              onClick={() => void importTemplate()}
+              onClick={() => void importTemplate(false)}
             >
               {importing() ? "Importing…" : "Import Philippine SME template"}
             </button>
@@ -713,9 +716,20 @@ export default function ChartOfAccountsPage() {
             type="button"
             class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
             disabled={importing()}
-            onClick={() => void importTemplate()}
+            onClick={() => void importTemplate(false)}
           >
             Import PH template
+          </button>
+        </Show>
+        <Show when={!isEmpty()}>
+          <button
+            type="button"
+            class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+            disabled={importing()}
+            onClick={() => void importTemplate(true)}
+            title="Soft-delete current accounts and load the Philippine SME market template"
+          >
+            {importing() ? "Replacing…" : "Replace with PH template"}
           </button>
         </Show>
       </div>
