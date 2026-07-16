@@ -123,11 +123,19 @@ export default function ChartOfAccountsPage() {
   const parentOptions = createQuery(() => ({
     queryKey: ["finance-accounts-parent-options"],
     queryFn: async () => {
-      const res = await apiFetch<AccountRow[]>(
-        "/api/v1/finance/accounts?page=1&pageSize=2000&status=active&sort=account_code&order=asc",
+      // Fetch per account_type so expense (5xxx) is never truncated by a global pageSize
+      // cap when the chart has many asset/liability rows ahead of it.
+      const types: AccountRow["account_type"][] = ["asset", "liability", "equity", "income", "expense"];
+      const chunks = await Promise.all(
+        types.map(async (accountType) => {
+          const res = await apiFetch<AccountRow[]>(
+            `/api/v1/finance/accounts?page=1&pageSize=2000&status=active&account_type=${accountType}&sort=account_code&order=asc`,
+          );
+          if (!res.success) throw new Error(res.message ?? "Failed to load account options");
+          return res.data ?? [];
+        }),
       );
-      if (!res.success) throw new Error(res.message ?? "Failed to load account options");
-      return res.data ?? [];
+      return chunks.flat();
     },
   }));
 
@@ -142,7 +150,7 @@ export default function ChartOfAccountsPage() {
 
   createEffect(() => {
     const d = defaultsQuery.data;
-    if (!d) return;
+    if (!d || mappingsDirty()) return;
     setDefaultsForm({
       cash_account_id: d.cash_account_id ?? null,
       receivable_account_id: d.receivable_account_id ?? null,
@@ -162,6 +170,16 @@ export default function ChartOfAccountsPage() {
 
   const purchaseCogsOptions = createMemo(() => accountsForSlot(["expense"]));
   const purchaseCogsEmpty = createMemo(() => purchaseCogsOptions().length === 0);
+  const purchaseMappingMissing = createMemo(() => {
+    const id = defaultsForm().purchase_account_id;
+    return !id || id <= 0;
+  });
+  const purchaseNeedsEnsure = createMemo(() => {
+    if (purchaseCogsEmpty()) return true;
+    const id = defaultsForm().purchase_account_id;
+    if (!id) return true;
+    return !purchaseCogsOptions().some((a) => a.id === id);
+  });
   const [ensuringPurchaseCogs, setEnsuringPurchaseCogs] = createSignal(false);
 
   const defaultsMappedCount = createMemo(() => {
@@ -186,54 +204,46 @@ export default function ChartOfAccountsPage() {
       toast.warning(detail || res.message || "Could not create Purchases / COGS account.");
       return;
     }
-    // Merge the ensured expense account into the options cache immediately so the
-    // Purchases / COGS dropdown is not stuck empty while list refetch is in flight
-    // (list API previously capped pageSize at 100 and omitted 5xxx expense codes).
-    if (res.data?.account) {
-      const acct = res.data.account;
-      client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], (prev) => {
-        const rows = prev ?? [];
-        if (rows.some((a) => a.id === acct.id)) return rows;
-        return [...rows, acct].sort((a, b) => a.account_code.localeCompare(b.account_code));
-      });
-    }
+
+    const acct = res.data?.account;
+    const mergeAccount = (rows: AccountRow[] | undefined) => {
+      const list = rows ?? [];
+      if (!acct?.id) return list;
+      if (list.some((a) => a.id === acct.id)) {
+        return list.map((a) => (a.id === acct.id ? { ...a, ...acct } : a));
+      }
+      return [...list, acct].sort((a, b) => a.account_code.localeCompare(b.account_code));
+    };
+
+    // Apply mapping in the form first so the select shows the new expense account.
     if (res.data?.defaults) {
       setDefaultsForm({
         cash_account_id: res.data.defaults.cash_account_id ?? null,
         receivable_account_id: res.data.defaults.receivable_account_id ?? null,
         payable_account_id: res.data.defaults.payable_account_id ?? null,
         sales_account_id: res.data.defaults.sales_account_id ?? null,
-        purchase_account_id: res.data.defaults.purchase_account_id ?? null,
+        purchase_account_id: res.data.defaults.purchase_account_id ?? acct?.id ?? null,
         input_vat_account_id: res.data.defaults.input_vat_account_id ?? null,
         output_vat_account_id: res.data.defaults.output_vat_account_id ?? null,
       });
-      setMappingsDirty(true);
-    } else if (res.data?.account?.id) {
-      setDefaultsForm((v) => ({ ...v, purchase_account_id: res.data!.account.id }));
-      setMappingsDirty(true);
+    } else if (acct?.id) {
+      setDefaultsForm((v) => ({ ...v, purchase_account_id: acct.id }));
     }
-    await Promise.all([
-      client.invalidateQueries({ queryKey: ["finance-accounts"] }),
-      client.invalidateQueries({ queryKey: ["finance-accounts-parent-options"] }),
-      client.invalidateQueries({ queryKey: ["finance-account-defaults"] }),
-    ]);
+
+    client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], mergeAccount);
+    await client.invalidateQueries({ queryKey: ["finance-accounts"] });
+    // Refetch mapping options, then re-merge so a truncated refetch cannot drop 5010.
+    await client.refetchQueries({ queryKey: ["finance-accounts-parent-options"] });
+    client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], mergeAccount);
+    await client.invalidateQueries({ queryKey: ["finance-account-defaults"] });
+
+    setMappingsDirty(false);
     toast.success(
       res.data?.created
-        ? "Created expense account and mapped Purchases / COGS."
-        : res.data?.mapped
-          ? "Mapped Purchases / COGS to an expense account."
-          : "Purchases / COGS account is ready.",
+        ? `Created ${acct?.account_code ?? "5010"} and mapped Purchases / COGS.`
+        : `Mapped Purchases / COGS to ${acct?.account_code ?? "expense account"}.`,
     );
-    // Mapping is persisted by the ensure API when created/remapped.
-    if (res.data?.mapped || res.data?.created) {
-      setMappingsDirty(false);
-    }
   };
-
-  const purchaseMappingMissing = createMemo(() => {
-    const id = defaultsForm().purchase_account_id;
-    return !id || id <= 0;
-  });
 
   onMount(() => {
     const focus = String(searchParams.focus ?? "");
@@ -469,13 +479,12 @@ export default function ChartOfAccountsPage() {
         </div>
       </Show>
 
-      <Show when={!isEmpty() && purchaseMappingMissing()}>
+      <Show when={!isEmpty() && purchaseNeedsEnsure()}>
         <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <p class="font-medium">Purchases / COGS is not mapped yet</p>
+          <p class="font-medium">Purchases / COGS needs an expense account</p>
           <p class="mt-1 text-amber-900/80">
-            Accountants set this under <span class="font-medium">Default account mappings</span> below — pick an expense
-            account (usually <span class="font-medium">5010 Cost of Goods Sold</span>). Supplier invoices use this as
-            “Purchases / COGS (Acct I)”.
+            Click <span class="font-medium">Create Purchases / COGS (5010)</span> to add and map an expense account.
+            You can change the dropdown to any other expense account afterward.
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
             <button
@@ -487,7 +496,7 @@ export default function ChartOfAccountsPage() {
                 void ensurePurchaseCogs();
               }}
             >
-              {ensuringPurchaseCogs() ? "Creating…" : "Create & map Purchases / COGS (5010)"}
+              {ensuringPurchaseCogs() ? "Creating…" : "Create Purchases / COGS (5010)"}
             </button>
             <button
               type="button"
@@ -602,7 +611,7 @@ export default function ChartOfAccountsPage() {
                       classList={{
                         "bg-amber-50":
                           slot.key === "purchase_account_id" &&
-                          (purchaseCogsEmpty() || purchaseMappingMissing() || String(searchParams.focus ?? "") === "purchase"),
+                          (purchaseNeedsEnsure() || String(searchParams.focus ?? "") === "purchase"),
                       }}
                     >
                       <label class="block">
@@ -616,18 +625,23 @@ export default function ChartOfAccountsPage() {
                           <option value="">— Not set —</option>
                           <For each={accountsForSlot(slot.types)}>
                             {(acc) => (
-                              <option value={acc.id}>
+                              <option value={String(acc.id)}>
                                 {acc.account_code} - {acc.account_name}
                               </option>
                             )}
                           </For>
                         </select>
                       </label>
-                      <Show when={slot.key === "purchase_account_id" && purchaseCogsEmpty()}>
+                      <Show when={slot.key === "purchase_account_id" && purchaseNeedsEnsure()}>
                         <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                          <p class="font-medium">No active expense accounts available</p>
+                          <p class="font-medium">
+                            {purchaseCogsEmpty()
+                              ? "No active expense accounts available"
+                              : "Purchases / COGS is not mapped to an expense account"}
+                          </p>
                           <p class="mt-0.5 text-amber-900/80">
-                            Purchases / COGS must map to an expense account. Your chart has none yet — create one or import the PH template.
+                            Click Create to add <span class="font-medium">5010</span> (or the next free 50xx) and map it.
+                            You can switch to another expense account in the dropdown afterward.
                           </p>
                           <div class="mt-2 flex flex-wrap gap-2">
                             <button
@@ -637,14 +651,6 @@ export default function ChartOfAccountsPage() {
                               onClick={() => void ensurePurchaseCogs()}
                             >
                               {ensuringPurchaseCogs() ? "Creating…" : "Create Purchases / COGS (5010)"}
-                            </button>
-                            <button
-                              type="button"
-                              class="rounded-md border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                              disabled={importing()}
-                              onClick={() => void importTemplate()}
-                            >
-                              Import PH template
                             </button>
                           </div>
                         </div>

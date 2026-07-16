@@ -411,7 +411,7 @@ func importAccountTemplate(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // ensurePurchaseCogsAccount creates (or reuses) an active expense posting account for Purchases/COGS
-// and maps it on tenant finance defaults when purchase_account_id is unset.
+// and always maps it as the tenant purchase_account_id default.
 func ensurePurchaseCogsAccount(pool *pgxpool.Pool) http.HandlerFunc {
 	const code = "5010"
 	const name = "Purchases / Cost of Goods Sold"
@@ -419,59 +419,70 @@ func ensurePurchaseCogsAccount(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 
-		var existingID int64
-		err := pool.QueryRow(r.Context(), `
-			select id from public.fin_accounts
-			where tenant_id = $1 and deleted_at is null and is_active
-			  and account_type = 'expense' and coalesce(is_group, false) = false
-			  and account_code = $2
-			order by id asc limit 1`, tu.TenantID, code).Scan(&existingID)
-		if err != nil {
-			_ = pool.QueryRow(r.Context(), `
+		resolveExpense := func() (int64, bool, error) {
+			var id int64
+			// Prefer active expense 5010.
+			err := pool.QueryRow(r.Context(), `
 				select id from public.fin_accounts
 				where tenant_id = $1 and deleted_at is null and is_active
 				  and account_type = 'expense' and coalesce(is_group, false) = false
-				order by account_code asc, id asc limit 1`, tu.TenantID).Scan(&existingID)
-		}
+				  and account_code = $2
+				order by id asc limit 1`, tu.TenantID, code).Scan(&id)
+			if err == nil && id > 0 {
+				return id, false, nil
+			}
 
-		created := false
-		accountID := existingID
-		if accountID <= 0 {
+			// Reactivate soft-deleted / inactive 5010 and coerce to expense posting.
+			err = pool.QueryRow(r.Context(), `
+				update public.fin_accounts
+				set deleted_at = null, is_active = true, is_group = false,
+				    account_type = 'expense', account_name = $3, updated_at = now()
+				where tenant_id = $1 and account_code = $2
+				returning id`, tu.TenantID, code, name).Scan(&id)
+			if err == nil && id > 0 {
+				return id, true, nil
+			}
+
+			// Insert 5010 (or next free 50xx on unique conflict).
 			err = pool.QueryRow(r.Context(), `
 				insert into public.fin_accounts (
 				  tenant_id, account_code, account_name, account_type,
 				  parent_id, is_group, is_active, is_system, sort_order
 				) values ($1, $2, $3, 'expense', null, false, true, false, 5010)
-				returning id`, tu.TenantID, code, name).Scan(&accountID)
-			if err != nil {
-				if strings.Contains(strings.ToLower(err.Error()), "unique") {
-					// Code taken by inactive/deleted/group row — use a free 50xx code.
-					for i := 5011; i <= 5099; i++ {
-						alt := fmt.Sprintf("%d", i)
-						err = pool.QueryRow(r.Context(), `
-							insert into public.fin_accounts (
-							  tenant_id, account_code, account_name, account_type,
-							  parent_id, is_group, is_active, is_system, sort_order
-							) values ($1, $2, $3, 'expense', null, false, true, false, $4)
-							returning id`, tu.TenantID, alt, name, i).Scan(&accountID)
-						if err == nil {
-							break
-						}
-						if !strings.Contains(strings.ToLower(err.Error()), "unique") {
-							response.Err(w, http.StatusInternalServerError, "Failed to create Purchases / COGS account.", "ERR_INTERNAL")
-							return
-						}
-					}
-					if accountID <= 0 {
-						response.Err(w, http.StatusConflict, "Could not allocate an expense account code for Purchases / COGS.", "ERR_CONFLICT")
-						return
-					}
-				} else {
-					response.Err(w, http.StatusInternalServerError, "Failed to create Purchases / COGS account.", "ERR_INTERNAL")
-					return
+				returning id`, tu.TenantID, code, name).Scan(&id)
+			if err == nil {
+				return id, true, nil
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), "unique") {
+				return 0, false, err
+			}
+			for i := 5011; i <= 5099; i++ {
+				alt := fmt.Sprintf("%d", i)
+				err = pool.QueryRow(r.Context(), `
+					insert into public.fin_accounts (
+					  tenant_id, account_code, account_name, account_type,
+					  parent_id, is_group, is_active, is_system, sort_order
+					) values ($1, $2, $3, 'expense', null, false, true, false, $4)
+					returning id`, tu.TenantID, alt, name, i).Scan(&id)
+				if err == nil {
+					return id, true, nil
+				}
+				if !strings.Contains(strings.ToLower(err.Error()), "unique") {
+					return 0, false, err
 				}
 			}
-			created = true
+			return 0, false, fmt.Errorf("could not allocate expense account code")
+		}
+
+		accountID, created, err := resolveExpense()
+		if err != nil || accountID <= 0 {
+			msg := "Failed to create Purchases / COGS account."
+			if err != nil && strings.Contains(strings.ToLower(err.Error()), "allocate") {
+				response.Err(w, http.StatusConflict, "Could not allocate an expense account code for Purchases / COGS.", "ERR_CONFLICT")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, msg, "ERR_INTERNAL")
+			return
 		}
 
 		d, err := financedefaults.Load(r.Context(), pool, tu.TenantID)
@@ -479,29 +490,13 @@ func ensurePurchaseCogsAccount(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load defaults.", "ERR_INTERNAL")
 			return
 		}
-		mapped := false
-		needMap := d.PurchaseAccountID == nil || *d.PurchaseAccountID <= 0
-		if !needMap && d.PurchaseAccountID != nil {
-			// Remap when the stored id is missing, inactive, or not an expense posting account
-			// (common on legacy charts where purchase_account_id pointed at inventory/asset).
-			var acctType string
-			var isGroup bool
-			verr := pool.QueryRow(r.Context(), `
-				select account_type, coalesce(is_group, false)
-				from public.fin_accounts
-				where id = $1 and tenant_id = $2 and deleted_at is null and is_active`,
-				*d.PurchaseAccountID, tu.TenantID).Scan(&acctType, &isGroup)
-			if verr != nil || acctType != "expense" || isGroup {
-				needMap = true
-			}
-		}
-		if needMap {
-			d.PurchaseAccountID = &accountID
-			if err := financedefaults.Save(r.Context(), pool, tu.TenantID, d); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Account ready but failed to save mapping.", "ERR_INTERNAL")
-				return
-			}
-			mapped = true
+		// Always map Purchases / COGS to the ensured expense account when the user clicks Create.
+		prev := d.PurchaseAccountID
+		mapped := prev == nil || *prev != accountID
+		d.PurchaseAccountID = &accountID
+		if err := financedefaults.Save(r.Context(), pool, tu.TenantID, d); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Account ready but failed to save mapping.", "ERR_INTERNAL")
+			return
 		}
 
 		acct, err := fetchAccount(r, pool, tu.TenantID, accountID)

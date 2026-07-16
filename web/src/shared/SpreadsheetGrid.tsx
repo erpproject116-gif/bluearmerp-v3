@@ -44,6 +44,8 @@ type Props<T extends { id: number }> = {
   search?: string;
   onSearchChange?: (q: string) => void;
   searchPlaceholder?: string;
+  /** Delay before applying search to the list query. Default 2000ms. Enter commits immediately. */
+  searchDebounceMs?: number;
   status?: string;
   onStatusChange?: (status: string) => void;
   statusLabel?: string;
@@ -60,6 +62,40 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const [importing, setImporting] = createSignal(false);
   const toast = useToast();
   let fileInputEl: HTMLInputElement | undefined;
+
+  // Local draft so typing stays responsive; only the committed query (props.search / onSearchChange)
+  // refetches the table after debounce — not a full page reload.
+  const [searchDraft, setSearchDraft] = createSignal(props.search ?? "");
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastEmittedSearch = props.search ?? "";
+
+  createEffect(() => {
+    const external = props.search ?? "";
+    if (external !== lastEmittedSearch) {
+      lastEmittedSearch = external;
+      setSearchDraft(external);
+    }
+  });
+
+  onCleanup(() => {
+    if (searchTimer) clearTimeout(searchTimer);
+  });
+
+  const commitSearch = (value: string) => {
+    if (searchTimer) {
+      clearTimeout(searchTimer);
+      searchTimer = undefined;
+    }
+    lastEmittedSearch = value;
+    props.onSearchChange?.(value);
+  };
+
+  const onSearchInput = (value: string) => {
+    setSearchDraft(value);
+    if (searchTimer) clearTimeout(searchTimer);
+    const ms = props.searchDebounceMs ?? 2000;
+    searchTimer = setTimeout(() => commitSearch(value), ms);
+  };
 
   const columnDefs = () =>
     props.columns.map((c) => ({
@@ -196,8 +232,14 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                   type="search"
                   class={`${toolbarControlClass} w-full pl-9`}
                   placeholder={props.searchPlaceholder ?? brandingPlaceholder("search.item", "Search…")}
-                  value={props.search ?? ""}
-                  onInput={(e) => props.onSearchChange?.(e.currentTarget.value)}
+                  value={searchDraft()}
+                  onInput={(e) => onSearchInput(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitSearch(searchDraft());
+                    }
+                  }}
                 />
               </div>
             </label>
