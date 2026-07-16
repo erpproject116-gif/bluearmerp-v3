@@ -146,8 +146,8 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
     lastSerialized = JSON.stringify(options.getPayload());
   };
 
-  const saveDraft = async (payload: T) => {
-    if (!isEnabled()) return;
+  const saveDraft = async (payload: T, force = false) => {
+    if (!force && !isEnabled()) return;
     const entityType = currentEntityType;
     const draftKey = currentDraftKey;
     const localAt = writeLocalMirror(entityType, draftKey, payload);
@@ -170,14 +170,17 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
     setDirty(false);
   };
 
-  const flushNow = () => {
-    if (!isEnabled() || autosavePaused() || loading()) return;
+  const flushNow = (force = false) => {
+    if (autosavePaused() || loading()) return;
+    if (!force && !isEnabled()) return;
     const payload = options.getPayload();
     const serialized = JSON.stringify(payload);
-    if (serialized === lastSerialized) return;
+    if (serialized === lastSerialized && !force) return;
+    // When forcing (tab hide / unmount / disable), still skip empty no-op if unchanged.
+    if (serialized === lastSerialized && force && !dirty()) return;
     clearTimeout(debounceTimer);
     lastSerialized = serialized;
-    void saveDraft(payload);
+    void saveDraft(payload, force);
   };
 
   const loadForKey = async (entityType: string, draftKey: string) => {
@@ -236,7 +239,7 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
         const serialized = JSON.stringify(payload);
         if (serialized !== lastSerialized) {
           lastSerialized = serialized;
-          void saveDraft(payload);
+          void saveDraft(payload, true);
         }
       }
       autoApplied = false;
@@ -268,16 +271,35 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
     }, debounceMs());
   });
 
+  // Flush when the form becomes inactive (modal close / tab leave) so the last keystrokes
+  // are not dropped because enabled flipped false before unmount cleanup.
+  // When it becomes active again with the same draft key, reload from storage — loadForKey
+  // otherwise only runs on key change, so a flushed draft would never resurface on reopen.
+  let wasEnabled = false;
   createEffect(() => {
-    if (!isEnabled()) return;
+    const on = isEnabled();
+    if (wasEnabled && !on) {
+      flushNow(true);
+    } else if (!wasEnabled && on) {
+      autoApplied = false;
+      setLoading(true);
+      setAutosavePaused(true);
+      void loadForKey(currentEntityType, currentDraftKey);
+    }
+    wasEnabled = on;
+  });
+
+  // Visibility / unload listeners stay mounted for the component lifetime so browser tab
+  // switches still flush even if enabled toggles.
+  createEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!dirty() && !savedAt()) return;
-      flushNow();
+      flushNow(true);
       e.preventDefault();
       e.returnValue = "";
     };
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") flushNow();
+      if (document.visibilityState === "hidden") flushNow(true);
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     document.addEventListener("visibilitychange", onVisibility);
@@ -289,7 +311,7 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
 
   onCleanup(() => {
     clearTimeout(debounceTimer);
-    flushNow();
+    flushNow(true);
   });
 
   const applyDraft = () => {

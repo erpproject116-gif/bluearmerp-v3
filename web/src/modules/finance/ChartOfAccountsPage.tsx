@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, onMount, Show } from "soli
 import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, ModalMessage, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
@@ -90,6 +91,8 @@ export default function ChartOfAccountsPage() {
   const [mappingsDirty, setMappingsDirty] = createSignal(false);
   const [savingDefaults, setSavingDefaults] = createSignal(false);
   const [editingId, setEditingId] = createSignal<number | null>(null);
+  const [pendingMapSlot, setPendingMapSlot] = createSignal<keyof FinanceDefaults | null>(null);
+  const [mapLabels, setMapLabels] = createSignal<Partial<Record<keyof FinanceDefaults, string>>>({});
   const [form, setForm] = createSignal({
     account_code: "",
     account_name: "",
@@ -99,6 +102,9 @@ export default function ChartOfAccountsPage() {
     is_active: true,
     sort_order: "0",
   });
+
+  const accountLabel = (acc: { account_code: string; account_name: string }) =>
+    `${acc.account_code} - ${acc.account_name}`;
 
   const list = createQuery(() => {
     const qs = new URLSearchParams({
@@ -168,6 +174,45 @@ export default function ChartOfAccountsPage() {
   const accountsForSlot = (types: Array<AccountRow["account_type"]>) =>
     activeAccounts().filter((a) => !a.is_group && types.includes(a.account_type));
 
+  createEffect(() => {
+    const d = defaultsForm();
+    const accounts = activeAccounts();
+    setMapLabels((prev) => {
+      const next = { ...prev };
+      for (const slot of DEFAULT_SLOTS) {
+        const id = d[slot.key];
+        if (id == null || id <= 0) {
+          next[slot.key] = "";
+          continue;
+        }
+        const acc = accounts.find((a) => a.id === id);
+        if (acc) next[slot.key] = accountLabel(acc);
+      }
+      return next;
+    });
+  });
+
+  const fetchAccountsForSlot = async (
+    types: Array<AccountRow["account_type"]>,
+    q: string,
+  ): Promise<LookupOption[]> => {
+    const needle = q.trim().toLowerCase();
+    return accountsForSlot(types)
+      .filter((a) => {
+        if (!needle) return true;
+        return (
+          a.account_code.toLowerCase().includes(needle) ||
+          a.account_name.toLowerCase().includes(needle)
+        );
+      })
+      .slice(0, 40)
+      .map((a) => ({
+        id: a.id,
+        label: accountLabel(a),
+        sublabel: a.account_type,
+      }));
+  };
+
   const purchaseCogsOptions = createMemo(() => accountsForSlot(["expense"]));
   const purchaseCogsEmpty = createMemo(() => purchaseCogsOptions().length === 0);
   const purchaseNeedsEnsure = createMemo(() => {
@@ -211,7 +256,7 @@ export default function ChartOfAccountsPage() {
       return [...list, acct].sort((a, b) => a.account_code.localeCompare(b.account_code));
     };
 
-    // Apply mapping in the form first so the select shows the new expense account.
+    // Apply mapping in the form first so the combo shows the new expense account.
     if (res.data?.defaults) {
       setDefaultsForm({
         cash_account_id: res.data.defaults.cash_account_id ?? null,
@@ -224,6 +269,9 @@ export default function ChartOfAccountsPage() {
       });
     } else if (acct?.id) {
       setDefaultsForm((v) => ({ ...v, purchase_account_id: acct.id }));
+    }
+    if (acct) {
+      setMapLabels((m) => ({ ...m, purchase_account_id: accountLabel(acct) }));
     }
 
     client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], mergeAccount);
@@ -264,12 +312,18 @@ export default function ChartOfAccountsPage() {
     void client.invalidateQueries({ queryKey: ["finance-account-defaults"] });
   };
 
-  const openCreate = () => {
+  const openCreate = (seed?: {
+    account_type?: AccountRow["account_type"];
+    account_code?: string;
+    account_name?: string;
+    mapSlot?: keyof FinanceDefaults;
+  }) => {
     setEditingId(null);
+    setPendingMapSlot(seed?.mapSlot ?? null);
     setForm({
-      account_code: "",
-      account_name: "",
-      account_type: "asset",
+      account_code: seed?.account_code ?? "",
+      account_name: seed?.account_name ?? "",
+      account_type: seed?.account_type ?? "asset",
       parent_id: "",
       is_group: false,
       is_active: true,
@@ -278,7 +332,19 @@ export default function ChartOfAccountsPage() {
     setModalOpen(true);
   };
 
+  const openCreateFromMapping = (slot: DefaultSlot, query: string) => {
+    const trimmed = query.trim();
+    const codeMatch = trimmed.match(/^(\d{3,6})\s*[-–:]?\s*(.*)$/);
+    openCreate({
+      mapSlot: slot.key,
+      account_type: slot.types[0] ?? "expense",
+      account_code: codeMatch?.[1] ?? "",
+      account_name: (codeMatch?.[2] ?? trimmed).trim(),
+    });
+  };
+
   const openEdit = (row: AccountRow) => {
+    setPendingMapSlot(null);
     setEditingId(row.id);
     setForm({
       account_code: row.account_code,
@@ -304,16 +370,21 @@ export default function ChartOfAccountsPage() {
 
   const accountDraft = useDocumentDraft<AccountFormDraft>({
     entityType: DRAFT_ENTITY.finAccount,
-    draftKey: () => (editingId() ? `edit-${editingId()}` : "new"),
+    draftKey: () => {
+      if (editingId()) return `edit-${editingId()}`;
+      // Isolate mapping "Add account" seeds from the plain New-account draft.
+      if (pendingMapSlot()) return `new-map-${pendingMapSlot()}`;
+      return "new";
+    },
     getPayload: () => form(),
     onApply: (payload) => setForm({ ...payload }),
     enabled: () => modalOpen(),
-    // Banner-only: openCreate/openEdit reset the form synchronously; silent autoApply
-    // would race with that wipe. Restore banner is the safe path (same as PO/OR).
+    autoApply: () => modalOpen() && !pendingMapSlot(),
   });
 
   const save = async () => {
     const editId = editingId();
+    const mapSlot = pendingMapSlot();
     const body = {
       account_code: form().account_code.trim(),
       account_name: form().account_name.trim(),
@@ -332,6 +403,13 @@ export default function ChartOfAccountsPage() {
     if (!res.success) {
       toast.warning(res.message ?? "Failed to save account.");
       return;
+    }
+    const created = res.data;
+    if (!editId && created?.id && mapSlot) {
+      setMappingsDirty(true);
+      setDefaultsForm((d) => ({ ...d, [mapSlot]: created.id }));
+      setMapLabels((m) => ({ ...m, [mapSlot]: accountLabel(created) }));
+      setPendingMapSlot(null);
     }
     await accountDraft.clearOnSave();
     setModalOpen(false);
@@ -410,16 +488,18 @@ export default function ChartOfAccountsPage() {
     invalidate();
   };
 
-  // enabled only once the user actually edits a mapping (mappingsDirty), so the freshly
-  // server-loaded defaultsForm is never mistaken for an unsaved draft on plain page load.
-  // The initial recovery load still runs unconditionally, so a prior dirty session's draft
-  // (and its Restore banner) survives a refresh even before the user touches anything.
+  // Autosave only while dirty; recovery still loads on mount. autoApply restores mappings
+  // after a tab switch / remount so the server refetch cannot wipe unsaved picks.
   const defaultsDraft = useDocumentDraft({
     entityType: DRAFT_ENTITY.financeDefaults,
     draftKey: "defaults",
     getPayload: defaultsForm,
-    onApply: setDefaultsForm,
+    onApply: (payload) => {
+      setDefaultsForm(payload);
+      setMappingsDirty(true);
+    },
     enabled: () => mappingsDirty(),
+    autoApply: () => true,
     localOnly: true,
   });
 
@@ -440,10 +520,10 @@ export default function ChartOfAccountsPage() {
     void client.invalidateQueries({ queryKey: ["finance-account-defaults"] });
   };
 
-  const setDefaultSlot = (key: keyof FinanceDefaults, value: string) => {
-    const id = value ? Number(value) : null;
+  const setDefaultSlot = (key: keyof FinanceDefaults, id: number | null, label = "") => {
     setMappingsDirty(true);
     setDefaultsForm((d) => ({ ...d, [key]: id }));
+    setMapLabels((m) => ({ ...m, [key]: label }));
   };
 
   return (
@@ -459,7 +539,7 @@ export default function ChartOfAccountsPage() {
             <button
               type="button"
               class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
-              onClick={openCreate}
+              onClick={() => openCreate()}
             >
               Add first account
             </button>
@@ -610,24 +690,26 @@ export default function ChartOfAccountsPage() {
                           (purchaseNeedsEnsure() || String(searchParams.focus ?? "") === "purchase"),
                       }}
                     >
-                      <label class="block">
-                        <span class="font-medium text-slate-700">{slot.label}</span>
-                        <span class="block text-xs text-slate-500">{slot.hint}</span>
-                        <select
-                          class={`${inputClass} mt-1`}
-                          value={defaultsForm()[slot.key] ? String(defaultsForm()[slot.key]) : ""}
-                          onChange={(e) => setDefaultSlot(slot.key, e.currentTarget.value)}
-                        >
-                          <option value="">— Not set —</option>
-                          <For each={accountsForSlot(slot.types)}>
-                            {(acc) => (
-                              <option value={String(acc.id)}>
-                                {acc.account_code} - {acc.account_name}
-                              </option>
-                            )}
-                          </For>
-                        </select>
-                      </label>
+                      <LookupCombo
+                        label={slot.label}
+                        value={() => mapLabels()[slot.key] ?? ""}
+                        selectedId={() => defaultsForm()[slot.key]}
+                        onInput={(text) => {
+                          setMapLabels((m) => ({ ...m, [slot.key]: text }));
+                          if (defaultsForm()[slot.key] != null) {
+                            setDefaultSlot(slot.key, null, text);
+                          } else {
+                            setMappingsDirty(true);
+                          }
+                        }}
+                        onSelect={(opt) => setDefaultSlot(slot.key, opt.id, opt.label)}
+                        onClear={() => setDefaultSlot(slot.key, null, "")}
+                        fetchOptions={(q) => fetchAccountsForSlot(slot.types, q)}
+                        placeholder={`Search ${slot.label.toLowerCase()}…`}
+                        createLabel="Add account"
+                        onCreate={(q) => openCreateFromMapping(slot, q)}
+                      />
+                      <p class="mt-1 px-0.5 text-xs text-slate-500">{slot.hint}</p>
                       <Show when={slot.key === "purchase_account_id" && purchaseNeedsEnsure()}>
                         <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
                           <p class="font-medium">
@@ -636,8 +718,8 @@ export default function ChartOfAccountsPage() {
                               : "Purchases / COGS is not mapped to an expense account"}
                           </p>
                           <p class="mt-0.5 text-amber-900/80">
-                            Click Create to add <span class="font-medium">5010</span> (or the next free 50xx) and map it.
-                            You can switch to another expense account in the dropdown afterward.
+                            Click Create to add <span class="font-medium">5010</span> (or the next free 50xx) and map it,
+                            or use <span class="font-medium">Add account</span> in the search box above.
                           </p>
                           <div class="mt-2 flex flex-wrap gap-2">
                             <button
@@ -683,8 +765,8 @@ export default function ChartOfAccountsPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        onNew={() => openCreate()}
         onEdit={openEdit}
-        onNew={openCreate}
         codeKey="account_code"
         nameKey="account_name"
         sortKey={sort()}
@@ -702,7 +784,10 @@ export default function ChartOfAccountsPage() {
       <EntityModal
         open={modalOpen()}
         title={editingId() ? "Edit account" : "New account"}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setPendingMapSlot(null);
+          setModalOpen(false);
+        }}
         onSave={() => void save()}
         saving={saving()}
       >

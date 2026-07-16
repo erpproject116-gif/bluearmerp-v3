@@ -77,7 +77,7 @@ export function LookupCombo(props: Props) {
             Clear
           </button>
         </Show>
-        <Show when={open() && (options().length > 0 || loading() || (!!props.onCreate && props.value().trim() !== ""))}>
+        <Show when={open() && (options().length > 0 || loading() || !!props.onCreate)}>
           <ul class="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-stroke bg-white py-1 shadow-lg">
             <Show when={loading()}>
               <LoadingText class="px-3 py-2 text-sm text-text-secondary" as="li" />
@@ -102,7 +102,7 @@ export function LookupCombo(props: Props) {
                 </li>
               )}
             </For>
-            <Show when={props.onCreate && props.value().trim() !== ""}>
+            <Show when={props.onCreate}>
               <li class="sticky bottom-0 border-t border-stroke bg-white">
                 <button
                   type="button"
@@ -114,7 +114,10 @@ export function LookupCombo(props: Props) {
                   }}
                 >
                   <span class="text-base leading-none">+</span>
-                  <span>{props.createLabel ?? "Add new"} "{props.value().trim()}"</span>
+                  <span>
+                    {props.createLabel ?? "Add new"}
+                    {props.value().trim() ? ` "${props.value().trim()}"` : ""}
+                  </span>
                 </button>
               </li>
             </Show>
