@@ -9,18 +9,19 @@ import (
 )
 
 type SaleCommissionLine struct {
-	ID                int64   `json:"id,omitempty"`
-	LineNo            int     `json:"line_no"`
-	TicUserID         *int64  `json:"tic_user_id,omitempty"`
-	TicName           string  `json:"tic_name"`
-	CalcMode          string  `json:"calc_mode"` // percent | fixed
-	RateValue         float64 `json:"rate_value"`
-	BaseAmount        float64 `json:"base_amount"`
-	CommissionAmount  float64 `json:"commission_amount"`
-	Notes             *string `json:"notes,omitempty"`
+	ID               int64   `json:"id,omitempty"`
+	LineNo           int     `json:"line_no"`
+	TicUserID        *int64  `json:"tic_user_id,omitempty"`
+	TicName          string  `json:"tic_name"`
+	CalcMode         string  `json:"calc_mode"` // percent | fixed
+	RateValue        float64 `json:"rate_value"`
+	BaseAmount       float64 `json:"base_amount"`
+	CommissionAmount float64 `json:"commission_amount"`
+	Notes            *string `json:"notes,omitempty"`
 }
 
-type saleCommissionLineBody struct {
+// CommissionLineInput is the public payload for writing commission lines (Sales + POS).
+type CommissionLineInput struct {
 	LineNo    int     `json:"line_no"`
 	TicUserID *int64  `json:"tic_user_id"`
 	TicName   string  `json:"tic_name"`
@@ -28,6 +29,8 @@ type saleCommissionLineBody struct {
 	RateValue float64 `json:"rate_value"`
 	Notes     *string `json:"notes"`
 }
+
+type saleCommissionLineBody = CommissionLineInput
 
 func normalizeCalcMode(mode string) string {
 	m := strings.ToLower(strings.TrimSpace(mode))
@@ -199,4 +202,25 @@ func accrueSaleLineCommissions(ctx context.Context, tx pgx.Tx, tenantID, salesID
 			tenantID, salesID, lineID)
 	}
 	return nil
+}
+
+// ApplyCompletedSaleCommissions writes optional TIC lines, accrues rule + line commissions, and posts GL.
+func ApplyCompletedSaleCommissions(ctx context.Context, tx pgx.Tx, tenantID, userID, salesID int64, grandTotal float64, inputs []CommissionLineInput) error {
+	if len(inputs) > 0 {
+		if v := validateCommissionBodies(inputs); v != nil {
+			for _, msg := range v {
+				return fmt.Errorf("%s", msg)
+			}
+		}
+		if err := replaceSaleCommissions(ctx, tx, tenantID, salesID, grandTotal, inputs); err != nil {
+			return err
+		}
+	}
+	if err := accrueCommissionForSale(ctx, tx, tenantID, salesID); err != nil {
+		return err
+	}
+	if err := accrueSaleLineCommissions(ctx, tx, tenantID, salesID); err != nil {
+		return err
+	}
+	return postCommissionJournalForSale(ctx, tx, tenantID, userID, salesID)
 }

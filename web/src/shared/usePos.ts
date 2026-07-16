@@ -65,6 +65,7 @@ export type PosCartLine = {
   line_total: number;
   notes?: string | null;
   size_label?: string | null;
+  guest_no?: number;
   serial_unit_ids?: number[];
   lot_batch_id?: number | null;
   lot_no?: string;
@@ -228,7 +229,7 @@ export async function savePosSettings(body: PosSettings) {
 export async function patchPosCartLine(
   sessionId: number,
   lineId: number,
-  body: { qty?: number; unit_price?: number; serial_unit_ids?: number[]; lot_batch_id?: number | null },
+  body: { qty?: number; unit_price?: number; guest_no?: number; serial_unit_ids?: number[]; lot_batch_id?: number | null },
 ) {
   return apiFetch<PosCartLine>(`/api/v1/pos/sessions/${sessionId}/cart-lines/${lineId}`, {
     method: "PATCH",
@@ -292,6 +293,21 @@ export async function checkoutPos(
     tip_amount?: number;
     table_label?: string;
     order_type?: string;
+    guests?: Array<{
+      guest_no: number;
+      display_name?: string;
+      privilege_type: string;
+      privilege_id_no?: string;
+      privilege_name?: string;
+      manual_discount?: number;
+    }>;
+    commissions?: Array<{
+      line_no: number;
+      tic_user_id?: number | null;
+      tic_name: string;
+      calc_mode: string;
+      rate_value: number;
+    }>;
   },
 ) {
   return apiFetch<CheckoutResult>(`/api/v1/pos/sessions/${sessionId}/checkout`, { method: "POST", body: JSON.stringify(body) });

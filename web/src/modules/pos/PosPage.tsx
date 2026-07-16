@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, Index, Show, onCleanup, on
 import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
-import { formatPeso, sanitizeIntegerInput, parseDecimalInput, bindDecimalInput, computePosOrderTax, roundMoney } from "../../shared/money";
+import { formatPeso, sanitizeIntegerInput, parseDecimalInput, bindDecimalInput, roundMoney } from "../../shared/money";
 import { AuthImage } from "../../shared/AuthImage";
 import { LotLineCell } from "../../shared/LotLineCell";
 import { QuickCustomerModal } from "../../shared/QuickCustomerModal";
@@ -10,6 +10,14 @@ import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useAuth, hasPermission } from "../../shared/auth-context";
+import {
+  emptyGuest,
+  previewGuestTicket,
+  previewTicketPrivilege,
+  type PosCommissionDraft,
+  type PosGuestDraft,
+  type PosPrivilegeKind,
+} from "./posGuests";
 import {
   addPosCartLine,
   checkoutPos,
@@ -101,9 +109,11 @@ export default function PosPage() {
   const [shiftReport, setShiftReport] = createSignal<SessionReport | null>(null);
   const [modalItem, setModalItem] = createSignal<PosCatalogItem | null>(null);
   const [discount, setDiscount] = createSignal(0);
-  const [privilegeType, setPrivilegeType] = createSignal<"none" | "senior" | "pwd" | "student" | "manual">("none");
+  const [privilegeType, setPrivilegeType] = createSignal<PosPrivilegeKind>("none");
   const [privilegeIdNo, setPrivilegeIdNo] = createSignal("");
   const [privilegeName, setPrivilegeName] = createSignal("");
+  const [guests, setGuests] = createSignal<PosGuestDraft[]>([]);
+  const [commissions, setCommissions] = createSignal<PosCommissionDraft[]>([]);
   const [tipAmount, setTipAmount] = createSignal(0);
   const [tableLabel, setTableLabel] = createSignal("");
   const [customerId, setCustomerId] = createSignal<number | null>(null);
@@ -223,36 +233,36 @@ export default function PosPage() {
   const taxPreview = createMemo(() => {
     const s = settings.data;
     const rawSub = subtotalLines();
-    const pType = privilegeType();
-    let disc = 0;
-    let vatExempt = false;
-    if (pType === "senior") {
-      disc = roundMoney(rawSub * ((s?.privilege_senior_pct ?? 20) / 100));
-      vatExempt = true;
-    } else if (pType === "pwd") {
-      disc = roundMoney(rawSub * ((s?.privilege_pwd_pct ?? 20) / 100));
-      vatExempt = true;
-    } else if (pType === "student") {
-      disc = roundMoney(rawSub * ((s?.student_discount_pct ?? 10) / 100));
-    } else {
-      disc = Math.min(Math.max(discount(), 0), rawSub);
+    const tip = tipAmount();
+    const g = guests();
+    if (g.length > 0) {
+      return {
+        ...previewGuestTicket({
+          lines: cartLines(),
+          guests: g,
+          seniorPct: s?.privilege_senior_pct ?? 20,
+          pwdPct: s?.privilege_pwd_pct ?? 20,
+          studentPct: s?.student_discount_pct ?? 10,
+          taxMode: s?.tax_mode ?? "none",
+          taxRate: s?.tax_rate_percent ?? 0,
+          taxInclusive: s?.tax_inclusive ?? true,
+          tip,
+        }),
+        privilegeType: "none" as PosPrivilegeKind,
+      };
     }
-    disc = Math.min(disc, rawSub);
-    const sub = roundMoney(rawSub - disc);
-    const rate = s?.tax_rate_percent ?? 0;
-    const mode = vatExempt ? "none" : (s?.tax_mode ?? "none");
-    const taxInclusive = s?.tax_inclusive ?? true;
-    const computed = computePosOrderTax(sub, mode, rate, taxInclusive);
-    const tip = Math.max(0, tipAmount());
-    return {
-      discount: disc,
-      subtotal: computed.subtotal,
-      tax: computed.tax,
-      total: roundMoney(computed.total + tip),
+    return previewTicketPrivilege({
+      rawSub,
+      privilegeType: privilegeType(),
+      discount: discount(),
+      seniorPct: s?.privilege_senior_pct ?? 20,
+      pwdPct: s?.privilege_pwd_pct ?? 20,
+      studentPct: s?.student_discount_pct ?? 10,
+      taxMode: s?.tax_mode ?? "none",
+      taxRate: s?.tax_rate_percent ?? 0,
+      taxInclusive: s?.tax_inclusive ?? true,
       tip,
-      vatExempt,
-      privilegeType: pType,
-    };
+    });
   });
 
   const openShift = async () => {
@@ -384,20 +394,58 @@ export default function PosPage() {
       toast.warning("Cart is empty.");
       return;
     }
-    if ((preview.privilegeType === "senior" || preview.privilegeType === "pwd") && !privilegeIdNo().trim()) {
-      toast.warning(preview.privilegeType === "pwd" ? "PWD ID is required." : "Senior / OSCA ID is required.");
-      return;
+    const guestList = guests();
+    if (guestList.length === 0) {
+      if ((preview.privilegeType === "senior" || preview.privilegeType === "pwd") && !privilegeIdNo().trim()) {
+        toast.warning(preview.privilegeType === "pwd" ? "PWD ID is required." : "Senior / OSCA ID is required.");
+        return;
+      }
+    } else {
+      for (const g of guestList) {
+        if ((g.privilege_type === "senior" || g.privilege_type === "pwd") && !g.privilege_id_no.trim()) {
+          toast.warning(`${g.display_name || `Guest ${g.guest_no}`}: ID is required for ${g.privilege_type}.`);
+          return;
+        }
+      }
     }
     const body = {
       tenders,
       partner_id: customerId(),
-      discount_amount: preview.privilegeType === "manual" || preview.privilegeType === "none" ? preview.discount : 0,
-      privilege_type: preview.privilegeType === "none" && preview.discount > 0 ? "manual" : preview.privilegeType,
-      privilege_id_no: privilegeIdNo().trim() || undefined,
-      privilege_name: privilegeName().trim() || undefined,
+      discount_amount:
+        guestList.length === 0 && (preview.privilegeType === "manual" || preview.privilegeType === "none")
+          ? preview.discount
+          : 0,
+      privilege_type:
+        guestList.length > 0
+          ? "none"
+          : preview.privilegeType === "none" && preview.discount > 0
+            ? "manual"
+            : preview.privilegeType,
+      privilege_id_no: guestList.length === 0 ? privilegeIdNo().trim() || undefined : undefined,
+      privilege_name: guestList.length === 0 ? privilegeName().trim() || undefined : undefined,
       tip_amount: tipAmount(),
       table_label: tableLabel().trim() || undefined,
       order_type: orderType(),
+      guests:
+        guestList.length > 0
+          ? guestList.map((g) => ({
+              guest_no: g.guest_no,
+              display_name: g.display_name,
+              privilege_type: g.privilege_type,
+              privilege_id_no: g.privilege_id_no || undefined,
+              privilege_name: g.privilege_name || undefined,
+              manual_discount: g.privilege_type === "manual" ? g.manual_discount : 0,
+            }))
+          : undefined,
+      commissions: commissions()
+        .filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0)
+        .map((c, i) => ({
+          line_no: i + 1,
+          tic_user_id: c.tic_user_id,
+          tic_name: c.tic_name.trim(),
+          calc_mode: c.calc_mode,
+          rate_value: Number(c.rate_value) || 0,
+        })),
     };
     setCheckingOut(true);
     try {
@@ -427,6 +475,8 @@ export default function PosPage() {
       setPrivilegeType("none");
       setPrivilegeIdNo("");
       setPrivilegeName("");
+      setGuests([]);
+      setCommissions([]);
       setTipAmount(0);
       setTableLabel("");
       setCustomerId(null);
@@ -486,21 +536,61 @@ export default function PosPage() {
   const applyDiscount = () => setShowDiscount(true);
 
   const confirmDiscount = (next: {
-    privilegeType: "none" | "senior" | "pwd" | "student" | "manual";
+    mode: "ticket" | "guests";
+    privilegeType: PosPrivilegeKind;
     amount: number;
     idNo: string;
     name: string;
+    guests: PosGuestDraft[];
   }) => {
-    setPrivilegeType(next.privilegeType);
-    setPrivilegeIdNo(next.idNo);
-    setPrivilegeName(next.name);
-    if (next.privilegeType === "manual" || next.privilegeType === "none") {
-      setDiscount(next.amount > 0 ? Math.min(next.amount, subtotalLines()) : 0);
-      if (next.amount > 0 && next.privilegeType === "none") setPrivilegeType("manual");
-    } else {
+    if (next.mode === "guests") {
+      setGuests(next.guests.length > 0 ? next.guests : [emptyGuest(1), emptyGuest(2)]);
+      setPrivilegeType("none");
+      setPrivilegeIdNo("");
+      setPrivilegeName("");
       setDiscount(0);
+    } else {
+      setGuests([]);
+      setPrivilegeType(next.privilegeType);
+      setPrivilegeIdNo(next.idNo);
+      setPrivilegeName(next.name);
+      if (next.privilegeType === "manual" || next.privilegeType === "none") {
+        setDiscount(next.amount > 0 ? Math.min(next.amount, subtotalLines()) : 0);
+        if (next.amount > 0 && next.privilegeType === "none") setPrivilegeType("manual");
+      } else {
+        setDiscount(0);
+      }
     }
     setShowDiscount(false);
+  };
+
+  const openPaymentWithCommissions = () => {
+    if (commissions().length === 0) {
+      const u = auth.me?.user;
+      if (u) {
+        setCommissions([
+          {
+            line_no: 1,
+            tic_user_id: u.id,
+            tic_name: u.full_name || u.email,
+            calc_mode: "percent",
+            rate_value: "",
+          },
+        ]);
+      }
+    }
+    openPayment();
+  };
+
+  const setLineGuest = async (ln: PosCartLine, guestNo: number) => {
+    const s = session.data;
+    if (!s?.id) return;
+    const res = await patchPosCartLine(s.id, ln.id, { guest_no: guestNo });
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not assign guest.");
+      return;
+    }
+    invalidate();
   };
 
   const handleSearchKey = async (e: KeyboardEvent) => {
@@ -791,8 +881,10 @@ export default function PosPage() {
             onRemove={removeLine}
             onLot={pickLot}
             onClear={clearOrder}
-            onCheckout={openPayment}
+            onCheckout={openPaymentWithCommissions}
             checkingOut={checkingOut()}
+            guests={guests()}
+            onAssignGuest={setLineGuest}
           />
         </div>
       </Show>
@@ -812,6 +904,8 @@ export default function PosPage() {
           showTable={orderType() === "dine_in"}
           tenders={settings.data?.allowed_tenders ?? ["cash"]}
           checkingOut={checkingOut()}
+          commissions={commissions()}
+          onCommissionsChange={setCommissions}
           onCancel={() => setShowPayment(false)}
           onConfirm={checkout}
         />
@@ -838,6 +932,7 @@ export default function PosPage() {
           currentType={privilegeType()}
           currentIdNo={privilegeIdNo()}
           currentName={privilegeName()}
+          currentGuests={guests()}
           max={subtotalLines()}
           seniorPct={settings.data?.privilege_senior_pct ?? 20}
           pwdPct={settings.data?.privilege_pwd_pct ?? 20}
@@ -1020,6 +1115,8 @@ function PaymentModal(props: {
   showTable?: boolean;
   tenders: string[];
   checkingOut: boolean;
+  commissions: PosCommissionDraft[];
+  onCommissionsChange: (rows: PosCommissionDraft[]) => void;
   onCancel: () => void;
   onConfirm: (tenders: { tender_type: string; amount: number }[]) => void;
 }) {
@@ -1116,6 +1213,74 @@ function PaymentModal(props: {
             placeholder="0.00"
           />
         </Show>
+
+        <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div class="mb-2 flex items-center justify-between">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Commission (optional)</p>
+            <button
+              type="button"
+              class="text-xs text-emerald-700 hover:underline"
+              onClick={() =>
+                props.onCommissionsChange([
+                  ...props.commissions,
+                  {
+                    line_no: props.commissions.length + 1,
+                    tic_user_id: null,
+                    tic_name: "",
+                    calc_mode: "percent",
+                    rate_value: "",
+                  },
+                ])
+              }
+            >
+              + Add
+            </button>
+          </div>
+          <Show when={props.commissions.length === 0}>
+            <p class="text-xs text-slate-500">Leave empty for rules-only. Enter % or ₱ to accrue for this sale.</p>
+          </Show>
+          <For each={props.commissions}>
+            {(row, i) => (
+              <div class="mb-2 grid grid-cols-[1fr_3.5rem_4rem] gap-1">
+                <input
+                  class="rounded border border-slate-300 px-2 py-1 text-xs"
+                  placeholder="Server / TIC"
+                  value={row.tic_name}
+                  onInput={(e) =>
+                    props.onCommissionsChange(
+                      props.commissions.map((r, idx) => (idx === i() ? { ...r, tic_name: e.currentTarget.value } : r)),
+                    )
+                  }
+                />
+                <select
+                  class="rounded border border-slate-300 px-1 py-1 text-xs"
+                  value={row.calc_mode}
+                  onChange={(e) =>
+                    props.onCommissionsChange(
+                      props.commissions.map((r, idx) =>
+                        idx === i() ? { ...r, calc_mode: e.currentTarget.value as "percent" | "fixed" } : r,
+                      ),
+                    )
+                  }
+                >
+                  <option value="percent">%</option>
+                  <option value="fixed">₱</option>
+                </select>
+                <input
+                  class="rounded border border-slate-300 px-2 py-1 text-xs tabular-nums"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={row.rate_value}
+                  onInput={(e) =>
+                    props.onCommissionsChange(
+                      props.commissions.map((r, idx) => (idx === i() ? { ...r, rate_value: e.currentTarget.value } : r)),
+                    )
+                  }
+                />
+              </div>
+            )}
+          </For>
+        </div>
 
         <div class="space-y-3">
           <Index each={lines()}>
@@ -1224,25 +1389,34 @@ function PaymentModal(props: {
 
 function DiscountModal(props: {
   currentAmount: number;
-  currentType: "none" | "senior" | "pwd" | "student" | "manual";
+  currentType: PosPrivilegeKind;
   currentIdNo: string;
   currentName: string;
+  currentGuests: PosGuestDraft[];
   max: number;
   seniorPct: number;
   pwdPct: number;
   studentPct: number;
   onCancel: () => void;
   onConfirm: (next: {
-    privilegeType: "none" | "senior" | "pwd" | "student" | "manual";
+    mode: "ticket" | "guests";
+    privilegeType: PosPrivilegeKind;
     amount: number;
     idNo: string;
     name: string;
+    guests: PosGuestDraft[];
   }) => void;
 }) {
-  const [type, setType] = createSignal(props.currentType === "none" && props.currentAmount > 0 ? "manual" : props.currentType);
+  const [mode, setMode] = createSignal<"ticket" | "guests">(props.currentGuests.length > 0 ? "guests" : "ticket");
+  const [type, setType] = createSignal<PosPrivilegeKind>(
+    props.currentType === "none" && props.currentAmount > 0 ? "manual" : props.currentType,
+  );
   const [amount, setAmount] = createSignal(props.currentAmount > 0 ? props.currentAmount.toFixed(2) : "");
   const [idNo, setIdNo] = createSignal(props.currentIdNo);
   const [name, setName] = createSignal(props.currentName);
+  const [guestRows, setGuestRows] = createSignal<PosGuestDraft[]>(
+    props.currentGuests.length > 0 ? props.currentGuests : [emptyGuest(1), emptyGuest(2)],
+  );
 
   const previewDisc = () => {
     const t = type();
@@ -1253,89 +1427,171 @@ function DiscountModal(props: {
     return Number.isFinite(n) && n > 0 ? Math.min(n, props.max) : 0;
   };
 
+  const updateGuest = (idx: number, patch: Partial<PosGuestDraft>) => {
+    setGuestRows((rows) => rows.map((g, i) => (i === idx ? { ...g, ...patch } : g)));
+  };
+
   const apply = () => {
+    if (mode() === "guests") {
+      const rows = guestRows().map((g, i) => ({ ...g, guest_no: i + 1 }));
+      for (const g of rows) {
+        if ((g.privilege_type === "senior" || g.privilege_type === "pwd") && !g.privilege_id_no.trim()) return;
+      }
+      props.onConfirm({
+        mode: "guests",
+        privilegeType: "none",
+        amount: 0,
+        idNo: "",
+        name: "",
+        guests: rows,
+      });
+      return;
+    }
     const t = type();
     if ((t === "senior" || t === "pwd") && !idNo().trim()) return;
     props.onConfirm({
+      mode: "ticket",
       privilegeType: t,
       amount: t === "manual" || t === "none" ? previewDisc() : 0,
       idNo: idNo().trim(),
       name: name().trim(),
+      guests: [],
     });
   };
 
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
       <div class="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 class="mb-1 text-lg font-semibold">Discount</h3>
-        <p class="mb-2 text-sm text-slate-500">
-          Choose <span class="font-medium text-slate-700">one</span> type per ticket. Senior / PWD and student / promo
-          discounts do not stack — pick the privilege that applies to this sale.
-        </p>
-        <ul class="mb-4 list-disc space-y-1 pl-5 text-xs text-slate-500">
-          <li>
-            <span class="font-medium text-slate-600">Senior or PWD:</span> statutory % + VAT exempt (ID required). Not
-            combined with each other or with student/manual.
-          </li>
-          <li>
-            <span class="font-medium text-slate-600">Student:</span> commercial % (VAT stays). Not combined with senior/PWD.
-          </li>
-          <li>
-            <span class="font-medium text-slate-600">Manual:</span> fixed ₱ amount for store promos when no privilege card
-            applies.
-          </li>
-          <li>
-            Split guest check (some senior / some regular)? Ring separate tickets — order-level discount applies to the
-            whole cart.
-          </li>
-        </ul>
-        <label class="mb-1 block text-xs font-medium text-slate-500">Type</label>
-        <select
-          class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          value={type()}
-          onChange={(e) => setType(e.currentTarget.value as "none" | "senior" | "pwd" | "student" | "manual")}
-        >
-          <option value="none">None</option>
-          <option value="senior">Senior citizen ({props.seniorPct}% · VAT exempt)</option>
-          <option value="pwd">PWD ({props.pwdPct}% · VAT exempt)</option>
-          <option value="student">Student ({props.studentPct}% · commercial)</option>
-          <option value="manual">Manual fixed amount</option>
-        </select>
-        <Show when={type() === "senior" || type() === "pwd" || type() === "student"}>
-          <label class="mb-1 block text-xs font-medium text-slate-500">
-            {type() === "pwd" ? "PWD ID (required)" : type() === "senior" ? "OSCA / Senior ID (required)" : "Student ID (optional)"}
-          </label>
-          <input
+        <h3 class="mb-1 text-lg font-semibold">Discount / Guests</h3>
+        <div class="mb-3 flex gap-2">
+          <button
+            type="button"
+            class={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${mode() === "ticket" ? "bg-emerald-600 text-white" : "border border-slate-300"}`}
+            onClick={() => setMode("ticket")}
+          >
+            Whole ticket
+          </button>
+          <button
+            type="button"
+            class={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${mode() === "guests" ? "bg-emerald-600 text-white" : "border border-slate-300"}`}
+            onClick={() => setMode("guests")}
+          >
+            Per guest (F&B)
+          </button>
+        </div>
+
+        <Show when={mode() === "ticket"}>
+          <p class="mb-3 text-xs text-slate-500">One privilege for the entire cart. Prefer Per guest when only some covers qualify.</p>
+          <label class="mb-1 block text-xs font-medium text-slate-500">Type</label>
+          <select
             class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            value={idNo()}
-            onInput={(e) => setIdNo(e.currentTarget.value)}
-            placeholder="ID number"
-          />
-          <label class="mb-1 block text-xs font-medium text-slate-500">Cardholder name (optional)</label>
-          <input
-            class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            value={name()}
-            onInput={(e) => setName(e.currentTarget.value)}
-          />
-        </Show>
-        <Show when={type() === "manual"}>
-          <label class="mb-1 block text-xs font-medium text-slate-500">Amount (max {money(props.max)})</label>
-          <input
-            type="text"
-            inputmode="decimal"
-            autocomplete="off"
-            class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
-            placeholder="0.00"
-            value={amount()}
-            onInput={(e) => bindDecimalInput(e.currentTarget, setAmount)}
-          />
-        </Show>
-        <p class="mb-4 text-sm text-slate-600">
-          Discount preview: <span class="font-semibold tabular-nums">{money(previewDisc())}</span>
-          <Show when={type() === "senior" || type() === "pwd"}>
-            <span class="ml-2 text-xs text-emerald-700">VAT will be exempted</span>
+            value={type()}
+            onChange={(e) => setType(e.currentTarget.value as PosPrivilegeKind)}
+          >
+            <option value="none">None</option>
+            <option value="senior">Senior citizen ({props.seniorPct}% · VAT exempt)</option>
+            <option value="pwd">PWD ({props.pwdPct}% · VAT exempt)</option>
+            <option value="student">Student ({props.studentPct}% · commercial)</option>
+            <option value="manual">Manual fixed amount</option>
+          </select>
+          <Show when={type() === "senior" || type() === "pwd" || type() === "student"}>
+            <label class="mb-1 block text-xs font-medium text-slate-500">
+              {type() === "pwd" ? "PWD ID (required)" : type() === "senior" ? "OSCA / Senior ID (required)" : "Student ID (optional)"}
+            </label>
+            <input
+              class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={idNo()}
+              onInput={(e) => setIdNo(e.currentTarget.value)}
+              placeholder="ID number"
+            />
+            <label class="mb-1 block text-xs font-medium text-slate-500">Cardholder name (optional)</label>
+            <input
+              class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={name()}
+              onInput={(e) => setName(e.currentTarget.value)}
+            />
           </Show>
-        </p>
+          <Show when={type() === "manual"}>
+            <label class="mb-1 block text-xs font-medium text-slate-500">Amount (max {money(props.max)})</label>
+            <input
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-right text-lg font-semibold focus:border-emerald-500 focus:outline-none"
+              placeholder="0.00"
+              value={amount()}
+              onInput={(e) => bindDecimalInput(e.currentTarget, setAmount)}
+            />
+          </Show>
+          <p class="mb-4 text-sm text-slate-600">
+            Discount preview: <span class="font-semibold tabular-nums">{money(previewDisc())}</span>
+          </p>
+        </Show>
+
+        <Show when={mode() === "guests"}>
+          <p class="mb-3 text-xs text-slate-500">
+            Cart is split equally across guests unless you assign lines to a guest on the order panel. Senior/PWD VAT
+            exemption applies only to that guest&apos;s share.
+          </p>
+          <For each={guestRows()}>
+            {(g, i) => (
+              <div class="mb-3 rounded-xl border border-slate-200 p-3">
+                <div class="mb-2 flex items-center justify-between gap-2">
+                  <input
+                    class="flex-1 rounded border border-slate-300 px-2 py-1 text-sm font-medium"
+                    value={g.display_name}
+                    onInput={(e) => updateGuest(i(), { display_name: e.currentTarget.value })}
+                  />
+                  <Show when={guestRows().length > 1}>
+                    <button
+                      type="button"
+                      class="text-xs text-rose-600"
+                      onClick={() => setGuestRows((rows) => rows.filter((_, idx) => idx !== i()).map((r, n) => ({ ...r, guest_no: n + 1 })))}
+                    >
+                      Remove
+                    </button>
+                  </Show>
+                </div>
+                <select
+                  class="mb-2 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                  value={g.privilege_type}
+                  onChange={(e) => updateGuest(i(), { privilege_type: e.currentTarget.value as PosPrivilegeKind })}
+                >
+                  <option value="none">Regular (no discount)</option>
+                  <option value="senior">Senior ({props.seniorPct}%)</option>
+                  <option value="pwd">PWD ({props.pwdPct}%)</option>
+                  <option value="student">Student ({props.studentPct}%)</option>
+                  <option value="manual">Manual ₱</option>
+                </select>
+                <Show when={g.privilege_type === "senior" || g.privilege_type === "pwd" || g.privilege_type === "student"}>
+                  <input
+                    class="mb-2 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    placeholder={g.privilege_type === "pwd" ? "PWD ID *" : g.privilege_type === "senior" ? "OSCA ID *" : "Student ID"}
+                    value={g.privilege_id_no}
+                    onInput={(e) => updateGuest(i(), { privilege_id_no: e.currentTarget.value })}
+                  />
+                </Show>
+                <Show when={g.privilege_type === "manual"}>
+                  <input
+                    class="w-full rounded border border-slate-300 px-2 py-1 text-sm tabular-nums"
+                    inputMode="decimal"
+                    placeholder="Manual discount ₱"
+                    value={g.manual_discount > 0 ? String(g.manual_discount) : ""}
+                    onInput={(e) => updateGuest(i(), { manual_discount: Number(e.currentTarget.value) || 0 })}
+                  />
+                </Show>
+              </div>
+            )}
+          </For>
+          <button
+            type="button"
+            class="mb-4 w-full rounded-lg border border-dashed border-slate-300 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            onClick={() => setGuestRows((rows) => [...rows, emptyGuest(rows.length + 1)])}
+          >
+            + Add guest
+          </button>
+        </Show>
+
         <div class="flex gap-2">
           <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
             Cancel
@@ -1343,7 +1599,11 @@ function DiscountModal(props: {
           <button
             type="button"
             class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-            disabled={(type() === "senior" || type() === "pwd") && !idNo().trim()}
+            disabled={
+              mode() === "ticket"
+                ? (type() === "senior" || type() === "pwd") && !idNo().trim()
+                : guestRows().some((g) => (g.privilege_type === "senior" || g.privilege_type === "pwd") && !g.privilege_id_no.trim())
+            }
             onClick={apply}
           >
             Apply
@@ -1677,6 +1937,8 @@ function OrderPanel(props: {
   onClear: () => void;
   onCheckout: () => void;
   checkingOut: boolean;
+  guests: PosGuestDraft[];
+  onAssignGuest: (ln: PosCartLine, guestNo: number) => void;
 }) {
   const actionBtn = "flex flex-col items-center gap-1 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50";
   return (
@@ -1687,7 +1949,7 @@ function OrderPanel(props: {
             <span>Customer</span>
           </button>
           <button type="button" class={actionBtn} onClick={props.onDiscount}>
-            <span>Discount</span>
+            <span>{props.guests.length > 0 ? `Guests (${props.guests.length})` : "Discount"}</span>
           </button>
           <button type="button" class={actionBtn} onClick={props.onSaveBill}>
             <span>Save Bill</span>
@@ -1746,6 +2008,17 @@ function OrderPanel(props: {
                     </Show>
                     <Show when={ln.notes}>
                       <p class="truncate text-xs italic text-slate-400">“{ln.notes}”</p>
+                    </Show>
+                    <Show when={props.guests.length > 0}>
+                      <select
+                        class="mt-1 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-600"
+                        value={String(ln.guest_no && ln.guest_no > 0 ? ln.guest_no : 1)}
+                        onChange={(e) => props.onAssignGuest(ln, Number(e.currentTarget.value) || 1)}
+                      >
+                        <For each={props.guests}>
+                          {(g) => <option value={String(g.guest_no)}>{g.display_name || `Guest ${g.guest_no}`}</option>}
+                        </For>
+                      </select>
                     </Show>
                     <Show when={props.catalogByItemId.get(ln.item_id)?.track_lot}>
                       <div class="mt-1">

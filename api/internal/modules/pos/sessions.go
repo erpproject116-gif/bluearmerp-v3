@@ -40,19 +40,20 @@ type Session struct {
 }
 
 type CartLine struct {
-	ID        int64             `json:"id"`
-	LineNo    int               `json:"line_no"`
-	ItemID    int64             `json:"item_id"`
-	ItemCode  string            `json:"item_code"`
-	ItemName  string            `json:"item_name"`
-	Qty       float64           `json:"qty"`
-	UnitPrice float64           `json:"unit_price"`
-	LineTotal float64           `json:"line_total"`
-	Notes     *string           `json:"notes,omitempty"`
-	SizeLabel *string           `json:"size_label,omitempty"`
-	SerialUnitIDs []int64            `json:"serial_unit_ids,omitempty"`
-	LotBatchID    *int64             `json:"lot_batch_id,omitempty"`
-	LotNo         string             `json:"lot_no,omitempty"`
+	ID            int64             `json:"id"`
+	LineNo        int               `json:"line_no"`
+	ItemID        int64             `json:"item_id"`
+	ItemCode      string            `json:"item_code"`
+	ItemName      string            `json:"item_name"`
+	Qty           float64           `json:"qty"`
+	UnitPrice     float64           `json:"unit_price"`
+	LineTotal     float64           `json:"line_total"`
+	Notes         *string           `json:"notes,omitempty"`
+	SizeLabel     *string           `json:"size_label,omitempty"`
+	GuestNo       int               `json:"guest_no"`
+	SerialUnitIDs []int64           `json:"serial_unit_ids,omitempty"`
+	LotBatchID    *int64            `json:"lot_batch_id,omitempty"`
+	LotNo         string            `json:"lot_no,omitempty"`
 	Modifiers     []CartLineModifier `json:"modifiers,omitempty"`
 }
 
@@ -95,22 +96,25 @@ type cartLineBody struct {
 type cartLinePatch struct {
 	Qty           *float64 `json:"qty"`
 	UnitPrice     *float64 `json:"unit_price"`
+	GuestNo       *int     `json:"guest_no"`
 	SerialUnitIDs []int64  `json:"serial_unit_ids"`
 	LotBatchID    *int64   `json:"lot_batch_id"`
 }
 
 type checkoutBody struct {
-	PartnerID       *int64         `json:"partner_id"`
-	Tenders         []tenderBody   `json:"tenders"`
-	DiscountAmount  float64        `json:"discount_amount"`
-	VoucherCode     string         `json:"voucher_code"`
-	VoucherAmount   float64        `json:"voucher_amount"`
-	PrivilegeType   string         `json:"privilege_type"`
-	PrivilegeIDNo   string         `json:"privilege_id_no"`
-	PrivilegeName   string         `json:"privilege_name"`
-	TipAmount       float64        `json:"tip_amount"`
-	TableLabel      string         `json:"table_label"`
-	OrderType       string         `json:"order_type"`
+	PartnerID       *int64                     `json:"partner_id"`
+	Tenders         []tenderBody               `json:"tenders"`
+	DiscountAmount  float64                    `json:"discount_amount"`
+	VoucherCode     string                     `json:"voucher_code"`
+	VoucherAmount   float64                    `json:"voucher_amount"`
+	PrivilegeType   string                     `json:"privilege_type"`
+	PrivilegeIDNo   string                     `json:"privilege_id_no"`
+	PrivilegeName   string                     `json:"privilege_name"`
+	TipAmount       float64                    `json:"tip_amount"`
+	TableLabel      string                     `json:"table_label"`
+	OrderType       string                     `json:"order_type"`
+	Guests          []checkoutGuestBody        `json:"guests"`
+	Commissions     []sales.CommissionLineInput `json:"commissions"`
 }
 
 type tenderBody struct {
@@ -439,6 +443,19 @@ func patchCartLine(pool *pgxpool.Pool) http.HandlerFunc {
 			unitPrice = *body.UnitPrice
 		}
 		lineTotal := roundMoney(qty * unitPrice)
+		if body.GuestNo != nil {
+			gno := *body.GuestNo
+			if gno < 1 {
+				gno = 1
+			}
+			_, err := pool.Exec(r.Context(), `update public.pos_cart_lines set qty=$3, unit_price=$4, line_total=$5, guest_no=$6, updated_at=now() where id=$1 and session_id=$2`, lineID, sessionID, qty, unitPrice, lineTotal, gno)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to update cart line guest. Apply migration 177.", "ERR_INTERNAL")
+				return
+			}
+			response.OK(w, CartLine{ID: lineID, Qty: qty, UnitPrice: unitPrice, LineTotal: lineTotal, GuestNo: gno}, "Updated.")
+			return
+		}
 		if body.SerialUnitIDs != nil || body.LotBatchID != nil {
 			serialIDs := body.SerialUnitIDs
 			if serialIDs == nil {
@@ -535,23 +552,61 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			       coalesce(student_discount_pct, 10)::float8
 			from public.pos_settings where tenant_id = $1`, tu.TenantID).Scan(&privCfg.SeniorPct, &privCfg.PwdPct, &privCfg.StudentPct)
 
-		privType := normalizePrivilegeType(body.PrivilegeType)
-		if privType == PrivilegeNone && body.DiscountAmount > 0 {
-			privType = PrivilegeManual
-		}
-		priv, err := applyPrivilegeDiscount(subtotalLines, privilegeInput{
-			Type:           privType,
-			IDNo:           body.PrivilegeIDNo,
-			Name:           body.PrivilegeName,
-			ManualDiscount: body.DiscountAmount,
-			VoucherAmount:  body.VoucherAmount,
-		}, privCfg)
-		if err != nil {
-			response.Validation(w, map[string]string{"privilege": err.Error()})
-			return
+		var guestBundle guestDiscountBundle
+		var priv privilegeResult
+		useGuests := len(body.Guests) > 0
+		if useGuests {
+			var err error
+			guestBundle, err = applyGuestDiscounts(lines, body.Guests, privCfg)
+			if err != nil {
+				response.Validation(w, map[string]string{"guests": err.Error()})
+				return
+			}
+			priv = privilegeResult{
+				Type:          PrivilegeNone,
+				Discount:      guestBundle.DiscountTotal,
+				BaseAfterDisc: roundMoney(guestBundle.TaxableBase + guestBundle.ExemptBase),
+				VATExempted:   guestBundle.ExemptBase > 0 && guestBundle.TaxableBase <= 0,
+			}
+			// Ticket-level attrs: summarize when multiple privilege types.
+			if len(guestBundle.Guests) == 1 {
+				g0 := guestBundle.Guests[0]
+				priv.Type = g0.PrivilegeType
+				priv.IDNo = g0.PrivilegeIDNo
+				priv.Name = g0.PrivilegeName
+				priv.Pct = g0.PrivilegePct
+				priv.VATExempted = g0.VATExempted
+			} else {
+				priv.Type = PrivilegeManual
+				priv.Name = fmt.Sprintf("%d guests", len(guestBundle.Guests))
+			}
+		} else {
+			privType := normalizePrivilegeType(body.PrivilegeType)
+			if privType == PrivilegeNone && body.DiscountAmount > 0 {
+				privType = PrivilegeManual
+			}
+			var err error
+			priv, err = applyPrivilegeDiscount(subtotalLines, privilegeInput{
+				Type:           privType,
+				IDNo:           body.PrivilegeIDNo,
+				Name:           body.PrivilegeName,
+				ManualDiscount: body.DiscountAmount,
+				VoucherAmount:  body.VoucherAmount,
+			}, privCfg)
+			if err != nil {
+				response.Validation(w, map[string]string{"privilege": err.Error()})
+				return
+			}
 		}
 		discountTotal := priv.Discount
 		subtotalLines = priv.BaseAfterDisc
+		taxableBase := subtotalLines
+		exemptBase := 0.0
+		if useGuests {
+			taxableBase = guestBundle.TaxableBase
+			exemptBase = guestBundle.ExemptBase
+			subtotalLines = roundMoney(taxableBase + exemptBase)
+		}
 
 		lotInputs := make([]sales.SaleLotLineInput, len(lines))
 		for i, ln := range lines {
@@ -585,8 +640,12 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		if taxMode == "included" && !settingsTaxInclusive {
 			taxMode = "excluded"
 		}
-		// Strict PH privilege: senior/PWD sales are VAT-exempt on the discounted ticket.
-		if priv.VATExempted {
+		// Whole-ticket senior/PWD: VAT-exempt entire ticket.
+		if !useGuests && priv.VATExempted {
+			taxMode = "none"
+		}
+		// Mixed guests: only taxableBase carries VAT; exemptBase stays VAT-free.
+		if useGuests && taxableBase <= 0 {
 			taxMode = "none"
 		}
 
@@ -594,20 +653,20 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		templateCode := "non_vat"
 		switch taxMode {
 		case "included":
-			taxTotal = roundMoney(subtotalLines * ratePercent / (100 + ratePercent))
-			subtotal = roundMoney(subtotalLines - taxTotal)
-			grandTotal = subtotalLines
+			taxTotal = roundMoney(taxableBase * ratePercent / (100 + ratePercent))
+			subtotal = roundMoney(taxableBase - taxTotal + exemptBase)
+			grandTotal = roundMoney(taxableBase + exemptBase)
 			templateCode = "vat_included"
 		case "excluded":
-			taxTotal = roundMoney(subtotalLines * ratePercent / 100)
-			subtotal = subtotalLines
-			grandTotal = roundMoney(subtotalLines + taxTotal)
+			taxTotal = roundMoney(taxableBase * ratePercent / 100)
+			subtotal = roundMoney(taxableBase + exemptBase)
+			grandTotal = roundMoney(taxableBase + exemptBase + taxTotal)
 			templateCode = "default"
 		default:
 			taxTotal = 0
-			subtotal = subtotalLines
-			grandTotal = subtotalLines
-			if priv.VATExempted {
+			subtotal = roundMoney(taxableBase + exemptBase)
+			grandTotal = subtotal
+			if priv.VATExempted || (useGuests && exemptBase > 0 && taxableBase <= 0) {
 				templateCode = "non_vat"
 			}
 		}
@@ -661,7 +720,19 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		var salesID int64
 		notesParts := []string{}
-		if priv.Type == PrivilegeSenior || priv.Type == PrivilegePWD || priv.Type == PrivilegeStudent {
+		if useGuests {
+			notesParts = append(notesParts, fmt.Sprintf("%d guests", len(guestBundle.Guests)))
+			for _, g := range guestBundle.Guests {
+				if g.PrivilegeType == PrivilegeNone || g.PrivilegeType == PrivilegeManual {
+					continue
+				}
+				part := fmt.Sprintf("G%d %s %s", g.GuestNo, g.DisplayName, g.PrivilegeType)
+				if g.PrivilegeIDNo != "" {
+					part += " " + g.PrivilegeIDNo
+				}
+				notesParts = append(notesParts, part)
+			}
+		} else if priv.Type == PrivilegeSenior || priv.Type == PrivilegePWD || priv.Type == PrivilegeStudent {
 			notesParts = append(notesParts, fmt.Sprintf("Privilege: %s", priv.Type))
 			if priv.IDNo != "" {
 				notesParts = append(notesParts, "ID: "+priv.IDNo)
@@ -703,19 +774,44 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		for i, ln := range lines {
+			guestNo := ln.GuestNo
+			if guestNo <= 0 {
+				guestNo = 1
+			}
 			var saleLineID int64
 			if err := tx.QueryRow(r.Context(), `
-				insert into public.sa_sales_lines (sales_id, line_no, item_id, item_code, item_name, qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, lot_batch_id)
-				values ($1,$2,$3,$4,$5,$6,$7,$8,0,$7,$8,$9) returning id`,
-				salesID, i+1, ln.ItemID, ln.ItemCode, ln.ItemName, ln.Qty, ln.UnitPrice, ln.LineTotal, ln.LotBatchID).Scan(&saleLineID); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to save sale lines.", "ERR_INTERNAL")
-				return
+				insert into public.sa_sales_lines (sales_id, line_no, item_id, item_code, item_name, qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, lot_batch_id, guest_no)
+				values ($1,$2,$3,$4,$5,$6,$7,$8,0,$7,$8,$9,$10) returning id`,
+				salesID, i+1, ln.ItemID, ln.ItemCode, ln.ItemName, ln.Qty, ln.UnitPrice, ln.LineTotal, ln.LotBatchID, guestNo).Scan(&saleLineID); err != nil {
+				// Fallback if migration 177 not applied yet.
+				if err2 := tx.QueryRow(r.Context(), `
+					insert into public.sa_sales_lines (sales_id, line_no, item_id, item_code, item_name, qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, lot_batch_id)
+					values ($1,$2,$3,$4,$5,$6,$7,$8,0,$7,$8,$9) returning id`,
+					salesID, i+1, ln.ItemID, ln.ItemCode, ln.ItemName, ln.Qty, ln.UnitPrice, ln.LineTotal, ln.LotBatchID).Scan(&saleLineID); err2 != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to save sale lines.", "ERR_INTERNAL")
+					return
+				}
 			}
 			var trackInventory bool
 			_ = tx.QueryRow(r.Context(), `select track_inventory_qty from public.inv_items where id=$1`, ln.ItemID).Scan(&trackInventory)
 			if trackInventory {
 				if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, locationID, -ln.Qty, tu.AppUserID, "pos_checkout", salesID, "sales"); err != nil {
 					response.Validation(w, map[string]string{"stock": err.Error()})
+					return
+				}
+			}
+		}
+		if useGuests {
+			for _, g := range guestBundle.Guests {
+				if _, err := tx.Exec(r.Context(), `
+					insert into public.pos_sale_guests (
+					  tenant_id, sales_id, guest_no, display_name, privilege_type, privilege_id_no, privilege_name,
+					  privilege_pct, share_amount, discount_amount, net_amount, vat_exempted
+					) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+					tu.TenantID, salesID, g.GuestNo, g.DisplayName, string(g.PrivilegeType), g.PrivilegeIDNo, g.PrivilegeName,
+					g.PrivilegePct, g.ShareAmount, g.DiscountAmount, g.NetAmount, g.VATExempted,
+				); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to save guests. Apply migration 177.", "ERR_INTERNAL")
 					return
 				}
 			}
@@ -733,6 +829,17 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := sales.ApplySaleLot(r.Context(), tx, tu.TenantID, salesID); err != nil {
 			response.Validation(w, map[string]string{"lots": err.Error()})
+			return
+		}
+		// Commissions: explicit TIC lines and/or automatic rules; post JE when accounts mapped.
+		comms := body.Commissions
+		if len(comms) == 0 {
+			// Default: cashier as TIC at 0% so register can still show rules-only accruals;
+			// still run accrual for commission rules.
+			comms = nil
+		}
+		if err := sales.ApplyCompletedSaleCommissions(r.Context(), tx, tu.TenantID, tu.AppUserID, salesID, grandTotal, comms); err != nil {
+			response.Validation(w, map[string]string{"commissions": err.Error()})
 			return
 		}
 		acct, err := postCheckoutAccounting(r.Context(), tx, tu.TenantID, tu.AppUserID, salesID, partnerID, currencyID, orderDate, salesNo, subtotal, taxTotal, grandTotal, primaryTender)
@@ -809,12 +916,39 @@ func loadCartLinesTx(ctx context.Context, tx pgx.Tx, sessionID int64) ([]CartLin
 func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64) ([]CartLine, error) {
 	rows, err := q.Query(ctx, `
 		select cl.id, cl.line_no, cl.item_id, cl.item_code, cl.item_name, cl.qty::float8, cl.unit_price::float8, cl.line_total::float8,
-		  cl.notes, cl.size_label, coalesce(cl.serial_unit_ids, '{}'), cl.lot_batch_id, coalesce(lb.lot_no, '')
+		  cl.notes, cl.size_label, coalesce(cl.guest_no, 1), coalesce(cl.serial_unit_ids, '{}'), cl.lot_batch_id, coalesce(lb.lot_no, '')
 		from public.pos_cart_lines cl
 		left join public.inv_lot_batches lb on lb.id = cl.lot_batch_id
 		where cl.session_id=$1 order by cl.line_no`, sessionID)
 	if err != nil {
-		return nil, err
+		// Pre-migration 177: guest_no column missing.
+		rows, err = q.Query(ctx, `
+			select cl.id, cl.line_no, cl.item_id, cl.item_code, cl.item_name, cl.qty::float8, cl.unit_price::float8, cl.line_total::float8,
+			  cl.notes, cl.size_label, coalesce(cl.serial_unit_ids, '{}'), cl.lot_batch_id, coalesce(lb.lot_no, '')
+			from public.pos_cart_lines cl
+			left join public.inv_lot_batches lb on lb.id = cl.lot_batch_id
+			where cl.session_id=$1 order by cl.line_no`, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		var out []CartLine
+		byID := map[int64]int{}
+		var lineIDs []int64
+		for rows.Next() {
+			var ln CartLine
+			if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.SerialUnitIDs, &ln.LotBatchID, &ln.LotNo); err != nil {
+				return nil, err
+			}
+			ln.GuestNo = 1
+			byID[ln.ID] = len(out)
+			lineIDs = append(lineIDs, ln.ID)
+			out = append(out, ln)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return attachCartModifiers(ctx, q, out, byID, lineIDs)
 	}
 	defer rows.Close()
 	var out []CartLine
@@ -822,8 +956,11 @@ func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64)
 	var lineIDs []int64
 	for rows.Next() {
 		var ln CartLine
-		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.SerialUnitIDs, &ln.LotBatchID, &ln.LotNo); err != nil {
+		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.GuestNo, &ln.SerialUnitIDs, &ln.LotBatchID, &ln.LotNo); err != nil {
 			return nil, err
+		}
+		if ln.GuestNo <= 0 {
+			ln.GuestNo = 1
 		}
 		byID[ln.ID] = len(out)
 		lineIDs = append(lineIDs, ln.ID)
@@ -832,6 +969,10 @@ func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64)
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	return attachCartModifiers(ctx, q, out, byID, lineIDs)
+}
+
+func attachCartModifiers(ctx context.Context, q cartLineQuerier, out []CartLine, byID map[int64]int, lineIDs []int64) ([]CartLine, error) {
 	if len(lineIDs) > 0 {
 		mrows, err := q.Query(ctx, `select line_id, id, coalesce(modifier_id, 0), name, price_delta::float8 from public.pos_cart_line_modifiers where line_id = any($1) order by id`, lineIDs)
 		if err != nil {
