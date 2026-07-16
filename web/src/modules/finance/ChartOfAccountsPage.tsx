@@ -36,8 +36,10 @@ type FinanceDefaults = {
   disabled_account_types?: string[];
 };
 
+type DefaultAccountSlotKey = Exclude<keyof FinanceDefaults, "disabled_account_types">;
+
 type DefaultSlot = {
-  key: keyof FinanceDefaults;
+  key: DefaultAccountSlotKey;
   label: string;
   hint: string;
   types: Array<AccountRow["account_type"]>;
@@ -96,8 +98,8 @@ export default function ChartOfAccountsPage() {
   const [mappingsDirty, setMappingsDirty] = createSignal(false);
   const [savingDefaults, setSavingDefaults] = createSignal(false);
   const [editingId, setEditingId] = createSignal<number | null>(null);
-  const [pendingMapSlot, setPendingMapSlot] = createSignal<keyof FinanceDefaults | null>(null);
-  const [mapLabels, setMapLabels] = createSignal<Partial<Record<keyof FinanceDefaults, string>>>({});
+  const [pendingMapSlot, setPendingMapSlot] = createSignal<DefaultAccountSlotKey | null>(null);
+  const [mapLabels, setMapLabels] = createSignal<Partial<Record<DefaultAccountSlotKey, string>>>({});
   const [form, setForm] = createSignal({
     account_code: "",
     account_name: "",
@@ -330,7 +332,7 @@ export default function ChartOfAccountsPage() {
     account_type?: AccountRow["account_type"];
     account_code?: string;
     account_name?: string;
-    mapSlot?: keyof FinanceDefaults;
+    mapSlot?: DefaultAccountSlotKey;
   }) => {
     setEditingId(null);
     setPendingMapSlot(seed?.mapSlot ?? null);
@@ -534,7 +536,7 @@ export default function ChartOfAccountsPage() {
     void client.invalidateQueries({ queryKey: ["finance-account-defaults"] });
   };
 
-  const setDefaultSlot = (key: keyof FinanceDefaults, id: number | null, label = "") => {
+  const setDefaultSlot = (key: DefaultAccountSlotKey, id: number | null, label = "") => {
     setMappingsDirty(true);
     setDefaultsForm((d) => ({ ...d, [key]: id }));
     setMapLabels((m) => ({ ...m, [key]: label }));
