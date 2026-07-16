@@ -205,6 +205,7 @@ func accrueSaleLineCommissions(ctx context.Context, tx pgx.Tx, tenantID, salesID
 }
 
 // ApplyCompletedSaleCommissions writes optional TIC lines, accrues rule + line commissions, and posts GL.
+// Missing commission tables or GL mapping never fail the sale — checkout still completes.
 func ApplyCompletedSaleCommissions(ctx context.Context, tx pgx.Tx, tenantID, userID, salesID int64, grandTotal float64, inputs []CommissionLineInput) error {
 	if len(inputs) > 0 {
 		if v := validateCommissionBodies(inputs); v != nil {
@@ -213,14 +214,34 @@ func ApplyCompletedSaleCommissions(ctx context.Context, tx pgx.Tx, tenantID, use
 			}
 		}
 		if err := replaceSaleCommissions(ctx, tx, tenantID, salesID, grandTotal, inputs); err != nil {
+			if strings.Contains(err.Error(), "sa_sales_commission_lines") ||
+				strings.Contains(err.Error(), "sa_commission_accruals") {
+				return nil
+			}
 			return err
 		}
 	}
 	if err := accrueCommissionForSale(ctx, tx, tenantID, salesID); err != nil {
+		if strings.Contains(err.Error(), "sa_commission") {
+			return nil
+		}
 		return err
 	}
 	if err := accrueSaleLineCommissions(ctx, tx, tenantID, salesID); err != nil {
+		if strings.Contains(err.Error(), "sa_commission") || strings.Contains(err.Error(), "sa_sales_commission") {
+			return nil
+		}
 		return err
 	}
-	return postCommissionJournalForSale(ctx, tx, tenantID, userID, salesID)
+	if err := postCommissionJournalForSale(ctx, tx, tenantID, userID, salesID); err != nil {
+		// Accruals already saved — do not block POS/Sales checkout on JE issues.
+		if strings.Contains(err.Error(), "journal_entry_id") ||
+			strings.Contains(err.Error(), "beneficiary_name") ||
+			strings.Contains(err.Error(), "commission_") ||
+			strings.Contains(err.Error(), "fin_journal") {
+			return nil
+		}
+		return nil
+	}
+	return nil
 }

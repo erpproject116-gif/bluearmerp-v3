@@ -811,8 +811,11 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 					tu.TenantID, salesID, g.GuestNo, g.DisplayName, string(g.PrivilegeType), g.PrivilegeIDNo, g.PrivilegeName,
 					g.PrivilegePct, g.ShareAmount, g.DiscountAmount, g.NetAmount, g.VATExempted,
 				); err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to save guests. Apply migration 177.", "ERR_INTERNAL")
-					return
+					// Soft-fail if migration 177 not applied — discount already applied to totals.
+					if !strings.Contains(err.Error(), "pos_sale_guests") {
+						response.Err(w, http.StatusInternalServerError, "Failed to save guests.", "ERR_INTERNAL")
+						return
+					}
 				}
 			}
 		}

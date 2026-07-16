@@ -9,7 +9,8 @@ export type PosGuestDraft = {
   privilege_type: PosPrivilegeKind;
   privilege_id_no: string;
   privilege_name: string;
-  manual_discount: number;
+  /** Raw typed amount for manual discount — keep as string so inputs don't fight focus. */
+  manual_discount: string;
 };
 
 export type PosCommissionDraft = {
@@ -27,7 +28,7 @@ export function emptyGuest(n: number): PosGuestDraft {
     privilege_type: "none",
     privilege_id_no: "",
     privilege_name: "",
-    manual_discount: 0,
+    manual_discount: "",
   };
 }
 
@@ -76,7 +77,7 @@ function guestDiscount(
     const disc = roundMoney(share * (pct.student / 100));
     return { disc, net: roundMoney(share - disc), vatExempt: false };
   }
-  const manual = Math.min(Math.max(g.manual_discount, 0), share);
+  const manual = Math.min(Math.max(Number(g.manual_discount) || 0, 0), share);
   return { disc: manual, net: roundMoney(share - manual), vatExempt: false };
 }
 

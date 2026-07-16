@@ -74,6 +74,12 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   pickup: "Pickup",
 };
 
+function formatPosApiError(res: { message?: string; errors?: Record<string, string> }): string {
+  const fieldMsgs = res.errors ? Object.values(res.errors).filter(Boolean) : [];
+  if (fieldMsgs.length > 0) return fieldMsgs.join(" ");
+  return (res.message ?? "").trim();
+}
+
 export default function PosPage() {
   const auth = useAuth();
   const toast = useToast();
@@ -156,6 +162,7 @@ export default function PosPage() {
   const [heldOrders, setHeldOrders] = createSignal<HeldOrder[]>([]);
   const [showCustomer, setShowCustomer] = createSignal(false);
   const [showDiscount, setShowDiscount] = createSignal(false);
+  const [showCommission, setShowCommission] = createSignal(false);
   const [offlinePending, setOfflinePending] = createSignal(peekPosOfflineQueue().length);
   const [syncingOffline, setSyncingOffline] = createSignal(false);
 
@@ -434,7 +441,7 @@ export default function PosPage() {
               privilege_type: g.privilege_type,
               privilege_id_no: g.privilege_id_no || undefined,
               privilege_name: g.privilege_name || undefined,
-              manual_discount: g.privilege_type === "manual" ? g.manual_discount : 0,
+              manual_discount: g.privilege_type === "manual" ? Number(g.manual_discount) || 0 : 0,
             }))
           : undefined,
       commissions: commissions()
@@ -459,7 +466,7 @@ export default function PosPage() {
           setShowPayment(false);
           return;
         }
-        toast.warning(res.message ?? "Checkout failed.");
+        toast.warning(formatPosApiError(res) || "Checkout failed.");
         return;
       }
       const change = res.data?.change ?? 0;
@@ -565,21 +572,28 @@ export default function PosPage() {
   };
 
   const openPaymentWithCommissions = () => {
-    if (commissions().length === 0) {
-      const u = auth.me?.user;
-      if (u) {
-        setCommissions([
-          {
-            line_no: 1,
-            tic_user_id: u.id,
-            tic_name: u.full_name || u.email,
-            calc_mode: "percent",
-            rate_value: "",
-          },
-        ]);
-      }
-    }
+    ensureDefaultCommission();
     openPayment();
+  };
+
+  const ensureDefaultCommission = () => {
+    if (commissions().length > 0) return;
+    const u = auth.me?.user;
+    if (!u) return;
+    setCommissions([
+      {
+        line_no: 1,
+        tic_user_id: u.id,
+        tic_name: u.full_name || u.email,
+        calc_mode: "percent",
+        rate_value: "",
+      },
+    ]);
+  };
+
+  const openCommission = () => {
+    ensureDefaultCommission();
+    setShowCommission(true);
   };
 
   const setLineGuest = async (ln: PosCartLine, guestNo: number) => {
@@ -875,6 +889,8 @@ export default function PosPage() {
             customerLabel={customerLabel()}
             onCustomer={() => setShowCustomer(true)}
             onDiscount={applyDiscount}
+            onCommission={openCommission}
+            commissionCount={commissions().filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0).length}
             onSaveBill={saveBill}
             onBills={openBills}
             onQty={changeQty}
@@ -939,6 +955,16 @@ export default function PosPage() {
           studentPct={settings.data?.student_discount_pct ?? 10}
           onCancel={() => setShowDiscount(false)}
           onConfirm={confirmDiscount}
+        />
+      </Show>
+
+      <Show when={showCommission()}>
+        <CommissionModal
+          rows={commissions()}
+          onChange={setCommissions}
+          grandTotal={taxPreview().total - tipAmount()}
+          onCancel={() => setShowCommission(false)}
+          onConfirm={() => setShowCommission(false)}
         />
       </Show>
 
@@ -1214,73 +1240,14 @@ function PaymentModal(props: {
           />
         </Show>
 
-        <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div class="mb-2 flex items-center justify-between">
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Commission (optional)</p>
-            <button
-              type="button"
-              class="text-xs text-emerald-700 hover:underline"
-              onClick={() =>
-                props.onCommissionsChange([
-                  ...props.commissions,
-                  {
-                    line_no: props.commissions.length + 1,
-                    tic_user_id: null,
-                    tic_name: "",
-                    calc_mode: "percent",
-                    rate_value: "",
-                  },
-                ])
-              }
-            >
-              + Add
-            </button>
-          </div>
-          <Show when={props.commissions.length === 0}>
-            <p class="text-xs text-slate-500">Leave empty for rules-only. Enter % or ₱ to accrue for this sale.</p>
-          </Show>
-          <For each={props.commissions}>
-            {(row, i) => (
-              <div class="mb-2 grid grid-cols-[1fr_3.5rem_4rem] gap-1">
-                <input
-                  class="rounded border border-slate-300 px-2 py-1 text-xs"
-                  placeholder="Server / TIC"
-                  value={row.tic_name}
-                  onInput={(e) =>
-                    props.onCommissionsChange(
-                      props.commissions.map((r, idx) => (idx === i() ? { ...r, tic_name: e.currentTarget.value } : r)),
-                    )
-                  }
-                />
-                <select
-                  class="rounded border border-slate-300 px-1 py-1 text-xs"
-                  value={row.calc_mode}
-                  onChange={(e) =>
-                    props.onCommissionsChange(
-                      props.commissions.map((r, idx) =>
-                        idx === i() ? { ...r, calc_mode: e.currentTarget.value as "percent" | "fixed" } : r,
-                      ),
-                    )
-                  }
-                >
-                  <option value="percent">%</option>
-                  <option value="fixed">₱</option>
-                </select>
-                <input
-                  class="rounded border border-slate-300 px-2 py-1 text-xs tabular-nums"
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={row.rate_value}
-                  onInput={(e) =>
-                    props.onCommissionsChange(
-                      props.commissions.map((r, idx) => (idx === i() ? { ...r, rate_value: e.currentTarget.value } : r)),
-                    )
-                  }
-                />
-              </div>
-            )}
-          </For>
-        </div>
+        <Show when={props.commissions.some((c) => c.tic_name.trim() && Number(c.rate_value) > 0)}>
+          <p class="mb-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            Commission set on this ticket (
+            {props.commissions.filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0).length} person
+            {props.commissions.filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0).length === 1 ? "" : "s"}). Edit via
+            the Commission button on the order panel.
+          </p>
+        </Show>
 
         <div class="space-y-3">
           <Index each={lines()}>
@@ -1380,6 +1347,112 @@ function PaymentModal(props: {
             onClick={confirm}
           >
             {props.checkingOut ? "Processing…" : "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommissionModal(props: {
+  rows: PosCommissionDraft[];
+  onChange: (rows: PosCommissionDraft[]) => void;
+  grandTotal: number;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  // Local copy + Index so typing does not remount inputs (Solid For remounts when object identity changes).
+  const [rows, setRows] = createSignal<PosCommissionDraft[]>(props.rows.map((r) => ({ ...r })));
+
+  const update = (idx: number, patch: Partial<PosCommissionDraft>) => {
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  };
+
+  const previewTotal = () =>
+    rows().reduce((sum, r) => {
+      const rate = Number(r.rate_value);
+      if (!r.tic_name.trim() || !Number.isFinite(rate) || rate <= 0) return sum;
+      if (r.calc_mode === "fixed") return sum + rate;
+      return sum + roundMoney((props.grandTotal * rate) / 100);
+    }, 0);
+
+  const done = () => {
+    props.onChange(rows());
+    props.onConfirm();
+  };
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
+      <div class="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 class="mb-1 text-lg font-semibold">Commission</h3>
+        <p class="mb-3 text-sm text-slate-500">
+          Optional. Set % of ticket total or a fixed ₱ for server / TIC. Leave rate blank to skip. Automatic Sales commission
+          rules still apply on checkout.
+        </p>
+        <p class="mb-3 text-xs text-slate-500">
+          Base (pre-tip): <span class="font-semibold tabular-nums text-slate-700">{money(Math.max(0, props.grandTotal))}</span>
+        </p>
+        <Index each={rows()}>
+          {(row, i) => (
+            <div class="mb-3 rounded-xl border border-slate-200 p-3">
+              <div class="mb-2 flex items-center justify-between gap-2">
+                <input
+                  class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Server / TIC name"
+                  value={row().tic_name}
+                  onInput={(e) => update(i, { tic_name: e.currentTarget.value })}
+                />
+                <Show when={rows().length > 1}>
+                  <button
+                    type="button"
+                    class="text-xs text-rose-600"
+                    onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i).map((r, n) => ({ ...r, line_no: n + 1 })))}
+                  >
+                    Remove
+                  </button>
+                </Show>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <select
+                  class="rounded-lg border border-slate-300 px-2 py-2 text-sm"
+                  value={row().calc_mode}
+                  onChange={(e) => update(i, { calc_mode: e.currentTarget.value as "percent" | "fixed" })}
+                >
+                  <option value="percent">Percent of total</option>
+                  <option value="fixed">Fixed amount ₱</option>
+                </select>
+                <input
+                  class="rounded-lg border border-slate-300 px-3 py-2 text-right text-sm tabular-nums"
+                  inputMode="decimal"
+                  placeholder={row().calc_mode === "fixed" ? "0.00" : "0"}
+                  value={row().rate_value}
+                  onInput={(e) => update(i, { rate_value: e.currentTarget.value })}
+                />
+              </div>
+            </div>
+          )}
+        </Index>
+        <button
+          type="button"
+          class="mb-4 w-full rounded-lg border border-dashed border-slate-300 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          onClick={() =>
+            setRows((prev) => [
+              ...prev,
+              { line_no: prev.length + 1, tic_user_id: null, tic_name: "", calc_mode: "percent", rate_value: "" },
+            ])
+          }
+        >
+          + Add person
+        </button>
+        <p class="mb-4 text-sm text-slate-600">
+          Preview total: <span class="font-semibold tabular-nums">{money(previewTotal())}</span>
+        </p>
+        <div class="flex gap-2">
+          <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
+            Cancel
+          </button>
+          <button type="button" class="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500" onClick={done}>
+            Done
           </button>
         </div>
       </div>
@@ -1533,20 +1606,20 @@ function DiscountModal(props: {
             Cart is split equally across guests unless you assign lines to a guest on the order panel. Senior/PWD VAT
             exemption applies only to that guest&apos;s share.
           </p>
-          <For each={guestRows()}>
+          <Index each={guestRows()}>
             {(g, i) => (
               <div class="mb-3 rounded-xl border border-slate-200 p-3">
                 <div class="mb-2 flex items-center justify-between gap-2">
                   <input
                     class="flex-1 rounded border border-slate-300 px-2 py-1 text-sm font-medium"
-                    value={g.display_name}
-                    onInput={(e) => updateGuest(i(), { display_name: e.currentTarget.value })}
+                    value={g().display_name}
+                    onInput={(e) => updateGuest(i, { display_name: e.currentTarget.value })}
                   />
                   <Show when={guestRows().length > 1}>
                     <button
                       type="button"
                       class="text-xs text-rose-600"
-                      onClick={() => setGuestRows((rows) => rows.filter((_, idx) => idx !== i()).map((r, n) => ({ ...r, guest_no: n + 1 })))}
+                      onClick={() => setGuestRows((rows) => rows.filter((_, idx) => idx !== i).map((r, n) => ({ ...r, guest_no: n + 1 })))}
                     >
                       Remove
                     </button>
@@ -1554,8 +1627,8 @@ function DiscountModal(props: {
                 </div>
                 <select
                   class="mb-2 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                  value={g.privilege_type}
-                  onChange={(e) => updateGuest(i(), { privilege_type: e.currentTarget.value as PosPrivilegeKind })}
+                  value={g().privilege_type}
+                  onChange={(e) => updateGuest(i, { privilege_type: e.currentTarget.value as PosPrivilegeKind })}
                 >
                   <option value="none">Regular (no discount)</option>
                   <option value="senior">Senior ({props.seniorPct}%)</option>
@@ -1563,26 +1636,26 @@ function DiscountModal(props: {
                   <option value="student">Student ({props.studentPct}%)</option>
                   <option value="manual">Manual ₱</option>
                 </select>
-                <Show when={g.privilege_type === "senior" || g.privilege_type === "pwd" || g.privilege_type === "student"}>
+                <Show when={g().privilege_type === "senior" || g().privilege_type === "pwd" || g().privilege_type === "student"}>
                   <input
                     class="mb-2 w-full rounded border border-slate-300 px-2 py-1 text-sm"
-                    placeholder={g.privilege_type === "pwd" ? "PWD ID *" : g.privilege_type === "senior" ? "OSCA ID *" : "Student ID"}
-                    value={g.privilege_id_no}
-                    onInput={(e) => updateGuest(i(), { privilege_id_no: e.currentTarget.value })}
+                    placeholder={g().privilege_type === "pwd" ? "PWD ID *" : g().privilege_type === "senior" ? "OSCA ID *" : "Student ID"}
+                    value={g().privilege_id_no}
+                    onInput={(e) => updateGuest(i, { privilege_id_no: e.currentTarget.value })}
                   />
                 </Show>
-                <Show when={g.privilege_type === "manual"}>
+                <Show when={g().privilege_type === "manual"}>
                   <input
                     class="w-full rounded border border-slate-300 px-2 py-1 text-sm tabular-nums"
                     inputMode="decimal"
                     placeholder="Manual discount ₱"
-                    value={g.manual_discount > 0 ? String(g.manual_discount) : ""}
-                    onInput={(e) => updateGuest(i(), { manual_discount: Number(e.currentTarget.value) || 0 })}
+                    value={g().manual_discount}
+                    onInput={(e) => updateGuest(i, { manual_discount: e.currentTarget.value })}
                   />
                 </Show>
               </div>
             )}
-          </For>
+          </Index>
           <button
             type="button"
             class="mb-4 w-full rounded-lg border border-dashed border-slate-300 py-2 text-sm text-slate-600 hover:bg-slate-50"
@@ -1929,6 +2002,8 @@ function OrderPanel(props: {
   customerLabel: string;
   onCustomer: () => void;
   onDiscount: () => void;
+  onCommission: () => void;
+  commissionCount: number;
   onSaveBill: () => void;
   onBills: () => void;
   onQty: (ln: PosCartLine, delta: number) => void;
@@ -1944,12 +2019,15 @@ function OrderPanel(props: {
   return (
     <aside class="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
       <div class="border-b border-slate-100 p-4">
-        <div class="mb-3 grid grid-cols-4 gap-2">
+        <div class="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
           <button type="button" class={actionBtn} onClick={props.onCustomer}>
             <span>Customer</span>
           </button>
           <button type="button" class={actionBtn} onClick={props.onDiscount}>
             <span>{props.guests.length > 0 ? `Guests (${props.guests.length})` : "Discount"}</span>
+          </button>
+          <button type="button" class={actionBtn} onClick={props.onCommission}>
+            <span>{props.commissionCount > 0 ? `Comm (${props.commissionCount})` : "Commission"}</span>
           </button>
           <button type="button" class={actionBtn} onClick={props.onSaveBill}>
             <span>Save Bill</span>

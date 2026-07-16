@@ -3,6 +3,7 @@ package financedefaults
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -109,6 +110,23 @@ func Load(ctx context.Context, q querier, tenantID int64) (Defaults, error) {
 		&d.CommissionExpenseAccountID, &d.CommissionPayableAccountID, &d.AutoPostCommissionJournal,
 		&d.DisabledAccountTypes,
 	)
+	if err != nil {
+		// Migration 176 not applied yet — load core defaults without commission columns.
+		if strings.Contains(err.Error(), "commission_expense_account_id") ||
+			strings.Contains(err.Error(), "auto_post_commission_journal") ||
+			strings.Contains(err.Error(), "commission_payable_account_id") {
+			err = q.QueryRow(ctx, `
+				select cash_account_id, receivable_account_id, payable_account_id,
+				  sales_account_id, purchase_account_id, input_vat_account_id, output_vat_account_id,
+				  coalesce(disabled_account_types, '{}')
+				from public.tenant_finance_defaults
+				where tenant_id = $1`, tenantID).Scan(
+				&d.CashAccountID, &d.ReceivableAccountID, &d.PayableAccountID,
+				&d.SalesAccountID, &d.PurchaseAccountID, &d.InputVATAccountID, &d.OutputVATAccountID,
+				&d.DisabledAccountTypes,
+			)
+		}
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return d, nil
 	}
