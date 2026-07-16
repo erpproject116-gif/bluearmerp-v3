@@ -43,6 +43,7 @@ export function useCurrencyList(params: () => CurrencyListParams) {
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

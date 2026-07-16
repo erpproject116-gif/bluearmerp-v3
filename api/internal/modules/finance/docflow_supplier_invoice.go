@@ -31,6 +31,15 @@ func docflowValidation(fields map[string]string) error {
 	return &docflowValidationError{fields: fields}
 }
 
+// ValidationFields returns field messages when err is a docflow validation error.
+func ValidationFields(err error) map[string]string {
+	var ve *docflowValidationError
+	if errors.As(err, &ve) {
+		return ve.fields
+	}
+	return nil
+}
+
 // CreateSupplierInvoiceFromGoodsReceipt creates a supplier invoice from open goods receipt lines.
 // If a supplier invoice already exists for the goods receipt, the existing id is returned.
 func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, grID int64) (int64, error) {

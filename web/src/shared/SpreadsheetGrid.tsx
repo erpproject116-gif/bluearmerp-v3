@@ -69,6 +69,22 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let lastEmittedSearch = props.search ?? "";
 
+  // Keep last rows visible while a search/page refetch returns empty interim data
+  // (TanStack Query drops cache on queryKey change unless placeholderData is set).
+  const [displayRows, setDisplayRows] = createSignal<T[]>(props.rows);
+  const [displayTotal, setDisplayTotal] = createSignal<number | undefined>(props.total);
+
+  createEffect(() => {
+    const rows = props.rows;
+    const total = props.total;
+    const loading = !!props.loading;
+    if (loading && rows.length === 0 && displayRows().length > 0) {
+      return;
+    }
+    setDisplayRows(rows);
+    if (total !== undefined) setDisplayTotal(total);
+  });
+
   createEffect(() => {
     const external = props.search ?? "";
     if (external !== lastEmittedSearch) {
@@ -96,6 +112,9 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
     const ms = props.searchDebounceMs ?? 2000;
     searchTimer = setTimeout(() => commitSearch(value), ms);
   };
+
+  const isInitialLoading = () => !!props.loading && displayRows().length === 0;
+  const isRefreshing = () => !!props.loading && displayRows().length > 0;
 
   const columnDefs = () =>
     props.columns.map((c) => ({
@@ -140,28 +159,38 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   };
 
   createEffect(() => {
-    if (props.rows.length === 0) setFocusIdx(0);
-    else if (focusIdx() >= props.rows.length) setFocusIdx(props.rows.length - 1);
+    const rows = displayRows();
+    if (rows.length === 0) setFocusIdx(0);
+    else if (focusIdx() >= rows.length) setFocusIdx(rows.length - 1);
   });
 
   const totalPages = () => {
-    const total = props.total ?? 0;
+    const total = displayTotal() ?? 0;
     const size = props.pageSize ?? 1;
     return Math.max(1, Math.ceil(total / size));
   };
 
   const rangeStart = () => {
-    if (!props.total || props.total === 0) return 0;
-    return ((props.page ?? 1) - 1) * (props.pageSize ?? props.rows.length) + 1;
+    const total = displayTotal();
+    if (!total || total === 0) return 0;
+    return ((props.page ?? 1) - 1) * (props.pageSize ?? displayRows().length) + 1;
   };
 
   const rangeEnd = () => {
-    if (!props.total || props.total === 0) return 0;
-    return Math.min((props.page ?? 1) * (props.pageSize ?? props.rows.length), props.total);
+    const total = displayTotal();
+    if (!total || total === 0) return 0;
+    return Math.min((props.page ?? 1) * (props.pageSize ?? displayRows().length), total);
   };
 
   onMount(() => {
+    const isTypingTarget = (el: EventTarget | null) => {
+      if (!(el instanceof HTMLElement)) return false;
+      const tag = el.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      return el.isContentEditable;
+    };
     const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       if (e.key === "F2") {
         e.preventDefault();
         props.onNew();
@@ -169,18 +198,18 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setFocusIdx((i) => Math.min(i + 1, Math.max(0, props.rows.length - 1)));
-        const row = props.rows[focusIdx()];
+        setFocusIdx((i) => Math.min(i + 1, Math.max(0, displayRows().length - 1)));
+        const row = displayRows()[focusIdx()];
         if (row) props.onSelect(row.id);
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
         setFocusIdx((i) => Math.max(i - 1, 0));
-        const row = props.rows[focusIdx()];
+        const row = displayRows()[focusIdx()];
         if (row) props.onSelect(row.id);
       }
       if (e.key === "Enter") {
-        const row = props.rows[focusIdx()];
+        const row = displayRows()[focusIdx()];
         if (row) {
           e.preventDefault();
           props.onEdit(row);
@@ -313,11 +342,15 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           </div>
         </div>
       </div>
-      <Show when={props.loading && props.rows.length === 0}>
+      <Show when={isInitialLoading()}>
         <p class="p-8 text-center text-sm text-text-secondary">{uiLabel("common.loading")}</p>
       </Show>
-      <Show when={!props.loading || props.rows.length > 0}>
-        <DataTableScroll maxHeight="calc(100vh - 16rem)">
+      <Show when={!isInitialLoading()}>
+        <div class="relative">
+          <Show when={isRefreshing()}>
+            <div class="pointer-events-none absolute inset-0 z-[2] bg-white/40" aria-hidden="true" />
+          </Show>
+          <DataTableScroll maxHeight="calc(100vh - 16rem)">
           <table
             class="erp-grid text-left text-sm"
             style={{ width: `${tableWidth()}px`, "min-width": "100%" }}
@@ -350,7 +383,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               </tr>
             </thead>
             <tbody>
-              {props.rows.map((row, idx) => (
+              {displayRows().map((row, idx) => (
                 <tr
                   class="cursor-pointer transition hover:erp-panel"
                   classList={{ "bg-brand-50": idx === focusIdx() || props.selectedId === row.id }}
@@ -391,17 +424,18 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               ))}
             </tbody>
           </table>
-          <Show when={props.rows.length === 0 && !props.loading}>
+          <Show when={displayRows().length === 0 && !props.loading}>
             <p class="p-8 text-center text-sm text-text-secondary">{uiLabel("common.no_rows")}</p>
           </Show>
         </DataTableScroll>
-        <Show when={props.total !== undefined && props.page !== undefined && props.pageSize !== undefined}>
+        </div>
+        <Show when={displayTotal() !== undefined && props.page !== undefined && props.pageSize !== undefined}>
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3">
             <span class="text-sm text-text-secondary">
-              {props.total === 0
+              {displayTotal() === 0
                 ? uiLabel("common.no_results")
-                : `Showing ${rangeStart()}–${rangeEnd()} of ${props.total}`}
-              <Show when={props.loading}>
+                : `Showing ${rangeStart()}–${rangeEnd()} of ${displayTotal()}`}
+              <Show when={isRefreshing()}>
                 <span class="ml-2 text-brand-600">{uiLabel("common.updating")}</span>
               </Show>
             </span>

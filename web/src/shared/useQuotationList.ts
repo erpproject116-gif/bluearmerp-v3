@@ -59,6 +59,7 @@ export function useQuotationList(params: () => QuotationListParams) {
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

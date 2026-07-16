@@ -537,7 +537,7 @@ func detectSnapshot(ctx context.Context, pool *pgxpool.Pool, tenantID int64) det
 		select count(*)::int from public.com_sent_messages
 		where tenant_id=$1 and status in ('sent', 'pending')`, tenantID)
 	s.RepairOrder = exists(`select count(*)::int from public.inv_repair_orders where tenant_id=$1 and deleted_at is null`, tenantID)
-	s.SupportTicket = exists(`select count(*)::int from public.support_tickets where tenant_id=$1`, tenantID)
+	s.SupportTicket = exists(`select count(*)::int from public.sup_support_tickets where tenant_id=$1`, tenantID)
 	s.QualityNCR = exists(`select count(*)::int from public.qms_ncrs where tenant_id=$1`, tenantID)
 	s.TeamInvited = count(`
 		select count(*)::int from public.users

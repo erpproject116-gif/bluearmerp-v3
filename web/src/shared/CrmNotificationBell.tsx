@@ -62,7 +62,7 @@ export function CrmNotificationBell(props: Props) {
         <button
           type="button"
           class="relative rounded-lg border border-stroke p-2 text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
-          aria-label="CRM notifications"
+          aria-label="Notifications"
           onClick={(e) => {
             e.stopPropagation();
             setOpen((v) => !v);

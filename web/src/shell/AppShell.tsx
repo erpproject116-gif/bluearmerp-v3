@@ -208,7 +208,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               <PresenceHeartbeat />
               <IdleLogoutGuard />
               <PresenceAvatars />
-              <CrmNotificationPoller enabled={canViewCrm(auth.me)} />
+              <CrmNotificationPoller enabled={Boolean(auth.me)} />
               <Show when={canViewCrm(auth.me)}>
                 <button
                   type="button"
@@ -218,7 +218,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                   + CRM task
                 </button>
               </Show>
-              <CrmNotificationBell enabled={canViewCrm(auth.me)} />
+              <CrmNotificationBell enabled={Boolean(auth.me)} />
             </div>
           </div>
           <SetupReminderBar />

@@ -63,6 +63,7 @@ export function useSalesList(params: () => SalesListParams) {
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

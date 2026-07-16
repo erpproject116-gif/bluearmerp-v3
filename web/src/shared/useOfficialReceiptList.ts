@@ -81,6 +81,7 @@ export function useOfficialReceiptList(params: () => OfficialReceiptListParams) 
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

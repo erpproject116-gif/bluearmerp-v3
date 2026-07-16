@@ -66,7 +66,24 @@ export default function CustomerVendorBookPage(props: Props) {
     <FinanceLayout>
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <h2 class="text-lg font-semibold text-text-primary">{title()}</h2>
-        <p class="mt-1 text-sm text-text-secondary">By slip + details — set date range, then Search (F8).</p>
+        <p class="mt-1 text-sm text-text-secondary">
+          {props.bookType === "ar"
+            ? "Customer ledger from Sales (debit) and Official Receipts (credit). Set a date range, then Search (F8)."
+            : "Vendor ledger from Purchases / supplier invoices (credit) and Payment Vouchers (debit). Set a date range, then Search (F8)."}
+        </p>
+        <div class="mt-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+          {props.bookType === "ar" ? (
+            <p>
+              No rows until you search. Data appears after you save <span class="font-medium">Sales</span> invoices
+              under Selling → Sales, and apply receipts under Finance → Official Receipts.
+            </p>
+          ) : (
+            <p>
+              No rows until you search. Data appears after you save <span class="font-medium">Purchases</span>
+              (supplier invoices) under Buying → Purchases, and apply payments under Finance → Payment Vouchers.
+            </p>
+          )}
+        </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Date from">
             <DateInput value={draftFilters().date_from} onInput={(e) => setDraftFilters((f) => ({ ...f, date_from: e.currentTarget.value }))} />
@@ -128,6 +145,16 @@ export default function CustomerVendorBookPage(props: Props) {
                   <tr>
                     <td colSpan={8} class="px-3 py-6 text-center text-text-secondary">
                       Loading…
+                    </td>
+                  </tr>
+                </Show>
+                <Show when={!report.isFetching && rowsWithBalance().length === 0}>
+                  <tr>
+                    <td colSpan={8} class="px-3 py-8 text-center text-sm text-text-secondary">
+                      No slips in this date range.
+                      {props.bookType === "ar"
+                        ? " Create a Sales invoice first, then search again."
+                        : " Create a Purchase (supplier invoice) first, then search again."}
                     </td>
                   </tr>
                 </Show>

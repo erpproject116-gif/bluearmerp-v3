@@ -104,7 +104,8 @@ func validateGenerate(ctx context.Context, pool *pgxpool.Pool, tenantID int64, b
 	switch pair {
 	case "quotation->sales_order", "sales_order->sales", "sales_order->delivery_receipt",
 		"sales_order->purchase_request",
-		"purchase_request->purchase_order", "goods_receipt->supplier_invoice", "sales_order->release":
+		"purchase_request->purchase_order", "goods_receipt->supplier_invoice",
+		"purchase_order->supplier_invoice", "sales_order->release":
 	default:
 		return warnings, fmt.Errorf("unsupported generation pair: %s", pair)
 	}
@@ -131,6 +132,8 @@ func executeGenerate(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 		return generatePRFromSO(ctx, pool, tu, sourceIDs)
 	case "goods_receipt->supplier_invoice":
 		return generateSupplierInvoiceFromGR(ctx, pool, tu, sourceIDs)
+	case "purchase_order->supplier_invoice":
+		return generateSupplierInvoiceFromPO(ctx, pool, tu, sourceIDs)
 	default:
 		return nil, fmt.Errorf("generation for %s is not yet automated; use module create endpoints", pair)
 	}
@@ -204,6 +207,49 @@ func generateSupplierInvoiceFromGR(ctx context.Context, pool *pgxpool.Pool, tu a
 			return out, fmt.Errorf("goods receipt %d: %w", grID, err)
 		}
 		out = append(out, invID)
+	}
+	return out, nil
+}
+
+func generateSupplierInvoiceFromPO(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, poIDs []int64) ([]int64, error) {
+	var out []int64
+	for _, poID := range poIDs {
+		rows, err := pool.Query(ctx, `
+			select id from public.gr_goods_receipts
+			where tenant_id = $1 and purchase_order_id = $2 and status = 'posted'
+			order by id`, tu.TenantID, poID)
+		if err != nil {
+			return out, fmt.Errorf("PO %d: %w", poID, err)
+		}
+		var grIDs []int64
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return out, fmt.Errorf("PO %d: %w", poID, err)
+			}
+			grIDs = append(grIDs, id)
+		}
+		rows.Close()
+		if len(grIDs) == 0 {
+			return out, fmt.Errorf("PO %d: no posted goods receipts to invoice — receive/post GR first", poID)
+		}
+		created := 0
+		for _, grID := range grIDs {
+			invID, err := finance.CreateSupplierInvoiceFromGoodsReceipt(ctx, pool, tu, grID)
+			if err != nil {
+				if fields := finance.ValidationFields(err); fields != nil {
+					// Skip GRs with nothing left to bill; keep going for others.
+					continue
+				}
+				return out, fmt.Errorf("PO %d / GR %d: %w", poID, grID, err)
+			}
+			out = append(out, invID)
+			created++
+		}
+		if created == 0 {
+			return out, fmt.Errorf("PO %d: posted GRs have no open qty left to bill", poID)
+		}
 	}
 	return out, nil
 }

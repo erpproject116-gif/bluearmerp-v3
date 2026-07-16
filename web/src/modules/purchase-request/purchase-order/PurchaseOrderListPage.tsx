@@ -1,9 +1,10 @@
-import { A } from "@solidjs/router";
-import { createSignal, For, Show } from "solid-js";
+import { A, useNavigate } from "@solidjs/router";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
+import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { useListState } from "../../../shared/useListState";
 import {
   confirmPurchaseOrder,
@@ -268,6 +269,7 @@ function CreateFromSupplierQuotationModal(props: {
 
 export default function PurchaseOrderListPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const invalidate = useInvalidatePurchaseOrders();
 
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -282,6 +284,11 @@ export default function PurchaseOrderListPage() {
   const [fromSqOpen, setFromSqOpen] = createSignal(false);
   const [poModalOpen, setPoModalOpen] = createSignal(false);
   const [editingPoId, setEditingPoId] = createSignal<number | null>(null);
+
+  const selectedIds = createMemo(() => {
+    const id = selectedId();
+    return id != null ? [id] : [];
+  });
 
   const list = usePurchaseOrderList(() => ({
     page: page(),
@@ -310,6 +317,11 @@ export default function PurchaseOrderListPage() {
 
   return (
     <PurchaseRequestLayout>
+      <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+        After goods are received and posted, select a PO and use{" "}
+        <span class="font-medium">Generate slip → Purchase</span> to create the AP invoice (or post a GR — Purchase is
+        created automatically).
+      </div>
       <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
@@ -434,21 +446,33 @@ export default function PurchaseOrderListPage() {
         statusLabel="Progress"
         statusOptions={[...DOC_PROGRESS_STATUS_TABS]}
         toolbarExtra={
-          <label class="shrink-0">
-            <span class="mb-1 block text-xs font-medium text-text-primary">Fulfillment</span>
-            <select
-              class="rounded-lg border border-stroke bg-white px-3 py-1.5 text-sm"
-              value={operationalFilter()}
-              onChange={(e) => {
-                setOperationalFilter(e.currentTarget.value);
-                setPage(1);
+          <div class="flex flex-wrap items-end gap-2">
+            <GenerateOtherSlipsMenu
+              sourceEntity="purchase_order"
+              targets={[{ label: "Purchase (from posted GRs)", targetEntity: "supplier_invoice" }]}
+              selectedIds={selectedIds}
+              onSuccess={(result) => {
+                invalidate();
+                const id = result.target_ids[0];
+                if (id) navigate(`/app/purchases/purchases?openId=${id}`);
               }}
-            >
-              <For each={OPERATIONAL_STATUS_TABS}>
-                {(opt) => <option value={opt.value}>{opt.label}</option>}
-              </For>
-            </select>
-          </label>
+            />
+            <label class="shrink-0">
+              <span class="mb-1 block text-xs font-medium text-text-primary">Fulfillment</span>
+              <select
+                class="rounded-lg border border-stroke bg-white px-3 py-1.5 text-sm"
+                value={operationalFilter()}
+                onChange={(e) => {
+                  setOperationalFilter(e.currentTarget.value);
+                  setPage(1);
+                }}
+              >
+                <For each={OPERATIONAL_STATUS_TABS}>
+                  {(opt) => <option value={opt.value}>{opt.label}</option>}
+                </For>
+              </select>
+            </label>
+          </div>
         }
         onRefresh={invalidate}
       />

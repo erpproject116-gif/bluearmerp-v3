@@ -1,6 +1,7 @@
-import { A } from "@solidjs/router";
-import { createSignal, Show } from "solid-js";
+import { A, useNavigate } from "@solidjs/router";
+import { createMemo, createSignal, Show } from "solid-js";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
+import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
 import {
@@ -29,6 +30,7 @@ function statusLabel(status: string): string {
 
 export default function GoodsReceiptListPage() {
   const auth = useAuth();
+  const navigate = useNavigate();
   const canInspect = () => hasPermission(auth.me, "quality.gr_inspection", "write");
   const canQc = () => hasPermission(auth.me, "quality.qc_requests", "write");
   const canReverse = () => hasPermission(auth.me, "purchase_order.goods_receipts_reverse", "write");
@@ -44,6 +46,11 @@ export default function GoodsReceiptListPage() {
   const [inspectingId, setInspectingId] = createSignal<number | null>(null);
   const [qcCreatingId, setQcCreatingId] = createSignal<number | null>(null);
   const [reversingId, setReversingId] = createSignal<number | null>(null);
+
+  const selectedIds = createMemo(() => {
+    const id = selectedId();
+    return id != null ? [id] : [];
+  });
 
   const reverseReceipt = async (row: GoodsReceiptRow) => {
     if (row.status !== "posted") return;
@@ -104,7 +111,10 @@ export default function GoodsReceiptListPage() {
   return (
     <PurchaseRequestLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-text-secondary">{uiLabel("goods_receipt.list_description")}</p>
+        <p class="text-sm text-text-secondary">
+          {uiLabel("goods_receipt.list_description")} Select a posted GR, then{" "}
+          <span class="font-medium">Generate slip → Purchase</span> to create the AP invoice.
+        </p>
         <div class="flex flex-wrap gap-2">
           <A
             href="/app/inventory/serial-lot/receive"
@@ -231,6 +241,18 @@ export default function GoodsReceiptListPage() {
         statusLabel="Status"
         statusOptions={STATUS_TABS}
         onRefresh={invalidate}
+        toolbarExtra={
+          <GenerateOtherSlipsMenu
+            sourceEntity="goods_receipt"
+            targets={[{ label: "Purchase (supplier invoice)", targetEntity: "supplier_invoice" }]}
+            selectedIds={selectedIds}
+            onSuccess={(result) => {
+              invalidate();
+              const id = result.target_ids[0];
+              if (id) navigate(`/app/purchases/purchases?openId=${id}`);
+            }}
+          />
+        }
       />
 
       <Show when={selectedId()}>

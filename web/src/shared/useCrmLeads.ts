@@ -59,6 +59,7 @@ export function useLeads(params: () => LeadListParams) {
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
       staleTime: 15_000,
+      placeholderData: (prev) => prev,
     };
   });
 }
@@ -77,6 +78,7 @@ export function useOpportunities(params: () => OpportunityListParams) {
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
       staleTime: 15_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

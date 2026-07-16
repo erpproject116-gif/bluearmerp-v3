@@ -1,6 +1,6 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { PURCHASES_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
@@ -34,6 +34,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   const canQc = () => hasPermission(auth.me, "quality.qc_requests", "write");
   const loc = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const invalidate = useInvalidateSupplierInvoices();
   const basePath = () => listBasePath(loc.pathname);
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("invoice_date", 25, {
@@ -88,6 +89,17 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
 
   onMount(() => {
     if (props.openNewOnMount || loc.pathname.endsWith("/new")) openNew();
+    const openId = Number(searchParams.openId ?? "");
+    if (openId > 0) {
+      void (async () => {
+        const res = await apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${openId}`);
+        if (res.success && res.data) {
+          setEditing(res.data);
+          setModalOpen(true);
+        }
+        setSearchParams({ openId: undefined }, { replace: true });
+      })();
+    }
   });
 
   return (

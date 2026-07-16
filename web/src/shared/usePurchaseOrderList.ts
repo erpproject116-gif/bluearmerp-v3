@@ -68,6 +68,7 @@ export function usePurchaseOrderList(params: () => PurchaseOrderListParams) {
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

@@ -48,6 +48,7 @@ export function useRepairOrderList(params: () => RepairOrderListParams) {
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

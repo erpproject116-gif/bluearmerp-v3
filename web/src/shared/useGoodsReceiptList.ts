@@ -54,6 +54,7 @@ export function useGoodsReceiptList(params: () => GoodsReceiptListParams) {
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

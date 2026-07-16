@@ -434,7 +434,7 @@ export function RepairOrderModal(props: Props) {
           }}
           fetchOptions={fetchLocations}
         />
-        <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status" fallbackRequired>
+        <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
           {(m) => (
             <select
               class={inputClass}

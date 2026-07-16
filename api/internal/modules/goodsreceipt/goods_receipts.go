@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -1218,7 +1220,26 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.post", "gr_goods_receipt", &grID, nil, nil)
-		response.OK(w, gr, "Goods receipt posted.")
+
+		msg := "Goods receipt posted."
+		if siID, err := finance.CreateSupplierInvoiceFromGoodsReceipt(r.Context(), pool, tu, grID); err != nil {
+			log.Printf("goods_receipt.post auto supplier invoice gr=%d: %v", grID, err)
+			detail := ""
+			for _, v := range finance.ValidationFields(err) {
+				if v != "" {
+					detail = v
+					break
+				}
+			}
+			if detail != "" {
+				msg = "Goods receipt posted. Purchase invoice not created: " + detail
+			} else {
+				msg = "Goods receipt posted. Purchase invoice was not created automatically."
+			}
+		} else if siID > 0 {
+			msg = fmt.Sprintf("Goods receipt posted. Purchase invoice #%d created for payables.", siID)
+		}
+		response.OK(w, gr, msg)
 	}
 }
 

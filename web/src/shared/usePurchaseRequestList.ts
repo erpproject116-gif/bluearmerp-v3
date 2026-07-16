@@ -83,6 +83,7 @@ export function usePurchaseRequestList(params: () => PurchaseRequestListParams) 
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

@@ -13,23 +13,27 @@ func RegisterJobRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/crm", func(cr chi.Router) {
-		cr.Use(auth.RequireViewCRM)
-		registerDashboardRoutes(cr, pool)
-		registerSalesTeamRoutes(cr, pool)
-		registerWarrantyAssetRoutes(cr, pool)
-		registerFollowUpTaskRoutes(cr, pool)
+		// Inbox is tenant-wide (activity + CRM alerts), not CRM-module gated.
 		registerNotificationRoutes(cr, pool)
-		registerPipelineRoutes(cr, pool)
-		registerLeadRoutes(cr, pool)
 
-		cr.Route("/reports", func(rr chi.Router) {
-			rr.Use(auth.RequireCrmAnalytics)
-			registerReportRoutes(rr, pool)
-		})
+		cr.Group(func(g chi.Router) {
+			g.Use(auth.RequireViewCRM)
+			registerDashboardRoutes(g, pool)
+			registerSalesTeamRoutes(g, pool)
+			registerWarrantyAssetRoutes(g, pool)
+			registerFollowUpTaskRoutes(g, pool)
+			registerPipelineRoutes(g, pool)
+			registerLeadRoutes(g, pool)
 
-		cr.Route("/alert-rules", func(ar chi.Router) {
-			ar.Get("/", listAlertRules(pool))
-			ar.With(auth.RequireManageCrmRules).Patch("/{id}", patchAlertRule(pool))
+			g.Route("/reports", func(rr chi.Router) {
+				rr.Use(auth.RequireCrmAnalytics)
+				registerReportRoutes(rr, pool)
+			})
+
+			g.Route("/alert-rules", func(ar chi.Router) {
+				ar.Get("/", listAlertRules(pool))
+				ar.With(auth.RequireManageCrmRules).Patch("/{id}", patchAlertRule(pool))
+			})
 		})
 	})
 }

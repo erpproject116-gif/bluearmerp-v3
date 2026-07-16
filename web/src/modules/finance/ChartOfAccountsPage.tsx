@@ -123,6 +123,7 @@ export default function ChartOfAccountsPage() {
         if (!res.success) throw new Error(res.message ?? "Failed to load accounts");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
+      placeholderData: (prev: { rows: AccountRow[]; total: number } | undefined) => prev,
     };
   });
 
@@ -182,7 +183,8 @@ export default function ChartOfAccountsPage() {
       for (const slot of DEFAULT_SLOTS) {
         const id = d[slot.key];
         if (id == null || id <= 0) {
-          next[slot.key] = "";
+          // Keep whatever the user is typing; only Clear should blank the label.
+          if (!(slot.key in next)) next[slot.key] = "";
           continue;
         }
         const acc = accounts.find((a) => a.id === id);

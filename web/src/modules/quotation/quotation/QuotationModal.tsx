@@ -589,7 +589,7 @@ export function QuotationModal(props: Props) {
         }}
         fetchOptions={fetchLocations}
       />
-      <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status" fallbackRequired>
+      <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
         {(m) => <ProgressStatusMenu value={progressStatus()} disabled={m.disabled} onChange={setProgressStatus} />}
       </ModalField>
       <ModalField settings={byKey} fieldKey="quotation_validity_text" fallbackLabel="Quotation validity">

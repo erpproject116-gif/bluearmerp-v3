@@ -42,6 +42,7 @@ export function usePaymentVoucherList(params: () => { page: number; pageSize: nu
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

@@ -46,6 +46,7 @@ export function useTaxTypeList(params: () => TaxTypeListParams) {
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

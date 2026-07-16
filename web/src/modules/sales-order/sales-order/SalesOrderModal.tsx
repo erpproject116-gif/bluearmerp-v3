@@ -662,7 +662,7 @@ export function SalesOrderModal(props: Props) {
           }}
           fetchOptions={fetchLocations}
         />
-        <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status" fallbackRequired>
+        <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
           {(m) => <ProgressStatusMenu value={progressStatus()} disabled={m.disabled} onChange={setProgressStatus} />}
         </ModalField>
         <ModalField settings={byKey} fieldKey="reference" fallbackLabel="Reference">

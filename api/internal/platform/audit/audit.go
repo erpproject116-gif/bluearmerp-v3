@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/notify"
 )
 
 type logEvent struct {
@@ -185,7 +186,11 @@ func insertOne(ctx context.Context, pool *pgxpool.Pool, ev logEvent) error {
 		  (tenant_id, actor_user_id, action_code, target_type, target_id, old_values, new_values)
 		values ($1, $2, $3, $4, $5, $6, $7)`,
 		ev.tenantID, ev.actorUserID, ev.actionCode, ev.targetType, ev.targetID, ev.oldJSON, ev.newJSON)
-	return err
+	if err != nil {
+		return err
+	}
+	notify.FromAudit(ctx, pool, ev.tenantID, ev.actorUserID, ev.actionCode, ev.targetType, ev.targetID)
+	return nil
 }
 
 func insertBatch(ctx context.Context, pool *pgxpool.Pool, batch []logEvent) error {

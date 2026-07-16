@@ -112,6 +112,7 @@ export function useSupplierInvoiceList(params: () => {
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

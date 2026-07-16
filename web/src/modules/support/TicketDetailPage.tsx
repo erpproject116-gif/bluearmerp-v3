@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { A, useNavigate, useParams } from "@solidjs/router";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { LookupCombo } from "../../shared/LookupCombo";
@@ -10,11 +10,21 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from "../../shared/useSupportTickets";
+import {
+  downloadSupportTicketAttachment,
+  formatTicketFileSize,
+  listSupportTicketAttachments,
+  uploadSupportTicketAttachment,
+  type SupportTicketAttachment,
+} from "../../shared/supportTicketAttachments";
 import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { SupportLayout } from "./SupportLayout";
 import { fetchRepairOrders, fetchSupportUsers, fetchWarrantyAssets } from "./supportLookups";
 import { LoadingText } from "../../shared/LoadingText";
+
+const STATUS_OPTIONS: TicketStatus[] = ["open", "in_progress", "waiting", "resolved", "closed"];
+const PRIORITY_OPTIONS: TicketPriority[] = ["low", "normal", "high", "urgent"];
 
 export default function TicketDetailPage() {
   const params = useParams();
@@ -30,10 +40,24 @@ export default function TicketDetailPage() {
   const [warrantyLabel, setWarrantyLabel] = createSignal("");
   const [assigneeLabel, setAssigneeLabel] = createSignal("");
   const [repairOrderLabel, setRepairOrderLabel] = createSignal("");
+  const [attachments, setAttachments] = createSignal<SupportTicketAttachment[]>([]);
+  const [uploading, setUploading] = createSignal(false);
 
   const canWrite = () => hasPermission(auth.me, "support.tickets", "write");
   const canAssign = () =>
     hasPermission(auth.me, "support.tickets_assign", "write") || canWrite();
+
+  const attachmentBytesUsed = () => attachments().reduce((sum, a) => sum + (a.size_bytes || 0), 0);
+
+  const loadAttachments = async (id: number) => {
+    const res = await listSupportTicketAttachments(id);
+    if (res.success && res.data) setAttachments(res.data);
+  };
+
+  createEffect(() => {
+    const id = ticketId();
+    if (id) void loadAttachments(id);
+  });
 
   const updateField = async (patch: Parameters<typeof patchTicket>[1]) => {
     const id = ticketId();
@@ -110,6 +134,65 @@ export default function TicketDetailPage() {
                   </A>
                 </p>
               </Show>
+
+              <div class="mb-6">
+                <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h2 class="text-sm font-semibold uppercase tracking-wide text-text-secondary">Attachments</h2>
+                  <span class="text-xs text-text-secondary">
+                    {formatTicketFileSize(attachmentBytesUsed())} / 25 MB
+                  </span>
+                </div>
+                <p class="mb-2 text-xs text-text-secondary">
+                  Images, documents, and short videos. Combined size must stay under 25 MB.
+                </p>
+                <Show when={canWrite()}>
+                  <label class="inline-block cursor-pointer rounded border border-stroke bg-white px-3 py-1.5 text-sm hover:bg-slate-50">
+                    {uploading() ? "Uploading…" : "Upload file"}
+                    <input
+                      type="file"
+                      class="hidden"
+                      accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                      disabled={uploading()}
+                      onChange={(e) => {
+                        const file = e.currentTarget.files?.[0];
+                        e.currentTarget.value = "";
+                        const id = ticketId();
+                        if (!file || !id) return;
+                        setUploading(true);
+                        void uploadSupportTicketAttachment(id, file).then((res) => {
+                          setUploading(false);
+                          if (!res.success) {
+                            toast.warning(res.message ?? "Upload failed.");
+                            return;
+                          }
+                          void loadAttachments(id);
+                        });
+                      }}
+                    />
+                  </label>
+                </Show>
+                <Show when={attachments().length > 0} fallback={<p class="mt-2 text-sm text-text-secondary">No attachments yet.</p>}>
+                  <ul class="mt-3 space-y-1 text-sm">
+                    <For each={attachments()}>
+                      {(a) => (
+                        <li class="flex flex-wrap items-center justify-between gap-2 rounded border border-stroke/60 px-3 py-2">
+                          <span class="text-text-primary">
+                            {a.file_name}{" "}
+                            <span class="text-xs text-text-secondary">({formatTicketFileSize(a.size_bytes)})</span>
+                          </span>
+                          <button
+                            type="button"
+                            class="text-xs font-medium text-brand-600 hover:underline"
+                            onClick={() => void downloadSupportTicketAttachment(ticketId()!, a)}
+                          >
+                            Download
+                          </button>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
+              </div>
 
               <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">Comments</h2>
               <div class="space-y-3">
@@ -230,6 +313,3 @@ export default function TicketDetailPage() {
     </SupportLayout>
   );
 }
-
-const STATUS_OPTIONS: TicketStatus[] = ["open", "in_progress", "waiting", "resolved", "closed"];
-const PRIORITY_OPTIONS: TicketPriority[] = ["low", "normal", "high", "urgent"];

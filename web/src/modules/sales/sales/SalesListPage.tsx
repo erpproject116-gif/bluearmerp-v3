@@ -1,5 +1,5 @@
 import { createMemo, createSignal, onMount } from "solid-js";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { SALES_SETTINGS_HREF } from "../../../shared/entityTypes";
@@ -30,6 +30,7 @@ type PageOptions = {
 export function SalesListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const invalidate = useInvalidateSales();
 
@@ -124,6 +125,17 @@ export function SalesListPageInner(props: PageOptions = {}) {
   onMount(() => {
     if (props.templateCode) setTemplateCode(props.templateCode);
     if (props.openNewOnMount || loc.pathname.endsWith("/new")) openNew();
+    const openId = Number(searchParams.openId ?? "");
+    if (openId > 0) {
+      void (async () => {
+        const res = await apiFetch<SalesDetail>(`/api/v1/sales/${openId}`);
+        if (res.success && res.data) {
+          setEditing(res.data);
+          setModalOpen(true);
+        }
+        setSearchParams({ openId: undefined }, { replace: true });
+      })();
+    }
   });
 
   return (

@@ -7,6 +7,7 @@ import {
   fieldRequired,
   fieldVisible,
   labelWithRequired,
+  DEFAULTED_STATUS_FIELDS,
 } from "./useFormFieldSettings";
 
 export type ModalFieldMeta = {
@@ -31,7 +32,9 @@ export function ModalField(props: Props) {
     const f = props.settings()[props.fieldKey];
     if (!fieldVisible(f, true)) return null;
     const label = f?.label?.trim() || props.fallbackLabel;
-    const required = fieldRequired(f, props.fallbackRequired ?? false);
+    const required = DEFAULTED_STATUS_FIELDS.has(props.fieldKey)
+      ? false
+      : fieldRequired(f, props.fallbackRequired ?? false);
     const disabled = fieldDisabled(f);
     const placeholder = fieldPlaceholder(f, props.fallbackPlaceholder);
     return {

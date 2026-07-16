@@ -50,6 +50,7 @@ export function useDeliveryReceiptList(params: () => DeliveryReceiptListParams) 
         const res = await apiFetch<DeliveryReceiptRow[]>(`/api/v1/sales-order/delivery-receipts?${qs}`);
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
+      placeholderData: (prev) => prev,
     };
   });
 }

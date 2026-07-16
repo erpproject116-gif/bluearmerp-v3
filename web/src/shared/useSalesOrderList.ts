@@ -62,6 +62,7 @@ export function useSalesOrderList(params: () => SalesOrderListParams) {
         };
       },
       staleTime: 30_000,
+      placeholderData: (prev) => prev,
     };
   });
 }

@@ -41,7 +41,7 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 			p.Order = "desc"
 		}
 		offset := httputil.Offset(p)
-		where := "n.tenant_id = $1 and (n.user_id is null or n.user_id = $2)"
+		where := "n.tenant_id = $1 and (n.user_id is null or n.user_id = $2) and (n.actor_user_id is null or n.actor_user_id <> $2)"
 		args := []any{tu.TenantID, tu.AppUserID}
 		n := 3
 		if strings.TrimSpace(r.URL.Query().Get("unread_only")) == "true" {
@@ -84,7 +84,8 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = pool.QueryRow(r.Context(), `
 			select count(*) from public.crm_notifications
 			where tenant_id = $1 and read_at is null
-			  and (user_id is null or user_id = $2)`, tu.TenantID, tu.AppUserID).Scan(&unreadTotal)
+			  and (user_id is null or user_id = $2)
+			  and (actor_user_id is null or actor_user_id <> $2)`, tu.TenantID, tu.AppUserID).Scan(&unreadTotal)
 		response.OKListWithMeta(w, out, p.Page, p.PageSize, total, &unreadTotal)
 	}
 }

@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createSignal, For, onMount, Show } from "solid-js";
 import { ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
@@ -48,7 +49,7 @@ export default function ApAgingReportPage() {
     <FinanceLayout>
       <ReportPageLayout
         title="A/P Aging"
-        description="Payables balances grouped by aging bucket - Search (F8)."
+        description="Payables balances grouped by aging bucket - Search (F8). Click an invoice no. to open the purchase."
         dateFrom={() => filters().as_of ?? ""}
         dateTo={() => filters().as_of ?? ""}
         onDateFromChange={(v) => setFilters({ as_of: v })}
@@ -91,8 +92,15 @@ export default function ApAgingReportPage() {
           <tbody>
             <For each={report.data?.rows ?? []}>
               {(row) => (
-                <tr class="border-t border-stroke/60">
-                  <td class="px-3 py-2">{row.invoice_no}</td>
+                <tr class="border-t border-stroke/60 hover:bg-brand-50/40">
+                  <td class="px-3 py-2">
+                    <A
+                      href={`/app/purchases/purchases?openId=${row.supplier_invoice_id}`}
+                      class="font-medium text-brand-600 underline-offset-2 hover:underline"
+                    >
+                      {row.invoice_no}
+                    </A>
+                  </td>
                   <td class="px-3 py-2">{row.vendor_name}</td>
                   <td class="px-3 py-2">{row.due_date}</td>
                   <td class="px-3 py-2 text-right">{row.balance}</td>

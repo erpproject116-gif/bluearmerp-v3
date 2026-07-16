@@ -79,6 +79,7 @@ func registerTicketRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/tickets/{id}", getTicket(pool))
 	r.With(auth.RequirePermission("support.tickets", auth.AccessWrite)).Patch("/tickets/{id}", patchTicket(pool))
 	r.With(auth.RequirePermission("support.tickets", auth.AccessWrite)).Post("/tickets/{id}/comments", addTicketComment(pool))
+	registerTicketAttachmentRoutes(r, pool)
 }
 
 func listTickets(pool *pgxpool.Pool) http.HandlerFunc {
