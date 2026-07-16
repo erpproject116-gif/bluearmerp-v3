@@ -55,6 +55,19 @@ export type MeData = {
   };
 };
 
+/** Platform console (Customers / Plans) — must match API platformConsoleOwnerEmails. */
+export const PLATFORM_CONSOLE_EMAILS = new Set([
+  "itsjohnranel@gmail.com",
+  "bluearmph@gmail.com",
+  "erpproject116@gmail.com",
+]);
+
+export function canAccessPlatformConsole(me: MeData | null | undefined): boolean {
+  if (!me?.user?.is_platform_superadmin) return false;
+  const email = me.user.email?.trim().toLowerCase() ?? "";
+  return PLATFORM_CONSOLE_EMAILS.has(email);
+}
+
 export function canManageFormSettings(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;

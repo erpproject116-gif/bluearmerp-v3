@@ -1,5 +1,5 @@
 import { createMemo, createSignal, onMount } from "solid-js";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
@@ -117,6 +117,13 @@ export function QuotationListPageInner(props: PageOptions = {}) {
 
   return (
     <QuotationLayout>
+      <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+        Create and edit quote documents here. For a stage board of the same quotes, open{" "}
+        <A href="/app/crm/pipelines/quotations" class="font-medium text-brand-700 hover:underline">
+          Quote board
+        </A>{" "}
+        (CRM).
+      </div>
       <SpreadsheetGrid
         columns={[
           { key: "date_no_display", header: "Date-no", clickable: true },

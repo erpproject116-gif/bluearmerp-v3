@@ -1,4 +1,5 @@
 -- Verify BLUEARM platform owners and module access flags
+-- Expected platform console emails: itsjohnranel@, bluearmph@, erpproject116@
 select
   t.company_code,
   t.company_name,
@@ -15,6 +16,10 @@ left join public.users owner_u on owner_u.id = t.owner_user_id
 left join public.platform_users pu on pu.auth_user_id = u.auth_user_id
 where t.company_code = 'BLUEARM'
 order by u.email;
+
+select pu.email, pu.role, pu.is_active
+from public.platform_users pu
+order by pu.email;
 
 select tm.module_code, tm.is_enabled
 from public.tenant_modules tm

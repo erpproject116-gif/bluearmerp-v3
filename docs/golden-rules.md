@@ -46,7 +46,7 @@ Screens with **+ New row** expose form field settings (standard + custom fields,
 
 ### Table ↔ Board toggle
 
-Pipeline pages (Follow-up Tasks, Quotation Pipeline) use `ViewModeToggle` from `web/src/shared/ViewModeToggle.tsx`:
+Pipeline pages (Follow-up Tasks, Quote board) use `ViewModeToggle` from `web/src/shared/ViewModeToggle.tsx`:
 
 - Segmented control: **Table | Board**
 - Persist choice in `localStorage` per page key

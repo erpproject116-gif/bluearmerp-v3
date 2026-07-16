@@ -117,7 +117,7 @@ export default function TicketDetailPage() {
                     href={`/app/crm/warranty-assets?q=${encodeURIComponent(t().ticket_no)}`}
                     class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
                   >
-                    View warranty registry
+                    View warranty coverage
                   </A>
                 </Show>
               </div>

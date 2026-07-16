@@ -146,6 +146,11 @@ export const appModules: AppModule[] = [
         href: "/app/after-sales/register-repair/consumption",
         settingsHref: "/app/after-sales/repair-orders/settings",
       },
+      {
+        label: "Warranty coverage",
+        href: "/app/crm/warranty-assets",
+        settingsHref: "/app/crm/settings/alert-rules",
+      },
     ],
   },
   {
@@ -160,6 +165,11 @@ export const appModules: AppModule[] = [
         label: "Open quotes",
         href: "/app/quotation/quotations/outstanding",
         settingsHref: "/app/quotation/quotations/settings",
+      },
+      {
+        label: "Quote board",
+        href: "/app/crm/pipelines/quotations",
+        settingsHref: "/app/crm/settings/alert-rules",
       },
     ],
   },
@@ -282,11 +292,11 @@ export const appModules: AppModule[] = [
       { label: "Leads", href: "/app/crm/leads", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Opportunities", href: "/app/crm/opportunities", settingsHref: "/app/crm/settings/alert-rules" },
       {
-        label: "Quotation Pipeline",
+        label: "Quote board",
         href: "/app/crm/pipelines/quotations",
         settingsHref: "/app/crm/settings/alert-rules",
       },
-      { label: "Warranty Registry", href: "/app/crm/warranty-assets", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Warranty coverage", href: "/app/crm/warranty-assets", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Alert Rules", href: "/app/crm/settings/alert-rules", settingsHref: "/app/crm/settings/alert-rules", managersOnly: true },
     ],
   },

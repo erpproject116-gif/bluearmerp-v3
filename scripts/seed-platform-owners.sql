@@ -44,7 +44,8 @@ from public.tenants t
 cross join (
   values
     ('itsjohnranel@gmail.com', 'John Ranel'),
-    ('bluearmph@gmail.com', 'Bluearm PH')
+    ('bluearmph@gmail.com', 'Bluearm PH'),
+    ('erpproject116@gmail.com', 'ERP Project')
 ) as v(email, full_name)
 where t.company_code = 'BLUEARM'
 on conflict (tenant_id, email) do update

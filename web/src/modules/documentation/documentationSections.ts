@@ -231,7 +231,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "Quotation List shows all quotes. Quotation Status and Outstanding Quote Status help you find quotes that are still open, expired, or waiting for follow-up.",
+        text: "Quotation List shows all quotes. Quotation Status and Outstanding Quote Status help you find quotes that are still open, expired, or waiting for follow-up. For a Kanban of the same quotes by stage, open Quote board under CRM (also linked from Quotation tabs).",
       },
     ],
   },
@@ -538,8 +538,8 @@ export const documentationSections: DocSection[] = [
         items: [
           "Check CRM Dashboard and Notifications for items that need attention.",
           "Use Follow-up Tasks to schedule calls or visits.",
-          "Open Warranty Registry to see products under warranty for your customers.",
-          "Use Quotation Pipeline to see quotes at each stage.",
+          "Open Warranty coverage to see sold products under warranty for your customers.",
+          "Use Quote board to see quotes at each sales stage (same quotes as Quotation → List).",
         ],
       },
       {
@@ -548,7 +548,11 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "tip",
-        text: "The bell icon at the top of the screen shows CRM alerts when you have new notifications.",
+        text: "The bell icon at the top of the screen shows CRM alerts when you have new notifications. The floating Help (?) button opens the help assistant; the ticket button above it opens a new support ticket. Drag the pair to move them; double-click to reset position.",
+      },
+      {
+        type: "tip",
+        text: "Quote board is a CRM stage view of quotations — create and edit quote lines under Quotation. Warranty coverage tracks sold-asset end dates; After-Sales handles repair jobs.",
       },
     ],
   },
@@ -618,7 +622,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Support helps your team track customer issues after the sale. Each ticket links to a customer and can reference a warranty asset from the CRM registry.",
+        text: "Support helps your team track customer issues after the sale. Each ticket links to a customer and can reference a warranty asset from CRM → Warranty coverage.",
       },
       {
         type: "steps",
@@ -836,7 +840,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "After-Sales covers repair orders and registered repairs. Use it when customers bring products back for service or when you track in-house repair work.",
+        text: "After-Sales covers repair orders and registered repairs. Use it when customers bring products back for service or when you track in-house repair work. Sold-unit warranty end dates live under CRM → Warranty coverage (also linked from After-Sales tabs).",
       },
       {
         type: "steps",
@@ -845,6 +849,7 @@ export const documentationSections: DocSection[] = [
           "Click New Repair Order to log a new service job with customer and item details.",
           "Use Repair Order Status to monitor progress across all open jobs.",
           "Register Repair screens handle day-to-day repair logging and consumption of parts.",
+          "Open Warranty coverage when you need coverage end dates or CRM warranty follow-ups (not repair intake).",
         ],
       },
     ],
@@ -869,8 +874,13 @@ export const documentationSections: DocSection[] = [
           "User Management → Process Policies: require quotations, SO, PR approval, GR before supplier invoice, and legacy vs split SO release.",
           "User Management → Demo Data: populate or purge sample documents on DEMO000 / BLUEARM tenants.",
           "Activity Logs: see who changed important records.",
-          "Branding (from your account menu): upload your logo and set the company name on printed documents.",
+          "Branding (from your account menu): upload your logo, set print names, and under Navigation rename sidebar modules and header tabs for your store.",
+          "Use the floating Support ticket button (above Help) to open a new ticket from any screen — drag the pair out of the way if they cover content.",
         ],
+      },
+      {
+        type: "tip",
+        text: "Rename sidebar and tabs under Branding → Navigation. Leave a field blank to restore the default product name.",
       },
     ],
   },

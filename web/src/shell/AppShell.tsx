@@ -11,7 +11,7 @@ import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
 import { IdleLogoutGuard } from "../shared/IdleLogoutGuard";
 import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ShellProvider, useShell } from "./shell-context";
-import { featureHeaderTitle, resolveFeature, resolveModule, resolveSubBranch, visibleHeaderFeatures } from "./modules";
+import { resolveFeature, resolveModule, resolveSubBranch, visibleHeaderFeatures } from "./modules";
 import { isSubBranchPath } from "./sub-branch-nav";
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
 import { CollectiveInvoicingHeaderNav } from "./CollectiveInvoicingHeaderNav";
@@ -31,6 +31,7 @@ import { isReviewPurchasesPath, reviewPurchasesHeaderTitle } from "./review-purc
 import { useBranding } from "../shared/branding/BrandingProvider";
 import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
+import { navFeatureLabelKey, navModuleLabelKey } from "../shared/branding/navLabels";
 import { UserAccountMenu } from "./UserAccountMenu";
 import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
 import { SidebarNav } from "./SidebarNav";
@@ -64,8 +65,17 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const appTagline = () => brandingLabel("app.tagline", "ERP v3");
 
   const activeModule = () => resolveModule(loc.pathname);
-  const moduleLabel = (mod: NonNullable<ReturnType<typeof resolveModule>>) =>
-    moduleDisplayLabel(auth.me, mod.id, mod.label);
+  const moduleLabel = (mod: NonNullable<ReturnType<typeof resolveModule>>) => {
+    const key = navModuleLabelKey(mod.id);
+    const override = branding.settings().labels[key];
+    const fallback = moduleDisplayLabel(auth.me, mod.id, mod.label);
+    return override?.trim() ? override : fallback;
+  };
+  const featureLabel = (modId: string, feature: NonNullable<ReturnType<typeof resolveFeature>>) => {
+    const key = navFeatureLabelKey(modId, feature.href);
+    const override = branding.settings().labels[key];
+    return override?.trim() ? override : feature.label;
+  };
   const activeFeature = () => {
     const mod = activeModule();
     return mod ? resolveFeature(mod, loc.pathname) : undefined;
@@ -186,7 +196,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                             <span class="mx-1.5 text-text-secondary/50" aria-hidden="true">
                               ›
                             </span>
-                            <span>{branch().label}</span>
+                            <span>{featureLabel(mod().id, branch())}</span>
                           </>
                         )}
                       </Show>
@@ -197,7 +207,13 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                         : activeSubBranch()
                           ? subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix)
                           : activeFeature()
-                            ? featureHeaderTitle(activeFeature()!, loc.pathname)
+                            ? (() => {
+                                const f = activeFeature()!;
+                                const base = featureLabel(mod().id, f);
+                                return loc.pathname === f.settingsHref && f.settingsHref !== f.href
+                                  ? `${base} settings`
+                                  : base;
+                              })()
                             : moduleLabel(mod())}
                     </h1>
                   </>
@@ -225,7 +241,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <Show when={featureNavModule()}>
             {(mod) => (
               <Show when={visibleHeaderFeatures(mod()).length > 0}>
-                <nav class="erp-header-features mt-3" aria-label={`${mod().label} features`}>
+                <nav class="erp-header-features mt-3" aria-label={`${moduleLabel(mod())} features`}>
                   {visibleHeaderFeatures(mod())
                     .filter((feature) => {
                       if (mod().id === "crm") {
@@ -258,7 +274,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                           "text-text-secondary hover:erp-panel hover:text-text-primary": !active,
                         }}
                       >
-                        {feature.label}
+                        {featureLabel(mod().id, feature)}
                       </A>
                       );
                     })}

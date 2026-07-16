@@ -20,7 +20,8 @@ begin
     from (
       values
         ('itsjohnranel@gmail.com'::text, 'John Ranel'::text),
-        ('bluearmph@gmail.com'::text, 'Bluearm PH'::text)
+        ('bluearmph@gmail.com'::text, 'Bluearm PH'::text),
+        ('erpproject116@gmail.com'::text, 'ERP Project'::text)
     ) as m(gmail, display_name)
   loop
     select u.auth_user_id

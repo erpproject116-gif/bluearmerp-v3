@@ -272,6 +272,8 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 	tu.canManageSalesTeamRole = canManageSalesTeam
 	tu.canViewCrmAnalyticsRole = canViewCrmAnalytics
 	tu.IsStoreAdmin = tu.CanManageFormSettings()
+	// Platform console: require both platform_users superadmin row AND allowlisted email.
+	tu.IsPlatformSuperadmin = tu.IsPlatformSuperadmin && isBootstrapSuperadminEmail(tu.Email)
 	if err := loadEffectivePermissions(ctx, pool, &tu); err != nil {
 		return TenantUser{}, err
 	}

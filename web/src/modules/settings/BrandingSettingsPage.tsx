@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { Navigate } from "@solidjs/router";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useAuth, canManageBranding } from "../../shared/auth-context";
@@ -10,6 +10,8 @@ import {
   STAGE_KEYS,
 } from "../../shared/branding/defaults";
 import { UI_COPY_GROUPS } from "../../shared/branding/uiCopyCatalog";
+import { buildNavLabelCatalog } from "../../shared/branding/navLabels";
+import { appModules } from "../../shell/modules";
 import type { BrandingColors, BrandingReceipt, BrandingSettings } from "../../shared/branding/types";
 import { StageBadge } from "../../shared/branding/StageBadge";
 import { progressStatusLabel } from "../../shared/branding/progressStatus";
@@ -106,6 +108,17 @@ export default function BrandingSettingsPage() {
     const ok = await branding.uploadLogo(file);
     if (ok) syncDraft();
   };
+
+  const navCatalog = createMemo(() => buildNavLabelCatalog(appModules));
+  const navGroups = createMemo(() => {
+    const map = new Map<string, ReturnType<typeof buildNavLabelCatalog>>();
+    for (const row of navCatalog()) {
+      const list = map.get(row.groupTitle) ?? [];
+      list.push(row);
+      map.set(row.groupTitle, list);
+    }
+    return [...map.entries()].map(([title, items]) => ({ title, items }));
+  });
 
   if (!canManageBranding(auth.me)) {
     return <Navigate href="/app" />;
@@ -232,6 +245,39 @@ export default function BrandingSettingsPage() {
                   />
                 </Show>
               </Field>
+              </div>
+            )}
+          </For>
+        </div>
+      </section>
+
+      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
+        <h2 class="text-lg font-medium text-text-primary">Navigation</h2>
+        <p class="mt-1 text-sm text-text-secondary">
+          Rename sidebar modules and header feature tabs. Leave blank to keep the default product name.
+        </p>
+        <div class="mt-6 max-h-[32rem] space-y-6 overflow-y-auto pr-1">
+          <For each={navGroups()}>
+            {(group) => (
+              <div>
+                <h3 class="text-sm font-semibold text-text-primary">{group.title}</h3>
+                <div class="mt-3 space-y-3">
+                  <For each={group.items}>
+                    {(row) => (
+                      <Field
+                        label={`${row.scope === "module" ? "Module" : "Tab"}: ${row.defaultLabel}`}
+                      >
+                        <input
+                          type="text"
+                          class={inputClass}
+                          placeholder={row.defaultLabel}
+                          value={draft().labels[row.key] ?? ""}
+                          onInput={(e) => patchLabel(row.key, e.currentTarget.value)}
+                        />
+                      </Field>
+                    )}
+                  </For>
+                </div>
               </div>
             )}
           </For>

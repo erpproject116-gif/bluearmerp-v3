@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createMemo, createSignal, Show } from "solid-js";
 import { KanbanBoard } from "../../shared/KanbanBoard";
 import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
@@ -100,6 +101,13 @@ export default function QuotationPipelinePage() {
 
   return (
     <CrmLayout>
+      <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+        Stage board for open quotes (same documents as{" "}
+        <A href="/app/quotation/quotations" class="font-medium text-brand-700 hover:underline">
+          Quotation → List
+        </A>
+        ). Create and edit quote lines there; chase stages here.
+      </div>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <ViewModeToggle value={viewMode()} onChange={setViewMode} storageKey={STORAGE_KEY} />
         <input

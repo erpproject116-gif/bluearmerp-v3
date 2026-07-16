@@ -1,7 +1,8 @@
 import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { useAuth } from "../shared/auth-context";
 import { isTenantFeatureEnabled, isTenantModuleEnabled, moduleDisplayLabel } from "../shared/moduleAccess";
+import { navFeatureLabelKey, navModuleLabelKey } from "../shared/branding/navLabels";
+import { useBranding } from "../shared/branding/BrandingProvider";
 import { ModuleIcon } from "./ModuleIcon";
 import { useShell } from "./shell-context";
 import {
@@ -20,6 +21,12 @@ import {
 import { isAnySubBranchPath, isSubBranchPath } from "./sub-branch-nav";
 import { isReviewPurchasesPath } from "./review-purchases-nav";
 import { isTaxMngtPath } from "./tax-mngt-nav";
+import { useAuth, canAccessPlatformConsole } from "../shared/auth-context";
+
+function brandedLabel(labels: Record<string, string>, key: string, fallback: string): string {
+  const v = labels[key];
+  return v?.trim() ? v : fallback;
+}
 
 function isFinanceModulePath(pathname: string): boolean {
   if (pathname === "/app/finance" || pathname.startsWith("/app/finance/")) return true;
@@ -55,7 +62,13 @@ function NavModuleLink(props: { module: AppModule }) {
   const loc = useLocation();
   const shell = useShell();
   const auth = useAuth();
-  const label = () => moduleDisplayLabel(auth.me, props.module.id, props.module.label);
+  const branding = useBranding();
+  const label = () =>
+    brandedLabel(
+      branding.settings().labels,
+      navModuleLabelKey(props.module.id),
+      moduleDisplayLabel(auth.me, props.module.id, props.module.label),
+    );
   const inModule = () => {
     if (props.module.id === "finance") return isFinanceModulePath(loc.pathname);
     return loc.pathname.startsWith(props.module.basePath);
@@ -131,6 +144,13 @@ function NavCustomLink(props: { label: string; href: string; basePath: string; i
 function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
   const loc = useLocation();
   const shell = useShell();
+  const branding = useBranding();
+  const branchLabel = () =>
+    brandedLabel(
+      branding.settings().labels,
+      navFeatureLabelKey(props.module.id, props.branch.href),
+      props.branch.label,
+    );
   const branchActive = () =>
     props.branch.prefix != null
       ? props.branch.href === loc.pathname ||
@@ -148,7 +168,7 @@ function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
       }}
     >
       <Show when={!shell.collapsed()}>
-        <span class="truncate">{props.branch.label}</span>
+        <span class="truncate">{branchLabel()}</span>
       </Show>
     </A>
   );
@@ -321,7 +341,7 @@ export function SidebarNav() {
 
       <For each={belowGroup()}>{(module) => <NavModuleLink module={module} />}</For>
 
-      <Show when={auth.me?.user.is_platform_superadmin}>
+      <Show when={canAccessPlatformConsole(auth.me)}>
         <div class="space-y-1 border-t border-stroke pt-3">
           <p class="px-3 text-xs font-semibold uppercase tracking-wider text-text-secondary">Platform</p>
           <A

@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createMemo, createSignal, Show } from "solid-js";
 import { DateInput } from "../../shared/DateInput";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
@@ -79,6 +80,13 @@ export default function WarrantyAssetsPage() {
 
   return (
     <CrmLayout>
+      <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+        Sold-asset warranty end dates and follow-ups. For repair jobs and intake, use{" "}
+        <A href="/app/after-sales/repair-orders" class="font-medium text-brand-700 hover:underline">
+          After-Sales → Repair Orders
+        </A>
+        .
+      </div>
       <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stroke bg-white p-4">
         <Field label="Sync from sales ID">
           <div class="flex gap-2">

@@ -1,5 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { INVENTORY_SETTINGS_HREF } from "../../../shared/entityTypes";
@@ -64,6 +64,13 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
 
   return (
     <AfterSalesLayout>
+      <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+        Repair jobs and service work. For sold-unit warranty end dates and CRM follow-ups, see{" "}
+        <A href="/app/crm/warranty-assets" class="font-medium text-brand-700 hover:underline">
+          Warranty coverage
+        </A>{" "}
+        (CRM).
+      </div>
       <SpreadsheetGrid
         columns={[
           { key: "date_no_display", header: "Date-no", clickable: true },

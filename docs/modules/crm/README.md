@@ -1,6 +1,6 @@
 # CRM module
 
-Customer relationship management: warranty registry, configurable alerts, in-app notifications, follow-up tasks, quotation pipeline (Table/Kanban), and analytics on existing Quotation / Sales Order / Sales / Inventory data.
+Customer relationship management: warranty coverage register, configurable alerts, in-app notifications, follow-up tasks, quote board (Table/Kanban), and analytics on existing Quotation / Sales Order / Sales / Inventory data.
 
 ## Features (MVP)
 
@@ -9,8 +9,8 @@ Customer relationship management: warranty registry, configurable alerts, in-app
 | CRM Dashboard | `/app/crm/dashboard` | `GET /api/v1/crm/dashboard/summary` |
 | Notifications | `/app/crm/notifications` | `GET /api/v1/crm/notifications` |
 | Follow-up Tasks | `/app/crm/follow-up-tasks` | `GET/POST/PATCH /api/v1/crm/follow-up-tasks` |
-| Quotation Pipeline | `/app/crm/pipelines/quotations` | `GET /api/v1/crm/pipelines/quotations` |
-| Warranty Registry | `/app/crm/warranty-assets` | `GET/PATCH /api/v1/crm/warranty-assets` |
+| Quote board | `/app/crm/pipelines/quotations` | `GET /api/v1/crm/pipelines/quotations` |
+| Warranty coverage | `/app/crm/warranty-assets` | `GET/PATCH /api/v1/crm/warranty-assets` |
 | Customer × Item | `/app/crm/reports/customer-quotations` | `GET /api/v1/crm/reports/customer-quotations-by-item` |
 | Item Demand | `/app/crm/reports/item-demand` | `GET /api/v1/crm/reports/item-demand` |
 | Conversion Funnel | `/app/crm/reports/conversion` | `GET /api/v1/crm/reports/conversion-funnel` |
@@ -50,7 +50,7 @@ Computed live from ERP tables (not cached):
 
 ## Table ↔ Kanban
 
-Follow-up Tasks and Quotation Pipeline support **Table | Board** toggle (`ViewModeToggle`). Board view uses `@thisbeyond/solid-dnd`; drag updates stage via PATCH.
+Follow-up Tasks and Quote board support **Table | Board** toggle (`ViewModeToggle`). Board view uses `@thisbeyond/solid-dnd`; drag updates stage via PATCH.
 
 See [golden-rules.md](../../golden-rules.md#kanban-and-notification-center).
 
@@ -83,7 +83,7 @@ Idempotent per rule + entity + day via `dedupe_key`.
 3. CRM Dashboard — KPI tiles load; drill-down links open reports.
 4. Create a Sale with `serial_lot_no` on an item with warranty months → warranty asset appears in registry.
 5. Follow-up Tasks — switch Table/Board; drag card updates stage.
-6. Quotation Pipeline — board shows open / expired / converted stages.
+6. Quote board — board shows open / expired / converted stages.
 7. Low Stock report — set `reorder_level` on an item below current `qty_on_hand`.
 8. Alert Rules — toggle rule off/on (requires `can_manage_crm_rules`).
 9. `POST /crm/jobs/evaluate-alerts` with valid secret creates notifications without duplicates on re-run.

@@ -18,10 +18,20 @@ func TestNormalizeEmail(t *testing.T) {
 }
 
 func TestIsBootstrapSuperadminEmail(t *testing.T) {
-	if !isBootstrapSuperadminEmail("itsjohnranel@gmail.com") {
-		t.Fatal("expected bootstrap email")
+	for _, email := range []string{
+		"itsjohnranel@gmail.com",
+		"bluearmph@gmail.com",
+		"erpproject116@gmail.com",
+		"ItsJohnRanel@Gmail.com",
+	} {
+		if !isBootstrapSuperadminEmail(email) {
+			t.Fatalf("expected platform console email %q", email)
+		}
 	}
 	if isBootstrapSuperadminEmail("other@example.com") {
 		t.Fatal("unexpected bootstrap email")
+	}
+	if IsPlatformConsoleEmail("demo@customer.com") {
+		t.Fatal("customer email must not access platform console")
 	}
 }

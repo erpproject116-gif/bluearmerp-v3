@@ -14,19 +14,29 @@ var (
 	ErrAmbiguousInvite = errors.New("ambiguous invite email across tenants")
 )
 
-// bootstrapSuperadminEmails match scripts/seed-platform-owners.sql + link-platform-owners.sql.
-var bootstrapSuperadminEmails = map[string]struct{}{
-	"itsjohnranel@gmail.com": {},
-	"bluearmph@gmail.com":    {},
+// platformConsoleOwnerEmails are the only accounts allowed Platform console access
+// (Customers / Plans). Must match scripts/seed-platform-owners.sql + link-platform-owners.sql.
+var platformConsoleOwnerEmails = map[string]struct{}{
+	"itsjohnranel@gmail.com":  {},
+	"bluearmph@gmail.com":     {},
+	"erpproject116@gmail.com": {},
 }
+
+// bootstrapSuperadminEmails is an alias kept for call sites / tests.
+var bootstrapSuperadminEmails = platformConsoleOwnerEmails
 
 func normalizeEmail(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
 }
 
 func isBootstrapSuperadminEmail(email string) bool {
-	_, ok := bootstrapSuperadminEmails[normalizeEmail(email)]
+	_, ok := platformConsoleOwnerEmails[normalizeEmail(email)]
 	return ok
+}
+
+// IsPlatformConsoleEmail reports whether email may use the Platform console.
+func IsPlatformConsoleEmail(email string) bool {
+	return isBootstrapSuperadminEmail(email)
 }
 
 // tryAutoLinkProvisionedUser links a Supabase auth user to ALL pre-provisioned rows for

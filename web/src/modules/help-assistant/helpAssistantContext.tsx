@@ -11,6 +11,10 @@ import {
 } from "solid-js";
 import { HelpAssistantPanel } from "./HelpAssistantPanel";
 import { useHelpAssistant } from "./useHelpAssistant";
+import { FloatingActionDock } from "../../shared/FloatingActionDock";
+import { NewSupportTicketModal } from "../support/NewSupportTicketModal";
+import { canViewCrm, hasPermission, useAuth } from "../../shared/auth-context";
+import { isTenantModuleEnabled } from "../../shared/moduleAccess";
 
 type HelpAssistantUi = {
   open: () => boolean;
@@ -22,9 +26,11 @@ const HelpAssistantContext = createContext<HelpAssistantUi>();
 
 export function HelpAssistantProvider(props: ParentProps) {
   const loc = useLocation();
+  const auth = useAuth();
   const assistant = useHelpAssistant(() => loc.pathname);
   const [open, setOpen] = createSignal(false);
   const [queuedQuery, setQueuedQuery] = createSignal<string | null>(null);
+  const [ticketOpen, setTicketOpen] = createSignal(false);
 
   const toggle = () => setOpen((v) => !v);
 
@@ -32,6 +38,13 @@ export function HelpAssistantProvider(props: ParentProps) {
     const q = query.trim();
     setOpen(true);
     if (q) setQueuedQuery(q);
+  };
+
+  const showSupportFab = () => {
+    if (!auth.me) return false;
+    if (!isTenantModuleEnabled(auth.me, "support")) return false;
+    if (!canViewCrm(auth.me)) return false;
+    return hasPermission(auth.me, "support.tickets_new", "write");
   };
 
   createEffect(() => {
@@ -58,19 +71,16 @@ export function HelpAssistantProvider(props: ParentProps) {
   return (
     <HelpAssistantContext.Provider value={value}>
       {props.children}
-      <button
-        type="button"
-        class="fixed bottom-5 right-5 z-[58] flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2"
-        aria-label={open() ? "Close help assistant" : "Open help assistant"}
-        aria-expanded={open()}
-        title="Help assistant (Ctrl+Shift+H)"
-        onClick={toggle}
-      >
-        <Show when={open()} fallback={<span class="text-lg" aria-hidden="true">?</span>}>
-          <span class="text-lg" aria-hidden="true">✕</span>
-        </Show>
-      </button>
+      <FloatingActionDock
+        showSupport={showSupportFab()}
+        helpOpen={open()}
+        onHelpClick={toggle}
+        onSupportClick={() => setTicketOpen(true)}
+      />
       <HelpAssistantPanel open={open()} onClose={() => setOpen(false)} assistant={assistant} />
+      <Show when={showSupportFab()}>
+        <NewSupportTicketModal open={ticketOpen()} onClose={() => setTicketOpen(false)} />
+      </Show>
     </HelpAssistantContext.Provider>
   );
 }
