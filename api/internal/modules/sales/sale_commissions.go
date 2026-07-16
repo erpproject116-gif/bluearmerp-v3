@@ -160,7 +160,7 @@ func accrueSaleLineCommissions(ctx context.Context, tx pgx.Tx, tenantID, salesID
 		return nil
 	}
 	rows, err := tx.Query(ctx, `
-		select id, tic_user_id, base_amount::float8, commission_amount::float8
+		select id, tic_user_id, tic_name, base_amount::float8, commission_amount::float8
 		from public.sa_sales_commission_lines
 		where tenant_id=$1 and sales_id=$2 and commission_amount > 0
 		order by line_no`, tenantID, salesID)
@@ -170,36 +170,54 @@ func accrueSaleLineCommissions(ctx context.Context, tx pgx.Tx, tenantID, salesID
 		}
 		return err
 	}
-	defer rows.Close()
+	type lineRow struct {
+		id   int64
+		tic  *int64
+		name string
+		base float64
+		amt  float64
+	}
+	var lines []lineRow
 	for rows.Next() {
-		var lineID int64
-		var tic *int64
-		var base, amt float64
-		if err := rows.Scan(&lineID, &tic, &base, &amt); err != nil {
+		var ln lineRow
+		if err := rows.Scan(&ln.id, &ln.tic, &ln.name, &ln.base, &ln.amt); err != nil {
+			rows.Close()
 			return err
 		}
+		lines = append(lines, ln)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, ln := range lines {
 		var exists int64
 		_ = tx.QueryRow(ctx, `
 			select id from public.sa_commission_accruals
 			where tenant_id=$1 and sales_id=$2 and sale_commission_line_id=$3`,
-			tenantID, salesID, lineID).Scan(&exists)
+			tenantID, salesID, ln.id).Scan(&exists)
 		if exists > 0 {
 			continue
 		}
+		// Prefer beneficiary_name on insert (migration 176); fall back without it if column missing.
 		if _, err := tx.Exec(ctx, `
 			insert into public.sa_commission_accruals (
-			  tenant_id, rule_id, sales_id, salesperson_user_id, base_amount, commission_amount, status, sale_commission_line_id
-			) values ($1, null, $2, $3, $4, $5, 'accrued', $6)`,
-			tenantID, salesID, tic, base, amt, lineID); err != nil {
-			return fmt.Errorf("insert line commission accrual: %w", err)
+			  tenant_id, rule_id, sales_id, salesperson_user_id, base_amount, commission_amount, status, sale_commission_line_id, beneficiary_name
+			) values ($1, null, $2, $3, $4, $5, 'accrued', $6, nullif($7,''))`,
+			tenantID, salesID, ln.tic, ln.base, ln.amt, ln.id, strings.TrimSpace(ln.name)); err != nil {
+			if strings.Contains(err.Error(), "beneficiary_name") || strings.Contains(err.Error(), "42703") {
+				if _, err2 := tx.Exec(ctx, `
+					insert into public.sa_commission_accruals (
+					  tenant_id, rule_id, sales_id, salesperson_user_id, base_amount, commission_amount, status, sale_commission_line_id
+					) values ($1, null, $2, $3, $4, $5, 'accrued', $6)`,
+					tenantID, salesID, ln.tic, ln.base, ln.amt, ln.id); err2 != nil {
+					return fmt.Errorf("insert line commission accrual: %w", err2)
+				}
+			} else {
+				return fmt.Errorf("insert line commission accrual: %w", err)
+			}
 		}
-		// Best-effort display name (column from migration 176).
-		_, _ = tx.Exec(ctx, `
-			update public.sa_commission_accruals a
-			set beneficiary_name = scl.tic_name
-			from public.sa_sales_commission_lines scl
-			where a.sale_commission_line_id = scl.id and a.tenant_id = $1 and a.sales_id = $2 and a.sale_commission_line_id = $3`,
-			tenantID, salesID, lineID)
 	}
 	return nil
 }
@@ -228,7 +246,9 @@ func ApplyCompletedSaleCommissions(ctx context.Context, tx pgx.Tx, tenantID, use
 		return err
 	}
 	if err := accrueSaleLineCommissions(ctx, tx, tenantID, salesID); err != nil {
-		if strings.Contains(err.Error(), "sa_commission") || strings.Contains(err.Error(), "sa_sales_commission") {
+		if strings.Contains(err.Error(), "sa_commission") ||
+			strings.Contains(err.Error(), "sa_sales_commission") ||
+			strings.Contains(err.Error(), "conn busy") {
 			return nil
 		}
 		return err
