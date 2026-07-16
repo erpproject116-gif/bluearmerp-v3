@@ -140,28 +140,60 @@ export function InvoicePanel(props: Props) {
     const res = await apiFetch<{
       sales_account_id?: number | null;
       purchase_account_id?: number | null;
+      receivable_account_id?: number | null;
+      payable_account_id?: number | null;
     }>("/api/v1/finance/accounts/defaults", {}, { silent: true });
-    if (!res.success || !res.data) return false;
-    const id = kind === "sales" ? res.data.sales_account_id : res.data.purchase_account_id;
-    if (!id) return false;
-    const params = new URLSearchParams({
-      page: "1",
-      pageSize: "200",
-      status: "active",
-      sort: "account_code",
-      order: "asc",
-      account_type: cfg().acctIType,
-    });
-    const list = await apiFetch<{ id: number; account_code: string; account_name: string }[]>(
-      `/api/v1/finance/accounts?${params}`,
-      {},
-      { silent: true },
-    );
-    const found = (list.data ?? []).find((a) => a.id === id);
-    if (!found) return false;
-    setAcctILabel(`[${found.account_code}] ${found.account_name}`);
-    setAcctIId(found.id);
-    return true;
+    if (!res.success || !res.data) return { acctI: false, acctII: false };
+
+    let acctI = false;
+    let acctII = false;
+    const acctIId = kind === "sales" ? res.data.sales_account_id : res.data.purchase_account_id;
+    const acctIIId = kind === "sales" ? res.data.receivable_account_id : res.data.payable_account_id;
+
+    if (acctIId) {
+      const params = new URLSearchParams({
+        page: "1",
+        pageSize: "200",
+        status: "active",
+        sort: "account_code",
+        order: "asc",
+        account_type: cfg().acctIType,
+      });
+      const list = await apiFetch<{ id: number; account_code: string; account_name: string }[]>(
+        `/api/v1/finance/accounts?${params}`,
+        {},
+        { silent: true },
+      );
+      const found = (list.data ?? []).find((a) => a.id === acctIId);
+      if (found) {
+        setAcctILabel(`[${found.account_code}] ${found.account_name}`);
+        setAcctIId(found.id);
+        acctI = true;
+      }
+    }
+
+    if (acctIIId) {
+      const params = new URLSearchParams({
+        page: "1",
+        pageSize: "200",
+        status: "active",
+        sort: "account_code",
+        order: "asc",
+      });
+      const list = await apiFetch<{ id: number; account_code: string; account_name: string }[]>(
+        `/api/v1/finance/accounts?${params}`,
+        {},
+        { silent: true },
+      );
+      const found = (list.data ?? []).find((a) => a.id === acctIIId);
+      if (found) {
+        setAcctIILabel(`[${found.account_code}] ${found.account_name}`);
+        setAcctIIId(found.id);
+        acctII = true;
+      }
+    }
+
+    return { acctI, acctII };
   };
 
   const ensurePurchaseCogsAccount = async () => {
@@ -194,24 +226,26 @@ export function InvoicePanel(props: Props) {
       const voucher = data.voucher;
       if (props.kind === "sales") {
         const v = voucher as SalesInvoice;
-        if (!v.sales_account_id) {
+        if (!v.sales_account_id || !v.deposit_account_id) {
           const fromDefaults = await prefillFromDefaults("sales");
-          if (!fromDefaults) void prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
+          if (!v.sales_account_id && !fromDefaults.acctI) void prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
+          if (!v.deposit_account_id && !fromDefaults.acctII) void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
         }
-        if (!v.deposit_account_id) void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
       } else {
         const v = voucher as PurchaseInvoice;
-        if (!v.purchase_account_id) {
+        if (!v.purchase_account_id || !v.withdrawal_account_id) {
           const fromDefaults = await prefillFromDefaults("purchase");
-          if (!fromDefaults) {
+          if (!v.purchase_account_id && !fromDefaults.acctI) {
             const ok = await prefill(cfg().defaultAcctI, setAcctILabel, setAcctIId);
             if (!ok) {
               const expenseOpts = await fetchAccountOptions("", "expense");
               setPurchaseCogsHint(expenseOpts.length === 0);
             }
           }
+          if (!v.withdrawal_account_id && !fromDefaults.acctII) {
+            void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
+          }
         }
-        if (!v.withdrawal_account_id) void prefill(cfg().defaultAcctII, setAcctIILabel, setAcctIIId);
       }
     } catch (err) {
       toast.warning(err instanceof Error ? err.message : "Failed to load invoice.");

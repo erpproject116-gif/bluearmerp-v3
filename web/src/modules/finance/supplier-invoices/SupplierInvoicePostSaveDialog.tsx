@@ -14,7 +14,7 @@ export function SupplierInvoicePostSaveDialog(props: Props) {
   return (
     <Modal open={props.open} title="Purchase saved" onClose={props.onDone} stacked>
       <p class="text-sm text-text-secondary">
-        <strong>{props.invoiceNo}</strong> saved — {formatPeso(props.amount)}. Record a vendor payment now, or open Payment Vouchers later for unpaid balances.
+        <strong>{props.invoiceNo}</strong> saved — {formatPeso(props.amount)}. Record a vendor payment now, open the Invoice tab for A/P accounts, or finish and pay later from Unpaid / Payment Vouchers.
       </p>
       <div class="mt-6 flex flex-wrap justify-end gap-2">
         <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={props.onDone}>

@@ -41,6 +41,7 @@ import {
 import { SupplierInvoiceApprovalPanel } from "./SupplierInvoiceApprovalPanel";
 import { SupplierInvoicePostSaveDialog } from "./SupplierInvoicePostSaveDialog";
 import { CashPaymentToVendorModal } from "./CashPaymentToVendorModal";
+import { tryAutoSavePurchaseInvoice } from "../../../shared/invoiceApi";
 
 export type { SupplierInvoiceDetail as PurchaseDetail };
 
@@ -460,10 +461,16 @@ export function SupplierInvoiceModal(props: Props) {
     await draft.clearOnSave();
     props.onSaved();
     if (props.editing) {
+      // Refresh accounting voucher when line totals change and defaults are mapped.
+      void tryAutoSavePurchaseInvoice(props.editing.id);
       props.onClose();
       return;
     }
     setCreatedInvoice(res.data);
+    const autoOk = await tryAutoSavePurchaseInvoice(res.data.id);
+    if (autoOk) {
+      toast.success("Accounting invoice prepared from CoA defaults.");
+    }
     setPostSaveOpen(true);
   };
 

@@ -22,6 +22,7 @@ import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeCon
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
+import { tryAutoSaveSalesInvoice } from "../../../shared/invoiceApi";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
@@ -713,10 +714,15 @@ export function SalesModal(props: Props) {
     await draft.clearOnSave();
     props.onSaved();
     if (ed) {
+      void tryAutoSaveSalesInvoice(ed.id);
       props.onClose();
       return;
     }
     setCreatedSale(res.data);
+    const autoOk = await tryAutoSaveSalesInvoice(res.data.id);
+    if (autoOk) {
+      toast.success("Accounting invoice prepared from CoA defaults.");
+    }
     setPostSaveOpen(true);
   };
 

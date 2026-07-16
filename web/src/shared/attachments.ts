@@ -20,7 +20,8 @@ export type AttachmentScope =
   | "sales"
   | "sales-order/sales-orders"
   | "purchase-order/purchase-orders"
-  | "finance/supplier-invoices";
+  | "finance/supplier-invoices"
+  | "support/tickets";
 
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAccessToken();

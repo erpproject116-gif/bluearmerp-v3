@@ -239,7 +239,6 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onClose={closeModal}
         onSaved={() => {
           invalidate();
-          closeModal();
         }}
       />
       <WideEntityModal
