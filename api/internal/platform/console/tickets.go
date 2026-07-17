@@ -39,7 +39,13 @@ func (s *service) listTickets(w http.ResponseWriter, r *http.Request) {
 		       tn.company_code
 		from public.sup_support_tickets t
 		join public.tenants tn on tn.id = t.tenant_id
-		left join public.platform_customers pc on pc.tenant_id = t.tenant_id
+		left join lateral (
+		  select id, company_name, full_name
+		  from public.platform_customers
+		  where tenant_id = t.tenant_id
+		  order by id
+		  limit 1
+		) pc on true
 		`+where+`
 		order by t.updated_at desc nulls last, t.created_at desc
 		limit 100`, args...)
@@ -121,7 +127,7 @@ func (s *service) getTicket(w http.ResponseWriter, r *http.Request) {
 	var customerID *int64
 	var customerName string
 	_ = s.pool.QueryRow(r.Context(), `
-		select id, coalesce(company_name, full_name, '') from public.platform_customers where tenant_id = $1`, tenantID).
+		select id, coalesce(company_name, full_name, '') from public.platform_customers where tenant_id = $1 order by id limit 1`, tenantID).
 		Scan(&customerID, &customerName)
 
 	notes := []map[string]any{}

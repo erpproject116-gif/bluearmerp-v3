@@ -49,7 +49,12 @@ func (s *service) commandOverview(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.pool.Query(ctx, `
 		select t.id, t.ticket_no, t.subject, t.tenant_id, pc.id
 		from public.sup_support_tickets t
-		left join public.platform_customers pc on pc.tenant_id = t.tenant_id
+		left join lateral (
+		  select id from public.platform_customers
+		  where tenant_id = t.tenant_id
+		  order by id
+		  limit 1
+		) pc on true
 		where t.status in ('open','in_progress','waiting')
 		order by t.updated_at desc nulls last, t.created_at desc
 		limit 15`)
