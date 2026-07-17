@@ -83,8 +83,26 @@ func loadReservedSerialUnitIDsForSOLine(ctx context.Context, db interface {
 	return ids, rows.Err()
 }
 
+// validateSerialUnitLocationForSale ensures a serial being sold sits at the sale's location.
+func validateSerialUnitLocationForSale(lineNo int, serialNo string, saleLocationID int64, unitLocationID *int64) error {
+	if saleLocationID <= 0 {
+		return nil
+	}
+	if unitLocationID == nil || *unitLocationID != saleLocationID {
+		return fmt.Errorf("line %d: serial %s is not at the sale location", lineNo, serialNo)
+	}
+	return nil
+}
+
 // applySaleSerialUnits marks ledger serials sold and sets serial_lot_no on sales lines.
 func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, partnerID int64, lines []saleLineBody) error {
+	var saleLocationID int64
+	if err := tx.QueryRow(ctx, `
+		select location_id from public.sa_sales
+		where id = $1 and tenant_id = $2`, salesID, tenantID).Scan(&saleLocationID); err != nil {
+		return fmt.Errorf("sale not found")
+	}
+
 	rows, err := tx.Query(ctx, `
 		select ln.id, ln.line_no, ln.item_id, ln.qty::float8
 		from public.sa_sales_lines ln
@@ -148,15 +166,19 @@ func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, par
 		for _, unitID := range body.SerialUnitIDs {
 			var serialNo string
 			var status string
+			var locID *int64
 			err := tx.QueryRow(ctx, `
-				select serial_no, status from public.inv_serial_units
+				select serial_no, status, location_id from public.inv_serial_units
 				where id = $1 and tenant_id = $2 and item_id = $3
-				for update`, unitID, tenantID, *dbLn.itemID).Scan(&serialNo, &status)
+				for update`, unitID, tenantID, *dbLn.itemID).Scan(&serialNo, &status, &locID)
 			if err != nil {
 				return fmt.Errorf("line %d: invalid serial unit %d", dbLn.lineNo, unitID)
 			}
 			if status != "in_stock" && status != "reserved" {
 				return fmt.Errorf("line %d: serial %s is not available", dbLn.lineNo, serialNo)
+			}
+			if err := validateSerialUnitLocationForSale(dbLn.lineNo, serialNo, saleLocationID, locID); err != nil {
+				return err
 			}
 			_, err = tx.Exec(ctx, `
 				update public.inv_serial_units
@@ -171,8 +193,6 @@ func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, par
 			if err != nil {
 				return err
 			}
-			var locID *int64
-			_ = tx.QueryRow(ctx, `select location_id from public.inv_serial_units where id = $1`, unitID).Scan(&locID)
 			if err := inventory.InsertSerialEvent(ctx, tx, tenantID, unitID, "sold", locID, nil, "sa_sales_line", dbLn.id, nil); err != nil {
 				return err
 			}

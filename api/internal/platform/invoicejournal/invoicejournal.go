@@ -130,10 +130,20 @@ func SyncTx(ctx context.Context, tx pgx.Tx, tenantID, userID int64, entryDate ti
 	}
 
 	if autoPost {
-		if _, err := tx.Exec(ctx,
-			`update public.fin_journal_entries set status = 'posted', posted_at = now(), updated_at = now() where id = $1 and status = 'draft'`,
-			jeID); err != nil {
+		// finance_require_je_approval downgrades auto-post: the entry stays in
+		// draft so it must go through JE approval before posting.
+		var requireJEApproval bool
+		if err := tx.QueryRow(ctx,
+			`select coalesce(finance_require_je_approval, false) from public.tenant_process_policies where tenant_id = $1`,
+			tenantID).Scan(&requireJEApproval); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return 0, err
+		}
+		if !requireJEApproval {
+			if _, err := tx.Exec(ctx,
+				`update public.fin_journal_entries set status = 'posted', posted_at = now(), updated_at = now() where id = $1 and status = 'draft'`,
+				jeID); err != nil {
+				return 0, err
+			}
 		}
 	}
 	return jeID, nil

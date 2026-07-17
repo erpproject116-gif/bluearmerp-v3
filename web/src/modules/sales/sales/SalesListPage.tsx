@@ -21,6 +21,8 @@ import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesModal, type SalesDetail } from "./SalesModal";
 import { formatMoney, openSalesPrint } from "./salesPrint";
 import type { SalesTemplateCode } from "./SalesLineGrid";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 
 type PageOptions = {
   openNewOnMount?: boolean;
@@ -32,6 +34,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
+  const auth = useAuth();
   const invalidate = useInvalidateSales();
 
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -44,7 +47,15 @@ export function SalesListPageInner(props: PageOptions = {}) {
   const [creatingInvoice, setCreatingInvoice] = createSignal(false);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<SalesDetail | null>(null);
+  const [viewingDeleted, setViewingDeleted] = createSignal(false);
   const [templateCode, setTemplateCode] = createSignal<SalesTemplateCode>(props.templateCode ?? "default");
+
+  const lifecycle = useDocumentLifecycle({
+    apiBase: "/api/v1/sales",
+    documentLabel: "sales invoice",
+    canManage: () => hasPermission(auth.me, "sales.sales", "write"),
+    onChanged: invalidate,
+  });
 
   const list = useSalesList(() => ({
     page: page(),
@@ -53,6 +64,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
     order: order(),
     q: q() || undefined,
     progressStatus: statusFilter() || undefined,
+    lifecycle: lifecycle.filter(),
   }));
 
   const salesIds = createMemo(() => (list.data?.rows ?? []).map((r) => r.id));
@@ -60,13 +72,18 @@ export function SalesListPageInner(props: PageOptions = {}) {
 
   const openNew = () => {
     setEditing(null);
+    setViewingDeleted(false);
     setModalOpen(true);
   };
 
   const openEdit = async (row: SalesRow) => {
-    const res = await apiFetch<SalesDetail>(`/api/v1/sales/${row.id}`);
+    const [res, deleted] = await Promise.all([
+      apiFetch<SalesDetail>(lifecycle.detailUrl(row.id)),
+      lifecycle.resolveDeleted(row.id),
+    ]);
     if (!res.success || !res.data) return;
     setEditing(res.data);
+    setViewingDeleted(deleted);
     setModalOpen(true);
   };
 
@@ -256,6 +273,12 @@ export function SalesListPageInner(props: PageOptions = {}) {
               <ActivityHistoryLink module="sales" targetType="sa_sales" targetId={r.id} />
             ),
           },
+          {
+            key: "lifecycle",
+            header: "Manage",
+            sortable: false,
+            render: (r) => <lifecycle.RowAction id={r.id} label={r.sales_no || r.date_no_display} />,
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -286,15 +309,18 @@ export function SalesListPageInner(props: PageOptions = {}) {
         ]}
         onRefresh={invalidate}
         settingsHref={SALES_SETTINGS_HREF.sales}
+        toolbarExtra={<lifecycle.FilterControl />}
       />
 
       <SalesModal
         open={modalOpen()}
         editing={editing()}
         templateCode={templateCode()}
+        readOnly={viewingDeleted()}
         onClose={closeModal}
         onSaved={invalidate}
       />
+      <lifecycle.Dialog />
     </SalesLayout>
   );
 }

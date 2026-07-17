@@ -125,46 +125,30 @@ func createQcRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		source := strings.TrimSpace(body.SourceType)
-		if source != "goods_receipt" && source != "supplier_invoice" {
-			response.Validation(w, map[string]string{"source_type": "Must be goods_receipt or supplier_invoice."})
+		if source != "goods_receipt" {
+			response.Validation(w, map[string]string{
+				"source_type": "Quality control is performed at Goods Receipt, not Purchase Invoice.",
+			})
 			return
 		}
 		if source == "goods_receipt" && (body.GoodsReceiptID == nil || *body.GoodsReceiptID <= 0) {
 			response.Validation(w, map[string]string{"goods_receipt_id": "Goods receipt is required."})
 			return
 		}
-		if source == "supplier_invoice" && (body.SupplierInvoiceID == nil || *body.SupplierInvoiceID <= 0) {
-			response.Validation(w, map[string]string{"supplier_invoice_id": "Supplier invoice is required."})
-			return
-		}
 
 		var partnerName *string
-		if source == "goods_receipt" {
-			var name string
-			err := pool.QueryRow(r.Context(), `
-				select p.company_name
-				from public.gr_goods_receipts gr
-				join public.po_purchase_orders po on po.id = gr.purchase_order_id
-				join public.inv_partners p on p.id = po.partner_id
-				where gr.id = $1 and gr.tenant_id = $2`, *body.GoodsReceiptID, tu.TenantID).Scan(&name)
-			if err != nil {
-				response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
-				return
-			}
-			partnerName = &name
-		} else {
-			var name string
-			err := pool.QueryRow(r.Context(), `
-				select p.company_name
-				from public.fin_supplier_invoices si
-				join public.inv_partners p on p.id = si.partner_id
-				where si.id = $1 and si.tenant_id = $2 and si.deleted_at is null`, *body.SupplierInvoiceID, tu.TenantID).Scan(&name)
-			if err != nil {
-				response.Err(w, http.StatusNotFound, "Supplier invoice not found.", "ERR_NOT_FOUND")
-				return
-			}
-			partnerName = &name
+		var name string
+		err := pool.QueryRow(r.Context(), `
+			select p.company_name
+			from public.gr_goods_receipts gr
+			join public.po_purchase_orders po on po.id = gr.purchase_order_id
+			join public.inv_partners p on p.id = po.partner_id
+			where gr.id = $1 and gr.tenant_id = $2`, *body.GoodsReceiptID, tu.TenantID).Scan(&name)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
+			return
 		}
+		partnerName = &name
 
 		reqNo, err := allocateQcRequestNo(r.Context(), pool, tu.TenantID)
 		if err != nil {

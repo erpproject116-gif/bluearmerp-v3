@@ -36,6 +36,12 @@ type serialAdjustmentBody struct {
 	Lines  []serialAdjustmentLine `json:"lines"`
 }
 
+// serialStatusBlocksPositiveAdjustment reports statuses where increasing qty would corrupt the ledger:
+// sold/reserved units already belong to a sales document and must not be re-added to stock via adjustment.
+func serialStatusBlocksPositiveAdjustment(status string) bool {
+	return status == "sold" || status == "reserved"
+}
+
 func serialQtyOnHandSubquery() string {
 	return fmt.Sprintf(`greatest(0, coalesce((
 		select sum(%s)::float8
@@ -179,6 +185,10 @@ func applySerialAdjustments(pool *pgxpool.Pool) http.HandlerFunc {
 			newQty := currentQty + line.QtyDelta
 			if newQty < -0.0001 || newQty > 1.0001 {
 				response.Validation(w, map[string]string{"lines": fmt.Sprintf("Adjustment for %d would set invalid quantity (%.4f on hand).", line.SerialUnitID, currentQty)})
+				return
+			}
+			if line.QtyDelta > 0 && serialStatusBlocksPositiveAdjustment(status) {
+				response.Validation(w, map[string]string{"lines": fmt.Sprintf("Serial unit %d is %s; positive adjustments are not allowed.", line.SerialUnitID, status)})
 				return
 			}
 

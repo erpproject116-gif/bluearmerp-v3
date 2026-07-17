@@ -100,7 +100,7 @@ type receiptJournalBody struct {
 
 func registerReceiptJournalRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/receivables/open", listOpenReceivables(pool))
-	r.Patch("/official-receipts/{id}/journal", saveReceiptJournal(pool))
+	r.With(auth.RequirePermission("finance.official_receipts", auth.AccessWrite)).Patch("/official-receipts/{id}/journal", saveReceiptJournal(pool))
 }
 
 func loadReceiptJournal(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (OfficialReceiptJournal, error) {
@@ -297,6 +297,9 @@ func saveReceiptJournal(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		if blockIfPosted(w, r, pool, tu.TenantID, "official_receipt", id, "Editing") {
+			return
+		}
 		var body receiptJournalBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
@@ -375,6 +378,10 @@ func saveReceiptJournal(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if _, err := tx.Exec(r.Context(), `delete from public.fin_receipt_applications where official_receipt_id = $1`, id); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update applications.", "ERR_INTERNAL")
+			return
+		}
+		if err := lockAndCheckReceiptApplications(r.Context(), tx, tu.TenantID, id, appBodies); err != nil {
+			respondApplicationSaveError(w, err)
 			return
 		}
 		for _, app := range body.Applications {

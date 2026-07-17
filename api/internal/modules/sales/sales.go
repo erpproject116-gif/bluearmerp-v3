@@ -19,6 +19,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -26,33 +27,33 @@ import (
 )
 
 type SaleLine struct {
-	ID                     int64   `json:"id,omitempty"`
-	LineNo                 int     `json:"line_no"`
-	ItemID                 *int64  `json:"item_id,omitempty"`
-	ItemCode               string  `json:"item_code"`
-	ItemName               string  `json:"item_name"`
-	Description            *string `json:"description,omitempty"`
-	Qty                    float64 `json:"qty"`
-	ReturnedQty            float64 `json:"returned_qty"`
-	UnitNonVat             float64 `json:"unit_non_vat"`
-	NonVatTotal            float64 `json:"non_vat_total"`
-	TaxAmount              float64 `json:"tax_amount"`
-	UnitVatInc             float64 `json:"unit_vat_inc"`
-	LineTotal              float64 `json:"line_total"`
-	DiscountAmount         float64 `json:"discount_amount"`
-	DiscountedUnitNonVat   float64 `json:"discounted_unit_non_vat"`
-	DiscountedUnitVatInc   float64 `json:"discounted_unit_vat_inc"`
-	Remark                 *string `json:"remark,omitempty"`
-	SerialLotNo            *string `json:"serial_lot_no,omitempty"`
-	SerialUnitIDs          []int64 `json:"serial_unit_ids,omitempty"`
+	ID                     int64            `json:"id,omitempty"`
+	LineNo                 int              `json:"line_no"`
+	ItemID                 *int64           `json:"item_id,omitempty"`
+	ItemCode               string           `json:"item_code"`
+	ItemName               string           `json:"item_name"`
+	Description            *string          `json:"description,omitempty"`
+	Qty                    float64          `json:"qty"`
+	ReturnedQty            float64          `json:"returned_qty"`
+	UnitNonVat             float64          `json:"unit_non_vat"`
+	NonVatTotal            float64          `json:"non_vat_total"`
+	TaxAmount              float64          `json:"tax_amount"`
+	UnitVatInc             float64          `json:"unit_vat_inc"`
+	LineTotal              float64          `json:"line_total"`
+	DiscountAmount         float64          `json:"discount_amount"`
+	DiscountedUnitNonVat   float64          `json:"discounted_unit_non_vat"`
+	DiscountedUnitVatInc   float64          `json:"discounted_unit_vat_inc"`
+	Remark                 *string          `json:"remark,omitempty"`
+	SerialLotNo            *string          `json:"serial_lot_no,omitempty"`
+	SerialUnitIDs          []int64          `json:"serial_unit_ids,omitempty"`
 	SerialUnits            []SaleSerialUnit `json:"serial_units,omitempty"`
-	TrackSerial            bool    `json:"track_serial,omitempty"`
-	TrackLot               bool    `json:"track_lot,omitempty"`
-	LotBatchID             *int64  `json:"lot_batch_id,omitempty"`
-	LotNo                  string  `json:"lot_no,omitempty"`
-	SerialPolicy           string  `json:"serial_policy,omitempty"`
-	LotPolicy              string  `json:"lot_policy,omitempty"`
-	SourceSalesOrderLineID *int64  `json:"source_sales_order_line_id,omitempty"`
+	TrackSerial            bool             `json:"track_serial,omitempty"`
+	TrackLot               bool             `json:"track_lot,omitempty"`
+	LotBatchID             *int64           `json:"lot_batch_id,omitempty"`
+	LotNo                  string           `json:"lot_no,omitempty"`
+	SerialPolicy           string           `json:"serial_policy,omitempty"`
+	LotPolicy              string           `json:"lot_policy,omitempty"`
+	SourceSalesOrderLineID *int64           `json:"source_sales_order_line_id,omitempty"`
 }
 
 type SaleSerialUnit struct {
@@ -61,41 +62,41 @@ type SaleSerialUnit struct {
 }
 
 type Sale struct {
-	ID                  int64      `json:"id"`
-	OrderDate           string     `json:"order_date"`
-	DateSeq             int        `json:"date_seq"`
-	DateNoDisplay       string     `json:"date_no_display"`
-	SalesNo             string     `json:"sales_no"`
-	TaxTypeID           int64      `json:"tax_type_id"`
-	TaxTypeName         string     `json:"tax_type_name,omitempty"`
-	CurrencyID          int64      `json:"currency_id"`
-	CurrencyCode        string     `json:"currency_code,omitempty"`
-	PartnerID           int64      `json:"partner_id"`
-	CustomerName        string     `json:"customer_name"`
-	PicUserID           *int64     `json:"pic_user_id,omitempty"`
-	PicName             string     `json:"pic_name"`
-	LocationID          int64      `json:"location_id"`
-	LocationName        string     `json:"location_name,omitempty"`
-	ProjectID           *int64     `json:"project_id,omitempty"`
-	ProjectName         *string    `json:"project_name,omitempty"`
-	DueDate             *string    `json:"due_date,omitempty"`
-	TermsOfPayment      *string    `json:"terms_of_payment,omitempty"`
-	PaymentTerms        *string    `json:"payment_terms,omitempty"`
-	SiDrNo              *string    `json:"si_dr_no,omitempty"`
-	Notes               *string    `json:"notes,omitempty"`
-	ProgressStatus      string     `json:"progress_status"`
-	InvoicingStatus     bool       `json:"invoicing_status"`
-	TemplateCode        string     `json:"template_code"`
-	SalesCategory       *string    `json:"sales_category,omitempty"`
-	SourceSalesOrderID  *int64     `json:"source_sales_order_id,omitempty"`
-	Subtotal            float64    `json:"subtotal"`
-	TaxTotal            float64    `json:"tax_total"`
-	GrandTotal          float64    `json:"grand_total"`
-	CreatedByUserID     *int64     `json:"created_by_user_id,omitempty"`
-	CreatedByName       string     `json:"created_by_name,omitempty"`
-	ItemNameSummary     string               `json:"item_name_summary,omitempty"`
-	Lines               []SaleLine           `json:"lines,omitempty"`
-	Commissions         []SaleCommissionLine `json:"commissions,omitempty"`
+	ID                 int64                `json:"id"`
+	OrderDate          string               `json:"order_date"`
+	DateSeq            int                  `json:"date_seq"`
+	DateNoDisplay      string               `json:"date_no_display"`
+	SalesNo            string               `json:"sales_no"`
+	TaxTypeID          int64                `json:"tax_type_id"`
+	TaxTypeName        string               `json:"tax_type_name,omitempty"`
+	CurrencyID         int64                `json:"currency_id"`
+	CurrencyCode       string               `json:"currency_code,omitempty"`
+	PartnerID          int64                `json:"partner_id"`
+	CustomerName       string               `json:"customer_name"`
+	PicUserID          *int64               `json:"pic_user_id,omitempty"`
+	PicName            string               `json:"pic_name"`
+	LocationID         int64                `json:"location_id"`
+	LocationName       string               `json:"location_name,omitempty"`
+	ProjectID          *int64               `json:"project_id,omitempty"`
+	ProjectName        *string              `json:"project_name,omitempty"`
+	DueDate            *string              `json:"due_date,omitempty"`
+	TermsOfPayment     *string              `json:"terms_of_payment,omitempty"`
+	PaymentTerms       *string              `json:"payment_terms,omitempty"`
+	SiDrNo             *string              `json:"si_dr_no,omitempty"`
+	Notes              *string              `json:"notes,omitempty"`
+	ProgressStatus     string               `json:"progress_status"`
+	InvoicingStatus    bool                 `json:"invoicing_status"`
+	TemplateCode       string               `json:"template_code"`
+	SalesCategory      *string              `json:"sales_category,omitempty"`
+	SourceSalesOrderID *int64               `json:"source_sales_order_id,omitempty"`
+	Subtotal           float64              `json:"subtotal"`
+	TaxTotal           float64              `json:"tax_total"`
+	GrandTotal         float64              `json:"grand_total"`
+	CreatedByUserID    *int64               `json:"created_by_user_id,omitempty"`
+	CreatedByName      string               `json:"created_by_name,omitempty"`
+	ItemNameSummary    string               `json:"item_name_summary,omitempty"`
+	Lines              []SaleLine           `json:"lines,omitempty"`
+	Commissions        []SaleCommissionLine `json:"commissions,omitempty"`
 }
 
 type saleLineBody struct {
@@ -116,23 +117,23 @@ type saleLineBody struct {
 }
 
 type saleBody struct {
-	OrderDate          string         `json:"order_date"`
-	TaxTypeID          int64          `json:"tax_type_id"`
-	CurrencyID         int64          `json:"currency_id"`
-	PartnerID          int64          `json:"partner_id"`
-	PicUserID          *int64         `json:"pic_user_id"`
-	PicName            string         `json:"pic_name"`
-	LocationID         int64          `json:"location_id"`
-	ProjectID          *int64         `json:"project_id"`
-	ProjectName        *string        `json:"project_name"`
-	DueDate            *string        `json:"due_date"`
-	TermsOfPayment     *string        `json:"terms_of_payment"`
-	PaymentTerms       *string        `json:"payment_terms"`
-	SiDrNo             *string        `json:"si_dr_no"`
-	Notes              *string        `json:"notes"`
-	ProgressStatus     string         `json:"progress_status"`
-	TemplateCode       string         `json:"template_code"`
-	SalesCategory      *string        `json:"sales_category"`
+	OrderDate          string                   `json:"order_date"`
+	TaxTypeID          int64                    `json:"tax_type_id"`
+	CurrencyID         int64                    `json:"currency_id"`
+	PartnerID          int64                    `json:"partner_id"`
+	PicUserID          *int64                   `json:"pic_user_id"`
+	PicName            string                   `json:"pic_name"`
+	LocationID         int64                    `json:"location_id"`
+	ProjectID          *int64                   `json:"project_id"`
+	ProjectName        *string                  `json:"project_name"`
+	DueDate            *string                  `json:"due_date"`
+	TermsOfPayment     *string                  `json:"terms_of_payment"`
+	PaymentTerms       *string                  `json:"payment_terms"`
+	SiDrNo             *string                  `json:"si_dr_no"`
+	Notes              *string                  `json:"notes"`
+	ProgressStatus     string                   `json:"progress_status"`
+	TemplateCode       string                   `json:"template_code"`
+	SalesCategory      *string                  `json:"sales_category"`
 	SourceSalesOrderID *int64                   `json:"source_sales_order_id"`
 	Lines              []saleLineBody           `json:"lines"`
 	Commissions        []saleCommissionLineBody `json:"commissions"`
@@ -164,6 +165,7 @@ func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerCustomerCreditBalanceRoutes(r, pool)
 	registerSalesApprovalRoutes(r, pool)
 	registerSalesHoldRoutes(r, pool)
+	documentlifecycle.RegisterRoutes(r, pool, "", documentlifecycle.SaleConfig())
 	r.Get("/preview-sequences", previewSalesSequences(pool))
 	r.Get("/sales-order-lines/open", listOpenSalesOrderLines(pool))
 	r.Get("/status-report/export", exportSalesStatusReport(pool))
@@ -235,7 +237,12 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "order_date", allowed)
 		offset := httputil.Offset(p)
 
-		where := "s.tenant_id = $1 and s.deleted_at is null"
+		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "s")
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where := "s.tenant_id = $1 and " + lifecycleWhere
 		args := []any{tu.TenantID}
 		argN := 2
 
@@ -348,6 +355,10 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 
 func getSale(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var ok bool
+		if r, ok = documentlifecycle.PrepareDetailRequest(w, r); !ok {
+			return
+		}
 		tu, _ := auth.FromContext(r.Context())
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
@@ -385,7 +396,7 @@ func loadSale(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Sale
 		join public.quo_currencies c on c.id = s.currency_id
 		join public.inv_locations l on l.id = s.location_id
 		left join public.users u on u.id = s.created_by_user_id
-		where s.id = $1 and s.tenant_id = $2 and s.deleted_at is null`,
+		where s.id = $1 and s.tenant_id = $2 and `+documentlifecycle.DetailPredicate(ctx, "s"),
 		id, tenantID).Scan(
 		&sale.ID, &orderDate, &sale.DateSeq, &sale.SalesNo,
 		&sale.TaxTypeID, &sale.TaxTypeName, &sale.CurrencyID, &sale.CurrencyCode,
@@ -536,6 +547,10 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if vErrs := processpolicy.ValidateDirectSale(policy, hasSOLinkedLine); vErrs != nil {
 			response.Validation(w, vErrs)
+			return
+		}
+		if v := validateSourceSOApproval(r.Context(), pool, tu.TenantID, policy, body.SourceSalesOrderID, body.Lines); v != nil {
+			response.Validation(w, v)
 			return
 		}
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), 0); v != nil {
@@ -731,6 +746,22 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
 			return
 		}
+		hasSOLinkedLine := false
+		for _, ln := range body.Lines {
+			if ln.SourceSalesOrderLineID != nil && *ln.SourceSalesOrderLineID > 0 {
+				hasSOLinkedLine = true
+				break
+			}
+		}
+		// Re-validate source requirements on update so edits cannot strip the SO link.
+		if vErrs := processpolicy.ValidateDirectSale(policy, hasSOLinkedLine); vErrs != nil {
+			response.Validation(w, vErrs)
+			return
+		}
+		if v := validateSourceSOApproval(r.Context(), pool, tu.TenantID, policy, body.SourceSalesOrderID, body.Lines); v != nil {
+			response.Validation(w, v)
+			return
+		}
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), id); v != nil {
 			response.Validation(w, v)
 			return
@@ -854,43 +885,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func deleteSale(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tu, _ := auth.FromContext(r.Context())
-		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-		if err != nil {
-			response.Validation(w, map[string]string{"id": "Invalid id."})
-			return
-		}
-		tx, err := pool.Begin(r.Context())
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to delete.", "ERR_INTERNAL")
-			return
-		}
-		defer tx.Rollback(r.Context())
-		if err := reverseSaleStock(r.Context(), tx, tu.TenantID, id); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to reverse stock.", "ERR_INTERNAL")
-			return
-		}
-		if err := reverseSaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to reverse lot stock.", "ERR_INTERNAL")
-			return
-		}
-		if err := reverseSaleSerials(r.Context(), tx, tu.TenantID, id); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to reverse serials.", "ERR_INTERNAL")
-			return
-		}
-		tag, err := tx.Exec(r.Context(), `update public.sa_sales set deleted_at = now(), updated_at = now() where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID)
-		if err != nil || tag.RowsAffected() == 0 {
-			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
-			return
-		}
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to delete.", "ERR_INTERNAL")
-			return
-		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.delete", "sa_sales", &id, nil, nil)
-		response.OK(w, nil, "Deleted.")
-	}
+	return documentlifecycle.DeleteHandler(pool, documentlifecycle.SaleConfig())
 }
 
 func insertSaleLines(ctx context.Context, tx pgx.Tx, salesID int64, lines []computedLine) error {

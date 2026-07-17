@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -71,7 +72,7 @@ func registerPaymentVoucherRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/payment-vouchers", listPaymentVouchers(pool))
 	r.With(auth.RequirePermission("finance.payment_vouchers_new", auth.AccessWrite)).Post("/payment-vouchers", createPaymentVoucher(pool))
 	r.Get("/payment-vouchers/{id}", getPaymentVoucher(pool))
-	r.Delete("/payment-vouchers/{id}", deletePaymentVoucher(pool))
+	r.With(auth.RequirePermission("finance.payment_vouchers", auth.AccessWrite)).Delete("/payment-vouchers/{id}", deletePaymentVoucher(pool))
 }
 
 func previewPaymentVoucherSequences(pool *pgxpool.Pool) http.HandlerFunc {
@@ -354,7 +355,42 @@ func sumPaymentApplicationAmounts(apps []paymentApplicationBody) float64 {
 	return total
 }
 
-func insertPaymentApplications(ctx context.Context, tx pgx.Tx, paymentID int64, apps []paymentApplicationBody) error {
+// lockAndCheckPaymentApplications locks each referenced supplier invoice row
+// (FOR UPDATE) and re-validates the applied amounts inside the current
+// transaction, so concurrent payment vouchers cannot over-pay the same
+// invoice. Rows are locked in invoice-id order to avoid deadlocks.
+func lockAndCheckPaymentApplications(ctx context.Context, tx pgx.Tx, tenantID, paymentID int64, apps []paymentApplicationBody) error {
+	ordered := make([]paymentApplicationBody, len(apps))
+	copy(ordered, apps)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].SupplierInvoiceID < ordered[j].SupplierInvoiceID })
+	for _, app := range ordered {
+		var grandTotal float64
+		if err := tx.QueryRow(ctx, `
+			select grand_total::float8 from public.fin_supplier_invoices
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			for update`, app.SupplierInvoiceID, tenantID).Scan(&grandTotal); err != nil {
+			return err
+		}
+		var applied float64
+		if err := tx.QueryRow(ctx, `
+			select coalesce(sum(a.applied_amount), 0)::float8
+			from public.fin_payment_applications a
+			join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
+			where a.supplier_invoice_id = $1 and pv.tenant_id = $2 and pv.deleted_at is null and pv.id <> $3`,
+			app.SupplierInvoiceID, tenantID, paymentID).Scan(&applied); err != nil {
+			return err
+		}
+		if outstanding := grandTotal - applied; app.AppliedAmount > outstanding+0.0001 {
+			return overAppliedError{message: fmt.Sprintf("Applied amount exceeds outstanding balance (%.4f) for supplier invoice %d. Another payment may have been applied concurrently.", outstanding, app.SupplierInvoiceID)}
+		}
+	}
+	return nil
+}
+
+func insertPaymentApplications(ctx context.Context, tx pgx.Tx, tenantID, paymentID int64, apps []paymentApplicationBody) error {
+	if err := lockAndCheckPaymentApplications(ctx, tx, tenantID, paymentID, apps); err != nil {
+		return err
+	}
 	for _, app := range apps {
 		_, err := tx.Exec(ctx, `
 			insert into public.fin_payment_applications (payment_voucher_id, supplier_invoice_id, applied_amount)
@@ -422,8 +458,8 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := insertPaymentApplications(r.Context(), tx, id, body.Applications); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save applications.", "ERR_INTERNAL")
+		if err := insertPaymentApplications(r.Context(), tx, tu.TenantID, id, body.Applications); err != nil {
+			respondApplicationSaveError(w, err)
 			return
 		}
 
@@ -467,6 +503,15 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 
 func deletePaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		if blockIfPosted(w, r, pool, tu.TenantID, "payment_voucher", id, "Deletion") {
+			return
+		}
 		softDelete(pool, w, r, "fin_payment_vouchers", "finance.payment_voucher.delete", "fin_payment_voucher")
 	}
 }

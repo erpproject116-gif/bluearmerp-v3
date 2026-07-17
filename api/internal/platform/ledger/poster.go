@@ -44,10 +44,19 @@ func (AuditPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) error {
 	return err
 }
 
+// EntryNo returns the journal entry number the auto-poster assigns to a
+// source document (e.g. "official_receipt-42").
+func EntryNo(sourceType string, sourceID int64) string {
+	return sourceType + "-" + itoa(sourceID)
+}
+
 // JournalPoster creates a posted journal entry when tenant auto-post is enabled.
+// When RequireJEApproval is set the entry is created as a draft instead, so it
+// must pass journal-entry approval before it can be posted.
 type JournalPoster struct {
-	AutoOR bool
-	AutoPV bool
+	AutoOR            bool
+	AutoPV            bool
+	RequireJEApproval bool
 }
 
 func (jp JournalPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) error {
@@ -63,13 +72,17 @@ func (jp JournalPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) er
 	if len(ev.Lines) == 0 {
 		return nil
 	}
+	status := "posted"
+	if jp.RequireJEApproval {
+		status = "draft"
+	}
 	var entryID int64
-	entryNo := ev.SourceType + "-" + itoa(ev.SourceID)
+	entryNo := EntryNo(ev.SourceType, ev.SourceID)
 	err := tx.QueryRow(ctx, `
 		insert into public.fin_journal_entries (tenant_id, entry_date, date_seq, entry_no, status, remarks, posted_at, created_by_user_id)
-		values ($1, current_date, 1, $2, 'posted', $3, now(), null)
+		values ($1, current_date, 1, $2, $3, $4, case when $3 = 'posted' then now() end, null)
 		returning id`,
-		ev.TenantID, entryNo, ev.SourceType).Scan(&entryID)
+		ev.TenantID, entryNo, status, ev.SourceType).Scan(&entryID)
 	if err != nil {
 		return err
 	}

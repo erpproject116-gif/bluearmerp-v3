@@ -166,7 +166,11 @@ func postCheckoutAccounting(
 			{AccountCode: recvCode, Credit: grandTotal, PartyID: &partner},
 		},
 	}
-	poster := ledger.JournalPoster{AutoOR: policy.AccountsAutoPostOR, AutoPV: policy.AccountsAutoPostPV}
+	poster := ledger.JournalPoster{
+		AutoOR:            policy.AccountsAutoPostOR,
+		AutoPV:            policy.AccountsAutoPostPV,
+		RequireJEApproval: policy.FinanceRequireJEApproval,
+	}
 	if err := finance.PostLedgerEventTx(ctx, tx, poster, ev); err != nil {
 		return out, fmt.Errorf("receipt journal: %w", err)
 	}

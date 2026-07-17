@@ -21,6 +21,7 @@ import {
   useActiveTaxTypes,
 } from "../../../shared/useDocumentLookups";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { LifecycleReadOnlyShell, withLifecycleParam, type LifecycleFilter } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
@@ -118,6 +119,10 @@ export type PurchaseOrderDetail = {
 type Props = {
   open: boolean;
   purchaseOrderId: number | null;
+  /** Deleted (soft-deleted) document opened for viewing — no edits allowed. */
+  readOnly?: boolean;
+  /** Lifecycle scope for the detail fetch (needed to load deleted records). */
+  lifecycle?: LifecycleFilter;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -233,7 +238,7 @@ export function PurchaseOrderModal(props: Props) {
 
   const isCreate = () => props.open && effectivePoId() == null;
   const isDraft = () => isCreate() || detail()?.status === "draft";
-  const readOnly = () => !isDraft();
+  const readOnly = () => Boolean(props.readOnly) || !isDraft();
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
 
   const buildDraftPayload = (): PoDraftPayload => ({
@@ -308,7 +313,9 @@ export function PurchaseOrderModal(props: Props) {
   const loadDetail = async (id: number) => {
     setLoading(true);
     const [poRes] = await Promise.all([
-      apiFetch<PurchaseOrderDetail>(`/api/v1/purchase-order/purchase-orders/${id}`),
+      apiFetch<PurchaseOrderDetail>(
+        withLifecycleParam(`/api/v1/purchase-order/purchase-orders/${id}`, props.lifecycle ?? "active"),
+      ),
       queryClient.ensureQueryData({ queryKey: ACTIVE_TAX_TYPES_KEY, queryFn: loadActiveTaxTypes }),
       queryClient.ensureQueryData({ queryKey: ACTIVE_CURRENCIES_KEY, queryFn: loadActiveCurrencies }),
     ]);
@@ -544,7 +551,7 @@ export function PurchaseOrderModal(props: Props) {
     <>
     <WideEntityModal
       open={props.open}
-      title={isCreate() ? "New Purchase Order" : po() ? `Purchase Order — ${po()!.purchase_order_no}` : "Purchase Order"}
+      title={isCreate() ? "New Purchase Order" : po() ? `Purchase Order — ${po()!.purchase_order_no}${props.readOnly ? " (deleted)" : ""}` : "Purchase Order"}
       onClose={props.onClose}
       onSave={() => void save()}
       readOnly={readOnly()}
@@ -562,6 +569,7 @@ export function PurchaseOrderModal(props: Props) {
         </Show>
       }
     >
+      <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
       <Show when={loading()}>
         <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
@@ -859,6 +867,7 @@ export function PurchaseOrderModal(props: Props) {
       />
       <EmailHistoryPanel docType="purchase_order" docId={effectivePoId()} />
       <ChangeLogPanel targetType="po_purchase_order" targetId={effectivePoId()} />
+      </LifecycleReadOnlyShell>
     </WideEntityModal>
     <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="po_purchase_order" targetId={effectivePoId()} title="History — Purchase Order" />
     <PurchaseRequestLinePickerModal

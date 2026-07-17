@@ -89,10 +89,28 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 	return rows.Err()
 }
 
+// validateLotBatchForSaleLine ensures the lot batch matches the line's item and the sale's location.
+func validateLotBatchForSaleLine(lineNo int, lineItemID *int64, saleLocationID, lotItemID, lotLocationID int64) error {
+	if lineItemID == nil || *lineItemID != lotItemID {
+		return fmt.Errorf("line %d: lot batch does not belong to the line item", lineNo)
+	}
+	if saleLocationID > 0 && lotLocationID != saleLocationID {
+		return fmt.Errorf("line %d: lot batch is not at the sale location", lineNo)
+	}
+	return nil
+}
+
 // applySaleLot deducts lot batch qty for sales lines with lot_batch_id set.
 func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
+	var saleLocationID int64
+	if err := tx.QueryRow(ctx, `
+		select location_id from public.sa_sales
+		where id = $1 and tenant_id = $2`, salesID, tenantID).Scan(&saleLocationID); err != nil {
+		return fmt.Errorf("sale not found")
+	}
+
 	rows, err := tx.Query(ctx, `
-		select ln.id, ln.lot_batch_id, ln.qty::float8
+		select ln.id, ln.line_no, ln.item_id, ln.lot_batch_id, ln.qty::float8
 		from public.sa_sales_lines ln
 		where ln.sales_id = $1 and ln.lot_batch_id is not null
 		order by ln.line_no`, salesID)
@@ -103,24 +121,30 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 
 	for rows.Next() {
 		var lineID, lotBatchID int64
+		var lineNo int
+		var lineItemID *int64
 		var qty float64
-		if err := rows.Scan(&lineID, &lotBatchID, &qty); err != nil {
+		if err := rows.Scan(&lineID, &lineNo, &lineItemID, &lotBatchID, &qty); err != nil {
 			return err
 		}
 		if qty <= 0 {
 			continue
 		}
 		var lotQty float64
+		var lotItemID, lotLocationID int64
 		err := tx.QueryRow(ctx, `
-			select qty_on_hand::float8
+			select qty_on_hand::float8, item_id, location_id
 			from public.inv_lot_batches
 			where id = $1 and tenant_id = $2
-			for update`, lotBatchID, tenantID).Scan(&lotQty)
+			for update`, lotBatchID, tenantID).Scan(&lotQty, &lotItemID, &lotLocationID)
 		if err != nil {
-			return fmt.Errorf("line %d: lot batch not found", lineID)
+			return fmt.Errorf("line %d: lot batch not found", lineNo)
+		}
+		if err := validateLotBatchForSaleLine(lineNo, lineItemID, saleLocationID, lotItemID, lotLocationID); err != nil {
+			return err
 		}
 		if lotQty+0.0001 < qty {
-			return fmt.Errorf("line %d: insufficient lot qty (%.4f on hand)", lineID, lotQty)
+			return fmt.Errorf("line %d: insufficient lot qty (%.4f on hand)", lineNo, lotQty)
 		}
 		tag, err := tx.Exec(ctx, `
 			update public.inv_lot_batches
@@ -128,7 +152,7 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 			where id = $2 and tenant_id = $3 and qty_on_hand >= $1 - 0.0001`,
 			qty, lotBatchID, tenantID)
 		if err != nil || tag.RowsAffected() == 0 {
-			return fmt.Errorf("line %d: failed to deduct lot qty", lineID)
+			return fmt.Errorf("line %d: failed to deduct lot qty", lineNo)
 		}
 	}
 	return rows.Err()

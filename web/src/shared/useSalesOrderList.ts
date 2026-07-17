@@ -8,6 +8,7 @@ export type SalesOrderListParams = {
   order: "asc" | "desc";
   q?: string;
   progressStatus?: string;
+  lifecycle?: string;
 };
 
 export type SalesOrderRow = {
@@ -48,6 +49,7 @@ export function useSalesOrderList(params: () => SalesOrderListParams) {
     });
     if (p.q) qs.set("q", p.q);
     if (p.progressStatus) qs.set("progress_status", p.progressStatus);
+    if (p.lifecycle && p.lifecycle !== "active") qs.set("lifecycle", p.lifecycle);
 
     return {
       queryKey: ["sales-orders", p],

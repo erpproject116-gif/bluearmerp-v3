@@ -19,6 +19,7 @@ export type PurchaseRequestListParams = {
   item_id?: number;
   send_status?: string;
   sort_by_modified?: boolean;
+  lifecycle?: string;
 };
 
 export type PurchaseRequestRow = {
@@ -68,6 +69,7 @@ export function usePurchaseRequestList(params: () => PurchaseRequestListParams) 
       sort: p.sort,
       order: p.order,
     });
+    if (p.lifecycle && p.lifecycle !== "active") qs.set("lifecycle", p.lifecycle);
 
     return {
       queryKey: ["purchase-requests", p],

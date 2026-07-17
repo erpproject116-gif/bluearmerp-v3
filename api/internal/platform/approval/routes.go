@@ -45,6 +45,12 @@ func submitApproval(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		entityType := chi.URLParam(r, "entityType")
+		if requiresDedicatedApprovalRoute(entityType) {
+			response.Validation(w, map[string]string{
+				"entity_type": "Use the document-specific approval action so its policies and permissions are enforced.",
+			})
+			return
+		}
 		entityID, err := strconv.ParseInt(chi.URLParam(r, "entityId"), 10, 64)
 		if err != nil {
 			response.Validation(w, map[string]string{"entityId": "Invalid id."})
@@ -87,6 +93,12 @@ func decideApproval(pool *pgxpool.Pool, approve bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		entityType := chi.URLParam(r, "entityType")
+		if requiresDedicatedApprovalRoute(entityType) {
+			response.Validation(w, map[string]string{
+				"entity_type": "Use the document-specific approval action so its policies and permissions are enforced.",
+			})
+			return
+		}
 		entityID, err := strconv.ParseInt(chi.URLParam(r, "entityId"), 10, 64)
 		if err != nil {
 			response.Validation(w, map[string]string{"entityId": "Invalid id."})
@@ -114,6 +126,15 @@ func decideApproval(pool *pgxpool.Pool, approve bool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, map[string]any{"entity_type": entityType, "entity_id": entityID, "status": status}, "Updated.")
+	}
+}
+
+func requiresDedicatedApprovalRoute(entityType string) bool {
+	switch strings.TrimSpace(entityType) {
+	case "sa_sales", "fin_supplier_invoice":
+		return true
+	default:
+		return false
 	}
 }
 

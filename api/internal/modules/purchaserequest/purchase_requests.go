@@ -14,73 +14,74 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 )
 
 type PurchaseRequestLine struct {
-	ID          int64   `json:"id,omitempty"`
-	LineNo      int     `json:"line_no"`
-	PartnerID   *int64  `json:"partner_id,omitempty"`
-	PartnerCode string  `json:"partner_code"`
-	PartnerName string  `json:"partner_name"`
-	ItemID      *int64  `json:"item_id,omitempty"`
-	ItemCode    string  `json:"item_code"`
-	ItemName    string  `json:"item_name"`
-	SpecName    *string `json:"spec_name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Qty         float64 `json:"qty"`
-	UnitNonVat  float64 `json:"unit_non_vat"`
-	NonVatTotal float64 `json:"non_vat_total"`
-	TaxAmount   float64 `json:"tax_amount"`
-	UnitVatInc  float64 `json:"unit_vat_inc"`
-	LineTotal   float64 `json:"line_total"`
-	Remark             *string  `json:"remark,omitempty"`
-	PlannedSerialNos   []string `json:"planned_serial_nos,omitempty"`
-	TrackSerial        bool     `json:"track_serial,omitempty"`
-	SerialPolicy       string   `json:"serial_policy,omitempty"`
+	ID               int64    `json:"id,omitempty"`
+	LineNo           int      `json:"line_no"`
+	PartnerID        *int64   `json:"partner_id,omitempty"`
+	PartnerCode      string   `json:"partner_code"`
+	PartnerName      string   `json:"partner_name"`
+	ItemID           *int64   `json:"item_id,omitempty"`
+	ItemCode         string   `json:"item_code"`
+	ItemName         string   `json:"item_name"`
+	SpecName         *string  `json:"spec_name,omitempty"`
+	Description      *string  `json:"description,omitempty"`
+	Qty              float64  `json:"qty"`
+	UnitNonVat       float64  `json:"unit_non_vat"`
+	NonVatTotal      float64  `json:"non_vat_total"`
+	TaxAmount        float64  `json:"tax_amount"`
+	UnitVatInc       float64  `json:"unit_vat_inc"`
+	LineTotal        float64  `json:"line_total"`
+	Remark           *string  `json:"remark,omitempty"`
+	PlannedSerialNos []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial      bool     `json:"track_serial,omitempty"`
+	SerialPolicy     string   `json:"serial_policy,omitempty"`
 }
 
 type PurchaseRequest struct {
-	ID                 int64                 `json:"id"`
-	RequestDate        string                `json:"request_date"`
-	DateSeq            int                   `json:"date_seq"`
-	DateNoDisplay      string                `json:"date_no_display"`
-	PurchaseRequestNo  string                `json:"purchase_request_no"`
-	TaxTypeID          int64                 `json:"tax_type_id"`
-	TaxTypeName        string                `json:"tax_type_name,omitempty"`
-	CurrencyID         int64                 `json:"currency_id"`
-	CurrencyCode       string                `json:"currency_code,omitempty"`
-	PartnerID          *int64                `json:"partner_id,omitempty"`
-	PartnerName        string                `json:"partner_name"`
-	PicUserID          *int64                `json:"pic_user_id,omitempty"`
-	PicName            string                `json:"pic_name"`
-	LocationID         int64                 `json:"location_id"`
-	LocationName       string                `json:"location_name,omitempty"`
-	ProjectID          *int64                `json:"project_id,omitempty"`
-	ProjectName        *string               `json:"project_name,omitempty"`
-	CC                 *string               `json:"cc,omitempty"`
-	DomesticForeign    string                `json:"domestic_foreign"`
-	SendStatus         string                `json:"send_status"`
-	ProgressStatus     string                `json:"progress_status"`
-	ApprovedAt         *string               `json:"approved_at,omitempty"`
-	ApprovedByUserID   *int64                `json:"approved_by_user_id,omitempty"`
-	ApprovedByName     string                `json:"approved_by_name,omitempty"`
-	TotalQty           float64               `json:"total_qty"`
-	Reference          *string               `json:"reference,omitempty"`
-	Notes              *string               `json:"notes,omitempty"`
-	Subtotal           float64               `json:"subtotal"`
-	TaxTotal           float64               `json:"tax_total"`
-	GrandTotal         float64               `json:"grand_total"`
-	CreatedByUserID    *int64                `json:"created_by_user_id,omitempty"`
-	CreatedByName      string                `json:"created_by_name,omitempty"`
-	ItemNameSummary    string                `json:"item_name_summary,omitempty"`
-	Lines              []PurchaseRequestLine `json:"lines,omitempty"`
+	ID                int64                 `json:"id"`
+	RequestDate       string                `json:"request_date"`
+	DateSeq           int                   `json:"date_seq"`
+	DateNoDisplay     string                `json:"date_no_display"`
+	PurchaseRequestNo string                `json:"purchase_request_no"`
+	TaxTypeID         int64                 `json:"tax_type_id"`
+	TaxTypeName       string                `json:"tax_type_name,omitempty"`
+	CurrencyID        int64                 `json:"currency_id"`
+	CurrencyCode      string                `json:"currency_code,omitempty"`
+	PartnerID         *int64                `json:"partner_id,omitempty"`
+	PartnerName       string                `json:"partner_name"`
+	PicUserID         *int64                `json:"pic_user_id,omitempty"`
+	PicName           string                `json:"pic_name"`
+	LocationID        int64                 `json:"location_id"`
+	LocationName      string                `json:"location_name,omitempty"`
+	ProjectID         *int64                `json:"project_id,omitempty"`
+	ProjectName       *string               `json:"project_name,omitempty"`
+	CC                *string               `json:"cc,omitempty"`
+	DomesticForeign   string                `json:"domestic_foreign"`
+	SendStatus        string                `json:"send_status"`
+	ProgressStatus    string                `json:"progress_status"`
+	ApprovedAt        *string               `json:"approved_at,omitempty"`
+	ApprovedByUserID  *int64                `json:"approved_by_user_id,omitempty"`
+	ApprovedByName    string                `json:"approved_by_name,omitempty"`
+	TotalQty          float64               `json:"total_qty"`
+	Reference         *string               `json:"reference,omitempty"`
+	Notes             *string               `json:"notes,omitempty"`
+	Subtotal          float64               `json:"subtotal"`
+	TaxTotal          float64               `json:"tax_total"`
+	GrandTotal        float64               `json:"grand_total"`
+	CreatedByUserID   *int64                `json:"created_by_user_id,omitempty"`
+	CreatedByName     string                `json:"created_by_name,omitempty"`
+	ItemNameSummary   string                `json:"item_name_summary,omitempty"`
+	Lines             []PurchaseRequestLine `json:"lines,omitempty"`
 }
 
 type purchaseRequestLineBody struct {
@@ -170,6 +171,7 @@ left join lateral (
 left join public.inv_partners hp on hp.id = pr.partner_id`
 
 func registerPurchaseRequestRoutes(r chi.Router, pool *pgxpool.Pool) {
+	documentlifecycle.RegisterRoutes(r, pool, "/purchase-requests", documentlifecycle.PurchaseRequestConfig())
 	r.Get("/purchase-requests/preview-sequences", previewPurchaseRequestSequences(pool))
 	r.Get("/purchase-requests/status-report/export", exportPurchaseRequestStatusReport(pool))
 	r.Get("/purchase-requests/status-report", listPurchaseRequestStatusReport(pool))
@@ -210,9 +212,9 @@ func previewPurchaseRequestSequences(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, map[string]any{
-			"date_seq":              dateSeq,
-			"purchase_request_no":   purchaseRequestNo,
-			"date_no_display":       formatDateNoDisplay(requestDate, dateSeq),
+			"date_seq":            dateSeq,
+			"purchase_request_no": purchaseRequestNo,
+			"date_no_display":     formatDateNoDisplay(requestDate, dateSeq),
 		}, "OK")
 	}
 }
@@ -243,7 +245,12 @@ func listPurchaseRequests(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		offset := httputil.Offset(p)
 
-		where := "pr.tenant_id = $1 and pr.deleted_at is null"
+		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "pr")
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where := "pr.tenant_id = $1 and " + lifecycleWhere
 		args := []any{tu.TenantID}
 		argN := 2
 		var explicitLoc *int64
@@ -330,8 +337,8 @@ func listPurchaseRequests(pool *pgxpool.Pool) http.HandlerFunc {
 		where += scope
 
 		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
-			CustomerColumn:       "coalesce(pr.partner_id, line_partner.partner_id)",
-			LocationColumn:       "pr.location_id",
+			CustomerColumn:     "coalesce(pr.partner_id, line_partner.partner_id)",
+			LocationColumn:     "pr.location_id",
 			ExplicitLocationID: explicitLoc,
 		}, argN, &args)
 		if err != nil {
@@ -410,6 +417,10 @@ func listPurchaseRequests(pool *pgxpool.Pool) http.HandlerFunc {
 
 func getPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var ok bool
+		if r, ok = documentlifecycle.PrepareDetailRequest(w, r); !ok {
+			return
+		}
 		tu, _ := auth.FromContext(r.Context())
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
@@ -453,7 +464,7 @@ func loadPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		join public.inv_locations l on l.id = pr.location_id
 		left join public.users u on u.id = pr.created_by_user_id
 		left join public.users approver on approver.id = pr.approved_by_user_id
-		where pr.id = $1 and pr.tenant_id = $2 and pr.deleted_at is null`,
+		where pr.id = $1 and pr.tenant_id = $2 and `+documentlifecycle.DetailPredicate(ctx, "pr"),
 		id, tenantID).Scan(
 		&pr.ID, &requestDate, &pr.DateSeq, &pr.PurchaseRequestNo,
 		&pr.TaxTypeID, &pr.TaxTypeName, &pr.CurrencyID, &pr.CurrencyCode,
@@ -756,9 +767,7 @@ func allocatePurchaseRequestSequences(ctx context.Context, tx pgx.Tx, tenantID i
 }
 
 func deletePurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		softDelete(pool, w, r, "pr_purchase_requests", "purchase_request.delete", "pr_purchase_request")
-	}
+	return documentlifecycle.DeleteHandler(pool, documentlifecycle.PurchaseRequestConfig())
 }
 
 func assertDateSeqAvailable(ctx context.Context, tx pgx.Tx, tenantID int64, requestDate time.Time, dateSeq int, excludeID int64) error {
@@ -874,18 +883,18 @@ func computePurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, tenant
 		}
 		amounts := taxcalc.ComputeLine(tt, ln.UnitPrice, ln.Qty, inputBasis)
 		out = append(out, computedLine{
-			LineNo:      ln.LineNo,
-			PartnerID:   ln.PartnerID,
-			PartnerCode: ln.PartnerCode,
-			PartnerName: ln.PartnerName,
-			ItemID:      ln.ItemID,
-			ItemCode:    ln.ItemCode,
-			ItemName:    ln.ItemName,
-			SpecName:    ln.SpecName,
-			Description: ln.Description,
-			Qty:         ln.Qty,
-			InputBasis:  inputBasis,
-			Amounts:     amounts,
+			LineNo:                 ln.LineNo,
+			PartnerID:              ln.PartnerID,
+			PartnerCode:            ln.PartnerCode,
+			PartnerName:            ln.PartnerName,
+			ItemID:                 ln.ItemID,
+			ItemCode:               ln.ItemCode,
+			ItemName:               ln.ItemName,
+			SpecName:               ln.SpecName,
+			Description:            ln.Description,
+			Qty:                    ln.Qty,
+			InputBasis:             inputBasis,
+			Amounts:                amounts,
 			Remark:                 ln.Remark,
 			SourceSalesOrderLineID: ln.SourceSalesOrderLineID,
 			PlannedSerialNos:       planned,
@@ -1031,21 +1040,21 @@ func listOpenSalesOrderLinesForPR(pool *pgxpool.Pool) http.HandlerFunc {
 // context so the PR editor can adopt the source document's tax type, currency,
 // location, partner and PIC when lines are pulled in.
 type openSalesOrderSlipLine struct {
-	SalesOrderID     int64   `json:"sales_order_id"`
-	SalesOrderLineID int64   `json:"sales_order_line_id"`
-	DateNoDisplay    string  `json:"date_no_display"`
-	ReferenceNo      string  `json:"reference_no"`
-	CustomerName     string  `json:"customer_name"`
-	LocationID       int64   `json:"location_id"`
-	LocationName     string  `json:"location_name"`
-	PartnerID        int64   `json:"partner_id"`
-	TaxTypeID        int64   `json:"tax_type_id"`
-	CurrencyID       int64   `json:"currency_id"`
-	PicName          string  `json:"pic_name"`
-	ItemID           *int64  `json:"item_id,omitempty"`
-	ItemCode         string  `json:"item_code"`
-	ItemName         string  `json:"item_name"`
-	Description      *string `json:"description,omitempty"`
+	SalesOrderID     int64    `json:"sales_order_id"`
+	SalesOrderLineID int64    `json:"sales_order_line_id"`
+	DateNoDisplay    string   `json:"date_no_display"`
+	ReferenceNo      string   `json:"reference_no"`
+	CustomerName     string   `json:"customer_name"`
+	LocationID       int64    `json:"location_id"`
+	LocationName     string   `json:"location_name"`
+	PartnerID        int64    `json:"partner_id"`
+	TaxTypeID        int64    `json:"tax_type_id"`
+	CurrencyID       int64    `json:"currency_id"`
+	PicName          string   `json:"pic_name"`
+	ItemID           *int64   `json:"item_id,omitempty"`
+	ItemCode         string   `json:"item_code"`
+	ItemName         string   `json:"item_name"`
+	Description      *string  `json:"description,omitempty"`
 	Qty              float64  `json:"qty"`
 	BalanceQty       float64  `json:"balance_qty"`
 	UnitVatInc       float64  `json:"unit_vat_inc"`

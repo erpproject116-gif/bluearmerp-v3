@@ -14,42 +14,44 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 )
 
 type PurchaseOrderLine struct {
-	ID                      int64   `json:"id,omitempty"`
-	LineNo                  int     `json:"line_no"`
-	PurchaseRequestLineID   *int64  `json:"purchase_request_line_id,omitempty"`
-	RFQRequestLineID        *int64  `json:"rfq_request_line_id,omitempty"`
-	SupplierQuotationLineID *int64  `json:"supplier_quotation_line_id,omitempty"`
-	PartnerID               *int64  `json:"partner_id,omitempty"`
-	PartnerCode             string  `json:"partner_code"`
-	PartnerName             string  `json:"partner_name"`
-	ItemID                  *int64  `json:"item_id,omitempty"`
-	ItemCode                string  `json:"item_code"`
-	ItemName                string  `json:"item_name"`
-	SpecName                *string `json:"spec_name,omitempty"`
-	Description             *string `json:"description,omitempty"`
-	Qty                     float64 `json:"qty"`
-	ReceivedQty             float64 `json:"received_qty"`
-	BilledQty               float64 `json:"billed_qty"`
-	UnitNonVat              float64 `json:"unit_non_vat"`
-	NonVatTotal             float64 `json:"non_vat_total"`
-	TaxAmount               float64 `json:"tax_amount"`
-	UnitVatInc              float64 `json:"unit_vat_inc"`
-	LineTotal               float64 `json:"line_total"`
-	Remark               *string  `json:"remark,omitempty"`
-	PlannedSerialNos     []string `json:"planned_serial_nos,omitempty"`
-	TrackSerial          bool     `json:"track_serial,omitempty"`
-	SerialPolicy         string   `json:"serial_policy,omitempty"`
+	ID                      int64    `json:"id,omitempty"`
+	LineNo                  int      `json:"line_no"`
+	PurchaseRequestLineID   *int64   `json:"purchase_request_line_id,omitempty"`
+	RFQRequestLineID        *int64   `json:"rfq_request_line_id,omitempty"`
+	SupplierQuotationLineID *int64   `json:"supplier_quotation_line_id,omitempty"`
+	PartnerID               *int64   `json:"partner_id,omitempty"`
+	PartnerCode             string   `json:"partner_code"`
+	PartnerName             string   `json:"partner_name"`
+	ItemID                  *int64   `json:"item_id,omitempty"`
+	ItemCode                string   `json:"item_code"`
+	ItemName                string   `json:"item_name"`
+	SpecName                *string  `json:"spec_name,omitempty"`
+	Description             *string  `json:"description,omitempty"`
+	Qty                     float64  `json:"qty"`
+	ReceivedQty             float64  `json:"received_qty"`
+	BilledQty               float64  `json:"billed_qty"`
+	UnitNonVat              float64  `json:"unit_non_vat"`
+	NonVatTotal             float64  `json:"non_vat_total"`
+	TaxAmount               float64  `json:"tax_amount"`
+	UnitVatInc              float64  `json:"unit_vat_inc"`
+	LineTotal               float64  `json:"line_total"`
+	Remark                  *string  `json:"remark,omitempty"`
+	PlannedSerialNos        []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial             bool     `json:"track_serial,omitempty"`
+	SerialPolicy            string   `json:"serial_policy,omitempty"`
 }
 
 type PurchaseOrder struct {
@@ -89,19 +91,19 @@ type PurchaseOrder struct {
 }
 
 type purchaseOrderLineBody struct {
-	LineNo                int     `json:"line_no"`
-	PurchaseRequestLineID *int64  `json:"purchase_request_line_id"`
-	PartnerID             *int64  `json:"partner_id"`
-	PartnerCode           string  `json:"partner_code"`
-	PartnerName           string  `json:"partner_name"`
-	ItemID                *int64  `json:"item_id"`
-	ItemCode              string  `json:"item_code"`
-	ItemName              string  `json:"item_name"`
-	SpecName              *string `json:"spec_name"`
-	Description           *string `json:"description"`
-	Qty                   float64 `json:"qty"`
-	UnitPrice             float64 `json:"unit_price"`
-	InputBasis            string  `json:"input_basis"`
+	LineNo                int      `json:"line_no"`
+	PurchaseRequestLineID *int64   `json:"purchase_request_line_id"`
+	PartnerID             *int64   `json:"partner_id"`
+	PartnerCode           string   `json:"partner_code"`
+	PartnerName           string   `json:"partner_name"`
+	ItemID                *int64   `json:"item_id"`
+	ItemCode              string   `json:"item_code"`
+	ItemName              string   `json:"item_name"`
+	SpecName              *string  `json:"spec_name"`
+	Description           *string  `json:"description"`
+	Qty                   float64  `json:"qty"`
+	UnitPrice             float64  `json:"unit_price"`
+	InputBasis            string   `json:"input_basis"`
 	Remark                *string  `json:"remark"`
 	PlannedSerialNos      []string `json:"planned_serial_nos"`
 }
@@ -169,6 +171,7 @@ left join lateral (
 left join public.inv_partners hp on hp.id = po.partner_id`
 
 func registerPurchaseOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
+	documentlifecycle.RegisterRoutes(r, pool, "/purchase-orders", documentlifecycle.PurchaseOrderConfig())
 	r.Get("/purchase-orders/preview-sequences", previewPurchaseOrderSequences(pool))
 	r.Get("/purchase-orders/status-report/export", exportPurchaseOrderStatusReport(pool))
 	r.Get("/purchase-orders/status-report", listPurchaseOrderStatusReport(pool))
@@ -244,7 +247,12 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		offset := httputil.Offset(p)
 
-		where := "po.tenant_id = $1 and po.deleted_at is null"
+		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "po")
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where := "po.tenant_id = $1 and " + lifecycleWhere
 		args := []any{tu.TenantID}
 		argN := 2
 		var explicitLoc *int64
@@ -341,8 +349,8 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		where += scope
 
 		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
-			CustomerColumn:       "po.partner_id",
-			LocationColumn:       "po.location_id",
+			CustomerColumn:     "po.partner_id",
+			LocationColumn:     "po.location_id",
 			ExplicitLocationID: explicitLoc,
 		}, argN, &args)
 		if err != nil {
@@ -431,6 +439,10 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 
 func getPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var ok bool
+		if r, ok = documentlifecycle.PrepareDetailRequest(w, r); !ok {
+			return
+		}
 		tu, _ := auth.FromContext(r.Context())
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
@@ -469,7 +481,7 @@ func loadPurchaseOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int
 		join public.quo_currencies c on c.id = po.currency_id
 		join public.inv_locations l on l.id = po.location_id
 		left join public.users u on u.id = po.created_by_user_id
-		where po.id = $1 and po.tenant_id = $2 and po.deleted_at is null`,
+		where po.id = $1 and po.tenant_id = $2 and `+documentlifecycle.DetailPredicate(ctx, "po"),
 		id, tenantID).Scan(
 		&po.ID, &orderDate, &po.DateSeq, &po.PurchaseOrderNo,
 		&po.PurchaseRequestID, &po.RFQID, &po.SupplierQuotationID,
@@ -538,6 +550,23 @@ func loadPurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, purchaseOrd
 	return lines, nil
 }
 
+// validateLinkedPRApproval blocks saving a PO against a purchase request that has
+// not passed approval when the PR-approval policy is on.
+func validateLinkedPRApproval(ctx context.Context, pool *pgxpool.Pool, tenantID int64, policy processpolicy.Policy, prID *int64) map[string]string {
+	if prID == nil || *prID <= 0 || !policy.PurchaseRequirePRApproval {
+		return nil
+	}
+	var progress string
+	var approvedAt *time.Time
+	err := pool.QueryRow(ctx, `
+		select progress_status, approved_at from public.pr_purchase_requests
+		where id = $1 and tenant_id = $2 and deleted_at is null`, *prID, tenantID).Scan(&progress, &approvedAt)
+	if err != nil {
+		return map[string]string{"purchase_request_id": "Purchase request not found."}
+	}
+	return processpolicy.ValidatePurchaseRequestForPO(policy, progress, approvedAt)
+}
+
 func createPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -557,6 +586,10 @@ func createPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if vErrs := processpolicy.ValidatePurchaseOrderCreate(policy, body.PurchaseRequestID); vErrs != nil {
+			response.Validation(w, vErrs)
+			return
+		}
+		if vErrs := validateLinkedPRApproval(r.Context(), pool, tu.TenantID, policy, body.PurchaseRequestID); vErrs != nil {
 			response.Validation(w, vErrs)
 			return
 		}
@@ -954,6 +987,22 @@ func updatePurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Re-validate source requirements so an update cannot strip the PR link
+		// or attach an unapproved purchase request.
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if vErrs := processpolicy.ValidatePurchaseOrderCreate(policy, body.PurchaseRequestID); vErrs != nil {
+			response.Validation(w, vErrs)
+			return
+		}
+		if vErrs := validateLinkedPRApproval(r.Context(), pool, tu.TenantID, policy, body.PurchaseRequestID); vErrs != nil {
+			response.Validation(w, vErrs)
+			return
+		}
+
 		tt, err := loadTaxCalcType(r.Context(), pool, tu.TenantID, body.TaxTypeID)
 		if err != nil {
 			response.Validation(w, map[string]string{"tax_type_id": "Tax type not found."})
@@ -1073,6 +1122,17 @@ func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, v)
 			return
 		}
+		if policy.PurchaseRequirePOApproval {
+			status, found, err := approval.Status(r.Context(), pool, tu.TenantID, "purchase_order", id)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to check approval.", "ERR_INTERNAL")
+				return
+			}
+			if v := processpolicy.ValidatePurchaseOrderApproval(policy, found, status); v != nil {
+				response.Validation(w, v)
+				return
+			}
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -1120,27 +1180,7 @@ func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func deletePurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tu, _ := auth.FromContext(r.Context())
-		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-		if err != nil {
-			response.Validation(w, map[string]string{"id": "Invalid id."})
-			return
-		}
-		var status string
-		if err := pool.QueryRow(r.Context(), `
-			select status from public.po_purchase_orders
-			where id = $1 and tenant_id = $2 and deleted_at is null`,
-			id, tu.TenantID).Scan(&status); err != nil {
-			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
-			return
-		}
-		if status != "draft" {
-			response.Err(w, http.StatusConflict, "Only draft purchase orders can be deleted.", "ERR_CONFLICT")
-			return
-		}
-		softDelete(pool, w, r, "po_purchase_orders", "purchase_order.delete", "po_purchase_order")
-	}
+	return documentlifecycle.DeleteHandler(pool, documentlifecycle.PurchaseOrderConfig())
 }
 
 func allocatePurchaseOrderSequences(ctx context.Context, tx pgx.Tx, tenantID int64, orderDate time.Time, requestedSeq *int, excludeID int64) (dateSeq int, purchaseOrderNo string, errs map[string]string) {

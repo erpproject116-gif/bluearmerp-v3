@@ -3,8 +3,10 @@ package finance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -72,8 +74,8 @@ func registerOfficialReceiptRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/official-receipts", listOfficialReceipts(pool))
 	r.With(auth.RequirePermission("finance.official_receipts_new", auth.AccessWrite)).Post("/official-receipts", createOfficialReceipt(pool))
 	r.Get("/official-receipts/{id}", getOfficialReceipt(pool))
-	r.Patch("/official-receipts/{id}", updateOfficialReceipt(pool))
-	r.Delete("/official-receipts/{id}", deleteOfficialReceipt(pool))
+	r.With(auth.RequirePermission("finance.official_receipts", auth.AccessWrite)).Patch("/official-receipts/{id}", updateOfficialReceipt(pool))
+	r.With(auth.RequirePermission("finance.official_receipts", auth.AccessWrite)).Delete("/official-receipts/{id}", deleteOfficialReceipt(pool))
 }
 
 func previewReceiptSequences(pool *pgxpool.Pool) http.HandlerFunc {
@@ -447,8 +449,8 @@ func createOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := insertReceiptApplications(r.Context(), tx, id, body.Applications); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save applications.", "ERR_INTERNAL")
+		if err := insertReceiptApplications(r.Context(), tx, tu.TenantID, id, body.Applications); err != nil {
+			respondApplicationSaveError(w, err)
 			return
 		}
 
@@ -469,6 +471,9 @@ func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		if blockIfPosted(w, r, pool, tu.TenantID, "official_receipt", id, "Editing") {
 			return
 		}
 		var body receiptBody
@@ -517,8 +522,8 @@ func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to update applications.", "ERR_INTERNAL")
 			return
 		}
-		if err := insertReceiptApplications(r.Context(), tx, id, body.Applications); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save applications.", "ERR_INTERNAL")
+		if err := insertReceiptApplications(r.Context(), tx, tu.TenantID, id, body.Applications); err != nil {
+			respondApplicationSaveError(w, err)
 			return
 		}
 
@@ -535,11 +540,63 @@ func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 
 func deleteOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		if blockIfPosted(w, r, pool, tu.TenantID, "official_receipt", id, "Deletion") {
+			return
+		}
 		softDelete(pool, w, r, "fin_official_receipts", "finance.receipt.delete", "fin_official_receipt")
 	}
 }
 
-func insertReceiptApplications(ctx context.Context, tx pgx.Tx, receiptID int64, apps []applicationBody) error {
+// overAppliedError signals that, at insert time (under row locks), an applied
+// amount no longer fits the document's open balance.
+type overAppliedError struct {
+	message string
+}
+
+func (e overAppliedError) Error() string { return e.message }
+
+// lockAndCheckReceiptApplications locks each referenced sale row (FOR UPDATE)
+// and re-validates the applied amounts inside the current transaction, so
+// concurrent receipts cannot over-apply the same invoice. Rows are locked in
+// sales_id order to avoid deadlocks between concurrent requests.
+func lockAndCheckReceiptApplications(ctx context.Context, tx pgx.Tx, tenantID, receiptID int64, apps []applicationBody) error {
+	ordered := make([]applicationBody, len(apps))
+	copy(ordered, apps)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].SalesID < ordered[j].SalesID })
+	for _, app := range ordered {
+		var grandTotal float64
+		if err := tx.QueryRow(ctx, `
+			select grand_total::float8 from public.sa_sales
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			for update`, app.SalesID, tenantID).Scan(&grandTotal); err != nil {
+			return err
+		}
+		var applied float64
+		if err := tx.QueryRow(ctx, `
+			select coalesce(sum(a.applied_amount), 0)::float8
+			from public.fin_receipt_applications a
+			join public.fin_official_receipts r on r.id = a.official_receipt_id
+			where a.sales_id = $1 and r.tenant_id = $2 and r.deleted_at is null and r.id <> $3`,
+			app.SalesID, tenantID, receiptID).Scan(&applied); err != nil {
+			return err
+		}
+		if outstanding := grandTotal - applied; app.AppliedAmount > outstanding+0.0001 {
+			return overAppliedError{message: fmt.Sprintf("Applied amount exceeds outstanding balance (%.4f) for sales %d. Another payment may have been applied concurrently.", outstanding, app.SalesID)}
+		}
+	}
+	return nil
+}
+
+func insertReceiptApplications(ctx context.Context, tx pgx.Tx, tenantID, receiptID int64, apps []applicationBody) error {
+	if err := lockAndCheckReceiptApplications(ctx, tx, tenantID, receiptID, apps); err != nil {
+		return err
+	}
 	for _, app := range apps {
 		if _, err := tx.Exec(ctx, `
 			insert into public.fin_receipt_applications (official_receipt_id, sales_id, applied_amount)
@@ -549,6 +606,17 @@ func insertReceiptApplications(ctx context.Context, tx pgx.Tx, receiptID int64, 
 		}
 	}
 	return nil
+}
+
+// respondApplicationSaveError maps over-application conflicts to a 409 and
+// everything else to a generic 500.
+func respondApplicationSaveError(w http.ResponseWriter, err error) {
+	var oa overAppliedError
+	if errors.As(err, &oa) {
+		response.Err(w, http.StatusConflict, oa.message, "ERR_OVER_APPLIED")
+		return
+	}
+	response.Err(w, http.StatusInternalServerError, "Failed to save applications.", "ERR_INTERNAL")
 }
 
 func optionalInt64Query(r *http.Request, key string) (*int64, bool) {

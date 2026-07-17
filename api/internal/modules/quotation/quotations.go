@@ -14,112 +14,113 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 )
 
 type QuotationLine struct {
-	ID          int64   `json:"id,omitempty"`
-	LineNo      int     `json:"line_no"`
-	ItemID      *int64  `json:"item_id,omitempty"`
-	ItemCode    string  `json:"item_code"`
-	ItemName    string  `json:"item_name"`
-	Description *string `json:"description,omitempty"`
-	Qty         float64 `json:"qty"`
-	UnitNonVat  float64 `json:"unit_non_vat"`
-	NonVatTotal float64 `json:"non_vat_total"`
-	TaxAmount   float64 `json:"tax_amount"`
-	UnitVatInc  float64 `json:"unit_vat_inc"`
-	LineTotal   float64 `json:"line_total"`
-	Remark            *string  `json:"remark,omitempty"`
-	PlannedSerialNos  []string `json:"planned_serial_nos,omitempty"`
-	TrackSerial       bool     `json:"track_serial,omitempty"`
-	SerialPolicy      string   `json:"serial_policy,omitempty"`
+	ID               int64    `json:"id,omitempty"`
+	LineNo           int      `json:"line_no"`
+	ItemID           *int64   `json:"item_id,omitempty"`
+	ItemCode         string   `json:"item_code"`
+	ItemName         string   `json:"item_name"`
+	Description      *string  `json:"description,omitempty"`
+	Qty              float64  `json:"qty"`
+	UnitNonVat       float64  `json:"unit_non_vat"`
+	NonVatTotal      float64  `json:"non_vat_total"`
+	TaxAmount        float64  `json:"tax_amount"`
+	UnitVatInc       float64  `json:"unit_vat_inc"`
+	LineTotal        float64  `json:"line_total"`
+	Remark           *string  `json:"remark,omitempty"`
+	PlannedSerialNos []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial      bool     `json:"track_serial,omitempty"`
+	SerialPolicy     string   `json:"serial_policy,omitempty"`
 }
 
 type Quotation struct {
-	ID                      int64           `json:"id"`
-	OrderDate               string          `json:"order_date"`
-	DateSeq                 int             `json:"date_seq"`
-	DateNoDisplay           string          `json:"date_no_display"`
-	ReferenceNo             string          `json:"reference_no"`
-	TaxTypeID               int64           `json:"tax_type_id"`
-	TaxTypeName             string          `json:"tax_type_name,omitempty"`
-	CurrencyID              int64           `json:"currency_id"`
-	CurrencyCode            string          `json:"currency_code,omitempty"`
-	PartnerID               int64           `json:"partner_id"`
-	CustomerName            string          `json:"customer_name"`
-	PicUserID               *int64          `json:"pic_user_id,omitempty"`
-	PicName                 string          `json:"pic_name"`
-	LocationID              int64           `json:"location_id"`
-	LocationName            string          `json:"location_name,omitempty"`
-	ProjectID               *int64          `json:"project_id,omitempty"`
-	ProjectName             *string         `json:"project_name,omitempty"`
-	QuotationValidityText   *string         `json:"quotation_validity_text,omitempty"`
-	ValidityDays            *int            `json:"validity_days,omitempty"`
-	ValidUntil              *string         `json:"valid_until,omitempty"`
-	PaymentTerms            *string         `json:"payment_terms,omitempty"`
-	NoteForPicOnly          *string         `json:"note_for_pic_only,omitempty"`
-	Notes                   *string         `json:"notes,omitempty"`
-	ProgressStatus          string          `json:"progress_status"`
-	VoucherStatus           string          `json:"voucher_status"`
-	Subtotal                float64         `json:"subtotal"`
-	TaxTotal                float64         `json:"tax_total"`
-	GrandTotal              float64         `json:"grand_total"`
-	CreatedByUserID         *int64          `json:"created_by_user_id,omitempty"`
-	CreatedByName           string          `json:"created_by_name,omitempty"`
-	ItemNameSummary         string          `json:"item_name_summary,omitempty"`
-	Lines                   []QuotationLine `json:"lines,omitempty"`
-	CustomValues            map[string]any  `json:"custom_values,omitempty"`
+	ID                    int64           `json:"id"`
+	OrderDate             string          `json:"order_date"`
+	DateSeq               int             `json:"date_seq"`
+	DateNoDisplay         string          `json:"date_no_display"`
+	ReferenceNo           string          `json:"reference_no"`
+	TaxTypeID             int64           `json:"tax_type_id"`
+	TaxTypeName           string          `json:"tax_type_name,omitempty"`
+	CurrencyID            int64           `json:"currency_id"`
+	CurrencyCode          string          `json:"currency_code,omitempty"`
+	PartnerID             int64           `json:"partner_id"`
+	CustomerName          string          `json:"customer_name"`
+	PicUserID             *int64          `json:"pic_user_id,omitempty"`
+	PicName               string          `json:"pic_name"`
+	LocationID            int64           `json:"location_id"`
+	LocationName          string          `json:"location_name,omitempty"`
+	ProjectID             *int64          `json:"project_id,omitempty"`
+	ProjectName           *string         `json:"project_name,omitempty"`
+	QuotationValidityText *string         `json:"quotation_validity_text,omitempty"`
+	ValidityDays          *int            `json:"validity_days,omitempty"`
+	ValidUntil            *string         `json:"valid_until,omitempty"`
+	PaymentTerms          *string         `json:"payment_terms,omitempty"`
+	NoteForPicOnly        *string         `json:"note_for_pic_only,omitempty"`
+	Notes                 *string         `json:"notes,omitempty"`
+	ProgressStatus        string          `json:"progress_status"`
+	VoucherStatus         string          `json:"voucher_status"`
+	Subtotal              float64         `json:"subtotal"`
+	TaxTotal              float64         `json:"tax_total"`
+	GrandTotal            float64         `json:"grand_total"`
+	CreatedByUserID       *int64          `json:"created_by_user_id,omitempty"`
+	CreatedByName         string          `json:"created_by_name,omitempty"`
+	ItemNameSummary       string          `json:"item_name_summary,omitempty"`
+	Lines                 []QuotationLine `json:"lines,omitempty"`
+	CustomValues          map[string]any  `json:"custom_values,omitempty"`
 }
 
 type quotationLineBody struct {
-	LineNo      int     `json:"line_no"`
-	ItemID      *int64  `json:"item_id"`
-	ItemCode    string  `json:"item_code"`
-	ItemName    string  `json:"item_name"`
-	Description *string `json:"description"`
-	Qty         float64 `json:"qty"`
-	UnitPrice   float64 `json:"unit_price"`
-	InputBasis  string  `json:"input_basis"`
+	LineNo           int      `json:"line_no"`
+	ItemID           *int64   `json:"item_id"`
+	ItemCode         string   `json:"item_code"`
+	ItemName         string   `json:"item_name"`
+	Description      *string  `json:"description"`
+	Qty              float64  `json:"qty"`
+	UnitPrice        float64  `json:"unit_price"`
+	InputBasis       string   `json:"input_basis"`
 	Remark           *string  `json:"remark"`
 	PlannedSerialNos []string `json:"planned_serial_nos"`
 }
 
 type quotationBody struct {
-	OrderDate               string              `json:"order_date"`
-	TaxTypeID               int64               `json:"tax_type_id"`
-	CurrencyID              int64               `json:"currency_id"`
-	PartnerID               int64               `json:"partner_id"`
-	PicUserID               *int64              `json:"pic_user_id"`
-	PicName                 string              `json:"pic_name"`
-	LocationID              int64               `json:"location_id"`
-	ProjectID               *int64              `json:"project_id"`
-	ProjectName             *string             `json:"project_name"`
-	QuotationValidityText   *string             `json:"quotation_validity_text"`
-	ValidityDays            *int                `json:"validity_days"`
-	PaymentTerms            *string             `json:"payment_terms"`
-	NoteForPicOnly          *string             `json:"note_for_pic_only"`
-	Notes                   *string             `json:"notes"`
-	ProgressStatus          string              `json:"progress_status"`
-	Lines                   []quotationLineBody `json:"lines"`
-	CustomValues            map[string]any      `json:"custom_values"`
+	OrderDate             string              `json:"order_date"`
+	TaxTypeID             int64               `json:"tax_type_id"`
+	CurrencyID            int64               `json:"currency_id"`
+	PartnerID             int64               `json:"partner_id"`
+	PicUserID             *int64              `json:"pic_user_id"`
+	PicName               string              `json:"pic_name"`
+	LocationID            int64               `json:"location_id"`
+	ProjectID             *int64              `json:"project_id"`
+	ProjectName           *string             `json:"project_name"`
+	QuotationValidityText *string             `json:"quotation_validity_text"`
+	ValidityDays          *int                `json:"validity_days"`
+	PaymentTerms          *string             `json:"payment_terms"`
+	NoteForPicOnly        *string             `json:"note_for_pic_only"`
+	Notes                 *string             `json:"notes"`
+	ProgressStatus        string              `json:"progress_status"`
+	Lines                 []quotationLineBody `json:"lines"`
+	CustomValues          map[string]any      `json:"custom_values"`
 }
 
 type computedLine struct {
-	LineNo      int
-	ItemID      *int64
-	ItemCode    string
-	ItemName    string
-	Description *string
-	Qty         float64
-	Amounts     taxcalc.LineAmounts
+	LineNo           int
+	ItemID           *int64
+	ItemCode         string
+	ItemName         string
+	Description      *string
+	Qty              float64
+	Amounts          taxcalc.LineAmounts
 	Remark           *string
 	PlannedSerialNos []string
 }
@@ -144,6 +145,7 @@ type createdSlipLine struct {
 
 func registerQuotationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerAttachmentRoutes(r, pool)
+	documentlifecycle.RegisterRoutes(r, pool, "/quotations", documentlifecycle.QuotationConfig())
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Timeout(5 * time.Minute))
 		registerRfqImportRoutes(r, pool)
@@ -209,7 +211,12 @@ func listQuotations(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "order_date", allowed)
 		offset := httputil.Offset(p)
 
-		where := "q.tenant_id = $1 and q.deleted_at is null"
+		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "q")
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where := "q.tenant_id = $1 and " + lifecycleWhere
 		args := []any{tu.TenantID}
 		argN := 2
 
@@ -320,6 +327,10 @@ func formatItemNameSummary(first *string, lineCount int) string {
 
 func getQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var ok bool
+		if r, ok = documentlifecycle.PrepareDetailRequest(w, r); !ok {
+			return
+		}
 		tu, _ := auth.FromContext(r.Context())
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
@@ -357,7 +368,7 @@ func loadQuotation(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		join public.quo_currencies c on c.id = q.currency_id
 		join public.inv_locations l on l.id = q.location_id
 		left join public.users u on u.id = q.created_by_user_id
-		where q.id = $1 and q.tenant_id = $2 and q.deleted_at is null`,
+		where q.id = $1 and q.tenant_id = $2 and `+documentlifecycle.DetailPredicate(ctx, "q"),
 		id, tenantID).Scan(
 		&q.ID, &orderDate, &q.DateSeq, &q.ReferenceNo,
 		&q.TaxTypeID, &q.TaxTypeName, &q.CurrencyID, &q.CurrencyCode,
@@ -624,9 +635,7 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func deleteQuotation(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		softDelete(pool, w, r, "quo_quotations", "quotation.delete", "quo_quotation")
-	}
+	return documentlifecycle.DeleteHandler(pool, documentlifecycle.QuotationConfig())
 }
 
 func replaceQuotationLines(ctx context.Context, tx pgx.Tx, quotationID int64, lines []computedLine) error {

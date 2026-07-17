@@ -100,6 +100,7 @@ export function useSupplierInvoiceList(params: () => {
   q?: string;
   progressStatus?: string;
   paymentStatus?: string;
+  lifecycle?: string;
 }) {
   return createQuery(() => {
     const p = params();
@@ -107,6 +108,7 @@ export function useSupplierInvoiceList(params: () => {
     if (p.q) qs.set("q", p.q);
     if (p.progressStatus) qs.set("progress_status", p.progressStatus);
     if (p.paymentStatus) qs.set("payment_status", p.paymentStatus);
+    if (p.lifecycle && p.lifecycle !== "active") qs.set("lifecycle", p.lifecycle);
     return {
       queryKey: ["supplier-invoices", p],
       queryFn: async () => {

@@ -2,6 +2,7 @@ package approval
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -73,6 +74,28 @@ func Decide(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, entityType strin
 		insert into public.approval_actions (request_id, action, actor_user_id, remarks, from_status, to_status)
 		values ($1, $2, $3, $4, $5, $6)`, reqID, action, tu.AppUserID, remarks, fromStatus, toStatus)
 	return err
+}
+
+// rowQuerier is satisfied by *pgxpool.Pool and pgx.Tx.
+type rowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// Status returns the approval request status for an entity. found is false when
+// no approval request exists, which policy checks must treat as not approved
+// (unlike IsApproved, which treats a missing request as approved).
+func Status(ctx context.Context, q rowQuerier, tenantID int64, entityType string, entityID int64) (status string, found bool, err error) {
+	err = q.QueryRow(ctx, `
+		select status from public.approval_requests
+		where tenant_id = $1 and entity_type = $2 and entity_id = $3`,
+		tenantID, strings.TrimSpace(entityType), entityID).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return status, true, nil
 }
 
 // IsApproved returns true when no approval is required or entity is confirmed.

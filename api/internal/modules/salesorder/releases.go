@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
@@ -180,6 +181,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 		releaseDate := time.Now()
 		var releasedCount int
 		soIDs := map[int64]struct{}{}
+		soApprovalChecked := map[int64]bool{}
 
 		for i, item := range body.Lines {
 			if item.SalesOrderLineID <= 0 {
@@ -225,6 +227,21 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			if tenantID != tu.TenantID {
 				response.Err(w, http.StatusForbidden, "Forbidden.", "ERR_FORBIDDEN")
 				return
+			}
+
+			if policy.SalesRequireSOApproval && !soApprovalChecked[salesOrderID] {
+				status, found, err := approval.Status(r.Context(), tx, tu.TenantID, "sales_order", salesOrderID)
+				if err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to check sales order approval.", "ERR_INTERNAL")
+					return
+				}
+				if v := processpolicy.ValidateSalesOrderApproval(policy, found, status); v != nil {
+					response.Validation(w, map[string]string{
+						fmt.Sprintf("lines[%d].sales_order_line_id", i): v["sales_order_id"],
+					})
+					return
+				}
+				soApprovalChecked[salesOrderID] = true
 			}
 
 			balance := lineQty - released

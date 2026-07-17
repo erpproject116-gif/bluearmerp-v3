@@ -15,6 +15,7 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
@@ -128,6 +129,8 @@ type Props = {
   open: boolean;
   editing: SalesDetail | null;
   templateCode: SalesTemplateCode;
+  /** Deleted (soft-deleted) document opened for viewing — no edits allowed. */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -458,9 +461,7 @@ export function SalesModal(props: Props) {
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
     enabled: () => props.open,
-    // Create-only: the reset effect below (keyed on props.open/props.editing) runs synchronously
-    // before this draft's async recovery resolves, so applying here can't be clobbered by it.
-    autoApply: () => props.open && !props.editing,
+    // Banner-only: show Restore/Discard so the user chooses (ECOUNT-style recovery).
   });
 
   const onTaxTypeChange = async (newId: number | null) => {
@@ -638,6 +639,7 @@ export function SalesModal(props: Props) {
   };
 
   const save = async () => {
+    if (props.readOnly) return;
     if (!taxTypeId()) {
       toast.warning("Please select a transaction type.");
       return;
@@ -770,7 +772,9 @@ export function SalesModal(props: Props) {
     } else {
       toast.warning("Sale saved. Map CoA defaults (Sales + Receivable) to auto-prepare the accounting invoice.");
     }
-    setPostSaveOpen(true);
+    // Saving is terminal for this transaction window. Follow-up actions remain
+    // available from the saved record in the Sales list.
+    props.onClose();
   };
 
   const finishPostSave = () => {
@@ -782,9 +786,10 @@ export function SalesModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={effectiveEditing() ? "Edit Sale (actual sale)" : "New Sale (actual sale)"}
+        title={effectiveEditing() ? (props.readOnly ? "View Sales Invoice (deleted)" : "Edit Sales Invoice") : "New Sales Invoice"}
         onClose={() => props.onClose()}
         onSave={activeTab() === "details" ? () => void save() : undefined}
+        readOnly={props.readOnly}
         saving={saving()}
         tabs={effectiveEditing() ? [{ id: "details", label: "Details" }, { id: "invoice", label: "Invoice" }] : undefined}
         activeTab={activeTab()}
@@ -815,6 +820,8 @@ export function SalesModal(props: Props) {
           </Show>
         }
       >
+        <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
+        <draft.DraftBanner />
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
             kind="sales"
@@ -832,7 +839,6 @@ export function SalesModal(props: Props) {
           />
         </Show>
         <Show when={activeTab() === "details"}>
-        <draft.DraftBanner />
         <CoaSetupReminder />
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Date-no">
@@ -951,6 +957,7 @@ export function SalesModal(props: Props) {
             <ProgressStatusMenu
               value={progressStatus()}
               disabled={m.disabled || progressStatus() === "e_approval"}
+              excludeValues={["e_approval"]}
               onChange={setProgressStatus}
             />
           )}
@@ -1096,6 +1103,7 @@ export function SalesModal(props: Props) {
         <ChangeLogPanel targetType="sa_sales" targetId={effectiveEditing()?.id} />
         <EmailHistoryPanel docType="sales" docId={effectiveEditing()?.id} />
         </Show>
+        </LifecycleReadOnlyShell>
       </WideEntityModal>
 
       <HistoryLogModal

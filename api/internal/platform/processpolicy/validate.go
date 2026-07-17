@@ -57,6 +57,64 @@ func ValidatePurchaseRequestForPO(p Policy, progressStatus string, approvedAt *t
 	}
 }
 
+// ValidateSupplierInvoiceLineSource requires a posted goods receipt line on every
+// supplier invoice line when the GR-before-invoice policy is enabled. PO-only lines
+// are rejected because they bypass the receiving step.
+func ValidateSupplierInvoiceLineSource(p Policy, hasGRLine bool) map[string]string {
+	if !p.PurchaseRequireGRBeforeSupplierInv || hasGRLine {
+		return nil
+	}
+	return map[string]string{
+		"goods_receipt_line_id": "A posted goods receipt line is required before invoicing. Purchase order lines without a goods receipt are not allowed while the GR-before-invoice policy is enabled.",
+	}
+}
+
+func approvalConfirmed(hasRequest bool, requestStatus string) bool {
+	return hasRequest && strings.EqualFold(strings.TrimSpace(requestStatus), "confirmed")
+}
+
+// ValidateSalesOrderApproval blocks SO fulfillment (release, conversion to sale)
+// when the SO approval policy is on and the order has no confirmed approval request.
+// A missing approval request counts as not approved.
+func ValidateSalesOrderApproval(p Policy, hasRequest bool, requestStatus string) map[string]string {
+	if !p.SalesRequireSOApproval || approvalConfirmed(hasRequest, requestStatus) {
+		return nil
+	}
+	return map[string]string{
+		"sales_order_id": "Sales order must be approved before it can be released or invoiced. Submit it for approval first.",
+	}
+}
+
+// ValidatePurchaseOrderApproval blocks PO confirm, goods receipt and PO-linked
+// supplier invoicing when the PO approval policy is on and the order has no
+// confirmed approval request. A missing approval request counts as not approved.
+func ValidatePurchaseOrderApproval(p Policy, hasRequest bool, requestStatus string) map[string]string {
+	if !p.PurchaseRequirePOApproval || approvalConfirmed(hasRequest, requestStatus) {
+		return nil
+	}
+	return map[string]string{
+		"purchase_order_id": "Purchase order must be approved before this step. Submit it for approval first.",
+	}
+}
+
+// AllowJournalAutoPost reports whether an automatic journal posting may skip the
+// draft stage. When finance_require_je_approval is on, auto-post is downgraded so
+// the entry stays in draft until it passes approval.
+func AllowJournalAutoPost(p Policy, autoPost bool) bool {
+	return autoPost && !p.FinanceRequireJEApproval
+}
+
+// ValidateJournalEntryPost blocks direct journal posting when the JE approval
+// policy is on and the entry has no confirmed approval request.
+func ValidateJournalEntryPost(p Policy, hasRequest bool, requestStatus string) map[string]string {
+	if !p.FinanceRequireJEApproval || approvalConfirmed(hasRequest, requestStatus) {
+		return nil
+	}
+	return map[string]string{
+		"status": "Journal entry must be approved before posting. Submit it for approval first.",
+	}
+}
+
 // ValidateSalesInvoiceQtyAgainstDelivery blocks SI qty above delivered when DR policy is on.
 func ValidateSalesInvoiceQtyAgainstDelivery(p Policy, qty, deliveredQty float64) map[string]string {
 	if !p.SalesRequireDeliveryReceipt {
