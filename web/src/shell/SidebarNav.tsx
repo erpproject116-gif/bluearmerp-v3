@@ -21,7 +21,7 @@ import {
 import { isAnySubBranchPath, isSubBranchPath } from "./sub-branch-nav";
 import { isReviewPurchasesPath } from "./review-purchases-nav";
 import { isTaxMngtPath } from "./tax-mngt-nav";
-import { useAuth, canAccessPlatformConsole } from "../shared/auth-context";
+import { useAuth } from "../shared/auth-context";
 
 function brandedLabel(labels: Record<string, string>, key: string, fallback: string): string {
   const v = labels[key];
@@ -292,7 +292,6 @@ function NavGroupBlock(props: {
 export function SidebarNav() {
   const auth = useAuth();
   const loc = useLocation();
-  const shell = useShell();
   let navEl: HTMLElement | undefined;
   let savedScrollTop = 0;
 
@@ -339,36 +338,6 @@ export function SidebarNav() {
       </For>
 
       <For each={belowGroup()}>{(module) => <NavModuleLink module={module} />}</For>
-
-      <Show when={canAccessPlatformConsole(auth.me)}>
-        <div class="space-y-1 border-t border-stroke pt-3">
-          <p class="px-3 text-xs font-semibold uppercase tracking-wider text-text-secondary">Platform</p>
-          <A
-            href="/app/platform/customers"
-            class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:erp-panel hover:text-text-primary"
-            classList={{
-              "bg-brand-50 text-brand-600": loc.pathname.startsWith("/app/platform/customers"),
-              "justify-center": shell.collapsed(),
-            }}
-            title={shell.collapsed() ? "Customers" : undefined}
-          >
-            <span class="text-base" aria-hidden="true">👥</span>
-            <Show when={!shell.collapsed()}><span>Customers</span></Show>
-          </A>
-          <A
-            href="/app/platform/plans"
-            class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:erp-panel hover:text-text-primary"
-            classList={{
-              "bg-brand-50 text-brand-600": loc.pathname.startsWith("/app/platform/plans"),
-              "justify-center": shell.collapsed(),
-            }}
-            title={shell.collapsed() ? "Plans & pricing" : undefined}
-          >
-            <span class="text-base" aria-hidden="true">₱</span>
-            <Show when={!shell.collapsed()}><span>Plans & pricing</span></Show>
-          </A>
-        </div>
-      </Show>
     </nav>
   );
 }

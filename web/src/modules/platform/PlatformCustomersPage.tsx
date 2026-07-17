@@ -135,10 +135,10 @@ export default function PlatformCustomersPage() {
   };
 
   return (
-    <div class="mx-auto max-w-6xl p-6">
-      <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+    <div class="space-y-4">
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 class="text-xl font-semibold text-text-primary">Platform customers</h1>
+          <h1 class="text-xl font-semibold text-text-primary">Customers</h1>
           <p class="text-sm text-text-secondary">Subscription registry and CRM traceability</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -300,7 +300,7 @@ export default function PlatformCustomersPage() {
                       </td>
                       <td class="px-4 py-3">{c.days_remaining ?? "—"}</td>
                       <td class="px-4 py-3 text-right">
-                        <A href={`/app/platform/customers/${c.id}`} class="text-brand-600 hover:underline">
+                        <A href={`/app/platform-command/customers/${c.id}`} class="text-brand-600 hover:underline">
                           View
                         </A>
                       </td>

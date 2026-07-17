@@ -33,6 +33,11 @@ export type MeData = {
     can_view_crm_analytics?: boolean;
     can_manage_all_support_tickets?: boolean;
     permissions?: Record<string, string> | null;
+    can_access_platform_command?: boolean;
+    platform_user_id?: number;
+    platform_role?: string;
+    platform_only?: boolean;
+    platform_permissions?: Record<string, boolean> | null;
   };
   tenant: {
     id: number;
@@ -57,7 +62,7 @@ export type MeData = {
   };
 };
 
-/** Platform console (Customers / Plans) — must match API platformConsoleOwnerEmails. */
+/** @deprecated Prefer server-returned can_access_platform_command / platform_permissions. */
 export const PLATFORM_CONSOLE_EMAILS = new Set([
   "itsjohnranel@gmail.com",
   "bluearmph@gmail.com",
@@ -65,9 +70,25 @@ export const PLATFORM_CONSOLE_EMAILS = new Set([
 ]);
 
 export function canAccessPlatformConsole(me: MeData | null | undefined): boolean {
-  if (!me?.user?.is_platform_superadmin) return false;
+  if (!me?.user) return false;
+  if (me.user.can_access_platform_command) return true;
+  if (me.user.platform_permissions && Object.keys(me.user.platform_permissions).length > 0) {
+    return Boolean(
+      me.user.platform_permissions["platform.command.read"] ||
+        me.user.platform_permissions["platform.customers.read"] ||
+        me.user.is_platform_superadmin,
+    );
+  }
+  // Bootstrap fallback until migration 179 is applied everywhere.
+  if (!me.user.is_platform_superadmin) return false;
   const email = me.user.email?.trim().toLowerCase() ?? "";
   return PLATFORM_CONSOLE_EMAILS.has(email);
+}
+
+export function hasPlatformPermission(me: MeData | null | undefined, code: string): boolean {
+  if (!me?.user) return false;
+  if (me.user.is_platform_superadmin) return true;
+  return Boolean(me.user.platform_permissions?.[code]);
 }
 
 export function canManageFormSettings(me: MeData | null | undefined): boolean {

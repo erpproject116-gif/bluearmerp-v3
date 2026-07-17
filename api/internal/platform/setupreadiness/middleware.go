@@ -18,7 +18,7 @@ func RequireSetupReady(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				return
 			}
 			tu, ok := auth.FromContext(r.Context())
-			if !ok || tu.IsPlatformSuperadmin {
+			if !ok || tu.IsPlatformSuperadmin || tu.PlatformOnly {
 				next.ServeHTTP(w, r)
 				return
 			}

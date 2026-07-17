@@ -1,0 +1,105 @@
+import { For, Show, createSignal } from "solid-js";
+import { apiFetch } from "../../shared/api";
+import { useToast } from "../../shared/toast";
+import { usePlatformStaff, usePlatformStaffInvites } from "../../shared/usePlatform";
+
+const ROLES = [
+  "support_viewer",
+  "support_agent",
+  "onboarding_specialist",
+  "customer_success",
+  "billing_operator",
+  "superadmin",
+];
+
+export default function PlatformAccessPage() {
+  const toast = useToast();
+  const staff = usePlatformStaff();
+  const invites = usePlatformStaffInvites();
+  const [email, setEmail] = createSignal("");
+  const [fullName, setFullName] = createSignal("");
+  const [role, setRole] = createSignal("support_viewer");
+  const [saving, setSaving] = createSignal(false);
+
+  const invite = async () => {
+    setSaving(true);
+    const res = await apiFetch("/api/v1/platform/console/staff/invites", {
+      method: "POST",
+      body: JSON.stringify({ email: email().trim(), full_name: fullName().trim(), role: role() }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      toast.warning(res.message ?? "Could not invite.");
+      return;
+    }
+    toast.success((res.data as { message?: string })?.message ?? "Invite created.");
+    setEmail("");
+    setFullName("");
+    invites.refetch();
+  };
+
+  const revoke = async (id: number) => {
+    const res = await apiFetch(`/api/v1/platform/console/staff/invites/${id}/revoke`, { method: "POST" });
+    if (!res.ok) {
+      toast.warning(res.message ?? "Could not revoke.");
+      return;
+    }
+    invites.refetch();
+  };
+
+  return (
+    <div class="space-y-6">
+      <div>
+        <h2 class="text-xl font-semibold">Staff & access</h2>
+        <p class="mt-1 text-sm text-slate-500">
+          Invite platform staff by Google email. They sign in with Google — no user ID entry.
+        </p>
+      </div>
+
+      <section class="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 class="mb-3 text-sm font-semibold">Invite staff</h3>
+        <div class="flex flex-wrap gap-2">
+          <input class="rounded-lg border px-3 py-2 text-sm" placeholder="Email" value={email()} onInput={(e) => setEmail(e.currentTarget.value)} />
+          <input class="rounded-lg border px-3 py-2 text-sm" placeholder="Full name" value={fullName()} onInput={(e) => setFullName(e.currentTarget.value)} />
+          <select class="rounded-lg border px-3 py-2 text-sm" value={role()} onChange={(e) => setRole(e.currentTarget.value)}>
+            <For each={ROLES}>{(r) => <option value={r}>{r}</option>}</For>
+          </select>
+          <button type="button" class="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-40" disabled={saving()} onClick={() => void invite()}>
+            Send invite
+          </button>
+        </div>
+      </section>
+
+      <section class="rounded-xl border border-slate-200 bg-white">
+        <h3 class="border-b px-4 py-3 text-sm font-semibold">Active staff</h3>
+        <ul class="divide-y">
+          <For each={staff.data ?? []}>
+            {(u) => (
+              <li class="flex justify-between px-4 py-2 text-sm">
+                <span>{u.full_name} · {u.email}</span>
+                <span class="text-slate-500">{u.role}{u.is_active ? "" : " (disabled)"}</span>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
+
+      <section class="rounded-xl border border-slate-200 bg-white">
+        <h3 class="border-b px-4 py-3 text-sm font-semibold">Pending invites</h3>
+        <ul class="divide-y">
+          <Show when={(invites.data ?? []).filter((i) => !i.accepted_at && !i.revoked_at).length === 0}>
+            <li class="px-4 py-3 text-sm text-slate-500">No pending invites.</li>
+          </Show>
+          <For each={(invites.data ?? []).filter((i) => !i.accepted_at && !i.revoked_at)}>
+            {(i) => (
+              <li class="flex items-center justify-between px-4 py-2 text-sm">
+                <span>{i.email} · {i.role} · expires {new Date(i.expires_at).toLocaleDateString()}</span>
+                <button type="button" class="text-xs text-rose-700 hover:underline" onClick={() => void revoke(i.id)}>Revoke</button>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
+    </div>
+  );
+}

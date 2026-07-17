@@ -96,7 +96,7 @@ export default function PlatformPlanEditPage() {
       setError(res.message ?? "Save failed.");
       return;
     }
-    navigate("/app/platform/plans", { replace: true });
+    navigate("/app/platform-command/plans", { replace: true });
   };
 
   return (
@@ -268,7 +268,7 @@ export default function PlatformPlanEditPage() {
           <button
             type="button"
             class="rounded-lg border border-stroke px-4 py-2 text-sm"
-            onClick={() => navigate("/app/platform/plans")}
+            onClick={() => navigate("/app/platform-command/plans")}
           >
             Cancel
           </button>

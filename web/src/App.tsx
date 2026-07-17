@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/solid-query";
-import { Route, Router, type RouteSectionProps, Navigate, useLocation } from "@solidjs/router";
+import { Route, Router, type RouteSectionProps, Navigate, useLocation, useParams } from "@solidjs/router";
 import { Suspense } from "solid-js";
 import { AppShell } from "./shell/AppShell";
 import { AuthProvider } from "./shared/auth-context";
@@ -160,6 +160,15 @@ import {
   PlatformCustomerDetailPage,
   PlatformPlansPage,
   PlatformPlanEditPage,
+  PlatformCommandPage,
+  PlatformCommandLayout,
+  PlatformTicketsCommandPage,
+  PlatformTicketDetailCommandPage,
+  PlatformOnboardingCommandPage,
+  PlatformFollowUpsCommandPage,
+  PlatformHistoryCommandPage,
+  PlatformChangeLogsCommandPage,
+  PlatformAccessCommandPage,
   LowStockReportPage,
   ExpiredQuotationsReportPage,
   LeadsPage,
@@ -265,7 +274,7 @@ import { ManufacturingRoute } from "./shared/ManufacturingRoute";
 import { QualityRoute } from "./shared/QualityRoute";
 import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
 import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
-import { PlatformRoute } from "./shared/PlatformRoute";
+import { PlatformCommandRoute } from "./shared/PlatformCommandRoute";
 import { BrandingProvider } from "./shared/branding/BrandingProvider";
 import { SetupGate } from "./shared/SetupGate";
 
@@ -289,6 +298,14 @@ function AppLayout(props: RouteSectionProps) {
         <AppShell>{props.children}</AppShell>
       </SetupGate>
     </ProtectedRoute>
+  );
+}
+
+function PlatformCommandShell(props: RouteSectionProps) {
+  return (
+    <PlatformCommandRoute>
+      <PlatformCommandLayout>{props.children}</PlatformCommandLayout>
+    </PlatformCommandRoute>
   );
 }
 
@@ -342,6 +359,20 @@ export default function App() {
             <PosRoute><PosPage /></PosRoute>
           </ProtectedRoute>
         )} />
+        <Route path="/app/platform-command" component={PlatformCommandShell}>
+          <Route path="/" component={PlatformCommandPage} />
+          <Route path="/customers" component={PlatformCustomersPage} />
+          <Route path="/customers/:id" component={PlatformCustomerDetailPage} />
+          <Route path="/tickets" component={PlatformTicketsCommandPage} />
+          <Route path="/tickets/:id" component={PlatformTicketDetailCommandPage} />
+          <Route path="/onboarding" component={PlatformOnboardingCommandPage} />
+          <Route path="/follow-ups" component={PlatformFollowUpsCommandPage} />
+          <Route path="/history" component={PlatformHistoryCommandPage} />
+          <Route path="/change-logs" component={PlatformChangeLogsCommandPage} />
+          <Route path="/access" component={PlatformAccessCommandPage} />
+          <Route path="/plans" component={PlatformPlansPage} />
+          <Route path="/plans/:id" component={PlatformPlanEditPage} />
+        </Route>
         <Route path="/app" component={AppLayout}>
           <Route path="/dashboard" component={DashboardPage} />
           <Route path="/dashboard/approvals" component={ApprovalsQueuePage} />
@@ -654,26 +685,16 @@ export default function App() {
           <Route path="/setup/*" component={SetupWizardPage} />
           <Route path="/setup" component={SetupWizardPage} />
           <Route path="/onboarding" component={OnboardingPage} />
-          <Route path="/platform/customers" component={() => (
-            <PlatformRoute>
-              <PlatformCustomersPage />
-            </PlatformRoute>
-          )} />
-          <Route path="/platform/customers/:id" component={() => (
-            <PlatformRoute>
-              <PlatformCustomerDetailPage />
-            </PlatformRoute>
-          )} />
-          <Route path="/platform/plans" component={() => (
-            <PlatformRoute>
-              <PlatformPlansPage />
-            </PlatformRoute>
-          )} />
-          <Route path="/platform/plans/:id" component={() => (
-            <PlatformRoute>
-              <PlatformPlanEditPage />
-            </PlatformRoute>
-          )} />
+          <Route path="/platform/customers" component={() => <Navigate href="/app/platform-command/customers" />} />
+          <Route path="/platform/customers/:id" component={() => {
+            const p = useParams<{ id: string }>();
+            return <Navigate href={`/app/platform-command/customers/${p.id}`} />;
+          }} />
+          <Route path="/platform/plans" component={() => <Navigate href="/app/platform-command/plans" />} />
+          <Route path="/platform/plans/:id" component={() => {
+            const p = useParams<{ id: string }>();
+            return <Navigate href={`/app/platform-command/plans/${p.id}`} />;
+          }} />
           <Route path="/user-management/users" component={() => (
             <AdminModuleRoute>
               <UsersPage />

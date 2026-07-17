@@ -20,7 +20,8 @@ func Entitlement(pool *pgxpool.Pool, graceDays int) func(http.Handler) http.Hand
 				return
 			}
 			tu, ok := auth.FromContext(r.Context())
-			if !ok || tu.IsPlatformSuperadmin {
+			isConsole := strings.Contains(strings.ToLower(r.URL.Path), "/platform/console")
+			if !ok || tu.IsPlatformSuperadmin || tu.PlatformOnly || (tu.CanAccessPlatformCommand() && isConsole) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -39,7 +40,7 @@ func isEntitlementExempt(method, path string) bool {
 		return true
 	}
 	p := strings.ToLower(path)
-	for _, e := range []string{"/auth/me", "/platform/billing", "/platform/onboarding", "/branding/"} {
+	for _, e := range []string{"/auth/me", "/platform/billing", "/platform/onboarding", "/platform/console", "/branding/"} {
 		if strings.Contains(p, e) {
 			return true
 		}

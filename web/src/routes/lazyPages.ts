@@ -160,6 +160,15 @@ export const PlatformCustomersPage = lazy(() => import("../modules/platform/Plat
 export const PlatformCustomerDetailPage = lazy(() => import("../modules/platform/PlatformCustomerDetailPage"));
 export const PlatformPlansPage = lazy(() => import("../modules/platform/PlatformPlansPage"));
 export const PlatformPlanEditPage = lazy(() => import("../modules/platform/PlatformPlanEditPage"));
+export const PlatformCommandPage = lazy(() => import("../modules/platform/PlatformCommandPage"));
+export const PlatformCommandLayout = lazy(() => import("../modules/platform/PlatformCommandLayout"));
+export const PlatformTicketsCommandPage = lazy(() => import("../modules/platform/PlatformTicketsPage"));
+export const PlatformTicketDetailCommandPage = lazy(() => import("../modules/platform/PlatformTicketDetailPage"));
+export const PlatformOnboardingCommandPage = lazy(() => import("../modules/platform/PlatformOnboardingPage"));
+export const PlatformFollowUpsCommandPage = lazy(() => import("../modules/platform/PlatformFollowUpsPage"));
+export const PlatformHistoryCommandPage = lazy(() => import("../modules/platform/PlatformHistoryPage"));
+export const PlatformChangeLogsCommandPage = lazy(() => import("../modules/platform/PlatformChangeLogsPage"));
+export const PlatformAccessCommandPage = lazy(() => import("../modules/platform/PlatformAccessPage"));
 export const LowStockReportPage = lazy(() => import("../modules/crm/reports/LowStockReportPage"));
 export const ExpiredQuotationsReportPage = lazy(() => import("../modules/crm/reports/ExpiredQuotationsReportPage"));
 export const LeadsPage = lazy(() => import("../modules/crm/LeadsPage"));

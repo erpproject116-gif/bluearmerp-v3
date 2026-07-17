@@ -48,6 +48,11 @@ type TenantUser struct {
 	ActiveBranchID            int64
 	permissions               map[string]string
 	submitPerms               map[string]bool
+	// Platform Command Center identity (may exist alongside a tenant membership).
+	PlatformUserID      int64
+	PlatformRole        string
+	PlatformPermissions map[string]bool
+	PlatformOnly        bool
 }
 
 type Claims struct {
@@ -115,6 +120,13 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 			}
 			if err != nil {
 				if errorsIsNoProfile(err) {
+					// Platform-only staff: invited Command Center users without a tenant membership.
+					platformUser, pErr := resolvePlatformOnlyUser(r.Context(), pool, claims.Sub, claims.Email)
+					if pErr == nil {
+						ctx := context.WithValue(r.Context(), UserContextKey, platformUser)
+						next.ServeHTTP(w, r.WithContext(ctx))
+						return
+					}
 					response.Err(w, http.StatusForbidden,
 						"No tenant profile for this account. Ask an administrator to invite you, then sign in with Google using the invited email.",
 						"ERR_FORBIDDEN")
@@ -139,7 +151,10 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 				}
 			}
 
-			user.ActiveBranchID = resolveActiveBranchID(r.Context(), pool, user, parseActiveBranchHeader(r))
+			attachPlatformIdentity(r.Context(), pool, &user)
+			if !user.PlatformOnly {
+				user.ActiveBranchID = resolveActiveBranchID(r.Context(), pool, user, parseActiveBranchHeader(r))
+			}
 
 			ctx := context.WithValue(r.Context(), UserContextKey, user)
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -272,8 +287,11 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 	tu.canManageSalesTeamRole = canManageSalesTeam
 	tu.canViewCrmAnalyticsRole = canViewCrmAnalytics
 	tu.IsStoreAdmin = tu.CanManageFormSettings()
-	// Platform console: require both platform_users superadmin row AND allowlisted email.
-	tu.IsPlatformSuperadmin = tu.IsPlatformSuperadmin && isBootstrapSuperadminEmail(tu.Email)
+	// Legacy bootstrap: allowlisted emails with an active platform_users row keep superadmin.
+	// Non-allowlisted platform roles still get Command Center access via PlatformPermissions.
+	if tu.IsPlatformSuperadmin && !isBootstrapSuperadminEmail(tu.Email) {
+		// Keep true only if they still have a platform_users.superadmin row; role checked in attachPlatformIdentity.
+	}
 	if err := loadEffectivePermissions(ctx, pool, &tu); err != nil {
 		return TenantUser{}, err
 	}

@@ -3,6 +3,7 @@ import { Navigate } from "@solidjs/router";
 import { canAccessPlatformConsole, useAuth } from "./auth-context";
 import { SessionLoading } from "./AuthRedirect";
 
+/** Legacy wrapper — prefer PlatformCommandRoute for /app/platform-command. */
 export const PlatformRoute: ParentComponent = (props) => {
   const auth = useAuth();
   return (

@@ -58,6 +58,9 @@ func MeHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 }
 
 func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.Config) (MePayload, error) {
+	if tu.PlatformOnly || tu.TenantID <= 0 {
+		return buildPlatformOnlyMe(tu), nil
+	}
 	var companyName, companyCode, tenantStatus string
 	var autoEnableAll, isDemo bool
 	err := pool.QueryRow(ctx, `
@@ -146,6 +149,11 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 			"can_view_crm_analytics":        tu.CanViewCrmAnalytics(),
 			"can_manage_all_support_tickets": tu.CanManageAllSupportTickets(),
 			"permissions":                   tu.PermissionsMap(),
+			"can_access_platform_command":   tu.CanAccessPlatformCommand(),
+			"platform_user_id":              tu.PlatformUserID,
+			"platform_role":                 tu.PlatformRole,
+			"platform_only":                 tu.PlatformOnly,
+			"platform_permissions":          tu.PlatformPermissions,
 	}
 	if avatarURL != nil && strings.TrimSpace(*avatarURL) != "" {
 		user["avatar_url"] = resolveBrandingAvatarURL(strings.TrimSpace(*avatarURL))
@@ -169,6 +177,38 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 		Modules:            modules,
 		Entitlement:        ent,
 	}, nil
+}
+
+func buildPlatformOnlyMe(tu TenantUser) MePayload {
+	return MePayload{
+		User: map[string]any{
+			"id":                          tu.AppUserID,
+			"email":                       tu.Email,
+			"full_name":                   tu.FullName,
+			"tenant_role":                 "platform",
+			"is_platform_superadmin":      tu.IsPlatformSuperadmin,
+			"is_tenant_owner":             false,
+			"is_store_admin":              false,
+			"can_access_platform_command": tu.CanAccessPlatformCommand(),
+			"platform_user_id":            tu.PlatformUserID,
+			"platform_role":               tu.PlatformRole,
+			"platform_only":               true,
+			"platform_permissions":        tu.PlatformPermissions,
+			"permissions":                 map[string]string{},
+		},
+		Tenant: map[string]any{
+			"id":                      0,
+			"company_name":            "Platform Command",
+			"company_code":            "PLATFORM",
+			"status":                  "active",
+			"auto_enable_all_modules": false,
+			"is_demo":                 false,
+		},
+		ActiveTenantID:     0,
+		Memberships:        []Membership{},
+		EnabledModuleCodes: []string{},
+		Modules:            []ModuleRow{},
+	}
 }
 
 func resolveBrandingAvatarURL(ref string) string {

@@ -261,3 +261,138 @@ export function useBillingPayments() {
     },
   }));
 }
+
+export function usePlatformCommandOverview() {
+  return createQuery(() => ({
+    queryKey: ["platform-command-overview"],
+    queryFn: async () => {
+      const res = await apiFetch<{
+        counts: {
+          open_tickets: number;
+          trial_ending: number;
+          inactive_trials: number;
+          open_follow_ups: number;
+          pending_invites: number;
+        };
+        queue: Array<{
+          kind: string;
+          title: string;
+          customer_id?: number;
+          tenant_id?: number;
+          ref?: string;
+          due_at?: string;
+        }>;
+      }>("/api/v1/platform/console/command");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load command overview");
+      return res.data!;
+    },
+  }));
+}
+
+export function usePlatformCustomerOverview(id: () => number | undefined) {
+  return createQuery(() => ({
+    queryKey: ["platform-customer-overview", id()],
+    enabled: Boolean(id() && id()! > 0),
+    queryFn: async () => {
+      const res = await apiFetch<Record<string, any>>(`/api/v1/platform/console/customers/${id()}/overview`);
+      if (!res.ok) throw new Error(res.message ?? "Failed to load customer overview");
+      return res.data!;
+    },
+  }));
+}
+
+export type PlatformTicket = {
+  id: number;
+  tenant_id: number;
+  ticket_no: string;
+  subject: string;
+  status: string;
+  priority: string;
+  created_at?: string;
+  updated_at?: string;
+  customer_id?: number | null;
+  customer_name?: string;
+  company_code?: string;
+  description?: string;
+  internal_notes?: Array<{ id: number; author_email: string; author_name: string; body: string; created_at: string }>;
+};
+
+export function usePlatformTickets(q?: () => string) {
+  return createQuery(() => ({
+    queryKey: ["platform-tickets", q?.() ?? ""],
+    queryFn: async () => {
+      const search = q?.() ? `?q=${encodeURIComponent(q()!)}` : "";
+      const res = await apiFetch<{ tickets: PlatformTicket[] }>(`/api/v1/platform/console/tickets${search}`);
+      if (!res.ok) throw new Error(res.message ?? "Failed to load tickets");
+      return res.data?.tickets ?? [];
+    },
+  }));
+}
+
+export function usePlatformTicket(id: () => number | undefined) {
+  return createQuery(() => ({
+    queryKey: ["platform-ticket", id()],
+    enabled: Boolean(id() && id()! > 0),
+    queryFn: async () => {
+      const res = await apiFetch<PlatformTicket>(`/api/v1/platform/console/tickets/${id()}`);
+      if (!res.ok) throw new Error(res.message ?? "Failed to load ticket");
+      return res.data!;
+    },
+  }));
+}
+
+export function usePlatformOnboardingQueue() {
+  return createQuery(() => ({
+    queryKey: ["platform-onboarding-queue"],
+    queryFn: async () => {
+      const res = await apiFetch<{ customers: Array<Record<string, any>> }>("/api/v1/platform/console/onboarding");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load onboarding queue");
+      return res.data?.customers ?? [];
+    },
+  }));
+}
+
+export function usePlatformFollowUps() {
+  return createQuery(() => ({
+    queryKey: ["platform-follow-ups"],
+    queryFn: async () => {
+      const res = await apiFetch<{ follow_ups: Array<Record<string, any>> }>("/api/v1/platform/console/follow-ups");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load follow-ups");
+      return res.data?.follow_ups ?? [];
+    },
+  }));
+}
+
+export function usePlatformAccessLogs(kind?: string) {
+  return createQuery(() => ({
+    queryKey: ["platform-access-logs", kind ?? "all"],
+    queryFn: async () => {
+      const path = kind === "change" ? "/api/v1/platform/console/change-logs" : "/api/v1/platform/console/access-logs";
+      const res = await apiFetch<{ items: Array<Record<string, any>> }>(path);
+      if (!res.ok) throw new Error(res.message ?? "Failed to load access logs");
+      return res.data?.items ?? [];
+    },
+  }));
+}
+
+export function usePlatformStaff() {
+  return createQuery(() => ({
+    queryKey: ["platform-staff"],
+    queryFn: async () => {
+      const res = await apiFetch<{ staff: Array<Record<string, any>> }>("/api/v1/platform/console/staff");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load staff");
+      return res.data?.staff ?? [];
+    },
+  }));
+}
+
+export function usePlatformStaffInvites() {
+  return createQuery(() => ({
+    queryKey: ["platform-staff-invites"],
+    queryFn: async () => {
+      const res = await apiFetch<{ invites: Array<Record<string, any>> }>("/api/v1/platform/console/staff/invites");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load invites");
+      return res.data?.invites ?? [];
+    },
+  }));
+}

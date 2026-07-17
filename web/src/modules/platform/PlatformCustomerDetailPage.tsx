@@ -1,8 +1,13 @@
-import { useParams } from "@solidjs/router";
+import { A, useParams } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
-import { usePlatformCustomer, usePlatformPlansAdmin, type PlatformPlan } from "../../shared/usePlatform";
+import {
+  usePlatformCustomer,
+  usePlatformCustomerOverview,
+  usePlatformPlansAdmin,
+  type PlatformPlan,
+} from "../../shared/usePlatform";
 import { LoadingText } from "../../shared/LoadingText";
 
 
@@ -16,6 +21,7 @@ export default function PlatformCustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const id = () => Number(params.id);
   const q = usePlatformCustomer(id);
+  const overview = usePlatformCustomerOverview(id);
   const plansQ = usePlatformPlansAdmin();
   const [busy, setBusy] = createSignal(false);
 
@@ -30,11 +36,13 @@ export default function PlatformCustomerDetailPage() {
   };
 
   return (
-    <div class="mx-auto max-w-4xl p-6">
+    <div class="space-y-6">
+      <A href="/app/platform-command/customers" class="text-sm text-slate-500 hover:underline">← Customers</A>
       <Show when={q.isPending} fallback={
         <Show when={q.data} fallback={<p class="text-sm text-red-600">Customer not found.</p>}>
           {(d) => {
             const c = () => d().customer as Record<string, unknown>;
+            const ov = () => overview.data;
             return (
               <div class="space-y-6">
                 <div>
@@ -44,6 +52,28 @@ export default function PlatformCustomerDetailPage() {
                     Urgency: <strong>{String(c().urgency_label)}</strong> · Source: {String(c().entry_source)}
                   </p>
                 </div>
+
+                <Show when={ov()}>
+                  <section class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
+                    <div>
+                      <p class="text-xs uppercase text-slate-500">Workspace</p>
+                      <p class="font-medium">{ov()?.tenant?.company_name || "—"} ({ov()?.tenant?.company_code || "n/a"})</p>
+                      <p class="text-xs text-slate-500">{ov()?.tenant?.user_count ?? 0} users · {ov()?.tenant?.open_tickets ?? 0} open tickets</p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase text-slate-500">Onboarding</p>
+                      <p class="font-medium tabular-nums">{ov()?.onboarding?.overall_percent ?? ov()?.onboarding?.percent ?? 0}%</p>
+                      <p class="text-xs text-slate-500">{ov()?.onboarding?.blocking_reason || (ov()?.onboarding?.ready ? "Ready" : "In progress")}</p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase text-slate-500">Presence</p>
+                      <p class="font-medium text-sm">{ov()?.tenant?.current_screen || "Offline / unknown"}</p>
+                      <p class="text-xs text-slate-500">
+                        {ov()?.tenant?.last_seen_at ? `Last seen ${new Date(ov()!.tenant.last_seen_at).toLocaleString()}` : "No recent presence"}
+                      </p>
+                    </div>
+                  </section>
+                </Show>
 
                 <div>
                   <p class="mb-2 text-xs font-medium uppercase text-text-secondary">Activate paid plan</p>
@@ -153,3 +183,4 @@ export default function PlatformCustomerDetailPage() {
     </div>
   );
 }
+

@@ -18,7 +18,7 @@ export default function PlatformPlansPage() {
           </p>
         </div>
         <A
-          href="/app/platform/plans/new"
+          href="/app/platform-command/plans/new"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
           New plan
@@ -48,7 +48,7 @@ export default function PlatformPlansPage() {
                       <p class="mt-2 text-sm text-text-secondary">{p.description}</p>
                     </div>
                     <A
-                      href={`/app/platform/plans/${p.id}`}
+                      href={`/app/platform-command/plans/${p.id}`}
                       class="text-sm font-medium text-brand-600 hover:underline"
                     >
                       Edit
