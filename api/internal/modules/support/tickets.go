@@ -393,7 +393,7 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 		_, err = pool.Exec(r.Context(), `
 			update public.sup_support_tickets set
 			  subject = $1, description = $2, category = $3, priority = $4,
-			  status = $5, assigned_user_id = $6, warranty_asset_id = $7, repair_order_id = $8,
+			  status = $5::text, assigned_user_id = $6, warranty_asset_id = $7, repair_order_id = $8,
 			  resolved_at = case when $5::text in ('resolved','closed') then coalesce(resolved_at, now()) else null end,
 			  updated_at = now()
 			where id = $9 and tenant_id = $10`,
@@ -408,7 +408,8 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			log.Printf("support: patch ticket %d (tenant %d): %v", id, tu.TenantID, err)
 			// TEMP DEBUG: surface the DB error to the client so we can see the
 			// root cause on the deployed environment. Remove after diagnosis.
-			response.Err(w, http.StatusInternalServerError, "Failed to update ticket. [debug: "+err.Error()+"]", "ERR_INTERNAL")
+			// "v2" marks the build with both $5 uses cast to text.
+			response.Err(w, http.StatusInternalServerError, "Failed to update ticket. [debug v2: "+err.Error()+"]", "ERR_INTERNAL")
 			return
 		}
 		// #region agent log
