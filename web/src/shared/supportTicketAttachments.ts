@@ -44,16 +44,24 @@ export async function uploadSupportTicketAttachment(
   return { ...body, status: res.status, ok: res.ok };
 }
 
-export async function downloadSupportTicketAttachment(
+async function fetchAttachmentBlob(
   ticketId: number,
   attachment: SupportTicketAttachment,
-): Promise<boolean> {
+): Promise<Blob | null> {
   const res = await fetch(
     `${apiBase}/api/v1/support/tickets/${ticketId}/attachments/${attachment.id}/download`,
     { headers: await authHeaders() },
   );
-  if (!res.ok) return false;
-  const blob = await res.blob();
+  if (!res.ok) return null;
+  return res.blob();
+}
+
+export async function downloadSupportTicketAttachment(
+  ticketId: number,
+  attachment: SupportTicketAttachment,
+): Promise<boolean> {
+  const blob = await fetchAttachmentBlob(ticketId, attachment);
+  if (!blob) return false;
   const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = objectUrl;
@@ -63,6 +71,45 @@ export async function downloadSupportTicketAttachment(
   a.remove();
   URL.revokeObjectURL(objectUrl);
   return true;
+}
+
+const PREVIEWABLE_EXTENSIONS = [
+  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
+  ".pdf", ".txt", ".csv", ".md",
+  ".mp4", ".webm", ".mov", ".mp3", ".m4a",
+];
+
+export function canPreviewSupportTicketAttachment(attachment: SupportTicketAttachment): boolean {
+  const mime = (attachment.mime_type ?? "").toLowerCase();
+  if (
+    mime.startsWith("image/") ||
+    mime.startsWith("video/") ||
+    mime.startsWith("audio/") ||
+    mime === "application/pdf" ||
+    mime.startsWith("text/")
+  ) {
+    return true;
+  }
+  const name = attachment.file_name.toLowerCase();
+  return PREVIEWABLE_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+/** Opens the attachment in a new browser tab (browser renders images, PDFs, videos, etc.). */
+export async function previewSupportTicketAttachment(
+  ticketId: number,
+  attachment: SupportTicketAttachment,
+): Promise<boolean> {
+  const blob = await fetchAttachmentBlob(ticketId, attachment);
+  if (!blob) return false;
+  // Re-type the blob so the browser renders it instead of downloading
+  // (the server may have stored a generic octet-stream mime).
+  const mime = attachment.mime_type || blob.type || "application/octet-stream";
+  const typed = blob.type === mime ? blob : new Blob([blob], { type: mime });
+  const objectUrl = URL.createObjectURL(typed);
+  const win = window.open(objectUrl, "_blank", "noopener");
+  // Give the tab time to load before releasing the object URL.
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  return win != null;
 }
 
 export function formatTicketFileSize(bytes: number): string {

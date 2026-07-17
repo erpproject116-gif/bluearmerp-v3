@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -285,10 +286,23 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
-		var body ticketPatchBody
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		rawBody, err := io.ReadAll(r.Body)
+		if err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
+		}
+		var body ticketPatchBody
+		if err := json.Unmarshal(rawBody, &body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		// Track which keys were present so an explicit null clears the field
+		// (a nil pointer alone cannot distinguish "null" from "not sent").
+		presentKeys := map[string]json.RawMessage{}
+		_ = json.Unmarshal(rawBody, &presentKeys)
+		sent := func(key string) bool {
+			_, ok := presentKeys[key]
+			return ok
 		}
 
 		if !tu.CanManageAllSupportTickets() {
@@ -327,16 +341,16 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			status = normalizeStatus(*body.Status)
 		}
 		assignedID := before.AssignedUserID
-		if body.AssignedUserID != nil {
-			assignedID = body.AssignedUserID
+		if sent("assigned_user_id") {
+			assignedID = optionalPositiveID(body.AssignedUserID)
 		}
 		warrantyID := before.WarrantyAssetID
-		if body.WarrantyAssetID != nil {
-			warrantyID = body.WarrantyAssetID
+		if sent("warranty_asset_id") {
+			warrantyID = optionalPositiveID(body.WarrantyAssetID)
 		}
 		repairID := before.RepairOrderID
-		if body.RepairOrderID != nil {
-			repairID = body.RepairOrderID
+		if sent("repair_order_id") {
+			repairID = optionalPositiveID(body.RepairOrderID)
 		}
 
 		_, err = pool.Exec(r.Context(), `

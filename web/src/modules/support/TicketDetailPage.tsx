@@ -11,9 +11,11 @@ import {
   type TicketStatus,
 } from "../../shared/useSupportTickets";
 import {
+  canPreviewSupportTicketAttachment,
   downloadSupportTicketAttachment,
   formatTicketFileSize,
   listSupportTicketAttachments,
+  previewSupportTicketAttachment,
   uploadSupportTicketAttachment,
   type SupportTicketAttachment,
 } from "../../shared/supportTicketAttachments";
@@ -188,13 +190,32 @@ export default function TicketDetailPage() {
                             {a.file_name}{" "}
                             <span class="text-xs text-text-secondary">({formatTicketFileSize(a.size_bytes)})</span>
                           </span>
-                          <button
-                            type="button"
-                            class="text-xs font-medium text-brand-600 hover:underline"
-                            onClick={() => void downloadSupportTicketAttachment(ticketId()!, a)}
-                          >
-                            Download
-                          </button>
+                          <span class="flex items-center gap-3">
+                            <Show when={canPreviewSupportTicketAttachment(a)}>
+                              <button
+                                type="button"
+                                class="text-xs font-medium text-brand-600 hover:underline"
+                                onClick={() =>
+                                  void previewSupportTicketAttachment(ticketId()!, a).then((ok) => {
+                                    if (!ok) toast.warning("Could not open the file. It may have been removed from storage.");
+                                  })
+                                }
+                              >
+                                Preview
+                              </button>
+                            </Show>
+                            <button
+                              type="button"
+                              class="text-xs font-medium text-brand-600 hover:underline"
+                              onClick={() =>
+                                void downloadSupportTicketAttachment(ticketId()!, a).then((ok) => {
+                                  if (!ok) toast.warning("Download failed. The file may have been removed from storage.");
+                                })
+                              }
+                            >
+                              Download
+                            </button>
+                          </span>
                         </li>
                       )}
                     </For>
@@ -248,7 +269,13 @@ export default function TicketDetailPage() {
                   disabled={!canManage() || saving()}
                   onChange={(e) => void updateField({ status: e.currentTarget.value as TicketStatus })}
                 >
-                  <For each={STATUS_OPTIONS}>{(s) => <option value={s}>{s.replace("_", " ")}</option>}</For>
+                  <For each={STATUS_OPTIONS}>
+                    {(s) => (
+                      <option value={s} selected={s === t().status}>
+                        {s.replace("_", " ")}
+                      </option>
+                    )}
+                  </For>
                 </select>
               </Field>
               <Field label="Priority">
@@ -258,7 +285,13 @@ export default function TicketDetailPage() {
                   disabled={!canManage() || saving()}
                   onChange={(e) => void updateField({ priority: e.currentTarget.value as TicketPriority })}
                 >
-                  <For each={PRIORITY_OPTIONS}>{(p) => <option value={p}>{p}</option>}</For>
+                  <For each={PRIORITY_OPTIONS}>
+                    {(p) => (
+                      <option value={p} selected={p === t().priority}>
+                        {p}
+                      </option>
+                    )}
+                  </For>
                 </select>
               </Field>
               <Field label="Category">
@@ -275,8 +308,14 @@ export default function TicketDetailPage() {
                   value={() => warrantyLabel() || (t().warranty_asset_id ? "Linked asset" : "")}
                   selectedId={() => t().warranty_asset_id ?? null}
                   onInput={setWarrantyLabel}
-                  onSelect={(o) => void updateField({ warranty_asset_id: o.id })}
-                  onClear={() => void updateField({ warranty_asset_id: null })}
+                  onSelect={(o) => {
+                    setWarrantyLabel(o.label);
+                    void updateField({ warranty_asset_id: o.id });
+                  }}
+                  onClear={() => {
+                    setWarrantyLabel("");
+                    void updateField({ warranty_asset_id: null });
+                  }}
                   fetchOptions={(q) => fetchWarrantyAssets(q, t().partner_id ?? null)}
                 />
               </Show>
@@ -286,8 +325,14 @@ export default function TicketDetailPage() {
                   value={() => assigneeLabel() || t().assigned_name || ""}
                   selectedId={() => t().assigned_user_id ?? null}
                   onInput={setAssigneeLabel}
-                  onSelect={(o) => void updateField({ assigned_user_id: o.id })}
-                  onClear={() => void updateField({ assigned_user_id: null })}
+                  onSelect={(o) => {
+                    setAssigneeLabel(o.label);
+                    void updateField({ assigned_user_id: o.id });
+                  }}
+                  onClear={() => {
+                    setAssigneeLabel("");
+                    void updateField({ assigned_user_id: null });
+                  }}
                   fetchOptions={fetchSupportUsers}
                 />
               </Show>
@@ -297,8 +342,14 @@ export default function TicketDetailPage() {
                   value={() => repairOrderLabel() || (t().repair_order_id ? `RO #${t().repair_order_id}` : "")}
                   selectedId={() => t().repair_order_id ?? null}
                   onInput={setRepairOrderLabel}
-                  onSelect={(o) => void updateField({ repair_order_id: o.id })}
-                  onClear={() => void updateField({ repair_order_id: null })}
+                  onSelect={(o) => {
+                    setRepairOrderLabel(o.label);
+                    void updateField({ repair_order_id: o.id });
+                  }}
+                  onClear={() => {
+                    setRepairOrderLabel("");
+                    void updateField({ repair_order_id: null });
+                  }}
                   fetchOptions={(q) => fetchRepairOrders(q, t().partner_id ?? null)}
                 />
               </Show>
