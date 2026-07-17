@@ -112,6 +112,7 @@ export const knowledgebaseGroups: KbGroup[] = [
       "serial-count-mismatch",
       "serial-lot-registry",
       "item-serial-lot-tab",
+      "find-inventory-record-history",
       "sales-lot-batch-pick",
       "lot-expiry-pick-rules",
       "insufficient-stock-on-release",

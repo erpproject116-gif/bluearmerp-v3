@@ -42,6 +42,7 @@ import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
 import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
+import { WorkflowGuideBar } from "../shared/WorkflowGuideBar";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -295,6 +296,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         <main class="flex-1 p-6">
           <DemoTenantBanner />
           <EntitlementBanner />
+          <WorkflowGuideBar />
           <ModuleAccessGate>{props.children}</ModuleAccessGate>
         </main>
       </div>

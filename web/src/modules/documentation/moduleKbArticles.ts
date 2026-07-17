@@ -61,7 +61,7 @@ export const moduleKbArticles: KbArticle[] = [
         ],
       },
     ],
-    primaryHref: "/app/settings/process-policies",
+    primaryHref: "/app/user-management/process-policies",
     primaryLabel: "Process policies (attachment rules)",
     relatedGuideIds: ["process-policies", "load-slip-overview"],
   },
