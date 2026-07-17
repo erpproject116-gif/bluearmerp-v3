@@ -394,7 +394,7 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			update public.sup_support_tickets set
 			  subject = $1, description = $2, category = $3, priority = $4,
 			  status = $5, assigned_user_id = $6, warranty_asset_id = $7, repair_order_id = $8,
-			  resolved_at = case when $5 in ('resolved','closed') then coalesce(resolved_at, now()) else null end,
+			  resolved_at = case when $5::text in ('resolved','closed') then coalesce(resolved_at, now()) else null end,
 			  updated_at = now()
 			where id = $9 and tenant_id = $10`,
 			subject, desc, category, priority, status, assignedID, warrantyID, repairID, id, tu.TenantID)
