@@ -1,14 +1,15 @@
 {
-  "generatedAt": "2026-07-17T11:59:08.511Z",
+  "generatedAt": "2026-07-17T13:19:18.253Z",
   "source": "src/App.tsx",
   "totals": {
     "all": 282,
-    "smokeable": 233,
+    "smokeable": 193,
     "byKind": {
-      "app_static": 221,
-      "parametrized": 31,
+      "app_static": 193,
+      "parametrized": 27,
       "print_or_doc": 8,
-      "platform": 12,
+      "redirect": 34,
+      "platform": 10,
       "public": 10
     }
   },
@@ -64,36 +65,20 @@
     "/app/finance/acct-ii/landed-costs",
     "/app/finance/acct-ii/notes",
     "/app/finance/acct-ii/withholding-codes",
-    "/app/finance/bank-reconciliation",
-    "/app/finance/budgets",
-    "/app/finance/chart-of-accounts",
-    "/app/finance/fiscal-years",
-    "/app/finance/journal-entries",
     "/app/finance/official-receipts",
     "/app/finance/official-receipts/new",
     "/app/finance/official-receipts/settings",
-    "/app/finance/payment-entries",
-    "/app/finance/payment-vouchers",
-    "/app/finance/payment-vouchers/new",
     "/app/finance/reports/acct-inventory-reconciliation",
     "/app/finance/reports/ap-aging",
     "/app/finance/reports/ap-by-vendor",
     "/app/finance/reports/ar-aging",
     "/app/finance/reports/ar-ap-status",
     "/app/finance/reports/ar-by-customer",
-    "/app/finance/reports/balance-sheet",
-    "/app/finance/reports/budget-vs-actual",
     "/app/finance/reports/customer-vendor-book-ap",
     "/app/finance/reports/customer-vendor-book-ar",
-    "/app/finance/reports/general-ledger",
     "/app/finance/reports/official-receipt-status",
-    "/app/finance/reports/profit-and-loss",
     "/app/finance/reports/receipt-status",
     "/app/finance/reports/supplier-payment-status",
-    "/app/finance/reports/trial-balance",
-    "/app/finance/supplier-invoices",
-    "/app/finance/supplier-invoices/new",
-    "/app/finance/supplier-invoices/settings",
     "/app/fixed-assets",
     "/app/hr/attendance",
     "/app/hr/employees",
@@ -139,9 +124,6 @@
     "/app/inventory/stock-reconciliation",
     "/app/inventory/wms/scheduled-receipts",
     "/app/job-costing",
-    "/app/manufacturing/boms",
-    "/app/manufacturing/work-orders",
-    "/app/onboarding",
     "/app/operations",
     "/app/operations/automation",
     "/app/operations/calendar",
@@ -149,40 +131,20 @@
     "/app/operations/packs",
     "/app/operations/timeline",
     "/app/operations/work-items/settings",
-    "/app/platform-command",
-    "/app/platform-command/access",
-    "/app/platform-command/analytics",
-    "/app/platform-command/change-logs",
-    "/app/platform-command/customers",
-    "/app/platform-command/follow-ups",
-    "/app/platform-command/history",
-    "/app/platform-command/onboarding",
-    "/app/platform-command/plans",
-    "/app/platform-command/tickets",
-    "/app/platform/customers",
-    "/app/platform/plans",
     "/app/pos",
     "/app/pos/manage",
-    "/app/purchase-order/goods-receipt",
-    "/app/purchase-order/goods-receipt/settings",
     "/app/purchase-order/purchase-orders",
     "/app/purchase-order/purchase-orders/outstanding",
-    "/app/purchase-order/purchase-orders/settings",
     "/app/purchase-order/purchase-orders/status",
     "/app/purchase-order/purchase-returns",
     "/app/purchase-order/reports/items-to-receive",
     "/app/purchase-order/reports/po-analysis",
     "/app/purchase-order/rfq",
-    "/app/purchase-request/goods-receipt",
-    "/app/purchase-request/purchase-orders",
     "/app/purchase-request/purchase-requests",
     "/app/purchase-request/purchase-requests/new",
     "/app/purchase-request/purchase-requests/settings",
     "/app/purchase-request/purchase-requests/status",
-    "/app/purchases/purchases",
-    "/app/purchases/purchases/ap-by-vendor",
     "/app/purchases/purchases/new",
-    "/app/purchases/purchases/payment-status",
     "/app/purchases/purchases/pre-invoicing",
     "/app/purchases/purchases/settings",
     "/app/purchases/purchases/status",
@@ -235,7 +197,6 @@
     "/app/selling/reports/receivable-status",
     "/app/settings/billing",
     "/app/settings/branding",
-    "/app/setup",
     "/app/support/tickets",
     "/app/user-management/demo-data",
     "/app/user-management/groups",
@@ -474,27 +435,27 @@
     },
     {
       "path": "/app/finance/bank-reconciliation",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/budgets",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/budgets/:id",
-      "kind": "parametrized"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/chart-of-accounts",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/fiscal-years",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/journal-entries",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/official-receipts",
@@ -510,11 +471,11 @@
     },
     {
       "path": "/app/finance/payment-entries",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/payment-vouchers",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/payment-vouchers/:id/2307",
@@ -522,7 +483,7 @@
     },
     {
       "path": "/app/finance/payment-vouchers/new",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/reports/acct-inventory-reconciliation",
@@ -550,11 +511,11 @@
     },
     {
       "path": "/app/finance/reports/balance-sheet",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/reports/budget-vs-actual",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/reports/customer-vendor-book-ap",
@@ -566,7 +527,7 @@
     },
     {
       "path": "/app/finance/reports/general-ledger",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/reports/official-receipt-status",
@@ -574,7 +535,7 @@
     },
     {
       "path": "/app/finance/reports/profit-and-loss",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/reports/receipt-status",
@@ -586,11 +547,11 @@
     },
     {
       "path": "/app/finance/reports/trial-balance",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/supplier-invoices",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/supplier-invoices/:id/print",
@@ -598,11 +559,11 @@
     },
     {
       "path": "/app/finance/supplier-invoices/new",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/finance/supplier-invoices/settings",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/fixed-assets",
@@ -794,15 +755,15 @@
     },
     {
       "path": "/app/manufacturing/boms",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/manufacturing/work-orders",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/onboarding",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/operations",
@@ -890,19 +851,19 @@
     },
     {
       "path": "/app/platform/customers",
-      "kind": "platform"
+      "kind": "redirect"
     },
     {
       "path": "/app/platform/customers/:id",
-      "kind": "parametrized"
+      "kind": "redirect"
     },
     {
       "path": "/app/platform/plans",
-      "kind": "platform"
+      "kind": "redirect"
     },
     {
       "path": "/app/platform/plans/:id",
-      "kind": "parametrized"
+      "kind": "redirect"
     },
     {
       "path": "/app/pos",
@@ -914,11 +875,11 @@
     },
     {
       "path": "/app/purchase-order/goods-receipt",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/goods-receipt/settings",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/purchase-orders",
@@ -934,7 +895,7 @@
     },
     {
       "path": "/app/purchase-order/purchase-orders/settings",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/purchase-orders/status",
@@ -970,11 +931,11 @@
     },
     {
       "path": "/app/purchase-request/goods-receipt",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-request/purchase-orders",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-request/purchase-requests",
@@ -1002,7 +963,7 @@
     },
     {
       "path": "/app/purchases/purchases",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchases/purchases/:id/print",
@@ -1014,7 +975,7 @@
     },
     {
       "path": "/app/purchases/purchases/ap-by-vendor",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchases/purchases/new",
@@ -1022,7 +983,7 @@
     },
     {
       "path": "/app/purchases/purchases/payment-status",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchases/purchases/pre-invoicing",
@@ -1282,11 +1243,11 @@
     },
     {
       "path": "/app/setup",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/setup/*",
-      "kind": "parametrized"
+      "kind": "redirect"
     },
     {
       "path": "/app/support/tickets",
