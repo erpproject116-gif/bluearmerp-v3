@@ -7,6 +7,7 @@ import { ToastProvider } from "./shared/toast";
 import { AuthEntryRedirect } from "./shared/AuthRedirect";
 import { ProtectedRoute } from "./shared/ProtectedRoute";
 import { PageLoader } from "./shared/PageLoader";
+import { UsageTracker } from "./shared/UsageTracker";
 import SignInPage from "./modules/auth/SignInPage";
 import SignUpPage from "./modules/auth/SignUpPage";
 import ForgotPasswordPage from "./modules/auth/ForgotPasswordPage";
@@ -169,6 +170,7 @@ import {
   PlatformHistoryCommandPage,
   PlatformChangeLogsCommandPage,
   PlatformAccessCommandPage,
+  PlatformAnalyticsCommandPage,
   LowStockReportPage,
   ExpiredQuotationsReportPage,
   LeadsPage,
@@ -316,7 +318,12 @@ export default function App() {
       <AuthProvider>
         <BrandingProvider>
         <CrmTaskModalProvider>
-        <Router root={(props) => <Suspense fallback={<PageLoader />}>{props.children}</Suspense>}>
+        <Router root={(props) => (
+          <Suspense fallback={<PageLoader />}>
+            <UsageTracker />
+            {props.children}
+          </Suspense>
+        )}>
         <Route path="/signin" component={SignInPage} />
         <Route path="/auth/login" component={AuthLoginRedirect} />
         <Route path="/signup" component={SignUpPage} />
@@ -361,6 +368,7 @@ export default function App() {
         )} />
         <Route path="/app/platform-command" component={PlatformCommandShell}>
           <Route path="/" component={PlatformCommandPage} />
+          <Route path="/analytics" component={PlatformAnalyticsCommandPage} />
           <Route path="/customers" component={PlatformCustomersPage} />
           <Route path="/customers/:id" component={PlatformCustomerDetailPage} />
           <Route path="/tickets" component={PlatformTicketsCommandPage} />

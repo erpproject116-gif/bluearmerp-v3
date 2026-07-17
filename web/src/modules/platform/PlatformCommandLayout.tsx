@@ -4,6 +4,7 @@ import { useAuth } from "../../shared/auth-context";
 
 const NAV = [
   { href: "/app/platform-command", label: "Overview", exact: true },
+  { href: "/app/platform-command/analytics", label: "Analytics" },
   { href: "/app/platform-command/customers", label: "Customers" },
   { href: "/app/platform-command/tickets", label: "Tickets" },
   { href: "/app/platform-command/onboarding", label: "Onboarding" },

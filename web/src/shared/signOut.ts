@@ -1,8 +1,14 @@
 import { supabase, apiFetch } from "./api";
 import { LAST_ACTIVITY_STORAGE_KEY } from "./sessionIdleClient";
 
-/** Clears presence, server idle tracking, local activity, then Supabase session. */
-export async function signOutApp() {
+/** Clears presence, usage session, server idle tracking, local activity, then Supabase session. */
+export async function signOutApp(reason: "logout" | "idle_timeout" = "logout") {
+  try {
+    const { endUsageSession } = await import("./UsageTracker");
+    await endUsageSession(reason);
+  } catch {
+    /* usage end is best-effort */
+  }
   try {
     const { clearPresence } = await import("./usePresence");
     await clearPresence();

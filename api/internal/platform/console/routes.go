@@ -41,6 +41,11 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/subscriptions/{id}/invoices", svc.createInvoice)
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/invoices/{id}/mark-paid", svc.markInvoicePaid)
 
+		// Analytics / engagement
+		cr.With(requirePlatformPermission("platform.analytics.read")).Get("/platform/console/analytics", svc.analyticsOverview)
+		cr.With(requirePlatformPermission("platform.analytics.read")).Get("/platform/console/customers/{id}/engagement", svc.customerEngagement)
+		cr.With(requirePlatformPermission("platform.analytics.read")).Get("/platform/console/customers/{id}/sessions/{sessionId}", svc.customerSessionDetail)
+
 		// Tickets / onboarding / follow-ups
 		cr.With(requirePlatformPermission("platform.tickets.read")).Get("/platform/console/tickets", svc.listTickets)
 		cr.With(requirePlatformPermission("platform.tickets.read")).Get("/platform/console/tickets/{id}", svc.getTicket)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -251,6 +252,7 @@ func createTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			assignedID, tu.AppUserID,
 		).Scan(&id)
 		if err != nil {
+			log.Printf("support: create ticket (tenant %d): %v", tu.TenantID, err)
 			response.Err(w, http.StatusInternalServerError, "Failed to insert ticket.", "ERR_INTERNAL")
 			return
 		}
@@ -362,6 +364,7 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			where id = $9 and tenant_id = $10`,
 			subject, desc, category, priority, status, assignedID, warrantyID, repairID, id, tu.TenantID)
 		if err != nil {
+			log.Printf("support: patch ticket %d (tenant %d): %v", id, tu.TenantID, err)
 			response.Err(w, http.StatusInternalServerError, "Failed to update ticket.", "ERR_INTERNAL")
 			return
 		}
@@ -415,6 +418,7 @@ func addTicketComment(pool *pgxpool.Pool) http.HandlerFunc {
 			values ($1, $2, $3, $4) returning id`,
 			id, tu.AppUserID, authorName, text).Scan(&commentID)
 		if err != nil {
+			log.Printf("support: add comment on ticket %d (tenant %d): %v", id, tu.TenantID, err)
 			response.Err(w, http.StatusInternalServerError, "Failed to add comment.", "ERR_INTERNAL")
 			return
 		}

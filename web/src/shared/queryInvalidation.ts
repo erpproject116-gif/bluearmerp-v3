@@ -146,6 +146,7 @@ export function shouldSkipMutationInvalidation(path: string, method: string): bo
   if (/\/print(\?|$)/.test(path)) return true;
   if (path.includes("/auth/")) return true;
   if (path.includes("/presence/")) return true;
+  if (path.includes("/usage/")) return true;
   if (path.includes("/attachments")) return true;
   if (path.startsWith("/api/v1/settings/")) return true;
   if (path.startsWith("/api/v1/form-field-settings")) return true;

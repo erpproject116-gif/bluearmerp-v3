@@ -396,3 +396,100 @@ export function usePlatformStaffInvites() {
     },
   }));
 }
+
+export type PlatformAnalyticsTotals = {
+  sessions: number;
+  page_views: number;
+  unique_users: number;
+  active_seconds: number;
+  idle_seconds: number;
+  active_now: number;
+  abandoned_24h: number;
+};
+
+export function usePlatformAnalytics(days: () => number) {
+  return createQuery(() => ({
+    queryKey: ["platform-analytics", days()],
+    queryFn: async () => {
+      const res = await apiFetch<{
+        days: number;
+        totals: PlatformAnalyticsTotals;
+        trend: Array<{ day: string; sessions: number; page_views: number; active_seconds: number; unique_users: number }>;
+        top_pages: Array<{ route_pattern: string; page_label: string; views: number; active_seconds: number }>;
+      }>(`/api/v1/platform/console/analytics?days=${days()}`);
+      if (!res.ok) throw new Error(res.message ?? "Failed to load analytics");
+      return res.data!;
+    },
+    staleTime: 30_000,
+  }));
+}
+
+export function usePlatformCustomerEngagement(id: () => number | undefined) {
+  return createQuery(() => ({
+    queryKey: ["platform-customer-engagement", id()],
+    enabled: Boolean(id() && id()! > 0),
+    queryFn: async () => {
+      const res = await apiFetch<{
+        tenant_id: number;
+        summary: {
+          last_login_at?: string | null;
+          last_logout_at?: string | null;
+          last_activity_at?: string | null;
+          last_end_reason?: string | null;
+          inactive_seconds?: number | null;
+        };
+        users: Array<{
+          id: number;
+          full_name: string;
+          email: string;
+          last_login_at?: string | null;
+          last_logout_at?: string | null;
+          last_activity_at?: string | null;
+          last_end_reason?: string | null;
+          inactive_seconds?: number | null;
+        }>;
+        sessions: Array<{
+          id: number;
+          user_id: number;
+          user_name: string;
+          started_at: string;
+          ended_at?: string | null;
+          last_activity_at?: string | null;
+          active_seconds: number;
+          idle_seconds: number;
+          page_view_count: number;
+          end_reason?: string;
+          end_exact?: boolean;
+        }>;
+      }>(`/api/v1/platform/console/customers/${id()}/engagement`);
+      if (!res.ok) throw new Error(res.message ?? "Failed to load engagement");
+      return res.data!;
+    },
+    staleTime: 15_000,
+  }));
+}
+
+export function usePlatformCustomerSession(customerId: () => number | undefined, sessionId: () => number | null) {
+  return createQuery(() => ({
+    queryKey: ["platform-customer-session", customerId(), sessionId()],
+    enabled: Boolean(customerId() && customerId()! > 0 && sessionId() && sessionId()! > 0),
+    queryFn: async () => {
+      const res = await apiFetch<{
+        session: Record<string, any>;
+        pages: Array<{
+          id: number;
+          seq: number;
+          route_path: string;
+          route_pattern: string;
+          page_label: string;
+          entered_at: string;
+          exited_at?: string | null;
+          active_seconds: number;
+          idle_seconds: number;
+        }>;
+      }>(`/api/v1/platform/console/customers/${customerId()}/sessions/${sessionId()}`);
+      if (!res.ok) throw new Error(res.message ?? "Failed to load session");
+      return res.data!;
+    },
+  }));
+}

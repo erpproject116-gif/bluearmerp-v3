@@ -61,6 +61,7 @@ func shouldSkipHTTPAudit(path string) bool {
 	path = strings.Split(path, "?")[0]
 	skipPrefixes := []string{
 		"/api/v1/presence/",
+		"/api/v1/usage/",
 		"/api/v1/document-drafts/",
 		"/api/v1/activity-logs",
 	}

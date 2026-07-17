@@ -34,6 +34,9 @@ func isSessionIdleExemptPath(path string) bool {
 	if strings.HasPrefix(path, "/api/v1/presence/") {
 		return true
 	}
+	if strings.HasPrefix(path, "/api/v1/usage/") {
+		return true
+	}
 	if strings.HasPrefix(path, "/api/v1/pos/") {
 		return true
 	}

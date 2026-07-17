@@ -68,6 +68,7 @@ import (
 	platformreports "github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reporttemplates"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/usage"
 )
 
 func main() {
@@ -132,6 +133,7 @@ func main() {
 			setupreadiness.RegisterRoutes(protected, pool)
 			console.RegisterRoutes(protected, pool, cfg)
 			presence.RegisterRoutes(protected, pool)
+			usage.RegisterRoutes(protected, pool)
 			customfields.RegisterRoutes(protected, pool)
 			drafts.RegisterRoutes(protected, pool)
 			formfields.RegisterRoutes(protected, pool)

@@ -86,6 +86,9 @@ func TierForPath(method, path string) Tier {
 	if strings.HasPrefix(p, "/api/v1/presence/") {
 		return TierExempt
 	}
+	if strings.HasPrefix(p, "/api/v1/usage/") {
+		return TierExempt
+	}
 	for _, prefix := range []string{
 		"/api/v1/demo/signup",
 		"/api/v1/platform/intake",

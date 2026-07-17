@@ -4,17 +4,37 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import {
   usePlatformCustomer,
+  usePlatformCustomerEngagement,
   usePlatformCustomerOverview,
+  usePlatformCustomerSession,
   usePlatformPlansAdmin,
   type PlatformPlan,
 } from "../../shared/usePlatform";
 import { LoadingText } from "../../shared/LoadingText";
 
-
-
 function planLabel(p: PlatformPlan) {
   const price = p.promo_active ? p.effective_monthly_amount : p.regular_monthly_amount;
   return `${p.display_name} — ${formatPeso(price)}/mo`;
+}
+
+function fmtWhen(v?: string | null): string {
+  if (!v) return "—";
+  try {
+    return new Date(v).toLocaleString();
+  } catch {
+    return String(v);
+  }
+}
+
+function fmtDuration(sec?: number | null): string {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m < 60) return r ? `${m}m ${r}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h}h ${rm}m` : `${h}h`;
 }
 
 export default function PlatformCustomerDetailPage() {
@@ -22,8 +42,11 @@ export default function PlatformCustomerDetailPage() {
   const id = () => Number(params.id);
   const q = usePlatformCustomer(id);
   const overview = usePlatformCustomerOverview(id);
+  const engagement = usePlatformCustomerEngagement(id);
   const plansQ = usePlatformPlansAdmin();
   const [busy, setBusy] = createSignal(false);
+  const [openSessionId, setOpenSessionId] = createSignal<number | null>(null);
+  const sessionDetail = usePlatformCustomerSession(id, openSessionId);
 
   const paidPlans = () =>
     (plansQ.data ?? []).filter((p) => p.is_active && !p.plan_code.includes("trial") && !p.plan_code.includes("demo"));
@@ -43,6 +66,7 @@ export default function PlatformCustomerDetailPage() {
           {(d) => {
             const c = () => d().customer as Record<string, unknown>;
             const ov = () => overview.data;
+            const eg = () => engagement.data;
             return (
               <div class="space-y-6">
                 <div>
@@ -74,6 +98,109 @@ export default function PlatformCustomerDetailPage() {
                     </div>
                   </section>
                 </Show>
+
+                <section class="rounded-xl border border-stroke bg-white p-4">
+                  <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold">Engagement</h2>
+                    <A href="/app/platform-command/analytics" class="text-xs text-brand-600 hover:underline">All analytics →</A>
+                  </div>
+                  <Show when={engagement.isPending}>
+                    <LoadingText class="text-sm text-text-secondary" as="p" />
+                  </Show>
+                  <Show when={eg()}>
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div>
+                        <p class="text-xs uppercase text-slate-500">Last login</p>
+                        <p class="text-sm font-medium">{fmtWhen(eg()!.summary.last_login_at)}</p>
+                      </div>
+                      <div>
+                        <p class="text-xs uppercase text-slate-500">Last logout</p>
+                        <p class="text-sm font-medium">{fmtWhen(eg()!.summary.last_logout_at)}</p>
+                        <p class="text-xs text-slate-500">{eg()!.summary.last_end_reason || ""}</p>
+                      </div>
+                      <div>
+                        <p class="text-xs uppercase text-slate-500">Last activity</p>
+                        <p class="text-sm font-medium">{fmtWhen(eg()!.summary.last_activity_at)}</p>
+                      </div>
+                      <div>
+                        <p class="text-xs uppercase text-slate-500">Inactivity</p>
+                        <p class="text-sm font-medium">
+                          {eg()!.summary.inactive_seconds != null ? fmtDuration(eg()!.summary.inactive_seconds) : "—"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <h3 class="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500">Users</h3>
+                    <ul class="mt-2 divide-y divide-stroke text-sm">
+                      <For each={eg()!.users} fallback={<li class="py-2 text-text-secondary">No users.</li>}>
+                        {(u) => (
+                          <li class="flex flex-wrap items-center justify-between gap-2 py-2">
+                            <div>
+                              <p class="font-medium">{u.full_name || u.email}</p>
+                              <p class="text-xs text-slate-500">{u.email}</p>
+                            </div>
+                            <div class="text-right text-xs text-slate-500">
+                              <p>In: {fmtWhen(u.last_login_at)}</p>
+                              <p>Out: {fmtWhen(u.last_logout_at)} {u.last_end_reason ? `(${u.last_end_reason})` : ""}</p>
+                              <p>Idle: {u.inactive_seconds != null ? fmtDuration(u.inactive_seconds) : "—"}</p>
+                            </div>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+
+                    <h3 class="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500">Recent sessions</h3>
+                    <ul class="mt-2 space-y-2 text-sm">
+                      <For each={eg()!.sessions} fallback={<li class="text-text-secondary">No sessions recorded yet.</li>}>
+                        {(s) => (
+                          <li class="rounded-lg border border-stroke p-3">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <p class="font-medium">{s.user_name}</p>
+                                <p class="text-xs text-slate-500">
+                                  {fmtWhen(s.started_at)} → {s.ended_at ? fmtWhen(s.ended_at) : "open"}
+                                  {s.end_reason ? ` · ${s.end_reason}` : ""}
+                                  {s.end_exact === false && s.end_reason ? " (inferred)" : ""}
+                                </p>
+                                <p class="text-xs text-slate-500">
+                                  Active {fmtDuration(s.active_seconds)} · Idle {fmtDuration(s.idle_seconds)} · {s.page_view_count} pages
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                class="text-xs font-medium text-brand-600 hover:underline"
+                                onClick={() => setOpenSessionId(openSessionId() === s.id ? null : s.id)}
+                              >
+                                {openSessionId() === s.id ? "Hide journey" : "Page journey"}
+                              </button>
+                            </div>
+                            <Show when={openSessionId() === s.id}>
+                              <Show when={sessionDetail.isFetching}>
+                                <LoadingText class="mt-2 text-xs text-text-secondary" as="p" />
+                              </Show>
+                              <ol class="mt-2 space-y-1 border-t border-stroke pt-2 text-xs">
+                                <For each={sessionDetail.data?.pages ?? []}>
+                                  {(p) => (
+                                    <li class="flex flex-wrap justify-between gap-2">
+                                      <span>
+                                        <span class="font-medium">{p.page_label || p.route_pattern}</span>
+                                        <span class="ml-2 text-slate-400">{p.route_pattern}</span>
+                                      </span>
+                                      <span class="tabular-nums text-slate-500">
+                                        {fmtDuration(p.active_seconds)}
+                                        {p.idle_seconds ? ` (+${fmtDuration(p.idle_seconds)} idle)` : ""}
+                                      </span>
+                                    </li>
+                                  )}
+                                </For>
+                              </ol>
+                            </Show>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
+                </section>
 
                 <div>
                   <p class="mb-2 text-xs font-medium uppercase text-text-secondary">Activate paid plan</p>
@@ -183,4 +310,3 @@ export default function PlatformCustomerDetailPage() {
     </div>
   );
 }
-

@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "@solidjs/router";
 import { supabase, apiNetworkErrorMessage } from "../shared/api";
 import { useAuth } from "../shared/auth-context";
 import { needsSignInRedirect, SessionLoading } from "./AuthRedirect";
+import { signOutApp } from "./signOut";
 
 export const ProtectedRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -19,7 +20,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
   });
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await signOutApp("logout");
     navigate("/signin", { replace: true });
   };
 

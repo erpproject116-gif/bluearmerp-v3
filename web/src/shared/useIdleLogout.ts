@@ -66,7 +66,7 @@ export function useIdleLogout() {
   const doLogout = async () => {
     clearTimers();
     setShowWarning(false);
-    await signOutApp();
+    await signOutApp("idle_timeout");
     window.location.href = "/signin?reason=idle";
   };
 
