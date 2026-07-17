@@ -1,6 +1,7 @@
 package filedownload
 
 import (
+	"bytes"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -42,4 +43,20 @@ func ServeStoredFile(w http.ResponseWriter, r *http.Request, uploadRoot, storage
 	}
 	http.ServeContent(w, r, downloadName, modTime, f)
 	return nil
+}
+
+// ServeBytesOrStoredFile serves DB-stored bytes when present (the durable path
+// on containerized deploys), falling back to the legacy on-disk file.
+func ServeBytesOrStoredFile(w http.ResponseWriter, r *http.Request, fileBytes []byte, uploadRoot, storagePath, downloadName, mime string, modTime time.Time) error {
+	if len(fileBytes) > 0 {
+		if mime != "" {
+			w.Header().Set("Content-Type", mime)
+		}
+		if downloadName != "" {
+			w.Header().Set("Content-Disposition", `attachment; filename="`+strings.ReplaceAll(downloadName, `"`, "")+`"`)
+		}
+		http.ServeContent(w, r, downloadName, modTime, bytes.NewReader(fileBytes))
+		return nil
+	}
+	return ServeStoredFile(w, r, uploadRoot, storagePath, downloadName, mime, modTime)
 }

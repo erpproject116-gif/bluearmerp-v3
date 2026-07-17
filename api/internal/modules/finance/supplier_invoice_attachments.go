@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -84,47 +83,34 @@ func uploadSIAttachment(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		relDir := filepath.Join(strconv.FormatInt(tu.TenantID, 10), strconv.FormatInt(siID, 10))
-		absDir := filepath.Join(supplierInvoiceUploadDir(), relDir)
-		if err := os.MkdirAll(absDir, 0o755); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to store file.", "ERR_INTERNAL")
-			return
-		}
-
-		storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
-		absPath := filepath.Join(absDir, storedName)
-		out, err := os.Create(absPath)
+		// Persist bytes in the database: local disk is ephemeral on containerized
+		// deploys, so files written here vanish on redeploy while their rows survive.
+		data, err := io.ReadAll(io.LimitReader(file, maxSIAttachmentBytes+1))
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to store file.", "ERR_INTERNAL")
 			return
 		}
-		written, err := io.Copy(out, io.LimitReader(file, maxSIAttachmentBytes+1))
-		_ = out.Close()
-		if err != nil {
-			_ = os.Remove(absPath)
-			response.Err(w, http.StatusInternalServerError, "Failed to store file.", "ERR_INTERNAL")
-			return
-		}
+		written := int64(len(data))
 		if written > maxSIAttachmentBytes {
-			_ = os.Remove(absPath)
 			response.Validation(w, map[string]string{"file": "File exceeds 25 MB limit."})
 			return
 		}
 
 		mimeType := header.Header.Get("Content-Type")
+		relDir := filepath.Join(strconv.FormatInt(tu.TenantID, 10), strconv.FormatInt(siID, 10))
+		storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 		storagePath := filepath.ToSlash(filepath.Join(relDir, storedName))
 
 		var id int64
 		var createdAt time.Time
 		err = pool.QueryRow(r.Context(), `
 			insert into public.fin_supplier_invoice_attachments
-			  (supplier_invoice_id, file_name, mime_type, size_bytes, storage_path, uploaded_by_user_id)
-			values ($1,$2,$3,$4,$5,$6)
+			  (supplier_invoice_id, file_name, mime_type, size_bytes, storage_path, uploaded_by_user_id, file_bytes)
+			values ($1,$2,$3,$4,$5,$6,$7)
 			returning id, created_at`,
-			siID, safeName, siNullIfEmpty(mimeType), written, storagePath, tu.AppUserID).
+			siID, safeName, siNullIfEmpty(mimeType), written, storagePath, tu.AppUserID, data).
 			Scan(&id, &createdAt)
 		if err != nil {
-			_ = os.Remove(absPath)
 			log.Printf("supplier_invoice attachment insert: supplier_invoice_id=%d: %v", siID, err)
 			if isMissingAttachmentTable(err) {
 				response.Err(w, http.StatusServiceUnavailable, "Purchase attachments are not available until database migration 142 is applied.", "ERR_SCHEMA")
@@ -223,18 +209,19 @@ func downloadSIAttachment(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		var fileName, storagePath, mime string
 		var createdAt time.Time
+		var fileBytes []byte
 		err = pool.QueryRow(r.Context(), `
-			select a.file_name, a.storage_path, coalesce(a.mime_type, ''), a.created_at
+			select a.file_name, a.storage_path, coalesce(a.mime_type, ''), a.created_at, a.file_bytes
 			from public.fin_supplier_invoice_attachments a
 			join public.fin_supplier_invoices si on si.id = a.supplier_invoice_id
 			where a.id = $1 and a.supplier_invoice_id = $2 and si.tenant_id = $3`,
 			attachmentID, siID, tu.TenantID).
-			Scan(&fileName, &storagePath, &mime, &createdAt)
+			Scan(&fileName, &storagePath, &mime, &createdAt, &fileBytes)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Attachment not found.", "ERR_NOT_FOUND")
 			return
 		}
-		if err := filedownload.ServeStoredFile(w, r, supplierInvoiceUploadDir(), storagePath, fileName, mime, createdAt); err != nil {
+		if err := filedownload.ServeBytesOrStoredFile(w, r, fileBytes, supplierInvoiceUploadDir(), storagePath, fileName, mime, createdAt); err != nil {
 			response.Err(w, http.StatusNotFound, "File not found.", "ERR_NOT_FOUND")
 		}
 	}
