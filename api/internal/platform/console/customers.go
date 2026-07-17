@@ -3,6 +3,7 @@ package console
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -106,7 +107,7 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 		createdAt                                     time.Time
 	)
 	err = s.pool.QueryRow(r.Context(), `
-		select email, full_name, company_name, mobile, entry_source, urgency_label,
+		select email, full_name, company_name, coalesce(mobile,''), entry_source, urgency_label,
 		       tenant_id, auth_user_id::text, crm_lead_id, crm_lead_tenant_id,
 		       onboarding_progress, created_at
 		from public.platform_customers where id = $1`, id).Scan(
@@ -117,6 +118,7 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 			response.Err(w, http.StatusNotFound, "Customer not found.", "ERR_NOT_FOUND")
 			return
 		}
+		log.Printf("console: get customer %d: %v", id, err)
 		response.Err(w, http.StatusInternalServerError, "Failed to load customer.", "ERR_INTERNAL")
 		return
 	}

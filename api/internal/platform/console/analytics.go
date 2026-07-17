@@ -92,6 +92,54 @@ func (s *service) analyticsOverview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Per-customer engagement so staff can see who the usage belongs to.
+	customers := []map[string]any{}
+	crows, err := s.pool.Query(r.Context(), `
+		select s.tenant_id,
+		       coalesce(t.company_name, '') as company_name,
+		       coalesce(t.company_code, '') as company_code,
+		       pc.id as customer_id,
+		       coalesce(pc.company_name, pc.full_name, pc.email, '') as customer_name,
+		       count(*)::int as sessions,
+		       count(distinct s.user_id)::int as unique_users,
+		       coalesce(sum(s.page_view_count),0)::int as page_views,
+		       coalesce(sum(s.active_seconds),0)::bigint as active_seconds,
+		       coalesce(sum(s.idle_seconds),0)::bigint as idle_seconds,
+		       max(s.last_activity_at) as last_activity_at
+		from public.app_usage_sessions s
+		join public.tenants t on t.id = s.tenant_id
+		left join lateral (
+		  select id, company_name, full_name, email
+		  from public.platform_customers
+		  where tenant_id = s.tenant_id
+		  order by id
+		  limit 1
+		) pc on true
+		where s.started_at >= now() - ($1::int * interval '1 day')
+		group by s.tenant_id, t.company_name, t.company_code, pc.id, pc.company_name, pc.full_name, pc.email
+		order by active_seconds desc
+		limit 50`, days)
+	if err == nil {
+		defer crows.Close()
+		for crows.Next() {
+			var tenantID int64
+			var companyName, companyCode, customerName string
+			var customerID *int64
+			var sess, users, views int
+			var active, idle int64
+			var lastAct *time.Time
+			if crows.Scan(&tenantID, &companyName, &companyCode, &customerID, &customerName,
+				&sess, &users, &views, &active, &idle, &lastAct) == nil {
+				customers = append(customers, map[string]any{
+					"tenant_id": tenantID, "company_name": companyName, "company_code": companyCode,
+					"customer_id": customerID, "customer_name": customerName,
+					"sessions": sess, "unique_users": users, "page_views": views,
+					"active_seconds": active, "idle_seconds": idle, "last_activity_at": lastAct,
+				})
+			}
+		}
+	}
+
 	response.OK(w, map[string]any{
 		"days": days,
 		"totals": map[string]any{
@@ -101,6 +149,7 @@ func (s *service) analyticsOverview(w http.ResponseWriter, r *http.Request) {
 		},
 		"trend":     trend,
 		"top_pages": topPages,
+		"customers": customers,
 	}, "OK")
 }
 

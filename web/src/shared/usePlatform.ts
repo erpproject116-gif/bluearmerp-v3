@@ -416,6 +416,19 @@ export function usePlatformAnalytics(days: () => number) {
         totals: PlatformAnalyticsTotals;
         trend: Array<{ day: string; sessions: number; page_views: number; active_seconds: number; unique_users: number }>;
         top_pages: Array<{ route_pattern: string; page_label: string; views: number; active_seconds: number }>;
+        customers: Array<{
+          tenant_id: number;
+          company_name: string;
+          company_code: string;
+          customer_id?: number | null;
+          customer_name: string;
+          sessions: number;
+          unique_users: number;
+          page_views: number;
+          active_seconds: number;
+          idle_seconds: number;
+          last_activity_at?: string | null;
+        }>;
       }>(`/api/v1/platform/console/analytics?days=${days()}`);
       if (!res.ok) throw new Error(res.message ?? "Failed to load analytics");
       return res.data!;

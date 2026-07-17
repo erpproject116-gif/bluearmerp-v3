@@ -100,6 +100,53 @@ export default function PlatformAnalyticsPage() {
       </section>
 
       <section class="rounded-xl border border-stroke bg-white p-4">
+        <h2 class="text-sm font-semibold">Usage by customer</h2>
+        <table class="mt-3 w-full text-left text-sm">
+          <thead class="text-xs uppercase text-slate-500">
+            <tr>
+              <th class="py-2 pr-2">Customer</th>
+              <th class="py-2 pr-2">Workspace</th>
+              <th class="py-2 pr-2 text-right">Sessions</th>
+              <th class="py-2 pr-2 text-right">Users</th>
+              <th class="py-2 pr-2 text-right">Pages</th>
+              <th class="py-2 pr-2 text-right">Active time</th>
+              <th class="py-2 text-right">Last activity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <For each={q.data?.customers ?? []} fallback={
+              <tr><td colSpan={7} class="py-4 text-text-secondary">No customer usage recorded yet for this range.</td></tr>
+            }>
+              {(c) => (
+                <tr class="border-t border-stroke/60">
+                  <td class="py-2 pr-2">
+                    <Show when={c.customer_id} fallback={<span class="font-medium">{c.customer_name || "—"}</span>}>
+                      <A href={`/app/platform-command/customers/${c.customer_id}`} class="font-medium text-brand-600 hover:underline">
+                        {c.customer_name || `Customer #${c.customer_id}`}
+                      </A>
+                    </Show>
+                    <span class="ml-2 text-xs text-slate-400">
+                      {c.customer_id ? `#${c.customer_id}` : `tenant ${c.tenant_id}`}
+                    </span>
+                  </td>
+                  <td class="py-2 pr-2 text-xs text-slate-500">
+                    {c.company_name || "—"}{c.company_code ? ` (${c.company_code})` : ""}
+                  </td>
+                  <td class="py-2 pr-2 text-right tabular-nums">{c.sessions}</td>
+                  <td class="py-2 pr-2 text-right tabular-nums">{c.unique_users}</td>
+                  <td class="py-2 pr-2 text-right tabular-nums">{c.page_views}</td>
+                  <td class="py-2 pr-2 text-right tabular-nums">{fmtDuration(c.active_seconds)}</td>
+                  <td class="py-2 text-right text-xs text-slate-500">
+                    {c.last_activity_at ? new Date(c.last_activity_at).toLocaleString() : "—"}
+                  </td>
+                </tr>
+              )}
+            </For>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="rounded-xl border border-stroke bg-white p-4">
         <h2 class="text-sm font-semibold">Top pages</h2>
         <table class="mt-3 w-full text-left text-sm">
           <thead class="text-xs uppercase text-slate-500">
