@@ -51,7 +51,6 @@ export function WorkflowGuideBar() {
       {(r) => {
         const guide = () => r().guide;
         const stepIndex = () => r().stepIndex;
-        const current = () => guide().steps[stepIndex()];
         return (
           <section
             class="mb-4 rounded-xl border border-brand-100 bg-brand-50/50 shadow-sm"
