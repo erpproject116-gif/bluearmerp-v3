@@ -48,6 +48,10 @@ npm run test:e2e
 # Core route list only
 npx playwright test e2e/route-smoke.spec.ts
 
+# Layer 2: non-destructive modal/button/field contracts for the eight core
+# selling, buying, and payment transaction flows
+npm run test:e2e:core-interactions
+
 # Full static /app map (~200 paths)
 npm run test:e2e:routes:full
 
@@ -75,6 +79,12 @@ Env:
 | `defineDocCrudSpec` | `e2e/helpers/docCrud.ts` | Shared cancel / edit / create journey |
 | Soft-skip | `softSkip` | Setup only (no table) — marks test skipped |
 | Incomplete create | `noteIncomplete` | After Cancel/Edit passed — annotates, still **passes** |
+
+`core-interactions.spec.ts` opens each core New transaction, checks the modal
+action contract, edits and restores an enabled field/checkbox, exercises
+Details/Invoice tabs when present, invokes empty-form validation, and closes
+the modal. Business mutations are intercepted, so the suite does not create,
+update, or delete ERP records.
 
 ### Demo seed helpers (GR / PR)
 

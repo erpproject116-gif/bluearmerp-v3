@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:core-interactions": "playwright test e2e/core-interactions.spec.ts",
     "test:e2e:routes:full": "node e2e/scripts/run-full-route-smoke.mjs",
     "e2e:routes:extract": "node e2e/scripts/extract-app-routes.mjs",
     "dead-code": "ts-prune -p tsconfig.app.json"

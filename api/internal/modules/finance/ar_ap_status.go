@@ -119,7 +119,7 @@ func listArApStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
 			log.Printf("ar-ap-status count failed: %v", err)
-			response.Err(w, http.StatusInternalServerError, fmt.Sprintf("Failed to count AR/AP status. [debug: %v]", err), "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to count AR/AP status.", "ERR_INTERNAL")
 			return
 		}
 		args = append(args, p.PageSize, offset)
@@ -128,7 +128,7 @@ func listArApStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
 			log.Printf("ar-ap-status query failed: %v", err)
-			response.Err(w, http.StatusInternalServerError, fmt.Sprintf("Failed to load AR/AP status. [debug: %v]", err), "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to load AR/AP status.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()

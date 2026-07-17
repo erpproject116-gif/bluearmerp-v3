@@ -72,7 +72,7 @@ func listCustomerCreditBalance(pool *pgxpool.Pool) http.HandlerFunc {
 		rows, err := pool.Query(r.Context(), q, tu.TenantID, p.PageSize, offset)
 		if err != nil {
 			log.Printf("customer-credit-balance query failed: %v", err)
-			response.Err(w, http.StatusInternalServerError, fmt.Sprintf("Failed to load credit balance report. [debug: %v]", err), "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to load credit balance report.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()

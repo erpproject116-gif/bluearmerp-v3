@@ -96,4 +96,7 @@ jobs:
           SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
         run: |
           export E2E_BENCH_TOKEN=$(node ../scripts/mint-bench-jwt.mjs)
-          npx playwright test e2e/sales-invoice.spec.ts e2e/goods-receipt-receive.spec.ts
+          npx playwright test \
+            e2e/core-interactions.spec.ts \
+            e2e/sales-invoice.spec.ts \
+            e2e/goods-receipt-receive.spec.ts

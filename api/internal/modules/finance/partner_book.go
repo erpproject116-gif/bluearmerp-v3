@@ -181,7 +181,7 @@ func listCustomerVendorBook(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
 			log.Printf("customer-vendor-book count failed (book_type=%s): %v", f.BookType, err)
-			response.Err(w, http.StatusInternalServerError, fmt.Sprintf("Failed to count partner book. [debug: %v]", err), "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to count partner book.", "ERR_INTERNAL")
 			return
 		}
 
@@ -194,7 +194,7 @@ func listCustomerVendorBook(pool *pgxpool.Pool) http.HandlerFunc {
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
 			log.Printf("customer-vendor-book query failed (book_type=%s): %v", f.BookType, err)
-			response.Err(w, http.StatusInternalServerError, fmt.Sprintf("Failed to load partner book. [debug: %v]", err), "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to load partner book.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
