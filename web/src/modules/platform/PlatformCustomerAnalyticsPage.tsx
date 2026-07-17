@@ -1,5 +1,5 @@
 import { A, useParams } from "@solidjs/router";
-import { For, Show, createSignal, onMount } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import {
   usePlatformCustomer,
   usePlatformCustomerEngagement,
@@ -34,24 +34,6 @@ export default function PlatformCustomerAnalyticsPage() {
   const engagement = usePlatformCustomerEngagement(id);
   const [openSessionId, setOpenSessionId] = createSignal<number | null>(null);
   const sessionDetail = usePlatformCustomerSession(id, openSessionId);
-
-  // #region agent log
-  onMount(() => {
-    fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "393b43" },
-      body: JSON.stringify({
-        sessionId: "393b43",
-        runId: "post-fix",
-        hypothesisId: "nav-customer-analytics",
-        location: "PlatformCustomerAnalyticsPage.tsx:onMount",
-        message: "opened customer analytics page",
-        data: { customerId: id(), path: typeof window !== "undefined" ? window.location.pathname : "" },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  });
-  // #endregion
 
   const c = () => customerQ.data?.customer as Record<string, unknown> | undefined;
   const eg = () => engagement.data;

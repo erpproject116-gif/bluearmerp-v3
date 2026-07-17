@@ -114,8 +114,8 @@ func updateConnectionSyncState(ctx context.Context, pool *pgxpool.Pool, id int64
 	_, err := pool.Exec(ctx, `
 		update public.com_gmail_connections
 		set history_id = coalesce($1, history_id),
-		  last_sync_at = case when $2 = 'idle' then now() else last_sync_at end,
-		  sync_status = $2,
+		  last_sync_at = case when $2::text = 'idle' then now() else last_sync_at end,
+		  sync_status = $2::text,
 		  sync_error = $3,
 		  updated_at = now()
 		where id = $4`, historyID, syncStatus, syncErr, id)

@@ -3,18 +3,15 @@ package support
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
@@ -23,32 +20,6 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
-
-// #region agent log
-func dbgLog(location, message string, data map[string]any) {
-	entry, _ := json.Marshal(map[string]any{
-		"sessionId": "393b43", "location": location, "message": message,
-		"data": data, "timestamp": time.Now().UnixMilli(),
-	})
-	if f, err := os.OpenFile("debug-393b43.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
-		_, _ = f.Write(append(entry, '\n'))
-		_ = f.Close()
-	}
-}
-
-func dbgErrInfo(err error) map[string]any {
-	info := map[string]any{"error": err.Error()}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		info["sqlstate"] = pgErr.Code
-		info["pg_message"] = pgErr.Message
-		info["constraint"] = pgErr.ConstraintName
-		info["table"] = pgErr.TableName
-	}
-	return info
-}
-
-// #endregion
 
 type Ticket struct {
 	ID              int64            `json:"id"`
@@ -346,12 +317,6 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
 			return
 		}
-		// #region agent log
-		dbgLog("tickets.go:patchTicket:entry", "patch ticket loaded", map[string]any{
-			"hypothesisId": "A,B,C,D", "ticket_id": id, "tenant_id": tu.TenantID,
-			"raw_body": string(rawBody), "before_status": before.Status, "before_priority": before.Priority,
-		})
-		// #endregion
 
 		subject := before.Subject
 		if body.Subject != nil {
@@ -399,24 +364,10 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			where id = $9 and tenant_id = $10`,
 			subject, desc, category, priority, status, assignedID, warrantyID, repairID, id, tu.TenantID)
 		if err != nil {
-			// #region agent log
-			info := dbgErrInfo(err)
-			info["hypothesisId"] = "A,B,C,D"
-			info["ticket_id"] = id
-			dbgLog("tickets.go:patchTicket:exec-error", "update exec failed", info)
-			// #endregion
 			log.Printf("support: patch ticket %d (tenant %d): %v", id, tu.TenantID, err)
-			// TEMP DEBUG: surface the DB error to the client so we can see the
-			// root cause on the deployed environment. Remove after diagnosis.
-			// "v2" marks the build with both $5 uses cast to text.
-			response.Err(w, http.StatusInternalServerError, "Failed to update ticket. [debug v2: "+err.Error()+"]", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to update ticket.", "ERR_INTERNAL")
 			return
 		}
-		// #region agent log
-		dbgLog("tickets.go:patchTicket:exec-ok", "update exec succeeded", map[string]any{
-			"hypothesisId": "A,B,C,D", "ticket_id": id, "status": status,
-		})
-		// #endregion
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "support.ticket_update", "support_ticket", &id, before, body)
 		ticket, _ := loadTicket(r.Context(), pool, tu.TenantID, id)

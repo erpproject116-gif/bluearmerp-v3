@@ -390,11 +390,11 @@ func patchFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.crm_follow_up_tasks set
-			  task_type = $1, stage = $2, due_date = $3,
+			  task_type = $1, stage = $2::text, due_date = $3,
 			  partner_id = $4, pic_user_id = $5, pic_name = $6,
 			  warranty_asset_id = $7, quotation_id = $8, sales_id = $9, purchase_request_id = $10,
 			  title = $11, notes = $12,
-			  completed_at = case when $2 in ('completed', 'closed') then coalesce(completed_at, now()) else null end,
+			  completed_at = case when $2::text in ('completed', 'closed') then coalesce(completed_at, now()) else null end,
 			  updated_at = now()
 			where id = $13 and tenant_id = $14`,
 			defaultTaskType(body.TaskType), stage, due,
@@ -439,8 +439,8 @@ func patchFollowUpTaskStage(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.crm_follow_up_tasks set
-			  stage = $1,
-			  completed_at = case when $1 in ('completed', 'closed') then coalesce(completed_at, now()) else null end,
+			  stage = $1::text,
+			  completed_at = case when $1::text in ('completed', 'closed') then coalesce(completed_at, now()) else null end,
 			  updated_at = now()
 			where id = $2 and tenant_id = $3`, stage, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
