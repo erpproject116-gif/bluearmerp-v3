@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "./api";
 import { DateInput } from "./DateInput";
 import { Field, inputClass } from "./SpreadsheetGrid";
@@ -30,9 +30,19 @@ export function GrLotEntryPanel(props: Props) {
   const [lotQty, setLotQty] = createSignal("1");
   const [lotExpiry, setLotExpiry] = createSignal("");
   const [addingLot, setAddingLot] = createSignal(false);
+  let lotNoInput: HTMLInputElement | undefined;
 
   const lotLines = () => props.lines.filter((l) => l.track_lot);
   const draft = () => props.status === "draft";
+
+  // Preselect the first line that still needs quantity so a scanner can go
+  // straight to the lot field without touching the line dropdown.
+  createEffect(() => {
+    const lines = lotLines();
+    if (lotLineId() && lines.some((l) => l.id === lotLineId())) return;
+    const next = lines.find((l) => l.received_qty < l.expected_qty) ?? lines[0];
+    setLotLineId(next ? next.id : null);
+  });
 
   const addLot = async () => {
     const lineId = lotLineId();
@@ -59,13 +69,19 @@ export function GrLotEntryPanel(props: Props) {
     setAddingLot(false);
     if (!res.success) {
       toast.warning(res.message ?? "Failed to add lot.");
+      lotNoInput?.focus();
       return;
     }
     setLotNo("");
-    setLotQty("1");
-    setLotExpiry("");
     await props.onRefresh();
     toast.success(`Added lot ${lot}`);
+    lotNoInput?.focus();
+  };
+
+  const onLotKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (!addingLot()) void addLot();
   };
 
   return (
@@ -92,10 +108,12 @@ export function GrLotEntryPanel(props: Props) {
             </Field>
             <Field label="Lot no.">
               <input
+                ref={lotNoInput}
                 class={inputClass}
                 value={lotNo()}
                 onInput={(e) => setLotNo(e.currentTarget.value)}
-                placeholder="Lot / batch no."
+                onKeyDown={onLotKeyDown}
+                placeholder="Scan or type lot no., Enter to add"
               />
             </Field>
             <Field label="Qty">
@@ -106,6 +124,7 @@ export function GrLotEntryPanel(props: Props) {
                 step="any"
                 value={lotQty()}
                 onInput={(e) => setLotQty(e.currentTarget.value)}
+                onKeyDown={onLotKeyDown}
               />
             </Field>
             <Field label="Expiry date">

@@ -14,7 +14,7 @@ import { applyColumnLabels, useColumnLabelSettings } from "../../../shared/useCo
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
 import { QuotationItemSearchModal } from "./QuotationItemSearchModal";
-import { SerialLineCell } from "../../../shared/SerialLineCell";
+import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
 import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
 
 export type QuotationLineRow = {
@@ -318,7 +318,7 @@ export function QuotationLineGrid(props: Props) {
                   </Show>
                   <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().line_total))}</ResizableTd>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
-                    <Show when={line().item_id && line().track_serial} fallback={<span class="text-xs text-text-secondary">—</span>}>
+                    <Show when={line().item_id && line().track_serial} fallback={<SerialCellHint hasItem={Boolean(line().item_id)} />}>
                       <div class="space-y-1">
                         <p class="text-[10px] uppercase tracking-wide text-text-secondary">
                           Planned · {trackingPolicyLabel(line().serial_policy)}

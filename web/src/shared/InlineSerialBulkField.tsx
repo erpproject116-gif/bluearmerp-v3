@@ -39,18 +39,34 @@ export function InlineSerialBulkField(props: Props) {
     }
   };
 
-  const appendToken = async (token: string) => {
+  // Scans arrive faster than commits complete (barcode guns send text + Enter
+  // back-to-back), so tokens are queued and drained serially instead of being
+  // dropped while a commit is in flight.
+  let queuedTokens: string[] = [];
+
+  const drainQueue = async () => {
+    while (queuedTokens.length > 0) {
+      const batch = queuedTokens.splice(0, queuedTokens.length);
+      const merged = dedupeSerials([...props.serials, ...batch.flatMap((t) => parseSerialBulkInput(t))]);
+      if (merged.length === props.serials.length) continue;
+      await props.onCommit(merged.slice(0, target()));
+    }
+  };
+
+  const appendToken = (token: string) => {
     const sn = token.trim();
     if (!sn || props.disabled || props.readOnly) return;
-    const existing = dedupeSerials([...props.serials, ...parseSerialBulkInput(sn)]);
-    if (existing.length === props.serials.length) return;
-    setLocalBusy(true);
-    try {
-      await props.onCommit(existing.slice(0, target()));
-    } finally {
-      setLocalBusy(false);
-    }
     setDraft("");
+    queuedTokens.push(sn);
+    if (localBusy()) return;
+    setLocalBusy(true);
+    void (async () => {
+      try {
+        await drainQueue();
+      } finally {
+        setLocalBusy(false);
+      }
+    })();
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -63,7 +79,7 @@ export function InlineSerialBulkField(props: Props) {
       void commitDraft(raw);
       return;
     }
-    void appendToken(raw);
+    appendToken(raw);
   };
 
   const onBlur = () => {
@@ -83,7 +99,7 @@ export function InlineSerialBulkField(props: Props) {
         <input
           class={`${inputClass} min-w-0 flex-1 font-mono text-xs ${borderClass()} ${props.readOnly ? "cursor-default bg-slate-50" : ""}`}
           value={draft()}
-          disabled={props.disabled || busy()}
+          disabled={props.disabled}
           readOnly={props.readOnly}
           placeholder={props.placeholder ?? "SN001, SN002, …"}
           title="Enter serials comma-separated. Each serial = 1 qty. Press Enter after each scan."

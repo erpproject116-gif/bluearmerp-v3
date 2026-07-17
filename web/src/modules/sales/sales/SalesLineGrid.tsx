@@ -469,7 +469,16 @@ export function SalesLineGrid(props: Props) {
                       </div>
                     </Show>
                     <Show when={!line().item_id || (!line().track_serial && !line().track_lot)}>
-                      <span class="text-xs text-text-secondary">—</span>
+                      <span
+                        class="cursor-help text-xs text-text-secondary"
+                        title={
+                          line().item_id
+                            ? "This item is not serial- or lot-tracked. Enable “Track serial numbers” or “Track lot numbers” on the item in Inventory → Items to scan here."
+                            : "Pick an item first — serial/lot entry appears for tracked items."
+                        }
+                      >
+                        {line().item_id ? "Not tracked" : "—"}
+                      </span>
                     </Show>
                   </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">

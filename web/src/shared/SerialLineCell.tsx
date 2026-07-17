@@ -527,7 +527,7 @@ function ReceiveSerialCell(props: ReceiveProps) {
       <InlineSerialBulkField
         serials={serialNos()}
         targetQty={targetQty()}
-        disabled={props.disabled || scanQueue.flushing()}
+        disabled={props.disabled}
         readOnly={readOnly()}
         busy={scanQueue.flushing()}
         placeholder="Scan serial, or paste comma-separated"
@@ -542,6 +542,22 @@ function ReceiveSerialCell(props: ReceiveProps) {
       />
       <ReceiveSerialModal {...props} open={open()} onClose={() => setOpen(false)} />
     </>
+  );
+}
+
+/** Fallback shown in the serial column when the line's item is not serial-tracked. */
+export function SerialCellHint(props: { hasItem: boolean }) {
+  return (
+    <span
+      class="cursor-help text-xs text-text-secondary"
+      title={
+        props.hasItem
+          ? "This item is not serial-tracked. Enable “Track serial numbers” on the item in Inventory → Items to enter serials here."
+          : "Pick an item first — serial entry appears for serial-tracked items."
+      }
+    >
+      {props.hasItem ? "Not tracked" : "—"}
+    </span>
   );
 }
 
