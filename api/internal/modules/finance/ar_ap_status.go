@@ -111,7 +111,7 @@ func listArApStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		p := httputil.ParseListParams(r, "partner_name", map[string]string{
-			"partner_name": "p.company_name", "ar_balance": "ar_balance", "ap_balance": "ap_balance",
+			"partner_name": "partner_name", "ar_balance": "ar_balance", "ap_balance": "ap_balance",
 		})
 		offset := httputil.Offset(p)
 		base, args := arApStatusSQL(tu.TenantID, asOf, statusType, partnerID)

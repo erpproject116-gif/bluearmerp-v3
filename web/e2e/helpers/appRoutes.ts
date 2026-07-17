@@ -60,7 +60,11 @@ type VisitResult = { path: string; ok: boolean; detail?: string };
  * are reported in the detail of other failures but do not fail on their own —
  * permission gates and optional probes legitimately 401/403/404.
  */
-export async function visitAppRoute(page: Page, routePath: string): Promise<VisitResult> {
+export async function visitAppRoute(
+  page: Page,
+  routePath: string,
+  pageErrorRetry = false,
+): Promise<VisitResult> {
   const pageErrors: string[] = [];
   const serverErrors: string[] = [];
   const clientErrors: string[] = [];
@@ -92,6 +96,19 @@ export async function visitAppRoute(page: Page, routePath: string): Promise<Visi
       return { path: routePath, ok: false, detail: `redirected to sign-in (status=${res?.status()})` };
     }
     if (pageErrors.length) {
+      // A rapid full-map run can receive delayed errors while the previous
+      // page is being torn down. Re-open the route once from a blank document
+      // to distinguish a real route error from cross-navigation noise.
+      if (!pageErrorRetry) {
+        page.off("pageerror", onError);
+        page.off("response", onResponse);
+        if (rateLimited || pageErrors.every((message) => /too many requests/i.test(message))) {
+          console.warn(`[route-smoke] ${routePath}: pageerror after 429 — waiting 65s before isolated retry`);
+          await page.waitForTimeout(65_000);
+        }
+        await page.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 10_000 }).catch(() => undefined);
+        return visitAppRoute(page, routePath, true);
+      }
       return { path: routePath, ok: false, detail: `pageerror: ${pageErrors[0]}` };
     }
     // ProtectedRoute can flash “Cannot reach the API” while the first /api call is in flight.
