@@ -1,4 +1,4 @@
-/** Golden retrieval fixtures for Help Assistant (Phase B). */
+﻿/** Golden retrieval fixtures for Help Assistant (Phase B). */
 export type HelpGoldenQuery = {
   query: string;
   path: string;
@@ -28,16 +28,16 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
 
   // P1
   { query: "progress status required quotation", path: "/app/quotation/quotations", expectArticleId: "quotation-progress-status" },
-  { query: "mapping center vs load slip", path: "/app/mapping-center", expectArticleId: "mapping-center-when-to-use" },
+  { query: "mapping center vs load slip", path: "/app/user-management/mapping-center", expectArticleId: "mapping-center-when-to-use" },
   { query: "delivery receipt vs shipping order", path: "/app/sales-order", expectArticleId: "delivery-receipt-vs-shipping" },
-  { query: "goods receipt with serial numbers", path: "/app/goods-receipt/list", expectArticleId: "goods-receipt-serial-receive" },
+  { query: "goods receipt with serial numbers", path: "/app/purchase-order/goods-receipt", expectArticleId: "goods-receipt-serial-receive" },
   { query: "lot batch expiry pick on sales", path: "/app/sales", expectArticleId: "lot-expiry-pick-rules" },
   { query: "confirm purchase order from list", path: "/app/purchase-order", expectArticleId: "po-confirm-from-list" },
   { query: "purchase request stuck in approval", path: "/app/purchase-request", expectArticleId: "pr-approval-stuck" },
   { query: "bank reconciliation unmatched statement lines", path: "/app/finance/acct-i/bank-reconciliation", expectArticleId: "bank-rec-unmatched-lines" },
   { query: "journal entry will not post unbalanced", path: "/app/finance/acct-i/journal-entries", expectArticleId: "je-wont-post" },
   { query: "switch business vs switch branch", path: "/app/dashboard", expectArticleId: "switch-tenant-vs-branch" },
-  { query: "connect gmail document email", path: "/app/communications", expectArticleId: "gmail-comms-connect" },
+  { query: "connect gmail document email", path: "/app/comms/settings", expectArticleId: "gmail-comms-connect" },
   { query: "link work item to quotation erp document", path: "/app/operations", expectArticleId: "work-item-link-erp-doc" },
   { query: "required custom field blocks save", path: "/app/quotation/quotations", expectArticleId: "custom-field-required-block" },
   { query: "import rfq pdf quotation", path: "/app/quotation/quotations", expectArticleId: "quotation-rfq-ai-import" },
@@ -51,12 +51,12 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
   { query: "collective group invoicing edge cases", path: "/app/sales", expectArticleId: "collective-invoice-edge-cases" },
   { query: "resume sales invoice from hold list", path: "/app/sales", expectArticleId: "sales-hold-list-resume" },
   { query: "demo data golden scenarios serial", path: "/app/user-management/demo-data", expectArticleId: "demo-data-golden-scenarios" },
-  { query: "dock appointment expected vs actual", path: "/app/wms", expectArticleId: "wms-scheduled-receipt-variance" },
-  { query: "what can customers see on portal", path: "/app/portal", expectArticleId: "customer-portal-what-they-see" },
+  { query: "dock appointment expected vs actual", path: "/app/inventory/wms/scheduled-receipts", expectArticleId: "wms-scheduled-receipt-variance" },
+  { query: "what can customers see on portal", path: "/app/inventory/partners", expectArticleId: "customer-portal-what-they-see" },
   { query: "run payroll salary", path: "/app/hr", expectArticleId: "hr-payroll-run-basics" },
   { query: "fixed asset depreciation register", path: "/app/fixed-assets", expectArticleId: "fixed-assets-depreciation-basics" },
   { query: "support ticket after repair", path: "/app/support", expectArticleId: "support-ticket-from-after-sales" },
-  { query: "data center import spreadsheet errors", path: "/app/data-ops", expectArticleId: "data-center-import-errors" },
+  { query: "data center import spreadsheet errors", path: "/app/data-center/inbox", expectArticleId: "data-center-import-errors" },
   { query: "bi analytics reports dashboard", path: "/app/dashboard", expectArticleId: "bi-reports-overview" },
 
   // Alias / paraphrase / error-style queries
@@ -75,14 +75,14 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
   { query: "rfq to purchase order", path: "/app/purchase-order/rfq", expectArticleId: "rfq-workflow" },
   { query: "quote to cash", path: "/app/quotation/quotations", expectArticleId: "quotation-to-sales-flow" },
   { query: "copy lines between documents", path: "/app/sales", expectArticleId: "load-slip-overview" },
-  { query: "si from gr", path: "/app/goods-receipt/list", expectArticleId: "goods-receipt-load-slip" },
+  { query: "si from gr", path: "/app/purchase-order/goods-receipt", expectArticleId: "goods-receipt-load-slip" },
   { query: "operations kanban board", path: "/app/operations", expectArticleId: "operations-hub-intro" },
   { query: "how to scan serial barcode", path: "/app/inventory/serial-lot/receive", expectArticleId: "serial-barcode-scanning" },
   { query: "park draft sale hold", path: "/app/sales", expectArticleId: "sales-hold-list-resume" },
-  { query: "who approves purchase request", path: "/app/approvals", expectArticleId: "pr-approval-stuck" },
-  { query: "mapping center or load slip", path: "/app/mapping-center", expectArticleId: "mapping-center-when-to-use" },
+  { query: "who approves purchase request", path: "/app/dashboard/approvals", expectArticleId: "pr-approval-stuck" },
+  { query: "mapping center or load slip", path: "/app/user-management/mapping-center", expectArticleId: "mapping-center-when-to-use" },
   { query: "pick list vs shipping order", path: "/app/sales-order", expectArticleId: "delivery-receipt-vs-shipping" },
-  { query: "connect gmail", path: "/app/communications", expectArticleId: "gmail-comms-connect" },
+  { query: "connect gmail", path: "/app/comms/settings", expectArticleId: "gmail-comms-connect" },
   { query: "link kanban to quotation", path: "/app/operations", expectArticleId: "work-item-link-erp-doc" },
   { query: "where is receivable status", path: "/app/selling", expectArticleId: "where-status-reports-live" },
   { query: "philippines coa template", path: "/app/finance/acct-i/chart-of-accounts", expectArticleId: "chart-of-accounts-ph-template" },
@@ -92,7 +92,7 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
   { query: "issue bom components", path: "/app/manufacturing", expectArticleId: "manufacturing-wo-issue-complete" },
   { query: "how to reconcile bank", path: "/app/finance/acct-i/bank-reconciliation", expectArticleId: "bank-reconciliation-weekly" },
   { query: "draft to posted journal entry", path: "/app/finance/acct-i/journal-entries", expectArticleId: "finance-je-draft-to-post" },
-  { query: "approve purchase request queue", path: "/app/approvals", expectArticleId: "approvals-queue" },
+  { query: "approve purchase request queue", path: "/app/dashboard/approvals", expectArticleId: "approvals-queue" },
   { query: "cash payment after purchase save", path: "/app/finance/payment-vouchers", expectArticleId: "purchase-cash-payment-after-save" },
   { query: "collect after sales invoice cash in", path: "/app/finance/official-receipts", expectArticleId: "sales-cash-in-after-save" },
   { query: "attachment required to confirm quotation", path: "/app/quotation/quotations", expectArticleId: "attachment-requirements" },

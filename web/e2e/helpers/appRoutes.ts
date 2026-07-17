@@ -55,12 +55,28 @@ export function routesForSmoke(): string[] {
 type VisitResult = { path: string; ok: boolean; detail?: string };
 
 /**
- * Visit a route after auth. Soft-checks: stayed in app, no pageerror, body has content.
+ * Visit a route after auth. Soft-checks: stayed in app, no pageerror, body has
+ * content, and no API call returned a server error (5xx). Client errors (4xx)
+ * are reported in the detail of other failures but do not fail on their own —
+ * permission gates and optional probes legitimately 401/403/404.
  */
 export async function visitAppRoute(page: Page, routePath: string): Promise<VisitResult> {
   const pageErrors: string[] = [];
+  const serverErrors: string[] = [];
+  const clientErrors: string[] = [];
+  let rateLimited = false;
   const onError = (err: Error) => pageErrors.push(err.message);
+  const onResponse = (res: import("@playwright/test").Response) => {
+    const url = res.url();
+    if (!url.includes("/api/")) return;
+    const status = res.status();
+    const short = `${status} ${res.request().method()} ${url.replace(/^https?:\/\/[^/]+/, "")}`;
+    if (status === 429) rateLimited = true;
+    if (status >= 500) serverErrors.push(short);
+    else if (status >= 400 && status !== 401) clientErrors.push(short);
+  };
   page.on("pageerror", onError);
+  page.on("response", onResponse);
   try {
     const res = await page.goto(routePath, { waitUntil: "domcontentloaded", timeout: 20000 });
     // Wait for shell (sidebar) — Solid lazy routes often leave body sparse for >400ms.
@@ -82,15 +98,25 @@ export async function visitAppRoute(page: Page, routePath: string): Promise<Visi
     const apiDown = page.getByText(/Cannot reach the API/i);
     if (await apiDown.isVisible().catch(() => false)) {
       await apiDown.waitFor({ state: "hidden", timeout: 8000 }).catch(() => undefined);
+      if ((await apiDown.isVisible().catch(() => false)) && rateLimited) {
+        // Deployed APIs rate-limit per user per minute; rapid full-page visits
+        // burst past it and /auth/me gets 429. Wait out the window once.
+        console.warn(`[route-smoke] ${routePath}: rate-limited (429) — waiting 65s for the window to reset`);
+        await page.waitForTimeout(65_000);
+        rateLimited = false;
+      }
       if (await apiDown.isVisible().catch(() => false)) {
         await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 }).catch(() => undefined);
         await page.waitForTimeout(500);
       }
       if (await apiDown.isVisible().catch(() => false)) {
+        const evidence = [...new Set([...serverErrors, ...clientErrors])].slice(0, 3).join("; ");
         return {
           path: routePath,
           ok: false,
-          detail: "API down (start: cd api && go run ./cmd/server)",
+          detail: evidence
+            ? `API unreachable; recent API errors: ${evidence}`
+            : "API down (start: cd api && go run ./cmd/server)",
         };
       }
     }
@@ -120,11 +146,27 @@ export async function visitAppRoute(page: Page, routePath: string): Promise<Visi
     if (bodyText.length < 20) {
       return { path: routePath, ok: false, detail: "body nearly empty" };
     }
+    if (serverErrors.length) {
+      return {
+        path: routePath,
+        ok: false,
+        detail: `API 5xx during load: ${[...new Set(serverErrors)].slice(0, 3).join("; ")}`,
+      };
+    }
+    if (clientErrors.length) {
+      // Not fatal by itself, but surfaced so silent grid failures are visible.
+      return {
+        path: routePath,
+        ok: true,
+        detail: `API 4xx during load: ${[...new Set(clientErrors)].slice(0, 3).join("; ")}`,
+      };
+    }
     return { path: routePath, ok: true };
   } catch (e) {
     return { path: routePath, ok: false, detail: e instanceof Error ? e.message : String(e) };
   } finally {
     page.off("pageerror", onError);
+    page.off("response", onResponse);
   }
 }
 
@@ -133,6 +175,7 @@ export async function visitRoutesCollectFailures(page: Page, paths: string[]): P
   for (const p of paths) {
     const r = await visitAppRoute(page, p);
     if (!r.ok) failures.push(r);
+    else if (r.detail) console.warn(`[route-smoke] ${p}: ${r.detail}`);
   }
   return failures;
 }

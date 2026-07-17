@@ -30,7 +30,7 @@ export function crmNotificationHref(n: CrmNotification): string {
     case "fin_account":
       return "/app/finance/acct-i/chart-of-accounts";
     case "wm_work_item":
-      return "/app/operations/board";
+      return "/app/operations";
     default:
       return "/app/crm/notifications";
   }

@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, on, onMount, Show, untrack } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -71,11 +71,17 @@ export default function LotAdjustmentPage() {
     };
   });
 
-  createEffect(() => {
-    const incoming = list.data?.rows ?? [];
-    if (editableRows().some((r) => r.dirty)) return;
-    setEditableRows(initEditable(incoming));
-  });
+  // `on` restricts the dependency to fetched rows; reading editableRows via
+  // untrack avoids the write-triggers-own-effect infinite loop (stack overflow).
+  createEffect(
+    on(
+      () => list.data?.rows,
+      (incoming) => {
+        if (untrack(editableRows).some((r) => r.dirty)) return;
+        setEditableRows(initEditable(incoming ?? []));
+      },
+    ),
+  );
 
   const patch = (p: Partial<LotAdjustmentFilters>) => setDraft((prev) => ({ ...prev, ...p }));
 

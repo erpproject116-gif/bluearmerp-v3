@@ -3,6 +3,7 @@ package finance
 import (
 	"encoding/csv"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -103,7 +104,7 @@ func partnerBookARSQL(tenantID int64, f partnerBookFilters) (string, []any) {
 		  select r.receipt_date, 'Official Receipt', r.receipt_no,
 		    to_char(r.receipt_date, 'MM/DD/YYYY') || '-' || r.date_seq,
 		    r.partner_id, p.company_name,
-		    coalesce(r.reference, r.receipt_no),
+		    coalesce(r.reference_no, r.receipt_no),
 		    0::float8, a.applied_amount::float8,
 		    'official_receipt', r.id
 		  from public.fin_receipt_applications a
@@ -112,8 +113,7 @@ func partnerBookARSQL(tenantID int64, f partnerBookFilters) (string, []any) {
 		  where r.tenant_id = $1 and r.deleted_at is null
 		    and r.receipt_date >= $2::date and r.receipt_date <= $3::date
 		) sub
-		where 1=1%s
-		order by txn_date asc, slip_type asc, slip_no asc`, partnerFilter)
+		where 1=1%s`, partnerFilter)
 	return q, args
 }
 
@@ -141,7 +141,7 @@ func partnerBookAPSQL(tenantID int64, f partnerBookFilters) (string, []any) {
 		  select pv.payment_date, 'Payment Voucher', pv.payment_no,
 		    to_char(pv.payment_date, 'MM/DD/YYYY') || '-' || pv.date_seq,
 		    pv.partner_id, p.company_name,
-		    coalesce(pv.reference, pv.payment_no),
+		    coalesce(pv.reference_no, pv.payment_no),
 		    a.applied_amount::float8, 0::float8,
 		    'payment_voucher', pv.id
 		  from public.fin_payment_applications a
@@ -150,8 +150,7 @@ func partnerBookAPSQL(tenantID int64, f partnerBookFilters) (string, []any) {
 		  where pv.tenant_id = $1 and pv.deleted_at is null
 		    and pv.payment_date >= $2::date and pv.payment_date <= $3::date
 		) sub
-		where 1=1%s
-		order by txn_date asc, slip_type asc, slip_no asc`, partnerFilter)
+		where 1=1%s`, partnerFilter)
 	return q, args
 }
 
@@ -181,16 +180,20 @@ func listCustomerVendorBook(pool *pgxpool.Pool) http.HandlerFunc {
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
+			log.Printf("customer-vendor-book count failed (book_type=%s): %v", f.BookType, err)
 			response.Err(w, http.StatusInternalServerError, "Failed to count partner book.", "ERR_INTERNAL")
 			return
 		}
 
 		args = append(args, p.PageSize, offset)
-		q := fmt.Sprintf("select txn_date::text, slip_type, slip_no, date_no_display, partner_id, partner_name, description, debit, credit, doc_kind, doc_id from (%s) sub limit $%d offset $%d",
-			base, len(args)-1, len(args))
+		q := fmt.Sprintf(
+			"select txn_date::text, slip_type, slip_no, date_no_display, partner_id, partner_name, description, debit, credit, doc_kind, doc_id from (%s) sub order by %s %s, slip_type asc, slip_no asc limit $%d offset $%d",
+			base, p.Sort, orderSQL(p.Order), len(args)-1, len(args),
+		)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
+			log.Printf("customer-vendor-book query failed (book_type=%s): %v", f.BookType, err)
 			response.Err(w, http.StatusInternalServerError, "Failed to load partner book.", "ERR_INTERNAL")
 			return
 		}
@@ -227,7 +230,10 @@ func exportCustomerVendorBook(pool *pgxpool.Pool) http.HandlerFunc {
 		} else {
 			base, args = partnerBookAPSQL(tu.TenantID, f)
 		}
-		q := fmt.Sprintf("select txn_date::text, slip_type, slip_no, date_no_display, partner_name, description, debit, credit from (%s) sub limit %d", base, reportExportMaxRows)
+		q := fmt.Sprintf(
+			"select txn_date::text, slip_type, slip_no, date_no_display, partner_name, description, debit, credit from (%s) sub order by txn_date asc, slip_type asc, slip_no asc limit %d",
+			base, reportExportMaxRows,
+		)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to export partner book.", "ERR_INTERNAL")

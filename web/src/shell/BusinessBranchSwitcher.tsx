@@ -1,6 +1,6 @@
-import { For, Show, createEffect, createResource, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
-import { useQueryClient } from "@tanstack/solid-query";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../shared/api";
 import { useAuth } from "../shared/auth-context";
 import { getActiveBranch, setActiveBranch } from "../shared/activeContext";
@@ -24,11 +24,18 @@ export function BusinessBranchSwitcher() {
   const memberships = () => auth.me?.memberships ?? [];
   const hasMultipleBusinesses = () => memberships().length > 1;
 
-  const [branches] = createResource(tenantId, async (tid) => {
-    if (!tid) return [] as Branch[];
-    const res = await apiFetch<Branch[]>("/api/v1/auth/branches");
-    return res.success && res.data ? res.data : [];
-  });
+  // TanStack query (not createResource) so creating/renaming a location in
+  // /app/inventory/locations refreshes this switcher immediately — the
+  // "auth-branches" key is invalidated by inventory mutations.
+  const branchesQuery = createQuery(() => ({
+    queryKey: ["auth-branches", tenantId()],
+    enabled: tenantId() > 0,
+    queryFn: async () => {
+      const res = await apiFetch<Branch[]>("/api/v1/auth/branches");
+      return res.success && res.data ? res.data : [];
+    },
+  }));
+  const branches = () => branchesQuery.data ?? [];
 
   const [selectedBranchId, setSelectedBranchId] = createSignal<number | null>(null);
   const [switchingBusiness, setSwitchingBusiness] = createSignal(false);

@@ -21,7 +21,7 @@ const LINKS = [
   {
     title: "Lot batches",
     description: "View on-hand lot quantities by location and expiry.",
-    href: "/app/inventory/serial-lot/lot-batches",
+    href: "/app/inventory/serial-lot/lots",
   },
   {
     title: "Item master — serial/lot tab",

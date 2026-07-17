@@ -126,6 +126,18 @@ export default function DocumentationPage() {
       ? "You may need administrator access to use these screens. Ask your store owner if you need help."
       : undefined;
 
+  // relatedGuideIds may reference either guide sections or other KB articles;
+  // split them so both render instead of unknown IDs being dropped silently.
+  const articleRelated = createMemo(() => {
+    const a = article();
+    if (!a) return { guides: [] as string[], articles: [] as string[] };
+    const ids = a.relatedGuideIds ?? [];
+    return {
+      guides: ids.filter((id) => sectionsById().has(id)),
+      articles: ids.filter((id) => id !== a.id && articlesById().has(id)),
+    };
+  });
+
   return (
     <div class="mx-auto max-w-6xl">
       <DocumentationHeaderTabs active={isKb() ? "knowledgebase" : "guides"} />
@@ -224,7 +236,9 @@ export default function DocumentationPage() {
                     blocks={a().blocks}
                     primaryHref={a().primaryHref}
                     primaryLabel={a().primaryLabel}
-                    relatedGuideIds={a().relatedGuideIds}
+                    relatedGuideIds={articleRelated().guides}
+                    relatedKbArticleIds={articleRelated().articles}
+                    articlesById={articlesById()}
                     sectionsById={sectionsById()}
                     prev={kbNeighbors().prev}
                     next={kbNeighbors().next}

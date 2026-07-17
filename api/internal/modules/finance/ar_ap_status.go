@@ -3,6 +3,7 @@ package finance
 import (
 	"encoding/csv"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -82,9 +83,10 @@ func arApStatusSQL(tenantID int64, asOf time.Time, statusType string, partnerID 
 		  where si.tenant_id = $1 and si.deleted_at is null and si.invoice_date <= $2::date
 		  group by si.partner_id
 		)
-		select p.id, p.company_name as partner_name, p.partner_kind,
-		  coalesce(ar.balance, 0)::float8, coalesce(ap.balance, 0)::float8,
-		  (coalesce(ar.balance, 0) - coalesce(ap.balance, 0))::float8
+		select p.id as partner_id, p.company_name as partner_name, p.partner_kind,
+		  coalesce(ar.balance, 0)::float8 as ar_balance,
+		  coalesce(ap.balance, 0)::float8 as ap_balance,
+		  (coalesce(ar.balance, 0) - coalesce(ap.balance, 0))::float8 as net_balance
 		from public.inv_partners p
 		left join ar on ar.partner_id = p.id
 		left join ap on ap.partner_id = p.id
@@ -116,6 +118,7 @@ func listArApStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
+			log.Printf("ar-ap-status count failed: %v", err)
 			response.Err(w, http.StatusInternalServerError, "Failed to count AR/AP status.", "ERR_INTERNAL")
 			return
 		}
@@ -124,6 +127,7 @@ func listArApStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			base, p.Sort, orderSQL(p.Order), len(args)-1, len(args))
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
+			log.Printf("ar-ap-status query failed: %v", err)
 			response.Err(w, http.StatusInternalServerError, "Failed to load AR/AP status.", "ERR_INTERNAL")
 			return
 		}

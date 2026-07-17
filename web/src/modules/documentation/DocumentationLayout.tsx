@@ -4,6 +4,7 @@ import type { DocBlock, DocGroup, DocSection, KbArticle, KbGroup } from "./docum
 import { ModuleIcon } from "../../shell/ModuleIcon";
 import { filterKbArticles, filterSections } from "./documentationSearch";
 import { HelpAssistantAskButton } from "../help-assistant/HelpAssistantAskButton";
+import { workflowGuides } from "../../shared/workflowGuides";
 
 export type DocTab = "guides" | "knowledgebase";
 
@@ -340,6 +341,54 @@ type HomeProps = {
   onSelect: (id: string) => void;
 };
 
+function WorkflowJourneys() {
+  return (
+    <section class="rounded-xl border border-brand-100 bg-brand-50/50 p-4">
+      <h2 class="text-sm font-semibold text-text-primary">Follow a workflow from start to finish</h2>
+      <p class="mt-1 max-w-2xl text-xs leading-relaxed text-text-secondary">
+        Not sure where to begin? Pick a journey below. Each one walks you through every step in order — what to do,
+        why, and where to click. The same guide also appears at the top of each page while you work.
+      </p>
+      <div class="mt-3 grid gap-3 lg:grid-cols-3">
+        <For each={workflowGuides}>
+          {(guide) => (
+            <div class="flex flex-col rounded-lg border border-stroke bg-white p-3 shadow-sm">
+              <h3 class="text-sm font-semibold text-text-primary">{guide.title}</h3>
+              <div class="mt-2 flex flex-wrap items-center gap-1 text-xs">
+                <For each={guide.steps}>
+                  {(step, i) => (
+                    <>
+                      <Show when={i() > 0}>
+                        <span class="text-text-secondary/60" aria-hidden="true">
+                          →
+                        </span>
+                      </Show>
+                      <span class="rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-text-secondary">
+                        {i() + 1}. {step.short}
+                      </span>
+                    </>
+                  )}
+                </For>
+              </div>
+              <p class="mt-2 flex-1 text-xs leading-relaxed text-text-secondary">{guide.summary}</p>
+              <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-stroke pt-2 text-xs">
+                <A href={guide.steps[0].href} class="font-medium text-brand-600 hover:underline">
+                  Start at step 1 →
+                </A>
+                <Show when={guide.docHref}>
+                  <A href={guide.docHref!} class="font-medium text-brand-600 hover:underline">
+                    Read the full guide
+                  </A>
+                </Show>
+              </div>
+            </div>
+          )}
+        </For>
+      </div>
+    </section>
+  );
+}
+
 export function DocumentationHome(props: HomeProps) {
   return (
     <div class="space-y-8">
@@ -357,6 +406,8 @@ export function DocumentationHome(props: HomeProps) {
           <HelpAssistantAskButton />
         </div>
       </header>
+
+      <WorkflowJourneys />
 
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <For each={props.groups}>

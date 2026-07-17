@@ -22,14 +22,16 @@ type EssPayslip = {
 };
 
 function EssSelfServiceView() {
+  // Return null (don't throw) when no employee is linked — throwing from
+  // createResource surfaces as a pageerror and breaks route smoke.
   const [me] = createResource(async () => {
     const res = await apiFetch<EssMe>("/api/v1/hr/ess/me");
-    if (!res.success || !res.data) throw new Error(res.message ?? "No employee profile linked.");
+    if (!res.success || !res.data) return null;
     return res.data;
   });
   const [payslips] = createResource(async () => {
     const res = await apiFetch<EssPayslip[]>("/api/v1/hr/ess/payslips");
-    if (!res.success) throw new Error(res.message ?? "Failed to load payslips.");
+    if (!res.success) return [];
     return res.data ?? [];
   });
 
@@ -41,9 +43,9 @@ function EssSelfServiceView() {
       <Show when={me.loading}>
         <LoadingText />
       </Show>
-      <Show when={me.error}>
+      <Show when={!me.loading && me() === null}>
         <p class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          {String(me.error)}. Ask HR to link your login to an employee record (user_id).
+          No employee profile linked to your user. Ask HR to set user_id on your employee record.
         </p>
       </Show>
       <Show when={me()}>

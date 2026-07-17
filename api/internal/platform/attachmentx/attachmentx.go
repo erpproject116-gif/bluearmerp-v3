@@ -66,7 +66,7 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 		return nil
 	}
 	q := fmt.Sprintf(
-		`select file_name, coalesce(mime_type, ''), size_bytes, storage_path, uploaded_by_user_id
+		`select file_name, coalesce(mime_type, ''), size_bytes, storage_path, uploaded_by_user_id, file_bytes
 		 from %s where %s = $1 order by created_at`, p.SrcTable, p.SrcFKCol)
 	rows, err := pool.Query(ctx, q, p.SrcID)
 	if err != nil {
@@ -78,11 +78,12 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 		sizeBytes   int64
 		storagePath string
 		uploader    *int64
+		fileBytes   []byte
 	}
 	var items []srcRow
 	for rows.Next() {
 		var s srcRow
-		if err := rows.Scan(&s.fileName, &s.mimeType, &s.sizeBytes, &s.storagePath, &s.uploader); err != nil {
+		if err := rows.Scan(&s.fileName, &s.mimeType, &s.sizeBytes, &s.storagePath, &s.uploader, &s.fileBytes); err != nil {
 			rows.Close()
 			return err
 		}
@@ -97,11 +98,29 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 	absDir := filepath.Join(p.DstBaseDir, relDir)
 
 	insertSQL := fmt.Sprintf(
-		`insert into %s (%s, file_name, mime_type, size_bytes, storage_path, uploaded_by_user_id)
-		 values ($1,$2,$3,$4,$5,$6)`, p.DstTable, p.DstFKCol)
+		`insert into %s (%s, file_name, mime_type, size_bytes, storage_path, uploaded_by_user_id, file_bytes)
+		 values ($1,$2,$3,$4,$5,$6,$7)`, p.DstTable, p.DstFKCol)
 
 	var firstErr error
 	for i, it := range items {
+		storedName := fmt.Sprintf("%d_%d_%s", time.Now().UnixNano(), i, filepath.Base(it.fileName))
+		dstStoragePath := filepath.ToSlash(filepath.Join(relDir, storedName))
+		var mime any
+		if it.mimeType != "" {
+			mime = it.mimeType
+		}
+
+		// Bytes stored in the DB (the durable path): copy the row directly.
+		if len(it.fileBytes) > 0 {
+			if _, err := pool.Exec(ctx, insertSQL, p.DstID, it.fileName, mime, it.sizeBytes, dstStoragePath, it.uploader, it.fileBytes); err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+			}
+			continue
+		}
+
+		// Legacy attachment stored on disk only: copy the file, too.
 		srcAbs := filepath.Join(p.SrcBaseDir, filepath.FromSlash(it.storagePath))
 		if err := os.MkdirAll(absDir, 0o755); err != nil {
 			if firstErr == nil {
@@ -109,7 +128,6 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 			}
 			continue
 		}
-		storedName := fmt.Sprintf("%d_%d_%s", time.Now().UnixNano(), i, filepath.Base(it.fileName))
 		dstAbs := filepath.Join(absDir, storedName)
 		if err := copyFile(srcAbs, dstAbs); err != nil {
 			if firstErr == nil {
@@ -117,12 +135,7 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 			}
 			continue
 		}
-		dstStoragePath := filepath.ToSlash(filepath.Join(relDir, storedName))
-		var mime any
-		if it.mimeType != "" {
-			mime = it.mimeType
-		}
-		if _, err := pool.Exec(ctx, insertSQL, p.DstID, it.fileName, mime, it.sizeBytes, dstStoragePath, it.uploader); err != nil {
+		if _, err := pool.Exec(ctx, insertSQL, p.DstID, it.fileName, mime, it.sizeBytes, dstStoragePath, it.uploader, nil); err != nil {
 			_ = os.Remove(dstAbs)
 			if firstErr == nil {
 				firstErr = err

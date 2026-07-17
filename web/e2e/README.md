@@ -2,6 +2,22 @@
 
 Living checklist for proving Bluearm ERP screens load and critical nested controls work. Hybrid Phase 1: **Vitest shared controls** + **Playwright CRUD/interaction journeys**. See also `docs/qa/ui-coverage.md`.
 
+## Static gates (no browser needed)
+
+- **Link integrity** — `src/routes/linkIntegrity.test.ts` (runs with `npm test`): every
+  hardcoded `/app/...` string in `web/src` must resolve to a route declared in `App.tsx`.
+  Routes are re-extracted at test time via `e2e/scripts/extract-app-routes.mjs` (shared
+  module), so route renames immediately fail files still linking to old paths.
+
+## Route smoke behavior
+
+- Any **API 5xx** during a route visit fails that route with method + endpoint in the message.
+- **API 4xx** (except 401) are logged as `[route-smoke]` warnings — visible but non-fatal.
+- **429 rate limiting** (deployed API: ~200 authenticated req/min/user) is detected and the
+  runner waits out the window once before declaring the API down. Full-mode timeout is 60 min.
+- Run against a deployed environment with `E2E_BASE_URL=https://app.bluearmerp.com`
+  (demo credentials must exist there).
+
 ## Prerequisites
 
 Authenticated e2e needs **both**:
@@ -32,6 +48,10 @@ npm run test:e2e
 # Core route list only
 npx playwright test e2e/route-smoke.spec.ts
 
+# Layer 2: non-destructive modal/button/field contracts for the eight core
+# selling, buying, and payment transaction flows
+npm run test:e2e:core-interactions
+
 # Full static /app map (~200 paths)
 npm run test:e2e:routes:full
 
@@ -59,6 +79,12 @@ Env:
 | `defineDocCrudSpec` | `e2e/helpers/docCrud.ts` | Shared cancel / edit / create journey |
 | Soft-skip | `softSkip` | Setup only (no table) — marks test skipped |
 | Incomplete create | `noteIncomplete` | After Cancel/Edit passed — annotates, still **passes** |
+
+`core-interactions.spec.ts` opens each core New transaction, checks the modal
+action contract, edits and restores an enabled field/checkbox, exercises
+Details/Invoice tabs when present, invokes empty-form validation, and closes
+the modal. Business mutations are intercepted, so the suite does not create,
+update, or delete ERP records.
 
 ### Demo seed helpers (GR / PR)
 

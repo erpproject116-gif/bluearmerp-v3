@@ -25,6 +25,8 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
   goodsReceipt: ["goods-receipts", "report-items-to-receive"],
   inventory: [
     "inventory",
+    // Sidebar branch switcher lists inv_locations via /auth/branches.
+    "auth-branches",
     "serial-units",
     "serial-events",
     "lot-batches",

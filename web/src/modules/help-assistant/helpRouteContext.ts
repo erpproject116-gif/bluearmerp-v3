@@ -5,7 +5,9 @@ const ROUTE_TAG_RULES: Array<{ prefix: string; tags: string[] }> = [
   { prefix: "/app/sales", tags: ["sales", "selling", "return"] },
   { prefix: "/app/purchase-request", tags: ["purchase-request", "buying"] },
   { prefix: "/app/purchase-order", tags: ["purchase-order", "buying", "rfq"] },
-  { prefix: "/app/goods-receipt", tags: ["goods-receipt", "buying", "inventory", "receive"] },
+  { prefix: "/app/purchase-order/goods-receipt", tags: ["goods-receipt", "buying", "inventory", "receive"] },
+  { prefix: "/app/purchases", tags: ["supplier-invoice", "buying", "finance"] },
+  { prefix: "/app/buying", tags: ["buying", "reports"] },
   { prefix: "/app/inventory/serial-lot", tags: ["serial-lot", "serial", "inventory"] },
   { prefix: "/app/inventory", tags: ["inventory"] },
   { prefix: "/app/after-sales", tags: ["after-sales", "repair", "warranty"] },
@@ -16,7 +18,7 @@ const ROUTE_TAG_RULES: Array<{ prefix: string; tags: string[] }> = [
   { prefix: "/app/operations/calendar", tags: ["operations", "calendar", "today"] },
   { prefix: "/app/operations/packs", tags: ["operations", "pack"] },
   { prefix: "/app/operations", tags: ["operations", "calendar", "packs"] },
-  { prefix: "/app/communications", tags: ["communications", "gmail", "email"] },
+  { prefix: "/app/comms", tags: ["communications", "gmail", "email"] },
   { prefix: "/app/crm", tags: ["crm"] },
   { prefix: "/app/onboarding", tags: ["onboarding", "setup"] },
   { prefix: "/app/setup", tags: ["setup", "onboarding"] },
@@ -123,8 +125,15 @@ export function suggestedPrompts(pathname: string): string[] {
   if (pathname.includes("/pos")) {
     return ["How do I open a POS shift?", "How does POS checkout work?"];
   }
-  if (pathname.includes("/communications")) {
+  if (pathname.includes("/comms") || pathname.includes("/communications")) {
     return ["How do I email a document?", "How do I connect Gmail?", "Where is the sent documents log?"];
+  }
+  if (pathname.includes("/purchases")) {
+    return [
+      "How do I create a supplier invoice from a goods receipt?",
+      "How do I pay a supplier invoice?",
+      "What is purchase pre-invoicing?",
+    ];
   }
   if (pathname.includes("/onboarding") || pathname.includes("/setup")) {
     return [
