@@ -1,6 +1,7 @@
 package support
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -136,45 +137,34 @@ func uploadTicketAttachment(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		relDir := filepath.Join(strconv.FormatInt(tu.TenantID, 10), strconv.FormatInt(ticketID, 10))
-		absDir := filepath.Join(ticketUploadDir(), relDir)
-		if err := os.MkdirAll(absDir, 0o755); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to store file.", "ERR_INTERNAL")
-			return
-		}
-
-		storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
-		absPath := filepath.Join(absDir, storedName)
-		dst, err := os.Create(absPath)
+		// Read the file into memory and persist bytes in the database. Local
+		// disk is ephemeral on containerized deploys (files vanished on every
+		// redeploy while their DB rows survived), so the DB is the source of
+		// truth. The 25 MB combined cap keeps rows small enough for bytea.
+		data, err := io.ReadAll(io.LimitReader(file, remaining+1))
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to store file.", "ERR_INTERNAL")
 			return
 		}
-		written, err := io.Copy(dst, io.LimitReader(file, remaining+1))
-		_ = dst.Close()
-		if err != nil {
-			_ = os.Remove(absPath)
-			response.Err(w, http.StatusInternalServerError, "Failed to store file.", "ERR_INTERNAL")
-			return
-		}
+		written := int64(len(data))
 		if written > remaining {
-			_ = os.Remove(absPath)
 			response.Validation(w, map[string]string{"file": "Combined attachments must stay under 25 MB."})
 			return
 		}
 
+		relDir := filepath.Join(strconv.FormatInt(tu.TenantID, 10), strconv.FormatInt(ticketID, 10))
+		storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 		storagePath := filepath.ToSlash(filepath.Join(relDir, storedName))
 		var id int64
 		var createdAt time.Time
 		err = pool.QueryRow(r.Context(), `
 			insert into public.sup_support_ticket_attachments
-			  (ticket_id, file_name, mime_type, size_bytes, storage_path, uploaded_by_user_id)
-			values ($1,$2,$3,$4,$5,$6)
+			  (ticket_id, file_name, mime_type, size_bytes, storage_path, uploaded_by_user_id, file_bytes)
+			values ($1,$2,$3,$4,$5,$6,$7)
 			returning id, created_at`,
-			ticketID, safeName, nullIfEmptyStr(mimeType), written, storagePath, tu.AppUserID).
+			ticketID, safeName, nullIfEmptyStr(mimeType), written, storagePath, tu.AppUserID, data).
 			Scan(&id, &createdAt)
 		if err != nil {
-			_ = os.Remove(absPath)
 			response.Err(w, http.StatusInternalServerError, "Failed to save attachment.", "ERR_INTERNAL")
 			return
 		}
@@ -258,17 +248,27 @@ func downloadTicketAttachment(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		var fileName, storagePath, mime string
 		var createdAt time.Time
+		var fileBytes []byte
 		err = pool.QueryRow(r.Context(), `
-			select a.file_name, a.storage_path, coalesce(a.mime_type, ''), a.created_at
+			select a.file_name, a.storage_path, coalesce(a.mime_type, ''), a.created_at, a.file_bytes
 			from public.sup_support_ticket_attachments a
 			join public.sup_support_tickets t on t.id = a.ticket_id
 			where a.id = $1 and a.ticket_id = $2 and t.tenant_id = $3`,
 			attachmentID, ticketID, tu.TenantID).
-			Scan(&fileName, &storagePath, &mime, &createdAt)
+			Scan(&fileName, &storagePath, &mime, &createdAt, &fileBytes)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Attachment not found.", "ERR_NOT_FOUND")
 			return
 		}
+		if len(fileBytes) > 0 {
+			if mime != "" {
+				w.Header().Set("Content-Type", mime)
+			}
+			w.Header().Set("Content-Disposition", `attachment; filename="`+strings.ReplaceAll(fileName, `"`, "")+`"`)
+			http.ServeContent(w, r, fileName, createdAt, bytes.NewReader(fileBytes))
+			return
+		}
+		// Legacy rows uploaded before bytes were stored in the DB: try disk.
 		if err := filedownload.ServeStoredFile(w, r, ticketUploadDir(), storagePath, fileName, mime, createdAt); err != nil {
 			response.Err(w, http.StatusNotFound, "File not found.", "ERR_NOT_FOUND")
 		}
