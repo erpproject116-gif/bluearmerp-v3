@@ -7,7 +7,9 @@ test.describe("App route smoke", () => {
 
   test("core (or full) static /app routes load without pageerror", async ({ page }) => {
     test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD for authenticated smoke");
-    test.setTimeout(process.env.E2E_FULL_ROUTE_SMOKE === "1" ? 20 * 60 * 1000 : 6 * 60 * 1000);
+    // Full mode paces itself around deployed API rate limits (~200 req/min/user),
+    // so 233 routes can legitimately take half an hour.
+    test.setTimeout(process.env.E2E_FULL_ROUTE_SMOKE === "1" ? 60 * 60 * 1000 : 6 * 60 * 1000);
 
     await demoSignIn(page);
     const paths = routesForSmoke();

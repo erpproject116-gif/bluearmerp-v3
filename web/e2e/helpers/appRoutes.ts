@@ -64,12 +64,14 @@ export async function visitAppRoute(page: Page, routePath: string): Promise<Visi
   const pageErrors: string[] = [];
   const serverErrors: string[] = [];
   const clientErrors: string[] = [];
+  let rateLimited = false;
   const onError = (err: Error) => pageErrors.push(err.message);
   const onResponse = (res: import("@playwright/test").Response) => {
     const url = res.url();
     if (!url.includes("/api/")) return;
     const status = res.status();
     const short = `${status} ${res.request().method()} ${url.replace(/^https?:\/\/[^/]+/, "")}`;
+    if (status === 429) rateLimited = true;
     if (status >= 500) serverErrors.push(short);
     else if (status >= 400 && status !== 401) clientErrors.push(short);
   };
@@ -96,15 +98,25 @@ export async function visitAppRoute(page: Page, routePath: string): Promise<Visi
     const apiDown = page.getByText(/Cannot reach the API/i);
     if (await apiDown.isVisible().catch(() => false)) {
       await apiDown.waitFor({ state: "hidden", timeout: 8000 }).catch(() => undefined);
+      if ((await apiDown.isVisible().catch(() => false)) && rateLimited) {
+        // Deployed APIs rate-limit per user per minute; rapid full-page visits
+        // burst past it and /auth/me gets 429. Wait out the window once.
+        console.warn(`[route-smoke] ${routePath}: rate-limited (429) — waiting 65s for the window to reset`);
+        await page.waitForTimeout(65_000);
+        rateLimited = false;
+      }
       if (await apiDown.isVisible().catch(() => false)) {
         await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 }).catch(() => undefined);
         await page.waitForTimeout(500);
       }
       if (await apiDown.isVisible().catch(() => false)) {
+        const evidence = [...new Set([...serverErrors, ...clientErrors])].slice(0, 3).join("; ");
         return {
           path: routePath,
           ok: false,
-          detail: "API down (start: cd api && go run ./cmd/server)",
+          detail: evidence
+            ? `API unreachable; recent API errors: ${evidence}`
+            : "API down (start: cd api && go run ./cmd/server)",
         };
       }
     }

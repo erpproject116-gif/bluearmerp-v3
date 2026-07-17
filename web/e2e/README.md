@@ -2,6 +2,22 @@
 
 Living checklist for proving Bluearm ERP screens load and critical nested controls work. Hybrid Phase 1: **Vitest shared controls** + **Playwright CRUD/interaction journeys**. See also `docs/qa/ui-coverage.md`.
 
+## Static gates (no browser needed)
+
+- **Link integrity** — `src/routes/linkIntegrity.test.ts` (runs with `npm test`): every
+  hardcoded `/app/...` string in `web/src` must resolve to a route declared in `App.tsx`.
+  Routes are re-extracted at test time via `e2e/scripts/extract-app-routes.mjs` (shared
+  module), so route renames immediately fail files still linking to old paths.
+
+## Route smoke behavior
+
+- Any **API 5xx** during a route visit fails that route with method + endpoint in the message.
+- **API 4xx** (except 401) are logged as `[route-smoke]` warnings — visible but non-fatal.
+- **429 rate limiting** (deployed API: ~200 authenticated req/min/user) is detected and the
+  runner waits out the window once before declaring the API down. Full-mode timeout is 60 min.
+- Run against a deployed environment with `E2E_BASE_URL=https://app.bluearmerp.com`
+  (demo credentials must exist there).
+
 ## Prerequisites
 
 Authenticated e2e needs **both**:
