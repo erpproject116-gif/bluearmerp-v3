@@ -121,7 +121,10 @@ export default function PlatformAnalyticsPage() {
                 <tr class="border-t border-stroke/60">
                   <td class="py-2 pr-2">
                     <Show when={c.customer_id} fallback={<span class="font-medium">{c.customer_name || "—"}</span>}>
-                      <A href={`/app/platform-command/customers/${c.customer_id}`} class="font-medium text-brand-600 hover:underline">
+                      <A
+                        href={`/app/platform-command/customers/${c.customer_id}/analytics`}
+                        class="font-medium text-brand-600 hover:underline"
+                      >
                         {c.customer_name || `Customer #${c.customer_id}`}
                       </A>
                     </Show>
@@ -173,7 +176,7 @@ export default function PlatformAnalyticsPage() {
           </tbody>
         </table>
         <p class="mt-3 text-xs text-slate-500">
-          Open a <A href="/app/platform-command/customers" class="text-brand-600 hover:underline">customer</A> to see last login/logout, inactivity, and page journeys.
+          Click a customer name above for that customer’s analytics (login/logout, inactivity, page journeys).
         </p>
       </section>
     </div>

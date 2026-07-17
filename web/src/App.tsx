@@ -171,6 +171,7 @@ import {
   PlatformChangeLogsCommandPage,
   PlatformAccessCommandPage,
   PlatformAnalyticsCommandPage,
+  PlatformCustomerAnalyticsCommandPage,
   LowStockReportPage,
   ExpiredQuotationsReportPage,
   LeadsPage,
@@ -370,6 +371,7 @@ export default function App() {
           <Route path="/" component={PlatformCommandPage} />
           <Route path="/analytics" component={PlatformAnalyticsCommandPage} />
           <Route path="/customers" component={PlatformCustomersPage} />
+          <Route path="/customers/:id/analytics" component={PlatformCustomerAnalyticsCommandPage} />
           <Route path="/customers/:id" component={PlatformCustomerDetailPage} />
           <Route path="/tickets" component={PlatformTicketsCommandPage} />
           <Route path="/tickets/:id" component={PlatformTicketDetailCommandPage} />
