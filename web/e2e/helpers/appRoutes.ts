@@ -55,12 +55,26 @@ export function routesForSmoke(): string[] {
 type VisitResult = { path: string; ok: boolean; detail?: string };
 
 /**
- * Visit a route after auth. Soft-checks: stayed in app, no pageerror, body has content.
+ * Visit a route after auth. Soft-checks: stayed in app, no pageerror, body has
+ * content, and no API call returned a server error (5xx). Client errors (4xx)
+ * are reported in the detail of other failures but do not fail on their own —
+ * permission gates and optional probes legitimately 401/403/404.
  */
 export async function visitAppRoute(page: Page, routePath: string): Promise<VisitResult> {
   const pageErrors: string[] = [];
+  const serverErrors: string[] = [];
+  const clientErrors: string[] = [];
   const onError = (err: Error) => pageErrors.push(err.message);
+  const onResponse = (res: import("@playwright/test").Response) => {
+    const url = res.url();
+    if (!url.includes("/api/")) return;
+    const status = res.status();
+    const short = `${status} ${res.request().method()} ${url.replace(/^https?:\/\/[^/]+/, "")}`;
+    if (status >= 500) serverErrors.push(short);
+    else if (status >= 400 && status !== 401) clientErrors.push(short);
+  };
   page.on("pageerror", onError);
+  page.on("response", onResponse);
   try {
     const res = await page.goto(routePath, { waitUntil: "domcontentloaded", timeout: 20000 });
     // Wait for shell (sidebar) — Solid lazy routes often leave body sparse for >400ms.
@@ -120,11 +134,27 @@ export async function visitAppRoute(page: Page, routePath: string): Promise<Visi
     if (bodyText.length < 20) {
       return { path: routePath, ok: false, detail: "body nearly empty" };
     }
+    if (serverErrors.length) {
+      return {
+        path: routePath,
+        ok: false,
+        detail: `API 5xx during load: ${[...new Set(serverErrors)].slice(0, 3).join("; ")}`,
+      };
+    }
+    if (clientErrors.length) {
+      // Not fatal by itself, but surfaced so silent grid failures are visible.
+      return {
+        path: routePath,
+        ok: true,
+        detail: `API 4xx during load: ${[...new Set(clientErrors)].slice(0, 3).join("; ")}`,
+      };
+    }
     return { path: routePath, ok: true };
   } catch (e) {
     return { path: routePath, ok: false, detail: e instanceof Error ? e.message : String(e) };
   } finally {
     page.off("pageerror", onError);
+    page.off("response", onResponse);
   }
 }
 
@@ -133,6 +163,7 @@ export async function visitRoutesCollectFailures(page: Page, paths: string[]): P
   for (const p of paths) {
     const r = await visitAppRoute(page, p);
     if (!r.ok) failures.push(r);
+    else if (r.detail) console.warn(`[route-smoke] ${p}: ${r.detail}`);
   }
   return failures;
 }

@@ -663,8 +663,8 @@ export const helpScenarioArticles: KbArticle[] = [
         text: "Sent log can succeed while SMTP is misconfigured — check server logs if customers never receive mail.",
       },
     ],
-    primaryHref: "/app/communications",
-    primaryLabel: "Communications",
+    primaryHref: "/app/comms/settings",
+    primaryLabel: "Communications settings",
     relatedGuideIds: ["communications-overview", "document-email-workflow"],
   },
   {
@@ -821,8 +821,8 @@ export const helpScenarioArticles: KbArticle[] = [
         text: "Serial/lot rules on actual receive still apply — schedule does not bypass Track serial counts.",
       },
     ],
-    primaryHref: "/app/wms",
-    primaryLabel: "WMS",
+    primaryHref: "/app/inventory/wms/scheduled-receipts",
+    primaryLabel: "WMS scheduled receipts",
     relatedGuideIds: ["wms-scheduled-receipts", "goods-receipt-serial-receive"],
   },
   {
@@ -847,8 +847,8 @@ export const helpScenarioArticles: KbArticle[] = [
         text: "Portal users cannot post stock or GL. For edits, they contact your team or open a support ticket.",
       },
     ],
-    primaryHref: "/app/portal",
-    primaryLabel: "Portal",
+    primaryHref: "/app/inventory/partners",
+    primaryLabel: "Open Partners (enable portal access)",
     relatedGuideIds: ["customer-portal", "support-tickets"],
   },
   {
@@ -1085,8 +1085,8 @@ export const helpScenarioArticles: KbArticle[] = [
         text: "Import into a demo tenant first when learning mappings. Production imports should be backed up / reversible via purge only when safe.",
       },
     ],
-    primaryHref: "/app/data-ops",
-    primaryLabel: "Data Center",
+    primaryHref: "/app/data-center/inbox",
+    primaryLabel: "Data Center import inbox",
     relatedGuideIds: ["data-center-ingestion", "inventory-master-data"],
   },
 

@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-07-13T23:33:57.683Z",
+  "generatedAt": "2026-07-17T11:59:08.511Z",
   "source": "src/App.tsx",
   "totals": {
-    "all": 258,
-    "smokeable": 214,
+    "all": 282,
+    "smokeable": 233,
     "byKind": {
-      "parametrized": 26,
-      "app_static": 212,
+      "app_static": 221,
+      "parametrized": 31,
       "print_or_doc": 8,
-      "platform": 2,
+      "platform": 12,
       "public": 10
     }
   },
@@ -95,8 +95,13 @@
     "/app/finance/supplier-invoices/new",
     "/app/finance/supplier-invoices/settings",
     "/app/fixed-assets",
+    "/app/hr/attendance",
     "/app/hr/employees",
+    "/app/hr/ess",
+    "/app/hr/pay-items",
     "/app/hr/payroll-runs",
+    "/app/hr/remittances",
+    "/app/hr/special-runs",
     "/app/inventory",
     "/app/inventory/departments",
     "/app/inventory/departments/settings",
@@ -144,6 +149,16 @@
     "/app/operations/packs",
     "/app/operations/timeline",
     "/app/operations/work-items/settings",
+    "/app/platform-command",
+    "/app/platform-command/access",
+    "/app/platform-command/analytics",
+    "/app/platform-command/change-logs",
+    "/app/platform-command/customers",
+    "/app/platform-command/follow-ups",
+    "/app/platform-command/history",
+    "/app/platform-command/onboarding",
+    "/app/platform-command/plans",
+    "/app/platform-command/tickets",
     "/app/platform/customers",
     "/app/platform/plans",
     "/app/pos",
@@ -165,8 +180,12 @@
     "/app/purchase-request/purchase-requests/settings",
     "/app/purchase-request/purchase-requests/status",
     "/app/purchases/purchases",
+    "/app/purchases/purchases/ap-by-vendor",
     "/app/purchases/purchases/new",
+    "/app/purchases/purchases/payment-status",
+    "/app/purchases/purchases/pre-invoicing",
     "/app/purchases/purchases/settings",
+    "/app/purchases/purchases/status",
     "/app/quality/capa",
     "/app/quality/ncrs",
     "/app/quality/qc-requests",
@@ -230,1293 +249,1131 @@
   ],
   "routes": [
     {
-      "path": "/app/*",
-      "source": "*",
-      "kind": "parametrized"
-    },
-    {
       "path": "/app/activity-logs",
-      "source": "/activity-logs",
       "kind": "app_static"
     },
     {
       "path": "/app/activity-logs/changes",
-      "source": "/activity-logs/changes",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/register-repair",
-      "source": "/after-sales/register-repair",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/register-repair/consumption",
-      "source": "/after-sales/register-repair/consumption",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/register-repair/new",
-      "source": "/after-sales/register-repair/new",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/register-repair/status",
-      "source": "/after-sales/register-repair/status",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/repair-orders",
-      "source": "/after-sales/repair-orders",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/repair-orders/:orderId/receipt",
-      "source": "/app/after-sales/repair-orders/:orderId/receipt",
       "kind": "parametrized"
     },
     {
       "path": "/app/after-sales/repair-orders/:orderId/warranty",
-      "source": "/app/after-sales/repair-orders/:orderId/warranty",
       "kind": "parametrized"
     },
     {
       "path": "/app/after-sales/repair-orders/new",
-      "source": "/after-sales/repair-orders/new",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/repair-orders/settings",
-      "source": "/after-sales/repair-orders/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/repair-orders/status",
-      "source": "/after-sales/repair-orders/status",
       "kind": "app_static"
     },
     {
       "path": "/app/after-sales/repair-orders/status/print",
-      "source": "/app/after-sales/repair-orders/status/print",
       "kind": "print_or_doc"
     },
     {
       "path": "/app/buying",
-      "source": "/buying",
       "kind": "app_static"
     },
     {
       "path": "/app/buying/reports/payable-status",
-      "source": "/buying/reports/payable-status",
       "kind": "app_static"
     },
     {
       "path": "/app/buying/reports/pre-invoicing",
-      "source": "/buying/reports/pre-invoicing",
       "kind": "app_static"
     },
     {
       "path": "/app/buying/reports/purchase-status",
-      "source": "/buying/reports/purchase-status",
       "kind": "app_static"
     },
     {
       "path": "/app/comms/inbox",
-      "source": "/comms/inbox",
       "kind": "app_static"
     },
     {
       "path": "/app/comms/sent-documents",
-      "source": "/comms/sent-documents",
       "kind": "app_static"
     },
     {
       "path": "/app/comms/settings",
-      "source": "/comms/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/dashboard",
-      "source": "/crm/dashboard",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/follow-up-tasks",
-      "source": "/crm/follow-up-tasks",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/leads",
-      "source": "/crm/leads",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/notifications",
-      "source": "/crm/notifications",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/opportunities",
-      "source": "/crm/opportunities",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/pipelines/quotations",
-      "source": "/crm/pipelines/quotations",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/reports/conversion",
-      "source": "/crm/reports/conversion",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/reports/customer-quotations",
-      "source": "/crm/reports/customer-quotations",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/reports/expired-quotations",
-      "source": "/crm/reports/expired-quotations",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/reports/item-demand",
-      "source": "/crm/reports/item-demand",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/reports/low-stock",
-      "source": "/crm/reports/low-stock",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/settings/alert-rules",
-      "source": "/crm/settings/alert-rules",
       "kind": "app_static"
     },
     {
       "path": "/app/crm/warranty-assets",
-      "source": "/crm/warranty-assets",
       "kind": "app_static"
     },
     {
       "path": "/app/dashboard",
-      "source": "/app",
       "kind": "app_static"
     },
     {
       "path": "/app/dashboard/approvals",
-      "source": "/dashboard/approvals",
       "kind": "app_static"
     },
     {
       "path": "/app/data-center/inbox",
-      "source": "/data-center/inbox",
       "kind": "app_static"
     },
     {
       "path": "/app/data-center/ingestion-rules",
-      "source": "/data-center/ingestion-rules",
       "kind": "app_static"
     },
     {
       "path": "/app/documentation",
-      "source": "/documentation",
       "kind": "app_static"
     },
     {
       "path": "/app/documentation/:sectionId",
-      "source": "/documentation/:sectionId",
       "kind": "parametrized"
     },
     {
       "path": "/app/documentation/kb",
-      "source": "/documentation/kb",
       "kind": "app_static"
     },
     {
       "path": "/app/documentation/kb/:articleId",
-      "source": "/documentation/kb/:articleId",
       "kind": "parametrized"
     },
     {
       "path": "/app/finance",
-      "source": "/finance",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/bank-reconciliation",
-      "source": "/finance/acct-i/bank-reconciliation",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/chart-of-accounts",
-      "source": "/finance/acct-i/chart-of-accounts",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/fiscal-years",
-      "source": "/finance/acct-i/fiscal-years",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/journal-entries",
-      "source": "/finance/acct-i/journal-entries",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/payment-entries",
-      "source": "/finance/acct-i/payment-entries",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/reports/balance-sheet",
-      "source": "/finance/acct-i/reports/balance-sheet",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/reports/general-ledger",
-      "source": "/finance/acct-i/reports/general-ledger",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/reports/profit-and-loss",
-      "source": "/finance/acct-i/reports/profit-and-loss",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-i/reports/trial-balance",
-      "source": "/finance/acct-i/reports/trial-balance",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-ii/checks",
-      "source": "/finance/acct-ii/checks",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-ii/contracts",
-      "source": "/finance/acct-ii/contracts",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-ii/landed-costs",
-      "source": "/finance/acct-ii/landed-costs",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-ii/notes",
-      "source": "/finance/acct-ii/notes",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/acct-ii/withholding-codes",
-      "source": "/finance/acct-ii/withholding-codes",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/bank-reconciliation",
-      "source": "/finance/bank-reconciliation",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/budgets",
-      "source": "/finance/budgets",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/budgets/:id",
-      "source": "/finance/budgets/:id",
       "kind": "parametrized"
     },
     {
       "path": "/app/finance/chart-of-accounts",
-      "source": "/finance/chart-of-accounts",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/fiscal-years",
-      "source": "/finance/fiscal-years",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/journal-entries",
-      "source": "/finance/journal-entries",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/official-receipts",
-      "source": "/finance/official-receipts",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/official-receipts/new",
-      "source": "/finance/official-receipts/new",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/official-receipts/settings",
-      "source": "/finance/official-receipts/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/payment-entries",
-      "source": "/finance/payment-entries",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/payment-vouchers",
-      "source": "/finance/payment-vouchers",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/payment-vouchers/:id/2307",
-      "source": "/app/finance/payment-vouchers/:id/2307",
       "kind": "parametrized"
     },
     {
       "path": "/app/finance/payment-vouchers/new",
-      "source": "/finance/payment-vouchers/new",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/acct-inventory-reconciliation",
-      "source": "/finance/reports/acct-inventory-reconciliation",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/ap-aging",
-      "source": "/finance/reports/ap-aging",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/ap-by-vendor",
-      "source": "/finance/reports/ap-by-vendor",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/ar-aging",
-      "source": "/finance/reports/ar-aging",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/ar-ap-status",
-      "source": "/finance/reports/ar-ap-status",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/ar-by-customer",
-      "source": "/finance/reports/ar-by-customer",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/balance-sheet",
-      "source": "/finance/reports/balance-sheet",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/budget-vs-actual",
-      "source": "/finance/reports/budget-vs-actual",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/customer-vendor-book-ap",
-      "source": "/finance/reports/customer-vendor-book-ap",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/customer-vendor-book-ar",
-      "source": "/finance/reports/customer-vendor-book-ar",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/general-ledger",
-      "source": "/finance/reports/general-ledger",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/official-receipt-status",
-      "source": "/finance/reports/official-receipt-status",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/profit-and-loss",
-      "source": "/finance/reports/profit-and-loss",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/receipt-status",
-      "source": "/finance/reports/receipt-status",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/supplier-payment-status",
-      "source": "/finance/reports/supplier-payment-status",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/trial-balance",
-      "source": "/finance/reports/trial-balance",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/supplier-invoices",
-      "source": "/finance/supplier-invoices",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/supplier-invoices/:id/print",
-      "source": "/app/finance/supplier-invoices/:id/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/finance/supplier-invoices/new",
-      "source": "/finance/supplier-invoices/new",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/supplier-invoices/settings",
-      "source": "/finance/supplier-invoices/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/fixed-assets",
-      "source": "/fixed-assets",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/attendance",
       "kind": "app_static"
     },
     {
       "path": "/app/hr/employees",
-      "source": "/hr/employees",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/ess",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/pay-items",
       "kind": "app_static"
     },
     {
       "path": "/app/hr/payroll-runs",
-      "source": "/hr/payroll-runs",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/payslips/:payslipId/print",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/hr/remittances",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/special-runs",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory",
-      "source": "/inventory",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/after-sales/*",
-      "source": "/app/inventory/after-sales/*",
       "kind": "parametrized"
     },
     {
       "path": "/app/inventory/departments",
-      "source": "/inventory/departments",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/departments/settings",
-      "source": "/inventory/departments/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/items",
-      "source": "/inventory/items",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/items/settings",
-      "source": "/inventory/items/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/locations",
-      "source": "/inventory/locations",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/locations/settings",
-      "source": "/inventory/locations/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/partners",
-      "source": "/inventory/partners",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/partners/settings",
-      "source": "/inventory/partners/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/price-lists",
-      "source": "/inventory/price-lists",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/product-bundles",
-      "source": "/inventory/product-bundles",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/projects",
-      "source": "/inventory/projects",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/projects/settings",
-      "source": "/inventory/projects/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/reports/inv-book",
-      "source": "/inventory/reports/inv-book",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/reports/on-hand",
-      "source": "/inventory/reports/on-hand",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/reports/stock-ageing",
-      "source": "/inventory/reports/stock-ageing",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/reports/stock-balance",
-      "source": "/inventory/reports/stock-balance",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/reports/stock-ledger",
-      "source": "/inventory/reports/stock-ledger",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/adjustment",
-      "source": "/inventory/serial-lot/adjustment",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/lot-adjustment",
-      "source": "/inventory/serial-lot/lot-adjustment",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/lots",
-      "source": "/inventory/serial-lot/lots",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/manufacturing/boms",
-      "source": "/inventory/serial-lot/manufacturing/boms",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/manufacturing/work-orders",
-      "source": "/inventory/serial-lot/manufacturing/work-orders",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/movements",
-      "source": "/inventory/serial-lot/movements",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/receive",
-      "source": "/inventory/serial-lot/receive",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/registry",
-      "source": "/inventory/serial-lot/registry",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/reports/balance",
-      "source": "/inventory/serial-lot/reports/balance",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/reports/book",
-      "source": "/inventory/serial-lot/reports/book",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/reports/reconciliation",
-      "source": "/inventory/serial-lot/reports/reconciliation",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/reports/status",
-      "source": "/inventory/serial-lot/reports/status",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/settings",
-      "source": "/inventory/serial-lot/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/serial-lot/trace",
-      "source": "/inventory/serial-lot/trace",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/stock-entries",
-      "source": "/inventory/stock-entries",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/stock-movements",
-      "source": "/inventory/stock-movements",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/stock-reconciliation",
-      "source": "/inventory/stock-reconciliation",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/wms/scheduled-receipts",
-      "source": "/inventory/wms/scheduled-receipts",
       "kind": "app_static"
     },
     {
       "path": "/app/job-costing",
-      "source": "/job-costing",
       "kind": "app_static"
     },
     {
       "path": "/app/manufacturing/boms",
-      "source": "/manufacturing/boms",
       "kind": "app_static"
     },
     {
       "path": "/app/manufacturing/work-orders",
-      "source": "/manufacturing/work-orders",
       "kind": "app_static"
     },
     {
       "path": "/app/onboarding",
-      "source": "/onboarding",
       "kind": "app_static"
     },
     {
       "path": "/app/operations",
-      "source": "/operations",
       "kind": "app_static"
     },
     {
       "path": "/app/operations/automation",
-      "source": "/operations/automation",
       "kind": "app_static"
     },
     {
       "path": "/app/operations/calendar",
-      "source": "/operations/calendar",
       "kind": "app_static"
     },
     {
       "path": "/app/operations/dashboard",
-      "source": "/operations/dashboard",
       "kind": "app_static"
     },
     {
       "path": "/app/operations/packs",
-      "source": "/operations/packs",
       "kind": "app_static"
     },
     {
       "path": "/app/operations/timeline",
-      "source": "/operations/timeline",
       "kind": "app_static"
     },
     {
       "path": "/app/operations/work-items/settings",
-      "source": "/operations/work-items/settings",
       "kind": "app_static"
     },
     {
+      "path": "/app/platform-command",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/access",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/analytics",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/change-logs",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/customers",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/customers/:id",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/platform-command/customers/:id/analytics",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/platform-command/follow-ups",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/history",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/onboarding",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/plans",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/plans/:id",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/platform-command/tickets",
+      "kind": "platform"
+    },
+    {
+      "path": "/app/platform-command/tickets/:id",
+      "kind": "parametrized"
+    },
+    {
       "path": "/app/platform/customers",
-      "source": "/platform/customers",
       "kind": "platform"
     },
     {
       "path": "/app/platform/customers/:id",
-      "source": "/platform/customers/:id",
       "kind": "parametrized"
     },
     {
       "path": "/app/platform/plans",
-      "source": "/platform/plans",
       "kind": "platform"
     },
     {
       "path": "/app/platform/plans/:id",
-      "source": "/platform/plans/:id",
       "kind": "parametrized"
     },
     {
       "path": "/app/pos",
-      "source": "/app/pos",
       "kind": "app_static"
     },
     {
       "path": "/app/pos/manage",
-      "source": "/pos/manage",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/goods-receipt",
-      "source": "/purchase-order/goods-receipt",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/goods-receipt/settings",
-      "source": "/purchase-order/goods-receipt/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/purchase-orders",
-      "source": "/purchase-order/purchase-orders",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/purchase-orders/:purchaseOrderId/print",
-      "source": "/app/purchase-order/purchase-orders/:purchaseOrderId/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/purchase-order/purchase-orders/outstanding",
-      "source": "/purchase-order/purchase-orders/outstanding",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/purchase-orders/settings",
-      "source": "/purchase-order/purchase-orders/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/purchase-orders/status",
-      "source": "/purchase-order/purchase-orders/status",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/purchase-returns",
-      "source": "/purchase-order/purchase-returns",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/reports/items-to-receive",
-      "source": "/purchase-order/reports/items-to-receive",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/reports/po-analysis",
-      "source": "/purchase-order/reports/po-analysis",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/rfq",
-      "source": "/purchase-order/rfq",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/rfq/:id",
-      "source": "/purchase-order/rfq/:id",
       "kind": "parametrized"
     },
     {
       "path": "/app/purchase-order/rfq/:rfqId/print",
-      "source": "/app/purchase-order/rfq/:rfqId/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/purchase-order/supplier-quotations/:sqId/print",
-      "source": "/app/purchase-order/supplier-quotations/:sqId/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/purchase-request/goods-receipt",
-      "source": "/purchase-request/goods-receipt",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-request/purchase-orders",
-      "source": "/purchase-request/purchase-orders",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-request/purchase-requests",
-      "source": "/purchase-request/purchase-requests",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-request/purchase-requests/:purchaseRequestId/print",
-      "source": "/app/purchase-request/purchase-requests/:purchaseRequestId/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/purchase-request/purchase-requests/new",
-      "source": "/purchase-request/purchase-requests/new",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-request/purchase-requests/settings",
-      "source": "/purchase-request/purchase-requests/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-request/purchase-requests/status",
-      "source": "/purchase-request/purchase-requests/status",
       "kind": "app_static"
     },
     {
       "path": "/app/purchase-request/purchase-requests/status/print",
-      "source": "/app/purchase-request/purchase-requests/status/print",
       "kind": "print_or_doc"
     },
     {
       "path": "/app/purchases/purchases",
-      "source": "/purchases/purchases",
       "kind": "app_static"
     },
     {
       "path": "/app/purchases/purchases/:id/print",
-      "source": "/app/purchases/purchases/:id/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/purchases/purchases/:purchaseId/print-doc",
-      "source": "/app/purchases/purchases/:purchaseId/print-doc",
       "kind": "parametrized"
     },
     {
+      "path": "/app/purchases/purchases/ap-by-vendor",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/purchases/purchases/new",
-      "source": "/purchases/purchases/new",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/purchases/purchases/payment-status",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/purchases/purchases/pre-invoicing",
       "kind": "app_static"
     },
     {
       "path": "/app/purchases/purchases/settings",
-      "source": "/purchases/purchases/settings",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/purchases/purchases/status",
       "kind": "app_static"
     },
     {
       "path": "/app/quality/capa",
-      "source": "/quality/capa",
       "kind": "app_static"
     },
     {
       "path": "/app/quality/ncrs",
-      "source": "/quality/ncrs",
       "kind": "app_static"
     },
     {
       "path": "/app/quality/qc-requests",
-      "source": "/quality/qc-requests",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/quotations",
-      "source": "/quotation/quotations",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/quotations/:quotationId/print",
-      "source": "/app/quotation/quotations/:quotationId/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/quotation/quotations/new",
-      "source": "/quotation/quotations/new",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/quotations/outstanding",
-      "source": "/quotation/quotations/outstanding",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/quotations/settings",
-      "source": "/quotation/quotations/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/quotations/status",
-      "source": "/quotation/quotations/status",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/quotations/status/print",
-      "source": "/app/quotation/quotations/status/print",
       "kind": "print_or_doc"
     },
     {
       "path": "/app/quotation/tax-mngt/currencies",
-      "source": "/quotation/tax-mngt/currencies",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/tax-mngt/currencies/settings",
-      "source": "/quotation/tax-mngt/currencies/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/tax-mngt/tax-types",
-      "source": "/quotation/tax-mngt/tax-types",
       "kind": "app_static"
     },
     {
       "path": "/app/quotation/tax-mngt/tax-types/settings",
-      "source": "/quotation/tax-mngt/tax-types/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/reports",
-      "source": "/reports",
       "kind": "app_static"
     },
     {
       "path": "/app/reports/saved-views",
-      "source": "/reports/saved-views",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/delivery-receipts",
-      "source": "/sales-order/delivery-receipts",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/delivery-receipts/new",
-      "source": "/sales-order/delivery-receipts/new",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/reports/pending-shipment",
-      "source": "/sales-order/reports/pending-shipment",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/reports/shipment-status",
-      "source": "/sales-order/reports/shipment-status",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/reports/shipping-order-status",
-      "source": "/sales-order/reports/shipping-order-status",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/reports/so-analysis",
-      "source": "/sales-order/reports/so-analysis",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/sales-orders",
-      "source": "/sales-order/sales-orders",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/sales-orders/:salesOrderId/print",
-      "source": "/app/sales-order/sales-orders/:salesOrderId/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/sales-order/sales-orders/new",
-      "source": "/sales-order/sales-orders/new",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/sales-orders/outstanding",
-      "source": "/sales-order/sales-orders/outstanding",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/sales-orders/release",
-      "source": "/sales-order/sales-orders/release",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/sales-orders/settings",
-      "source": "/sales-order/sales-orders/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/sales-orders/status",
-      "source": "/sales-order/sales-orders/status",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/sales-orders/status/print",
-      "source": "/app/sales-order/sales-orders/status/print",
       "kind": "print_or_doc"
     },
     {
       "path": "/app/sales-order/shipping/orders",
-      "source": "/sales-order/shipping/orders",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/shipping/rules",
-      "source": "/sales-order/shipping/rules",
       "kind": "app_static"
     },
     {
       "path": "/app/sales-order/shipping/trips",
-      "source": "/sales-order/shipping/trips",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/collective-invoicing/:id/invoice/print",
-      "source": "/app/sales/collective-invoicing/:id/invoice/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/sales/collective-invoicing/:id/slip/print",
-      "source": "/app/sales/collective-invoicing/:id/slip/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/sales/collective-invoicing/list",
-      "source": "/sales/collective-invoicing/list",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/collective-invoicing/status",
-      "source": "/sales/collective-invoicing/status",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/collective-invoicing/status/print",
-      "source": "/app/sales/collective-invoicing/status/print",
       "kind": "print_or_doc"
     },
     {
       "path": "/app/sales/commission-rules",
-      "source": "/sales/commission-rules",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/reports/ar-by-customer",
-      "source": "/sales/reports/ar-by-customer",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/reports/customer-credit-balance",
-      "source": "/sales/reports/customer-credit-balance",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/reports/discount-status",
-      "source": "/sales/reports/discount-status",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/reports/discount-status/print",
-      "source": "/app/sales/reports/discount-status/print",
       "kind": "print_or_doc"
     },
     {
       "path": "/app/sales/reports/official-receipt-status",
-      "source": "/sales/reports/official-receipt-status",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/reports/print-slips",
-      "source": "/sales/reports/print-slips",
       "kind": "print_or_doc"
     },
     {
       "path": "/app/sales/reports/print-slips/print",
-      "source": "/app/sales/reports/print-slips/print",
       "kind": "print_or_doc"
     },
     {
       "path": "/app/sales/reports/si-receipt-status",
-      "source": "/sales/reports/si-receipt-status",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/sales",
-      "source": "/sales/sales",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/sales-returns",
-      "source": "/sales/sales-returns",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/sales/:id/invoice/print",
-      "source": "/app/sales/sales/:id/invoice/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/sales/sales/:id/print",
-      "source": "/app/sales/sales/:id/print",
       "kind": "parametrized"
     },
     {
       "path": "/app/sales/sales/new",
-      "source": "/sales/sales/new",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/sales/pre-invoicing",
-      "source": "/sales/sales/pre-invoicing",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/sales/price-batch",
-      "source": "/sales/sales/price-batch",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/sales/settings",
-      "source": "/sales/sales/settings",
       "kind": "app_static"
     },
     {
       "path": "/app/sales/sales/status",
-      "source": "/sales/sales/status",
       "kind": "app_static"
     },
     {
       "path": "/app/selling",
-      "source": "/selling",
       "kind": "app_static"
     },
     {
       "path": "/app/selling/reports",
-      "source": "/selling/reports",
       "kind": "app_static"
     },
     {
       "path": "/app/selling/reports/receivable-status",
-      "source": "/selling/reports/receivable-status",
       "kind": "app_static"
     },
     {
       "path": "/app/settings/billing",
-      "source": "/settings/billing",
       "kind": "app_static"
     },
     {
       "path": "/app/settings/branding",
-      "source": "/settings/branding",
       "kind": "app_static"
     },
     {
       "path": "/app/setup",
-      "source": "/setup",
       "kind": "app_static"
     },
     {
       "path": "/app/setup/*",
-      "source": "/setup/*",
       "kind": "parametrized"
     },
     {
       "path": "/app/support/tickets",
-      "source": "/support/tickets",
       "kind": "app_static"
     },
     {
       "path": "/app/support/tickets/:id",
-      "source": "/support/tickets/:id",
       "kind": "parametrized"
     },
     {
       "path": "/app/user-management/demo-data",
-      "source": "/user-management/demo-data",
       "kind": "app_static"
     },
     {
       "path": "/app/user-management/groups",
-      "source": "/user-management/groups",
       "kind": "app_static"
     },
     {
       "path": "/app/user-management/help-feedback",
-      "source": "/user-management/help-feedback",
       "kind": "app_static"
     },
     {
       "path": "/app/user-management/mapping-center",
-      "source": "/user-management/mapping-center",
       "kind": "app_static"
     },
     {
       "path": "/app/user-management/process-policies",
-      "source": "/user-management/process-policies",
       "kind": "app_static"
     },
     {
       "path": "/app/user-management/roles",
-      "source": "/user-management/roles",
       "kind": "app_static"
     },
     {
       "path": "/app/user-management/tenant-modules",
-      "source": "/user-management/tenant-modules",
       "kind": "app_static"
     },
     {
       "path": "/app/user-management/user-permissions",
-      "source": "/user-management/user-permissions",
       "kind": "app_static"
     },
     {
       "path": "/app/user-management/users",
-      "source": "/user-management/users",
       "kind": "app_static"
     },
     {
       "path": "/auth/callback",
-      "source": "/auth/callback",
       "kind": "public"
     },
     {
       "path": "/auth/login",
-      "source": "/auth/login",
       "kind": "public"
     },
     {
       "path": "/auth/reset-password",
-      "source": "/auth/reset-password",
       "kind": "public"
     },
     {
       "path": "/demo",
-      "source": "/demo",
       "kind": "public"
     },
     {
       "path": "/forgot-password",
-      "source": "/forgot-password",
       "kind": "public"
     },
     {
+      "path": "/payslip/:token",
+      "kind": "parametrized"
+    },
+    {
       "path": "/portal/dashboard",
-      "source": "/portal/dashboard",
       "kind": "public"
     },
     {
       "path": "/portal/login",
-      "source": "/portal/login",
       "kind": "public"
     },
     {
       "path": "/signin",
-      "source": "/signin",
       "kind": "public"
     },
     {
       "path": "/signup",
-      "source": "/signup",
       "kind": "public"
     },
     {
       "path": "/welcome",
-      "source": "/welcome",
       "kind": "public"
     }
   ]

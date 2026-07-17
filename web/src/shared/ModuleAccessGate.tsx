@@ -5,7 +5,7 @@ import { isTenantModuleEnabled } from "./moduleAccess";
 import { permissionCodeForHref } from "./permissionCodes";
 import { resolveModule } from "../shell/modules";
 
-const OPEN_PREFIXES = ["/app/setup", "/app/user-management/branding", "/app/hr/ess"];
+const OPEN_PREFIXES = ["/app/setup", "/app/settings/branding", "/app/hr/ess"];
 
 function isOpenPath(pathname: string): boolean {
   return OPEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));

@@ -1,42 +1,77 @@
 /**
  * Extract SPA routes from src/App.tsx into e2e/fixtures/app-routes.json.
- * Nested paths under <Route path="/app"> become /app/... absolute URLs.
+ *
+ * Nesting-aware: container routes (e.g. <Route path="/app" component={AppLayout}>
+ * or <Route path="/app/platform-command" component={PlatformCommandShell}>)
+ * prefix their children, so /analytics under platform-command resolves to
+ * /app/platform-command/analytics — not /app/analytics.
  *
  * Usage: node e2e/scripts/extract-app-routes.mjs
+ * Also imported by src/routes/linkIntegrity.test.ts as the single source of truth.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const webRoot = path.resolve(__dirname, "../..");
-const appTsx = path.join(webRoot, "src/App.tsx");
-const outFile = path.join(webRoot, "e2e/fixtures/app-routes.json");
+/** Join a container prefix and a child route path. */
+function joinRoute(prefix, p) {
+  if (!prefix) return p;
+  if (p === "/" || p === "") return prefix;
+  return `${prefix}${p.startsWith("/") ? p : `/${p}`}`;
+}
 
-const src = fs.readFileSync(appTsx, "utf8");
-const pathRe = /path="([^"]+)"/g;
-const raw = [];
-let m;
-while ((m = pathRe.exec(src)) !== null) raw.push(m[1]);
+/**
+ * Parse App.tsx line by line, tracking container routes.
+ * A container is a <Route path="..."> line ending with `>` (has children),
+ * closed later by a matching </Route> at the same depth.
+ */
+export function extractRouteEntries(src) {
+  const containerOpenRe = /^\s*<Route\s+path="([^"]+)"[^>]*component=\{\w+\}>\s*$/;
+  const routePathRe = /<Route\s+path="([^"]+)"/;
+  const stack = [];
+  const raw = [];
 
-/** Resolve Solid nested routes under /app layout to full browser paths. */
-function toAbsolute(p) {
-  if (p === "/" || p === "") return null;
-  if (p.startsWith("/app") || p === "/app") return p === "/app" ? "/app/dashboard" : p;
-  if (
-    p.startsWith("/signin") ||
-    p.startsWith("/signup") ||
-    p.startsWith("/demo") ||
-    p.startsWith("/welcome") ||
-    p.startsWith("/auth/") ||
-    p.startsWith("/forgot-password") ||
-    p.startsWith("/portal/")
-  ) {
-    return p;
+  for (const line of src.split("\n")) {
+    const open = containerOpenRe.exec(line);
+    if (open) {
+      stack.push(joinRoute(stack[stack.length - 1] ?? "", open[1]));
+      continue;
+    }
+    if (/^\s*<\/Route>\s*$/.test(line)) {
+      stack.pop();
+      continue;
+    }
+    const m = routePathRe.exec(line);
+    if (m) raw.push(joinRoute(stack[stack.length - 1] ?? "", m[1]));
   }
-  // Nested under AppLayout: "/dashboard" → "/app/dashboard"
-  if (p.startsWith("/")) return `/app${p}`;
-  return `/app/${p}`;
+  return raw;
+}
+
+/** Resolve extracted paths to absolute browser paths. */
+export function extractAbsoluteRoutes(src) {
+  const seen = new Set();
+  for (const p of extractRouteEntries(src)) {
+    if (p === "/" || p === "" || p === "*" || p === "/*") continue;
+    if (p.startsWith("/app")) {
+      seen.add(p);
+    } else if (
+      p.startsWith("/signin") ||
+      p.startsWith("/signup") ||
+      p.startsWith("/demo") ||
+      p.startsWith("/welcome") ||
+      p.startsWith("/auth/") ||
+      p.startsWith("/forgot-password") ||
+      p.startsWith("/portal/")
+    ) {
+      seen.add(p);
+    } else if (p.startsWith("/")) {
+      // Top-level route outside any container (public pages).
+      seen.add(p);
+    } else {
+      seen.add(`/${p}`);
+    }
+  }
+  return [...seen];
 }
 
 function classify(abs) {
@@ -50,39 +85,37 @@ function classify(abs) {
   return "app_static";
 }
 
-const seen = new Set();
-const routes = [];
-for (const p of raw) {
-  const abs = toAbsolute(p);
-  if (!abs || abs === "/app/" || seen.has(abs)) continue;
-  seen.add(abs);
-  routes.push({
-    path: abs,
-    source: p,
-    kind: classify(abs),
-  });
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const webRoot = path.resolve(__dirname, "../..");
+  const appTsx = path.join(webRoot, "src/App.tsx");
+  const outFile = path.join(webRoot, "e2e/fixtures/app-routes.json");
+
+  const src = fs.readFileSync(appTsx, "utf8");
+  const routes = extractAbsoluteRoutes(src)
+    .map((abs) => ({ path: abs, kind: classify(abs) }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+
+  const smokeable = routes.filter((r) => r.kind === "app_static" || r.kind === "platform").map((r) => r.path);
+
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    source: "src/App.tsx",
+    totals: {
+      all: routes.length,
+      smokeable: smokeable.length,
+      byKind: routes.reduce((acc, r) => {
+        acc[r.kind] = (acc[r.kind] ?? 0) + 1;
+        return acc;
+      }, {}),
+    },
+    smokeable,
+    routes,
+  };
+
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(outFile, JSON.stringify(payload, null, 2) + "\n");
+  console.log(`Wrote ${outFile}`);
+  console.log(JSON.stringify(payload.totals, null, 2));
 }
-
-routes.sort((a, b) => a.path.localeCompare(b.path));
-
-const smokeable = routes.filter((r) => r.kind === "app_static" || r.kind === "platform").map((r) => r.path);
-
-const payload = {
-  generatedAt: new Date().toISOString(),
-  source: "src/App.tsx",
-  totals: {
-    all: routes.length,
-    smokeable: smokeable.length,
-    byKind: routes.reduce((acc, r) => {
-      acc[r.kind] = (acc[r.kind] ?? 0) + 1;
-      return acc;
-    }, {}),
-  },
-  smokeable,
-  routes,
-};
-
-fs.mkdirSync(path.dirname(outFile), { recursive: true });
-fs.writeFileSync(outFile, JSON.stringify(payload, null, 2) + "\n");
-console.log(`Wrote ${outFile}`);
-console.log(JSON.stringify(payload.totals, null, 2));
