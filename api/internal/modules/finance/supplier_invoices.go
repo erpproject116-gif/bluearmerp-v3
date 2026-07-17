@@ -13,8 +13,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -80,18 +82,18 @@ type supplierInvoiceLineBody struct {
 	GoodsReceiptLineID  *int64  `json:"goods_receipt_line_id"`
 	PurchaseOrderLineID *int64  `json:"purchase_order_line_id"`
 	ItemID              *int64  `json:"item_id"`
-	ItemCode           string  `json:"item_code"`
-	ItemName           string  `json:"item_name"`
-	Description        *string `json:"description"`
-	Qty                float64 `json:"qty"`
-	UnitPrice          float64 `json:"unit_price"`
-	InputBasis         string  `json:"input_basis"`
-	UnitNonVat         float64 `json:"unit_non_vat"`
-	NonVatTotal        float64 `json:"non_vat_total"`
-	TaxAmount          float64 `json:"tax_amount"`
-	UnitVatInc         float64 `json:"unit_vat_inc"`
-	LineTotal          float64 `json:"line_total"`
-	Remark             *string `json:"remark"`
+	ItemCode            string  `json:"item_code"`
+	ItemName            string  `json:"item_name"`
+	Description         *string `json:"description"`
+	Qty                 float64 `json:"qty"`
+	UnitPrice           float64 `json:"unit_price"`
+	InputBasis          string  `json:"input_basis"`
+	UnitNonVat          float64 `json:"unit_non_vat"`
+	NonVatTotal         float64 `json:"non_vat_total"`
+	TaxAmount           float64 `json:"tax_amount"`
+	UnitVatInc          float64 `json:"unit_vat_inc"`
+	LineTotal           float64 `json:"line_total"`
+	Remark              *string `json:"remark"`
 }
 
 type supplierInvoiceBody struct {
@@ -284,6 +286,7 @@ type openGRLineRow struct {
 }
 
 func registerSupplierInvoiceRoutes(r chi.Router, pool *pgxpool.Pool) {
+	documentlifecycle.RegisterRoutes(r, pool, "/supplier-invoices", documentlifecycle.SupplierInvoiceConfig())
 	r.Get("/supplier-invoices/preview-sequences", previewSupplierInvoiceSequences(pool))
 	r.Get("/supplier-invoices/open-gr-lines", listOpenGRLines(pool))
 	r.Get("/supplier-invoices/open-po-lines", listOpenPOLines(pool))
@@ -409,7 +412,12 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "invoice_date", allowed)
 		offset := httputil.Offset(p)
 
-		where := "si.tenant_id = $1 and si.deleted_at is null"
+		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "si")
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where := "si.tenant_id = $1 and " + lifecycleWhere
 		args := []any{tu.TenantID}
 		argN := 2
 		if p.Q != "" {
@@ -507,6 +515,10 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 
 func getSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var ok bool
+		if r, ok = documentlifecycle.PrepareDetailRequest(w, r); !ok {
+			return
+		}
 		tu, _ := auth.FromContext(r.Context())
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
@@ -543,7 +555,7 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		left join public.quo_tax_types tt on tt.id = si.tax_type_id
 		left join public.inv_locations l on l.id = si.location_id
 		left join public.users u on u.id = si.created_by_user_id
-		where si.id = $1 and si.tenant_id = $2 and si.deleted_at is null`,
+		where si.id = $1 and si.tenant_id = $2 and `+documentlifecycle.DetailPredicate(ctx, "si"),
 		id, tenantID).Scan(
 		&inv.ID, &invoiceDate, &inv.DateSeq, &inv.InvoiceNo,
 		&inv.TaxTypeID, &inv.TaxTypeName,
@@ -596,43 +608,43 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 	return inv, nil
 }
 
-func grLineBalance(ctx context.Context, tx pgx.Tx, tenantID, grLineID int64) (float64, int64, int64, error) {
+func grLineBalance(ctx context.Context, tx pgx.Tx, tenantID, grLineID int64) (float64, int64, int64, int64, error) {
 	var receivedQty float64
-	var poLineID int64
+	var poLineID, poID int64
 	var partnerID int64
 	err := tx.QueryRow(ctx, `
-		select grl.received_qty::float8, grl.purchase_order_line_id, po.partner_id
+		select grl.received_qty::float8, grl.purchase_order_line_id, po.id, po.partner_id
 		from public.gr_goods_receipt_lines grl
 		join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
 		join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
 		join public.po_purchase_orders po on po.id = pol.purchase_order_id
 		where grl.id = $1 and gr.tenant_id = $2 and gr.status = 'posted'`,
-		grLineID, tenantID).Scan(&receivedQty, &poLineID, &partnerID)
+		grLineID, tenantID).Scan(&receivedQty, &poLineID, &poID, &partnerID)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, err
 	}
 	var billed float64
 	_ = tx.QueryRow(ctx, `
 		select coalesce(sum(qty), 0)::float8
 		from public.gr_goods_receipt_slip_lines
 		where goods_receipt_line_id = $1 and slip_type = 'supplier_invoice'`, grLineID).Scan(&billed)
-	return receivedQty - billed, poLineID, partnerID, nil
+	return receivedQty - billed, poLineID, poID, partnerID, nil
 }
 
-func poLineBalance(ctx context.Context, tx pgx.Tx, tenantID, poLineID int64) (float64, int64, error) {
+func poLineBalance(ctx context.Context, tx pgx.Tx, tenantID, poLineID int64) (float64, int64, int64, error) {
 	var orderedQty, billedQty float64
-	var partnerID int64
+	var poID, partnerID int64
 	err := tx.QueryRow(ctx, `
-		select pol.qty::float8, coalesce(pol.billed_qty, 0)::float8, po.partner_id
+		select pol.qty::float8, coalesce(pol.billed_qty, 0)::float8, po.id, po.partner_id
 		from public.po_purchase_order_lines pol
 		join public.po_purchase_orders po on po.id = pol.purchase_order_id
 		where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null
 		  and po.status in ('confirmed', 'partially_received', 'received')`,
-		poLineID, tenantID).Scan(&orderedQty, &billedQty, &partnerID)
+		poLineID, tenantID).Scan(&orderedQty, &billedQty, &poID, &partnerID)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
-	return orderedQty - billedQty, partnerID, nil
+	return orderedQty - billedQty, poID, partnerID, nil
 }
 
 func validateSupplierInvoiceBody(body supplierInvoiceBody) map[string]string {
@@ -675,16 +687,39 @@ func validateSupplierInvoiceBody(body supplierInvoiceBody) map[string]string {
 	return nil
 }
 
-func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, partnerID int64, requireGR bool, lines []supplierInvoiceLineBody) map[string]string {
+func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, partnerID int64, policy processpolicy.Policy, lines []supplierInvoiceLineBody) map[string]string {
 	errs := map[string]string{}
 	seenGR := map[int64]bool{}
 	seenPO := map[int64]bool{}
+	// Cache PO approval decisions so each purchase order is checked once.
+	poApprovalErr := map[int64]string{}
+	checkPOApproval := func(poID int64) string {
+		if !policy.PurchaseRequirePOApproval {
+			return ""
+		}
+		if msg, ok := poApprovalErr[poID]; ok {
+			return msg
+		}
+		status, found, err := approval.Status(ctx, tx, tenantID, "purchase_order", poID)
+		if err != nil {
+			poApprovalErr[poID] = "Failed to verify purchase order approval."
+			return poApprovalErr[poID]
+		}
+		msg := ""
+		if v := processpolicy.ValidatePurchaseOrderApproval(policy, found, status); v != nil {
+			msg = v["purchase_order_id"]
+		}
+		poApprovalErr[poID] = msg
+		return msg
+	}
 	for i, ln := range lines {
 		key := fmt.Sprintf("lines[%d]", i)
 		hasGR := ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0
 		hasPO := ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0
-		if requireGR && !hasGR && !hasPO {
-			errs[key+".goods_receipt_line_id"] = "Goods receipt or purchase order line is required."
+		// GR-before-invoice policy requires every line to carry a posted goods
+		// receipt line; PO-only lines are rejected because they bypass receiving.
+		if v := processpolicy.ValidateSupplierInvoiceLineSource(policy, hasGR); v != nil {
+			errs[key+".goods_receipt_line_id"] = v["goods_receipt_line_id"]
 			continue
 		}
 		if hasGR {
@@ -693,7 +728,7 @@ func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, part
 				continue
 			}
 			seenGR[*ln.GoodsReceiptLineID] = true
-			balance, _, linePartnerID, err := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
+			balance, _, poID, linePartnerID, err := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
 			if err != nil {
 				errs[key+".goods_receipt_line_id"] = "Goods receipt line not found or not posted."
 				continue
@@ -704,6 +739,9 @@ func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, part
 			if ln.Qty > balance+0.0001 {
 				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds GR balance (%.4f).", balance)
 			}
+			if msg := checkPOApproval(poID); msg != "" {
+				errs[key+".goods_receipt_line_id"] = msg
+			}
 			continue
 		}
 		if hasPO {
@@ -712,7 +750,7 @@ func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, part
 				continue
 			}
 			seenPO[*ln.PurchaseOrderLineID] = true
-			balance, linePartnerID, err := poLineBalance(ctx, tx, tenantID, *ln.PurchaseOrderLineID)
+			balance, poID, linePartnerID, err := poLineBalance(ctx, tx, tenantID, *ln.PurchaseOrderLineID)
 			if err != nil {
 				errs[key+".purchase_order_line_id"] = "Purchase order line not found or not confirmed."
 				continue
@@ -722,6 +760,9 @@ func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, part
 			}
 			if ln.Qty > balance+0.0001 {
 				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds PO balance (%.4f).", balance)
+			}
+			if msg := checkPOApproval(poID); msg != "" {
+				errs[key+".purchase_order_line_id"] = msg
 			}
 		}
 	}
@@ -771,7 +812,7 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		if errs := validateSupplierInvoiceLines(r.Context(), tx, tu.TenantID, body.PartnerID, policy.PurchaseRequireGRBeforeSupplierInv, body.Lines); errs != nil {
+		if errs := validateSupplierInvoiceLines(r.Context(), tx, tu.TenantID, body.PartnerID, policy, body.Lines); errs != nil {
 			response.Validation(w, errs)
 			return
 		}
@@ -780,6 +821,10 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		dueDate, err := parseOptionalDate(body.DueDate)
 		if err != nil {
 			response.Validation(w, map[string]string{"due_date": "Invalid date."})
+			return
+		}
+		if strings.TrimSpace(body.ProgressStatus) == "e_approval" {
+			response.Validation(w, map[string]string{"progress_status": "Save as Unconfirmed, then use Submit for approval."})
 			return
 		}
 		progress := defaultSupplierInvoiceProgress(body.ProgressStatus)
@@ -839,14 +884,12 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func deleteSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		softDelete(pool, w, r, "fin_supplier_invoices", "finance.supplier_invoice.delete", "fin_supplier_invoice")
-	}
+	return documentlifecycle.DeleteHandler(pool, documentlifecycle.SupplierInvoiceConfig())
 }
 
 func resolveSupplierInvoiceLineItem(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody) (itemID *int64, itemCode, itemName string, poLineID *int64, err error) {
 	if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
-		_, polID, _, grErr := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
+		_, polID, _, _, grErr := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
 		if grErr != nil {
 			return nil, "", "", nil, grErr
 		}
@@ -1003,12 +1046,16 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		if errs := validateSupplierInvoiceLines(r.Context(), tx, tu.TenantID, body.PartnerID, policy.PurchaseRequireGRBeforeSupplierInv, body.Lines); errs != nil {
+		if errs := validateSupplierInvoiceLines(r.Context(), tx, tu.TenantID, body.PartnerID, policy, body.Lines); errs != nil {
 			response.Validation(w, errs)
 			return
 		}
 
 		subtotal, taxTotal, grandTotal := sumSupplierInvoiceTotals(body.Lines)
+		if strings.TrimSpace(body.ProgressStatus) == "e_approval" {
+			response.Validation(w, map[string]string{"progress_status": "Use Submit for approval instead of changing the status directly."})
+			return
+		}
 		progress := defaultSupplierInvoiceProgress(body.ProgressStatus)
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, progress, id); v != nil {
 			response.Validation(w, v)

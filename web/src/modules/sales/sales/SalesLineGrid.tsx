@@ -5,6 +5,9 @@ import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { LotLineCell } from "../../../shared/LotLineCell";
+import { DocumentSerialScanBar } from "../../../shared/DocumentSerialScanBar";
+import type { ResolvedSerialUnit } from "../../../shared/serialScanTypes";
+import { useToast } from "../../../shared/toast";
 import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
@@ -194,6 +197,7 @@ type Props = {
 };
 
 export function SalesLineGrid(props: Props) {
+  const toast = useToast();
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchLineIdx, setSearchLineIdx] = createSignal<number | null>(null);
   const lineLabels = useColumnLabelSettings(`${SALES_ENTITY.sales}.lines`);
@@ -325,6 +329,75 @@ export function SalesLineGrid(props: Props) {
     });
   };
 
+  const applySerialUnits = async (units: ResolvedSerialUnit[]) => {
+    const meta = props.taxTypeMeta();
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const pid = props.partnerId?.() ?? null;
+    let current = [...props.lines()];
+    let added = 0;
+
+    for (const u of units) {
+      const alreadyOnDoc = current.some((ln) => (ln.serial_unit_ids ?? []).includes(u.serial_unit_id));
+      if (alreadyOnDoc) {
+        toast.warning(`${u.serial_no} is already on this sale.`);
+        continue;
+      }
+
+      const sameItemIdx = current.findIndex(
+        (ln) => ln.item_id === u.item_id && Boolean(ln.track_serial),
+      );
+      if (sameItemIdx >= 0) {
+        const ln = current[sameItemIdx];
+        const ids = [...(ln.serial_unit_ids ?? []), u.serial_unit_id];
+        const labels = [ln.serial_lot_no, u.serial_no].filter(Boolean).join(", ");
+        current[sameItemIdx] = {
+          ...ln,
+          serial_unit_ids: ids,
+          serial_lot_no: labels,
+          qty: String(ids.length),
+          track_serial: true,
+        };
+        added++;
+        continue;
+      }
+
+      const emptyIdx = current.findIndex((ln) => !ln.item_id && !(ln.item_code || "").trim());
+      const rate = (await resolveItemRate(pid, u.item_id)) ?? 0;
+      const patch: Partial<SalesLineRow> = {
+        item_id: u.item_id,
+        item_code: u.item_code,
+        item_name: u.item_name,
+        unit_price: String(rate),
+        input_basis: basis,
+        track_serial: true,
+        track_lot: false,
+        serial_policy: "required",
+        serial_unit_ids: [u.serial_unit_id],
+        serial_lot_no: u.serial_no,
+        qty: "1",
+      };
+      if (emptyIdx >= 0) {
+        current[emptyIdx] = { ...current[emptyIdx], ...patch };
+      } else {
+        current.push({ ...emptySalesLine(current.length + 1, String(rate), basis), ...patch });
+      }
+      added++;
+    }
+
+    if (added === 0) return;
+    const numbered = current.map((ln, i) => ({ ...ln, line_no: i + 1 }));
+    props.onChange(numbered);
+    void Promise.all(numbered.map((ln, i) => previewLine(ln).then((amounts) => ({ i, amounts })))).then((results) => {
+      props.onChange((prev) =>
+        prev.map((ln, i) => {
+          const hit = results.find((r) => r.i === i);
+          return hit ? { ...ln, ...hit.amounts } : ln;
+        }),
+      );
+    });
+    toast.success(added === 1 ? "Line updated from serial." : `${added} lines updated from serials.`);
+  };
+
   const totals = () => {
     const lines = props.lines();
     return {
@@ -348,6 +421,11 @@ export function SalesLineGrid(props: Props) {
           {uiLabel("lines.add_button")}
         </button>
       </div>
+      <DocumentSerialScanBar
+        locationId={props.locationId()}
+        context="sale"
+        onUnits={applySerialUnits}
+      />
       <Show when={!props.taxTypeId()}>
         <p class="mb-2 text-xs text-amber-700">{uiLabel("lines.tax_hint")}</p>
       </Show>

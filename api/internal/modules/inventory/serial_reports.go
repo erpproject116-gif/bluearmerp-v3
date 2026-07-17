@@ -548,8 +548,9 @@ func formatDateString(t *time.Time) string {
 }
 
 func listSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
+	// Sort columns refer to the wrapped subquery's output names, not inner table aliases.
 	allowedDetail := map[string]string{
-		"created_at": "e.created_at", "serial_no": "su.serial_no", "item_code": "i.item_code",
+		"created_at": "created_at", "serial_no": "serial_no", "item_code": "item_code",
 	}
 	allowedSummary := map[string]string{
 		"serial_no": "serial_no", "item_code": "item_code", "closing_qty": "closing_qty",
@@ -618,7 +619,7 @@ func listSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		sortCol := allowedDetail[p.Sort]
 		if sortCol == "" {
-			sortCol = "e.created_at"
+			sortCol = "created_at"
 		}
 		args = append(args, p.PageSize, offset)
 		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $%d offset $%d", base, sortCol, reports.OrderSQL(p.Order), len(args)-1, len(args))
@@ -782,8 +783,9 @@ func exportSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func listSerialBalanceReport(pool *pgxpool.Pool) http.HandlerFunc {
+	// Sort columns refer to the wrapped subquery's output names, not inner table aliases.
 	allowed := map[string]string{
-		"serial_no": "su.serial_no", "item_code": "i.item_code", "qty_on_hand": "bal.qty",
+		"serial_no": "serial_no", "item_code": "item_code", "qty_on_hand": "qty_on_hand",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -808,7 +810,7 @@ func listSerialBalanceReport(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		sortCol := allowed[p.Sort]
 		if sortCol == "" {
-			sortCol = "su.serial_no"
+			sortCol = "serial_no"
 		}
 		args = append(args, p.PageSize, offset)
 		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $%d offset $%d", base, sortCol, reports.OrderSQL(p.Order), len(args)-1, len(args))
@@ -907,11 +909,12 @@ func exportSerialBalanceReport(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func listSerialReconciliationReport(pool *pgxpool.Pool) http.HandlerFunc {
+	// Sort columns refer to the wrapped subquery's output names, not inner table aliases.
 	allowedSerial := map[string]string{
-		"serial_no": "su.serial_no", "item_code": "i.item_code", "variance": "variance",
+		"serial_no": "serial_no", "item_code": "item_code", "variance": "variance",
 	}
 	allowedItem := map[string]string{
-		"item_code": "i.item_code", "variance": "variance",
+		"item_code": "item_code", "variance": "variance",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -934,7 +937,7 @@ func listSerialReconciliationReport(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			sortCol := allowedItem[p.Sort]
 			if sortCol == "" {
-				sortCol = "i.item_code"
+				sortCol = "item_code"
 			}
 			args = append(args, p.PageSize, offset)
 			q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $%d offset $%d", base, sortCol, reports.OrderSQL(p.Order), len(args)-1, len(args))
@@ -972,7 +975,7 @@ func listSerialReconciliationReport(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		sortCol := allowedSerial[p.Sort]
 		if sortCol == "" {
-			sortCol = "su.serial_no"
+			sortCol = "serial_no"
 		}
 		args = append(args, p.PageSize, offset)
 		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $%d offset $%d", base, sortCol, reports.OrderSQL(p.Order), len(args)-1, len(args))
@@ -1007,19 +1010,28 @@ func serialReconciliationSerialSQL(tenantID int64, f serialReportFilters, mismat
 	argN := 2
 	where, args, argN = appendSerialUnitFilters(where, args, argN, f, "su")
 	if mismatchesOnly {
-		where += ` and abs(coalesce(bal.qty_on_hand, 0) - 1) > 0.0001`
+		where += ` and abs(coalesce(bal.qty_on_hand, 0) - coalesce(sc.cnt, 0)) > 0.0001`
 	}
+	// Each serial row compares the item-location balance against the serial unit count
+	// at the same item and location, so the variance is the actual ledger gap rather
+	// than the misleading "item qty minus 1" per serial.
 	q := fmt.Sprintf(`
 		select su.serial_no, su.item_id, i.item_code, i.item_name,
-		  su.location_id, coalesce(l.location_name, ''),
-		  coalesce(bal.qty_on_hand, 0)::float8,
-		  1::float8,
-		  (coalesce(bal.qty_on_hand, 0) - 1)::float8
+		  su.location_id, coalesce(l.location_name, '') as location_name,
+		  coalesce(bal.qty_on_hand, 0)::float8 as item_qty_on_hand,
+		  coalesce(sc.cnt, 0)::float8 as serial_unit_count,
+		  (coalesce(bal.qty_on_hand, 0) - coalesce(sc.cnt, 0))::float8 as variance
 		from public.inv_serial_units su
 		join public.inv_items i on i.id = su.item_id
 		left join public.inv_locations l on l.id = su.location_id
 		left join public.inv_item_location_balances bal
 		  on bal.tenant_id = su.tenant_id and bal.item_id = su.item_id and bal.location_id = su.location_id
+		left join (
+		  select item_id, location_id, count(*)::float8 as cnt
+		  from public.inv_serial_units
+		  where tenant_id = $1 and status in ('in_stock', 'reserved')
+		  group by item_id, location_id
+		) sc on sc.item_id = su.item_id and sc.location_id = su.location_id
 		where %s`, where)
 	return q, args
 }
@@ -1049,9 +1061,9 @@ func serialReconciliationItemSQL(tenantID int64, f serialReportFilters, mismatch
 	q := fmt.Sprintf(`
 		select i.id, i.item_code, i.item_name,
 		  bal.location_id, l.location_name,
-		  bal.qty_on_hand::float8,
-		  coalesce(sc.cnt, 0)::float8,
-		  (bal.qty_on_hand - coalesce(sc.cnt, 0))::float8
+		  bal.qty_on_hand::float8 as item_qty_on_hand,
+		  coalesce(sc.cnt, 0)::float8 as serial_unit_count,
+		  (bal.qty_on_hand - coalesce(sc.cnt, 0))::float8 as variance
 		from public.inv_item_location_balances bal
 		join public.inv_items i on i.id = bal.item_id and i.tenant_id = bal.tenant_id
 		join public.inv_locations l on l.id = bal.location_id

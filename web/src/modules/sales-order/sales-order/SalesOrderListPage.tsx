@@ -20,6 +20,8 @@ import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesOrderModal, type SalesOrderDetail } from "./SalesOrderModal";
 import { formatMoney, openSalesOrderPrint } from "./salesOrderPrint";
 import { progressStatusLabel } from "./progressStatus";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 
 type PageOptions = {
   openNewOnMount?: boolean;
@@ -29,6 +31,7 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
+  const auth = useAuth();
   const invalidate = useInvalidateSalesOrders();
 
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -39,8 +42,16 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<SalesOrderDetail | null>(null);
+  const [viewingDeleted, setViewingDeleted] = createSignal(false);
   const [slipOpen, setSlipOpen] = createSignal(false);
   const [slipSalesOrderId, setSlipSalesOrderId] = createSignal<number | null>(null);
+
+  const lifecycle = useDocumentLifecycle({
+    apiBase: "/api/v1/sales-order/sales-orders",
+    documentLabel: "sales order",
+    canManage: () => hasPermission(auth.me, "sales_order.sales_orders", "write"),
+    onChanged: invalidate,
+  });
 
   const list = useSalesOrderList(() => ({
     page: page(),
@@ -49,6 +60,7 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
     order: order(),
     q: q() || undefined,
     progressStatus: statusFilter() || undefined,
+    lifecycle: lifecycle.filter(),
   }));
 
   const selectedIds = createMemo(() => {
@@ -58,13 +70,18 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
 
   const openNew = () => {
     setEditing(null);
+    setViewingDeleted(false);
     setModalOpen(true);
   };
 
   const openEdit = async (row: SalesOrderRow) => {
-    const res = await apiFetch<SalesOrderDetail>(`/api/v1/sales-order/sales-orders/${row.id}`);
+    const [res, deleted] = await Promise.all([
+      apiFetch<SalesOrderDetail>(lifecycle.detailUrl(row.id)),
+      lifecycle.resolveDeleted(row.id),
+    ]);
     if (!res.success || !res.data) return;
     setEditing(res.data);
+    setViewingDeleted(deleted);
     setModalOpen(true);
   };
 
@@ -190,6 +207,12 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
           { key: "created_by_name", header: "Creator", render: (r) => r.created_by_name ?? "" },
           { key: "delivery_remarks", header: "Delivery Remarks", render: (r) => r.delivery_remarks ?? "" },
           { key: "payment_terms", header: "Payment Terms", render: (r) => r.payment_terms ?? "" },
+          {
+            key: "lifecycle",
+            header: "Manage",
+            sortable: false,
+            render: (r) => <lifecycle.RowAction id={r.id} label={r.sales_order_no || r.date_no_display} />,
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -221,20 +244,24 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
         onRefresh={invalidate}
         settingsHref={SALES_ORDER_SETTINGS_HREF.salesOrder}
         toolbarExtra={
-          <GenerateOtherSlipsMenu
-            sourceEntity="sales_order"
-            targets={[
-              { label: "Sales (actual sale)", targetEntity: "sales" },
-              { label: "Delivery Slip", targetEntity: "delivery_receipt" },
-              { label: "Purchase Request (buy to fulfill)", targetEntity: "purchase_request" },
-            ]}
-            selectedIds={selectedIds}
-            onSuccess={() => invalidate()}
-          />
+          <div class="flex flex-wrap items-end gap-2">
+            <GenerateOtherSlipsMenu
+              sourceEntity="sales_order"
+              targets={[
+                { label: "Sales (actual sale)", targetEntity: "sales" },
+                { label: "Delivery Slip", targetEntity: "delivery_receipt" },
+                { label: "Purchase Request (buy to fulfill)", targetEntity: "purchase_request" },
+              ]}
+              selectedIds={selectedIds}
+              onSuccess={() => invalidate()}
+            />
+            <lifecycle.FilterControl />
+          </div>
         }
       />
 
-      <SalesOrderModal open={modalOpen()} editing={editing()} onClose={closeModal} onSaved={invalidate} />
+      <SalesOrderModal open={modalOpen()} editing={editing()} readOnly={viewingDeleted()} onClose={closeModal} onSaved={invalidate} />
+      <lifecycle.Dialog />
       <CreatedSlipModal open={slipOpen()} salesOrderId={slipSalesOrderId()} onClose={() => setSlipOpen(false)} />
     </SalesOrderLayout>
   );

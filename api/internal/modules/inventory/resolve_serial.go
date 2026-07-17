@@ -191,6 +191,18 @@ func resolveOneSerial(
 		return res
 	}
 
+	// Purchase / lookup: any non-void serial identifies the item for line fill.
+	if context == "lookup" || context == "purchase" {
+		if filterItemID != nil && *filterItemID > 0 && unit.ItemID != *filterItemID {
+			res.Status = resolveScanWrongItem
+			res.Message = "Serial belongs to " + unit.ItemCode + ", not this line."
+			return res
+		}
+		res.Status = resolveScanAccepted
+		res.Unit = unit
+		return res
+	}
+
 	allowed := allowedSerialStatusForContext(context)
 	if !allowed[unit.Status] {
 		res.Status = resolveScanUnavailable

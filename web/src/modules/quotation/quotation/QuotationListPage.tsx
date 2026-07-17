@@ -23,6 +23,7 @@ import { formatMoney, fetchQuotationPrint, openQuotationPrint } from "./quotatio
 import { progressStatusLabel, voucherStatusLabel } from "./progressStatus";
 import { SendEmailModal } from "../../comms/SendEmailModal";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 
 type PageOptions = {
   openNewOnMount?: boolean;
@@ -53,11 +54,19 @@ export function QuotationListPageInner(props: PageOptions = {}) {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<QuotationDetail | null>(null);
+  const [viewingDeleted, setViewingDeleted] = createSignal(false);
   const [slipOpen, setSlipOpen] = createSignal(false);
   const [slipQuotationId, setSlipQuotationId] = createSignal<number | null>(null);
   const [emailOpen, setEmailOpen] = createSignal(false);
   const [emailQuotationId, setEmailQuotationId] = createSignal<number | null>(null);
   const [emailDefaultTo, setEmailDefaultTo] = createSignal("");
+
+  const lifecycle = useDocumentLifecycle({
+    apiBase: "/api/v1/quotation/quotations",
+    documentLabel: "quotation",
+    canManage: () => hasPermission(auth.me, "quotation.quotations", "write"),
+    onChanged: invalidate,
+  });
 
   const list = useQuotationList(() => ({
     page: page(),
@@ -66,6 +75,7 @@ export function QuotationListPageInner(props: PageOptions = {}) {
     order: order(),
     q: q() || undefined,
     progressStatus: statusFilter() || undefined,
+    lifecycle: lifecycle.filter(),
   }));
 
   const quotationIds = createMemo(() => (list.data?.rows ?? []).map((r) => r.id));
@@ -78,13 +88,18 @@ export function QuotationListPageInner(props: PageOptions = {}) {
 
   const openNew = () => {
     setEditing(null);
+    setViewingDeleted(false);
     setModalOpen(true);
   };
 
   const openEdit = async (row: QuotationRow) => {
-    const res = await apiFetch<QuotationDetail>(`/api/v1/quotation/quotations/${row.id}`);
+    const [res, deleted] = await Promise.all([
+      apiFetch<QuotationDetail>(lifecycle.detailUrl(row.id)),
+      lifecycle.resolveDeleted(row.id),
+    ]);
     if (!res.success || !res.data) return;
     setEditing(res.data);
+    setViewingDeleted(deleted);
     setModalOpen(true);
   };
 
@@ -242,6 +257,12 @@ export function QuotationListPageInner(props: PageOptions = {}) {
               <ActivityHistoryLink module="quotation" targetType="quo_quotation" targetId={r.id} />
             ),
           },
+          {
+            key: "lifecycle",
+            header: "Manage",
+            sortable: false,
+            render: (r) => <lifecycle.RowAction id={r.id} label={r.reference_no || r.date_no_display} />,
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
@@ -273,16 +294,20 @@ export function QuotationListPageInner(props: PageOptions = {}) {
         onRefresh={invalidate}
         settingsHref={QUOTATION_SETTINGS_HREF.quotation}
         toolbarExtra={
-          <GenerateOtherSlipsMenu
-            sourceEntity="quotation"
-            targets={[{ label: "Sales Order", targetEntity: "sales_order" }]}
-            selectedIds={selectedIds}
-            onSuccess={() => invalidate()}
-          />
+          <div class="flex flex-wrap items-end gap-2">
+            <GenerateOtherSlipsMenu
+              sourceEntity="quotation"
+              targets={[{ label: "Sales Order", targetEntity: "sales_order" }]}
+              selectedIds={selectedIds}
+              onSuccess={() => invalidate()}
+            />
+            <lifecycle.FilterControl />
+          </div>
         }
       />
 
-      <QuotationModal open={modalOpen()} editing={editing()} onClose={closeModal} onSaved={invalidate} />
+      <QuotationModal open={modalOpen()} editing={editing()} readOnly={viewingDeleted()} onClose={closeModal} onSaved={invalidate} />
+      <lifecycle.Dialog />
       <CreatedSlipModal open={slipOpen()} quotationId={slipQuotationId()} onClose={() => setSlipOpen(false)} />
       <SendEmailModal
         open={emailOpen()}

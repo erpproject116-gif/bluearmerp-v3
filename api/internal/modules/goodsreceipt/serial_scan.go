@@ -11,6 +11,10 @@ import (
 
 const maxSerialBatchSize = 100
 
+// reversalBlockingSerialStatuses lists serial statuses that block a goods receipt reversal:
+// sold units belong to a customer and reserved units are committed to a sales order.
+var reversalBlockingSerialStatuses = []string{"sold", "reserved"}
+
 // SerialScanStatus is the outcome of a single scan in a batch request.
 type SerialScanStatus string
 
@@ -145,7 +149,7 @@ func loadUnavailableSerials(ctx context.Context, tx pgx.Tx, tenantID int64, excl
 		from public.gr_goods_receipt_serials gs
 		join public.gr_goods_receipt_lines grl on grl.id = gs.goods_receipt_line_id
 		join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
-		where gr.tenant_id = $1 and gr.status = 'draft' and gr.id <> $2
+		where gr.tenant_id = $1 and gr.status = 'draft' and gr.id <> $3
 		  and gs.serial_no = any($2)`, tenantID, serialNos, excludeGrID)
 	if err != nil {
 		return nil, err

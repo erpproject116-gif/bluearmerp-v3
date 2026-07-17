@@ -18,10 +18,12 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -411,6 +413,23 @@ func formatDatePtr(t *time.Time) *string {
 	return &s
 }
 
+// validatePOApprovalForReceipt blocks GR create/post against a purchase order
+// that lacks a confirmed approval when the PO-approval policy is on.
+func validatePOApprovalForReceipt(ctx context.Context, tx pgx.Tx, tenantID, purchaseOrderID int64) map[string]string {
+	policy, err := processpolicy.LoadTx(ctx, tx, tenantID)
+	if err != nil {
+		return map[string]string{"purchase_order_id": "Failed to load process policies."}
+	}
+	if !policy.PurchaseRequirePOApproval {
+		return nil
+	}
+	status, found, err := approval.Status(ctx, tx, tenantID, "purchase_order", purchaseOrderID)
+	if err != nil {
+		return map[string]string{"purchase_order_id": "Failed to check purchase order approval."}
+	}
+	return processpolicy.ValidatePurchaseOrderApproval(policy, found, status)
+}
+
 func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -457,6 +476,10 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if poStatus != "confirmed" && poStatus != "partially_received" {
 			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order must be confirmed or partially received."})
+			return
+		}
+		if v := validatePOApprovalForReceipt(r.Context(), tx, tu.TenantID, body.PurchaseOrderID); v != nil {
+			response.Validation(w, v)
 			return
 		}
 
@@ -920,6 +943,10 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order is not open for receiving."})
 			return
 		}
+		if v := validatePOApprovalForReceipt(r.Context(), tx, tu.TenantID, purchaseOrderID); v != nil {
+			response.Validation(w, v)
+			return
+		}
 
 		lineRows, err := tx.Query(r.Context(), `
 			select grl.id, grl.purchase_order_line_id, grl.received_qty::float8,
@@ -1275,25 +1302,26 @@ func reverseGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		var soldSerials int
+		var blockedSerials int
 		if err := tx.QueryRow(r.Context(), `
 			select count(*) from public.inv_serial_units su
 			where su.tenant_id = $1 and su.goods_receipt_line_id in (
 			  select id from public.gr_goods_receipt_lines where goods_receipt_id = $2
-			) and su.status = 'sold'`, tu.TenantID, grID).Scan(&soldSerials); err != nil {
+			) and su.status = any($3)`, tu.TenantID, grID, reversalBlockingSerialStatuses).Scan(&blockedSerials); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to check serials.", "ERR_INTERNAL")
 			return
 		}
-		if soldSerials > 0 {
+		if blockedSerials > 0 {
 			response.Validation(w, map[string]string{
-				"serials": "Cannot reverse: one or more received serials have been sold.",
+				"serials": "Cannot reverse: one or more received serials have been sold or are reserved.",
 			})
 			return
 		}
 
 		lineRows, err := tx.Query(r.Context(), `
 			select grl.id, grl.purchase_order_line_id, grl.received_qty::float8,
-			  pol.item_id, coalesce(i.track_serial, false), coalesce(i.track_inventory_qty, false)
+			  pol.item_id, coalesce(i.track_serial, false), coalesce(i.track_lot, false),
+			  coalesce(i.track_inventory_qty, false)
 			from public.gr_goods_receipt_lines grl
 			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
 			left join public.inv_items i on i.id = pol.item_id
@@ -1305,29 +1333,46 @@ func reverseGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer lineRows.Close()
 
-		userID := tu.AppUserID
+		type lineReverse struct {
+			ID                  int64
+			PurchaseOrderLineID int64
+			ReceivedQty         float64
+			ItemID              *int64
+			TrackSerial         bool
+			TrackLot            bool
+			TrackInventory      bool
+		}
+		var lines []lineReverse
 		for lineRows.Next() {
-			var lineID, poLineID int64
-			var receivedQty float64
-			var itemID *int64
-			var trackSerial, trackInventory bool
-			if err := lineRows.Scan(&lineID, &poLineID, &receivedQty, &itemID, &trackSerial, &trackInventory); err != nil {
+			var ln lineReverse
+			if err := lineRows.Scan(&ln.ID, &ln.PurchaseOrderLineID, &ln.ReceivedQty, &ln.ItemID,
+				&ln.TrackSerial, &ln.TrackLot, &ln.TrackInventory); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
 				return
 			}
-			if receivedQty <= 0 {
+			if ln.ReceivedQty <= 0 {
 				continue
 			}
+			lines = append(lines, ln)
+		}
+		if err := lineRows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to process lines.", "ERR_INTERNAL")
+			return
+		}
+		lineRows.Close()
 
-			if trackSerial {
+		userID := tu.AppUserID
+		for _, ln := range lines {
+			if ln.TrackSerial {
 				unitRows, err := tx.Query(r.Context(), `
 					select id from public.inv_serial_units
 					where tenant_id = $1 and goods_receipt_line_id = $2
-					for update`, tu.TenantID, lineID)
+					for update`, tu.TenantID, ln.ID)
 				if err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to load serial units.", "ERR_INTERNAL")
 					return
 				}
+				var unitIDs []int64
 				for unitRows.Next() {
 					var unitID int64
 					if err := unitRows.Scan(&unitID); err != nil {
@@ -1335,38 +1380,88 @@ func reverseGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 						response.Err(w, http.StatusInternalServerError, "Failed to read serial unit.", "ERR_INTERNAL")
 						return
 					}
+					unitIDs = append(unitIDs, unitID)
+				}
+				if err := unitRows.Err(); err != nil {
+					unitRows.Close()
+					response.Err(w, http.StatusInternalServerError, "Failed to process serials.", "ERR_INTERNAL")
+					return
+				}
+				unitRows.Close()
+				for _, unitID := range unitIDs {
 					_, err = tx.Exec(r.Context(), `
 						update public.inv_serial_units
 						set status = 'void', location_id = null, updated_at = now()
 						where id = $1`, unitID)
 					if err != nil {
-						unitRows.Close()
 						response.Err(w, http.StatusInternalServerError, "Failed to void serial.", "ERR_INTERNAL")
 						return
 					}
 					if err := inventory.InsertSerialEvent(r.Context(), tx, tu.TenantID, unitID, "voided", nil, nil, "goods_receipt", grID, &userID); err != nil {
-						unitRows.Close()
 						response.Err(w, http.StatusInternalServerError, "Failed to record serial event.", "ERR_INTERNAL")
 						return
 					}
 				}
-				unitRows.Close()
-				if err := unitRows.Err(); err != nil {
-					response.Err(w, http.StatusInternalServerError, "Failed to process serials.", "ERR_INTERNAL")
+			}
+
+			if ln.TrackLot && ln.ItemID != nil {
+				lotRows, err := tx.Query(r.Context(), `
+					select lot_no, qty::float8
+					from public.gr_goods_receipt_line_lots
+					where goods_receipt_line_id = $1
+					order by lot_no`, ln.ID)
+				if err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to load lots.", "ERR_INTERNAL")
 					return
+				}
+				type lotReverse struct {
+					LotNo string
+					Qty   float64
+				}
+				var lots []lotReverse
+				for lotRows.Next() {
+					var lot lotReverse
+					if err := lotRows.Scan(&lot.LotNo, &lot.Qty); err != nil {
+						lotRows.Close()
+						response.Err(w, http.StatusInternalServerError, "Failed to read lot.", "ERR_INTERNAL")
+						return
+					}
+					if lot.Qty > 0 {
+						lots = append(lots, lot)
+					}
+				}
+				if err := lotRows.Err(); err != nil {
+					lotRows.Close()
+					response.Err(w, http.StatusInternalServerError, "Failed to process lots.", "ERR_INTERNAL")
+					return
+				}
+				lotRows.Close()
+				for _, lot := range lots {
+					tag, err := tx.Exec(r.Context(), `
+						update public.inv_lot_batches
+						set qty_on_hand = qty_on_hand - $1, updated_at = now()
+						where tenant_id = $2 and item_id = $3 and lot_no = $4 and location_id = $5
+						  and qty_on_hand >= $1 - 0.0001`,
+						lot.Qty, tu.TenantID, *ln.ItemID, lot.LotNo, locationID)
+					if err != nil || tag.RowsAffected() == 0 {
+						response.Validation(w, map[string]string{
+							"lots": fmt.Sprintf("Insufficient quantity in lot %s to reverse line %d.", lot.LotNo, ln.ID),
+						})
+						return
+					}
 				}
 			}
 
-			if trackInventory && itemID != nil {
+			if ln.TrackInventory && ln.ItemID != nil {
 				tag, err := tx.Exec(r.Context(), `
 					update public.inv_item_location_balances
 					set qty_on_hand = qty_on_hand - $1, updated_at = now()
 					where tenant_id = $2 and item_id = $3 and location_id = $4
 					  and qty_on_hand >= $1 - 0.0001`,
-					receivedQty, tu.TenantID, *itemID, locationID)
+					ln.ReceivedQty, tu.TenantID, *ln.ItemID, locationID)
 				if err != nil || tag.RowsAffected() == 0 {
 					response.Validation(w, map[string]string{
-						"stock": fmt.Sprintf("Insufficient stock to reverse line %d.", lineID),
+						"stock": fmt.Sprintf("Insufficient stock to reverse line %d.", ln.ID),
 					})
 					return
 				}
@@ -1374,7 +1469,7 @@ func reverseGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					insert into public.inv_stock_movements (
 					  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
 					) values ($1, $2, $3, $4, 'goods_receipt_reversal', 'goods_receipt', $5, $6)`,
-					tu.TenantID, *itemID, locationID, -receivedQty, grID, tu.AppUserID)
+					tu.TenantID, *ln.ItemID, locationID, -ln.ReceivedQty, grID, tu.AppUserID)
 				if err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
 					return
@@ -1385,15 +1480,11 @@ func reverseGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				update public.po_purchase_order_lines
 				set received_qty = received_qty - $1
 				where id = $2 and received_qty >= $1 - 0.0001`,
-				receivedQty, poLineID)
+				ln.ReceivedQty, ln.PurchaseOrderLineID)
 			if err != nil || tag.RowsAffected() == 0 {
 				response.Validation(w, map[string]string{"received_qty": "Failed to update purchase order line quantity."})
 				return
 			}
-		}
-		if err := lineRows.Err(); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to process lines.", "ERR_INTERNAL")
-			return
 		}
 
 		_, err = tx.Exec(r.Context(), `

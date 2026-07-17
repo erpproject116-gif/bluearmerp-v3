@@ -12,6 +12,7 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
@@ -83,6 +84,8 @@ export type PurchaseRequestDetail = {
 type Props = {
   open: boolean;
   editing: PurchaseRequestDetail | null;
+  /** Deleted (soft-deleted) document opened for viewing — no edits allowed. */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -359,6 +362,7 @@ export function PurchaseRequestModal(props: Props) {
   };
 
   const save = async () => {
+    if (props.readOnly) return;
     if (!taxTypeId()) {
       toast.warning("Please select a transaction type.");
       return;
@@ -451,9 +455,10 @@ export function PurchaseRequestModal(props: Props) {
     <>
     <WideEntityModal
       open={props.open}
-      title={props.editing ? "Edit Purchase Request" : "New Purchase Request"}
+      title={props.editing ? (props.readOnly ? "View Purchase Request (deleted)" : "Edit Purchase Request") : "New Purchase Request"}
       onClose={() => props.onClose()}
       onSave={() => void save()}
+      readOnly={props.readOnly}
       saving={saving()}
       headerActions={
         <Show when={props.editing}>
@@ -463,6 +468,7 @@ export function PurchaseRequestModal(props: Props) {
         </Show>
       }
     >
+      <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
       <draft.DraftBanner />
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label="Date-no">
@@ -672,6 +678,7 @@ export function PurchaseRequestModal(props: Props) {
         locationId={locationId}
       />
       <ChangeLogPanel targetType="pr_purchase_request" targetId={props.editing?.id} />
+      </LifecycleReadOnlyShell>
     </WideEntityModal>
     <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="pr_purchase_request" targetId={props.editing?.id} title="History — Purchase Request" />
     <SalesOrderLinePickerModal

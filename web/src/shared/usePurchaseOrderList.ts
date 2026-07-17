@@ -11,6 +11,7 @@ export type PurchaseOrderListParams = {
   progressStatus?: string;
   purchase_request_id?: number;
   supplier_quotation_id?: number;
+  lifecycle?: string;
 };
 
 export type PurchaseOrderRow = {
@@ -54,6 +55,7 @@ export function usePurchaseOrderList(params: () => PurchaseOrderListParams) {
     if (p.progressStatus) qs.set("progress_status", p.progressStatus);
     if (p.purchase_request_id) qs.set("purchase_request_id", String(p.purchase_request_id));
     if (p.supplier_quotation_id) qs.set("supplier_quotation_id", String(p.supplier_quotation_id));
+    if (p.lifecycle && p.lifecycle !== "active") qs.set("lifecycle", p.lifecycle);
 
     return {
       queryKey: ["purchase-orders", p],

@@ -22,6 +22,8 @@ import { PurchaseRequestModal, type PurchaseRequestDetail } from "./PurchaseRequ
 import { defaultListFilters, type PurchaseRequestListFilters } from "./purchaseRequestListFilters";
 import { formatMoney, openPurchaseRequestPrint } from "./purchaseRequestPrint";
 import { progressStatusLabel } from "./progressStatus";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 
 type PageOptions = {
   openNewOnMount?: boolean;
@@ -40,6 +42,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
+  const auth = useAuth();
   const invalidate = useInvalidatePurchaseRequests();
 
   const [draftFilters, setDraftFilters] = createSignal<PurchaseRequestListFilters>(defaultListFilters());
@@ -53,6 +56,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<PurchaseRequestDetail | null>(null);
+  const [viewingDeleted, setViewingDeleted] = createSignal(false);
   const [slipOpen, setSlipOpen] = createSignal(false);
   const [slipPurchaseRequestId, setSlipPurchaseRequestId] = createSignal<number | null>(null);
 
@@ -60,6 +64,13 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
     const base = submittedFilters();
     if (!base) return null;
     return { ...base, progress_status: progressTab() || base.progress_status };
+  });
+
+  const lifecycle = useDocumentLifecycle({
+    apiBase: "/api/v1/purchase-request/purchase-requests",
+    documentLabel: "purchase request",
+    canManage: () => hasPermission(auth.me, "purchase_request.purchase_requests", "write"),
+    onChanged: invalidate,
   });
 
   const list = usePurchaseRequestList(() => {
@@ -81,6 +92,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
       item_id: f?.item_id ?? undefined,
       send_status: f?.send_status !== "all" ? f?.send_status : undefined,
       sort_by_modified: f?.sort_by_modified,
+      lifecycle: lifecycle.filter(),
     };
   });
 
@@ -108,13 +120,18 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
 
   const openNew = () => {
     setEditing(null);
+    setViewingDeleted(false);
     setModalOpen(true);
   };
 
   const openEdit = async (row: PurchaseRequestRow) => {
-    const res = await apiFetch<PurchaseRequestDetail>(`/api/v1/purchase-request/purchase-requests/${row.id}`);
+    const [res, deleted] = await Promise.all([
+      apiFetch<PurchaseRequestDetail>(lifecycle.detailUrl(row.id)),
+      lifecycle.resolveDeleted(row.id),
+    ]);
     if (!res.success || !res.data) return;
     setEditing(res.data);
+    setViewingDeleted(deleted);
     setModalOpen(true);
   };
 
@@ -241,6 +258,12 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
                   <ActivityHistoryLink module="purchase_request" targetType="pr_purchase_request" targetId={r.id} />
                 ),
               },
+              {
+                key: "lifecycle",
+                header: "Manage",
+                sortable: false,
+                render: (r) => <lifecycle.RowAction id={r.id} label={r.purchase_request_no || r.date_no_display} />,
+              },
             ]}
             rows={list.data?.rows ?? []}
             loading={list.isFetching}
@@ -267,18 +290,22 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
             onRefresh={invalidate}
             settingsHref={PURCHASE_REQUEST_SETTINGS_HREF.purchaseRequest}
             toolbarExtra={
-              <GenerateOtherSlipsMenu
-                sourceEntity="purchase_request"
-                targets={[{ label: "Purchase Order", targetEntity: "purchase_order" }]}
-                selectedIds={selectedIds}
-                onSuccess={() => invalidate()}
-              />
+              <div class="flex flex-wrap items-end gap-2">
+                <GenerateOtherSlipsMenu
+                  sourceEntity="purchase_request"
+                  targets={[{ label: "Purchase Order", targetEntity: "purchase_order" }]}
+                  selectedIds={selectedIds}
+                  onSuccess={() => invalidate()}
+                />
+                <lifecycle.FilterControl />
+              </div>
             }
           />
         </div>
       </Show>
 
-      <PurchaseRequestModal open={modalOpen()} editing={editing()} onClose={closeModal} onSaved={invalidate} />
+      <PurchaseRequestModal open={modalOpen()} editing={editing()} readOnly={viewingDeleted()} onClose={closeModal} onSaved={invalidate} />
+      <lifecycle.Dialog />
       <CreatedSlipModal open={slipOpen()} purchaseRequestId={slipPurchaseRequestId()} onClose={() => setSlipOpen(false)} />
     </PurchaseRequestLayout>
   );

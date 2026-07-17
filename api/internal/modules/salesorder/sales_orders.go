@@ -18,6 +18,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -25,25 +26,25 @@ import (
 )
 
 type SalesOrderLine struct {
-	ID                     int64   `json:"id,omitempty"`
-	LineNo                 int     `json:"line_no"`
-	ItemID                 *int64  `json:"item_id,omitempty"`
-	ItemCode               string  `json:"item_code"`
-	ItemName               string  `json:"item_name"`
-	Description            *string `json:"description,omitempty"`
-	Qty                    float64 `json:"qty"`
-	DeliveredQty           float64 `json:"delivered_qty"`
-	BilledQty              float64 `json:"billed_qty"`
-	UnitNonVat             float64 `json:"unit_non_vat"`
-	NonVatTotal            float64 `json:"non_vat_total"`
-	TaxAmount              float64 `json:"tax_amount"`
-	UnitVatInc             float64 `json:"unit_vat_inc"`
-	LineTotal              float64 `json:"line_total"`
-	Remark                 *string `json:"remark,omitempty"`
-	SourceQuotationLineID  *int64   `json:"source_quotation_line_id,omitempty"`
-	PlannedSerialNos       []string `json:"planned_serial_nos,omitempty"`
-	TrackSerial            bool     `json:"track_serial,omitempty"`
-	SerialPolicy           string   `json:"serial_policy,omitempty"`
+	ID                    int64    `json:"id,omitempty"`
+	LineNo                int      `json:"line_no"`
+	ItemID                *int64   `json:"item_id,omitempty"`
+	ItemCode              string   `json:"item_code"`
+	ItemName              string   `json:"item_name"`
+	Description           *string  `json:"description,omitempty"`
+	Qty                   float64  `json:"qty"`
+	DeliveredQty          float64  `json:"delivered_qty"`
+	BilledQty             float64  `json:"billed_qty"`
+	UnitNonVat            float64  `json:"unit_non_vat"`
+	NonVatTotal           float64  `json:"non_vat_total"`
+	TaxAmount             float64  `json:"tax_amount"`
+	UnitVatInc            float64  `json:"unit_vat_inc"`
+	LineTotal             float64  `json:"line_total"`
+	Remark                *string  `json:"remark,omitempty"`
+	SourceQuotationLineID *int64   `json:"source_quotation_line_id,omitempty"`
+	PlannedSerialNos      []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial           bool     `json:"track_serial,omitempty"`
+	SerialPolicy          string   `json:"serial_policy,omitempty"`
 }
 
 type SalesOrder struct {
@@ -88,15 +89,15 @@ type SalesOrder struct {
 }
 
 type salesOrderLineBody struct {
-	LineNo                int     `json:"line_no"`
-	ItemID                *int64  `json:"item_id"`
-	ItemCode              string  `json:"item_code"`
-	ItemName              string  `json:"item_name"`
-	Description           *string `json:"description"`
-	Qty                   float64 `json:"qty"`
-	UnitPrice             float64 `json:"unit_price"`
-	InputBasis            string  `json:"input_basis"`
-	Remark                *string `json:"remark"`
+	LineNo                int      `json:"line_no"`
+	ItemID                *int64   `json:"item_id"`
+	ItemCode              string   `json:"item_code"`
+	ItemName              string   `json:"item_name"`
+	Description           *string  `json:"description"`
+	Qty                   float64  `json:"qty"`
+	UnitPrice             float64  `json:"unit_price"`
+	InputBasis            string   `json:"input_basis"`
+	Remark                *string  `json:"remark"`
 	SourceQuotationLineID *int64   `json:"source_quotation_line_id"`
 	PlannedSerialNos      []string `json:"planned_serial_nos"`
 }
@@ -138,11 +139,11 @@ type computedLine struct {
 }
 
 type createdSlipRow struct {
-	ID         int64   `json:"id"`
-	SlipType   string  `json:"slip_type"`
-	SlipRef    *string `json:"slip_ref,omitempty"`
-	SlipDateNo *string `json:"slip_date_no,omitempty"`
-	Qty        float64 `json:"qty"`
+	ID          int64   `json:"id"`
+	SlipType    string  `json:"slip_type"`
+	SlipRef     *string `json:"slip_ref,omitempty"`
+	SlipDateNo  *string `json:"slip_date_no,omitempty"`
+	Qty         float64 `json:"qty"`
 	ReleaseDate *string `json:"release_date,omitempty"`
 }
 
@@ -158,6 +159,7 @@ type createdSlipLine struct {
 
 func registerSalesOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerAttachmentRoutes(r, pool)
+	documentlifecycle.RegisterRoutes(r, pool, "/sales-orders", documentlifecycle.SalesOrderConfig())
 	r.Get("/sales-orders/preview-sequences", previewSalesOrderSequences(pool))
 	r.Get("/sales-orders/quotation-lines/open", listOpenQuotationLines(pool))
 	r.Get("/sales-orders/release-queue", listReleaseQueue(pool))
@@ -226,7 +228,12 @@ func listSalesOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "order_date", allowed)
 		offset := httputil.Offset(p)
 
-		where := "so.tenant_id = $1 and so.deleted_at is null"
+		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "so")
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where := "so.tenant_id = $1 and " + lifecycleWhere
 		args := []any{tu.TenantID}
 		argN := 2
 
@@ -341,6 +348,10 @@ func listSalesOrders(pool *pgxpool.Pool) http.HandlerFunc {
 
 func getSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var ok bool
+		if r, ok = documentlifecycle.PrepareDetailRequest(w, r); !ok {
+			return
+		}
 		tu, _ := auth.FromContext(r.Context())
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
@@ -380,7 +391,7 @@ func loadSalesOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 		join public.inv_locations l on l.id = so.location_id
 		left join public.users u on u.id = so.created_by_user_id
 		left join public.users sp on sp.id = so.sales_person_id
-		where so.id = $1 and so.tenant_id = $2 and so.deleted_at is null`,
+		where so.id = $1 and so.tenant_id = $2 and `+documentlifecycle.DetailPredicate(ctx, "so"),
 		id, tenantID).Scan(
 		&so.ID, &orderDate, &so.DateSeq, &so.SalesOrderNo,
 		&so.TaxTypeID, &so.TaxTypeName, &so.CurrencyID, &so.CurrencyCode,
@@ -657,6 +668,12 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Re-validate the quotation requirement so an update cannot strip the link.
+		if vErrs := processpolicy.ValidateSalesOrderCreate(policy, body.SourceQuotationID); vErrs != nil {
+			response.Validation(w, vErrs)
+			return
+		}
+
 		newProgress := defaultProgress(body.ProgressStatus)
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSalesOrder, newProgress, id); v != nil {
 			response.Validation(w, v)
@@ -755,9 +772,7 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func deleteSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		softDelete(pool, w, r, "so_sales_orders", "sales_order.delete", "so_sales_order")
-	}
+	return documentlifecycle.DeleteHandler(pool, documentlifecycle.SalesOrderConfig())
 }
 
 func insertSalesOrderLines(ctx context.Context, tx pgx.Tx, salesOrderID int64, lines []computedLine) ([]int64, error) {

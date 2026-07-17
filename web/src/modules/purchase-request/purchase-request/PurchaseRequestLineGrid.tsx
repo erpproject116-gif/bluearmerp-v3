@@ -14,6 +14,9 @@ import { uiLabel } from "../../../shared/branding/uiLabel";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { PartnerSearchModal, type PartnerSearchRow } from "./PartnerSearchModal";
 import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
+import { DocumentSerialScanBar } from "../../../shared/DocumentSerialScanBar";
+import type { ResolvedSerialUnit } from "../../../shared/serialScanTypes";
+import { useToast } from "../../../shared/toast";
 import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
 
 export type PurchaseRequestLineRow = {
@@ -153,6 +156,7 @@ type Props = {
 };
 
 export function PurchaseRequestLineGrid(props: Props) {
+  const toast = useToast();
   const [itemSearchOpen, setItemSearchOpen] = createSignal(false);
   const [itemSearchLineIdx, setItemSearchLineIdx] = createSignal<number | null>(null);
   const [partnerSearchOpen, setPartnerSearchOpen] = createSignal(false);
@@ -289,6 +293,68 @@ export function PurchaseRequestLineGrid(props: Props) {
     return qtyIdx > 0 ? qtyIdx : 1;
   };
 
+  const applySerialUnits = (units: ResolvedSerialUnit[]) => {
+    const meta = props.taxTypeMeta();
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    let current = [...props.lines()];
+    let added = 0;
+
+    for (const u of units) {
+      const sn = u.serial_no;
+      const already = current.some((ln) => (ln.planned_serial_nos ?? []).some((p) => p.toLowerCase() === sn.toLowerCase()));
+      if (already) {
+        toast.warning(`${sn} is already on this document.`);
+        continue;
+      }
+
+      const sameItemIdx = current.findIndex((ln) => ln.item_id === u.item_id && Boolean(ln.track_serial));
+      if (sameItemIdx >= 0) {
+        const ln = current[sameItemIdx];
+        const serials = [...(ln.planned_serial_nos ?? []), sn];
+        current[sameItemIdx] = {
+          ...ln,
+          planned_serial_nos: serials,
+          qty: String(serials.length),
+          track_serial: true,
+        };
+        added++;
+        continue;
+      }
+
+      const emptyIdx = current.findIndex((ln) => !ln.item_id && !(ln.item_code || "").trim());
+      const patch: Partial<PurchaseRequestLineRow> = {
+        item_id: u.item_id,
+        item_code: u.item_code,
+        item_name: u.item_name,
+        unit_price: "0",
+        input_basis: basis,
+        track_serial: true,
+        serial_policy: "required",
+        planned_serial_nos: [sn],
+        qty: "1",
+      };
+      if (emptyIdx >= 0) {
+        current[emptyIdx] = { ...current[emptyIdx], ...patch };
+      } else {
+        current.push({ ...emptyPurchaseRequestLine(current.length + 1, "0", basis), ...patch });
+      }
+      added++;
+    }
+
+    if (added === 0) return;
+    const numbered = current.map((ln, i) => ({ ...ln, line_no: i + 1 }));
+    props.onChange(numbered);
+    void Promise.all(numbered.map((ln, i) => previewLine(ln).then((amounts) => ({ i, amounts })))).then((results) => {
+      props.onChange((prev) =>
+        prev.map((ln, i) => {
+          const hit = results.find((r) => r.i === i);
+          return hit ? { ...ln, ...hit.amounts } : ln;
+        }),
+      );
+    });
+    toast.success(added === 1 ? "Line updated from serial." : `${added} lines updated from serials.`);
+  };
+
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(() =>
     columns().map((c) => ({ key: c.key, width: c.width })),
   );
@@ -301,6 +367,34 @@ export function PurchaseRequestLineGrid(props: Props) {
           {uiLabel("lines.add_button")}
         </button>
       </div>
+      <DocumentSerialScanBar
+        locationId={null}
+        context="purchase"
+        placeholder="Scan serial no. — Enter fills item + planned serial"
+        onUnits={applySerialUnits}
+        onUnregistered={(sn) => {
+          // Unknown serial (new supplier stock): if exactly one serial-tracked line
+          // already has an item, attach it there as a planned serial. Otherwise let
+          // the bar show the fix guidance (we can't guess the item).
+          const current = props.lines();
+          const candidates = current
+            .map((ln, i) => ({ ln, i }))
+            .filter(({ ln }) => ln.item_id && Boolean(ln.track_serial));
+          if (candidates.length !== 1) return false;
+          const { ln, i } = candidates[0];
+          if ((ln.planned_serial_nos ?? []).some((p) => p.toLowerCase() === sn.toLowerCase())) {
+            toast.warning(`${sn} is already on this document.`);
+            return true;
+          }
+          const serials = [...(ln.planned_serial_nos ?? []), sn];
+          const next = current.map((row, idx) =>
+            idx === i ? { ...row, planned_serial_nos: serials, qty: String(serials.length) } : row,
+          );
+          props.onChange(next);
+          toast.success(`Added ${sn} to ${ln.item_code || "the item line"}.`);
+          return true;
+        }}
+      />
       <Show when={!props.taxTypeId()}>
         <p class="mb-2 text-xs text-amber-700">{uiLabel("lines.tax_hint")}</p>
       </Show>

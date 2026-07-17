@@ -31,7 +31,7 @@ type ORAttachment struct {
 const maxORAttachmentBytes = 25 * 1024 * 1024
 
 func registerORAttachmentRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.Post("/official-receipts/{id}/attachments", uploadORAttachment(pool))
+	r.With(auth.RequirePermission("finance.official_receipts", auth.AccessWrite)).Post("/official-receipts/{id}/attachments", uploadORAttachment(pool))
 	r.Get("/official-receipts/{id}/attachments", listORAttachments(pool))
 	r.Get("/official-receipts/{id}/attachments/{attachmentId}/download", downloadORAttachment(pool))
 }

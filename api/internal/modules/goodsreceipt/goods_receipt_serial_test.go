@@ -24,5 +24,17 @@ func TestMaxSerialBatchSize(t *testing.T) {
 	}
 }
 
+func TestReversalBlockingSerialStatuses(t *testing.T) {
+	want := map[string]bool{"sold": true, "reserved": true}
+	if len(reversalBlockingSerialStatuses) != len(want) {
+		t.Fatalf("expected %d blocking statuses, got %v", len(want), reversalBlockingSerialStatuses)
+	}
+	for _, st := range reversalBlockingSerialStatuses {
+		if !want[st] {
+			t.Errorf("unexpected blocking status %q", st)
+		}
+	}
+}
+
 // Integration tests for processSerialScans require DATABASE_URL and migration 050 applied.
 // Run manually: go test ./internal/modules/goodsreceipt/ -run Integration -tags=integration

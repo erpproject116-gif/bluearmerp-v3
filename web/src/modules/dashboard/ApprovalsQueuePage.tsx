@@ -21,6 +21,7 @@ const ENTITY_LABELS: Record<string, string> = {
   journal_entry: "Journal Entry",
   collective_invoice: "Collective Invoice",
   sa_sales: "Sales",
+  fin_supplier_invoice: "Purchase",
 };
 
 function entityLabel(type: string): string {
@@ -61,9 +62,13 @@ export default function ApprovalsQueuePage() {
     const key = `${row.entity_type}:${row.entity_id}:${action}`;
     setBusyKey(key);
     let res;
-    if (row.entity_type === "sa_sales") {
+    if (row.entity_type === "sa_sales" || row.entity_type === "fin_supplier_invoice") {
+      const base =
+        row.entity_type === "sa_sales"
+          ? `/api/v1/sales/${row.entity_id}`
+          : `/api/v1/finance/supplier-invoices/${row.entity_id}`;
       if (approve) {
-        res = await apiFetch(`/api/v1/sales/${row.entity_id}/approve`, { method: "POST", body: JSON.stringify({}) });
+        res = await apiFetch(`${base}/approve`, { method: "POST", body: JSON.stringify({}) });
       } else {
         const remarks = window.prompt("Rejection remarks (required):");
         if (remarks === null) {
@@ -75,7 +80,7 @@ export default function ApprovalsQueuePage() {
           toast.warning("Rejection remarks are required.");
           return;
         }
-        res = await apiFetch(`/api/v1/sales/${row.entity_id}/reject`, {
+        res = await apiFetch(`${base}/reject`, {
           method: "POST",
           body: JSON.stringify({ remarks: remarks.trim() }),
         });

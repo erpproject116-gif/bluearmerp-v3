@@ -20,6 +20,8 @@ import { PurchaseRequestLayout } from "../PurchaseRequestLayout";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 
 const OPERATIONAL_STATUS_TABS = [
   { value: "", label: "All statuses" },
@@ -270,6 +272,7 @@ function CreateFromSupplierQuotationModal(props: {
 export default function PurchaseOrderListPage() {
   const toast = useToast();
   const navigate = useNavigate();
+  const auth = useAuth();
   const invalidate = useInvalidatePurchaseOrders();
 
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -284,6 +287,14 @@ export default function PurchaseOrderListPage() {
   const [fromSqOpen, setFromSqOpen] = createSignal(false);
   const [poModalOpen, setPoModalOpen] = createSignal(false);
   const [editingPoId, setEditingPoId] = createSignal<number | null>(null);
+  const [viewingDeleted, setViewingDeleted] = createSignal(false);
+
+  const lifecycle = useDocumentLifecycle({
+    apiBase: "/api/v1/purchase-order/purchase-orders",
+    documentLabel: "purchase order",
+    canManage: () => hasPermission(auth.me, "purchase_order.purchase_orders", "write"),
+    onChanged: invalidate,
+  });
 
   const selectedIds = createMemo(() => {
     const id = selectedId();
@@ -298,6 +309,7 @@ export default function PurchaseOrderListPage() {
     q: q() || undefined,
     status: operationalFilter() || undefined,
     progressStatus: statusFilter() || undefined,
+    lifecycle: lifecycle.filter(),
   }));
 
   const onConfirm = async (row: PurchaseOrderRow) => {
@@ -310,7 +322,9 @@ export default function PurchaseOrderListPage() {
     invalidate();
   };
 
-  const openPo = (row: PurchaseOrderRow) => {
+  const openPo = async (row: PurchaseOrderRow) => {
+    const deleted = await lifecycle.resolveDeleted(row.id);
+    setViewingDeleted(deleted);
     setEditingPoId(row.id);
     setPoModalOpen(true);
   };
@@ -419,14 +433,21 @@ export default function PurchaseOrderListPage() {
               />
             ),
           },
+          {
+            key: "lifecycle",
+            header: "Manage",
+            sortable: false,
+            render: (r) => <lifecycle.RowAction id={r.id} label={r.purchase_order_no || r.date_no_display} />,
+          },
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onEdit={openPo}
+        onEdit={(row) => void openPo(row)}
         onNew={() => {
           setEditingPoId(null);
+          setViewingDeleted(false);
           setPoModalOpen(true);
         }}
         codeKey="purchase_order_no"
@@ -472,6 +493,7 @@ export default function PurchaseOrderListPage() {
                 </For>
               </select>
             </label>
+            <lifecycle.FilterControl />
           </div>
         }
         onRefresh={invalidate}
@@ -491,12 +513,16 @@ export default function PurchaseOrderListPage() {
       <PurchaseOrderModal
         open={poModalOpen()}
         purchaseOrderId={editingPoId()}
+        readOnly={viewingDeleted()}
+        lifecycle={lifecycle.filter()}
         onClose={() => {
           setPoModalOpen(false);
           setEditingPoId(null);
+          setViewingDeleted(false);
         }}
         onSaved={invalidate}
       />
+      <lifecycle.Dialog />
     </PurchaseRequestLayout>
   );
 }

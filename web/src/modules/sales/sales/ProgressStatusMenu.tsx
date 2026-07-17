@@ -8,6 +8,8 @@ type Props = {
   class?: string;
   disabled?: boolean;
   fallback?: string;
+  /** Values that must be reached through a dedicated action, not direct selection. */
+  excludeValues?: readonly string[];
 };
 
 export function ProgressStatusMenu(props: Props) {
@@ -16,7 +18,16 @@ export function ProgressStatusMenu(props: Props) {
     const v = (props.value ?? "").trim();
     return v || fallback();
   };
-  const groups = () => progressStatusGroups();
+  const groups = () => {
+    const excluded = new Set(props.excludeValues ?? []);
+    return progressStatusGroups()
+      .map((group) => ({
+        ...group,
+        // Keep the current value visible for documents already in that state.
+        options: group.options.filter((opt) => opt.value === current() || !excluded.has(opt.value)),
+      }))
+      .filter((group) => group.options.length > 0);
+  };
   return (
     <select
       class={props.class ?? inputClass}

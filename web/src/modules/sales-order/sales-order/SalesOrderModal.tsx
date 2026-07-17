@@ -13,6 +13,7 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
@@ -92,6 +93,8 @@ export type SalesOrderDetail = {
 type Props = {
   open: boolean;
   editing: SalesOrderDetail | null;
+  /** Deleted (soft-deleted) document opened for viewing — no edits allowed. */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -258,9 +261,6 @@ export function SalesOrderModal(props: Props) {
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
     enabled: () => props.open,
-    // Create-only: the reset effect below (keyed on props.open/props.editing) runs synchronously
-    // before this draft's async recovery resolves, so applying here can't be clobbered by it.
-    autoApply: () => props.open && !props.editing,
   });
 
   const onTaxTypeChange = async (newId: number | null) => {
@@ -397,6 +397,7 @@ export function SalesOrderModal(props: Props) {
   };
 
   const save = async () => {
+    if (props.readOnly) return;
     if (!taxTypeId()) {
       toast.warning("Please select a transaction type.");
       return;
@@ -511,9 +512,10 @@ export function SalesOrderModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={effectiveEditing() ? "Edit Sales Order (upcoming sale)" : "New Sales Order (upcoming sale)"}
+        title={effectiveEditing() ? (props.readOnly ? "View Sales Order (deleted)" : "Edit Sales Order (upcoming sale)") : "New Sales Order (upcoming sale)"}
         onClose={() => props.onClose()}
         onSave={() => void save()}
+        readOnly={props.readOnly}
         saving={saving()}
         headerActions={
           <Show when={effectiveEditing()}>
@@ -528,6 +530,7 @@ export function SalesOrderModal(props: Props) {
           </Show>
         }
       >
+        <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
         <draft.DraftBanner />
         <CoaSetupReminder />
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -778,6 +781,7 @@ export function SalesOrderModal(props: Props) {
         />
         <ChangeLogPanel targetType="so_sales_order" targetId={effectiveEditing()?.id} />
         <EmailHistoryPanel docType="sales_order" docId={effectiveEditing()?.id} />
+        </LifecycleReadOnlyShell>
       </WideEntityModal>
 
       <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="so_sales_order" targetId={effectiveEditing()?.id} title="History — Sales Order" />

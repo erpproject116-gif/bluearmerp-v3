@@ -3,12 +3,15 @@ package finance
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/ledger"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
 func buildORPostingEvent(tenantID, receiptID int64, lines []journalLineBody) ledger.PostingEvent {
@@ -65,14 +68,41 @@ func buildPVPostingEvent(tenantID, paymentID, partnerID int64, amountTotal, with
 	}
 }
 
-func journalAlreadyPosted(ctx context.Context, tx pgx.Tx, tenantID int64, sourceType string, sourceID int64) (bool, error) {
+type rowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// sourceJournalPosted reports whether a posted GL journal entry already exists
+// for the given source document. This is the source of truth for "posted":
+// audit-only posting-log rows (written when tenant auto-post is disabled) do
+// not count, so they cannot permanently block a later legitimate auto-post.
+func sourceJournalPosted(ctx context.Context, q rowQuerier, tenantID int64, sourceType string, sourceID int64) (bool, error) {
 	var exists bool
-	err := tx.QueryRow(ctx, `
+	err := q.QueryRow(ctx, `
 		select exists(
-		  select 1 from public.fin_posting_log
-		  where tenant_id = $1 and source_type = $2 and source_id = $3 and poster_kind = 'audit'
-		)`, tenantID, sourceType, sourceID).Scan(&exists)
+		  select 1 from public.fin_journal_entries
+		  where tenant_id = $1 and entry_no = $2 and status = 'posted'
+		)`, tenantID, ledger.EntryNo(sourceType, sourceID)).Scan(&exists)
 	return exists, err
+}
+
+// blockIfPosted writes a 409 (or 500 on lookup failure) and returns true when
+// the source document already has a posted GL journal entry. Callers must
+// return immediately when it reports true.
+func blockIfPosted(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, tenantID int64, sourceType string, sourceID int64, action string) bool {
+	posted, err := sourceJournalPosted(r.Context(), pool, tenantID, sourceType, sourceID)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to check posting status.", "ERR_INTERNAL")
+		return true
+	}
+	if posted {
+		response.Err(w, http.StatusConflict,
+			fmt.Sprintf("This document is posted to the general ledger (journal entry %s). %s is blocked; reverse or cancel the journal entry first.",
+				ledger.EntryNo(sourceType, sourceID), action),
+			"ERR_POSTED_LOCKED")
+		return true
+	}
+	return false
 }
 
 func postWithJournalPoster(ctx context.Context, tx pgx.Tx, tenantID int64, ev ledger.PostingEvent) error {
@@ -80,13 +110,19 @@ func postWithJournalPoster(ctx context.Context, tx pgx.Tx, tenantID int64, ev le
 	if err != nil {
 		return fmt.Errorf("load process policy: %w", err)
 	}
-	poster := ledger.JournalPoster{AutoOR: policy.AccountsAutoPostOR, AutoPV: policy.AccountsAutoPostPV}
+	poster := ledger.JournalPoster{
+		AutoOR:            policy.AccountsAutoPostOR,
+		AutoPV:            policy.AccountsAutoPostPV,
+		RequireJEApproval: policy.FinanceRequireJEApproval,
+	}
 	return PostLedgerEventTx(ctx, tx, poster, ev)
 }
 
 // PostLedgerEventTx posts a sub-ledger event using the supplied poster within tx.
+// It skips only when a posted journal entry already exists for the document,
+// so audit-only markers never suppress a later real post.
 func PostLedgerEventTx(ctx context.Context, tx pgx.Tx, poster ledger.JournalPoster, ev ledger.PostingEvent) error {
-	already, err := journalAlreadyPosted(ctx, tx, ev.TenantID, ev.SourceType, ev.SourceID)
+	already, err := sourceJournalPosted(ctx, tx, ev.TenantID, ev.SourceType, ev.SourceID)
 	if err != nil {
 		return err
 	}

@@ -21,6 +21,7 @@ import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../share
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 
 type PageOptions = { openNewOnMount?: boolean };
 
@@ -42,9 +43,8 @@ function listBasePath(pathname: string) {
 }
 
 export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
-  const auth = useAuth();
   const toast = useToast();
-  const canQc = () => hasPermission(auth.me, "quality.qc_requests", "write");
+  const auth = useAuth();
   const loc = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,22 +58,17 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<SupplierInvoiceDetail | null>(null);
+  const [viewingDeleted, setViewingDeleted] = createSignal(false);
   const [viewRow, setViewRow] = createSignal<SupplierInvoiceRow | null>(null);
-  const [qcCreatingId, setQcCreatingId] = createSignal<number | null>(null);
 
-  const createQcRequest = async (row: SupplierInvoiceRow) => {
-    setQcCreatingId(row.id);
-    const res = await apiFetch("/api/v1/quality/qc-requests", {
-      method: "POST",
-      body: JSON.stringify({ source_type: "supplier_invoice", supplier_invoice_id: row.id }),
-    });
-    setQcCreatingId(null);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to create QC request.");
-      return;
-    }
-    toast.success("QC request created.");
-  };
+  const lifecycle = useDocumentLifecycle({
+    apiBase: "/api/v1/finance/supplier-invoices",
+    documentLabel: "purchase invoice",
+    canManage: () =>
+      hasPermission(auth.me, "finance.supplier_invoices", "write") ||
+      hasPermission(auth.me, "purchases.purchases", "write"),
+    onChanged: invalidate,
+  });
 
   const list = useSupplierInvoiceList(() => ({
     page: page(),
@@ -83,17 +78,23 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
     q: q() || undefined,
     progressStatus: statusFilter() || undefined,
     paymentStatus: paymentStatus() || undefined,
+    lifecycle: lifecycle.filter(),
   }));
 
   const openNew = () => {
     setEditing(null);
+    setViewingDeleted(false);
     setModalOpen(true);
   };
 
   const openEdit = async (row: SupplierInvoiceRow) => {
-    const res = await apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${row.id}`);
+    const [res, deleted] = await Promise.all([
+      apiFetch<SupplierInvoiceDetail>(lifecycle.detailUrl(row.id)),
+      lifecycle.resolveDeleted(row.id),
+    ]);
     if (!res.success || !res.data) return;
     setEditing(res.data);
+    setViewingDeleted(deleted);
     setModalOpen(true);
   };
 
@@ -163,26 +164,6 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
             render: (r) => paymentStatusLabel(r.payment_status),
           },
           {
-            key: "qc",
-            header: "QC",
-            sortable: false,
-            render: (r) => (
-              <Show when={canQc()}>
-                <button
-                  type="button"
-                  class="text-xs text-brand-600 hover:underline disabled:opacity-50"
-                  disabled={qcCreatingId() === r.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void createQcRequest(r);
-                  }}
-                >
-                  {qcCreatingId() === r.id ? "Creating…" : "Create QC Request"}
-                </button>
-              </Show>
-            ),
-          },
-          {
             key: "history",
             header: "History",
             sortable: false,
@@ -194,6 +175,12 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
                 title={`History — ${r.invoice_no}`}
               />
             ),
+          },
+          {
+            key: "lifecycle",
+            header: "Manage",
+            sortable: false,
+            render: (r) => <lifecycle.RowAction id={r.id} label={r.invoice_no || r.date_no_display} />,
           },
         ]}
         rows={list.data?.rows ?? []}
@@ -221,16 +208,19 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         statusLabel="Progress"
         statusOptions={[...DOC_PROGRESS_STATUS_TABS]}
         toolbarExtra={
-          <label class="shrink-0">
-            <span class="mb-1 block text-xs font-medium text-text-primary">Payment</span>
-            <select
-              class="h-10 rounded-lg border border-stroke bg-white px-3 text-sm text-text-primary"
-              value={paymentStatus()}
-              onChange={(e) => setPaymentFilter(e.currentTarget.value)}
-            >
-              <For each={PAYMENT_STATUS_OPTIONS}>{(opt) => <option value={opt.value}>{opt.label}</option>}</For>
-            </select>
-          </label>
+          <div class="flex flex-wrap items-end gap-2">
+            <label class="shrink-0">
+              <span class="mb-1 block text-xs font-medium text-text-primary">Payment</span>
+              <select
+                class="h-10 rounded-lg border border-stroke bg-white px-3 text-sm text-text-primary"
+                value={paymentStatus()}
+                onChange={(e) => setPaymentFilter(e.currentTarget.value)}
+              >
+                <For each={PAYMENT_STATUS_OPTIONS}>{(opt) => <option value={opt.value}>{opt.label}</option>}</For>
+              </select>
+            </label>
+            <lifecycle.FilterControl />
+          </div>
         }
         onRefresh={invalidate}
         settingsHref={PURCHASES_SETTINGS_HREF.purchases}
@@ -238,11 +228,13 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
       <SupplierInvoiceModal
         open={modalOpen()}
         editing={editing()}
+        readOnly={viewingDeleted()}
         onClose={closeModal}
         onSaved={() => {
           invalidate();
         }}
       />
+      <lifecycle.Dialog />
       <WideEntityModal
         open={viewRow() != null}
         title={viewRow() ? `Purchase ${viewRow()!.invoice_no} — Invoice` : "Invoice"}

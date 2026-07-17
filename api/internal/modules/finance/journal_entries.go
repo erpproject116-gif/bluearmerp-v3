@@ -9,8 +9,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -136,6 +138,22 @@ func postJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 		if errs := validatePostingDate(r.Context(), pool, tu.TenantID, entryDate); len(errs) > 0 {
 			response.Validation(w, errs)
 			return
+		}
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if policy.FinanceRequireJEApproval {
+			status, found, err := approval.Status(r.Context(), pool, tu.TenantID, "journal_entry", id)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to check approval.", "ERR_INTERNAL")
+				return
+			}
+			if v := processpolicy.ValidateJournalEntryPost(policy, found, status); v != nil {
+				response.Validation(w, v)
+				return
+			}
 		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.fin_journal_entries set status='posted', posted_at=now(), updated_at=now()

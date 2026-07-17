@@ -148,7 +148,7 @@ func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Po
 	}
 	defer tx.Rollback(ctx)
 
-	if errs := validateSupplierInvoiceLines(ctx, tx, tu.TenantID, body.PartnerID, policy.PurchaseRequireGRBeforeSupplierInv, body.Lines); errs != nil {
+	if errs := validateSupplierInvoiceLines(ctx, tx, tu.TenantID, body.PartnerID, policy, body.Lines); errs != nil {
 		return 0, docflowValidation(errs)
 	}
 
@@ -184,7 +184,7 @@ func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Po
 		var itemCode, itemName string
 		var poLineID *int64
 		if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
-			_, polID, _, err := grLineBalance(ctx, tx, tu.TenantID, *ln.GoodsReceiptLineID)
+			_, polID, _, _, err := grLineBalance(ctx, tx, tu.TenantID, *ln.GoodsReceiptLineID)
 			if err != nil {
 				return 0, err
 			}

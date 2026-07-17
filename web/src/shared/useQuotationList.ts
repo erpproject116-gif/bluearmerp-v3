@@ -8,6 +8,7 @@ export type QuotationListParams = {
   order: "asc" | "desc";
   q?: string;
   progressStatus?: string;
+  lifecycle?: string;
 };
 
 export type QuotationRow = {
@@ -45,6 +46,7 @@ export function useQuotationList(params: () => QuotationListParams) {
     });
     if (p.q) qs.set("q", p.q);
     if (p.progressStatus) qs.set("progress_status", p.progressStatus);
+    if (p.lifecycle && p.lifecycle !== "active") qs.set("lifecycle", p.lifecycle);
 
     return {
       queryKey: ["quotations", p],

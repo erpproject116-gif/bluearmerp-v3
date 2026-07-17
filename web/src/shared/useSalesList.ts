@@ -9,6 +9,7 @@ export type SalesListParams = {
   q?: string;
   progressStatus?: string;
   invoicingStatus?: string;
+  lifecycle?: string;
 };
 
 export type SalesRow = {
@@ -49,6 +50,7 @@ export function useSalesList(params: () => SalesListParams) {
     if (p.q) qs.set("q", p.q);
     if (p.progressStatus) qs.set("progress_status", p.progressStatus);
     if (p.invoicingStatus) qs.set("invoicing_status", p.invoicingStatus);
+    if (p.lifecycle && p.lifecycle !== "active") qs.set("lifecycle", p.lifecycle);
 
     return {
       queryKey: ["sales", p],

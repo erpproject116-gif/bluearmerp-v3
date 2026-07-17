@@ -13,6 +13,7 @@ import { PURCHASES_ENTITY } from "../../../shared/entityTypes";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
@@ -49,6 +50,8 @@ export type { SupplierInvoiceDetail as PurchaseDetail };
 type Props = {
   open: boolean;
   editing: SupplierInvoiceDetail | null;
+  /** Deleted (soft-deleted) document opened for viewing — no edits allowed. */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -213,9 +216,7 @@ export function SupplierInvoiceModal(props: Props) {
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
     enabled: () => props.open,
-    // Create-only: the reset effect below sets fields synchronously and only fires an async
-    // preview fetch for date-no/invoice-no (not part of this payload), so autoApply can't race.
-    autoApply: () => props.open && !props.editing,
+    // Banner-only: show Restore/Discard so the user chooses (ECOUNT-style recovery).
   });
 
   const loadPreview = async (date: string) => {
@@ -363,6 +364,7 @@ export function SupplierInvoiceModal(props: Props) {
   };
 
   const save = async () => {
+    if (props.readOnly) return;
     if (!taxTypeId()) {
       toast.warning("Please select a transaction type.");
       return;
@@ -474,7 +476,9 @@ export function SupplierInvoiceModal(props: Props) {
     if (autoOk) {
       toast.success("Accounting invoice prepared from CoA defaults.");
     }
-    setPostSaveOpen(true);
+    // Saving is terminal for this transaction window. Payment and printing
+    // remain available after reopening the saved purchase from the list.
+    props.onClose();
   };
 
   const finishPostSave = () => {
@@ -486,9 +490,10 @@ export function SupplierInvoiceModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={effectiveEditing() ? "Edit Purchase (actual purchase)" : "New Purchase (actual purchase)"}
+        title={effectiveEditing() ? (props.readOnly ? "View Purchase Invoice (deleted)" : "Edit Purchase Invoice") : "New Purchase Invoice"}
         onClose={props.onClose}
         onSave={activeTab() === "details" ? () => void save() : undefined}
+        readOnly={props.readOnly}
         saving={saving()}
         tabs={effectiveEditing() ? [{ id: "details", label: "Details" }, { id: "invoice", label: "Invoice" }] : undefined}
         activeTab={activeTab()}
@@ -510,6 +515,8 @@ export function SupplierInvoiceModal(props: Props) {
           </Show>
         }
       >
+        <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
+        <draft.DraftBanner />
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
             kind="purchase"
@@ -529,7 +536,6 @@ export function SupplierInvoiceModal(props: Props) {
           />
         </Show>
         <Show when={activeTab() === "details"}>
-          <draft.DraftBanner />
           <CoaSetupReminder />
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Date-no">
@@ -644,6 +650,7 @@ export function SupplierInvoiceModal(props: Props) {
                 <ProgressStatusMenu
                   value={progressStatus()}
                   disabled={m.disabled || progressStatus() === "e_approval"}
+                  excludeValues={["e_approval"]}
                   onChange={setProgressStatus}
                 />
               )}
@@ -769,6 +776,7 @@ export function SupplierInvoiceModal(props: Props) {
             <ChangeLogPanel targetType="fin_supplier_invoice" targetId={effectiveEditing()!.id} />
           </Show>
         </Show>
+        </LifecycleReadOnlyShell>
       </WideEntityModal>
 
       <OpenGRLinePickerModal

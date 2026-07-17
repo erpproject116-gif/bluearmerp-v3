@@ -179,8 +179,8 @@ export const appModules: AppModule[] = [
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
-      { label: "List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings" },
-      { label: "Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Invoice List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Invoice Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
       {
         label: "Pre-invoicing",
         href: "/app/sales/sales/pre-invoicing",
@@ -201,7 +201,7 @@ export const appModules: AppModule[] = [
     ],
     subBranches: [
       {
-        label: "Group Invoicing",
+        label: "Group / Tax Invoicing",
         prefix: COLLECTIVE_INVOICING_PREFIX,
         href: "/app/sales/collective-invoicing/list",
         settingsHref: "/app/sales/sales/settings",
@@ -277,8 +277,8 @@ export const appModules: AppModule[] = [
     href: "/app/purchases/purchases",
     basePath: "/app/purchases",
     features: [
-      { label: "List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
-      { label: "Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Purchase Invoice List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Purchase Invoice Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       {
         label: "Pre-invoicing",
         href: "/app/purchases/purchases/pre-invoicing",

@@ -15,6 +15,7 @@ import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../share
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
@@ -91,6 +92,8 @@ export type QuotationDetail = {
 type Props = {
   open: boolean;
   editing: QuotationDetail | null;
+  /** Deleted (soft-deleted) document opened for viewing — no edits allowed. */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -243,9 +246,6 @@ export function QuotationModal(props: Props) {
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
     enabled: () => props.open,
-    // Create-only: the reset effect below (guarded by initializedKey) runs synchronously before
-    // this draft's async recovery resolves, so applying here can't be clobbered by it.
-    autoApply: () => props.open && !props.editing,
   });
 
   const onTaxTypeChange = async (newId: number | null) => {
@@ -346,6 +346,7 @@ export function QuotationModal(props: Props) {
   });
 
   const save = async () => {
+    if (props.readOnly) return;
     if (!taxTypeId()) {
       toast.warning("Please select a transaction type.");
       return;
@@ -459,9 +460,10 @@ export function QuotationModal(props: Props) {
     <>
     <WideEntityModal
       open={props.open}
-      title={effectiveEditing() ? "Edit Quotation" : "New Quotation"}
+      title={effectiveEditing() ? (props.readOnly ? "View Quotation (deleted)" : "Edit Quotation") : "New Quotation"}
       onClose={() => props.onClose()}
       onSave={() => void save()}
+      readOnly={props.readOnly}
       saving={saving()}
       headerActions={
         <Show when={effectiveEditing()}>
@@ -480,6 +482,7 @@ export function QuotationModal(props: Props) {
         </Show>
       }
     >
+      <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
       <draft.DraftBanner />
       <CoaSetupReminder />
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -700,6 +703,7 @@ export function QuotationModal(props: Props) {
       />
       <ChangeLogPanel targetType="quo_quotation" targetId={effectiveEditing()?.id} />
       <EmailHistoryPanel docType="quotation" docId={effectiveEditing()?.id} />
+      </LifecycleReadOnlyShell>
     </WideEntityModal>
 
     <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={effectiveEditing()?.id} title="History — Quotation" />

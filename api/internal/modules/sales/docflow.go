@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -33,6 +34,52 @@ func docflowValidation(fields map[string]string) error {
 	return &docflowValidationError{fields: fields}
 }
 
+// validateSourceSOApproval enforces the SO approval policy for every sales order
+// referenced by the sale (header source SO and any SO-linked lines).
+func validateSourceSOApproval(ctx context.Context, pool *pgxpool.Pool, tenantID int64, policy processpolicy.Policy, headerSOID *int64, lines []saleLineBody) map[string]string {
+	if !policy.SalesRequireSOApproval {
+		return nil
+	}
+	soIDs := map[int64]bool{}
+	if headerSOID != nil && *headerSOID > 0 {
+		soIDs[*headerSOID] = true
+	}
+	var lineIDs []int64
+	for _, ln := range lines {
+		if ln.SourceSalesOrderLineID != nil && *ln.SourceSalesOrderLineID > 0 {
+			lineIDs = append(lineIDs, *ln.SourceSalesOrderLineID)
+		}
+	}
+	if len(lineIDs) > 0 {
+		rows, err := pool.Query(ctx, `
+			select distinct ln.sales_order_id
+			from public.so_sales_order_lines ln
+			join public.so_sales_orders so on so.id = ln.sales_order_id
+			where ln.id = any($1) and so.tenant_id = $2`, lineIDs, tenantID)
+		if err != nil {
+			return map[string]string{"lines": "Failed to resolve source sales orders."}
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var soID int64
+			if err := rows.Scan(&soID); err != nil {
+				return map[string]string{"lines": "Failed to resolve source sales orders."}
+			}
+			soIDs[soID] = true
+		}
+	}
+	for soID := range soIDs {
+		status, found, err := approval.Status(ctx, pool, tenantID, "sales_order", soID)
+		if err != nil {
+			return map[string]string{"lines": "Failed to check sales order approval."}
+		}
+		if v := processpolicy.ValidateSalesOrderApproval(policy, found, status); v != nil {
+			return map[string]string{"lines": v["sales_order_id"]}
+		}
+	}
+	return nil
+}
+
 // CreateFromSalesOrder creates a sales invoice from open sales order lines.
 // If a sale already exists for the sales order, the existing id is returned.
 func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, soID int64) (int64, error) {
@@ -51,6 +98,15 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 	policy, err := processpolicy.Load(ctx, pool, tu.TenantID)
 	if err != nil {
 		return 0, err
+	}
+	if policy.SalesRequireSOApproval {
+		status, found, err := approval.Status(ctx, pool, tu.TenantID, "sales_order", soID)
+		if err != nil {
+			return 0, err
+		}
+		if v := processpolicy.ValidateSalesOrderApproval(policy, found, status); v != nil {
+			return 0, docflowValidation(v)
+		}
 	}
 	useDelivery := !policy.LegacyCombinedSORelease
 
