@@ -62,7 +62,7 @@ type Props<T extends { id: number }> = {
 };
 
 function selectionSet(ids?: Set<number> | number[]): Set<number> {
-  if (!ids) return new Set();
+  if (!ids) return new Set<number>();
   return ids instanceof Set ? ids : new Set(ids);
 }
 

@@ -102,7 +102,7 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
   const [loadingImpact, setLoadingImpact] = createSignal(false);
   const [reason, setReason] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
-  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set<number>());
   const [bulkOpen, setBulkOpen] = createSignal(false);
   const [bulkAction, setBulkAction] = createSignal<"delete" | "restore">("delete");
   const [bulkSubmitting, setBulkSubmitting] = createSignal(false);
@@ -112,7 +112,7 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
 
   const setFilter = (value: string) => {
     setFilterSignal(value === "deleted" || value === "all" ? value : "active");
-    setSelectedIds(new Set());
+    setSelectedIds(new Set<number>());
   };
 
   const onSelectionChange = (ids: Set<number>) => setSelectedIds(new Set(ids));
@@ -224,7 +224,7 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
     const ok = res.data.deleted ?? res.data.restored ?? 0;
     if (ok > 0) {
       toast.success(`Bulk ${act}: ${ok} succeeded, ${res.data.skipped} skipped.`);
-      setSelectedIds(new Set());
+      setSelectedIds(new Set<number>());
       opts.onChanged();
     } else {
       toast.warning(`No ${opts.documentLabel}s were ${act === "delete" ? "deleted" : "restored"}.`);

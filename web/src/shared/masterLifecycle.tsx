@@ -52,7 +52,7 @@ type Options = {
 export function useMasterLifecycle(opts: Options) {
   const toast = useToast();
   const [filter, setFilterSignal] = createSignal<LifecycleFilter>("active");
-  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set<number>());
   const [bulkOpen, setBulkOpen] = createSignal(false);
   const [bulkAction, setBulkAction] = createSignal<"delete" | "restore">("delete");
   const [bulkSubmitting, setBulkSubmitting] = createSignal(false);
@@ -62,7 +62,7 @@ export function useMasterLifecycle(opts: Options) {
 
   const setFilter = (value: string) => {
     setFilterSignal(value === "deleted" || value === "all" ? value : "active");
-    setSelectedIds(new Set());
+    setSelectedIds(new Set<number>());
   };
 
   const onSelectionChange = (ids: Set<number>) => setSelectedIds(new Set(ids));
@@ -97,7 +97,7 @@ export function useMasterLifecycle(opts: Options) {
     const ok = res.data.deleted ?? res.data.restored ?? 0;
     if (ok > 0) {
       toast.success(`Bulk ${act}: ${ok} succeeded, ${res.data.skipped} skipped.`);
-      setSelectedIds(new Set());
+      setSelectedIds(new Set<number>());
       opts.onChanged();
     } else {
       toast.warning(`No ${opts.entityLabel}s were ${act === "delete" ? "deleted" : "restored"}.`);
