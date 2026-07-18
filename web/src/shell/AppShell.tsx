@@ -245,9 +245,9 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <SetupReminderBar />
           <Show when={featureNavModule()}>
             {(mod) => (
-              <Show when={visibleHeaderFeatures(mod()).length > 0}>
+              <Show when={visibleHeaderFeatures(mod(), auth.me).length > 0}>
                 <nav class="erp-header-features mt-3" aria-label={`${moduleLabel(mod())} features`}>
-                  {visibleHeaderFeatures(mod())
+                  {visibleHeaderFeatures(mod(), auth.me)
                     .filter((feature) => {
                       if (mod().id === "crm") {
                         if (feature.analyticsOnly && !canViewCrmAnalytics(auth.me)) return false;
@@ -260,7 +260,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                       return true;
                     })
                     .map((feature) => {
-                      const features = visibleHeaderFeatures(mod());
+                      const features = visibleHeaderFeatures(mod(), auth.me);
                       const hasExactTab = features.some(
                         (f) => f.href === loc.pathname || f.settingsHref === loc.pathname,
                       );

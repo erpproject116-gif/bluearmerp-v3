@@ -1,6 +1,7 @@
 import { A } from "@solidjs/router";
 import { For, Show, createMemo } from "solid-js";
 import { hasModuleAccess, hasPermission, useAuth } from "./auth-context";
+import { isTenantFeatureEnabled, isTenantModuleEnabled } from "./moduleAccess";
 import { useDashboardRedFlags, useDashboardSummary } from "./useDashboard";
 
 type DayJob = {
@@ -29,7 +30,10 @@ export function DayJobsPanel() {
     const flagCount = (code: string) => flags.find((c) => c.code === code)?.count ?? 0;
     const list: DayJob[] = [];
 
-    if (hasModuleAccess(m, "sales") || hasPermission(m, "sales.sales", "write") || hasPermission(m, "sales", "read")) {
+    if (
+      isTenantModuleEnabled(m, "sales") &&
+      (hasModuleAccess(m, "sales") || hasPermission(m, "sales.sales", "write") || hasPermission(m, "sales", "read"))
+    ) {
       list.push({
         id: "sell",
         title: "Sell",
@@ -38,7 +42,10 @@ export function DayJobsPanel() {
         count: (s?.quotes_expiring_7d ?? 0) + flagCount("dr_without_invoice"),
       });
     }
-    if (hasModuleAccess(m, "sales_order") || hasPermission(m, "sales_order", "read")) {
+    if (
+      isTenantModuleEnabled(m, "sales_order") &&
+      (hasModuleAccess(m, "sales_order") || hasPermission(m, "sales_order", "read"))
+    ) {
       list.push({
         id: "deliver",
         title: "Deliver / pick",
@@ -47,7 +54,13 @@ export function DayJobsPanel() {
         count: flagCount("so_release_gap") + flagCount("reserve_without_dr"),
       });
     }
-    if (hasModuleAccess(m, "purchase_request") || hasPermission(m, "purchase_request", "read") || hasPermission(m, "purchases", "read")) {
+    if (
+      isTenantModuleEnabled(m, "purchase_order") &&
+      (hasModuleAccess(m, "purchase_request") ||
+        hasModuleAccess(m, "purchase_order") ||
+        hasPermission(m, "purchase_request", "read") ||
+        hasPermission(m, "purchases", "read"))
+    ) {
       list.push({
         id: "receive",
         title: "Receive stock",
@@ -55,6 +68,11 @@ export function DayJobsPanel() {
         href: "/app/purchase-order/goods-receipt",
         count: flagCount("open_po") + (s?.open_po_lines ?? 0),
       });
+    }
+    if (
+      isTenantModuleEnabled(m, "purchases") &&
+      (hasModuleAccess(m, "purchases") || hasPermission(m, "purchases", "read"))
+    ) {
       list.push({
         id: "bill-vendor",
         title: "Bill a supplier",
@@ -63,7 +81,7 @@ export function DayJobsPanel() {
         count: flagCount("gr_without_supplier_invoice"),
       });
     }
-    if (hasModuleAccess(m, "finance") || hasPermission(m, "finance", "read")) {
+    if (isTenantModuleEnabled(m, "finance") && (hasModuleAccess(m, "finance") || hasPermission(m, "finance", "read"))) {
       list.push({
         id: "collect",
         title: "Record payment in",
@@ -71,14 +89,19 @@ export function DayJobsPanel() {
         href: "/app/finance/official-receipts",
         count: s?.ar_customers ?? 0,
       });
-      list.push({
-        id: "pay",
-        title: "Pay a supplier",
-        blurb: "Payment voucher for vendor bills.",
-        href: "/app/finance/payment-vouchers",
-      });
+      if (isTenantFeatureEnabled(m, "finance.payment_vouchers", "finance")) {
+        list.push({
+          id: "pay",
+          title: "Pay a supplier",
+          blurb: "Payment voucher for vendor bills.",
+          href: "/app/finance/payment-vouchers",
+        });
+      }
     }
-    if (hasModuleAccess(m, "pos") || hasPermission(m, "pos", "write") || hasPermission(m, "pos", "read")) {
+    if (
+      isTenantModuleEnabled(m, "pos") &&
+      (hasModuleAccess(m, "pos") || hasPermission(m, "pos", "write") || hasPermission(m, "pos", "read"))
+    ) {
       list.push({
         id: "pos",
         title: "Open POS",
@@ -86,7 +109,7 @@ export function DayJobsPanel() {
         href: "/app/pos",
       });
     }
-    if (hasModuleAccess(m, "hr") || hasPermission(m, "hr", "read")) {
+    if (isTenantModuleEnabled(m, "hr") && (hasModuleAccess(m, "hr") || hasPermission(m, "hr", "read"))) {
       list.push({
         id: "hr",
         title: "HR & payroll",
@@ -94,7 +117,10 @@ export function DayJobsPanel() {
         href: "/app/hr/employees",
       });
     }
-    if (hasPermission(m, "inventory", "read") || hasModuleAccess(m, "inventory")) {
+    if (
+      isTenantModuleEnabled(m, "inventory") &&
+      (hasPermission(m, "inventory", "read") || hasModuleAccess(m, "inventory"))
+    ) {
       list.push({
         id: "stock",
         title: "Check stock",

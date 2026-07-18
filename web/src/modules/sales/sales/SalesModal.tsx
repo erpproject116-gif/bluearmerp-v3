@@ -25,7 +25,7 @@ import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { tryAutoSaveSalesInvoice } from "../../../shared/invoiceApi";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
-import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
+import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
@@ -1048,7 +1048,7 @@ export function SalesModal(props: Props) {
         <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">
           <LoadSlipMenu
             disabled={!partnerId()}
-            options={SALES_LOAD_SLIP_OPTIONS}
+            options={filterLoadSlipOptions(SALES_LOAD_SLIP_OPTIONS, auth.me)}
             onSelect={(id) => {
               if (id === "so") setSoPickerOpen(true);
               if (id === "quotation") setQuotationPickerOpen(true);

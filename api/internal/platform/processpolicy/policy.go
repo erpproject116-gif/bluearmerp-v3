@@ -133,13 +133,8 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, erro
 	return p, err
 }
 
-// Update merges a patch into the stored policy.
-func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, patch Patch) (Policy, error) {
-	current, err := Load(ctx, pool, tenantID)
-	if err != nil {
-		return Policy{}, err
-	}
-
+// ApplyPatch merges non-nil patch fields onto current.
+func ApplyPatch(current Policy, patch Patch) Policy {
 	next := current
 	if patch.SalesRequireQuotation != nil {
 		next.SalesRequireQuotation = *patch.SalesRequireQuotation
@@ -212,8 +207,39 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 	if patch.SupplierInvoiceRequireAttachment != nil {
 		next.SupplierInvoiceRequireAttachment = *patch.SupplierInvoiceRequireAttachment
 	}
+	return next
+}
 
-	_, err = pool.Exec(ctx, `
+func writePolicyArgs(tenantID, userID int64, next Policy) []any {
+	return []any{
+		tenantID,
+		next.SalesRequireQuotation,
+		next.SalesRequireSO,
+		next.SalesRequireReservation,
+		next.SalesRequireDeliveryReceipt,
+		next.PurchaseRequirePR,
+		next.PurchaseRequirePRApproval,
+		next.PurchaseRequireGRBeforeSupplierInv,
+		next.LegacyCombinedSORelease,
+		next.SalesEnforceCreditLimit,
+		next.AccountsAutoPostOR,
+		next.AccountsAutoPostPV,
+		next.AccountsAutoPostSales,
+		next.AccountsAutoPostPurchase,
+		next.SalesRequireSOApproval,
+		next.PurchaseRequirePOApproval,
+		next.FinanceRequireJEApproval,
+		next.BudgetControlMode,
+		next.QuotationRequireAttachment,
+		next.SalesOrderRequireAttachment,
+		next.SalesRequireAttachment,
+		next.PurchaseOrderRequireAttachment,
+		next.SupplierInvoiceRequireAttachment,
+		userID,
+	}
+}
+
+const updatePolicySQL = `
 		update public.tenant_process_policies set
 		  sales_require_quotation = $2,
 		  sales_require_so = $3,
@@ -239,32 +265,30 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 		  supplier_invoice_require_attachment = $23,
 		  updated_by_user_id = $24,
 		  updated_at = now()
-		where tenant_id = $1`,
-		tenantID,
-		next.SalesRequireQuotation,
-		next.SalesRequireSO,
-		next.SalesRequireReservation,
-		next.SalesRequireDeliveryReceipt,
-		next.PurchaseRequirePR,
-		next.PurchaseRequirePRApproval,
-		next.PurchaseRequireGRBeforeSupplierInv,
-		next.LegacyCombinedSORelease,
-		next.SalesEnforceCreditLimit,
-		next.AccountsAutoPostOR,
-		next.AccountsAutoPostPV,
-		next.AccountsAutoPostSales,
-		next.AccountsAutoPostPurchase,
-		next.SalesRequireSOApproval,
-		next.PurchaseRequirePOApproval,
-		next.FinanceRequireJEApproval,
-		next.BudgetControlMode,
-		next.QuotationRequireAttachment,
-		next.SalesOrderRequireAttachment,
-		next.SalesRequireAttachment,
-		next.PurchaseOrderRequireAttachment,
-		next.SupplierInvoiceRequireAttachment,
-		userID,
-	)
+		where tenant_id = $1`
+
+// Update merges a patch into the stored policy.
+func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, patch Patch) (Policy, error) {
+	current, err := Load(ctx, pool, tenantID)
+	if err != nil {
+		return Policy{}, err
+	}
+	next := ApplyPatch(current, patch)
+	_, err = pool.Exec(ctx, updatePolicySQL, writePolicyArgs(tenantID, userID, next)...)
+	if err != nil {
+		return Policy{}, err
+	}
+	return next, nil
+}
+
+// UpdateTx merges a patch inside an existing transaction.
+func UpdateTx(ctx context.Context, tx pgx.Tx, tenantID, userID int64, patch Patch) (Policy, error) {
+	current, err := LoadTx(ctx, tx, tenantID)
+	if err != nil {
+		return Policy{}, err
+	}
+	next := ApplyPatch(current, patch)
+	_, err = tx.Exec(ctx, updatePolicySQL, writePolicyArgs(tenantID, userID, next)...)
 	if err != nil {
 		return Policy{}, err
 	}

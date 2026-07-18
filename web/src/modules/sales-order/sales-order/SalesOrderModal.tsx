@@ -11,6 +11,7 @@ import { handleSaveResult, requireFields } from "../../../shared/handleSaveResul
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { useAuth } from "../../../shared/auth-context";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
@@ -25,7 +26,7 @@ import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocum
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
-import { LoadSlipMenu, SALES_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
+import { LoadSlipMenu, SALES_ORDER_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import {
   QuotationLinePickerModal,
   type PickedQuotationLine,
@@ -158,6 +159,7 @@ function linesFromDetail(lines?: SalesOrderDetail["lines"]): SalesOrderLineRow[]
 
 export function SalesOrderModal(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
   const processPolicy = useProcessPolicy(() => props.open);
   const [attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
@@ -762,7 +764,7 @@ export function SalesOrderModal(props: Props) {
         </div>
         <div class="col-span-full mb-2">
           <LoadSlipMenu
-            options={SALES_ORDER_LOAD_SLIP_OPTIONS}
+            options={filterLoadSlipOptions(SALES_ORDER_LOAD_SLIP_OPTIONS, auth.me)}
             onSelect={(id) => {
               if (id === "quotation") setQuotationPickerOpen(true);
             }}

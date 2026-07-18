@@ -317,6 +317,7 @@ export const knowledgebaseArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
+          "Turn off steps you don’t use under User Management → Modules & Features (or each module’s Setup tab).",
           "Open /app/setup/process-policies or User Management → Process Policies.",
           "Review gates: Sales require SO, Sales require quotation, Purchase require PR, GR before supplier invoice, reservation before release.",
           "Choose legacy combined SO release (stock on pick list) vs split mode (delivery note issues stock).",

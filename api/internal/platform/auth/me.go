@@ -37,7 +37,9 @@ type MePayload struct {
 }
 
 func fullModuleAccess(tu TenantUser) bool {
-	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.AutoEnableAllModules
+	// Platform operators and tenants with auto_enable_all_modules see every module as on.
+	// Tenant owners otherwise respect tenant_modules so Simple store / feature hide works for admins too.
+	return tu.IsPlatformSuperadmin || tu.AutoEnableAllModules
 }
 
 func MeHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {

@@ -4,6 +4,9 @@
  * every step says what you do, in what order, and where to click next.
  */
 
+import type { MeData } from "./auth-context";
+import { isTenantFeatureEnabled, isTenantModuleEnabled } from "./moduleAccess";
+
 export type WorkflowStep = {
   id: string;
   /** Short label for the step chip, e.g. "Quotation". */
@@ -18,6 +21,11 @@ export type WorkflowStep = {
   routePrefixes?: string[];
   /** Step can be skipped in the flow — shown with an "Optional" badge. */
   optional?: boolean;
+  /** Hide step when this tenant module is disabled. */
+  moduleCode?: string;
+  /** Hide step when this tenant feature is disabled. */
+  featureCode?: string;
+  featureParentModuleId?: string;
 };
 
 export type WorkflowGuide = {
@@ -46,6 +54,7 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "Create a quotation listing the items and prices, then print or email it to the customer. Nothing leaves your stock yet — it is just an offer.",
         href: "/app/quotation/quotations",
         routePrefixes: ["/app/quotation"],
+        moduleCode: "quotation",
       },
       {
         id: "sales-order",
@@ -54,6 +63,7 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "When the customer says yes, turn the quotation into a sales order. Inside New Sales Order, click Load Slip → Quotation so the lines copy over — no retyping.",
         href: "/app/sales-order/sales-orders",
         routePrefixes: ["/app/sales-order"],
+        moduleCode: "sales_order",
       },
       {
         id: "deliver",
@@ -66,6 +76,7 @@ export const workflowGuides: WorkflowGuide[] = [
           "/app/sales-order/delivery-receipts",
           "/app/sales-order/shipping",
         ],
+        moduleCode: "sales_order",
       },
       {
         id: "invoice",
@@ -74,6 +85,7 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "Create the sales invoice — inside New Sales, click Load Slip → Sales Order to pull in what was delivered. This is the official record of the sale and what the customer owes.",
         href: "/app/sales/sales",
         routePrefixes: ["/app/sales", "/app/selling"],
+        moduleCode: "sales",
       },
       {
         id: "payment",
@@ -82,6 +94,7 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "When the customer pays, record it under Accounts → Receipts and apply it to their invoice. The invoice then shows as paid and your receivables stay accurate.",
         href: "/app/finance/official-receipts",
         routePrefixes: ["/app/finance/official-receipts"],
+        moduleCode: "finance",
       },
     ],
   },
@@ -100,6 +113,7 @@ export const workflowGuides: WorkflowGuide[] = [
         href: "/app/purchase-request/purchase-requests",
         routePrefixes: ["/app/purchase-request"],
         optional: true,
+        moduleCode: "purchase_request",
       },
       {
         id: "order",
@@ -108,6 +122,7 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "Create a purchase order for your supplier. Use Load Slip to copy lines from a purchase request, or use RFQ first to compare prices from several suppliers.",
         href: "/app/purchase-order/purchase-orders",
         routePrefixes: ["/app/purchase-order", "/app/buying"],
+        moduleCode: "purchase_order",
       },
       {
         id: "receive",
@@ -116,6 +131,7 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "When the delivery arrives, create a goods receipt from the purchase order and scan serial numbers if the items are tracked. Posting the receipt puts the items into your stock.",
         href: "/app/purchase-order/goods-receipt",
         routePrefixes: ["/app/purchase-order/goods-receipt"],
+        moduleCode: "purchase_order",
       },
       {
         id: "bill",
@@ -124,6 +140,7 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "Create the purchase (supplier invoice) — inside New Purchase, click Load Slip → Goods Receipt to pull in the received lines. This records exactly what you owe the supplier.",
         href: "/app/purchases/purchases",
         routePrefixes: ["/app/purchases"],
+        moduleCode: "purchases",
       },
       {
         id: "pay",
@@ -132,6 +149,9 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "Record your payment under Accounts → Vouchers and apply it to the supplier's bill. The bill then shows as paid and your payables stay accurate.",
         href: "/app/finance/payment-vouchers",
         routePrefixes: ["/app/finance/payment-vouchers"],
+        moduleCode: "finance",
+        featureCode: "finance.payment_vouchers",
+        featureParentModuleId: "finance",
       },
     ],
   },
@@ -148,6 +168,7 @@ export const workflowGuides: WorkflowGuide[] = [
         title: "Turn on tracking for the item (Items)",
         what: "Open the item and enable Track serial (or Track lot). Only tracked items ask for serial or lot numbers on documents — untracked items show a dash instead.",
         href: "/app/inventory/items",
+        moduleCode: "inventory",
       },
       {
         id: "receive",
@@ -155,6 +176,7 @@ export const workflowGuides: WorkflowGuide[] = [
         title: "Scan units in when receiving (Goods Receipt)",
         what: "On the goods receipt, scan each unit's serial number (or enter lot numbers and quantities). Posting the receipt registers every unit in your stock.",
         href: "/app/purchase-order/goods-receipt",
+        moduleCode: "purchase_order",
       },
       {
         id: "sell",
@@ -162,6 +184,7 @@ export const workflowGuides: WorkflowGuide[] = [
         title: "Scan units out when selling (Sales)",
         what: "On the sales document, scan the serial number of the exact unit that leaves the store. You can also scan a serial into the scan bar to add the item line automatically.",
         href: "/app/sales/sales",
+        moduleCode: "sales",
       },
       {
         id: "registry",
@@ -170,6 +193,9 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "The registry shows where every unit is and everything that happened to it — received, sold, returned, or adjusted. Use the reports here to reconcile counts.",
         href: "/app/inventory/serial-lot/registry",
         routePrefixes: ["/app/inventory/serial-lot"],
+        moduleCode: "inventory",
+        featureCode: "inventory.serial_lot",
+        featureParentModuleId: "inventory",
       },
     ],
   },
@@ -178,22 +204,46 @@ export const workflowGuides: WorkflowGuide[] = [
 export type ResolvedWorkflow = {
   guide: WorkflowGuide;
   stepIndex: number;
+  /** Steps after filtering disabled modules/features (same as guide.steps when unfiltered). */
+  visibleSteps: WorkflowStep[];
 };
 
+export function filterWorkflowSteps(steps: WorkflowStep[], me: MeData | null | undefined): WorkflowStep[] {
+  return steps.filter((step) => {
+    if (step.moduleCode && !isTenantModuleEnabled(me, step.moduleCode)) return false;
+    if (
+      step.featureCode &&
+      step.featureParentModuleId &&
+      !isTenantFeatureEnabled(me, step.featureCode, step.featureParentModuleId)
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
 /** Find the workflow and step that matches the current page, if any. */
-export function resolveWorkflowForPath(pathname: string): ResolvedWorkflow | null {
-  let best: { guide: WorkflowGuide; stepIndex: number; prefixLen: number } | null = null;
+export function resolveWorkflowForPath(
+  pathname: string,
+  me?: MeData | null,
+): ResolvedWorkflow | null {
+  let best: { guide: WorkflowGuide; stepIndex: number; prefixLen: number; visibleSteps: WorkflowStep[] } | null =
+    null;
   for (const guide of workflowGuides) {
-    for (let i = 0; i < guide.steps.length; i++) {
-      for (const prefix of guide.steps[i].routePrefixes ?? []) {
+    const visibleSteps = filterWorkflowSteps(guide.steps, me);
+    if (visibleSteps.length === 0) continue;
+    for (let i = 0; i < visibleSteps.length; i++) {
+      for (const prefix of visibleSteps[i].routePrefixes ?? []) {
         // Boundary-safe: "/app/sales" must not match "/app/sales-order/...".
         if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
           if (!best || prefix.length > best.prefixLen) {
-            best = { guide, stepIndex: i, prefixLen: prefix.length };
+            best = { guide, stepIndex: i, prefixLen: prefix.length, visibleSteps };
           }
         }
       }
     }
   }
-  return best ? { guide: best.guide, stepIndex: best.stepIndex } : null;
+  return best
+    ? { guide: { ...best.guide, steps: best.visibleSteps }, stepIndex: best.stepIndex, visibleSteps: best.visibleSteps }
+    : null;
 }

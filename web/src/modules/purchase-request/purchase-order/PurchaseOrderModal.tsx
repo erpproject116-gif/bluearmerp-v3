@@ -11,6 +11,7 @@ import { handleSaveResult, requireFields } from "../../../shared/handleSaveResul
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
+import { useAuth } from "../../../shared/auth-context";
 import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
 import {
   ACTIVE_CURRENCIES_KEY,
@@ -28,7 +29,7 @@ import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
-import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
+import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import {
   PurchaseRequestLineGrid,
@@ -200,6 +201,7 @@ function statusLabel(status: string): string {
 
 export function PurchaseOrderModal(props: Props) {
   const queryClient = useQueryClient();
+  const auth = useAuth();
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
   const { fields, byKey } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseOrder);
@@ -835,7 +837,7 @@ export function PurchaseOrderModal(props: Props) {
               <div class="mb-2">
                 <LoadSlipMenu
                   disabled={readOnly()}
-                  options={PURCHASE_ORDER_LOAD_SLIP_OPTIONS}
+                  options={filterLoadSlipOptions(PURCHASE_ORDER_LOAD_SLIP_OPTIONS, auth.me)}
                   onSelect={(id) => {
                     if (id === "pr") setPrPickerOpen(true);
                     if (id === "rfq") setSqPickerOpen(true);

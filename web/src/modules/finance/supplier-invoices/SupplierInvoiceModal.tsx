@@ -12,6 +12,7 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { PURCHASES_ENTITY } from "../../../shared/entityTypes";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { useAuth } from "../../../shared/auth-context";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
@@ -21,7 +22,7 @@ import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeCon
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
-import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS } from "../../../shared/LoadSlipMenu";
+import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
@@ -119,6 +120,7 @@ function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseReques
 
 export function SupplierInvoiceModal(props: Props) {
   const queryClient = useQueryClient();
+  const auth = useAuth();
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
   const { fields, byKey } = useFormFieldSettings(PURCHASES_ENTITY.purchases);
@@ -745,7 +747,7 @@ export function SupplierInvoiceModal(props: Props) {
           <div class="col-span-full mb-2 mt-2 flex flex-wrap items-center gap-2">
             <LoadSlipMenu
               disabled={!partnerId()}
-              options={PURCHASE_LOAD_SLIP_OPTIONS}
+              options={filterLoadSlipOptions(PURCHASE_LOAD_SLIP_OPTIONS, auth.me)}
               onSelect={(id) => {
                 if (id === "po") setPoPickerOpen(true);
                 if (id === "gr") setGrPickerOpen(true);
