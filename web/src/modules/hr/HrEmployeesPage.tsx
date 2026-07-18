@@ -2,8 +2,10 @@ import { createSignal, For, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import {
   createEmployee,
+  createHrDepartment,
   patchEmployee,
   useEmployees,
+  useHrDepartments,
   useInvalidateEmployees,
   type Employee,
 } from "../../shared/useHr";
@@ -15,9 +17,13 @@ import {
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
-import { DRAFT_ENTITY } from "../../shared/entityTypes";
+import { DRAFT_ENTITY, HR_ENTITY, HR_SETTINGS_HREF } from "../../shared/entityTypes";
 import { HrLayout } from "./HrLayout";
 import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
+import { UserSearchModal, type UserSearchRow } from "../purchase-request/purchase-request/UserSearchModal";
+import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
+import { requireFields } from "../../shared/handleSaveResult";
+import { useQueryClient } from "@tanstack/solid-query";
 
 const STATUS_OPTIONS = ["active", "inactive", "terminated"];
 
@@ -28,11 +34,16 @@ export default function HrEmployeesPage() {
   const [selected, setSelected] = createSignal<Employee | null>(null);
   const [employeeNo, setEmployeeNo] = createSignal("");
   const [fullName, setFullName] = createSignal("");
+  const [departmentId, setDepartmentId] = createSignal<number | null>(null);
   const [department, setDepartment] = createSignal("");
+  const [newDeptName, setNewDeptName] = createSignal("");
   const [jobTitle, setJobTitle] = createSignal("");
   const [hireDate, setHireDate] = createSignal(new Date().toISOString().slice(0, 10));
   const [status, setStatus] = createSignal("active");
   const [baseSalary, setBaseSalary] = createSignal("");
+  const [userId, setUserId] = createSignal<number | null>(null);
+  const [userLabel, setUserLabel] = createSignal("");
+  const [userSearchOpen, setUserSearchOpen] = createSignal(false);
   const [email, setEmail] = createSignal("");
   const [notes, setNotes] = createSignal("");
   const [tin, setTin] = createSignal("");
@@ -40,22 +51,30 @@ export default function HrEmployeesPage() {
   const [philhealthNo, setPhilhealthNo] = createSignal("");
   const [pagibigNo, setPagibigNo] = createSignal("");
   const [taxStatus, setTaxStatus] = createSignal("S");
+  const [bankName, setBankName] = createSignal("");
+  const [bankAccountNo, setBankAccountNo] = createSignal("");
   const [saving, setSaving] = createSignal(false);
   const [importing, setImporting] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateEmployees();
+  const qc = useQueryClient();
+  const depts = useHrDepartments();
+  const { fields } = useFormFieldSettings(HR_ENTITY.employee);
 
   const list = useEmployees(() => ({ page: page(), pageSize, q: q() || undefined }));
 
-  const openNew = () => {
-    setSelected(null);
+  const resetForm = () => {
     setEmployeeNo("");
     setFullName("");
+    setDepartmentId(null);
     setDepartment("");
+    setNewDeptName("");
     setJobTitle("");
     setHireDate(new Date().toISOString().slice(0, 10));
     setStatus("active");
     setBaseSalary("");
+    setUserId(null);
+    setUserLabel("");
     setEmail("");
     setNotes("");
     setTin("");
@@ -63,6 +82,13 @@ export default function HrEmployeesPage() {
     setPhilhealthNo("");
     setPagibigNo("");
     setTaxStatus("S");
+    setBankName("");
+    setBankAccountNo("");
+  };
+
+  const openNew = () => {
+    setSelected(null);
+    resetForm();
     setModalOpen(true);
   };
 
@@ -70,11 +96,14 @@ export default function HrEmployeesPage() {
     setSelected(row);
     setEmployeeNo(row.employee_no);
     setFullName(row.full_name);
+    setDepartmentId(row.department_id ?? null);
     setDepartment(row.department);
     setJobTitle(row.job_title);
     setHireDate(row.hire_date);
     setStatus(row.status);
     setBaseSalary(String(row.base_salary));
+    setUserId(row.user_id ?? null);
+    setUserLabel(row.user_id ? `User #${row.user_id}` : "");
     setEmail(row.email ?? "");
     setNotes(row.notes ?? "");
     setTin(row.tin ?? "");
@@ -82,17 +111,22 @@ export default function HrEmployeesPage() {
     setPhilhealthNo(row.philhealth_no ?? "");
     setPagibigNo(row.pagibig_no ?? "");
     setTaxStatus(row.tax_status || "S");
+    setBankName(row.bank_name ?? "");
+    setBankAccountNo(row.bank_account_no ?? "");
     setModalOpen(true);
   };
 
   const buildDraftPayload = () => ({
     employee_no: employeeNo(),
     full_name: fullName(),
+    department_id: departmentId(),
     department: department(),
     job_title: jobTitle(),
     hire_date: hireDate(),
     status: status(),
     base_salary: baseSalary(),
+    user_id: userId(),
+    user_label: userLabel(),
     email: email(),
     notes: notes(),
     tin: tin(),
@@ -100,16 +134,21 @@ export default function HrEmployeesPage() {
     philhealth_no: philhealthNo(),
     pagibig_no: pagibigNo(),
     tax_status: taxStatus(),
+    bank_name: bankName(),
+    bank_account_no: bankAccountNo(),
   });
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
     setEmployeeNo(payload.employee_no);
     setFullName(payload.full_name);
+    setDepartmentId(payload.department_id);
     setDepartment(payload.department);
     setJobTitle(payload.job_title);
     setHireDate(payload.hire_date);
     setStatus(payload.status);
     setBaseSalary(payload.base_salary);
+    setUserId(payload.user_id);
+    setUserLabel(payload.user_label);
     setEmail(payload.email);
     setNotes(payload.notes);
     setTin(payload.tin);
@@ -117,6 +156,8 @@ export default function HrEmployeesPage() {
     setPhilhealthNo(payload.philhealth_no);
     setPagibigNo(payload.pagibig_no);
     setTaxStatus(payload.tax_status);
+    setBankName(payload.bank_name);
+    setBankAccountNo(payload.bank_account_no);
   };
 
   const draft = useDocumentDraft({
@@ -128,20 +169,71 @@ export default function HrEmployeesPage() {
     autoApply: () => modalOpen() && !selected(),
   });
 
+  const onSelectUser = (row: UserSearchRow) => {
+    setUserId(row.id);
+    setUserLabel(`${row.full_name}${row.email ? ` (${row.email})` : ""}`);
+    setUserSearchOpen(false);
+  };
+
+  const addDepartment = async () => {
+    const name = newDeptName().trim();
+    if (!name) {
+      toast.warning("Enter a department name.");
+      return;
+    }
+    const res = await createHrDepartment({ department_name: name });
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Could not create department.");
+      return;
+    }
+    setNewDeptName("");
+    setDepartmentId(res.data.id);
+    setDepartment(res.data.department_name);
+    void qc.invalidateQueries({ queryKey: ["hr-departments"] });
+    toast.success("Department added.");
+  };
+
   const save = async () => {
+    const formValues = {
+      employee_no: employeeNo(),
+      full_name: fullName(),
+      department_id: departmentId(),
+      job_title: jobTitle(),
+      hire_date: hireDate(),
+      status: status(),
+      base_salary: baseSalary(),
+      user_id: userId(),
+      email: email(),
+      bank_name: bankName(),
+      bank_account_no: bankAccountNo(),
+      tin: tin(),
+      sss_no: sssNo(),
+      philhealth_no: philhealthNo(),
+      pagibig_no: pagibigNo(),
+      tax_status: taxStatus(),
+      notes: notes(),
+    };
+    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    if (clientError) {
+      toast.warning(clientError);
+      return;
+    }
     if (!fullName().trim()) {
       toast.warning("Full name is required.");
       return;
     }
     setSaving(true);
+    const dept = (depts.data ?? []).find((d) => d.id === departmentId());
     const body = {
       employee_no: employeeNo().trim(),
       full_name: fullName().trim(),
-      department: department().trim(),
+      department: dept?.department_name ?? department().trim(),
+      department_id: departmentId() || undefined,
       job_title: jobTitle().trim(),
       hire_date: hireDate(),
       status: status(),
       base_salary: Number(baseSalary()) || 0,
+      user_id: userId() && userId()! > 0 ? userId() : selected() ? 0 : undefined,
       email: email().trim() || undefined,
       notes: notes().trim() || undefined,
       tin: tin().trim() || undefined,
@@ -149,6 +241,8 @@ export default function HrEmployeesPage() {
       philhealth_no: philhealthNo().trim() || undefined,
       pagibig_no: pagibigNo().trim() || undefined,
       tax_status: taxStatus(),
+      bank_name: bankName().trim() || undefined,
+      bank_account_no: bankAccountNo().trim() || undefined,
     };
     const row = selected();
     const res = row ? await patchEmployee(row.id, body) : await createEmployee(body);
@@ -254,6 +348,7 @@ export default function HrEmployeesPage() {
         search={q()}
         onSearchChange={setQ}
         searchPlaceholder="Search employees…"
+        settingsHref={HR_SETTINGS_HREF.employee}
       />
       <EntityModal
         open={modalOpen()}
@@ -268,11 +363,42 @@ export default function HrEmployeesPage() {
             <input class={inputClass} value={employeeNo()} onInput={(e) => setEmployeeNo(e.currentTarget.value)} />
           </Field>
         </Show>
-        <Field label="Full name">
+        <Field label="Full name *">
           <input class={inputClass} value={fullName()} onInput={(e) => setFullName(e.currentTarget.value)} />
         </Field>
         <Field label="Department">
-          <input class={inputClass} value={department()} onInput={(e) => setDepartment(e.currentTarget.value)} />
+          <div class="space-y-2">
+            <select
+              class={inputClass}
+              value={departmentId() ?? ""}
+              onChange={(e) => {
+                const id = e.currentTarget.value ? Number(e.currentTarget.value) : null;
+                setDepartmentId(id);
+                const hit = (depts.data ?? []).find((d) => d.id === id);
+                setDepartment(hit?.department_name ?? "");
+              }}
+            >
+              <option value="">Select department…</option>
+              <For each={(depts.data ?? []).filter((d) => d.status === "active")}>
+                {(d) => (
+                  <option value={d.id}>
+                    {d.department_name}
+                  </option>
+                )}
+              </For>
+            </select>
+            <div class="flex gap-2">
+              <input
+                class={inputClass}
+                placeholder="Add new department…"
+                value={newDeptName()}
+                onInput={(e) => setNewDeptName(e.currentTarget.value)}
+              />
+              <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm whitespace-nowrap" onClick={() => void addDepartment()}>
+                Add
+              </button>
+            </div>
+          </div>
         </Field>
         <Field label="Job title">
           <input class={inputClass} value={jobTitle()} onInput={(e) => setJobTitle(e.currentTarget.value)} />
@@ -287,6 +413,33 @@ export default function HrEmployeesPage() {
         </Field>
         <Field label="Base salary">
           <input type="number" min="0" step="0.01" class={inputClass} value={baseSalary()} onInput={(e) => setBaseSalary(e.currentTarget.value)} />
+        </Field>
+        <Field label="ESS login user">
+          <div class="flex flex-wrap items-center gap-2">
+            <input class={`${inputClass} flex-1`} readOnly value={userLabel()} placeholder="Link a login user for My HR (ESS)…" />
+            <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setUserSearchOpen(true)}>
+              Search
+            </button>
+            <Show when={userId()}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-red-600"
+                onClick={() => {
+                  setUserId(null);
+                  setUserLabel("");
+                }}
+              >
+                Clear
+              </button>
+            </Show>
+          </div>
+          <p class="mt-1 text-[11px] text-text-secondary">Required for the employee to see payslips under My HR (ESS).</p>
+        </Field>
+        <Field label="Bank name">
+          <input class={inputClass} value={bankName()} onInput={(e) => setBankName(e.currentTarget.value)} />
+        </Field>
+        <Field label="Bank account no.">
+          <input class={inputClass} value={bankAccountNo()} onInput={(e) => setBankAccountNo(e.currentTarget.value)} />
         </Field>
         <Field label="TIN">
           <input class={inputClass} value={tin()} onInput={(e) => setTin(e.currentTarget.value)} />
@@ -317,6 +470,7 @@ export default function HrEmployeesPage() {
           {(id) => <EmployeeExtrasPanel employeeId={id()} />}
         </Show>
       </EntityModal>
+      <UserSearchModal open={userSearchOpen()} onClose={() => setUserSearchOpen(false)} onSelect={onSelectUser} />
     </HrLayout>
   );
 }

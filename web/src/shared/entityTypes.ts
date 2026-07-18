@@ -112,6 +112,16 @@ export const CRM_SETTINGS_HREF = {
 
 export type CrmFeature = keyof typeof CRM_ENTITY;
 
+export const HR_ENTITY = {
+  employee: "hr_employee",
+} as const;
+
+export const HR_SETTINGS_HREF = {
+  employee: "/app/hr/employees/settings",
+} as const;
+
+export type HrFeature = keyof typeof HR_ENTITY;
+
 /** Entity type strings for the unsaved-form draft hook (`useDocumentDraft`). Reuses existing
  * entity constants where one already exists for that record type. */
 export const DRAFT_ENTITY = {

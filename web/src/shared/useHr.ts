@@ -6,10 +6,12 @@ export type Employee = {
   employee_no: string;
   full_name: string;
   department: string;
+  department_id?: number | null;
   job_title: string;
   hire_date: string;
   status: string;
   base_salary: number;
+  user_id?: number | null;
   email?: string;
   notes?: string | null;
   tin?: string;
@@ -17,6 +19,15 @@ export type Employee = {
   philhealth_no?: string;
   pagibig_no?: string;
   tax_status?: string;
+  bank_name?: string;
+  bank_account_no?: string;
+};
+
+export type HrDepartment = {
+  id: number;
+  department_code: string;
+  department_name: string;
+  status: string;
 };
 
 export type PayPeriod = {
@@ -70,6 +81,22 @@ export function useEmployees(params: () => { page: number; pageSize: number; q?:
 export function useInvalidateEmployees() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: ["hr-employees"] });
+}
+
+export function useHrDepartments() {
+  return createQuery(() => ({
+    queryKey: ["hr-departments"],
+    queryFn: async () => {
+      const res = await apiFetch<HrDepartment[]>("/api/v1/hr/departments");
+      if (!res.success) throw new Error(res.message ?? "Failed to load departments");
+      return res.data ?? [];
+    },
+    staleTime: 30_000,
+  }));
+}
+
+export async function createHrDepartment(body: { department_name: string; department_code?: string }) {
+  return apiFetch<HrDepartment>("/api/v1/hr/departments", { method: "POST", body: JSON.stringify(body) });
 }
 
 export function usePayPeriods() {

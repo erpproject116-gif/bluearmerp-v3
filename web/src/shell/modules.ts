@@ -376,7 +376,7 @@ export const appModules: AppModule[] = [
     href: "/app/hr/employees",
     basePath: "/app/hr",
     features: [
-      { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees" },
+      { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees/settings" },
       { label: "Attendance / DTR", href: "/app/hr/attendance", settingsHref: "/app/hr/attendance" },
       { label: "Pay items", href: "/app/hr/pay-items", settingsHref: "/app/hr/pay-items" },
       { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },

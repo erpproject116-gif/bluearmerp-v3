@@ -191,6 +191,7 @@ import {
   PosPage,
   PosSettingsPage,
   HrEmployeesPage,
+  HrEmployeesSettingsPage,
   PayrollRunsPage,
   RemittancesPage,
   AttendancePage,
@@ -224,6 +225,11 @@ import {
   GeneralLedgerReportPage,
   ProfitAndLossReportPage,
   BalanceSheetReportPage,
+  CashFlowStatementPage,
+  CashBookReportPage,
+  CustomerVendorBookIIPage,
+  ArAgingDetailsPage,
+  ApAgingDetailsPage,
   ArAgingReportPage,
   ApAgingReportPage,
   ArApStatusReportPage,
@@ -522,6 +528,12 @@ export default function App() {
           <Route path="/finance/acct-ii/checks" component={CheckRegisterPage} />
           <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
           <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
+          <Route path="/finance/acct-i/reports/cash-flow-statement" component={CashFlowStatementPage} />
+          <Route path="/finance/acct-i/reports/cash-book" component={() => <CashBookReportPage />} />
+          <Route
+            path="/finance/acct-i/reports/fund-statement"
+            component={() => <CashBookReportPage title="Fund Statement" apiPath="/api/v1/finance/reports/fund-statement" exportName="fund-statement.csv" />}
+          />
           <Route path="/finance/acct-i/reports/general-ledger" component={GeneralLedgerReportPage} />
           <Route path="/finance/acct-i/reports/trial-balance" component={TrialBalanceReportPage} />
           <Route path="/finance/acct-i/payment-entries" component={PaymentEntriesPage} />
@@ -557,6 +569,10 @@ export default function App() {
           <Route path="/finance/reports/profit-and-loss" component={() => <Navigate href="/app/finance/acct-i/reports/profit-and-loss" />} />
           <Route path="/finance/reports/balance-sheet" component={() => <Navigate href="/app/finance/acct-i/reports/balance-sheet" />} />
           <Route path="/finance/reports/ar-aging" component={ArAgingReportPage} />
+          <Route path="/finance/reports/ar-aging-details" component={ArAgingDetailsPage} />
+          <Route path="/finance/reports/ap-aging-details" component={ApAgingDetailsPage} />
+          <Route path="/finance/reports/customer-vendor-book-ii-ar" component={() => <CustomerVendorBookIIPage bookType="ar" />} />
+          <Route path="/finance/reports/customer-vendor-book-ii-ap" component={() => <CustomerVendorBookIIPage bookType="ap" />} />
           <Route path="/finance/reports/ap-aging" component={ApAgingReportPage} />
           <Route path="/finance/reports/ar-ap-status" component={ArApStatusReportPage} />
           <Route path="/finance/reports/acct-inventory-reconciliation" component={AcctInventoryReconciliationPage} />
@@ -642,6 +658,9 @@ export default function App() {
           )} />
           <Route path="/operations" component={() => (
             <OperationsRoute><OperationsHubPage /></OperationsRoute>
+          )} />
+          <Route path="/hr/employees/settings" component={() => (
+            <HrRoute><HrEmployeesSettingsPage /></HrRoute>
           )} />
           <Route path="/hr/employees" component={() => (
             <HrRoute><HrEmployeesPage /></HrRoute>

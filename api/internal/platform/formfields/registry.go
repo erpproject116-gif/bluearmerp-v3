@@ -174,6 +174,25 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "end_date", Label: "End date", FieldType: "date", SortOrder: 70},
 		{FieldKey: "description", Label: "Description", FieldType: "textarea", SortOrder: 80},
 	},
+	"hr_employee": {
+		{FieldKey: "employee_no", Label: "Employee #", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "full_name", Label: "Full name", FieldType: "text", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "department_id", Label: "Department", FieldType: "select", SortOrder: 30},
+		{FieldKey: "job_title", Label: "Job title", FieldType: "text", SortOrder: 40},
+		{FieldKey: "hire_date", Label: "Hire date", FieldType: "date", DefaultRequired: true, SortOrder: 50},
+		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 60},
+		{FieldKey: "base_salary", Label: "Base salary", FieldType: "number", SortOrder: 70},
+		{FieldKey: "user_id", Label: "ESS login user", FieldType: "select", SortOrder: 80},
+		{FieldKey: "email", Label: "Email", FieldType: "text", SortOrder: 90},
+		{FieldKey: "bank_name", Label: "Bank name", FieldType: "text", SortOrder: 100},
+		{FieldKey: "bank_account_no", Label: "Bank account no.", FieldType: "text", SortOrder: 110},
+		{FieldKey: "tin", Label: "TIN", FieldType: "text", SortOrder: 120},
+		{FieldKey: "sss_no", Label: "SSS no.", FieldType: "text", SortOrder: 130},
+		{FieldKey: "philhealth_no", Label: "PhilHealth no.", FieldType: "text", SortOrder: 140},
+		{FieldKey: "pagibig_no", Label: "Pag-IBIG no.", FieldType: "text", SortOrder: 150},
+		{FieldKey: "tax_status", Label: "Tax status", FieldType: "select", SortOrder: 160},
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 170},
+	},
 }
 
 func StandardFields(entityType string) []StandardField {

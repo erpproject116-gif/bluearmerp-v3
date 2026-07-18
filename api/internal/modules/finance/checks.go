@@ -23,6 +23,7 @@ type Check struct {
 	PayeeName     string  `json:"payee_name"`
 	Amount        float64 `json:"amount"`
 	Status        string  `json:"status"`
+	CheckKind     string  `json:"check_kind"`
 }
 
 type checkBody struct {
@@ -32,6 +33,7 @@ type checkBody struct {
 	PayeeName     string  `json:"payee_name"`
 	Amount        float64 `json:"amount"`
 	Status        string  `json:"status"`
+	CheckKind     string  `json:"check_kind"`
 }
 
 func registerCheckRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -44,7 +46,8 @@ func listChecks(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		rows, err := pool.Query(r.Context(), `
-			select id, check_no, check_date::text, bank_account_id, payee_name, amount::float8, status
+			select id, check_no, check_date::text, bank_account_id, payee_name, amount::float8, status,
+			  coalesce(check_kind, 'issued')
 			from public.fin_checks
 			where tenant_id = $1
 			order by check_date desc, check_no desc`, tu.TenantID)
@@ -56,7 +59,7 @@ func listChecks(pool *pgxpool.Pool) http.HandlerFunc {
 		var out []Check
 		for rows.Next() {
 			var row Check
-			if err := rows.Scan(&row.ID, &row.CheckNo, &row.CheckDate, &row.BankAccountID, &row.PayeeName, &row.Amount, &row.Status); err != nil {
+			if err := rows.Scan(&row.ID, &row.CheckNo, &row.CheckDate, &row.BankAccountID, &row.PayeeName, &row.Amount, &row.Status, &row.CheckKind); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read checks.", "ERR_INTERNAL")
 				return
 			}
@@ -91,18 +94,29 @@ func createCheck(pool *pgxpool.Pool) http.HandlerFunc {
 		if status == "" {
 			status = "issued"
 		}
+		kind := strings.ToLower(strings.TrimSpace(body.CheckKind))
+		if kind == "" {
+			kind = "issued"
+		}
+		if kind != "issued" && kind != "received" {
+			response.Validation(w, map[string]string{"check_kind": "Must be issued or received."})
+			return
+		}
+		if kind == "received" && status == "issued" {
+			status = "received"
+		}
 		var id int64
 		err := pool.QueryRow(r.Context(), `
-			insert into public.fin_checks (tenant_id, check_no, check_date, bank_account_id, payee_name, amount, status, created_by_user_id)
-			values ($1, $2, $3::date, $4, $5, $6, $7, $8)
+			insert into public.fin_checks (tenant_id, check_no, check_date, bank_account_id, payee_name, amount, status, check_kind, created_by_user_id)
+			values ($1, $2, $3::date, $4, $5, $6, $7, $8, $9)
 			returning id`,
-			tu.TenantID, checkNo, checkDate, body.BankAccountID, payee, body.Amount, status, tu.AppUserID,
+			tu.TenantID, checkNo, checkDate, body.BankAccountID, payee, body.Amount, status, kind, tu.AppUserID,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create check.", "ERR_INTERNAL")
 			return
 		}
-		row := Check{ID: id, CheckNo: checkNo, CheckDate: checkDate, BankAccountID: body.BankAccountID, PayeeName: payee, Amount: body.Amount, Status: status}
+		row := Check{ID: id, CheckNo: checkNo, CheckDate: checkDate, BankAccountID: body.BankAccountID, PayeeName: payee, Amount: body.Amount, Status: status, CheckKind: kind}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.check.create", "fin_check", &id, nil, body)
 		response.OK(w, row, "Created.")
 	}
@@ -125,13 +139,13 @@ func patchCheckStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		status := strings.TrimSpace(body.Status)
 		switch status {
-		case "issued", "cleared", "stale", "cancelled":
+		case "issued", "cleared", "stale", "cancelled", "void", "received", "deposited", "outstanding":
 		default:
 			response.Validation(w, map[string]string{"status": "Invalid status."})
 			return
 		}
 		clearedAt := interface{}(nil)
-		if status == "cleared" {
+		if status == "cleared" || status == "deposited" {
 			clearedAt = time.Now()
 		}
 		tag, err := pool.Exec(r.Context(), `
