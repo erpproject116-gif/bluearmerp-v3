@@ -444,6 +444,9 @@ export default function PurchaseOrderListPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openPo(row)}
         onNew={() => {
           setEditingPoId(null);
@@ -493,6 +496,7 @@ export default function PurchaseOrderListPage() {
                 </For>
               </select>
             </label>
+            <lifecycle.BulkToolbar />
             <lifecycle.FilterControl />
           </div>
         }
@@ -523,6 +527,7 @@ export default function PurchaseOrderListPage() {
         onSaved={invalidate}
       />
       <lifecycle.Dialog />
+      <lifecycle.BulkDialog />
     </PurchaseRequestLayout>
   );
 }

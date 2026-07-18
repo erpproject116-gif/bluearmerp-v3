@@ -284,6 +284,9 @@ export function SalesListPageInner(props: PageOptions = {}) {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
         codeKey="sales_no"
@@ -309,7 +312,12 @@ export function SalesListPageInner(props: PageOptions = {}) {
         ]}
         onRefresh={invalidate}
         settingsHref={SALES_SETTINGS_HREF.sales}
-        toolbarExtra={<lifecycle.FilterControl />}
+        toolbarExtra={
+          <div class="flex flex-wrap items-end gap-2">
+            <lifecycle.BulkToolbar />
+            <lifecycle.FilterControl />
+          </div>
+        }
       />
 
       <SalesModal
@@ -321,6 +329,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
         onSaved={invalidate}
       />
       <lifecycle.Dialog />
+      <lifecycle.BulkDialog />
     </SalesLayout>
   );
 }

@@ -315,7 +315,7 @@ func exportItemsCSV(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		extra := parseItemListFilters(r)
-		where, args := buildItemListWhere(tu.TenantID, p, extra)
+		where, args := buildItemListWhere(tu.TenantID, p, extra, "i.deleted_at is null")
 		orderCol := "i.item_code"
 		if col, ok := allowed[p.Sort]; ok {
 			orderCol = "i." + col

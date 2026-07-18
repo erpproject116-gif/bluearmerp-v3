@@ -50,7 +50,7 @@ func listProjects(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		p := httputil.ParseListParams(r, "project_code", allowed)
 		offset := httputil.Offset(p)
-		where, args := buildWhere(tu.TenantID, p, "project_name", "project_code")
+		where, args := buildWhere(tu.TenantID, p, "project_name", "project_code", "deleted_at is null")
 		q := fmt.Sprintf(`select id, project_code, project_name, status, count(*) over() from public.inv_projects where %s order by %s %s limit $%d offset $%d`,
 			where, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
 		args = append(args, p.PageSize, offset)

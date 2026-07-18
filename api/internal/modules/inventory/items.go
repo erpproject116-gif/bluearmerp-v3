@@ -79,7 +79,10 @@ func registerItemRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/items/import", itemImportCSVHandler(pool))
 	r.Get("/items", listItems(pool))
 	r.Post("/items", createItem(pool))
+	r.Post("/items/actions/bulk-delete", bulkSoftDeleteHandler(pool, "inv_items", "inventory.item.delete", "inv_item"))
+	r.Post("/items/actions/bulk-restore", bulkSoftRestoreHandler(pool, "inv_items", "inventory.item.restore", "inv_item"))
 	r.Patch("/items/{id}", updateItem(pool))
+	r.Post("/items/{id}/restore", softRestoreHandler(pool, "inv_items", "inventory.item.restore", "inv_item"))
 	r.Delete("/items/{id}", deleteItem(pool))
 }
 
@@ -98,7 +101,12 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
 		extra := parseItemListFilters(r)
-		where, args := buildItemListWhere(tu.TenantID, p, extra)
+		lc, err := parseMasterLifecycle(r)
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where, args := buildItemListWhere(tu.TenantID, p, extra, deletedAtPredicateAliased("i", lc))
 		orderCol := "i.item_code"
 		if col, ok := allowed[p.Sort]; ok {
 			orderCol = "i." + col

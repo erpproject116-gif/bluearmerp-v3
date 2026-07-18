@@ -12,8 +12,9 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { PURCHASES_ENTITY } from "../../../shared/entityTypes";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
-import { useAuth } from "../../../shared/auth-context";
+import { useAuth, hasPermission } from "../../../shared/auth-context";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
@@ -35,6 +36,8 @@ import { OpenSupplierQuotationLinePickerModal } from "./OpenSupplierQuotationLin
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import { QuickLocationModal } from "../../../shared/QuickLocationModal";
+import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -140,11 +143,16 @@ export function SupplierInvoiceModal(props: Props) {
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [showNewVendor, setShowNewVendor] = createSignal(false);
   const [newVendorName, setNewVendorName] = createSignal("");
+  const [showNewLocation, setShowNewLocation] = createSignal(false);
+  const [newLocationName, setNewLocationName] = createSignal("");
+  const [showNewTaxType, setShowNewTaxType] = createSignal(false);
+  const [newTaxTypeName, setNewTaxTypeName] = createSignal("");
   const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
   const [invoiceDate, setInvoiceDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [invoiceNo, setInvoiceNo] = createSignal("");
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
+  const [taxTypeLabel, setTaxTypeLabel] = createSignal("");
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
   const [vendorLabel, setVendorLabel] = createSignal("");
@@ -165,6 +173,13 @@ export function SupplierInvoiceModal(props: Props) {
   const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
+
+  createEffect(() => {
+    const id = taxTypeId();
+    if (id == null || taxTypeLabel()) return;
+    const meta = taxTypes().find((t) => t.id === id);
+    if (meta) setTaxTypeLabel(formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent));
+  });
 
   const buildDraftPayload = () => ({
     invoice_date: invoiceDate(),
@@ -192,6 +207,7 @@ export function SupplierInvoiceModal(props: Props) {
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
     setInvoiceDate(payload.invoice_date);
     setTaxTypeId(payload.tax_type_id);
+    setTaxTypeLabel("");
     setCurrencyId(payload.currency_id);
     setPartnerId(payload.partner_id);
     setVendorLabel(payload.vendor_label);
@@ -242,6 +258,7 @@ export function SupplierInvoiceModal(props: Props) {
       setDateNoDisplay(ed.date_no_display);
       setInvoiceNo(ed.invoice_no);
       setTaxTypeId(ed.tax_type_id ?? null);
+      setTaxTypeLabel(ed.tax_type_name ?? "");
       setCurrencyId(ed.currency_id);
       setPartnerId(ed.partner_id);
       setVendorLabel(ed.vendor_name);
@@ -294,6 +311,7 @@ export function SupplierInvoiceModal(props: Props) {
     if (!taxTypeId()) {
       const first = tt[0];
       setTaxTypeId(first.id);
+      setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
       setLines([emptyPurchaseRequestLine(1, "", basis)]);
     }
@@ -308,9 +326,17 @@ export function SupplierInvoiceModal(props: Props) {
     void loadPreview(invoiceDate());
   });
 
+  const fetchTaxTypeOptions = async (q: string): Promise<LookupOption[]> => {
+    const qq = q.trim().toLowerCase();
+    return taxTypes()
+      .filter((t) => !qq || t.name.toLowerCase().includes(qq))
+      .map((t) => ({ id: t.id, label: formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent) }));
+  };
+
   const onTaxTypeChange = async (newId: number | null) => {
     setTaxTypeId(newId);
     const meta = taxTypes().find((t) => t.id === newId);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     if (!newId || !meta) return;
     const recalc = await recalculatePurchaseRequestLines(lines(), newId, meta);
     setLines(recalc);
@@ -518,6 +544,7 @@ export function SupplierInvoiceModal(props: Props) {
         }
       >
         <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
+        <ModalFormGuide guideId="supplier_invoice" />
         <draft.DraftBanner />
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
@@ -556,26 +583,30 @@ export function SupplierInvoiceModal(props: Props) {
                 <DateInput value={dueDate()} disabled={m.disabled} onInput={(e) => setDueDate(e.currentTarget.value)} />
               )}
             </ModalField>
-            <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
-              {(m) => (
-                <>
-                  <select
-                    class={inputClass}
-                    value={taxTypeId() ?? ""}
-                    disabled={m.disabled}
-                    onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-                  >
-                    <option value="">Select…</option>
-                    <For each={taxTypes()}>
-                      {(t) => <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>}
-                    </For>
-                  </select>
-                  <Show when={selectedTaxType()}>
-                    {(t) => <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>}
-                  </Show>
-                </>
-              )}
-            </ModalField>
+            <ModalLookupField
+              settings={byKey}
+              fieldKey="tax_type_id"
+              fallbackLabel="Transaction type"
+              fallbackRequired
+              value={taxTypeLabel}
+              selectedId={taxTypeId}
+              onInput={setTaxTypeLabel}
+              onSelect={(o) => void onTaxTypeChange(o.id)}
+              onClear={() => void onTaxTypeChange(null)}
+              fetchOptions={fetchTaxTypeOptions}
+              createLabel="Add tax type"
+              onCreate={
+                hasPermission(auth.me, "quotation.tax_types", "write")
+                  ? (q) => {
+                      setNewTaxTypeName(q);
+                      setShowNewTaxType(true);
+                    }
+                  : undefined
+              }
+            />
+            <Show when={selectedTaxType()}>
+              {(t) => <p class="mt-1 text-xs text-text-secondary md:col-span-2">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>}
+            </Show>
             <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
               {(m) => (
                 <select
@@ -646,6 +677,15 @@ export function SupplierInvoiceModal(props: Props) {
                 setLocationLabel("");
               }}
               fetchOptions={fetchLocations}
+              createLabel="Add location"
+              onCreate={
+                hasPermission(auth.me, "inventory.locations", "write")
+                  ? (q) => {
+                      setNewLocationName(q);
+                      setShowNewLocation(true);
+                    }
+                  : undefined
+              }
             />
             <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
               {(m) => (
@@ -852,6 +892,28 @@ export function SupplierInvoiceModal(props: Props) {
         onCreated={(p) => {
           setPartnerId(p.id);
           setVendorLabel(p.company_name);
+        }}
+      />
+
+      <QuickLocationModal
+        open={showNewLocation()}
+        initialName={newLocationName()}
+        onClose={() => setShowNewLocation(false)}
+        onCreated={(l) => {
+          setLocationId(l.id);
+          setLocationLabel(l.location_name);
+        }}
+      />
+
+      <QuickTaxTypeModal
+        open={showNewTaxType()}
+        initialName={newTaxTypeName()}
+        onClose={() => setShowNewTaxType(false)}
+        onCreated={(t) => {
+          void queryClient.invalidateQueries({ queryKey: ["quotation-tax-types"] });
+          setTaxTypeId(t.id);
+          setTaxTypeLabel(formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent));
+          void recalculatePurchaseRequestLines(lines(), t.id, t).then(setLines);
         }}
       />
     </>

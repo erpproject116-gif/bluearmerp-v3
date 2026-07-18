@@ -187,6 +187,9 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
         codeKey="invoice_no"
@@ -219,6 +222,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
                 <For each={PAYMENT_STATUS_OPTIONS}>{(opt) => <option value={opt.value}>{opt.label}</option>}</For>
               </select>
             </label>
+            <lifecycle.BulkToolbar />
             <lifecycle.FilterControl />
           </div>
         }
@@ -235,6 +239,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         }}
       />
       <lifecycle.Dialog />
+      <lifecycle.BulkDialog />
       <WideEntityModal
         open={viewRow() != null}
         title={viewRow() ? `Purchase ${viewRow()!.invoice_no} — Invoice` : "Invoice"}

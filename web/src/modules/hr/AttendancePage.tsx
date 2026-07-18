@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useEmployees } from "../../shared/useHr";
 import { downloadDtrImportTemplate, importDtrCsv } from "../../shared/hrCsvImport";
+import { HrMappedImportModal } from "./HrMappedImportModal";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
@@ -60,6 +61,7 @@ export default function AttendancePage() {
   const [dtrNightDiff, setDtrNightDiff] = createSignal("0");
   const [selectedDtrId, setSelectedDtrId] = createSignal<number | null>(null);
   const [importingDtr, setImportingDtr] = createSignal(false);
+  const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
 
   const holidays = createQuery(() => ({
     queryKey: ["hr-holidays", year],
@@ -306,6 +308,13 @@ export default function AttendancePage() {
                 }}
               />
             </label>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+              onClick={() => setMappedImportOpen(true)}
+            >
+              Import with mapping…
+            </button>
           </div>
         </div>
         <p class="mb-3 text-sm text-text-secondary">
@@ -366,6 +375,12 @@ export default function AttendancePage() {
           total={(dtr.data ?? []).length}
         />
       </section>
+      <HrMappedImportModal
+        open={mappedImportOpen()}
+        kind="dtr"
+        onClose={() => setMappedImportOpen(false)}
+        onImported={() => void qc.invalidateQueries({ queryKey: ["hr-dtr"] })}
+      />
     </HrLayout>
   );
 }

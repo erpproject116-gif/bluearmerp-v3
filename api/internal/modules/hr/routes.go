@@ -21,6 +21,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 			registerAttendanceRoutes(admin, pool)
 			registerPayItemRoutes(admin, pool)
 			registerEmployeeDocRoutes(admin, pool)
+			registerImportProfileRoutes(admin, pool)
 			registerSpecialRunRoutes(admin, pool)
 			registerBiometricRoutes(admin, pool)
 		})

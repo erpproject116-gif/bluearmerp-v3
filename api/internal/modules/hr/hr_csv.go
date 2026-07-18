@@ -3,6 +3,7 @@ package hr
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -53,11 +54,13 @@ func registerEmployeeCSVRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.employees", auth.AccessRead)).Get("/employees/import-template.csv", employeeImportTemplateHandler())
 	r.With(auth.RequirePermission("hr.employees", auth.AccessRead)).Get("/employees/export.csv", exportEmployeesCSV(pool))
 	r.With(auth.RequirePermission("hr.employees_new", auth.AccessWrite)).Post("/employees/import", importEmployeesCSV(pool))
+	r.With(auth.RequirePermission("hr.employees_new", auth.AccessWrite)).Post("/employees/import-mapped", importEmployeesMappedCSV(pool))
 }
 
 func registerAttendanceCSVRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/dtr/import-template.csv", dtrImportTemplateHandler())
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/dtr/import", importDTRCSV(pool))
+	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/dtr/import-mapped", importDTRMappedCSV(pool))
 }
 
 func registerPayrollCSVRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -128,98 +131,132 @@ func importEmployeesCSV(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"file": err.Error()})
 			return
 		}
-		colIdx, err := hrMapCSVHeaders(records[0], []string{"employee_no", "full_name"})
+		result, err := importEmployeesFromRecords(r.Context(), pool, tu, records)
 		if err != nil {
 			response.Validation(w, map[string]string{"file": err.Error()})
 			return
 		}
-		result := hrImportResult{}
-		for i, raw := range records[1:] {
-			rowNum := i + 2
-			if hrIsEmptyCSVRow(raw) {
-				continue
-			}
-			row := hrExtractCSVRow(raw, colIdx, employeeCSVHeaders)
-			body := employeeBody{
-				EmployeeNo: row["employee_no"],
-				FullName:   row["full_name"],
-				Department: row["department"],
-				JobTitle:   row["job_title"],
-				HireDate:   row["hire_date"],
-				Status:     row["status"],
-				Email:      strPtrOrNil(row["email"]),
-				TIN:        strPtrOrNil(row["tin"]),
-				SSSNo:      strPtrOrNil(row["sss_no"]),
-				PhilHealthNo: strPtrOrNil(row["philhealth_no"]),
-				PagibigNo:  strPtrOrNil(row["pagibig_no"]),
-				TaxStatus:  strPtrOrNil(row["tax_status"]),
-			}
-			if salary, err := hrParseCSVFloat(row["base_salary"], "base_salary"); err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: err.Error()})
-				continue
-			} else {
-				body.BaseSalary = salary
-			}
-			if errs := validateEmployeeBody(body); errs != nil {
-				result.Failed++
-				msg := strings.Join(mapValues(errs), "; ")
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: msg})
-				continue
-			}
-			hireDate, err := parseDate(body.HireDate)
-			if err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Invalid hire_date."})
-				continue
-			}
-			var existingID int64
-			err = pool.QueryRow(r.Context(), `
-				select id from public.hr_employees where tenant_id=$1 and employee_no=$2`,
-				tu.TenantID, strings.TrimSpace(body.EmployeeNo)).Scan(&existingID)
-			if err == nil {
-				_, err = pool.Exec(r.Context(), `
-					update public.hr_employees set
-					  full_name=$3, department=$4, job_title=$5, hire_date=$6, status=$7, base_salary=$8,
-					  email=$9, tin=$10, sss_no=$11, philhealth_no=$12, pagibig_no=$13, tax_status=$14, updated_at=now()
-					where id=$1 and tenant_id=$2`,
-					existingID, tu.TenantID,
-					strings.TrimSpace(body.FullName), strings.TrimSpace(body.Department), strings.TrimSpace(body.JobTitle),
-					hireDate, normalizeEmployeeStatus(body.Status), body.BaseSalary,
-					body.Email, strPtrVal(body.TIN), strPtrVal(body.SSSNo), strPtrVal(body.PhilHealthNo),
-					strPtrVal(body.PagibigNo), normalizeTaxStatus(strPtrVal(body.TaxStatus)),
-				)
-				if err != nil {
-					result.Failed++
-					result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Update failed."})
-					continue
-				}
-				result.Updated++
-				continue
-			}
-			var id int64
-			err = pool.QueryRow(r.Context(), `
-				insert into public.hr_employees (
-				  tenant_id, employee_no, full_name, department, job_title, hire_date, status, base_salary,
-				  email, tin, sss_no, philhealth_no, pagibig_no, tax_status
-				) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
-				tu.TenantID, strings.TrimSpace(body.EmployeeNo), strings.TrimSpace(body.FullName),
-				strings.TrimSpace(body.Department), strings.TrimSpace(body.JobTitle), hireDate,
-				normalizeEmployeeStatus(body.Status), body.BaseSalary,
-				body.Email, strPtrVal(body.TIN), strPtrVal(body.SSSNo), strPtrVal(body.PhilHealthNo),
-				strPtrVal(body.PagibigNo), normalizeTaxStatus(strPtrVal(body.TaxStatus)),
-			).Scan(&id)
-			if err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Insert failed."})
-				continue
-			}
-			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "hr.employee.import", "hr_employee", &id, nil, body)
-			result.Created++
+		msg := fmt.Sprintf("Imported %d, updated %d, %d failed.", result.Created, result.Updated, result.Failed)
+		response.OK(w, result, msg)
+	}
+}
+
+func importEmployeesMappedCSV(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		records, colMap, err := readMappedCSVUpload(r, pool, tu.TenantID, "employees")
+		if err != nil {
+			response.Validation(w, map[string]string{"file": err.Error()})
+			return
+		}
+		remapped, err := remapCSVWithColumnMap(records, colMap, []string{"employee_no", "full_name"}, employeeCSVHeaders)
+		if err != nil {
+			response.Validation(w, map[string]string{"column_map": err.Error()})
+			return
+		}
+		result, err := importEmployeesFromRecords(r.Context(), pool, tu, remapped)
+		if err != nil {
+			response.Validation(w, map[string]string{"file": err.Error()})
+			return
 		}
 		msg := fmt.Sprintf("Imported %d, updated %d, %d failed.", result.Created, result.Updated, result.Failed)
 		response.OK(w, result, msg)
 	}
+}
+
+func importEmployeesFromRecords(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, records [][]string) (hrImportResult, error) {
+	result := hrImportResult{}
+	if len(records) < 2 {
+		return result, fmt.Errorf("CSV must include a header row and at least one data row")
+	}
+	colIdx, err := hrMapCSVHeaders(records[0], []string{"employee_no", "full_name"})
+	if err != nil {
+		return result, err
+	}
+	for i, raw := range records[1:] {
+		rowNum := i + 2
+		if hrIsEmptyCSVRow(raw) {
+			continue
+		}
+		row := hrExtractCSVRow(raw, colIdx, employeeCSVHeaders)
+		body := employeeBody{
+			EmployeeNo:   row["employee_no"],
+			FullName:     row["full_name"],
+			Department:   row["department"],
+			JobTitle:     row["job_title"],
+			HireDate:     row["hire_date"],
+			Status:       row["status"],
+			Email:        strPtrOrNil(row["email"]),
+			TIN:          strPtrOrNil(row["tin"]),
+			SSSNo:        strPtrOrNil(row["sss_no"]),
+			PhilHealthNo: strPtrOrNil(row["philhealth_no"]),
+			PagibigNo:    strPtrOrNil(row["pagibig_no"]),
+			TaxStatus:    strPtrOrNil(row["tax_status"]),
+		}
+		if salary, err := hrParseCSVFloat(row["base_salary"], "base_salary"); err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: err.Error()})
+			continue
+		} else {
+			body.BaseSalary = salary
+		}
+		if errs := validateEmployeeBody(body); errs != nil {
+			result.Failed++
+			msg := strings.Join(mapValues(errs), "; ")
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: msg})
+			continue
+		}
+		hireDate, err := parseDate(body.HireDate)
+		if err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Invalid hire_date."})
+			continue
+		}
+		var existingID int64
+		err = pool.QueryRow(ctx, `
+			select id from public.hr_employees where tenant_id=$1 and employee_no=$2`,
+			tu.TenantID, strings.TrimSpace(body.EmployeeNo)).Scan(&existingID)
+		if err == nil {
+			_, err = pool.Exec(ctx, `
+				update public.hr_employees set
+				  full_name=$3, department=$4, job_title=$5, hire_date=$6, status=$7, base_salary=$8,
+				  email=$9, tin=$10, sss_no=$11, philhealth_no=$12, pagibig_no=$13, tax_status=$14, updated_at=now()
+				where id=$1 and tenant_id=$2`,
+				existingID, tu.TenantID,
+				strings.TrimSpace(body.FullName), strings.TrimSpace(body.Department), strings.TrimSpace(body.JobTitle),
+				hireDate, normalizeEmployeeStatus(body.Status), body.BaseSalary,
+				body.Email, strPtrVal(body.TIN), strPtrVal(body.SSSNo), strPtrVal(body.PhilHealthNo),
+				strPtrVal(body.PagibigNo), normalizeTaxStatus(strPtrVal(body.TaxStatus)),
+			)
+			if err != nil {
+				result.Failed++
+				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Update failed."})
+				continue
+			}
+			result.Updated++
+			continue
+		}
+		var id int64
+		err = pool.QueryRow(ctx, `
+			insert into public.hr_employees (
+			  tenant_id, employee_no, full_name, department, job_title, hire_date, status, base_salary,
+			  email, tin, sss_no, philhealth_no, pagibig_no, tax_status
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
+			tu.TenantID, strings.TrimSpace(body.EmployeeNo), strings.TrimSpace(body.FullName),
+			strings.TrimSpace(body.Department), strings.TrimSpace(body.JobTitle), hireDate,
+			normalizeEmployeeStatus(body.Status), body.BaseSalary,
+			body.Email, strPtrVal(body.TIN), strPtrVal(body.SSSNo), strPtrVal(body.PhilHealthNo),
+			strPtrVal(body.PagibigNo), normalizeTaxStatus(strPtrVal(body.TaxStatus)),
+		).Scan(&id)
+		if err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Insert failed."})
+			continue
+		}
+		_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "hr.employee.import", "hr_employee", &id, nil, body)
+		result.Created++
+	}
+	return result, nil
 }
 
 func importDTRCSV(pool *pgxpool.Pool) http.HandlerFunc {
@@ -230,76 +267,110 @@ func importDTRCSV(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"file": err.Error()})
 			return
 		}
-		colIdx, err := hrMapCSVHeaders(records[0], []string{"employee_no", "work_date"})
+		result, err := importDTRFromRecords(r.Context(), pool, tu, records)
 		if err != nil {
 			response.Validation(w, map[string]string{"file": err.Error()})
 			return
 		}
-		result := hrImportResult{}
-		for i, raw := range records[1:] {
-			rowNum := i + 2
-			if hrIsEmptyCSVRow(raw) {
-				continue
-			}
-			row := hrExtractCSVRow(raw, colIdx, dtrCSVHeaders)
-			empNo := strings.TrimSpace(row["employee_no"])
-			if empNo == "" {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "employee_no is required."})
-				continue
-			}
-			var employeeID int64
-			if err := pool.QueryRow(r.Context(), `
-				select id from public.hr_employees where tenant_id=$1 and employee_no=$2`,
-				tu.TenantID, empNo).Scan(&employeeID); err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Employee not found: " + empNo})
-				continue
-			}
-			workDate, err := time.Parse("2006-01-02", strings.TrimSpace(row["work_date"]))
-			if err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Invalid work_date."})
-				continue
-			}
-			st := strings.ToLower(strings.TrimSpace(row["status"]))
-			if st == "" {
-				st = "present"
-			}
-			validStatus := map[string]bool{"present": true, "absent": true, "leave": true, "holiday": true, "rest": true, "awol": true}
-			if !validStatus[st] {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Invalid status."})
-				continue
-			}
-			hours, err := hrParseCSVFloat(row["hours_worked"], "hours_worked")
-			if err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: err.Error()})
-				continue
-			}
-			ot, err := hrParseCSVFloat(row["ot_hours"], "ot_hours")
-			if err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: err.Error()})
-				continue
-			}
-			nd, err := hrParseCSVFloat(row["night_diff_hours"], "night_diff_hours")
-			if err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: err.Error()})
-				continue
-			}
-			if err := upsertDTRRow(r.Context(), pool, tu.TenantID, employeeID, workDate, "import", st, hours, ot, nd, nil); err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Save failed."})
-				continue
-			}
-			result.Created++
+		msg := fmt.Sprintf("Imported %d DTR row(s); %d failed.", result.Created, result.Failed)
+		response.OK(w, result, msg)
+	}
+}
+
+func importDTRMappedCSV(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		records, colMap, err := readMappedCSVUpload(r, pool, tu.TenantID, "dtr")
+		if err != nil {
+			response.Validation(w, map[string]string{"file": err.Error()})
+			return
+		}
+		remapped, err := remapCSVWithColumnMap(records, colMap, []string{"employee_no", "work_date"}, dtrCSVHeaders)
+		if err != nil {
+			response.Validation(w, map[string]string{"column_map": err.Error()})
+			return
+		}
+		result, err := importDTRFromRecords(r.Context(), pool, tu, remapped)
+		if err != nil {
+			response.Validation(w, map[string]string{"file": err.Error()})
+			return
 		}
 		msg := fmt.Sprintf("Imported %d DTR row(s); %d failed.", result.Created, result.Failed)
 		response.OK(w, result, msg)
 	}
+}
+
+func importDTRFromRecords(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, records [][]string) (hrImportResult, error) {
+	result := hrImportResult{}
+	if len(records) < 2 {
+		return result, fmt.Errorf("CSV must include a header row and at least one data row")
+	}
+	colIdx, err := hrMapCSVHeaders(records[0], []string{"employee_no", "work_date"})
+	if err != nil {
+		return result, err
+	}
+	for i, raw := range records[1:] {
+		rowNum := i + 2
+		if hrIsEmptyCSVRow(raw) {
+			continue
+		}
+		row := hrExtractCSVRow(raw, colIdx, dtrCSVHeaders)
+		empNo := strings.TrimSpace(row["employee_no"])
+		if empNo == "" {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "employee_no is required."})
+			continue
+		}
+		var employeeID int64
+		if err := pool.QueryRow(ctx, `
+			select id from public.hr_employees where tenant_id=$1 and employee_no=$2`,
+			tu.TenantID, empNo).Scan(&employeeID); err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Employee not found: " + empNo})
+			continue
+		}
+		workDate, err := time.Parse("2006-01-02", strings.TrimSpace(row["work_date"]))
+		if err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Invalid work_date."})
+			continue
+		}
+		st := strings.ToLower(strings.TrimSpace(row["status"]))
+		if st == "" {
+			st = "present"
+		}
+		validStatus := map[string]bool{"present": true, "absent": true, "leave": true, "holiday": true, "rest": true, "awol": true}
+		if !validStatus[st] {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Invalid status."})
+			continue
+		}
+		hours, err := hrParseCSVFloat(row["hours_worked"], "hours_worked")
+		if err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: err.Error()})
+			continue
+		}
+		ot, err := hrParseCSVFloat(row["ot_hours"], "ot_hours")
+		if err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: err.Error()})
+			continue
+		}
+		nd, err := hrParseCSVFloat(row["night_diff_hours"], "night_diff_hours")
+		if err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: err.Error()})
+			continue
+		}
+		if err := upsertDTRRow(ctx, pool, tu.TenantID, employeeID, workDate, "import", st, hours, ot, nd, nil); err != nil {
+			result.Failed++
+			result.RowErrors = append(result.RowErrors, hrImportRowError{Row: rowNum, Message: "Save failed."})
+			continue
+		}
+		result.Created++
+	}
+	return result, nil
 }
 
 func upsertDTRRow(ctx context.Context, pool *pgxpool.Pool, tenantID, employeeID int64, workDate time.Time, source, status string, hours, ot, nd float64, notes *string) error {
@@ -487,6 +558,130 @@ func readCSVUpload(r *http.Request) ([][]string, error) {
 	}
 	defer file.Close()
 	return readCSVFile(file)
+}
+
+// readMappedCSVUpload reads the CSV file and resolves column_map from profile_id
+// or a column_map JSON form field.
+func readMappedCSVUpload(r *http.Request, pool *pgxpool.Pool, tenantID int64, expectKind string) ([][]string, map[string]string, error) {
+	if err := r.ParseMultipartForm(hrImportMaxBytes); err != nil {
+		return nil, nil, fmt.Errorf("invalid upload")
+	}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		return nil, nil, fmt.Errorf("CSV file is required")
+	}
+	defer file.Close()
+	records, err := readCSVFile(file)
+	if err != nil {
+		return nil, nil, err
+	}
+	colMap, err := resolveColumnMapFromForm(r, pool, tenantID, expectKind)
+	if err != nil {
+		return nil, nil, err
+	}
+	return records, colMap, nil
+}
+
+func resolveColumnMapFromForm(r *http.Request, pool *pgxpool.Pool, tenantID int64, expectKind string) (map[string]string, error) {
+	if rawID := strings.TrimSpace(r.FormValue("profile_id")); rawID != "" {
+		profileID, err := strconv.ParseInt(rawID, 10, 64)
+		if err != nil || profileID <= 0 {
+			return nil, fmt.Errorf("invalid profile_id")
+		}
+		colMap, err := loadImportProfileColumnMap(r.Context(), pool, tenantID, profileID, expectKind)
+		if err != nil {
+			if err == errImportProfileKindMismatch {
+				return nil, fmt.Errorf("import profile kind does not match %s", expectKind)
+			}
+			return nil, fmt.Errorf("import profile not found")
+		}
+		return colMap, nil
+	}
+	rawMap := strings.TrimSpace(r.FormValue("column_map"))
+	if rawMap == "" {
+		return nil, fmt.Errorf("profile_id or column_map is required")
+	}
+	var colMap map[string]string
+	if err := json.Unmarshal([]byte(rawMap), &colMap); err != nil {
+		return nil, fmt.Errorf("column_map must be valid JSON object")
+	}
+	if colMap == nil {
+		colMap = map[string]string{}
+	}
+	return colMap, nil
+}
+
+// remapCSVWithColumnMap remaps CSV rows so headers become canonical keys.
+// columnMap maps canonical key → source CSV header name in the uploaded file.
+func remapCSVWithColumnMap(records [][]string, columnMap map[string]string, required, canonicalHeaders []string) ([][]string, error) {
+	if err := validateColumnMapRequired(columnMap, required); err != nil {
+		return nil, err
+	}
+	if len(records) < 1 {
+		return nil, fmt.Errorf("CSV must include a header row")
+	}
+	fileIdx := map[string]int{}
+	for i, h := range records[0] {
+		key := strings.ToLower(strings.TrimSpace(h))
+		if key != "" {
+			fileIdx[key] = i
+		}
+	}
+	srcIdx := map[string]int{}
+	for canonical, sourceHeader := range columnMap {
+		canonical = strings.ToLower(strings.TrimSpace(canonical))
+		sourceHeader = strings.TrimSpace(sourceHeader)
+		if canonical == "" || sourceHeader == "" {
+			continue
+		}
+		i, ok := fileIdx[strings.ToLower(sourceHeader)]
+		if !ok {
+			return nil, fmt.Errorf("column_map source header not found in file: %s", sourceHeader)
+		}
+		srcIdx[canonical] = i
+	}
+	for _, col := range required {
+		if _, ok := srcIdx[col]; !ok {
+			return nil, fmt.Errorf("missing required column mapping: %s", col)
+		}
+	}
+	out := make([][]string, 0, len(records))
+	out = append(out, append([]string(nil), canonicalHeaders...))
+	for _, raw := range records[1:] {
+		if hrIsEmptyCSVRow(raw) {
+			continue
+		}
+		row := make([]string, len(canonicalHeaders))
+		for i, col := range canonicalHeaders {
+			if idx, ok := srcIdx[col]; ok && idx < len(raw) {
+				row[i] = strings.TrimSpace(raw[idx])
+			}
+		}
+		out = append(out, row)
+	}
+	if len(out) < 2 {
+		return nil, fmt.Errorf("CSV must include a header row and at least one data row")
+	}
+	return out, nil
+}
+
+// validateColumnMapRequired ensures required canonical keys are present in the map
+// with non-empty source header names.
+func validateColumnMapRequired(columnMap map[string]string, required []string) error {
+	if columnMap == nil {
+		return fmt.Errorf("column_map is required")
+	}
+	var missing []string
+	for _, col := range required {
+		src, ok := columnMap[col]
+		if !ok || strings.TrimSpace(src) == "" {
+			missing = append(missing, col)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required column mapping: %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 func readCSVFile(file multipart.File) ([][]string, error) {

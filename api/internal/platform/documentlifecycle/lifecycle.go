@@ -143,6 +143,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, base string, cfg Config) {
 	if err := ValidateConfig(cfg); err != nil {
 		panic(err)
 	}
+	r.Post(base+"/actions/bulk-delete", bulkActionHandler(pool, cfg, "delete"))
+	r.Post(base+"/actions/bulk-restore", bulkActionHandler(pool, cfg, "restore"))
 	r.Get(base+"/{id}/delete-impact", impactHandler(pool, cfg))
 	r.Get(base+"/{id}/lifecycle", metadataHandler(pool, cfg))
 	r.Post(base+"/{id}/actions/delete", actionHandler(pool, cfg, "delete"))
@@ -232,6 +234,41 @@ type actionBody struct {
 	Reason string `json:"reason"`
 }
 
+type bulkActionBody struct {
+	IDs    []int64 `json:"ids"`
+	Reason string  `json:"reason"`
+}
+
+type BulkItemResult struct {
+	ID     int64  `json:"id"`
+	OK     bool   `json:"ok"`
+	Reason string `json:"reason,omitempty"`
+}
+
+type BulkOutcome struct {
+	Results  []BulkItemResult `json:"results"`
+	Deleted  int              `json:"deleted,omitempty"`
+	Restored int              `json:"restored,omitempty"`
+	Skipped  int              `json:"skipped"`
+}
+
+// AggregateBulkOutcome counts successes/skips for tests and handlers.
+func AggregateBulkOutcome(action string, results []BulkItemResult) BulkOutcome {
+	out := BulkOutcome{Results: results}
+	for _, r := range results {
+		if r.OK {
+			if action == "delete" {
+				out.Deleted++
+			} else {
+				out.Restored++
+			}
+		} else {
+			out.Skipped++
+		}
+	}
+	return out
+}
+
 func actionHandler(pool *pgxpool.Pool, cfg Config, action string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -239,16 +276,46 @@ func actionHandler(pool *pgxpool.Pool, cfg Config, action string) http.HandlerFu
 		if !ok {
 			return
 		}
-		reason := strings.TrimSpace(r.URL.Query().Get("reason"))
-		if reason == "" {
-			reason = strings.TrimSpace(r.Header.Get("X-Lifecycle-Reason"))
+		reason, ok := readReason(w, r)
+		if !ok {
+			return
 		}
-		if reason == "" && r.Body != nil {
-			var body actionBody
-			if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
-				reason = strings.TrimSpace(body.Reason)
+		if errReason := applyLifecycleAction(r.Context(), pool, cfg, tu, id, action, reason); errReason != "" {
+			if errReason == "not_found" {
+				response.Err(w, http.StatusNotFound, cfg.DisplayName+" not found.", "ERR_NOT_FOUND")
+				return
 			}
+			if errReason == "internal" {
+				response.Err(w, http.StatusInternalServerError, "Failed to apply lifecycle action.", "ERR_INTERNAL")
+				return
+			}
+			if strings.HasPrefix(errReason, "blocked:") {
+				impact, _ := loadImpact(r.Context(), pool, cfg, tu.TenantID, id)
+				response.JSON(w, http.StatusConflict, response.Envelope{
+					Success: false, Message: "Lifecycle action blocked by dependencies.",
+					Data: impact, Errors: map[string]string{}, Code: "ERR_DEPENDENCY_BLOCKED",
+				})
+				return
+			}
+			response.Err(w, http.StatusConflict, errReason, "ERR_LIFECYCLE_STATE")
+			return
 		}
+		response.OK(w, map[string]any{
+			"document_type": cfg.DocumentType, "document_id": id,
+			"lifecycle": map[string]string{"delete": Deleted, "restore": Active}[action],
+		}, strings.Title(action)+"d.")
+	}
+}
+
+func bulkActionHandler(pool *pgxpool.Pool, cfg Config, action string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		var body bulkActionBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		reason := strings.TrimSpace(body.Reason)
 		if reason == "" {
 			response.Validation(w, map[string]string{"reason": "Reason is required."})
 			return
@@ -257,84 +324,131 @@ func actionHandler(pool *pgxpool.Pool, cfg Config, action string) http.HandlerFu
 			response.Validation(w, map[string]string{"reason": "Reason must not exceed 2000 characters."})
 			return
 		}
-
-		tx, err := pool.Begin(r.Context())
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to begin lifecycle action.", "ERR_INTERNAL")
+		if len(body.IDs) == 0 {
+			response.Validation(w, map[string]string{"ids": "At least one id is required."})
 			return
 		}
-		defer tx.Rollback(r.Context())
-		lockKey := fmt.Sprintf("document-lifecycle:%d:%s:%d", tu.TenantID, cfg.DocumentType, id)
-		if _, err := tx.Exec(r.Context(), `select pg_advisory_xact_lock(hashtextextended($1, 0))`, lockKey); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to lock document.", "ERR_INTERNAL")
+		if len(body.IDs) > 500 {
+			response.Validation(w, map[string]string{"ids": "At most 500 ids per request."})
 			return
 		}
 
-		q := fmt.Sprintf(`select deleted_at from public.%s where id = $1 and tenant_id = $2 for update`, cfg.Table)
-		var deletedAt any
-		if err := tx.QueryRow(r.Context(), q, id, tu.TenantID).Scan(&deletedAt); err != nil {
-			response.Err(w, http.StatusNotFound, cfg.DisplayName+" not found.", "ERR_NOT_FOUND")
-			return
-		}
-		if (action == "delete" && deletedAt != nil) || (action == "restore" && deletedAt == nil) {
-			response.Err(w, http.StatusConflict, cfg.DisplayName+" is already "+map[bool]string{true: "deleted", false: "active"}[deletedAt != nil]+".", "ERR_LIFECYCLE_STATE")
-			return
-		}
-
-		blockers, err := loadBlockers(r.Context(), tx, cfg, tu.TenantID, id, action)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to inspect dependencies.", "ERR_INTERNAL")
-			return
-		}
-		if len(blockers) > 0 {
-			impact := Impact{
-				DocumentType: cfg.DocumentType, DocumentID: id,
-				Lifecycle: map[bool]string{true: Deleted, false: Active}[deletedAt != nil],
-				CanDelete: action != "delete", CanRestore: action != "restore", Blockers: blockers,
+		results := make([]BulkItemResult, 0, len(body.IDs))
+		for _, id := range body.IDs {
+			if id <= 0 {
+				results = append(results, BulkItemResult{ID: id, OK: false, Reason: "Invalid id."})
+				continue
 			}
-			response.JSON(w, http.StatusConflict, response.Envelope{
-				Success: false, Message: "Lifecycle action blocked by dependencies.",
-				Data: impact, Errors: map[string]string{}, Code: "ERR_DEPENDENCY_BLOCKED",
-			})
-			return
+			errReason := applyLifecycleAction(r.Context(), pool, cfg, tu, id, action, reason)
+			if errReason == "" {
+				results = append(results, BulkItemResult{ID: id, OK: true})
+				continue
+			}
+			msg := errReason
+			switch {
+			case errReason == "not_found":
+				msg = cfg.DisplayName + " not found."
+			case errReason == "internal":
+				msg = "Failed to apply lifecycle action."
+			case strings.HasPrefix(errReason, "blocked:"):
+				msg = strings.TrimPrefix(errReason, "blocked:")
+			}
+			results = append(results, BulkItemResult{ID: id, OK: false, Reason: msg})
 		}
-
-		var update string
-		if action == "delete" {
-			update = fmt.Sprintf(`
-				update public.%s set deleted_at = now(), deleted_by_user_id = $3, delete_reason = $4,
-				  updated_at = now(), lifecycle_version = lifecycle_version + 1
-				where id = $1 and tenant_id = $2 and deleted_at is null`, cfg.Table)
-		} else {
-			update = fmt.Sprintf(`
-				update public.%s set deleted_at = null, restored_at = now(), restored_by_user_id = $3,
-				  restore_reason = $4, updated_at = now(), lifecycle_version = lifecycle_version + 1
-				where id = $1 and tenant_id = $2 and deleted_at is not null`, cfg.Table)
-		}
-		tag, err := tx.Exec(r.Context(), update, id, tu.TenantID, tu.AppUserID, reason)
-		if err != nil || tag.RowsAffected() != 1 {
-			response.Err(w, http.StatusConflict, "Lifecycle state changed concurrently.", "ERR_LIFECYCLE_STATE")
-			return
-		}
-		if _, err := tx.Exec(r.Context(), `
-			insert into public.document_lifecycle_actions
-			  (tenant_id, document_type, document_id, action, reason, actor_user_id)
-			values ($1,$2,$3,$4,$5,$6)`,
-			tu.TenantID, cfg.DocumentType, id, action, reason, tu.AppUserID); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to preserve lifecycle history.", "ERR_INTERNAL")
-			return
-		}
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to commit lifecycle action.", "ERR_INTERNAL")
-			return
-		}
-		auditAction := cfg.DocumentType + "." + action
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, auditAction, cfg.AuditTarget, &id, nil, map[string]any{"reason": reason})
-		response.OK(w, map[string]any{
-			"document_type": cfg.DocumentType, "document_id": id,
-			"lifecycle": map[string]string{"delete": Deleted, "restore": Active}[action],
-		}, strings.Title(action)+"d.")
+		out := AggregateBulkOutcome(action, results)
+		response.OK(w, out, "OK")
 	}
+}
+
+func readReason(w http.ResponseWriter, r *http.Request) (string, bool) {
+	reason := strings.TrimSpace(r.URL.Query().Get("reason"))
+	if reason == "" {
+		reason = strings.TrimSpace(r.Header.Get("X-Lifecycle-Reason"))
+	}
+	if reason == "" && r.Body != nil {
+		var body actionBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			reason = strings.TrimSpace(body.Reason)
+		}
+	}
+	if reason == "" {
+		response.Validation(w, map[string]string{"reason": "Reason is required."})
+		return "", false
+	}
+	if len(reason) > 2000 {
+		response.Validation(w, map[string]string{"reason": "Reason must not exceed 2000 characters."})
+		return "", false
+	}
+	return reason, true
+}
+
+// applyLifecycleAction runs a single delete/restore. Empty return means success.
+// On dependency block returns "blocked:<human message>".
+func applyLifecycleAction(ctx context.Context, pool *pgxpool.Pool, cfg Config, tu auth.TenantUser, id int64, action, reason string) string {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return "internal"
+	}
+	defer tx.Rollback(ctx)
+
+	lockKey := fmt.Sprintf("document-lifecycle:%d:%s:%d", tu.TenantID, cfg.DocumentType, id)
+	if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtextextended($1, 0))`, lockKey); err != nil {
+		return "internal"
+	}
+
+	q := fmt.Sprintf(`select deleted_at from public.%s where id = $1 and tenant_id = $2 for update`, cfg.Table)
+	var deletedAt any
+	if err := tx.QueryRow(ctx, q, id, tu.TenantID).Scan(&deletedAt); err != nil {
+		return "not_found"
+	}
+	if action == "delete" && deletedAt != nil {
+		return cfg.DisplayName + " is already deleted."
+	}
+	if action == "restore" && deletedAt == nil {
+		return cfg.DisplayName + " is already active."
+	}
+
+	blockers, err := loadBlockers(ctx, tx, cfg, tu.TenantID, id, action)
+	if err != nil {
+		return "internal"
+	}
+	if len(blockers) > 0 {
+		parts := make([]string, 0, len(blockers))
+		for _, b := range blockers {
+			parts = append(parts, fmt.Sprintf("%s (%d)", b.Label, b.Count))
+		}
+		return "blocked:" + strings.Join(parts, "; ")
+	}
+
+	var update string
+	if action == "delete" {
+		update = fmt.Sprintf(`
+			update public.%s set deleted_at = now(), deleted_by_user_id = $3, delete_reason = $4,
+			  updated_at = now(), lifecycle_version = lifecycle_version + 1
+			where id = $1 and tenant_id = $2 and deleted_at is null`, cfg.Table)
+	} else {
+		update = fmt.Sprintf(`
+			update public.%s set deleted_at = null, restored_at = now(), restored_by_user_id = $3,
+			  restore_reason = $4, updated_at = now(), lifecycle_version = lifecycle_version + 1
+			where id = $1 and tenant_id = $2 and deleted_at is not null`, cfg.Table)
+	}
+	tag, err := tx.Exec(ctx, update, id, tu.TenantID, tu.AppUserID, reason)
+	if err != nil || tag.RowsAffected() != 1 {
+		return "Lifecycle state changed concurrently."
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into public.document_lifecycle_actions
+		  (tenant_id, document_type, document_id, action, reason, actor_user_id)
+		values ($1,$2,$3,$4,$5,$6)`,
+		tu.TenantID, cfg.DocumentType, id, action, reason, tu.AppUserID); err != nil {
+		return "internal"
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "internal"
+	}
+	auditAction := cfg.DocumentType + "." + action
+	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, auditAction, cfg.AuditTarget, &id, nil, map[string]any{"reason": reason})
+	return ""
 }
 
 type querier interface {

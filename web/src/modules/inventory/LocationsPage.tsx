@@ -12,6 +12,8 @@ import { useToast } from "../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useInventoryList, useInvalidateInventoryList } from "../../shared/useInventoryList";
 import { useListState } from "../../shared/useListState";
+import { useMasterLifecycle } from "../../shared/masterLifecycle";
+import { hasPermission, useAuth } from "../../shared/auth-context";
 
 type Location = {
   id: number;
@@ -25,6 +27,7 @@ type Location = {
 
 export default function LocationsPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("location_code");
+  const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Location | null>(null);
@@ -33,6 +36,12 @@ export default function LocationsPage() {
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
+  const lifecycle = useMasterLifecycle({
+    apiBase: "/api/v1/inventory/locations",
+    entityLabel: "location",
+    canManage: () => hasPermission(auth.me, "inventory.locations", "write"),
+    onChanged: () => invalidate("locations"),
+  });
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.locations);
 
@@ -43,6 +52,7 @@ export default function LocationsPage() {
     order: order(),
     q: q() || undefined,
     status: statusFilter() || undefined,
+    lifecycle: lifecycle.filter(),
   }));
 
   const openNew = async () => {
@@ -110,6 +120,9 @@ export default function LocationsPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={openEdit}
         onNew={() => void openNew()}
         codeKey="location_code"
@@ -127,7 +140,14 @@ export default function LocationsPage() {
         status={statusFilter()}
         onStatusChange={setStatusFilter}
         settingsHref={INVENTORY_SETTINGS_HREF.locations}
+        toolbarExtra={
+          <div class="flex flex-wrap items-end gap-2">
+            <lifecycle.BulkToolbar />
+            <lifecycle.FilterControl />
+          </div>
+        }
       />
+      <lifecycle.BulkDialog />
       <EntityModal
         open={modalOpen()}
         title={editing() ? "Edit location" : "New location"}

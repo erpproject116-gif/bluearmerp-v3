@@ -80,7 +80,10 @@ func registerPartnerRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/partners/next-code", nextCodeHandler(pool, "partner"))
 	r.Get("/partners", listPartners(pool))
 	r.Post("/partners", createPartner(pool))
+	r.Post("/partners/actions/bulk-delete", bulkSoftDeleteHandler(pool, "inv_partners", "inventory.partner.delete", "inv_partner"))
+	r.Post("/partners/actions/bulk-restore", bulkSoftRestoreHandler(pool, "inv_partners", "inventory.partner.restore", "inv_partner"))
 	r.Patch("/partners/{id}", updatePartner(pool))
+	r.Post("/partners/{id}/restore", softRestoreHandler(pool, "inv_partners", "inventory.partner.restore", "inv_partner"))
 	r.Delete("/partners/{id}", deletePartner(pool))
 }
 
@@ -101,7 +104,12 @@ func listPartners(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "partner_code", allowed)
 		offset := httputil.Offset(p)
 
-		where := "tenant_id = $1 and deleted_at is null"
+		lc, err := parseMasterLifecycle(r)
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where := "tenant_id = $1 and " + deletedAtPredicate(lc)
 		args := []any{tu.TenantID}
 		argN := 2
 		if p.Q != "" {

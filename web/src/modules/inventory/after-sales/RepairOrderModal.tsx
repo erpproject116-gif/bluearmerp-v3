@@ -26,6 +26,9 @@ import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../share
 import { type SerialTraceResult } from "../../../shared/useSerialLotList";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 
 export type RepairOrderDetail = {
   id: number;
@@ -121,6 +124,7 @@ function linesFromDetail(lines?: RepairOrderDetail["lines"]): RepairLineRow[] {
 export function RepairOrderModal(props: Props) {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const auth = useAuth();
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { fields, byKey, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.repairOrder);
 
@@ -132,6 +136,10 @@ export function RepairOrderModal(props: Props) {
   const [repairOrderNo, setRepairOrderNo] = createSignal("");
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
   const [customerLabel, setCustomerLabel] = createSignal("");
+  const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [newCustomerName, setNewCustomerName] = createSignal("");
+  const [showNewLocation, setShowNewLocation] = createSignal(false);
+  const [newLocationName, setNewLocationName] = createSignal("");
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
   const [picName, setPicName] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
@@ -366,6 +374,7 @@ export function RepairOrderModal(props: Props) {
   };
 
   return (
+    <>
     <WideEntityModal
       open={props.open}
       title={effectiveEditing() ? "Edit Repair Order" : "New Repair Order"}
@@ -414,6 +423,15 @@ export function RepairOrderModal(props: Props) {
             setCustomerLabel("");
           }}
           fetchOptions={fetchPartners}
+          createLabel="Add customer"
+          onCreate={
+            hasPermission(auth.me, "inventory.partners", "write")
+              ? (q) => {
+                  setNewCustomerName(q);
+                  setShowNewCustomer(true);
+                }
+              : undefined
+          }
         />
         <ModalLookupField
           settings={byKey}
@@ -449,6 +467,15 @@ export function RepairOrderModal(props: Props) {
             setLocationLabel("");
           }}
           fetchOptions={fetchLocations}
+          createLabel="Add location"
+          onCreate={
+            hasPermission(auth.me, "inventory.locations", "write")
+              ? (q) => {
+                  setNewLocationName(q);
+                  setShowNewLocation(true);
+                }
+              : undefined
+          }
         />
         <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
           {(m) => (
@@ -588,5 +615,26 @@ export function RepairOrderModal(props: Props) {
       <ChangeLogPanel targetType="inv_repair_order" targetId={effectiveEditing()?.id} />
       </div>
     </WideEntityModal>
+
+    <QuickCustomerModal
+      open={showNewCustomer()}
+      initialName={newCustomerName()}
+      onClose={() => setShowNewCustomer(false)}
+      onCreated={(p) => {
+        setPartnerId(p.id);
+        setCustomerLabel(p.company_name);
+      }}
+    />
+
+    <QuickLocationModal
+      open={showNewLocation()}
+      initialName={newLocationName()}
+      onClose={() => setShowNewLocation(false)}
+      onCreated={(l) => {
+        setLocationId(l.id);
+        setLocationLabel(l.location_name);
+      }}
+    />
+    </>
   );
 }

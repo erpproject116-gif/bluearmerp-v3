@@ -10,6 +10,9 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 import type { PaymentVoucherDetail } from "../../../shared/usePaymentVoucherList";
 
 type AppRow = {
@@ -63,7 +66,10 @@ async function fetchInvoicesForVendor(partnerId: number): Promise<LookupOption[]
 
 export function PaymentVoucherModal(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
   const [saving, setSaving] = createSignal(false);
+  const [showNewVendor, setShowNewVendor] = createSignal(false);
+  const [newVendorName, setNewVendorName] = createSignal("");
   const [paymentDate, setPaymentDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [paymentNo, setPaymentNo] = createSignal("");
@@ -227,7 +233,9 @@ export function PaymentVoucherModal(props: Props) {
   };
 
   return (
+    <>
     <WideEntityModal open={props.open} title="New Payment Voucher" onClose={props.onClose} onSave={() => void save()} saving={saving()}>
+      <ModalFormGuide guideId="payment_voucher" />
       <draft.DraftBanner />
       <Field label="Payment date">
         <DateInput value={paymentDate()} onInput={(e) => setPaymentDate(e.currentTarget.value)} />
@@ -251,6 +259,15 @@ export function PaymentVoucherModal(props: Props) {
             setVendorLabel("");
           }}
           fetchOptions={fetchVendors}
+          createLabel="Add vendor"
+          onCreate={
+            hasPermission(auth.me, "inventory.partners", "write")
+              ? (q) => {
+                  setNewVendorName(q);
+                  setShowNewVendor(true);
+                }
+              : undefined
+          }
         />
       </Field>
       <Field label="Currency">
@@ -392,5 +409,17 @@ export function PaymentVoucherModal(props: Props) {
         </Show>
       </div>
     </WideEntityModal>
+    <QuickCustomerModal
+      open={showNewVendor()}
+      partnerKind="vendor"
+      initialName={newVendorName()}
+      onClose={() => setShowNewVendor(false)}
+      onCreated={(p) => {
+        setPartnerId(p.id);
+        setVendorLabel(p.company_name);
+        setApplications([{ supplier_invoice_id: null, label: "", grand_total: 0, applied_amount: "" }]);
+      }}
+    />
+    </>
   );
 }

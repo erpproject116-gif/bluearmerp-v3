@@ -4,6 +4,8 @@ import { modalDismissClass } from "../../../shared/Modal";
 import { inventoryItemSearchErrorMessage, postInventoryItemSearch } from "../../../shared/inventoryItemSearch";
 import { useToast } from "../../../shared/toast";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
+import { QuickItemModal, type CreatedItem } from "../../../shared/QuickItemModal";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 
 const ITEM_CATEGORIES = [
   { value: "raw_material", label: "Raw Material" },
@@ -47,6 +49,7 @@ type Props = {
 
 export function QuotationItemSearchModal(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
   const [tab, setTab] = createSignal<"filters" | "results">("filters");
   const [filters, setFilters] = createSignal(defaultFilters());
   const [results, setResults] = createSignal<ItemSearchRow[]>([]);
@@ -54,6 +57,7 @@ export function QuotationItemSearchModal(props: Props) {
   const [total, setTotal] = createSignal(0);
   const [page, setPage] = createSignal(1);
   const [searching, setSearching] = createSignal(false);
+  const [showQuickItem, setShowQuickItem] = createSignal(false);
   const pageSize = 50;
 
   const runSearch = async (p = 1) => {
@@ -128,9 +132,20 @@ export function QuotationItemSearchModal(props: Props) {
         <div class="w-full max-w-4xl rounded-2xl border border-stroke bg-white shadow-xl">
           <div class="flex items-center justify-between border-b border-stroke px-5 py-3">
             <h2 class="text-lg font-semibold text-text-primary">Search Items (multi-select)</h2>
-            <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
-              Close
-            </button>
+            <div class="flex items-center gap-2">
+              <Show when={hasPermission(auth.me, "inventory.items", "write")}>
+                <button
+                  type="button"
+                  class="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100"
+                  onClick={() => setShowQuickItem(true)}
+                >
+                  + Add new item
+                </button>
+              </Show>
+              <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
+                Close
+              </button>
+            </div>
           </div>
 
           <div class="border-b border-stroke px-5 py-2">
@@ -231,6 +246,21 @@ export function QuotationItemSearchModal(props: Props) {
           </Show>
         </div>
       </div>
+      <QuickItemModal
+        open={showQuickItem()}
+        onClose={() => setShowQuickItem(false)}
+        onCreated={(item: CreatedItem) => {
+          const row: ItemSearchRow = {
+            id: item.id,
+            item_code: item.item_code,
+            item_name: item.item_name,
+            sales_price: item.sales_price ?? 0,
+            status: item.status ?? "active",
+          };
+          props.onConfirm([row]);
+          props.onClose();
+        }}
+      />
     </Show>
   );
 }

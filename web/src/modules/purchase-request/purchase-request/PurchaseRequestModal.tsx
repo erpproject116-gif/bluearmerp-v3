@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import type { LookupOption } from "../../../shared/LookupCombo";
@@ -10,13 +11,17 @@ import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
+import { QuickLocationModal } from "../../../shared/QuickLocationModal";
+import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { PurchaseRequestApprovalPanel } from "./PurchaseRequestApprovalPanel";
 import { SalesOrderLinePickerModal, type PickedSalesOrderLine } from "./SalesOrderLinePickerModal";
@@ -148,7 +153,9 @@ function linesFromDetail(lines?: PurchaseRequestDetail["lines"]): PurchaseReques
 }
 
 export function PurchaseRequestModal(props: Props) {
+  const queryClient = useQueryClient();
   const toast = useToast();
+  const auth = useAuth();
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
@@ -157,11 +164,16 @@ export function PurchaseRequestModal(props: Props) {
   const [saving, setSaving] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [showNewLocation, setShowNewLocation] = createSignal(false);
+  const [newLocationName, setNewLocationName] = createSignal("");
+  const [showNewTaxType, setShowNewTaxType] = createSignal(false);
+  const [newTaxTypeName, setNewTaxTypeName] = createSignal("");
   const [requestDate, setRequestDate] = createSignal(todayISO());
   const [dateSeq, setDateSeq] = createSignal(1);
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [purchaseRequestNo, setPurchaseRequestNo] = createSignal("");
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
+  const [taxTypeLabel, setTaxTypeLabel] = createSignal("");
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
   const [picName, setPicName] = createSignal("");
@@ -181,6 +193,13 @@ export function PurchaseRequestModal(props: Props) {
   const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
+
+  createEffect(() => {
+    const id = taxTypeId();
+    if (id == null || taxTypeLabel()) return;
+    const meta = taxTypes().find((t) => t.id === id);
+    if (meta) setTaxTypeLabel(formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent));
+  });
 
   const buildDraftPayload = () => ({
     request_date: requestDate(),
@@ -207,6 +226,7 @@ export function PurchaseRequestModal(props: Props) {
     setRequestDate(payload.request_date);
     setDateSeq(payload.date_seq);
     setTaxTypeId(payload.tax_type_id);
+    setTaxTypeLabel("");
     setCurrencyId(payload.currency_id);
     setPicUserId(payload.pic_user_id);
     setPicName(payload.pic_name);
@@ -236,9 +256,17 @@ export function PurchaseRequestModal(props: Props) {
     // recovered date_seq. Banner-only avoids that overwrite race.
   });
 
+  const fetchTaxTypeOptions = async (q: string): Promise<LookupOption[]> => {
+    const qq = q.trim().toLowerCase();
+    return taxTypes()
+      .filter((t) => !qq || t.name.toLowerCase().includes(qq))
+      .map((t) => ({ id: t.id, label: formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent) }));
+  };
+
   const onTaxTypeChange = async (newId: number | null) => {
     setTaxTypeId(newId);
     const meta = taxTypes().find((t) => t.id === newId);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     if (!newId || !meta) return;
     const recalc = await recalculatePurchaseRequestLines(lines(), newId, meta);
     setLines(recalc);
@@ -254,6 +282,7 @@ export function PurchaseRequestModal(props: Props) {
     if (first.pic_name) setPicName(first.pic_name);
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
       ...emptyPurchaseRequestLine(i + 1, String(row.unit_vat_inc), basis),
@@ -297,6 +326,7 @@ export function PurchaseRequestModal(props: Props) {
       setDateNoDisplay(ed.date_no_display);
       setPurchaseRequestNo(ed.purchase_request_no);
       setTaxTypeId(ed.tax_type_id);
+      setTaxTypeLabel(ed.tax_type_name ?? "");
       setCurrencyId(ed.currency_id);
       setPicUserId(ed.pic_user_id ?? null);
       setPicName(ed.pic_name);
@@ -343,6 +373,7 @@ export function PurchaseRequestModal(props: Props) {
     if (!taxTypeId()) {
       const first = tt[0];
       setTaxTypeId(first.id);
+      setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
       setLines([emptyPurchaseRequestLine(1, "", basis)]);
     }
@@ -469,6 +500,7 @@ export function PurchaseRequestModal(props: Props) {
       }
     >
       <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
+      <ModalFormGuide guideId="purchase_request" />
       <draft.DraftBanner />
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label="Date-no">
@@ -493,30 +525,32 @@ export function PurchaseRequestModal(props: Props) {
           />
         </Field>
       </Show>
-      <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
-        {(m) => (
-          <>
-            <select
-              class={inputClass}
-              value={taxTypeId() ?? ""}
-              disabled={m.disabled}
-              onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-            >
-              <option value="">Select…</option>
-              <For each={taxTypes()}>
-                {(t) => (
-                  <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
-                )}
-              </For>
-            </select>
-            <Show when={selectedTaxType()}>
-              {(t) => (
-                <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
-              )}
-            </Show>
-          </>
+      <ModalLookupField
+        settings={byKey}
+        fieldKey="tax_type_id"
+        fallbackLabel="Transaction type"
+        fallbackRequired
+        value={taxTypeLabel}
+        selectedId={taxTypeId}
+        onInput={setTaxTypeLabel}
+        onSelect={(o) => void onTaxTypeChange(o.id)}
+        onClear={() => void onTaxTypeChange(null)}
+        fetchOptions={fetchTaxTypeOptions}
+        createLabel="Add tax type"
+        onCreate={
+          hasPermission(auth.me, "quotation.tax_types", "write")
+            ? (q) => {
+                setNewTaxTypeName(q);
+                setShowNewTaxType(true);
+              }
+            : undefined
+        }
+      />
+      <Show when={selectedTaxType()}>
+        {(t) => (
+          <p class="mt-1 text-xs text-text-secondary md:col-span-2">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
         )}
-      </ModalField>
+      </Show>
       <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
         {(m) => (
           <select
@@ -564,6 +598,15 @@ export function PurchaseRequestModal(props: Props) {
           setLocationLabel("");
         }}
         fetchOptions={fetchLocations}
+        createLabel="Add location"
+        onCreate={
+          hasPermission(auth.me, "inventory.locations", "write")
+            ? (q) => {
+                setNewLocationName(q);
+                setShowNewLocation(true);
+              }
+            : undefined
+        }
       />
       <ModalLookupField
         settings={byKey}
@@ -685,6 +728,26 @@ export function PurchaseRequestModal(props: Props) {
       open={soPickerOpen()}
       onClose={() => setSoPickerOpen(false)}
       onConfirm={(picked) => void applySalesOrderLines(picked)}
+    />
+    <QuickLocationModal
+      open={showNewLocation()}
+      initialName={newLocationName()}
+      onClose={() => setShowNewLocation(false)}
+      onCreated={(l) => {
+        setLocationId(l.id);
+        setLocationLabel(l.location_name);
+      }}
+    />
+    <QuickTaxTypeModal
+      open={showNewTaxType()}
+      initialName={newTaxTypeName()}
+      onClose={() => setShowNewTaxType(false)}
+      onCreated={(t) => {
+        void queryClient.invalidateQueries({ queryKey: ["quotation-tax-types"] });
+        setTaxTypeId(t.id);
+        setTaxTypeLabel(formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent));
+        void recalculatePurchaseRequestLines(lines(), t.id, t).then(setLines);
+      }}
     />
     </>
   );

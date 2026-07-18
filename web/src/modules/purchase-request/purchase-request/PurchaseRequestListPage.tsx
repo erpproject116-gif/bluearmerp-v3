@@ -269,6 +269,9 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
             loading={list.isFetching}
             selectedId={selectedId()}
             onSelect={setSelectedId}
+            selectable
+            selectedIds={lifecycle.selectedIds()}
+            onSelectionChange={lifecycle.onSelectionChange}
             onEdit={(row) => void openEdit(row)}
             onNew={openNew}
             codeKey="purchase_request_no"
@@ -297,6 +300,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
                   selectedIds={selectedIds}
                   onSuccess={() => invalidate()}
                 />
+                <lifecycle.BulkToolbar />
                 <lifecycle.FilterControl />
               </div>
             }
@@ -306,6 +310,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
 
       <PurchaseRequestModal open={modalOpen()} editing={editing()} readOnly={viewingDeleted()} onClose={closeModal} onSaved={invalidate} />
       <lifecycle.Dialog />
+      <lifecycle.BulkDialog />
       <CreatedSlipModal open={slipOpen()} purchaseRequestId={slipPurchaseRequestId()} onClose={() => setSlipOpen(false)} />
     </PurchaseRequestLayout>
   );
