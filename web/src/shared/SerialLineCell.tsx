@@ -29,6 +29,11 @@ type UnitsProps = {
   context?: "sale" | "release" | "pos";
   disabled?: boolean;
   onChange: (unitIds: number[], labels: string, qty?: string) => void;
+  /**
+   * Scan-first: when the line is empty or the serial belongs to a different item,
+   * parent fills/replaces the row from resolved units (same as DocumentSerialScanBar).
+   */
+  onPopulateFromUnits?: (units: ResolvedSerialUnit[]) => void | Promise<void>;
 };
 
 type ReceiveProps = {
@@ -52,6 +57,8 @@ type PlannedProps = {
   plannedSerials?: string[];
   disabled?: boolean;
   onChange?: (serials: string[]) => void;
+  /** Resolve registered serials and let parent fill the item line (purchase/PR). */
+  onPopulateFromUnits?: (units: ResolvedSerialUnit[]) => void | Promise<void>;
 };
 
 export type SerialLineCellProps = UnitsProps | ReceiveProps | PlannedProps;
@@ -393,9 +400,48 @@ function PlannedSerialModal(props: PlannedProps & { open: boolean; onClose: () =
 }
 
 function PlannedSerialCell(props: PlannedProps) {
+  const toast = useToast();
   const [open, setOpen] = createSignal(false);
+  const [resolving, setResolving] = createSignal(false);
   const targetQty = () => Math.max(1, Math.floor(props.qty));
   const serials = () => props.plannedSerials ?? [];
+
+  const commitPlanned = async (next: string[]) => {
+    const capped = next.slice(0, targetQty());
+    if (!props.onPopulateFromUnits) {
+      props.onChange?.(capped);
+      return;
+    }
+    // New tokens only — try resolve so a scan on an empty/mismatched line fills the item.
+    const prev = new Set(serials().map((s) => s.toLowerCase()));
+    const added = capped.filter((s) => !prev.has(s.toLowerCase()));
+    if (added.length === 0) {
+      props.onChange?.(capped);
+      return;
+    }
+    setResolving(true);
+    const { units, errors } = await resolveSerialBulk(added, { context: "purchase" });
+    setResolving(false);
+    if (units.length > 0) {
+      await props.onPopulateFromUnits(units);
+      // Keep any unresolved new tokens on the line if an item is already chosen.
+      const unresolved = added.filter(
+        (sn) => !units.some((u) => u.serial_no.toLowerCase() === sn.toLowerCase()),
+      );
+      if (unresolved.length > 0 && serials().length > 0) {
+        props.onChange?.(dedupeSerials([...serials(), ...unresolved]).slice(0, targetQty()));
+      }
+      if (errors.length > 0) {
+        toast.warning(errors.slice(0, 2).join(" · "));
+      }
+      return;
+    }
+    // No registry hit — treat as planned serials on the current line.
+    props.onChange?.(capped);
+    if (errors.length > 0 && !serials().length) {
+      toast.warning(errors[0] ?? "Serial not registered — pick an item first, then enter the serial.");
+    }
+  };
 
   return (
     <>
@@ -403,10 +449,9 @@ function PlannedSerialCell(props: PlannedProps) {
         serials={serials()}
         targetQty={targetQty()}
         disabled={props.disabled}
-        placeholder="SN001, SN002, …"
-        onCommit={async (next) => {
-          props.onChange?.(next.slice(0, targetQty()));
-        }}
+        busy={resolving()}
+        placeholder="Scan serial — fills item if registered"
+        onCommit={commitPlanned}
         onOpenAdvanced={() => setOpen(true)}
       />
       <PlannedSerialModal {...props} open={open()} onClose={() => setOpen(false)} />
@@ -427,21 +472,40 @@ function UnitsSerialCell(props: UnitsProps) {
       .filter(Boolean);
 
   const commitResolved = async (serialNos: string[]) => {
-    const capped = serialNos.slice(0, targetQty());
+    // Empty scan-first lines should accept a multi-serial paste and let the parent
+    // create/fill rows; otherwise keep the qty cap for an already chosen item.
+    const capped =
+      props.onPopulateFromUnits && !props.itemId
+        ? serialNos.filter(Boolean)
+        : serialNos.slice(0, targetQty());
     if (capped.length === 0) {
       props.onChange([], "", undefined);
       return;
     }
     setResolving(true);
+    // When populate-from-units is wired, resolve without pinning item_id so a
+    // scan on an empty or wrong-item line can discover and fill the row.
+    const pinItem = Boolean(props.itemId) && !props.onPopulateFromUnits;
     const { units, errors } = await resolveSerialBulk(capped, {
       locationId: props.locationId,
-      itemId: props.itemId,
+      itemId: pinItem ? props.itemId : undefined,
       context: props.context ?? "sale",
     });
     setResolving(false);
     if (errors.length > 0) {
       toast.warning(errors.slice(0, 3).join(" · ") + (errors.length > 3 ? ` (+${errors.length - 3} more)` : ""));
     }
+    if (units.length === 0) return;
+
+    if (props.onPopulateFromUnits) {
+      const lineEmpty = !props.itemId;
+      const mismatched = units.some((u) => u.item_id !== props.itemId);
+      if (lineEmpty || mismatched) {
+        await props.onPopulateFromUnits(units);
+        return;
+      }
+    }
+
     const { ids, labels: lbls, qty } = serialUnitsToChange(units);
     props.onChange(ids, lbls, qty);
   };
@@ -453,11 +517,17 @@ function UnitsSerialCell(props: UnitsProps) {
         targetQty={targetQty()}
         disabled={props.disabled}
         busy={resolving()}
-        placeholder="Scan or type serials, comma-separated"
+        placeholder={
+          props.itemId
+            ? "Scan or type serials, comma-separated"
+            : "Scan serial — auto-fills item line"
+        }
         onCommit={commitResolved}
-        onOpenAdvanced={() => setOpen(true)}
+        onOpenAdvanced={props.itemId ? () => setOpen(true) : undefined}
       />
-      <UnitsSerialModal {...props} open={open()} onClose={() => setOpen(false)} />
+      <Show when={props.itemId}>
+        <UnitsSerialModal {...props} open={open()} onClose={() => setOpen(false)} />
+      </Show>
     </>
   );
 }

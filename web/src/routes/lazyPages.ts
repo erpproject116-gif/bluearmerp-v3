@@ -190,6 +190,7 @@ export const CommsSettingsPage = lazy(() => import("../modules/comms/CommsSettin
 export const PosPage = lazy(() => import("../modules/pos/PosPage"));
 export const PosSettingsPage = lazy(() => import("../modules/pos/PosSettingsPage"));
 export const HrEmployeesPage = lazy(() => import("../modules/hr/HrEmployeesPage"));
+export const HrEmployeesSettingsPage = lazy(() => import("../modules/hr/HrEmployeesSettingsPage"));
 export const PayrollRunsPage = lazy(() => import("../modules/hr/PayrollRunsPage"));
 export const RemittancesPage = lazy(() => import("../modules/hr/RemittancesPage"));
 export const AttendancePage = lazy(() => import("../modules/hr/AttendancePage"));
@@ -223,6 +224,11 @@ export const TrialBalanceReportPage = lazy(() => import("../modules/finance/repo
 export const GeneralLedgerReportPage = lazy(() => import("../modules/finance/reports/GeneralLedgerReportPage"));
 export const ProfitAndLossReportPage = lazy(() => import("../modules/finance/reports/ProfitAndLossReportPage"));
 export const BalanceSheetReportPage = lazy(() => import("../modules/finance/reports/BalanceSheetReportPage"));
+export const CashFlowStatementPage = lazy(() => import("../modules/finance/reports/CashFlowStatementPage"));
+export const CashBookReportPage = lazy(() => import("../modules/finance/reports/CashBookReportPage"));
+export const CustomerVendorBookIIPage = lazy(() => import("../modules/finance/reports/CustomerVendorBookIIPage"));
+export const ArAgingDetailsPage = lazy(() => import("../modules/finance/reports/ArAgingDetailsPage"));
+export const ApAgingDetailsPage = lazy(() => import("../modules/finance/reports/ApAgingDetailsPage"));
 export const ArAgingReportPage = lazy(() => import("../modules/finance/reports/ArAgingReportPage"));
 export const ApAgingReportPage = lazy(() => import("../modules/finance/reports/ApAgingReportPage"));
 export const ArApStatusReportPage = lazy(() => import("../modules/finance/reports/ArApStatusReportPage"));

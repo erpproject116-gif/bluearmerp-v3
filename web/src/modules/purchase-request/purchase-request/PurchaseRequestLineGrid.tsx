@@ -293,7 +293,7 @@ export function PurchaseRequestLineGrid(props: Props) {
     return qtyIdx > 0 ? qtyIdx : 1;
   };
 
-  const applySerialUnits = (units: ResolvedSerialUnit[]) => {
+  const applySerialUnits = (units: ResolvedSerialUnit[], preferLineIdx?: number) => {
     const meta = props.taxTypeMeta();
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     let current = [...props.lines()];
@@ -305,6 +305,38 @@ export function PurchaseRequestLineGrid(props: Props) {
       if (already) {
         toast.warning(`${sn} is already on this document.`);
         continue;
+      }
+
+      if (preferLineIdx != null && preferLineIdx >= 0 && preferLineIdx < current.length) {
+        const pref = current[preferLineIdx];
+        const prefEmpty = !pref.item_id && !(pref.item_code || "").trim();
+        const prefSame = pref.item_id === u.item_id && Boolean(pref.track_serial || prefEmpty);
+        if (prefEmpty || prefSame) {
+          if (prefEmpty) {
+            current[preferLineIdx] = {
+              ...pref,
+              item_id: u.item_id,
+              item_code: u.item_code,
+              item_name: u.item_name,
+              unit_price: "0",
+              input_basis: basis,
+              track_serial: true,
+              serial_policy: "required",
+              planned_serial_nos: [sn],
+              qty: "1",
+            };
+          } else {
+            const serials = [...(pref.planned_serial_nos ?? []), sn];
+            current[preferLineIdx] = {
+              ...pref,
+              planned_serial_nos: serials,
+              qty: String(serials.length),
+              track_serial: true,
+            };
+          }
+          added++;
+          continue;
+        }
       }
 
       const sameItemIdx = current.findIndex((ln) => ln.item_id === u.item_id && Boolean(ln.track_serial));
@@ -490,14 +522,22 @@ export function PurchaseRequestLineGrid(props: Props) {
                   </Show>
                   <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().line_total))}</ResizableTd>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
-                    <Show when={line().item_id && line().track_serial} fallback={<SerialCellHint hasItem={Boolean(line().item_id)} />}>
+                    <Show
+                      when={!line().item_id || line().track_serial}
+                      fallback={<SerialCellHint hasItem={Boolean(line().item_id)} />}
+                    >
                       <div class="space-y-1">
-                        <p class="text-[10px] uppercase tracking-wide text-text-secondary">
-                          Planned · {trackingPolicyLabel(line().serial_policy)}
-                        </p>
+                        <Show when={line().item_id && line().track_serial}>
+                          <p class="text-[10px] uppercase tracking-wide text-text-secondary">
+                            Planned · {trackingPolicyLabel(line().serial_policy)}
+                          </p>
+                        </Show>
+                        <Show when={!line().item_id}>
+                          <p class="text-[10px] uppercase tracking-wide text-text-secondary">Scan serial</p>
+                        </Show>
                         <SerialLineCell
                           mode="planned"
-                          qty={parseNum(line().qty)}
+                          qty={parseNum(line().qty) || 1}
                           plannedSerials={line().planned_serial_nos ?? []}
                           onChange={(serials) =>
                             void updateLine(idx, {
@@ -505,6 +545,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                               qty: serials.length > 0 ? String(serials.length) : line().qty,
                             })
                           }
+                          onPopulateFromUnits={(units) => applySerialUnits(units, idx)}
                         />
                       </div>
                     </Show>

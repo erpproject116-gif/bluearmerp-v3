@@ -16,6 +16,8 @@ export type WorkflowStep = {
   href: string;
   /** Route prefixes that mean "the user is currently on this step". */
   routePrefixes?: string[];
+  /** Step can be skipped in the flow — shown with an "Optional" badge. */
+  optional?: boolean;
 };
 
 export type WorkflowGuide = {
@@ -97,6 +99,7 @@ export const workflowGuides: WorkflowGuide[] = [
         what: "List what you need to buy and why. This step is optional — if your team does not use internal requests, start straight at the Purchase Order.",
         href: "/app/purchase-request/purchase-requests",
         routePrefixes: ["/app/purchase-request"],
+        optional: true,
       },
       {
         id: "order",

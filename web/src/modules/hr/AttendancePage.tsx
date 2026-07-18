@@ -57,6 +57,7 @@ export default function AttendancePage() {
   const [dtrStatus, setDtrStatus] = createSignal("present");
   const [dtrHours, setDtrHours] = createSignal("8");
   const [dtrOt, setDtrOt] = createSignal("0");
+  const [dtrNightDiff, setDtrNightDiff] = createSignal("0");
   const [selectedDtrId, setSelectedDtrId] = createSignal<number | null>(null);
   const [importingDtr, setImportingDtr] = createSignal(false);
 
@@ -110,6 +111,7 @@ export default function AttendancePage() {
       dtr_status: dtrStatus(),
       dtr_hours: dtrHours(),
       dtr_ot: dtrOt(),
+      dtr_night_diff: dtrNightDiff(),
     }),
     onApply: (payload) => {
       setDtrEmp(payload.dtr_emp);
@@ -117,6 +119,7 @@ export default function AttendancePage() {
       setDtrStatus(payload.dtr_status);
       setDtrHours(payload.dtr_hours);
       setDtrOt(payload.dtr_ot);
+      setDtrNightDiff(payload.dtr_night_diff ?? "0");
     },
     enabled: () => true,
     localOnly: true,
@@ -173,7 +176,7 @@ export default function AttendancePage() {
         source: "manual",
         hours_worked: Number(dtrHours()) || 0,
         ot_hours: Number(dtrOt()) || 0,
-        night_diff_hours: 0,
+        night_diff_hours: Number(dtrNightDiff()) || 0,
       }),
     });
     if (!res.success) {
@@ -334,6 +337,7 @@ export default function AttendancePage() {
           </select></Field>
           <Field label="Hours"><input class={inputClass} value={dtrHours()} onInput={(e) => setDtrHours(e.currentTarget.value)} /></Field>
           <Field label="OT hours"><input class={inputClass} value={dtrOt()} onInput={(e) => setDtrOt(e.currentTarget.value)} /></Field>
+          <Field label="Night diff hours"><input class={inputClass} value={dtrNightDiff()} onInput={(e) => setDtrNightDiff(e.currentTarget.value)} /></Field>
         </div>
         <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => void saveDtr()}>
           Save DTR
@@ -345,6 +349,7 @@ export default function AttendancePage() {
             { key: "status", header: "Status" },
             { key: "hours_worked", header: "Hours", render: (row) => <span class="tabular-nums">{row.hours_worked}</span> },
             { key: "ot_hours", header: "OT", render: (row) => <span class="tabular-nums">{row.ot_hours}</span> },
+            { key: "night_diff_hours", header: "Night diff", render: (row) => <span class="tabular-nums">{row.night_diff_hours}</span> },
             { key: "holiday_name", header: "Holiday", render: (row) => <span>{row.holiday_name ? `${row.holiday_name} (${row.holiday_type})` : "—"}</span> },
           ]}
           rows={dtr.data ?? []}

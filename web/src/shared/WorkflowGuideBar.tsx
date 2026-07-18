@@ -81,9 +81,12 @@ export function WorkflowGuideBar() {
                           "bg-white text-text-secondary shadow-sm hover:text-brand-700": i() !== stepIndex(),
                         }}
                         aria-current={i() === stepIndex() ? "step" : undefined}
-                        title={step.title}
+                        title={step.optional ? `${step.title} (optional)` : step.title}
                       >
                         {i() + 1}. {step.short}
+                        <Show when={step.optional}>
+                          <span class="ml-1 opacity-70">(optional)</span>
+                        </Show>
                       </A>
                     </>
                   )}
@@ -130,7 +133,14 @@ export function WorkflowGuideBar() {
                             {i() + 1}
                           </span>
                           <div class="min-w-0">
-                            <p class="text-sm font-medium text-text-primary">{step.title}</p>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                              <p class="text-sm font-medium text-text-primary">{step.title}</p>
+                              <Show when={step.optional}>
+                                <span class="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                                  Optional
+                                </span>
+                              </Show>
+                            </div>
                             <p class="mt-1 text-xs leading-relaxed text-text-secondary">{step.what}</p>
                             <Show
                               when={i() !== stepIndex()}

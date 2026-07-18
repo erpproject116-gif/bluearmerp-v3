@@ -16,6 +16,9 @@ export const acctINavLinks: AcctNavLink[] = [
   { label: "General Ledger", href: "/app/finance/acct-i/reports/general-ledger", permissionCode: "finance.journal_entries" },
   { label: "Profit & Loss", href: "/app/finance/acct-i/reports/profit-and-loss", permissionCode: "finance.journal_entries" },
   { label: "Balance Sheet", href: "/app/finance/acct-i/reports/balance-sheet", permissionCode: "finance.journal_entries" },
+  { label: "Cash Flow Statement", href: "/app/finance/acct-i/reports/cash-flow-statement", permissionCode: "finance.journal_entries" },
+  { label: "Cash Book", href: "/app/finance/acct-i/reports/cash-book", permissionCode: "finance.journal_entries" },
+  { label: "Fund Statement", href: "/app/finance/acct-i/reports/fund-statement", permissionCode: "finance.journal_entries" },
 ];
 
 export function isAcctIPath(pathname: string): boolean {

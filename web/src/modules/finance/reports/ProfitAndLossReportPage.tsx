@@ -70,11 +70,6 @@ export default function ProfitAndLossReportPage() {
         <Show when={submitted() && report.data?.hasJournalData === false}>
           <p class="px-5 py-4 text-sm text-amber-700">No posted journal entries yet.</p>
         </Show>
-        <Show when={submitted() && report.data?.totalAmount != null}>
-          <p class="px-5 py-2 text-sm font-medium text-brand-800">
-            Net total: {report.data?.totalAmount?.toFixed(4)}
-          </p>
-        </Show>
         <table class="erp-grid min-w-full text-left text-sm">
           <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
             <tr>
@@ -96,6 +91,16 @@ export default function ProfitAndLossReportPage() {
               )}
             </For>
           </tbody>
+          <Show when={submitted() && report.data?.totalAmount != null}>
+            <tfoot>
+              <tr class="border-t-2 border-stroke bg-brand-50/60 text-sm font-semibold text-brand-800">
+                <td class="px-3 py-2" colspan="3">
+                  Net total
+                </td>
+                <td class="px-3 py-2 text-right">{report.data?.totalAmount?.toFixed(4)}</td>
+              </tr>
+            </tfoot>
+          </Show>
         </table>
       </ReportPageLayout>
     </FinanceLayout>

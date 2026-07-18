@@ -74,6 +74,18 @@ func registerFinancialReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 		rr.Get("/balance-sheet", listBalanceSheet(pool))
 		rr.Get("/acct-inventory-reconciliation/export", exportAcctInventoryReconciliation(pool))
 		rr.Get("/acct-inventory-reconciliation", listAcctInventoryReconciliation(pool))
+		rr.Get("/cash-flow-statement/export", exportCashFlowStatement(pool))
+		rr.Get("/cash-flow-statement", listCashFlowStatement(pool))
+		rr.Get("/cash-book/export", exportCashBook(pool))
+		rr.Get("/cash-book", listCashBook(pool))
+		rr.Get("/fund-statement/export", exportCashBook(pool))
+		rr.Get("/fund-statement", listCashBook(pool))
+		rr.Get("/customer-vendor-book-ii/export", exportPartnerBookII(pool))
+		rr.Get("/customer-vendor-book-ii", listPartnerBookII(pool))
+		rr.Get("/ar-aging-details/export", exportArAging(pool))
+		rr.Get("/ar-aging-details", listArAging(pool))
+		rr.Get("/ap-aging-details/export", exportApAging(pool))
+		rr.Get("/ap-aging-details", listApAging(pool))
 	})
 }
 

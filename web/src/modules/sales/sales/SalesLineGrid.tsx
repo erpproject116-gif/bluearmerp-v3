@@ -329,7 +329,7 @@ export function SalesLineGrid(props: Props) {
     });
   };
 
-  const applySerialUnits = async (units: ResolvedSerialUnit[]) => {
+  const applySerialUnits = async (units: ResolvedSerialUnit[], preferLineIdx?: number) => {
     const meta = props.taxTypeMeta();
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const pid = props.partnerId?.() ?? null;
@@ -341,6 +341,45 @@ export function SalesLineGrid(props: Props) {
       if (alreadyOnDoc) {
         toast.warning(`${u.serial_no} is already on this sale.`);
         continue;
+      }
+
+      // Prefer the line the user scanned into when it is empty or the same item.
+      if (preferLineIdx != null && preferLineIdx >= 0 && preferLineIdx < current.length) {
+        const pref = current[preferLineIdx];
+        const prefEmpty = !pref.item_id && !(pref.item_code || "").trim();
+        const prefSame = pref.item_id === u.item_id && Boolean(pref.track_serial || prefEmpty);
+        if (prefEmpty || prefSame) {
+          if (prefEmpty) {
+            const rate = (await resolveItemRate(pid, u.item_id)) ?? 0;
+            current[preferLineIdx] = {
+              ...pref,
+              item_id: u.item_id,
+              item_code: u.item_code,
+              item_name: u.item_name,
+              unit_price: String(rate),
+              input_basis: basis,
+              track_serial: true,
+              track_lot: false,
+              serial_policy: "required",
+              lot_policy: "required",
+              serial_unit_ids: [u.serial_unit_id],
+              serial_lot_no: u.serial_no,
+              qty: "1",
+            };
+          } else {
+            const ids = [...(pref.serial_unit_ids ?? []), u.serial_unit_id];
+            const labels = [pref.serial_lot_no, u.serial_no].filter(Boolean).join(", ");
+            current[preferLineIdx] = {
+              ...pref,
+              serial_unit_ids: ids,
+              serial_lot_no: labels,
+              qty: String(ids.length),
+              track_serial: true,
+            };
+          }
+          added++;
+          continue;
+        }
       }
 
       const sameItemIdx = current.findIndex(
@@ -505,29 +544,35 @@ export function SalesLineGrid(props: Props) {
                     </ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
-                    <Show when={line().item_id && line().track_serial}>
+                    <Show when={!line().item_id || line().track_serial}>
                       <div class="space-y-1">
-                        <p class="text-[10px] uppercase tracking-wide text-text-secondary">
-                          Serial · {trackingPolicyLabel(line().serial_policy)}
-                        </p>
+                        <Show when={line().item_id && line().track_serial}>
+                          <p class="text-[10px] uppercase tracking-wide text-text-secondary">
+                            Serial · {trackingPolicyLabel(line().serial_policy)}
+                          </p>
+                        </Show>
+                        <Show when={!line().item_id}>
+                          <p class="text-[10px] uppercase tracking-wide text-text-secondary">Scan serial</p>
+                        </Show>
                         <SerialLineCell
-                        mode="units"
-                        itemId={line().item_id}
-                        itemCode={line().item_code}
-                        itemName={line().item_name}
-                        locationId={props.locationId()}
-                        qty={parseNum(line().qty)}
-                        serialUnitIds={line().serial_unit_ids ?? []}
-                        serialLabels={line().serial_lot_no}
-                        context="sale"
-                        onChange={(ids, labels, qty) => {
-                          void updateLine(idx, {
-                            serial_unit_ids: ids,
-                            serial_lot_no: labels,
-                            qty: qty ?? String(ids.length),
-                          });
-                        }}
-                      />
+                          mode="units"
+                          itemId={line().item_id}
+                          itemCode={line().item_code}
+                          itemName={line().item_name}
+                          locationId={props.locationId()}
+                          qty={parseNum(line().qty) || 1}
+                          serialUnitIds={line().serial_unit_ids ?? []}
+                          serialLabels={line().serial_lot_no}
+                          context="sale"
+                          onChange={(ids, labels, qty) => {
+                            void updateLine(idx, {
+                              serial_unit_ids: ids,
+                              serial_lot_no: labels,
+                              qty: qty ?? String(ids.length),
+                            });
+                          }}
+                          onPopulateFromUnits={(units) => applySerialUnits(units, idx)}
+                        />
                       </div>
                     </Show>
                     <Show when={line().item_id && line().track_lot && !line().track_serial}>
@@ -546,16 +591,12 @@ export function SalesLineGrid(props: Props) {
                       />
                       </div>
                     </Show>
-                    <Show when={!line().item_id || (!line().track_serial && !line().track_lot)}>
+                    <Show when={line().item_id && !line().track_serial && !line().track_lot}>
                       <span
                         class="cursor-help text-xs text-text-secondary"
-                        title={
-                          line().item_id
-                            ? "This item is not serial- or lot-tracked. Enable “Track serial numbers” or “Track lot numbers” on the item in Inventory → Items to scan here."
-                            : "Pick an item first — serial/lot entry appears for tracked items."
-                        }
+                        title="This item is not serial- or lot-tracked. Enable “Track serial numbers” or “Track lot numbers” on the item in Inventory → Items to scan here."
                       >
-                        {line().item_id ? "Not tracked" : "—"}
+                        Not tracked
                       </span>
                     </Show>
                   </ResizableTd>

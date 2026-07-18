@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
@@ -13,6 +13,7 @@ type Check = {
   payee_name: string;
   amount: number;
   status: string;
+  check_kind?: string;
 };
 
 type BankAccount = {
@@ -29,6 +30,7 @@ export default function CheckRegisterPage() {
   const [bankAccountId, setBankAccountId] = createSignal("");
   const [payeeName, setPayeeName] = createSignal("");
   const [amount, setAmount] = createSignal("");
+  const [checkKind, setCheckKind] = createSignal<"issued" | "received">("issued");
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const client = useQueryClient();
@@ -61,6 +63,7 @@ export default function CheckRegisterPage() {
     setBankAccountId("");
     setPayeeName("");
     setAmount("");
+    setCheckKind("issued");
     setModalOpen(true);
   };
 
@@ -79,7 +82,8 @@ export default function CheckRegisterPage() {
         bank_account_id: bankId,
         payee_name: payeeName().trim(),
         amount: Number(amount()) || 0,
-        status: "issued",
+        status: checkKind() === "received" ? "received" : "issued",
+        check_kind: checkKind(),
       }),
     });
     setSaving(false);
@@ -92,16 +96,16 @@ export default function CheckRegisterPage() {
     invalidate();
   };
 
-  const markCleared = async (row: Check) => {
+  const setStatus = async (row: Check, status: string, label: string) => {
     const res = await apiFetch(`/api/v1/finance/checks/${row.id}/status`, {
       method: "PATCH",
-      body: JSON.stringify({ status: "cleared" }),
+      body: JSON.stringify({ status }),
     });
     if (!res.success) {
       toast.warning(res.message ?? "Failed to update check.");
       return;
     }
-    toast.success("Check marked cleared.");
+    toast.success(label);
     invalidate();
   };
 
@@ -110,13 +114,18 @@ export default function CheckRegisterPage() {
       <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="text-lg font-semibold text-text-primary">Check register</h2>
         <p class="mt-1 text-sm text-text-secondary">
-          Acct. II — track issued checks, link to bank accounts, and mark cleared for reconciliation.
+          Acct. II — track issued and received checks, clear/deposit them, or void when needed.
         </p>
       </section>
       <SpreadsheetGrid<Check>
         columns={[
           { key: "check_no", header: "Check #", clickable: true },
           { key: "check_date", header: "Date" },
+          {
+            key: "check_kind",
+            header: "Kind",
+            render: (r) => <span class="capitalize">{r.check_kind ?? "issued"}</span>,
+          },
           { key: "payee_name", header: "Payee" },
           {
             key: "amount",
@@ -130,14 +139,36 @@ export default function CheckRegisterPage() {
           },
           {
             key: "id",
-            header: "",
+            header: "Actions",
             sortable: false,
-            render: (r) =>
-              r.status === "issued" ? (
-                <button type="button" class="text-sm font-medium text-brand-600 hover:underline" onClick={() => markCleared(r)}>
-                  Mark cleared
-                </button>
-              ) : null,
+            render: (r) => (
+              <div class="flex flex-wrap gap-2">
+                <Show when={r.status === "issued" || r.status === "outstanding" || r.status === "received"}>
+                  <button
+                    type="button"
+                    class="text-sm font-medium text-brand-600 hover:underline"
+                    onClick={() =>
+                      void setStatus(
+                        r,
+                        r.check_kind === "received" ? "deposited" : "cleared",
+                        r.check_kind === "received" ? "Check deposited." : "Check cleared.",
+                      )
+                    }
+                  >
+                    {r.check_kind === "received" ? "Deposit" : "Clear"}
+                  </button>
+                </Show>
+                <Show when={r.status !== "void" && r.status !== "cancelled"}>
+                  <button
+                    type="button"
+                    class="text-sm font-medium text-red-600 hover:underline"
+                    onClick={() => void setStatus(r, "void", "Check voided.")}
+                  >
+                    Void
+                  </button>
+                </Show>
+              </div>
+            ),
           },
         ]}
         rows={list.data?.rows ?? []}
@@ -161,6 +192,16 @@ export default function CheckRegisterPage() {
         saving={saving()}
         singleColumn
       >
+        <Field label="Kind">
+          <select
+            class={inputClass}
+            value={checkKind()}
+            onChange={(e) => setCheckKind(e.currentTarget.value as "issued" | "received")}
+          >
+            <option value="issued">Issued (payable)</option>
+            <option value="received">Received (receivable)</option>
+          </select>
+        </Field>
         <Field label="Check number *">
           <input class={inputClass} value={checkNo()} onInput={(e) => setCheckNo(e.currentTarget.value)} />
         </Field>
