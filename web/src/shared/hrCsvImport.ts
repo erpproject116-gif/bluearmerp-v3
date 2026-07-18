@@ -61,6 +61,76 @@ export function importDtrCsv(file: File) {
   return importCsv("/dtr/import", file);
 }
 
+export type HrImportProfile = {
+  id: number;
+  kind: "employees" | "dtr";
+  name: string;
+  column_map: Record<string, string>;
+};
+
+export async function listHrImportProfiles(kind: "employees" | "dtr"): Promise<ApiResult<HrImportProfile[]>> {
+  const token = await getAccessToken();
+  const res = await fetch(`${hrBase}/import-profiles?kind=${kind}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const body = (await res.json()) as ApiResult<HrImportProfile[]>;
+  return { ...body, status: res.status, ok: res.ok };
+}
+
+export async function upsertHrImportProfile(
+  kind: "employees" | "dtr",
+  name: string,
+  columnMap: Record<string, string>,
+): Promise<ApiResult<HrImportProfile>> {
+  const token = await getAccessToken();
+  const res = await fetch(`${hrBase}/import-profiles`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ kind, name, column_map: columnMap }),
+  });
+  const body = (await res.json()) as ApiResult<HrImportProfile>;
+  return { ...body, status: res.status, ok: res.ok };
+}
+
+export async function importEmployeesMapped(
+  file: File,
+  opts: { profileId?: number; columnMap?: Record<string, string> },
+): Promise<ApiResult<HrImportResult>> {
+  const token = await getAccessToken();
+  const fd = new FormData();
+  fd.append("file", file);
+  if (opts.profileId) fd.append("profile_id", String(opts.profileId));
+  if (opts.columnMap) fd.append("column_map", JSON.stringify(opts.columnMap));
+  const res = await fetch(`${hrBase}/employees/import-mapped`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  const body = (await res.json()) as ApiResult<HrImportResult>;
+  return { ...body, status: res.status, ok: res.ok };
+}
+
+export async function importDtrMapped(
+  file: File,
+  opts: { profileId?: number; columnMap?: Record<string, string> },
+): Promise<ApiResult<HrImportResult>> {
+  const token = await getAccessToken();
+  const fd = new FormData();
+  fd.append("file", file);
+  if (opts.profileId) fd.append("profile_id", String(opts.profileId));
+  if (opts.columnMap) fd.append("column_map", JSON.stringify(opts.columnMap));
+  const res = await fetch(`${hrBase}/dtr/import-mapped`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  const body = (await res.json()) as ApiResult<HrImportResult>;
+  return { ...body, status: res.status, ok: res.ok };
+}
+
 export function exportPayrollRegisterCsv(payPeriodId: number) {
   return downloadCsv(`/pay-periods/${payPeriodId}/register.csv`, `payroll-register-${payPeriodId}.csv`);
 }

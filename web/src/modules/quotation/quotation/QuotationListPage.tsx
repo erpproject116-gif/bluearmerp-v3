@@ -268,6 +268,9 @@ export function QuotationListPageInner(props: PageOptions = {}) {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
         codeKey="reference_no"
@@ -301,6 +304,7 @@ export function QuotationListPageInner(props: PageOptions = {}) {
               selectedIds={selectedIds}
               onSuccess={() => invalidate()}
             />
+            <lifecycle.BulkToolbar />
             <lifecycle.FilterControl />
           </div>
         }
@@ -308,6 +312,7 @@ export function QuotationListPageInner(props: PageOptions = {}) {
 
       <QuotationModal open={modalOpen()} editing={editing()} readOnly={viewingDeleted()} onClose={closeModal} onSaved={invalidate} />
       <lifecycle.Dialog />
+      <lifecycle.BulkDialog />
       <CreatedSlipModal open={slipOpen()} quotationId={slipQuotationId()} onClose={() => setSlipOpen(false)} />
       <SendEmailModal
         open={emailOpen()}

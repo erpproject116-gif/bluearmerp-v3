@@ -1,6 +1,10 @@
 import type { JSX } from "solid-js";
 import { For, Show, createSignal } from "solid-js";
 import { apiFetch } from "./api";
+import {
+  BulkLifecycleConfirmModal,
+  type BulkLifecycleOutcome,
+} from "./BulkLifecycleConfirmModal";
 import { Modal } from "./Modal";
 import { useToast } from "./toast";
 
@@ -12,6 +16,8 @@ import { useToast } from "./toast";
  *  - GET  {base}/{id}/lifecycle
  *  - POST {base}/{id}/actions/delete  { reason }
  *  - POST {base}/{id}/actions/restore { reason }
+ *  - POST {base}/actions/bulk-delete  { ids, reason }
+ *  - POST {base}/actions/bulk-restore { ids, reason }
  */
 
 export type LifecycleFilter = "active" | "deleted" | "all";
@@ -62,6 +68,20 @@ export function fetchLifecycleMeta(apiBase: string, id: number) {
   return apiFetch<LifecycleMeta>(`${apiBase}/${id}/lifecycle`);
 }
 
+export function bulkDeleteDocuments(apiBase: string, ids: number[], reason: string) {
+  return apiFetch<BulkLifecycleOutcome>(`${apiBase}/actions/bulk-delete`, {
+    method: "POST",
+    body: JSON.stringify({ ids, reason }),
+  }, { silent: true });
+}
+
+export function bulkRestoreDocuments(apiBase: string, ids: number[], reason: string) {
+  return apiFetch<BulkLifecycleOutcome>(`${apiBase}/actions/bulk-restore`, {
+    method: "POST",
+    body: JSON.stringify({ ids, reason }),
+  }, { silent: true });
+}
+
 type UseDocumentLifecycleOptions = {
   /** e.g. "/api/v1/quotation/quotations" */
   apiBase: string;
@@ -82,12 +102,20 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
   const [loadingImpact, setLoadingImpact] = createSignal(false);
   const [reason, setReason] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
+  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set<number>());
+  const [bulkOpen, setBulkOpen] = createSignal(false);
+  const [bulkAction, setBulkAction] = createSignal<"delete" | "restore">("delete");
+  const [bulkSubmitting, setBulkSubmitting] = createSignal(false);
+  const [bulkOutcome, setBulkOutcome] = createSignal<BulkLifecycleOutcome | null>(null);
 
   const canManage = () => opts.canManage?.() ?? true;
 
   const setFilter = (value: string) => {
     setFilterSignal(value === "deleted" || value === "all" ? value : "active");
+    setSelectedIds(new Set<number>());
   };
+
+  const onSelectionChange = (ids: Set<number>) => setSelectedIds(new Set(ids));
 
   /** Open the delete/restore dialog for a row; loads the impact preview. */
   const openDialog = async (id: number, label: string) => {
@@ -166,6 +194,43 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
     return "Delete";
   };
 
+  const openBulk = (act: "delete" | "restore") => {
+    if (!canManage() || selectedIds().size === 0) return;
+    setBulkAction(act);
+    setBulkOutcome(null);
+    setBulkOpen(true);
+  };
+
+  const closeBulk = () => {
+    if (bulkSubmitting()) return;
+    setBulkOpen(false);
+    setBulkOutcome(null);
+  };
+
+  const submitBulk = async (trimmed: string) => {
+    const ids = [...selectedIds()];
+    if (ids.length === 0) return;
+    const act = bulkAction();
+    setBulkSubmitting(true);
+    const res = act === "delete"
+      ? await bulkDeleteDocuments(opts.apiBase, ids, trimmed)
+      : await bulkRestoreDocuments(opts.apiBase, ids, trimmed);
+    setBulkSubmitting(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? `Bulk ${act} failed.`);
+      return;
+    }
+    setBulkOutcome(res.data);
+    const ok = res.data.deleted ?? res.data.restored ?? 0;
+    if (ok > 0) {
+      toast.success(`Bulk ${act}: ${ok} succeeded, ${res.data.skipped} skipped.`);
+      setSelectedIds(new Set<number>());
+      opts.onChanged();
+    } else {
+      toast.warning(`No ${opts.documentLabel}s were ${act === "delete" ? "deleted" : "restored"}.`);
+    }
+  };
+
   /** Grid cell: a Delete (active view) / Restore (deleted view) link. Hidden without permission. */
   const RowAction = (props: { id: number; label: string }): JSX.Element => (
     <Show when={canManage()} fallback={<span class="text-text-secondary">—</span>}>
@@ -194,6 +259,34 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
         <For each={LIFECYCLE_FILTER_OPTIONS}>{(opt) => <option value={opt.value}>{opt.label}</option>}</For>
       </select>
     </label>
+  );
+
+  /** Bulk Delete / Restore buttons for the current selection. */
+  const BulkToolbar = (): JSX.Element => (
+    <Show when={canManage()}>
+      <div class="flex items-end gap-2">
+        <Show when={filter() !== "deleted"}>
+          <button
+            type="button"
+            class="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-40"
+            disabled={selectedIds().size === 0}
+            onClick={() => openBulk("delete")}
+          >
+            Delete selected{selectedIds().size > 0 ? ` (${selectedIds().size})` : ""}
+          </button>
+        </Show>
+        <Show when={filter() !== "active"}>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+            disabled={selectedIds().size === 0}
+            onClick={() => openBulk("restore")}
+          >
+            Restore selected{selectedIds().size > 0 ? ` (${selectedIds().size})` : ""}
+          </button>
+        </Show>
+      </div>
+    </Show>
   );
 
   /** The delete/restore confirmation dialog. Render once per page. */
@@ -285,6 +378,19 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
     </Modal>
   );
 
+  const BulkDialog = (): JSX.Element => (
+    <BulkLifecycleConfirmModal
+      open={bulkOpen()}
+      action={bulkAction()}
+      entityLabel={opts.documentLabel}
+      count={selectedIds().size}
+      submitting={bulkSubmitting()}
+      outcome={bulkOutcome()}
+      onClose={closeBulk}
+      onConfirm={(r) => void submitBulk(r)}
+    />
+  );
+
   return {
     filter,
     setFilter,
@@ -292,9 +398,13 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
     openDialog,
     resolveDeleted,
     detailUrl,
+    selectedIds,
+    onSelectionChange,
     RowAction,
     FilterControl,
+    BulkToolbar,
     Dialog,
+    BulkDialog,
   };
 }
 

@@ -13,7 +13,10 @@ import { ModalField } from "../../../shared/ModalField";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import type { OfficialReceiptDetail } from "../../../shared/useOfficialReceiptList";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 
 export type { OfficialReceiptDetail };
 
@@ -84,8 +87,11 @@ function applicationsFromDetail(detail?: OfficialReceiptDetail | null): Applicat
 
 export function OfficialReceiptModal(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
   const { fields, byKey } = useFormFieldSettings(FINANCE_ENTITY.officialReceipt);
   const [saving, setSaving] = createSignal(false);
+  const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [newCustomerName, setNewCustomerName] = createSignal("");
   const [receiptDate, setReceiptDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [receiptNo, setReceiptNo] = createSignal("");
@@ -252,6 +258,7 @@ export function OfficialReceiptModal(props: Props) {
   };
 
   return (
+    <>
     <WideEntityModal
       open={props.open}
       title={props.editing ? "Edit Official Receipt" : "New Official Receipt"}
@@ -267,6 +274,7 @@ export function OfficialReceiptModal(props: Props) {
         />
       }
     >
+      <ModalFormGuide guideId="official_receipt" />
       <draft.DraftBanner />
       <ModalField settings={byKey} fieldKey="receipt_date" fallbackLabel="Date" fallbackRequired>
           {(m) => (
@@ -301,6 +309,15 @@ export function OfficialReceiptModal(props: Props) {
                 setApplications([emptyApplication()]);
               }}
               fetchOptions={fetchPartners}
+              createLabel="Add customer"
+              onCreate={
+                hasPermission(auth.me, "inventory.partners", "write")
+                  ? (q) => {
+                      setNewCustomerName(q);
+                      setShowNewCustomer(true);
+                    }
+                  : undefined
+              }
             />
           )}
         </ModalField>
@@ -434,5 +451,16 @@ export function OfficialReceiptModal(props: Props) {
         </div>
       </div>
     </WideEntityModal>
+    <QuickCustomerModal
+      open={showNewCustomer()}
+      initialName={newCustomerName()}
+      onClose={() => setShowNewCustomer(false)}
+      onCreated={(p) => {
+        setPartnerId(p.id);
+        setCustomerLabel(p.company_name);
+        setApplications([emptyApplication()]);
+      }}
+    />
+    </>
   );
 }

@@ -21,8 +21,8 @@ type pgxpoolConn interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func buildWhere(tenantID int64, p httputil.ListParams, nameCol, codeCol string) (string, []any) {
-	where := "tenant_id = $1 and deleted_at is null"
+func buildWhere(tenantID int64, p httputil.ListParams, nameCol, codeCol, lifecyclePred string) (string, []any) {
+	where := "tenant_id = $1 and " + lifecyclePred
 	args := []any{tenantID}
 	n := 2
 	if p.Q != "" {

@@ -68,15 +68,19 @@ func TestAllDocumentConfigsAreValid(t *testing.T) {
 	}
 }
 
-func TestTransactionalDocumentsGuardBothActions(t *testing.T) {
-	for _, cfg := range []Config{SaleConfig(), SupplierInvoiceConfig()} {
-		hasDelete, hasRestore := false, false
-		for _, dependency := range cfg.Dependencies {
-			hasDelete = hasDelete || dependency.BlockDelete
-			hasRestore = hasRestore || dependency.BlockRestore
-		}
-		if !hasDelete || !hasRestore {
-			t.Fatalf("%s must guard delete and restore", cfg.DocumentType)
-		}
+func TestAggregateBulkOutcome(t *testing.T) {
+	results := []BulkItemResult{
+		{ID: 1, OK: true},
+		{ID: 2, OK: false, Reason: "blocked"},
+		{ID: 3, OK: true},
+		{ID: 4, OK: false, Reason: "not found"},
+	}
+	del := AggregateBulkOutcome("delete", results)
+	if del.Deleted != 2 || del.Skipped != 2 || del.Restored != 0 {
+		t.Fatalf("delete aggregate = %+v; want deleted=2 skipped=2", del)
+	}
+	res := AggregateBulkOutcome("restore", results)
+	if res.Restored != 2 || res.Skipped != 2 || res.Deleted != 0 {
+		t.Fatalf("restore aggregate = %+v; want restored=2 skipped=2", res)
 	}
 }

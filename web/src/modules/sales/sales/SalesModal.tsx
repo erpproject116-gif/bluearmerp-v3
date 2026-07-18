@@ -29,6 +29,9 @@ import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "..
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import { QuickLocationModal } from "../../../shared/QuickLocationModal";
+import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import {
   QuotationLinePickerModal,
   type PickedQuotationLine,
@@ -219,6 +222,10 @@ export function SalesModal(props: Props) {
   const [holdOpen, setHoldOpen] = createSignal(false);
   const effectiveEditing = () => props.editing ?? createdSale();
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [showNewLocation, setShowNewLocation] = createSignal(false);
+  const [newLocationName, setNewLocationName] = createSignal("");
+  const [showNewTaxType, setShowNewTaxType] = createSignal(false);
+  const [newTaxTypeName, setNewTaxTypeName] = createSignal("");
   const [activeTab, setActiveTab] = createSignal<"details" | "invoice">("details");
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [returnLinesOpen, setReturnLinesOpen] = createSignal(false);
@@ -229,6 +236,7 @@ export function SalesModal(props: Props) {
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [salesNo, setSalesNo] = createSignal("");
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
+  const [taxTypeLabel, setTaxTypeLabel] = createSignal("");
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
   const [customerLabel, setCustomerLabel] = createSignal("");
@@ -252,6 +260,14 @@ export function SalesModal(props: Props) {
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
   const templateCode = () => (props.editing?.template_code ?? props.templateCode) as SalesTemplateCode;
+
+  /** Fill label when id is set but label still empty (e.g. after draft restore before list loads). */
+  createEffect(() => {
+    const id = taxTypeId();
+    if (id == null || taxTypeLabel()) return;
+    const meta = taxTypes().find((t) => t.id === id);
+    if (meta) setTaxTypeLabel(formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent));
+  });
 
   const draftKey = () => (props.editing ? `edit-${props.editing.id}` : `new-${templateCode()}`);
 
@@ -331,6 +347,7 @@ export function SalesModal(props: Props) {
     setDateNoDisplay(ed.date_no_display);
     setSalesNo(ed.sales_no);
     setTaxTypeId(ed.tax_type_id);
+    setTaxTypeLabel(ed.tax_type_name ?? "");
     setCurrencyId(ed.currency_id);
     setPartnerId(ed.partner_id);
     setCustomerLabel(ed.customer_name);
@@ -433,6 +450,7 @@ export function SalesModal(props: Props) {
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
     setOrderDate(payload.order_date);
     setTaxTypeId(payload.tax_type_id);
+    setTaxTypeLabel("");
     setCurrencyId(payload.currency_id);
     setPartnerId(payload.partner_id);
     setCustomerLabel(payload.customer_label);
@@ -464,9 +482,17 @@ export function SalesModal(props: Props) {
     // Banner-only: show Restore/Discard so the user chooses (ECOUNT-style recovery).
   });
 
+  const fetchTaxTypeOptions = async (q: string): Promise<LookupOption[]> => {
+    const qq = q.trim().toLowerCase();
+    return taxTypes()
+      .filter((t) => !qq || t.name.toLowerCase().includes(qq))
+      .map((t) => ({ id: t.id, label: formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent) }));
+  };
+
   const onTaxTypeChange = async (newId: number | null) => {
     setTaxTypeId(newId);
     const meta = taxTypes().find((t) => t.id === newId);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     if (!newId || !meta) return;
     const recalc = await recalculateSalesLines(lines(), newId, meta, templateCode());
     setLines(recalc);
@@ -526,6 +552,7 @@ export function SalesModal(props: Props) {
     if (!taxTypeId()) {
       const first = tt[0];
       setTaxTypeId(first.id);
+      setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
       setLines([emptySalesLine(1, "", basis)]);
     }
@@ -552,6 +579,7 @@ export function SalesModal(props: Props) {
     setSourceSalesOrderId(first.sales_order_id);
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const newLines: SalesLineRow[] = picked.map((row, i) => ({
       ...emptySalesLine(i + 1, String(row.unit_vat_inc), basis),
@@ -585,6 +613,7 @@ export function SalesModal(props: Props) {
     setPicName(first.pic_name);
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const newLines: SalesLineRow[] = picked.map((row, i) => ({
       ...emptySalesLine(i + 1, String(row.unit_vat_inc), basis),
@@ -617,6 +646,7 @@ export function SalesModal(props: Props) {
     setSourceSalesOrderId(first.sales_order_id);
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const newLines: SalesLineRow[] = picked.map((row, i) => ({
       ...emptySalesLine(i + 1, String(row.unit_vat_inc), basis),
@@ -821,6 +851,7 @@ export function SalesModal(props: Props) {
         }
       >
         <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
+        <ModalFormGuide guideId="sales" />
         <draft.DraftBanner />
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
@@ -857,30 +888,32 @@ export function SalesModal(props: Props) {
             <DateInput value={dueDate()} disabled={m.disabled} onInput={(e) => setDueDate(e.currentTarget.value)} />
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
-          {(m) => (
-            <>
-              <select
-                class={inputClass}
-                value={taxTypeId() ?? ""}
-                disabled={m.disabled}
-                onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-              >
-                <option value="">Select…</option>
-                <For each={taxTypes()}>
-                  {(t) => (
-                    <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
-                  )}
-                </For>
-              </select>
-              <Show when={selectedTaxType()}>
-                {(t) => (
-                  <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
-                )}
-              </Show>
-            </>
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="tax_type_id"
+          fallbackLabel="Transaction type"
+          fallbackRequired
+          value={taxTypeLabel}
+          selectedId={taxTypeId}
+          onInput={setTaxTypeLabel}
+          onSelect={(o) => void onTaxTypeChange(o.id)}
+          onClear={() => void onTaxTypeChange(null)}
+          fetchOptions={fetchTaxTypeOptions}
+          createLabel="Add tax type"
+          onCreate={
+            hasPermission(auth.me, "quotation.tax_types", "write")
+              ? (q) => {
+                  setNewTaxTypeName(q);
+                  setShowNewTaxType(true);
+                }
+              : undefined
+          }
+        />
+        <Show when={selectedTaxType()}>
+          {(t) => (
+            <p class="mt-1 text-xs text-text-secondary md:col-span-2">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
           )}
-        </ModalField>
+        </Show>
         <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
           {(m) => (
             <select
@@ -951,6 +984,15 @@ export function SalesModal(props: Props) {
             setLocationLabel("");
           }}
           fetchOptions={fetchLocations}
+          createLabel="Add location"
+          onCreate={
+            hasPermission(auth.me, "inventory.locations", "write")
+              ? (q) => {
+                  setNewLocationName(q);
+                  setShowNewLocation(true);
+                }
+              : undefined
+          }
         />
         <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
           {(m) => (
@@ -1174,6 +1216,28 @@ export function SalesModal(props: Props) {
         onCreated={(p) => {
           setPartnerId(p.id);
           setCustomerLabel(p.company_name);
+        }}
+      />
+
+      <QuickLocationModal
+        open={showNewLocation()}
+        initialName={newLocationName()}
+        onClose={() => setShowNewLocation(false)}
+        onCreated={(l) => {
+          setLocationId(l.id);
+          setLocationLabel(l.location_name);
+        }}
+      />
+
+      <QuickTaxTypeModal
+        open={showNewTaxType()}
+        initialName={newTaxTypeName()}
+        onClose={() => setShowNewTaxType(false)}
+        onCreated={(t) => {
+          void queryClient.invalidateQueries({ queryKey: ["quotation-tax-types"] });
+          setTaxTypeId(t.id);
+          setTaxTypeLabel(formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent));
+          void recalculateSalesLines(lines(), t.id, t, templateCode()).then(setLines);
         }}
       />
 

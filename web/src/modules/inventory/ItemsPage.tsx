@@ -10,6 +10,8 @@ import { useToast } from "../../shared/toast";
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useInventoryList, useInvalidateInventoryList } from "../../shared/useInventoryList";
 import { useListState } from "../../shared/useListState";
+import { useMasterLifecycle } from "../../shared/masterLifecycle";
+import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useCustomValues } from "../../shared/useCustomValues";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY, INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
@@ -97,6 +99,7 @@ function rowToForm(row: Item): ItemFormState {
 
 export default function ItemsPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("item_code");
+  const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [itemTab, setItemTab] = createSignal<ItemTab>("default");
@@ -109,6 +112,12 @@ export default function ItemsPage() {
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
+  const lifecycle = useMasterLifecycle({
+    apiBase: "/api/v1/inventory/items",
+    entityLabel: "item",
+    canManage: () => hasPermission(auth.me, "inventory.items", "write"),
+    onChanged: () => invalidate("items"),
+  });
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.items);
 
@@ -121,6 +130,7 @@ export default function ItemsPage() {
       order: order(),
       q: q() || undefined,
       status: statusFilter() || undefined,
+      lifecycle: lifecycle.filter(),
       item_code: adv.item_code,
       item_name: adv.item_name,
       spec_name: adv.spec_name,
@@ -269,6 +279,9 @@ export default function ItemsPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={openEdit}
         onNew={() => void openNew()}
         codeKey="item_code"
@@ -290,6 +303,8 @@ export default function ItemsPage() {
         settingsHref={INVENTORY_SETTINGS_HREF.items}
         toolbarExtra={
           <>
+            <lifecycle.BulkToolbar />
+            <lifecycle.FilterControl />
             <button
               type="button"
               class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
@@ -307,6 +322,7 @@ export default function ItemsPage() {
           </>
         }
       />
+      <lifecycle.BulkDialog />
       <ItemMasterModal
         open={modalOpen()}
         editing={Boolean(editing())}

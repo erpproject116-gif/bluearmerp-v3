@@ -1,9 +1,9 @@
 import { createSignal, For, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { formatAmount } from "../../shared/money";
 import {
   createEmployee,
-  createHrDepartment,
   patchEmployee,
   useEmployees,
   useHrDepartments,
@@ -19,17 +19,23 @@ import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY, HR_ENTITY, HR_SETTINGS_HREF } from "../../shared/entityTypes";
+import { useMasterLifecycle } from "../../shared/masterLifecycle";
 import { HrLayout } from "./HrLayout";
 import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
+import { HrMappedImportModal } from "./HrMappedImportModal";
 import { UserSearchModal, type UserSearchRow } from "../purchase-request/purchase-request/UserSearchModal";
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { requireFields } from "../../shared/handleSaveResult";
 import { useQueryClient } from "@tanstack/solid-query";
+import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { QuickDepartmentModal } from "../../shared/QuickDepartmentModal";
+import { hasPermission, useAuth } from "../../shared/auth-context";
 
 const STATUS_OPTIONS = ["active", "inactive", "terminated"];
 
 export default function HrEmployeesPage() {
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("full_name");
+  const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [selected, setSelected] = createSignal<Employee | null>(null);
@@ -37,7 +43,8 @@ export default function HrEmployeesPage() {
   const [fullName, setFullName] = createSignal("");
   const [departmentId, setDepartmentId] = createSignal<number | null>(null);
   const [department, setDepartment] = createSignal("");
-  const [newDeptName, setNewDeptName] = createSignal("");
+  const [showQuickDept, setShowQuickDept] = createSignal(false);
+  const [quickDeptName, setQuickDeptName] = createSignal("");
   const [jobTitle, setJobTitle] = createSignal("");
   const [hireDate, setHireDate] = createSignal(new Date().toISOString().slice(0, 10));
   const [status, setStatus] = createSignal("active");
@@ -56,20 +63,44 @@ export default function HrEmployeesPage() {
   const [bankAccountNo, setBankAccountNo] = createSignal("");
   const [saving, setSaving] = createSignal(false);
   const [importing, setImporting] = createSignal(false);
+  const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
+  const [formSection, setFormSection] = createSignal<"employment" | "statutory" | "documents">("employment");
   const toast = useToast();
   const invalidate = useInvalidateEmployees();
   const qc = useQueryClient();
   const depts = useHrDepartments();
   const { fields } = useFormFieldSettings(HR_ENTITY.employee);
 
-  const list = useEmployees(() => ({ page: page(), pageSize, q: q() || undefined }));
+  const canWriteEmployees = () => hasPermission(auth.me, "hr.employees", "write");
+
+  const lifecycle = useMasterLifecycle({
+    apiBase: "/api/v1/hr/employees",
+    entityLabel: "employee",
+    canManage: () => canWriteEmployees(),
+    onChanged: invalidate,
+  });
+
+  const list = useEmployees(() => ({
+    page: page(),
+    pageSize,
+    q: q() || undefined,
+    lifecycle: lifecycle.filter(),
+  }));
+
+  const fetchDepartments = async (query: string): Promise<LookupOption[]> => {
+    const needle = query.trim().toLowerCase();
+    return (depts.data ?? [])
+      .filter((d) => d.status === "active")
+      .filter((d) => !needle || d.department_name.toLowerCase().includes(needle))
+      .map((d) => ({ id: d.id, label: d.department_name }));
+  };
 
   const resetForm = () => {
     setEmployeeNo("");
     setFullName("");
     setDepartmentId(null);
     setDepartment("");
-    setNewDeptName("");
+    setQuickDeptName("");
     setJobTitle("");
     setHireDate(new Date().toISOString().slice(0, 10));
     setStatus("active");
@@ -90,6 +121,7 @@ export default function HrEmployeesPage() {
   const openNew = () => {
     setSelected(null);
     resetForm();
+    setFormSection("employment");
     setModalOpen(true);
   };
 
@@ -114,6 +146,7 @@ export default function HrEmployeesPage() {
     setTaxStatus(row.tax_status || "S");
     setBankName(row.bank_name ?? "");
     setBankAccountNo(row.bank_account_no ?? "");
+    setFormSection("employment");
     setModalOpen(true);
   };
 
@@ -176,24 +209,6 @@ export default function HrEmployeesPage() {
     setUserSearchOpen(false);
   };
 
-  const addDepartment = async () => {
-    const name = newDeptName().trim();
-    if (!name) {
-      toast.warning("Enter a department name.");
-      return;
-    }
-    const res = await createHrDepartment({ department_name: name });
-    if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Could not create department.");
-      return;
-    }
-    setNewDeptName("");
-    setDepartmentId(res.data.id);
-    setDepartment(res.data.department_name);
-    void qc.invalidateQueries({ queryKey: ["hr-departments"] });
-    toast.success("Department added.");
-  };
-
   const save = async () => {
     const formValues = {
       employee_no: employeeNo(),
@@ -253,6 +268,13 @@ export default function HrEmployeesPage() {
       return;
     }
     await draft.clearOnSave();
+    if (!row && res.data) {
+      setSelected(res.data as Employee);
+      setFormSection("documents");
+      toast.success("Employee saved. You can upload 201 documents now.");
+      invalidate();
+      return;
+    }
     setModalOpen(false);
     invalidate();
   };
@@ -311,6 +333,13 @@ export default function HrEmployeesPage() {
         <button
           type="button"
           class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+          onClick={() => setMappedImportOpen(true)}
+        >
+          Import with mapping…
+        </button>
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
           onClick={() =>
             void exportEmployeesCsv(q() || undefined).catch(() => toast.error("Export failed."))
           }
@@ -335,6 +364,9 @@ export default function HrEmployeesPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={openEdit}
         onNew={openNew}
         codeKey="employee_no"
@@ -350,7 +382,14 @@ export default function HrEmployeesPage() {
         onSearchChange={setQ}
         searchPlaceholder="Search employees…"
         settingsHref={HR_SETTINGS_HREF.employee}
+        toolbarExtra={
+          <div class="flex flex-wrap items-end gap-2">
+            <lifecycle.BulkToolbar />
+            <lifecycle.FilterControl />
+          </div>
+        }
       />
+      <lifecycle.BulkDialog />
       <EntityModal
         open={modalOpen()}
         title={selected() ? "Edit employee" : "New employee"}
@@ -358,120 +397,172 @@ export default function HrEmployeesPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
       >
+        <ModalFormGuide guideId="hr_employee" spanFull />
         <draft.DraftBanner />
-        <Show when={!selected()}>
-          <Field label="Employee #">
-            <input class={inputClass} value={employeeNo()} onInput={(e) => setEmployeeNo(e.currentTarget.value)} />
+        <div class="col-span-full mb-2 flex flex-wrap gap-1 border-b border-stroke pb-2">
+          <button
+            type="button"
+            class="rounded-md px-3 py-1.5 text-sm font-medium"
+            classList={{
+              "bg-brand-600 text-white": formSection() === "employment",
+              "text-text-secondary hover:bg-slate-50": formSection() !== "employment",
+            }}
+            onClick={() => setFormSection("employment")}
+          >
+            Employment
+          </button>
+          <button
+            type="button"
+            class="rounded-md px-3 py-1.5 text-sm font-medium"
+            classList={{
+              "bg-brand-600 text-white": formSection() === "statutory",
+              "text-text-secondary hover:bg-slate-50": formSection() !== "statutory",
+            }}
+            onClick={() => setFormSection("statutory")}
+          >
+            201 — statutory
+          </button>
+          <button
+            type="button"
+            class="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+            classList={{
+              "bg-brand-600 text-white": formSection() === "documents",
+              "text-text-secondary hover:bg-slate-50": formSection() !== "documents",
+            }}
+            disabled={!selected()?.id}
+            onClick={() => setFormSection("documents")}
+          >
+            201 — documents
+          </button>
+        </div>
+
+        <Show when={formSection() === "employment"}>
+          <Show when={!selected()}>
+            <Field label="Employee #">
+              <input class={inputClass} value={employeeNo()} onInput={(e) => setEmployeeNo(e.currentTarget.value)} />
+            </Field>
+          </Show>
+          <Field label="Full name *">
+            <input class={inputClass} value={fullName()} onInput={(e) => setFullName(e.currentTarget.value)} />
+          </Field>
+          <LookupCombo
+            label="Department"
+            value={department}
+            selectedId={departmentId}
+            onInput={setDepartment}
+            onSelect={(o) => {
+              setDepartmentId(o.id);
+              setDepartment(o.label);
+            }}
+            onClear={() => {
+              setDepartmentId(null);
+              setDepartment("");
+            }}
+            fetchOptions={fetchDepartments}
+            placeholder="Search departments…"
+            createLabel="Add department"
+            onCreate={
+              canWriteEmployees()
+                ? (query) => {
+                    setQuickDeptName(query);
+                    setShowQuickDept(true);
+                  }
+                : undefined
+            }
+          />
+          <Field label="Job title">
+            <input class={inputClass} value={jobTitle()} onInput={(e) => setJobTitle(e.currentTarget.value)} />
+          </Field>
+          <Field label="Hire date">
+            <input type="date" class={inputClass} value={hireDate()} onInput={(e) => setHireDate(e.currentTarget.value)} />
+          </Field>
+          <Field label="Status">
+            <select class={inputClass} value={status()} onChange={(e) => setStatus(e.currentTarget.value)}>
+              <For each={STATUS_OPTIONS}>{(s) => <option value={s}>{s}</option>}</For>
+            </select>
+          </Field>
+          <Field label="Base salary">
+            <input type="number" min="0" step="0.01" class={inputClass} value={baseSalary()} onInput={(e) => setBaseSalary(e.currentTarget.value)} />
+          </Field>
+          <Field label="ESS login user">
+            <div class="flex flex-wrap items-center gap-2">
+              <input class={`${inputClass} flex-1`} readOnly value={userLabel()} placeholder="Link a login user for My HR (ESS)…" />
+              <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setUserSearchOpen(true)}>
+                Search
+              </button>
+              <Show when={userId()}>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-red-600"
+                  onClick={() => {
+                    setUserId(null);
+                    setUserLabel("");
+                  }}
+                >
+                  Clear
+                </button>
+              </Show>
+            </div>
+            <p class="mt-1 text-[11px] text-text-secondary">Required for the employee to see payslips under My HR (ESS).</p>
+          </Field>
+          <Field label="Email">
+            <input type="email" class={inputClass} value={email()} onInput={(e) => setEmail(e.currentTarget.value)} />
+          </Field>
+          <Field label="Notes">
+            <textarea class={inputClass} rows={3} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
           </Field>
         </Show>
-        <Field label="Full name *">
-          <input class={inputClass} value={fullName()} onInput={(e) => setFullName(e.currentTarget.value)} />
-        </Field>
-        <Field label="Department">
-          <div class="space-y-2">
-            <select
-              class={inputClass}
-              value={departmentId() ?? ""}
-              onChange={(e) => {
-                const id = e.currentTarget.value ? Number(e.currentTarget.value) : null;
-                setDepartmentId(id);
-                const hit = (depts.data ?? []).find((d) => d.id === id);
-                setDepartment(hit?.department_name ?? "");
-              }}
-            >
-              <option value="">Select department…</option>
-              <For each={(depts.data ?? []).filter((d) => d.status === "active")}>
-                {(d) => (
-                  <option value={d.id}>
-                    {d.department_name}
-                  </option>
-                )}
+
+        <Show when={formSection() === "statutory"}>
+          <Field label="Bank name">
+            <input class={inputClass} value={bankName()} onInput={(e) => setBankName(e.currentTarget.value)} />
+          </Field>
+          <Field label="Bank account no.">
+            <input class={inputClass} value={bankAccountNo()} onInput={(e) => setBankAccountNo(e.currentTarget.value)} />
+          </Field>
+          <Field label="TIN">
+            <input class={inputClass} value={tin()} onInput={(e) => setTin(e.currentTarget.value)} />
+          </Field>
+          <Field label="SSS number">
+            <input class={inputClass} value={sssNo()} onInput={(e) => setSssNo(e.currentTarget.value)} />
+          </Field>
+          <Field label="PhilHealth number">
+            <input class={inputClass} value={philhealthNo()} onInput={(e) => setPhilhealthNo(e.currentTarget.value)} />
+          </Field>
+          <Field label="Pag-IBIG number">
+            <input class={inputClass} value={pagibigNo()} onInput={(e) => setPagibigNo(e.currentTarget.value)} />
+          </Field>
+          <Field label="Tax status">
+            <select class={inputClass} value={taxStatus()} onChange={(e) => setTaxStatus(e.currentTarget.value)}>
+              <For each={["S", "ME", "S1", "S2", "S3", "S4", "ME1", "ME2", "ME3", "ME4", "Z"]}>
+                {(s) => <option value={s}>{s}</option>}
               </For>
             </select>
-            <div class="flex gap-2">
-              <input
-                class={inputClass}
-                placeholder="Add new department…"
-                value={newDeptName()}
-                onInput={(e) => setNewDeptName(e.currentTarget.value)}
-              />
-              <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm whitespace-nowrap" onClick={() => void addDepartment()}>
-                Add
-              </button>
-            </div>
-          </div>
-        </Field>
-        <Field label="Job title">
-          <input class={inputClass} value={jobTitle()} onInput={(e) => setJobTitle(e.currentTarget.value)} />
-        </Field>
-        <Field label="Hire date">
-          <input type="date" class={inputClass} value={hireDate()} onInput={(e) => setHireDate(e.currentTarget.value)} />
-        </Field>
-        <Field label="Status">
-          <select class={inputClass} value={status()} onChange={(e) => setStatus(e.currentTarget.value)}>
-            <For each={STATUS_OPTIONS}>{(s) => <option value={s}>{s}</option>}</For>
-          </select>
-        </Field>
-        <Field label="Base salary">
-          <input type="number" min="0" step="0.01" class={inputClass} value={baseSalary()} onInput={(e) => setBaseSalary(e.currentTarget.value)} />
-        </Field>
-        <Field label="ESS login user">
-          <div class="flex flex-wrap items-center gap-2">
-            <input class={`${inputClass} flex-1`} readOnly value={userLabel()} placeholder="Link a login user for My HR (ESS)…" />
-            <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setUserSearchOpen(true)}>
-              Search
-            </button>
-            <Show when={userId()}>
-              <button
-                type="button"
-                class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-red-600"
-                onClick={() => {
-                  setUserId(null);
-                  setUserLabel("");
-                }}
-              >
-                Clear
-              </button>
-            </Show>
-          </div>
-          <p class="mt-1 text-[11px] text-text-secondary">Required for the employee to see payslips under My HR (ESS).</p>
-        </Field>
-        <Field label="Bank name">
-          <input class={inputClass} value={bankName()} onInput={(e) => setBankName(e.currentTarget.value)} />
-        </Field>
-        <Field label="Bank account no.">
-          <input class={inputClass} value={bankAccountNo()} onInput={(e) => setBankAccountNo(e.currentTarget.value)} />
-        </Field>
-        <Field label="TIN">
-          <input class={inputClass} value={tin()} onInput={(e) => setTin(e.currentTarget.value)} />
-        </Field>
-        <Field label="SSS number">
-          <input class={inputClass} value={sssNo()} onInput={(e) => setSssNo(e.currentTarget.value)} />
-        </Field>
-        <Field label="PhilHealth number">
-          <input class={inputClass} value={philhealthNo()} onInput={(e) => setPhilhealthNo(e.currentTarget.value)} />
-        </Field>
-        <Field label="Pag-IBIG number">
-          <input class={inputClass} value={pagibigNo()} onInput={(e) => setPagibigNo(e.currentTarget.value)} />
-        </Field>
-        <Field label="Tax status">
-          <select class={inputClass} value={taxStatus()} onChange={(e) => setTaxStatus(e.currentTarget.value)}>
-            <For each={["S", "ME", "S1", "S2", "S3", "S4", "ME1", "ME2", "ME3", "ME4", "Z"]}>
-              {(s) => <option value={s}>{s}</option>}
-            </For>
-          </select>
-        </Field>
-        <Field label="Email">
-          <input type="email" class={inputClass} value={email()} onInput={(e) => setEmail(e.currentTarget.value)} />
-        </Field>
-        <Field label="Notes">
-          <textarea class={inputClass} rows={3} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
-        </Field>
-        <Show when={selected()?.id}>
+          </Field>
+        </Show>
+
+        <Show when={formSection() === "documents" && selected()?.id}>
           {(id) => <EmployeeExtrasPanel employeeId={id()} />}
         </Show>
       </EntityModal>
       <UserSearchModal open={userSearchOpen()} onClose={() => setUserSearchOpen(false)} onSelect={onSelectUser} />
+      <HrMappedImportModal
+        open={mappedImportOpen()}
+        kind="employees"
+        onClose={() => setMappedImportOpen(false)}
+        onImported={() => invalidate()}
+      />
+      <QuickDepartmentModal
+        open={showQuickDept()}
+        initialName={quickDeptName()}
+        onClose={() => setShowQuickDept(false)}
+        onCreated={(dept) => {
+          setDepartmentId(dept.id);
+          setDepartment(dept.department_name);
+          void qc.invalidateQueries({ queryKey: ["hr-departments"] });
+          toast.success("Department added.");
+        }}
+      />
     </HrLayout>
   );
 }

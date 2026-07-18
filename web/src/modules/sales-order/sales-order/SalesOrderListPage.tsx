@@ -218,6 +218,9 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
         codeKey="sales_order_no"
@@ -255,6 +258,7 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
               selectedIds={selectedIds}
               onSuccess={() => invalidate()}
             />
+            <lifecycle.BulkToolbar />
             <lifecycle.FilterControl />
           </div>
         }
@@ -262,6 +266,7 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
 
       <SalesOrderModal open={modalOpen()} editing={editing()} readOnly={viewingDeleted()} onClose={closeModal} onSaved={invalidate} />
       <lifecycle.Dialog />
+      <lifecycle.BulkDialog />
       <CreatedSlipModal open={slipOpen()} salesOrderId={slipSalesOrderId()} onClose={() => setSlipOpen(false)} />
     </SalesOrderLayout>
   );

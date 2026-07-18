@@ -29,6 +29,10 @@ type Props<T extends { id: number }> = {
   loading?: boolean;
   selectedId: number | null;
   onSelect: (id: number) => void;
+  /** Enable multi-select checkboxes (independent of selectedId highlight). */
+  selectable?: boolean;
+  selectedIds?: Set<number> | number[];
+  onSelectionChange?: (ids: Set<number>) => void;
   onEdit: (row: T) => void;
   onNew: () => void;
   showNew?: boolean;
@@ -56,6 +60,11 @@ type Props<T extends { id: number }> = {
   itemsCsvImport?: boolean;
   onImportComplete?: () => void;
 };
+
+function selectionSet(ids?: Set<number> | number[]): Set<number> {
+  if (!ids) return new Set<number>();
+  return ids instanceof Set ? ids : new Set(ids);
+}
 
 export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const [focusIdx, setFocusIdx] = createSignal(0);
@@ -134,6 +143,46 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
       maxWidth: c.maxWidth,
     }));
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(columnDefs);
+
+  const selectedIdSet = createMemo(() => selectionSet(props.selectedIds));
+
+  const pageRowIds = createMemo(() => displayRows().map((r) => r.id));
+
+  const pageAllSelected = createMemo(() => {
+    const ids = pageRowIds();
+    if (ids.length === 0) return false;
+    const sel = selectedIdSet();
+    return ids.every((id) => sel.has(id));
+  });
+
+  const pageSomeSelected = createMemo(() => {
+    const ids = pageRowIds();
+    if (ids.length === 0) return false;
+    const sel = selectedIdSet();
+    return ids.some((id) => sel.has(id)) && !pageAllSelected();
+  });
+
+  const toggleRowSelected = (id: number, checked: boolean) => {
+    const next = new Set(selectedIdSet());
+    if (checked) next.add(id);
+    else next.delete(id);
+    props.onSelectionChange?.(next);
+  };
+
+  const togglePageSelected = (checked: boolean) => {
+    const next = new Set(selectedIdSet());
+    for (const id of pageRowIds()) {
+      if (checked) next.add(id);
+      else next.delete(id);
+    }
+    props.onSelectionChange?.(next);
+  };
+
+  let headerSelectEl: HTMLInputElement | undefined;
+
+  createEffect(() => {
+    if (headerSelectEl) headerSelectEl.indeterminate = pageSomeSelected();
+  });
 
   const handleImportFile = async (file: File) => {
     if (!props.itemsCsvImport) return;
@@ -367,6 +416,21 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           >
             <thead class="erp-panel sticky top-0 z-[1]">
               <tr>
+                <Show when={props.selectable}>
+                  <th class="w-10 px-3 py-3" scope="col">
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4 rounded border-stroke"
+                      checked={pageAllSelected()}
+                      ref={(el) => {
+                        headerSelectEl = el;
+                      }}
+                      aria-label="Select all rows on this page"
+                      onChange={(e) => togglePageSelected(e.currentTarget.checked)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </th>
+                </Show>
                 {props.columns.map((c) => {
                   const sortable = c.sortable !== false && Boolean(props.onSort);
                   const active = props.sortKey === c.key;
@@ -403,6 +467,17 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                   }}
                   onDblClick={() => props.onEdit(row)}
                 >
+                  <Show when={props.selectable}>
+                    <td class="w-10 px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-stroke"
+                        checked={selectedIdSet().has(row.id)}
+                        aria-label={`Select row ${row.id}`}
+                        onChange={(e) => toggleRowSelected(row.id, e.currentTarget.checked)}
+                      />
+                    </td>
+                  </Show>
                   {props.columns.map((c) => {
                     const val = (row as Record<string, unknown>)[c.key];
                     const clickable = c.clickable ?? (c.key === props.codeKey || c.key === props.nameKey);

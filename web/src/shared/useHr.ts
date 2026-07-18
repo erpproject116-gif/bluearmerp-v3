@@ -60,12 +60,19 @@ export type PayrollRunResult = {
   journal_entry_id?: number | null;
 };
 
-export function useEmployees(params: () => { page: number; pageSize: number; q?: string; status?: string }) {
+export function useEmployees(params: () => {
+  page: number;
+  pageSize: number;
+  q?: string;
+  status?: string;
+  lifecycle?: string;
+}) {
   return createQuery(() => {
     const p = params();
     const qs = new URLSearchParams({ page: String(p.page), pageSize: String(p.pageSize) });
     if (p.q) qs.set("q", p.q);
     if (p.status) qs.set("status", p.status);
+    if (p.lifecycle && p.lifecycle !== "active") qs.set("lifecycle", p.lifecycle);
     return {
       queryKey: ["hr-employees", p],
       queryFn: async () => {

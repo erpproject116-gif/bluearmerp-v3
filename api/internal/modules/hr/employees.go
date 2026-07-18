@@ -13,6 +13,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -85,8 +86,12 @@ func registerEmployeeRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerDepartmentRoutes(r, pool)
 	r.Get("/employees", listEmployees(pool))
 	r.With(auth.RequirePermission("hr.employees_new", auth.AccessWrite)).Post("/employees", createEmployee(pool))
+	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/employees/actions/bulk-delete", bulkDeleteEmployees(pool))
+	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/employees/actions/bulk-restore", bulkRestoreEmployees(pool))
 	r.Get("/employees/{id}", getEmployee(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Patch("/employees/{id}", patchEmployee(pool))
+	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/employees/{id}/actions/delete", deleteEmployee(pool))
+	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/employees/{id}/actions/restore", restoreEmployee(pool))
 }
 
 func listEmployees(pool *pgxpool.Pool) http.HandlerFunc {
@@ -97,7 +102,19 @@ func listEmployees(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		p := httputil.ParseListParams(r, "full_name", allowed)
 		offset := httputil.Offset(p)
-		where := "e.tenant_id = $1"
+		lifecycle, err := documentlifecycle.Parse(r.URL.Query().Get("lifecycle"))
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		pred := "e.deleted_at is null"
+		switch lifecycle {
+		case documentlifecycle.Deleted:
+			pred = "e.deleted_at is not null"
+		case documentlifecycle.All:
+			pred = "true"
+		}
+		where := "e.tenant_id = $1 and " + pred
 		args := []any{tu.TenantID}
 		n := 2
 		if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
@@ -329,7 +346,7 @@ func patchEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, strings.TrimSpace(*body.BankAccountNo))
 			n++
 		}
-		q := fmt.Sprintf(`update public.hr_employees set %s where id = $1 and tenant_id = $2`, strings.Join(sets, ", "))
+		q := fmt.Sprintf(`update public.hr_employees set %s where id = $1 and tenant_id = $2 and deleted_at is null`, strings.Join(sets, ", "))
 		tag, err := pool.Exec(r.Context(), q, args...)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
@@ -341,6 +358,230 @@ func patchEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+type employeeActionBody struct {
+	Reason string  `json:"reason"`
+	IDs    []int64 `json:"ids"`
+}
+
+type employeeBulkItem struct {
+	ID     int64  `json:"id"`
+	OK     bool   `json:"ok"`
+	Reason string `json:"reason,omitempty"`
+}
+
+type employeeBulkOutcome struct {
+	Results  []employeeBulkItem `json:"results"`
+	Deleted  int                `json:"deleted,omitempty"`
+	Restored int                `json:"restored,omitempty"`
+	Skipped  int                `json:"skipped"`
+}
+
+func deleteEmployee(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := parseID(chi.URLParam(r, "id"))
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		reason, ok := readEmployeeReason(w, r)
+		if !ok {
+			return
+		}
+		if msg := applyEmployeeDelete(r.Context(), pool, tu, id, reason); msg != "" {
+			if msg == "not_found" {
+				response.Err(w, http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if msg == "already" {
+				response.Err(w, http.StatusConflict, "Employee is already deleted.", "ERR_LIFECYCLE_STATE")
+				return
+			}
+			response.Err(w, http.StatusConflict, msg, "ERR_DEPENDENCY_BLOCKED")
+			return
+		}
+		response.OK(w, map[string]any{"id": id, "lifecycle": documentlifecycle.Deleted}, "Deleted.")
+	}
+}
+
+func restoreEmployee(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := parseID(chi.URLParam(r, "id"))
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		reason, ok := readEmployeeReason(w, r)
+		if !ok {
+			return
+		}
+		if msg := applyEmployeeRestore(r.Context(), pool, tu, id, reason); msg != "" {
+			if msg == "not_found" {
+				response.Err(w, http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.Err(w, http.StatusConflict, msg, "ERR_LIFECYCLE_STATE")
+			return
+		}
+		response.OK(w, map[string]any{"id": id, "lifecycle": documentlifecycle.Active}, "Restored.")
+	}
+}
+
+func bulkDeleteEmployees(pool *pgxpool.Pool) http.HandlerFunc {
+	return employeeBulkHandler(pool, "delete")
+}
+
+func bulkRestoreEmployees(pool *pgxpool.Pool) http.HandlerFunc {
+	return employeeBulkHandler(pool, "restore")
+}
+
+func employeeBulkHandler(pool *pgxpool.Pool, mode string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		var body employeeActionBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		reason := strings.TrimSpace(body.Reason)
+		if reason == "" {
+			response.Validation(w, map[string]string{"reason": "Reason is required."})
+			return
+		}
+		if len(reason) > 2000 {
+			response.Validation(w, map[string]string{"reason": "Reason must not exceed 2000 characters."})
+			return
+		}
+		if len(body.IDs) == 0 {
+			response.Validation(w, map[string]string{"ids": "At least one id is required."})
+			return
+		}
+		if len(body.IDs) > 500 {
+			response.Validation(w, map[string]string{"ids": "At most 500 ids per request."})
+			return
+		}
+		results := make([]employeeBulkItem, 0, len(body.IDs))
+		for _, id := range body.IDs {
+			if id <= 0 {
+				results = append(results, employeeBulkItem{ID: id, OK: false, Reason: "Invalid id."})
+				continue
+			}
+			var msg string
+			if mode == "delete" {
+				msg = applyEmployeeDelete(r.Context(), pool, tu, id, reason)
+			} else {
+				msg = applyEmployeeRestore(r.Context(), pool, tu, id, reason)
+			}
+			if msg == "" {
+				results = append(results, employeeBulkItem{ID: id, OK: true})
+				continue
+			}
+			human := msg
+			switch msg {
+			case "not_found":
+				human = "Employee not found."
+			case "already":
+				if mode == "delete" {
+					human = "Employee is already deleted."
+				} else {
+					human = "Employee is already active."
+				}
+			}
+			results = append(results, employeeBulkItem{ID: id, OK: false, Reason: human})
+		}
+		out := employeeBulkOutcome{Results: results}
+		for _, item := range results {
+			if item.OK {
+				if mode == "delete" {
+					out.Deleted++
+				} else {
+					out.Restored++
+				}
+			} else {
+				out.Skipped++
+			}
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+func readEmployeeReason(w http.ResponseWriter, r *http.Request) (string, bool) {
+	var body employeeActionBody
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	reason := strings.TrimSpace(body.Reason)
+	if reason == "" {
+		response.Validation(w, map[string]string{"reason": "Reason is required."})
+		return "", false
+	}
+	if len(reason) > 2000 {
+		response.Validation(w, map[string]string{"reason": "Reason must not exceed 2000 characters."})
+		return "", false
+	}
+	return reason, true
+}
+
+func employeeHasPostedPayslips(ctx context.Context, pool *pgxpool.Pool, tenantID, employeeID int64) (bool, error) {
+	var n int64
+	err := pool.QueryRow(ctx, `
+		select count(*) from public.hr_payslips
+		where tenant_id = $1 and employee_id = $2 and status = 'posted'`, tenantID, employeeID).Scan(&n)
+	return n > 0, err
+}
+
+func applyEmployeeDelete(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, id int64, reason string) string {
+	var deletedAt any
+	err := pool.QueryRow(ctx, `
+		select deleted_at from public.hr_employees where id = $1 and tenant_id = $2`, id, tu.TenantID).Scan(&deletedAt)
+	if err != nil {
+		return "not_found"
+	}
+	if deletedAt != nil {
+		return "already"
+	}
+	hasPosted, err := employeeHasPostedPayslips(ctx, pool, tu.TenantID, id)
+	if err != nil {
+		return "Failed to check payroll slips."
+	}
+	if hasPosted {
+		return "Cannot delete employee with posted payroll slips."
+	}
+	tag, err := pool.Exec(ctx, `
+		update public.hr_employees set
+		  deleted_at = now(), deleted_by_user_id = $3, delete_reason = $4,
+		  updated_at = now(), lifecycle_version = lifecycle_version + 1
+		where id = $1 and tenant_id = $2 and deleted_at is null`,
+		id, tu.TenantID, tu.AppUserID, reason)
+	if err != nil || tag.RowsAffected() != 1 {
+		return "Lifecycle state changed concurrently."
+	}
+	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "hr.employee.delete", "hr_employee", &id, nil, map[string]any{"reason": reason})
+	return ""
+}
+
+func applyEmployeeRestore(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, id int64, reason string) string {
+	var deletedAt any
+	err := pool.QueryRow(ctx, `
+		select deleted_at from public.hr_employees where id = $1 and tenant_id = $2`, id, tu.TenantID).Scan(&deletedAt)
+	if err != nil {
+		return "not_found"
+	}
+	if deletedAt == nil {
+		return "already"
+	}
+	tag, err := pool.Exec(ctx, `
+		update public.hr_employees set
+		  deleted_at = null, restored_at = now(), restored_by_user_id = $3, restore_reason = $4,
+		  updated_at = now(), lifecycle_version = lifecycle_version + 1
+		where id = $1 and tenant_id = $2 and deleted_at is not null`,
+		id, tu.TenantID, tu.AppUserID, reason)
+	if err != nil || tag.RowsAffected() != 1 {
+		return "Lifecycle state changed concurrently."
+	}
+	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "hr.employee.restore", "hr_employee", &id, nil, map[string]any{"reason": reason})
+	return ""
+}
+
 func loadEmployee(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Employee, error) {
 	var row Employee
 	var notes *string
@@ -349,7 +590,7 @@ func loadEmployee(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		  status, base_salary::float8, user_id, coalesce(email,''), notes,
 		  coalesce(tin,''), coalesce(sss_no,''), coalesce(philhealth_no,''), coalesce(pagibig_no,''),
 		  coalesce(tax_status,'S'), coalesce(bank_name,''), coalesce(bank_account_no,'')
-		from public.hr_employees where id = $1 and tenant_id = $2`, id, tenantID).Scan(
+		from public.hr_employees where id = $1 and tenant_id = $2 and deleted_at is null`, id, tenantID).Scan(
 		&row.ID, &row.EmployeeNo, &row.FullName, &row.Department, &row.DepartmentID, &row.JobTitle, &row.HireDate,
 		&row.Status, &row.BaseSalary, &row.UserID, &row.Email, &notes,
 		&row.TIN, &row.SSSNo, &row.PhilHealthNo, &row.PagibigNo, &row.TaxStatus,

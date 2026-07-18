@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Show, Suspense, lazy } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
 import type { LookupOption } from "../../../shared/LookupCombo";
@@ -15,6 +16,7 @@ import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../share
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
@@ -26,6 +28,8 @@ import { fetchQuotationPrint } from "./quotationPrint";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import { QuickLocationModal } from "../../../shared/QuickLocationModal";
+import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import {
   QuotationLineGrid,
@@ -155,6 +159,7 @@ function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
 }
 
 export function QuotationModal(props: Props) {
+  const queryClient = useQueryClient();
   const toast = useToast();
   const auth = useAuth();
   const canSendEmail = () => hasPermission(auth.me, "comms.send", "write");
@@ -173,10 +178,15 @@ export function QuotationModal(props: Props) {
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [referenceNo, setReferenceNo] = createSignal("");
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
+  const [taxTypeLabel, setTaxTypeLabel] = createSignal("");
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
   const [customerLabel, setCustomerLabel] = createSignal("");
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
+  const [showNewLocation, setShowNewLocation] = createSignal(false);
+  const [newLocationName, setNewLocationName] = createSignal("");
+  const [showNewTaxType, setShowNewTaxType] = createSignal(false);
+  const [newTaxTypeName, setNewTaxTypeName] = createSignal("");
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [emailOpen, setEmailOpen] = createSignal(false);
   const [emailDefaultTo, setEmailDefaultTo] = createSignal("");
@@ -197,6 +207,13 @@ export function QuotationModal(props: Props) {
   const [rfqImportOpen, setRfqImportOpen] = createSignal(false);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
+
+  createEffect(() => {
+    const id = taxTypeId();
+    if (id == null || taxTypeLabel()) return;
+    const meta = taxTypes().find((t) => t.id === id);
+    if (meta) setTaxTypeLabel(formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent));
+  });
 
   const buildDraftPayload = () => ({
     order_date: orderDate(),
@@ -222,6 +239,7 @@ export function QuotationModal(props: Props) {
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
     setOrderDate(payload.order_date);
     setTaxTypeId(payload.tax_type_id);
+    setTaxTypeLabel("");
     setCurrencyId(payload.currency_id);
     setPartnerId(payload.partner_id);
     setCustomerLabel(payload.customer_label);
@@ -248,9 +266,17 @@ export function QuotationModal(props: Props) {
     enabled: () => props.open,
   });
 
+  const fetchTaxTypeOptions = async (q: string): Promise<LookupOption[]> => {
+    const qq = q.trim().toLowerCase();
+    return taxTypes()
+      .filter((t) => !qq || t.name.toLowerCase().includes(qq))
+      .map((t) => ({ id: t.id, label: formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent) }));
+  };
+
   const onTaxTypeChange = async (newId: number | null) => {
     setTaxTypeId(newId);
     const meta = taxTypes().find((t) => t.id === newId);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     if (!newId || !meta) return;
     const recalc = await recalculateQuotationLines(lines(), newId, meta);
     setLines(recalc);
@@ -284,6 +310,7 @@ export function QuotationModal(props: Props) {
       setDateNoDisplay(ed.date_no_display);
       setReferenceNo(ed.reference_no);
       setTaxTypeId(ed.tax_type_id);
+      setTaxTypeLabel(ed.tax_type_name ?? "");
       setCurrencyId(ed.currency_id);
       setPartnerId(ed.partner_id);
       setCustomerLabel(ed.customer_name);
@@ -332,6 +359,7 @@ export function QuotationModal(props: Props) {
     if (!taxTypeId()) {
       const first = tt[0];
       setTaxTypeId(first.id);
+      setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
       setLines([emptyQuotationLine(1, "", basis)]);
     }
@@ -483,6 +511,7 @@ export function QuotationModal(props: Props) {
       }
     >
       <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
+      <ModalFormGuide guideId="quotation" />
       <draft.DraftBanner />
       <CoaSetupReminder />
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -497,30 +526,32 @@ export function QuotationModal(props: Props) {
           <DateInput value={orderDate()} disabled={m.disabled} onInput={(e) => setOrderDate(e.currentTarget.value)} />
         )}
       </ModalField>
-      <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
-        {(m) => (
-          <>
-            <select
-              class={inputClass}
-              value={taxTypeId() ?? ""}
-              disabled={m.disabled}
-              onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-            >
-              <option value="">Select…</option>
-              <For each={taxTypes()}>
-                {(t) => (
-                  <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
-                )}
-              </For>
-            </select>
-            <Show when={selectedTaxType()}>
-              {(t) => (
-                <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
-              )}
-            </Show>
-          </>
+      <ModalLookupField
+        settings={byKey}
+        fieldKey="tax_type_id"
+        fallbackLabel="Transaction type"
+        fallbackRequired
+        value={taxTypeLabel}
+        selectedId={taxTypeId}
+        onInput={setTaxTypeLabel}
+        onSelect={(o) => void onTaxTypeChange(o.id)}
+        onClear={() => void onTaxTypeChange(null)}
+        fetchOptions={fetchTaxTypeOptions}
+        createLabel="Add tax type"
+        onCreate={
+          hasPermission(auth.me, "quotation.tax_types", "write")
+            ? (q) => {
+                setNewTaxTypeName(q);
+                setShowNewTaxType(true);
+              }
+            : undefined
+        }
+      />
+      <Show when={selectedTaxType()}>
+        {(t) => (
+          <p class="mt-1 text-xs text-text-secondary md:col-span-2">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
         )}
-      </ModalField>
+      </Show>
       <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
         {(m) => (
           <select
@@ -591,6 +622,15 @@ export function QuotationModal(props: Props) {
           setLocationLabel("");
         }}
         fetchOptions={fetchLocations}
+        createLabel="Add location"
+        onCreate={
+          hasPermission(auth.me, "inventory.locations", "write")
+            ? (q) => {
+                setNewLocationName(q);
+                setShowNewLocation(true);
+              }
+            : undefined
+        }
       />
       <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
         {(m) => <ProgressStatusMenu value={progressStatus()} disabled={m.disabled} onChange={setProgressStatus} />}
@@ -715,6 +755,28 @@ export function QuotationModal(props: Props) {
       onCreated={(p) => {
         setPartnerId(p.id);
         setCustomerLabel(p.company_name);
+      }}
+    />
+
+    <QuickLocationModal
+      open={showNewLocation()}
+      initialName={newLocationName()}
+      onClose={() => setShowNewLocation(false)}
+      onCreated={(l) => {
+        setLocationId(l.id);
+        setLocationLabel(l.location_name);
+      }}
+    />
+
+    <QuickTaxTypeModal
+      open={showNewTaxType()}
+      initialName={newTaxTypeName()}
+      onClose={() => setShowNewTaxType(false)}
+      onCreated={(t) => {
+        void queryClient.invalidateQueries({ queryKey: ["quotation-tax-types"] });
+        setTaxTypeId(t.id);
+        setTaxTypeLabel(formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent));
+        void recalculateQuotationLines(lines(), t.id, t).then(setLines);
       }}
     />
 

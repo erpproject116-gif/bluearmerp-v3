@@ -31,8 +31,8 @@ func parseItemListFilters(r *http.Request) itemListFilters {
 	}
 }
 
-func buildItemListWhere(tenantID int64, p httputil.ListParams, extra itemListFilters) (string, []any) {
-	where := "i.tenant_id = $1 and i.deleted_at is null"
+func buildItemListWhere(tenantID int64, p httputil.ListParams, extra itemListFilters, lifecyclePred string) (string, []any) {
+	where := "i.tenant_id = $1 and " + lifecyclePred
 	args := []any{tenantID}
 	n := 2
 	if p.Q != "" {

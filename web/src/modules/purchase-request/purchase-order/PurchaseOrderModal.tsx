@@ -11,7 +11,7 @@ import { handleSaveResult, requireFields } from "../../../shared/handleSaveResul
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
-import { useAuth } from "../../../shared/auth-context";
+import { useAuth, hasPermission } from "../../../shared/auth-context";
 import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
 import {
   ACTIVE_CURRENCIES_KEY,
@@ -22,6 +22,7 @@ import {
   useActiveTaxTypes,
 } from "../../../shared/useDocumentLookups";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell, withLifecycleParam, type LifecycleFilter } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
@@ -31,6 +32,9 @@ import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
 import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import { QuickLocationModal } from "../../../shared/QuickLocationModal";
+import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -44,7 +48,6 @@ import {
 } from "./SupplierQuotationLinePickerModal";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 import { LoadingText } from "../../../shared/LoadingText";
-import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 
 type PoDraftPayload = {
@@ -217,12 +220,17 @@ export function PurchaseOrderModal(props: Props) {
   const [sqPickerOpen, setSqPickerOpen] = createSignal(false);
   const [showNewVendor, setShowNewVendor] = createSignal(false);
   const [newVendorName, setNewVendorName] = createSignal("");
+  const [showNewLocation, setShowNewLocation] = createSignal(false);
+  const [newLocationName, setNewLocationName] = createSignal("");
+  const [showNewTaxType, setShowNewTaxType] = createSignal(false);
+  const [newTaxTypeName, setNewTaxTypeName] = createSignal("");
   const [detail, setDetail] = createSignal<PurchaseOrderDetail | null>(null);
   const [savedPoId, setSavedPoId] = createSignal<number | null>(null);
   const effectivePoId = () => props.purchaseOrderId ?? savedPoId();
 
   const [orderDate, setOrderDate] = createSignal("");
   const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
+  const [taxTypeLabel, setTaxTypeLabel] = createSignal("");
   const [currencyId, setCurrencyId] = createSignal<number | null>(null);
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
   const [picName, setPicName] = createSignal("");
@@ -242,6 +250,13 @@ export function PurchaseOrderModal(props: Props) {
   const isDraft = () => isCreate() || detail()?.status === "draft";
   const readOnly = () => Boolean(props.readOnly) || !isDraft();
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
+
+  createEffect(() => {
+    const id = taxTypeId();
+    if (id == null || taxTypeLabel()) return;
+    const meta = taxTypes().find((t) => t.id === id);
+    if (meta) setTaxTypeLabel(formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent));
+  });
 
   const buildDraftPayload = (): PoDraftPayload => ({
     order_date: orderDate(),
@@ -265,6 +280,7 @@ export function PurchaseOrderModal(props: Props) {
   const applyDraftPayload = (payload: PoDraftPayload) => {
     setOrderDate(payload.order_date);
     setTaxTypeId(payload.tax_type_id);
+    setTaxTypeLabel("");
     setCurrencyId(payload.currency_id);
     setPicUserId(payload.pic_user_id);
     setPicName(payload.pic_name);
@@ -296,6 +312,7 @@ export function PurchaseOrderModal(props: Props) {
     setDetail(po);
     setOrderDate(po.order_date);
     setTaxTypeId(po.tax_type_id);
+    setTaxTypeLabel(po.tax_type_name ?? "");
     setCurrencyId(po.currency_id);
     setPicUserId(po.pic_user_id ?? null);
     setPicName(po.pic_name);
@@ -354,9 +371,11 @@ export function PurchaseOrderModal(props: Props) {
     if (tt.length) {
       const first = tt[0];
       setTaxTypeId(first.id);
+      setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       setLines([emptyPurchaseRequestLine(1, "", defaultInputBasis(first.tax_mode))]);
     } else {
       setTaxTypeId(null);
+      setTaxTypeLabel("");
       setLines([emptyPurchaseRequestLine(1)]);
     }
     const def = cc.find((c) => c.is_default) ?? cc[0];
@@ -373,10 +392,18 @@ export function PurchaseOrderModal(props: Props) {
     else if (!savedPoId()) void initNew();
   });
 
+  const fetchTaxTypeOptions = async (q: string): Promise<LookupOption[]> => {
+    const qq = q.trim().toLowerCase();
+    return taxTypes()
+      .filter((t) => !qq || t.name.toLowerCase().includes(qq))
+      .map((t) => ({ id: t.id, label: formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent) }));
+  };
+
   const onTaxTypeChange = async (newId: number | null) => {
     if (readOnly()) return;
     setTaxTypeId(newId);
     const meta = taxTypes().find((t) => t.id === newId);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     if (!newId || !meta) return;
     const recalc = await recalculatePurchaseRequestLines(lines(), newId, meta);
     setLines(recalc);
@@ -397,6 +424,7 @@ export function PurchaseOrderModal(props: Props) {
     }
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
       ...emptyPurchaseRequestLine(i + 1, String(row.unit_price), basis),
@@ -435,6 +463,7 @@ export function PurchaseOrderModal(props: Props) {
     setPartnerCode("");
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : taxTypeLabel());
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
       ...emptyPurchaseRequestLine(i + 1, String(row.unit_price), basis),
@@ -572,6 +601,7 @@ export function PurchaseOrderModal(props: Props) {
       }
     >
       <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
+      <ModalFormGuide guideId="purchase_order" />
       <Show when={loading()}>
         <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
@@ -611,30 +641,41 @@ export function PurchaseOrderModal(props: Props) {
                   />
                 )}
               </ModalField>
-              <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
-                {(m) => (
-                  <>
-                    <select
-                      class={inputClass}
-                      value={taxTypeId() ?? ""}
-                      disabled={m.disabled || readOnly()}
-                      onChange={(e) => void onTaxTypeChange(Number(e.currentTarget.value) || null)}
-                    >
-                      <option value="">Select…</option>
-                      <For each={taxTypes()}>
-                        {(t) => (
-                          <option value={t.id}>{formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent)}</option>
-                        )}
-                      </For>
-                    </select>
-                    <Show when={selectedTaxType()}>
-                      {(t) => (
-                        <p class="mt-1 text-xs text-text-secondary">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
-                      )}
-                    </Show>
-                  </>
+              <Show
+                when={isDraft()}
+                fallback={
+                  <ModalField settings={byKey} fieldKey="tax_type_id" fallbackLabel="Transaction type" fallbackRequired>
+                    {(m) => <input class={inputClass} value={taxTypeLabel()} readOnly disabled={m.disabled} />}
+                  </ModalField>
+                }
+              >
+                <ModalLookupField
+                  settings={byKey}
+                  fieldKey="tax_type_id"
+                  fallbackLabel="Transaction type"
+                  fallbackRequired
+                  value={taxTypeLabel}
+                  selectedId={taxTypeId}
+                  onInput={setTaxTypeLabel}
+                  onSelect={(o) => void onTaxTypeChange(o.id)}
+                  onClear={() => void onTaxTypeChange(null)}
+                  fetchOptions={fetchTaxTypeOptions}
+                  createLabel="Add tax type"
+                  onCreate={
+                    hasPermission(auth.me, "quotation.tax_types", "write")
+                      ? (q) => {
+                          setNewTaxTypeName(q);
+                          setShowNewTaxType(true);
+                        }
+                      : undefined
+                  }
+                />
+              </Show>
+              <Show when={isDraft() && selectedTaxType()}>
+                {(t) => (
+                  <p class="mt-1 text-xs text-text-secondary md:col-span-2">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
                 )}
-              </ModalField>
+              </Show>
               <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
                 {(m) => (
                   <select
@@ -713,6 +754,15 @@ export function PurchaseOrderModal(props: Props) {
                     setLocationLabel("");
                   }}
                   fetchOptions={fetchLocations}
+                  createLabel="Add location"
+                  onCreate={
+                    hasPermission(auth.me, "inventory.locations", "write")
+                      ? (q) => {
+                          setNewLocationName(q);
+                          setShowNewLocation(true);
+                        }
+                      : undefined
+                  }
                 />
               </Show>
               <Show
@@ -891,6 +941,26 @@ export function PurchaseOrderModal(props: Props) {
         setPartnerId(p.id);
         setPartnerLabel(p.company_name);
         setPartnerCode("");
+      }}
+    />
+    <QuickLocationModal
+      open={showNewLocation()}
+      initialName={newLocationName()}
+      onClose={() => setShowNewLocation(false)}
+      onCreated={(l) => {
+        setLocationId(l.id);
+        setLocationLabel(l.location_name);
+      }}
+    />
+    <QuickTaxTypeModal
+      open={showNewTaxType()}
+      initialName={newTaxTypeName()}
+      onClose={() => setShowNewTaxType(false)}
+      onCreated={(t) => {
+        void queryClient.invalidateQueries({ queryKey: ["quotation-tax-types"] });
+        setTaxTypeId(t.id);
+        setTaxTypeLabel(formatTaxTypeLabel(t.name, t.tax_mode, t.rate_percent));
+        void recalculatePurchaseRequestLines(lines(), t.id, t).then(setLines);
       }}
     />
     </>

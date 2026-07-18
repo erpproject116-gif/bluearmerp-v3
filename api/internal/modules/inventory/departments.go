@@ -50,7 +50,7 @@ func listDepartments(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		p := httputil.ParseListParams(r, "department_code", allowed)
 		offset := httputil.Offset(p)
-		where, args := buildWhere(tu.TenantID, p, "department_name", "department_code")
+		where, args := buildWhere(tu.TenantID, p, "department_name", "department_code", "deleted_at is null")
 		q := fmt.Sprintf(`select id, department_code, department_name, status, count(*) over() from public.inv_departments where %s order by %s %s limit $%d offset $%d`,
 			where, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
 		args = append(args, p.PageSize, offset)

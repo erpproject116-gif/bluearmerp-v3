@@ -2,6 +2,7 @@ import { createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
@@ -14,6 +15,8 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useInventoryList, useInvalidateInventoryList } from "../../shared/useInventoryList";
 import { useListState } from "../../shared/useListState";
+import { useMasterLifecycle } from "../../shared/masterLifecycle";
+import { hasPermission, useAuth } from "../../shared/auth-context";
 
 export type Partner = {
   id: number;
@@ -35,6 +38,7 @@ export type Partner = {
 
 export default function PartnersPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("partner_code");
+  const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Partner | null>(null);
@@ -56,6 +60,12 @@ export default function PartnersPage() {
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
+  const lifecycle = useMasterLifecycle({
+    apiBase: "/api/v1/inventory/partners",
+    entityLabel: "partner",
+    canManage: () => hasPermission(auth.me, "inventory.partners", "write"),
+    onChanged: () => invalidate("partners"),
+  });
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.partners);
 
@@ -75,6 +85,7 @@ export default function PartnersPage() {
     order: order(),
     q: q() || undefined,
     status: statusFilter() || undefined,
+    lifecycle: lifecycle.filter(),
   }));
 
   const openNew = async () => {
@@ -213,6 +224,9 @@ export default function PartnersPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={lifecycle.selectedIds()}
+        onSelectionChange={lifecycle.onSelectionChange}
         onEdit={openEdit}
         onNew={() => void openNew()}
         codeKey="partner_code"
@@ -231,7 +245,14 @@ export default function PartnersPage() {
         onStatusChange={setStatusFilter}
         onRefresh={() => invalidate("partners")}
         settingsHref={INVENTORY_SETTINGS_HREF.partners}
+        toolbarExtra={
+          <div class="flex flex-wrap items-end gap-2">
+            <lifecycle.BulkToolbar />
+            <lifecycle.FilterControl />
+          </div>
+        }
       />
+      <lifecycle.BulkDialog />
       <EntityModal
         open={modalOpen()}
         title={editing() ? "Edit partner" : "New partner"}
@@ -247,6 +268,7 @@ export default function PartnersPage() {
           />
         }
       >
+        <ModalFormGuide guideId="partner" spanFull />
         <draft.DraftBanner />
         <Field label="Customer/Vendor code">
           <input class={inputClass} value={nextCode()} readOnly />

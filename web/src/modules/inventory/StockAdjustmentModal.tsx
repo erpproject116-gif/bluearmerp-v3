@@ -6,6 +6,8 @@ import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { submitEntity } from "../../shared/handleSaveResult";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { hasPermission, useAuth } from "../../shared/auth-context";
+import { QuickLocationModal } from "../../shared/QuickLocationModal";
 
 type Props = {
   open: boolean;
@@ -29,11 +31,14 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 
 export function StockAdjustmentModal(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
   const [saving, setSaving] = createSignal(false);
   const [itemId, setItemId] = createSignal<number | null>(null);
   const [itemLabel, setItemLabel] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
+  const [showNewLocation, setShowNewLocation] = createSignal(false);
+  const [newLocationName, setNewLocationName] = createSignal("");
   const [qtyDelta, setQtyDelta] = createSignal("");
   const [reason, setReason] = createSignal("");
 
@@ -107,6 +112,7 @@ export function StockAdjustmentModal(props: Props) {
   };
 
   return (
+    <>
     <EntityModal
       open={props.open}
       title="Stock adjustment"
@@ -147,6 +153,15 @@ export function StockAdjustmentModal(props: Props) {
           setLocationLabel("");
         }}
         fetchOptions={fetchLocations}
+        createLabel="Add location"
+        onCreate={
+          hasPermission(auth.me, "inventory.locations", "write")
+            ? (q) => {
+                setNewLocationName(q);
+                setShowNewLocation(true);
+              }
+            : undefined
+        }
       />
       <Field label="Qty change *">
         <input
@@ -162,5 +177,16 @@ export function StockAdjustmentModal(props: Props) {
         <textarea class={inputClass} rows={2} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} />
       </Field>
     </EntityModal>
+
+    <QuickLocationModal
+      open={showNewLocation()}
+      initialName={newLocationName()}
+      onClose={() => setShowNewLocation(false)}
+      onCreated={(l) => {
+        setLocationId(l.id);
+        setLocationLabel(l.location_name);
+      }}
+    />
+    </>
   );
 }

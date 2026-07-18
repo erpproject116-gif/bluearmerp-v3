@@ -39,7 +39,10 @@ func registerLocationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/locations/next-code", nextCodeHandler(pool, "location"))
 	r.Get("/locations", listLocations(pool))
 	r.Post("/locations", createLocation(pool))
+	r.Post("/locations/actions/bulk-delete", bulkSoftDeleteHandler(pool, "inv_locations", "inventory.location.delete", "inv_location"))
+	r.Post("/locations/actions/bulk-restore", bulkSoftRestoreHandler(pool, "inv_locations", "inventory.location.restore", "inv_location"))
 	r.Patch("/locations/{id}", updateLocation(pool))
+	r.Post("/locations/{id}/restore", softRestoreHandler(pool, "inv_locations", "inventory.location.restore", "inv_location"))
 	r.Delete("/locations/{id}", deleteLocation(pool))
 }
 
@@ -56,7 +59,12 @@ func listLocations(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		p := httputil.ParseListParams(r, "location_code", allowed)
 		offset := httputil.Offset(p)
-		where, args := buildWhere(tu.TenantID, p, "location_name", "location_code")
+		lc, err := parseMasterLifecycle(r)
+		if err != nil {
+			response.Validation(w, map[string]string{"lifecycle": err.Error()})
+			return
+		}
+		where, args := buildWhere(tu.TenantID, p, "location_name", "location_code", deletedAtPredicate(lc))
 		order := orderSQL(p.Order)
 		q := fmt.Sprintf(`select id, location_code, location_name, location_type, production_process, status, count(*) over() as total_count
 			from public.inv_locations where %s order by %s %s limit $%d offset $%d`,

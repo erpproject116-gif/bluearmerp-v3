@@ -6,6 +6,9 @@ import { modalDismissClass } from "./Modal";
 import { useToast } from "./toast";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
+import { QuickItemModal } from "./QuickItemModal";
+import { hasPermission, useAuth } from "./auth-context";
+import type { CreatedItem } from "./QuickItemModal";
 
 export type ItemSearchRow = {
   id: number;
@@ -74,10 +77,12 @@ const ITEM_SEARCH_COLUMNS = [
 
 export function ItemSearchModal(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
   const [tab, setTab] = createSignal<"filters" | "results">("filters");
   const [filters, setFilters] = createSignal(defaultFilters());
   const [results, setResults] = createSignal<ItemSearchRow[]>([]);
   const [total, setTotal] = createSignal(0);
+  const [showQuickItem, setShowQuickItem] = createSignal(false);
   const [page, setPage] = createSignal(1);
   const [searching, setSearching] = createSignal(false);
   const pageSize = 50;
@@ -161,9 +166,20 @@ export function ItemSearchModal(props: Props) {
         <div class="w-full max-w-4xl rounded-2xl border border-stroke bg-white shadow-xl">
           <div class="flex items-center justify-between border-b border-stroke px-5 py-3">
             <h2 class="text-lg font-semibold text-text-primary">Search Item</h2>
-            <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
-              Close
-            </button>
+            <div class="flex items-center gap-2">
+              <Show when={hasPermission(auth.me, "inventory.items", "write")}>
+                <button
+                  type="button"
+                  class="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100"
+                  onClick={() => setShowQuickItem(true)}
+                >
+                  + Add new item
+                </button>
+              </Show>
+              <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
+                Close
+              </button>
+            </div>
           </div>
 
           <div class="border-b border-stroke px-5 py-2">
@@ -351,6 +367,21 @@ export function ItemSearchModal(props: Props) {
           </Show>
         </div>
       </div>
+      <QuickItemModal
+        open={showQuickItem()}
+        onClose={() => setShowQuickItem(false)}
+        onCreated={(item: CreatedItem) => {
+          const row: ItemSearchRow = {
+            id: item.id,
+            item_code: item.item_code,
+            item_name: item.item_name,
+            sales_price: item.sales_price ?? 0,
+            status: item.status ?? "active",
+          };
+          props.onSelect(row);
+          props.onClose();
+        }}
+      />
     </Show>
   );
 }
