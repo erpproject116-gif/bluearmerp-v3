@@ -124,6 +124,7 @@ func main() {
 			protected.Use(auth.Middleware(pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret))
 			protected.Use(platformmw.RateLimitProtected(cfg.RateLimit))
 			protected.Use(platformmw.Entitlement(pool, cfg.EntitlementGraceDays))
+			protected.Use(platformmw.ModuleEnablement(pool))
 			protected.Use(setupreadiness.RequireSetupReady(pool))
 			protected.Use(audit.Middleware(pool))
 			protected.Get("/auth/me", auth.MeHandler(pool, cfg))

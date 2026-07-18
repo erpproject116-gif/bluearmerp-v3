@@ -137,6 +137,7 @@ export const UserGroupsPage = lazy(() => import("../modules/user-management/grou
 export const RolesPage = lazy(() => import("../modules/user-management/roles/RolesPage"));
 export const UserPermissionsPage = lazy(() => import("../modules/user-management/user-permissions/UserPermissionsPage"));
 export const ProcessPoliciesPage = lazy(() => import("../modules/user-management/process-policies/ProcessPoliciesPage"));
+export const ModuleSetupHubPage = lazy(() => import("../modules/shared/ModuleSetupHubPage"));
 export const MappingCenterPage = lazy(() => import("../modules/user-management/mapping-center/MappingCenterPage"));
 export const ModuleFeaturesPage = lazy(() => import("../modules/user-management/tenant-modules/ModuleFeaturesPage"));
 export const DemoDataPage = lazy(() => import("../modules/user-management/demo-data/DemoDataPage"));

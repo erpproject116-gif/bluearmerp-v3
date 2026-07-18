@@ -48,6 +48,7 @@ var onboardingTracks = []trackDef{
 		ID:          "selling",
 		Title:       "Selling",
 		Description: "Quotation through sales invoice and customer payment.",
+		ModuleCode:  "sales",
 		Steps: []trackStepDef{
 			{ID: "quotation", Label: "Create a quotation", Href: "/app/quotation/quotations/new", Description: "Send a formal price offer to a customer.", KbArticleID: "quotation-to-sales-flow", Required: false},
 			{ID: "sales_order", Label: "Create a sales order", Href: "/app/sales-order/sales-orders/new", Description: "Confirm the order — use Load Slip → Quotation to copy open quote lines.", KbArticleID: "sales-order-load-slip-quotation", Required: false},
@@ -61,6 +62,7 @@ var onboardingTracks = []trackDef{
 		ID:          "buying",
 		Title:       "Buying",
 		Description: "Purchase request through goods receipt and supplier invoice.",
+		ModuleCode:  "purchase_order",
 		Steps: []trackStepDef{
 			{ID: "purchase_request", Label: "Create a purchase request", Href: "/app/purchase-request/purchase-requests/new", Description: "List what to buy — optional Load Slip from Sales Order for demand.", KbArticleID: "purchase-request-load-slip-so", Required: false},
 			{ID: "rfq_quotes", Label: "Request vendor quotes (RFQ)", Href: "/app/purchase-order/rfq", Description: "Optional: collect supplier quotations before ordering.", KbArticleID: "rfq-workflow", Required: false},
@@ -102,6 +104,7 @@ var onboardingTracks = []trackDef{
 		ID:          "finance",
 		Title:       "Accounts & reporting",
 		Description: "General ledger, bank reconciliation, and financial statements.",
+		ModuleCode:  "finance",
 		Steps: []trackStepDef{
 			{ID: "receivable_payable", Label: "Receivable / Payable status", Href: "/app/selling/reports/receivable-status", Description: "Open customer or vendor balances as-of a date.", KbArticleID: "receivable-payable-status", Required: false},
 			{ID: "customer_vendor_book", Label: "Customer/Vendor Book", Href: "/app/finance/reports/customer-vendor-book-ar", Description: "Slip-level AR or AP ledger for a date range.", KbArticleID: "customer-vendor-book-report", Required: false},

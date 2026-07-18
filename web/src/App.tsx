@@ -138,6 +138,7 @@ import {
   RolesPage,
   UserPermissionsPage,
   ProcessPoliciesPage,
+  ModuleSetupHubPage,
   MappingCenterPage,
   ModuleFeaturesPage,
   DemoDataPage,
@@ -398,6 +399,7 @@ export default function App() {
           <Route path="/documentation/kb" component={DocumentationPage} />
           <Route path="/documentation" component={DocumentationPage} />
           <Route path="/documentation/:sectionId" component={DocumentationPage} />
+          <Route path="/pos/setup" component={ModuleSetupHubPage} />
           <Route path="/pos/manage" component={PosSettingsPage} />
           <Route path="/inventory" component={StockWorkspacePage} />
           <Route path="/inventory/partners" component={PartnersPage} />
@@ -453,6 +455,7 @@ export default function App() {
           <Route path="/after-sales/register-repair/status" component={RegisterRepairStatusPage} />
           <Route path="/after-sales/register-repair/consumption" component={RegisterRepairConsumptionPage} />
           <Route path="/after-sales/register-repair" component={RegisterRepairListPage} />
+          <Route path="/quotation/setup" component={ModuleSetupHubPage} />
           <Route path="/quotation/tax-mngt/tax-types/settings" component={TaxTypeSettingsPage} />
           <Route path="/quotation/tax-mngt/tax-types" component={TaxTypeListPage} />
           <Route path="/quotation/tax-mngt/currencies/settings" component={CurrencySettingsPage} />
@@ -462,13 +465,16 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
+          <Route path="/selling/setup" component={ModuleSetupHubPage} />
           <Route path="/selling/reports/receivable-status" component={ReceivableStatusReportPage} />
           <Route path="/selling/reports" component={SellingReportsPage} />
           <Route path="/selling" component={SellingWorkspacePage} />
+          <Route path="/buying/setup" component={ModuleSetupHubPage} />
           <Route path="/buying/reports/payable-status" component={PayableStatusReportPage} />
           <Route path="/buying/reports/purchase-status" component={PurchaseStatusPage} />
           <Route path="/buying/reports/pre-invoicing" component={PurchasePreInvoicingPage} />
           <Route path="/buying" component={BuyingWorkspacePage} />
+          <Route path="/sales-order/setup" component={ModuleSetupHubPage} />
           <Route path="/sales-order/reports/so-analysis" component={SOAnalysisReportPage} />
           <Route path="/sales-order/reports/shipment-status" component={ShipmentStatusPage} />
           <Route path="/sales-order/reports/pending-shipment" component={PendingShipmentPage} />
@@ -484,6 +490,7 @@ export default function App() {
           <Route path="/sales-order/shipping/rules" component={ShippingRulesPage} />
           <Route path="/sales-order/shipping/orders" component={ShippingOrdersPage} />
           <Route path="/sales-order/shipping/trips" component={DeliveryTripsPage} />
+          <Route path="/purchase-order/setup" component={ModuleSetupHubPage} />
           <Route path="/purchase-order/reports/po-analysis" component={POAnalysisReportPage} />
           <Route path="/purchase-order/purchase-orders/status" component={PurchaseOrderStatusPage} />
           <Route path="/purchase-order/purchase-orders/outstanding" component={OutstandingPOStatusPage} />
@@ -495,6 +502,7 @@ export default function App() {
           <Route path="/purchase-order/goods-receipt" component={GoodsReceiptListPage} />
           <Route path="/purchase-order/goods-receipt/settings" component={GoodsReceiptSettingsPage} />
           <Route path="/purchase-order/purchase-orders/settings" component={PurchaseOrderSettingsPage} />
+          <Route path="/purchase-request/setup" component={ModuleSetupHubPage} />
           <Route path="/purchase-request/purchase-orders" component={() => <Navigate href="/app/purchase-order/purchase-orders" />} />
           <Route path="/purchase-request/goods-receipt" component={() => <Navigate href="/app/purchase-order/goods-receipt" />} />
           <Route path="/purchase-request/purchase-requests/new" component={PurchaseRequestNewPage} />
@@ -506,6 +514,7 @@ export default function App() {
               <ModuleFeaturesPage />
             </AdminModuleRoute>
           )} />
+          <Route path="/sales/setup" component={ModuleSetupHubPage} />
           <Route path="/sales/sales/new" component={SalesNewPage} />
           <Route path="/sales/sales/status" component={SalesStatusPage} />
           <Route path="/sales/sales/pre-invoicing" component={PreInvoicingStatusPage} />
@@ -541,6 +550,7 @@ export default function App() {
           <Route path="/finance/acct-i/fiscal-years" component={FiscalYearsPage} />
           <Route path="/finance/acct-i/chart-of-accounts" component={ChartOfAccountsPage} />
           <Route path="/finance/acct-i/journal-entries" component={JournalEntriesPage} />
+          <Route path="/purchases/setup" component={ModuleSetupHubPage} />
           <Route path="/purchases/purchases/new" component={SupplierInvoiceNewPage} />
           <Route path="/purchases/purchases/settings" component={SupplierInvoiceSettingsPage} />
           <Route path="/purchases/purchases/status" component={PurchaseStatusPage} />
@@ -583,6 +593,7 @@ export default function App() {
           <Route path="/finance/reports/customer-vendor-book-ap" component={CustomerVendorBookApPage} />
           <Route path="/finance/reports/receipt-status" component={ReceiptStatusPage} />
           <Route path="/finance/reports/official-receipt-status" component={OfficialReceiptStatusPage} />
+          <Route path="/finance/setup" component={ModuleSetupHubPage} />
           <Route path="/finance" component={FinanceWorkspacePage} />
           <Route path="/crm/dashboard" component={() => (
             <CrmRoute><CrmDashboardPage /></CrmRoute>

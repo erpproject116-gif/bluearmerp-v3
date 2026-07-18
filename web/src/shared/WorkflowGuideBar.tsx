@@ -2,6 +2,7 @@ import { A, useLocation } from "@solidjs/router";
 import { For, Show, createMemo, createSignal } from "solid-js";
 import { resolveWorkflowForPath } from "./workflowGuides";
 import { useOnboarding } from "./usePlatform";
+import { useAuth } from "./auth-context";
 
 function expandedKey(guideId: string): string {
   return `workflow-guide-expanded:${guideId}`;
@@ -36,8 +37,9 @@ function writeExpanded(guideId: string, value: boolean) {
  */
 export function WorkflowGuideBar() {
   const loc = useLocation();
+  const auth = useAuth();
   const onboarding = useOnboarding();
-  const resolved = createMemo(() => resolveWorkflowForPath(loc.pathname));
+  const resolved = createMemo(() => resolveWorkflowForPath(loc.pathname, auth.me));
 
   const preferExpanded = createMemo(() => {
     const d = onboarding.data;

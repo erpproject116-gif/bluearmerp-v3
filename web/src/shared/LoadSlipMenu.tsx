@@ -1,4 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
+import type { MeData } from "./auth-context";
+import { isTenantModuleEnabled } from "./moduleAccess";
 
 export type LoadSlipOption = {
   id: string;
@@ -98,3 +100,32 @@ export const SALES_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
 export const SALES_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "quotation", label: "Quotation", group: "Sales", hint: "Open quotation lines with balance qty" },
 ];
+
+/** Map Load Slip option id → tenant module that must be enabled. */
+const LOAD_SLIP_MODULE: Record<string, string> = {
+  quotation: "quotation",
+  so: "sales_order",
+  shipping: "sales_order",
+  pr: "purchase_request",
+  po: "purchase_order",
+  gr: "purchase_order",
+  rfq: "purchase_order",
+};
+
+/** Drop or disable Load Slip sources whose module is turned off. */
+export function filterLoadSlipOptions(
+  options: LoadSlipOption[],
+  me: MeData | null | undefined,
+  mode: "omit" | "disable" = "omit",
+): LoadSlipOption[] {
+  return options
+    .map((opt) => {
+      const mod = LOAD_SLIP_MODULE[opt.id];
+      if (!mod || isTenantModuleEnabled(me, mod)) return opt;
+      if (mode === "disable") {
+        return { ...opt, disabled: true, hint: opt.hint ?? "Module turned off for this workspace" };
+      }
+      return null;
+    })
+    .filter((o): o is LoadSlipOption => o != null);
+}

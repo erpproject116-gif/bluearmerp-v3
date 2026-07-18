@@ -1,7 +1,10 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
+import { useAuth } from "../../../shared/auth-context";
+import { isTenantModuleEnabled } from "../../../shared/moduleAccess";
 
 type ProcessPolicy = {
   tenant_id: number;
@@ -153,6 +156,7 @@ const BUDGET_CONTROL_OPTIONS: { value: BudgetControlMode; label: string }[] = [
 
 export default function ProcessPoliciesPage() {
   const toast = useToast();
+  const auth = useAuth();
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [canManage, setCanManage] = createSignal(false);
@@ -219,6 +223,26 @@ export default function ProcessPoliciesPage() {
           shortcuts (direct PO, direct SI) for procurement and counter sales.
         </p>
       </div>
+
+      <Show
+        when={
+          !isTenantModuleEnabled(auth.me, "quotation") ||
+          !isTenantModuleEnabled(auth.me, "sales_order") ||
+          !isTenantModuleEnabled(auth.me, "purchase_request")
+        }
+      >
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p class="font-medium">Some steps are controlled by Modules &amp; Features</p>
+          <p class="mt-1 text-amber-900/90">
+            When Quotation, Sales Order, or Purchase Request is hidden, matching “require…” gates are turned off
+            on save from Modules &amp; Features so staff are not blocked. Re-enabling a module does not turn
+            these gates back on — use a Full process preset or edit here.
+          </p>
+          <A href="/app/user-management/tenant-modules" class="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline">
+            Open Modules &amp; Features →
+          </A>
+        </div>
+      </Show>
 
       <Show when={!loading()} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
         <Show

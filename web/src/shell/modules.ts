@@ -6,6 +6,9 @@ import { ACCT_I_PREFIX } from "./acct-i-nav";
 import { ACCT_II_PREFIX } from "./acct-ii-nav";
 import { isReviewPurchasesPath, REVIEW_PURCHASES_SUB_BRANCH } from "./review-purchases-nav";
 import { isSubBranchPath } from "./sub-branch-nav";
+import { setupFeatureTab } from "../shared/moduleSetupScopes";
+import { isTenantFeatureEnabled } from "../shared/moduleAccess";
+import type { MeData } from "../shared/auth-context";
 
 export { TAX_MNGT_PREFIX, COLLECTIVE_INVOICING_PREFIX, SERIAL_LOT_PREFIX, WMS_PREFIX, ACCT_I_PREFIX, ACCT_II_PREFIX, isSubBranchPath };
 
@@ -15,6 +18,8 @@ export type ModuleFeature = {
   settingsHref: string;
   /** Path prefix for sidebar sub-branch detection (e.g. /app/after-sales). */
   prefix?: string;
+  /** Tenant feature registry code (migration 057 / 187). */
+  featureCode?: string;
   /** Hidden from sales team; requires CRM analytics permission. */
   analyticsOnly?: boolean;
   /** Hidden unless user can manage CRM alert rules. */
@@ -73,7 +78,7 @@ export const appModules: AppModule[] = [
       { label: "Stock Ledger", href: "/app/inventory/reports/stock-ledger", settingsHref: "/app/inventory/stock-movements" },
       { label: "Inv. Book", href: "/app/inventory/reports/inv-book", settingsHref: "/app/inventory/stock-movements" },
       { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing", settingsHref: "/app/inventory/stock-movements" },
-      { label: "Price List", href: "/app/inventory/price-lists", settingsHref: "/app/inventory/price-lists" },
+      { label: "Price List", href: "/app/inventory/price-lists", settingsHref: "/app/inventory/price-lists", featureCode: "inventory.price_lists" },
       { label: "Product Bundles", href: "/app/inventory/product-bundles", settingsHref: "/app/inventory/product-bundles" },
     ],
     subBranches: [
@@ -82,12 +87,14 @@ export const appModules: AppModule[] = [
         prefix: SERIAL_LOT_PREFIX,
         href: "/app/inventory/serial-lot/registry",
         settingsHref: "/app/inventory/serial-lot/settings",
+        featureCode: "inventory.serial_lot",
       },
       {
         label: "WMS",
         prefix: WMS_PREFIX,
         href: "/app/inventory/wms/scheduled-receipts",
         settingsHref: "/app/inventory/wms/scheduled-receipts",
+        featureCode: "inventory.wms",
       },
     ],
   },
@@ -100,6 +107,7 @@ export const appModules: AppModule[] = [
       { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying" },
       { label: "Purchase Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Pre-Invoicing (Purchases)", href: "/app/purchases/purchases/pre-invoicing", settingsHref: "/app/purchases/purchases/settings" },
+      setupFeatureTab("/app/buying"),
     ],
   },
   {
@@ -111,6 +119,7 @@ export const appModules: AppModule[] = [
       { label: "Workspace", href: "/app/selling", settingsHref: "/app/selling" },
       { label: "Sales Status", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings" },
       { label: "Receivable Status", href: "/app/selling/reports/receivable-status", settingsHref: "/app/sales/sales/settings" },
+      setupFeatureTab("/app/selling"),
     ],
   },
   {
@@ -171,6 +180,7 @@ export const appModules: AppModule[] = [
         href: "/app/crm/pipelines/quotations",
         settingsHref: "/app/crm/settings/alert-rules",
       },
+      setupFeatureTab("/app/quotation"),
     ],
   },
   {
@@ -198,6 +208,7 @@ export const appModules: AppModule[] = [
       { label: "SI receipts", href: "/app/sales/reports/si-receipt-status", settingsHref: "/app/sales/sales/settings" },
       { label: "Customer credit", href: "/app/sales/reports/customer-credit-balance", settingsHref: "/app/sales/sales/settings" },
       { label: "AR by customer", href: "/app/sales/reports/ar-by-customer", settingsHref: "/app/sales/sales/settings" },
+      setupFeatureTab("/app/sales"),
     ],
     subBranches: [
       {
@@ -205,6 +216,7 @@ export const appModules: AppModule[] = [
         prefix: COLLECTIVE_INVOICING_PREFIX,
         href: "/app/sales/collective-invoicing/list",
         settingsHref: "/app/sales/sales/settings",
+        featureCode: "sales.collective_invoicing",
       },
     ],
   },
@@ -238,6 +250,7 @@ export const appModules: AppModule[] = [
       { label: "Shipping Orders", href: "/app/sales-order/shipping/orders", settingsHref: "/app/sales-order/shipping/orders" },
       { label: "Shipping Rules", href: "/app/sales-order/shipping/rules", settingsHref: "/app/sales-order/shipping/rules" },
       { label: "Delivery Trips", href: "/app/sales-order/shipping/trips", settingsHref: "/app/sales-order/shipping/trips" },
+      setupFeatureTab("/app/sales-order"),
     ],
   },
   {
@@ -248,6 +261,7 @@ export const appModules: AppModule[] = [
     features: [
       { label: "List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       { label: "Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      setupFeatureTab("/app/purchase-request"),
     ],
   },
   {
@@ -269,6 +283,7 @@ export const appModules: AppModule[] = [
       { label: "PO status", href: "/app/purchase-order/purchase-orders/status", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Open POs", href: "/app/purchase-order/purchase-orders/outstanding", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "To receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      setupFeatureTab("/app/purchase-order"),
     ],
   },
   {
@@ -294,6 +309,7 @@ export const appModules: AppModule[] = [
         href: "/app/purchases/purchases/ap-by-vendor",
         settingsHref: "/app/purchases/purchases/settings",
       },
+      setupFeatureTab("/app/purchases"),
     ],
   },
   {
@@ -368,6 +384,7 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Terminal", href: "/app/pos", settingsHref: "/app/pos" },
       { label: "Manage", href: "/app/pos/manage", settingsHref: "/app/pos/manage", managersOnly: true },
+      setupFeatureTab("/app/pos"),
     ],
   },
   {
@@ -418,6 +435,7 @@ export const appModules: AppModule[] = [
       { label: "Remittances", href: "/app/hr/remittances", settingsHref: "/app/hr/remittances" },
       { label: "Assets", href: "/app/fixed-assets", settingsHref: "/app/fixed-assets" },
       { label: "Job costing", href: "/app/job-costing", settingsHref: "/app/job-costing" },
+      setupFeatureTab("/app/finance"),
     ],
     subBranches: [
       {
@@ -425,24 +443,28 @@ export const appModules: AppModule[] = [
         prefix: ACCT_I_PREFIX,
         href: "/app/finance/acct-i/journal-entries",
         settingsHref: "/app/finance/official-receipts/settings",
+        featureCode: "finance.acct_i",
       },
       {
         label: "Acct. II",
         prefix: ACCT_II_PREFIX,
         href: "/app/finance/acct-ii/checks",
         settingsHref: "/app/finance/acct-ii/checks",
+        featureCode: "finance.acct_ii",
       },
       {
         label: "Taxes",
         prefix: TAX_MNGT_PREFIX,
         href: "/app/quotation/tax-mngt/tax-types",
         settingsHref: "/app/quotation/tax-mngt/tax-types/settings",
+        featureCode: "quotation.tax_mngt",
       },
       {
         label: "AP Review",
         prefix: REVIEW_PURCHASES_SUB_BRANCH,
         href: "/app/finance/payment-vouchers",
         settingsHref: "/app/finance/official-receipts/settings",
+        featureCode: "finance.payment_vouchers",
       },
     ],
   },
@@ -598,12 +620,16 @@ export function featureHeaderTitle(feature: ModuleFeature, pathname: string): st
   return isFeatureSettings(pathname, feature) ? `${feature.label} settings` : feature.label;
 }
 
-/** Header tabs: drop redundant New-* shortcuts, report clutter, and single-tab modules. */
-export function visibleHeaderFeatures(module: AppModule): ModuleFeature[] {
+/** Header tabs: drop redundant New-* shortcuts and report clutter. Always keep Setup. */
+export function visibleHeaderFeatures(module: AppModule, me?: MeData | null): ModuleFeature[] {
   let features = module.features.filter((feature) => {
+    if (feature.href.endsWith("/setup")) return true;
     if (feature.href.endsWith("/new")) return false;
     if (module.id === "inventory" && feature.href.includes("/reports/")) return false;
     if (module.id === "finance" && feature.href.includes("/reports/")) return false;
+    if (feature.featureCode && me) {
+      return isTenantFeatureEnabled(me, feature.featureCode, module.id);
+    }
     return true;
   });
   if (features.length === 1 && features[0].href === module.href) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -29,10 +31,13 @@ type patchTenantModulesBody struct {
 		ModuleCode string `json:"module_code"`
 		IsEnabled  bool   `json:"is_enabled"`
 	} `json:"modules"`
+	ApplyPolicySync bool   `json:"apply_policy_sync"`
+	Preset          string `json:"preset,omitempty"`
 }
 
 func registerTenantModuleRoutes(ur chi.Router, pool *pgxpool.Pool) {
 	ur.Get("/tenant-modules", getTenantModules(pool))
+	ur.Post("/tenant-modules/preview", previewTenantModules(pool))
 	ur.Patch("/tenant-modules", patchTenantModules(pool))
 }
 
@@ -57,15 +62,19 @@ func getTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
+func canManageTenantModules(tu auth.TenantUser) bool {
+	return tu.HasPermission("settings.tenant_modules", auth.AccessWrite) ||
+		tu.IsStoreAdmin || tu.IsTenantOwner || tu.IsPlatformSuperadmin
+}
+
+func previewTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, ok := auth.FromContext(r.Context())
 		if !ok {
 			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 			return
 		}
-		if !tu.HasPermission("settings.tenant_modules", auth.AccessWrite) &&
-			!tu.IsStoreAdmin && !tu.IsTenantOwner && !tu.IsPlatformSuperadmin {
+		if !canManageTenantModules(tu) {
 			response.Err(w, http.StatusForbidden, "Not allowed.", "ERR_FORBIDDEN")
 			return
 		}
@@ -74,12 +83,147 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if len(body.Modules) == 0 {
-			response.Validation(w, map[string]string{"modules": "At least one module entry is required."})
+		prev, err := buildPreview(r.Context(), pool, tu, body)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to preview.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, prev, "OK")
+	}
+}
+
+func buildPreview(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, body patchTenantModulesBody) (policySyncPreview, error) {
+	current, err := listTenantModuleRows(ctx, pool, tu)
+	if err != nil {
+		return policySyncPreview{}, err
+	}
+	nextMap := map[string]bool{}
+	for _, row := range current {
+		nextMap[row.ModuleCode] = row.IsEnabled
+	}
+
+	preset := strings.TrimSpace(strings.ToLower(body.Preset))
+	var presetPatch processpolicy.Patch
+	var presetMsgs []string
+	if preset != "" {
+		presetMods, pp, msgs := applyPresetModules(preset)
+		presetPatch = pp
+		presetMsgs = msgs
+		for code, on := range presetMods {
+			nextMap[code] = on
+		}
+	}
+	for _, m := range body.Modules {
+		nextMap[m.ModuleCode] = m.IsEnabled
+	}
+
+	var modulesDelta []moduleToggle
+	for _, row := range current {
+		want, ok := nextMap[row.ModuleCode]
+		if !ok || want == row.IsEnabled {
+			continue
+		}
+		modulesDelta = append(modulesDelta, moduleToggle{ModuleCode: row.ModuleCode, IsEnabled: want})
+	}
+	// New codes from preset not in current list (shouldn't happen for registry rows)
+	for code, want := range nextMap {
+		found := false
+		for _, row := range current {
+			if row.ModuleCode == code {
+				found = true
+				break
+			}
+		}
+		if !found {
+			modulesDelta = append(modulesDelta, moduleToggle{ModuleCode: code, IsEnabled: want})
+		}
+	}
+
+	syncPatch, _, syncMsgs := buildPolicyPatchFromDisabled(nextMap)
+	merged := mergePolicyPatches(syncPatch, presetPatch)
+	deltas := policyDeltaList(merged)
+
+	msgs := append([]string{}, presetMsgs...)
+	if body.ApplyPolicySync || preset != "" {
+		seen := map[string]bool{}
+		for _, m := range msgs {
+			seen[m] = true
+		}
+		for _, d := range deltas {
+			if d.Message != "" && !seen[d.Message] {
+				msgs = append(msgs, d.Message)
+				seen[d.Message] = true
+			}
+		}
+		for _, m := range syncMsgs {
+			if !seen[m] {
+				msgs = append(msgs, m)
+				seen[m] = true
+			}
+		}
+	} else {
+		msgs = syncMsgs
+		deltas = nil
+	}
+
+	if modulesDelta == nil {
+		modulesDelta = []moduleToggle{}
+	}
+	if deltas == nil {
+		deltas = []policyDeltaMsg{}
+	}
+	if msgs == nil {
+		msgs = []string{}
+	}
+
+	return policySyncPreview{
+		ModulesDelta: modulesDelta,
+		PolicyDelta:  deltas,
+		Messages:     msgs,
+		Preset:       preset,
+	}, nil
+}
+
+func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !canManageTenantModules(tu) {
+			response.Err(w, http.StatusForbidden, "Not allowed.", "ERR_FORBIDDEN")
+			return
+		}
+		var body patchTenantModulesBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		preset := strings.TrimSpace(strings.ToLower(body.Preset))
+		if len(body.Modules) == 0 && preset == "" {
+			response.Validation(w, map[string]string{"modules": "At least one module entry or preset is required."})
 			return
 		}
 
 		before, _ := listTenantModuleRows(r.Context(), pool, tu)
+
+		// Build intended enable map
+		nextMap := map[string]bool{}
+		for _, row := range before {
+			nextMap[row.ModuleCode] = row.IsEnabled
+		}
+		var presetPatch processpolicy.Patch
+		if preset != "" {
+			presetMods, pp, _ := applyPresetModules(preset)
+			presetPatch = pp
+			for code, on := range presetMods {
+				nextMap[code] = on
+			}
+		}
+		for _, m := range body.Modules {
+			nextMap[m.ModuleCode] = m.IsEnabled
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -88,9 +232,23 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
+		// Upsert all codes we intend to change (or full body list)
+		upsertCodes := map[string]bool{}
 		for _, m := range body.Modules {
-			if err := upsertTenantModule(r.Context(), tx, tu.TenantID, m.ModuleCode, m.IsEnabled); err != nil {
-				response.Validation(w, map[string]string{m.ModuleCode: err.Error()})
+			upsertCodes[m.ModuleCode] = m.IsEnabled
+		}
+		if preset != "" {
+			for code, on := range nextMap {
+				// Only touch codes the preset cares about + body
+				presetMods, _, _ := applyPresetModules(preset)
+				if _, ok := presetMods[code]; ok {
+					upsertCodes[code] = on
+				}
+			}
+		}
+		for code, on := range upsertCodes {
+			if err := upsertTenantModule(r.Context(), tx, tu.TenantID, code, on); err != nil {
+				response.Validation(w, map[string]string{code: err.Error()})
 				return
 			}
 		}
@@ -98,6 +256,36 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := cascadeModuleDependencies(r.Context(), tx, tu.TenantID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to apply dependencies.", "ERR_INTERNAL")
 			return
+		}
+
+		applySync := body.ApplyPolicySync || preset != ""
+		if applySync {
+			// Re-read enabled state after cascade for accurate sync
+			afterCascade := map[string]bool{}
+			for code, on := range nextMap {
+				afterCascade[code] = on
+			}
+			// Load actual from tx
+			rows, qerr := tx.Query(r.Context(), `
+				select module_code, is_enabled from public.tenant_modules where tenant_id = $1`, tu.TenantID)
+			if qerr == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var code string
+					var on bool
+					if rows.Scan(&code, &on) == nil {
+						afterCascade[code] = on
+					}
+				}
+			}
+			syncPatch, _, _ := buildPolicyPatchFromDisabled(afterCascade)
+			merged := mergePolicyPatches(syncPatch, presetPatch)
+			if patchHasAny(merged) {
+				if _, err := processpolicy.UpdateTx(r.Context(), tx, tu.TenantID, tu.AppUserID, merged); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to sync process policies.", "ERR_INTERNAL")
+					return
+				}
+			}
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
@@ -215,23 +403,29 @@ func errNotToggleable(code string) error {
 }
 
 func cascadeModuleDependencies(ctx context.Context, tx pgx.Tx, tenantID int64) error {
-	// Disable children when parent is disabled
-	_, err := tx.Exec(ctx, `
-		update public.tenant_modules child
-		set is_enabled = false, disabled_at = now()
-		from public.module_dependencies md
-		join public.tenant_modules parent
-		  on parent.tenant_id = child.tenant_id
-		 and parent.module_code = md.depends_on_module_code
-		where child.tenant_id = $1
-		  and child.module_code = md.module_code
-		  and parent.is_enabled = false
-		  and child.is_enabled = true`, tenantID)
-	if err != nil {
-		return err
+	// Disable children when parent is disabled (repeat for shallow multi-level trees).
+	// Note: UPDATE target alias cannot appear in FROM join ON — use WHERE only.
+	for i := 0; i < 5; i++ {
+		tag, err := tx.Exec(ctx, `
+			update public.tenant_modules as child
+			set is_enabled = false, disabled_at = now()
+			from public.module_dependencies md,
+			     public.tenant_modules as parent
+			where child.tenant_id = $1
+			  and child.module_code = md.module_code
+			  and parent.tenant_id = child.tenant_id
+			  and parent.module_code = md.depends_on_module_code
+			  and parent.is_enabled = false
+			  and child.is_enabled = true`, tenantID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			break
+		}
 	}
 
-	// Enable required parents when child is enabled
+	// Collect parents to enable first — pgx cannot Exec while rows from the same tx are open.
 	rows, err := tx.Query(ctx, `
 		select distinct md.depends_on_module_code
 		from public.tenant_modules child
@@ -244,13 +438,21 @@ func cascadeModuleDependencies(ctx context.Context, tx pgx.Tx, tenantID int64) e
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
+	var parents []string
 	for rows.Next() {
 		var parentCode string
 		if err := rows.Scan(&parentCode); err != nil {
+			rows.Close()
 			return err
 		}
+		parents = append(parents, parentCode)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, parentCode := range parents {
 		_, err = tx.Exec(ctx, `
 			insert into public.tenant_modules (tenant_id, module_code, is_enabled, enabled_at, disabled_at)
 			values ($1, $2, true, now(), null)
