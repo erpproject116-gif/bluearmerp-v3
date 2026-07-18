@@ -8,6 +8,7 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
+import { formatAmount } from "../../shared/money";
 
 type RemittanceBatch = {
   id: number;
@@ -192,9 +193,9 @@ export default function RemittancesPage() {
             { key: "agency", header: "Agency", render: (batch) => <span class="uppercase">{batch.agency}</span> },
             { key: "period_label", header: "Period" },
             { key: "status", header: "Status" },
-            { key: "total_employee", header: "EE", render: (batch) => <span class="tabular-nums">{batch.total_employee.toFixed(2)}</span> },
-            { key: "total_employer", header: "ER", render: (batch) => <span class="tabular-nums">{batch.total_employer.toFixed(2)}</span> },
-            { key: "total_amount", header: "Total", render: (batch) => <span class="tabular-nums">{batch.total_amount.toFixed(2)}</span> },
+            { key: "total_employee", header: "EE", render: (batch) => <span class="tabular-nums">{formatAmount(batch.total_employee)}</span> },
+            { key: "total_employer", header: "ER", render: (batch) => <span class="tabular-nums">{formatAmount(batch.total_employer)}</span> },
+            { key: "total_amount", header: "Total", render: (batch) => <span class="tabular-nums">{formatAmount(batch.total_amount)}</span> },
             {
               key: "actions",
               header: "Actions",
@@ -248,8 +249,8 @@ export default function RemittancesPage() {
                           {String(ln.employee_no)} — {String(ln.employee_name)}
                         </td>
                         <td class="px-3 py-2">{String(ln.gov_id || "—")}</td>
-                        <td class="px-3 py-2 text-right tabular-nums">{Number(ln.ee_amount).toFixed(2)}</td>
-                        <td class="px-3 py-2 text-right tabular-nums">{Number(ln.er_amount).toFixed(2)}</td>
+                        <td class="px-3 py-2 text-right tabular-nums">{formatAmount(Number(ln.ee_amount))}</td>
+                        <td class="px-3 py-2 text-right tabular-nums">{formatAmount(Number(ln.er_amount))}</td>
                       </tr>
                     )}
                   </For>

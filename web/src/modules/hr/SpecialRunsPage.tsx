@@ -4,6 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { formatAmount, formatPeso } from "../../shared/money";
 
 type SpecialRow = {
   employee_id: number;
@@ -151,7 +152,7 @@ export default function SpecialRunsPage() {
           {(p) => (
             <div class="overflow-x-auto text-sm">
               <p class="mb-2 text-text-secondary">
-                {p().payslip_count} employee(s) · total ₱{p().total_gross.toFixed(2)}
+                {p().payslip_count} employee(s) · total {formatPeso(p().total_gross)}
               </p>
               <table class="min-w-full">
                 <thead>
@@ -166,8 +167,8 @@ export default function SpecialRunsPage() {
                     {(row) => (
                       <tr class="border-b border-stroke/50">
                         <td class="py-1 pr-3">{row.employee_name}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{(row.ytd_basic ?? 0).toFixed(2)}</td>
-                        <td class="py-1 text-right tabular-nums">{row.amount.toFixed(2)}</td>
+                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.ytd_basic ?? 0)}</td>
+                        <td class="py-1 text-right tabular-nums">{formatAmount(row.amount)}</td>
                       </tr>
                     )}
                   </For>
@@ -223,7 +224,7 @@ export default function SpecialRunsPage() {
           {(row) => (
             <div class="rounded-lg bg-slate-50 p-3 text-sm">
               <p class="font-medium">{row().employee_name}</p>
-              <p class="tabular-nums">Amount: ₱{row().amount.toFixed(2)}</p>
+              <p class="tabular-nums">Amount: {formatPeso(row().amount)}</p>
               <p class="text-text-secondary">{row().notes}</p>
             </div>
           )}

@@ -5,6 +5,7 @@ import { ProtectedRoute } from "../../shared/ProtectedRoute";
 import { PrintToolbar } from "../../shared/PrintToolbar";
 import { PrintLoading } from "../../shared/LoadingText";
 import "../quotation/quotation/quotationPrint.css";
+import { formatAmount } from "../../shared/money";
 
 export type PayslipDetail = {
   id: number;
@@ -95,7 +96,7 @@ export function PayslipDocument(props: { payload: PayslipDetail; secureNote: boo
             {(ln) => (
               <div class="flex justify-between border-b border-slate-100 py-1 text-sm">
                 <span>{ln.description}</span>
-                <span class="tabular-nums">{ln.amount.toFixed(2)}</span>
+                <span class="tabular-nums">{formatAmount(ln.amount)}</span>
               </div>
             )}
           </For>
@@ -107,7 +108,7 @@ export function PayslipDocument(props: { payload: PayslipDetail; secureNote: boo
             {(ln) => (
               <div class="flex justify-between border-b border-slate-100 py-1 text-sm">
                 <span>{ln.description}</span>
-                <span class="tabular-nums">-{ln.amount.toFixed(2)}</span>
+                <span class="tabular-nums">-{formatAmount(ln.amount)}</span>
               </div>
             )}
           </For>
@@ -119,7 +120,7 @@ export function PayslipDocument(props: { payload: PayslipDetail; secureNote: boo
             {(ln) => (
               <div class="flex justify-between border-b border-slate-100 py-1 text-sm text-slate-600">
                 <span>{ln.description}</span>
-                <span class="tabular-nums">{ln.amount.toFixed(2)}</span>
+                <span class="tabular-nums">{formatAmount(ln.amount)}</span>
               </div>
             )}
           </For>
@@ -131,15 +132,15 @@ export function PayslipDocument(props: { payload: PayslipDetail; secureNote: boo
         <div class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
           <div class="flex justify-between py-0.5">
             <span>Gross</span>
-            <span class="tabular-nums font-medium">{p().gross_pay.toFixed(2)}</span>
+            <span class="tabular-nums font-medium">{formatAmount(p().gross_pay)}</span>
           </div>
           <div class="flex justify-between py-0.5">
             <span>Deductions</span>
-            <span class="tabular-nums">-{p().deductions.toFixed(2)}</span>
+            <span class="tabular-nums">-{formatAmount(p().deductions)}</span>
           </div>
           <div class="mt-2 flex justify-between border-t border-slate-200 pt-2 text-base font-semibold">
             <span>Net pay</span>
-            <span class="tabular-nums">{p().net_pay.toFixed(2)}</span>
+            <span class="tabular-nums">{formatAmount(p().net_pay)}</span>
           </div>
         </div>
       </article>

@@ -1,15 +1,37 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { A, useParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { usePlatformTicket } from "../../shared/usePlatform";
+
+const PRODUCT_GAPS = [
+  { value: "", label: "— Not a product gap —" },
+  { value: "cash_flow", label: "Cash Flow / Fund statements" },
+  { value: "cash_book", label: "Cash Book" },
+  { value: "ar_ap_aging_details", label: "AR/AP Aging Details" },
+  { value: "check_lifecycle", label: "Check received/issued lifecycle" },
+  { value: "day_labor", label: "Day laborer payroll" },
+  { value: "leave_ess", label: "Leave / clock-in ESS" },
+  { value: "serial_scan", label: "Serial scan UX" },
+  { value: "pg_card", label: "PG / credit card flows" },
+  { value: "other", label: "Other ECOUNT / feature gap" },
+];
 
 export default function PlatformTicketDetailPage() {
   const params = useParams<{ id: string }>();
   const toast = useToast();
   const ticket = usePlatformTicket(() => Number(params.id));
   const [note, setNote] = createSignal("");
+  const [gapTag, setGapTag] = createSignal("");
+  const [gapNote, setGapNote] = createSignal("");
   const [saving, setSaving] = createSignal(false);
+
+  createEffect(() => {
+    const t = ticket.data;
+    if (!t) return;
+    setGapTag(t.product_gap_tag ?? "");
+    setGapNote(t.product_gap_note ?? "");
+  });
 
   const addNote = async () => {
     const body = note().trim();
@@ -26,6 +48,24 @@ export default function PlatformTicketDetailPage() {
     }
     setNote("");
     toast.success("Internal note saved.");
+    ticket.refetch();
+  };
+
+  const saveGap = async () => {
+    setSaving(true);
+    const res = await apiFetch(`/api/v1/platform/console/tickets/${params.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        product_gap_tag: gapTag(),
+        product_gap_note: gapNote(),
+      }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      toast.warning(res.message ?? "Could not save product gap.");
+      return;
+    }
+    toast.success(gapTag() ? "Tagged as product gap — feeds backlog signals." : "Product gap cleared.");
     ticket.refetch();
   };
 
@@ -53,7 +93,43 @@ export default function PlatformTicketDetailPage() {
               <Show when={t().description}>
                 <p class="mt-4 whitespace-pre-wrap text-sm text-slate-600">{t().description}</p>
               </Show>
+              <Show when={t().product_gap_tag}>
+                <p class="mt-3 rounded-md bg-violet-50 px-2 py-1 text-xs font-medium text-violet-900">
+                  Product gap: {t().product_gap_tag}
+                  <Show when={t().product_gap_note}> — {t().product_gap_note}</Show>
+                </p>
+              </Show>
             </div>
+
+            <section class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-1 text-sm font-semibold">Product gap tag</h3>
+              <p class="mb-3 text-xs text-slate-500">
+                Mark when this ticket is really a missing feature (ECOUNT parity, Phase B/C). It surfaces on the Command overview.
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <select
+                  class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={gapTag()}
+                  onChange={(e) => setGapTag(e.currentTarget.value)}
+                >
+                  <For each={PRODUCT_GAPS}>{(g) => <option value={g.value}>{g.label}</option>}</For>
+                </select>
+                <input
+                  class="min-w-[200px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Optional note for backlog"
+                  value={gapNote()}
+                  onInput={(e) => setGapNote(e.currentTarget.value)}
+                />
+                <button
+                  type="button"
+                  class="rounded-lg bg-violet-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                  disabled={saving()}
+                  onClick={() => void saveGap()}
+                >
+                  Save tag
+                </button>
+              </div>
+            </section>
 
             <section class="rounded-xl border border-slate-200 bg-white p-5">
               <h3 class="mb-3 text-sm font-semibold">Internal notes</h3>

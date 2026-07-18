@@ -4,6 +4,7 @@ import { ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { apAgingExportUrl, useApAgingReport, type AgingFilters } from "../../../shared/reports/useModuleReports";
 import { FinanceLayout } from "../FinanceLayout";
+import { formatAmount } from "../../../shared/money";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -71,12 +72,12 @@ export default function ApAgingReportPage() {
       >
         <Show when={submitted() && sum()}>
           <div class="grid gap-2 px-5 py-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
-            <span>Current: {sum()?.current?.toFixed(2)}</span>
-            <span>1-30: {sum()?.days_1_30?.toFixed(2)}</span>
-            <span>31-60: {sum()?.days_31_60?.toFixed(2)}</span>
-            <span>61-90: {sum()?.days_61_90?.toFixed(2)}</span>
-            <span>90+: {sum()?.over_90?.toFixed(2)}</span>
-            <span>Total: {sum()?.total?.toFixed(2)}</span>
+            <span>Current: {formatAmount(sum()?.current ?? 0)}</span>
+            <span>1-30: {formatAmount(sum()?.days_1_30 ?? 0)}</span>
+            <span>31-60: {formatAmount(sum()?.days_31_60 ?? 0)}</span>
+            <span>61-90: {formatAmount(sum()?.days_61_90 ?? 0)}</span>
+            <span>90+: {formatAmount(sum()?.over_90 ?? 0)}</span>
+            <span>Total: {formatAmount(sum()?.total ?? 0)}</span>
           </div>
         </Show>
         <table class="erp-grid min-w-full text-left text-sm">

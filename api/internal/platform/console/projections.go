@@ -109,6 +109,28 @@ func (s *service) customerOverview(w http.ResponseWriter, r *http.Request) {
 		where platform_customer_id = $1 and stage in ('open','in_progress')`, c.CustomerID).Scan(&openFollowUps)
 	out["open_follow_ups"] = openFollowUps
 
+	health, signals, usage := s.computeCustomerHealth(r.Context(), c.CustomerID, c.TenantID)
+	out["health_score"] = health
+	out["health_signals"] = signals
+	out["usage"] = usage
+
+	var pendingInvites int
+	if c.TenantID != nil {
+		_ = s.pool.QueryRow(r.Context(), `
+			select count(*) from public.user_invites
+			where tenant_id = $1 and accepted_at is null and revoked_at is null`, *c.TenantID).Scan(&pendingInvites)
+	}
+	out["pending_tenant_invites"] = pendingInvites
+
+	var assigneeID *int64
+	var assigneeName *string
+	_ = s.pool.QueryRow(r.Context(), `
+		select pc.assigned_platform_user_id, pu.full_name
+		from public.platform_customers pc
+		left join public.platform_users pu on pu.id = pc.assigned_platform_user_id
+		where pc.id = $1`, c.CustomerID).Scan(&assigneeID, &assigneeName)
+	out["assignee"] = map[string]any{"platform_user_id": assigneeID, "full_name": assigneeName}
+
 	response.OK(w, out, "OK")
 }
 

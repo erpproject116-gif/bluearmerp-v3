@@ -4,6 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { useToast } from "../../shared/toast";
+import { formatAmount } from "../../shared/money";
 
 type PriceListRow = { id: number; name: string; is_selling: boolean; is_buying: boolean; is_active: boolean };
 type PriceListItemRow = { item_id: number; item_code: string; item_name: string; rate: number };
@@ -220,7 +221,7 @@ export default function PriceListsPage() {
                       <td class="py-1">
                         {row.item_code} — {row.item_name}
                       </td>
-                      <td class="py-1 text-right">{row.rate.toFixed(2)}</td>
+                      <td class="py-1 text-right">{formatAmount(row.rate)}</td>
                     </tr>
                   )}
                 </For>

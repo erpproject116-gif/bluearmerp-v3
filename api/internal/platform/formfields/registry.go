@@ -66,6 +66,7 @@ var standardRegistry = map[string][]StandardField{
 	"quo_currency": {
 		{FieldKey: "currency_code", Label: "Code", FieldType: "text", DefaultRequired: true, SortOrder: 10},
 		{FieldKey: "name", Label: "Name", FieldType: "text", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "symbol", Label: "Currency sign", FieldType: "text", DefaultRequired: true, SortOrder: 25},
 		{FieldKey: "status", Label: "Status", FieldType: "select", DefaultRequired: true, SortOrder: 30},
 	},
 	"sa_sales": {

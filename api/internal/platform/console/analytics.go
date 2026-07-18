@@ -1,6 +1,7 @@
 package console
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -147,10 +148,36 @@ func (s *service) analyticsOverview(w http.ResponseWriter, r *http.Request) {
 			"active_seconds": activeSeconds, "idle_seconds": idleSeconds,
 			"active_now": activeNow, "abandoned_24h": abandoned24h,
 		},
+		"adoption":  s.adoptionFunnel(r.Context(), days),
 		"trend":     trend,
 		"top_pages": topPages,
 		"customers": customers,
 	}, "OK")
+}
+
+func (s *service) adoptionFunnel(ctx context.Context, days int) map[string]any {
+	var tenants, withLogin, withSales, withGR, withOR int
+	_ = s.pool.QueryRow(ctx, `select count(*) from public.tenants where status = 'active'`).Scan(&tenants)
+	_ = s.pool.QueryRow(ctx, `
+		select count(distinct tenant_id) from public.app_usage_sessions
+		where started_at >= now() - ($1::int * interval '1 day')`, days).Scan(&withLogin)
+	_ = s.pool.QueryRow(ctx, `
+		select count(distinct tenant_id) from public.sa_sales
+		where deleted_at is null and created_at >= now() - ($1::int * interval '1 day')`, days).Scan(&withSales)
+	_ = s.pool.QueryRow(ctx, `
+		select count(distinct tenant_id) from public.gr_goods_receipts
+		where created_at >= now() - ($1::int * interval '1 day')`, days).Scan(&withGR)
+	_ = s.pool.QueryRow(ctx, `
+		select count(distinct tenant_id) from public.fin_official_receipts
+		where deleted_at is null and created_at >= now() - ($1::int * interval '1 day')`, days).Scan(&withOR)
+	return map[string]any{
+		"active_tenants": tenants,
+		"logged_in":      withLogin,
+		"first_sale":     withSales,
+		"first_gr":       withGR,
+		"first_or":       withOR,
+		"days":           days,
+	}
 }
 
 func (s *service) customerEngagement(w http.ResponseWriter, r *http.Request) {

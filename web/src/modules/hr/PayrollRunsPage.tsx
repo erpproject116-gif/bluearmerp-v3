@@ -13,6 +13,7 @@ import {
 import { exportPayrollRegisterCsv } from "../../shared/hrCsvImport";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { formatAmount, formatPeso } from "../../shared/money";
 
 export default function PayrollRunsPage() {
   const toast = useToast();
@@ -45,7 +46,7 @@ export default function PayrollRunsPage() {
     setPreview(res.data);
     const withPremiums = res.data.employees.filter((e) => e.premium_total > 0).length;
     toast.success(
-      `Preview: ${res.data.employee_count} employee(s), gross ₱${res.data.total_gross.toFixed(2)}` +
+      `Preview: ${res.data.employee_count} employee(s), gross ${formatPeso(res.data.total_gross)}` +
         (withPremiums > 0 ? ` (${withPremiums} with DTR premiums)` : ""),
     );
   };
@@ -153,10 +154,10 @@ export default function PayrollRunsPage() {
                     {(row) => (
                       <tr class="border-b border-stroke/60">
                         <td class="py-1 pr-3">{row.employee_name}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{row.base_salary.toFixed(2)}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{row.premium_total.toFixed(2)}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{row.gross_pay.toFixed(2)}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{row.net_pay.toFixed(2)}</td>
+                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.base_salary)}</td>
+                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.premium_total)}</td>
+                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.gross_pay)}</td>
+                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.net_pay)}</td>
                         <td class="py-1 text-right tabular-nums">{row.dtr_days}</td>
                       </tr>
                     )}
@@ -225,9 +226,9 @@ export default function PayrollRunsPage() {
           columns={[
             { key: "employee_no", header: "Employee #" },
             { key: "employee_name", header: "Name" },
-            { key: "gross_pay", header: "Gross", render: (r: Payslip) => <span>{r.gross_pay.toFixed(2)}</span> },
-            { key: "deductions", header: "Deductions", render: (r: Payslip) => <span>{r.deductions.toFixed(2)}</span> },
-            { key: "net_pay", header: "Net", render: (r: Payslip) => <span>{r.net_pay.toFixed(2)}</span> },
+            { key: "gross_pay", header: "Gross", render: (r: Payslip) => <span>{formatAmount(r.gross_pay)}</span> },
+            { key: "deductions", header: "Deductions", render: (r: Payslip) => <span>{formatAmount(r.deductions)}</span> },
+            { key: "net_pay", header: "Net", render: (r: Payslip) => <span>{formatAmount(r.net_pay)}</span> },
             { key: "status", header: "Status" },
           ]}
           rows={payslips.data ?? []}

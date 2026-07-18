@@ -4,6 +4,7 @@ import { createMemo, For, Show } from "solid-js";
 import { DashboardLayout } from "./DashboardLayout";
 import { ReconciliationBanner } from "../../shared/ReconciliationBanner";
 import { OnboardingChecklist } from "../../shared/OnboardingChecklist";
+import { DayJobsPanel } from "../../shared/DayJobsPanel";
 import {
   useDashboardInventoryTrend,
   useDashboardRedFlags,
@@ -215,6 +216,8 @@ export default function DashboardPage() {
       <div class="mb-6">
         <OnboardingChecklist compact />
       </div>
+
+      <DayJobsPanel />
 
       <Show when={loading()}>
         <p class="text-sm text-text-secondary">Loading dashboard…</p>

@@ -3,6 +3,7 @@ import { A } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { ProtectedRoute } from "../../shared/ProtectedRoute";
 import { LoadingText } from "../../shared/LoadingText";
+import { formatPeso } from "../../shared/money";
 
 type EssMe = {
   id: number;
@@ -75,7 +76,7 @@ function EssSelfServiceView() {
                 <div>
                   <p class="font-medium">{p.period_label || `Payslip #${p.id}`}</p>
                   <p class="text-text-secondary">
-                    Gross ₱{p.gross_pay.toFixed(2)} · Net ₱{p.net_pay.toFixed(2)}
+                    Gross {formatPeso(p.gross_pay)} · Net {formatPeso(p.net_pay)}
                   </p>
                 </div>
                 <A href={`/app/hr/payslips/${p.id}/print`} class="text-brand-700 hover:underline" target="_blank">

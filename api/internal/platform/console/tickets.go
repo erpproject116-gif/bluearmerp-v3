@@ -110,12 +110,13 @@ func (s *service) customerTickets(w http.ResponseWriter, r *http.Request) {
 func (s *service) getTicket(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var tenantID int64
-	var ticketNo, subject, status, priority, description string
+	var ticketNo, subject, status, priority, description, gapTag, gapNote string
 	var created, updated time.Time
 	err := s.pool.QueryRow(r.Context(), `
-		select tenant_id, ticket_no, subject, status, priority, coalesce(description,''), created_at, updated_at
+		select tenant_id, ticket_no, subject, status, priority, coalesce(description,''),
+		       coalesce(product_gap_tag,''), coalesce(product_gap_note,''), created_at, updated_at
 		from public.sup_support_tickets where id = $1`, id).
-		Scan(&tenantID, &ticketNo, &subject, &status, &priority, &description, &created, &updated)
+		Scan(&tenantID, &ticketNo, &subject, &status, &priority, &description, &gapTag, &gapNote, &created, &updated)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
@@ -163,6 +164,7 @@ func (s *service) getTicket(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, map[string]any{
 		"id": id, "tenant_id": tenantID, "ticket_no": ticketNo, "subject": subject,
 		"status": status, "priority": priority, "description": description,
+		"product_gap_tag": gapTag, "product_gap_note": gapNote,
 		"created_at": created, "updated_at": updated,
 		"customer_id": customerID, "customer_name": customerName,
 		"internal_notes": notes,
@@ -201,8 +203,10 @@ func (s *service) addTicketInternalNote(w http.ResponseWriter, r *http.Request) 
 func (s *service) patchTicket(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var body struct {
-		Status   *string `json:"status"`
-		Priority *string `json:"priority"`
+		Status         *string `json:"status"`
+		Priority       *string `json:"priority"`
+		ProductGapTag  *string `json:"product_gap_tag"`
+		ProductGapNote *string `json:"product_gap_note"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		response.Validation(w, map[string]string{"body": "Invalid JSON."})
@@ -219,6 +223,16 @@ func (s *service) patchTicket(w http.ResponseWriter, r *http.Request) {
 	if body.Priority != nil {
 		args = append(args, strings.TrimSpace(*body.Priority))
 		sets = append(sets, "priority = $"+strconv.Itoa(n))
+		n++
+	}
+	if body.ProductGapTag != nil {
+		args = append(args, strings.TrimSpace(*body.ProductGapTag))
+		sets = append(sets, "product_gap_tag = $"+strconv.Itoa(n))
+		n++
+	}
+	if body.ProductGapNote != nil {
+		args = append(args, strings.TrimSpace(*body.ProductGapNote))
+		sets = append(sets, "product_gap_note = $"+strconv.Itoa(n))
 		n++
 	}
 	if len(args) == 0 {

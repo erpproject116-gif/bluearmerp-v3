@@ -272,7 +272,11 @@ export function usePlatformCommandOverview() {
           trial_ending: number;
           inactive_trials: number;
           open_follow_ups: number;
+          overdue_follow_ups?: number;
           pending_invites: number;
+          product_gap_tickets?: number;
+          no_docs_trials?: number;
+          churn_risk?: number;
         };
         queue: Array<{
           kind: string;
@@ -281,6 +285,8 @@ export function usePlatformCommandOverview() {
           tenant_id?: number;
           ref?: string;
           due_at?: string;
+          href?: string;
+          severity?: string;
         }>;
       }>("/api/v1/platform/console/command");
       if (!res.ok) throw new Error(res.message ?? "Failed to load command overview");
@@ -301,6 +307,32 @@ export function usePlatformCustomerOverview(id: () => number | undefined) {
   }));
 }
 
+export type CsPlaybookStep = {
+  code: string;
+  title: string;
+  hint: string;
+  status: string;
+  notes?: string;
+  completed_at?: string | null;
+};
+
+export function usePlatformCustomerPlaybook(id: () => number | undefined) {
+  return createQuery(() => ({
+    queryKey: ["platform-customer-playbook", id()],
+    enabled: Boolean(id() && id()! > 0),
+    queryFn: async () => {
+      const res = await apiFetch<{
+        percent: number;
+        done: number;
+        total: number;
+        steps: CsPlaybookStep[];
+      }>(`/api/v1/platform/console/customers/${id()}/playbook`);
+      if (!res.ok) throw new Error(res.message ?? "Failed to load playbook");
+      return res.data!;
+    },
+  }));
+}
+
 export type PlatformTicket = {
   id: number;
   tenant_id: number;
@@ -314,6 +346,8 @@ export type PlatformTicket = {
   customer_name?: string;
   company_code?: string;
   description?: string;
+  product_gap_tag?: string;
+  product_gap_note?: string;
   internal_notes?: Array<{ id: number; author_email: string; author_name: string; body: string; created_at: string }>;
 };
 
@@ -414,6 +448,14 @@ export function usePlatformAnalytics(days: () => number) {
       const res = await apiFetch<{
         days: number;
         totals: PlatformAnalyticsTotals;
+        adoption?: {
+          active_tenants: number;
+          logged_in: number;
+          first_sale: number;
+          first_gr: number;
+          first_or: number;
+          days: number;
+        };
         trend: Array<{ day: string; sessions: number; page_views: number; active_seconds: number; unique_users: number }>;
         top_pages: Array<{ route_pattern: string; page_label: string; views: number; active_seconds: number }>;
         customers: Array<{

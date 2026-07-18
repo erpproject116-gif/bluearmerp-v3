@@ -14,6 +14,7 @@ export type CurrencyRow = {
   id: number;
   currency_code: string;
   name: string;
+  symbol: string;
   is_default: boolean;
   status: string;
 };

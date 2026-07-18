@@ -7,9 +7,16 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { useListState } from "../../../shared/useListState";
 import { useCurrencyList, useInvalidateCurrencies, type CurrencyRow } from "../../../shared/useCurrencyList";
 import { apiFetch } from "../../../shared/api";
+import { PESO_SIGN, setDisplayCurrencySign } from "../../../shared/money";
 import { QuotationLayout } from "../QuotationLayout";
 
 export type CurrencyDetail = CurrencyRow;
+
+function defaultSymbolForCode(code: string): string {
+  const c = code.trim().toUpperCase();
+  if (!c || c === "PHP" || c === "DOMESTIC") return PESO_SIGN;
+  return c;
+}
 
 export function CurrencyModal(props: {
   open: boolean;
@@ -22,6 +29,7 @@ export function CurrencyModal(props: {
   const [saving, setSaving] = createSignal(false);
   const [currencyCode, setCurrencyCode] = createSignal("");
   const [name, setName] = createSignal("");
+  const [symbol, setSymbol] = createSignal(PESO_SIGN);
   const [isDefault, setIsDefault] = createSignal(false);
   const [status, setStatus] = createSignal("active");
 
@@ -31,18 +39,25 @@ export function CurrencyModal(props: {
     if (ed) {
       setCurrencyCode(ed.currency_code);
       setName(ed.name);
+      setSymbol(ed.symbol?.trim() || defaultSymbolForCode(ed.currency_code));
       setIsDefault(ed.is_default);
       setStatus(ed.status);
     } else {
-      setCurrencyCode("");
-      setName("");
+      setCurrencyCode("PHP");
+      setName("Philippine Peso");
+      setSymbol(PESO_SIGN);
       setIsDefault(false);
       setStatus("active");
     }
   });
 
   const save = async () => {
-    const form = { currency_code: currencyCode(), name: name(), status: status() };
+    const form = {
+      currency_code: currencyCode(),
+      name: name(),
+      symbol: symbol().trim() || defaultSymbolForCode(currencyCode()),
+      status: status(),
+    };
     const clientError = requireFields(form, buildRequiredChecks(fields()));
     if (clientError) {
       toast.warning(clientError);
@@ -51,6 +66,7 @@ export function CurrencyModal(props: {
     const body = {
       currency_code: currencyCode(),
       name: name(),
+      symbol: form.symbol,
       is_default: isDefault(),
       status: status(),
     };
@@ -66,6 +82,7 @@ export function CurrencyModal(props: {
     );
     setSaving(false);
     if (!ok) return;
+    if (body.is_default) setDisplayCurrencySign(body.symbol);
     props.onSaved();
     props.onClose();
   };
@@ -79,15 +96,37 @@ export function CurrencyModal(props: {
       saving={saving()}
     >
       <Field label="Currency code *">
-        <input class={inputClass} value={currencyCode()} onInput={(e) => setCurrencyCode(e.currentTarget.value.toUpperCase())} />
+        <input
+          class={inputClass}
+          value={currencyCode()}
+          onInput={(e) => {
+            const code = e.currentTarget.value.toUpperCase();
+            setCurrencyCode(code);
+            if (!props.editing && (!symbol() || symbol() === PESO_SIGN || symbol() === "PHP")) {
+              setSymbol(defaultSymbolForCode(code));
+            }
+          }}
+        />
       </Field>
       <Field label="Name *">
         <input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} />
       </Field>
+      <Field label="Currency sign *">
+        <input
+          class={inputClass}
+          value={symbol()}
+          maxlength={8}
+          placeholder={PESO_SIGN}
+          onInput={(e) => setSymbol(e.currentTarget.value)}
+        />
+        <p class="mt-1 text-xs text-text-secondary">
+          Shown before amounts (e.g. {PESO_SIGN}1,234.50). Philippine Peso is the default for domestic/PHP.
+        </p>
+      </Field>
       <Field label="Default">
         <label class="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={isDefault()} onChange={(e) => setIsDefault(e.currentTarget.checked)} />
-          Set as default currency
+          Set as default (domestic) currency
         </label>
       </Field>
       <Field label="Status">
@@ -122,6 +161,7 @@ export default function CurrencyListPage() {
         columns={[
           { key: "currency_code", header: "Code", clickable: true },
           { key: "name", header: "Name", clickable: true },
+          { key: "symbol", header: "Sign", render: (r) => r.symbol || PESO_SIGN },
           { key: "is_default", header: "Default", render: (r) => (r.is_default ? "Yes" : "") },
           { key: "status", header: "Status" },
         ]}

@@ -1,5 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { formatAmount } from "../../shared/money";
 import {
   createEmployee,
   createHrDepartment,
@@ -327,7 +328,7 @@ export default function HrEmployeesPage() {
           {
             key: "base_salary",
             header: "Base salary",
-            render: (r) => <span>{r.base_salary.toFixed(2)}</span>,
+            render: (r) => <span>{formatAmount(r.base_salary)}</span>,
           },
         ]}
         rows={list.data?.rows ?? []}

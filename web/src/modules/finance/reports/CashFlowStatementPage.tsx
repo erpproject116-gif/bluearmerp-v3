@@ -5,6 +5,7 @@ import { apiFetch } from "../../../shared/api";
 import { createQuery } from "@tanstack/solid-query";
 import { FinanceLayout } from "../FinanceLayout";
 import type { DateRangeFilters } from "../../../shared/reports/useModuleReports";
+import { formatAmount } from "../../../shared/money";
 
 type CashFlowPayload = {
   rows: { section: string; account_code: string; account_name: string; amount: number }[];
@@ -81,10 +82,10 @@ export default function CashFlowStatementPage() {
       >
         <Show when={submitted() && report.data}>
           <div class="grid gap-2 px-5 py-3 text-sm sm:grid-cols-4">
-            <span>Operating: {report.data!.operating_total.toFixed(2)}</span>
-            <span>Investing: {report.data!.investing_total.toFixed(2)}</span>
-            <span>Financing: {report.data!.financing_total.toFixed(2)}</span>
-            <span class="font-semibold">Net change: {report.data!.net_change.toFixed(2)}</span>
+            <span>Operating: {formatAmount(report.data!.operating_total)}</span>
+            <span>Investing: {formatAmount(report.data!.investing_total)}</span>
+            <span>Financing: {formatAmount(report.data!.financing_total)}</span>
+            <span class="font-semibold">Net change: {formatAmount(report.data!.net_change)}</span>
           </div>
         </Show>
         <table class="erp-grid min-w-full text-left text-sm">
@@ -103,7 +104,7 @@ export default function CashFlowStatementPage() {
                   <td class="px-3 py-2 capitalize">{row.section}</td>
                   <td class="px-3 py-2">{row.account_code}</td>
                   <td class="px-3 py-2">{row.account_name}</td>
-                  <td class="px-3 py-2 text-right">{row.amount.toFixed(4)}</td>
+                  <td class="px-3 py-2 text-right">{formatAmount(row.amount)}</td>
                 </tr>
               )}
             </For>
