@@ -15,12 +15,9 @@ import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import { formatAmount, formatPeso } from "../../shared/money";
 
 const STATUS_OPTIONS: FixedAssetStatus[] = ["active", "fully_depreciated", "disposed"];
-
-function formatMoney(n: number) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export default function FixedAssetsPage() {
   const auth = useAuth();
@@ -149,7 +146,7 @@ export default function FixedAssetsPage() {
       return;
     }
     invalidate();
-    toast.success(`Depreciation posted: ${formatMoney(res.data?.total_amount ?? 0)}`);
+    toast.success(`Depreciation posted: ${formatPeso(res.data?.total_amount ?? 0)}`);
   };
 
   return (
@@ -173,9 +170,9 @@ export default function FixedAssetsPage() {
           { key: "asset_code", header: "Code", clickable: true },
           { key: "asset_name", header: "Name" },
           { key: "acquisition_date", header: "Acquired" },
-          { key: "acquisition_cost", header: "Cost", render: (r) => formatMoney(r.acquisition_cost as number) },
-          { key: "accumulated_depreciation", header: "Accum. Dep.", render: (r) => formatMoney(r.accumulated_depreciation as number) },
-          { key: "monthly_depreciation", header: "Monthly", render: (r) => formatMoney((r.monthly_depreciation as number) ?? 0) },
+          { key: "acquisition_cost", header: "Cost", render: (r) => formatAmount(r.acquisition_cost as number) },
+          { key: "accumulated_depreciation", header: "Accum. Dep.", render: (r) => formatAmount(r.accumulated_depreciation as number) },
+          { key: "monthly_depreciation", header: "Monthly", render: (r) => formatAmount((r.monthly_depreciation as number) ?? 0) },
           { key: "status", header: "Status" },
         ]}
         rows={list.data?.rows ?? []}
@@ -236,7 +233,7 @@ export default function FixedAssetsPage() {
                   {(run) => (
                     <tr class="border-b border-stroke/50">
                       <td class="py-1 pr-2">{run.period_year}-{String(run.period_month).padStart(2, "0")}</td>
-                      <td class="py-1 pr-2">{formatMoney(run.total_amount)}</td>
+                      <td class="py-1 pr-2">{formatAmount(run.total_amount)}</td>
                       <td class="py-1 pr-2">{run.status}</td>
                       <td class="py-1">{run.journal_entry_id ?? "—"}</td>
                     </tr>

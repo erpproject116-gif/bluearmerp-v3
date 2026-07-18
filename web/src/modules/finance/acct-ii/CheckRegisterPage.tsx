@@ -4,6 +4,7 @@ import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared
 import { useToast } from "../../../shared/toast";
 import { apiFetch } from "../../../shared/api";
 import { AcctIILayout } from "./AcctIILayout";
+import { formatAmount } from "../../../shared/money";
 
 type Check = {
   id: number;
@@ -130,7 +131,7 @@ export default function CheckRegisterPage() {
           {
             key: "amount",
             header: "Amount",
-            render: (r) => r.amount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+            render: (r) => formatAmount(r.amount),
           },
           {
             key: "status",

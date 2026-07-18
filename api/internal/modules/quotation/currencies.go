@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,6 +22,7 @@ type Currency struct {
 	ID           int64  `json:"id"`
 	CurrencyCode string `json:"currency_code"`
 	Name         string `json:"name"`
+	Symbol       string `json:"symbol"`
 	IsDefault    bool   `json:"is_default"`
 	Status       string `json:"status"`
 }
@@ -28,9 +30,12 @@ type Currency struct {
 type currencyBody struct {
 	CurrencyCode string `json:"currency_code"`
 	Name         string `json:"name"`
+	Symbol       string `json:"symbol"`
 	IsDefault    bool   `json:"is_default"`
 	Status       string `json:"status"`
 }
+
+const defaultPesoSign = "₱"
 
 func registerCurrencyRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/currencies", listCurrencies(pool))
@@ -39,10 +44,26 @@ func registerCurrencyRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Delete("/currencies/{id}", deleteCurrency(pool))
 }
 
+func resolveCurrencySymbol(code, symbol string) string {
+	s := strings.TrimSpace(symbol)
+	if s != "" {
+		return s
+	}
+	if strings.EqualFold(strings.TrimSpace(code), "PHP") || strings.EqualFold(strings.TrimSpace(code), "DOMESTIC") {
+		return defaultPesoSign
+	}
+	code = strings.ToUpper(strings.TrimSpace(code))
+	if code != "" {
+		return code
+	}
+	return defaultPesoSign
+}
+
 func listCurrencies(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{
 		"currency_code": "currency_code",
 		"name":          "name",
+		"symbol":        "symbol",
 		"is_default":    "is_default",
 		"status":        "status",
 		"created_at":    "created_at",
@@ -56,7 +77,7 @@ func listCurrencies(pool *pgxpool.Pool) http.HandlerFunc {
 		args := []any{tu.TenantID}
 		argN := 2
 		if p.Q != "" {
-			where += fmt.Sprintf(" and (name ilike $%d or currency_code ilike $%d)", argN, argN)
+			where += fmt.Sprintf(" and (name ilike $%d or currency_code ilike $%d or coalesce(symbol,'') ilike $%d)", argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
@@ -67,7 +88,7 @@ func listCurrencies(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		q := fmt.Sprintf(`
-			select id, currency_code, name, is_default, status, count(*) over()
+			select id, currency_code, name, coalesce(nullif(trim(symbol), ''), currency_code), is_default, status, count(*) over()
 			from public.quo_currencies
 			where %s
 			order by %s %s
@@ -86,7 +107,7 @@ func listCurrencies(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		for rows.Next() {
 			var row Currency
-			if err := rows.Scan(&row.ID, &row.CurrencyCode, &row.Name, &row.IsDefault, &row.Status, &total); err != nil {
+			if err := rows.Scan(&row.ID, &row.CurrencyCode, &row.Name, &row.Symbol, &row.IsDefault, &row.Status, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read currencies.", "ERR_INTERNAL")
 				return
 			}
@@ -120,6 +141,7 @@ func createCurrency(pool *pgxpool.Pool) http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 
 		code := strings.ToUpper(strings.TrimSpace(body.CurrencyCode))
+		symbol := resolveCurrencySymbol(code, body.Symbol)
 		if body.IsDefault {
 			if _, err := tx.Exec(r.Context(),
 				`update public.quo_currencies set is_default = false, updated_at = now()
@@ -131,10 +153,10 @@ func createCurrency(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var id int64
 		err = tx.QueryRow(r.Context(), `
-			insert into public.quo_currencies (tenant_id, currency_code, name, is_default, status)
-			values ($1,$2,$3,$4,$5)
+			insert into public.quo_currencies (tenant_id, currency_code, name, symbol, is_default, status)
+			values ($1,$2,$3,$4,$5,$6)
 			returning id`,
-			tu.TenantID, code, strings.TrimSpace(body.Name), body.IsDefault, defaultStatus(body.Status)).Scan(&id)
+			tu.TenantID, code, strings.TrimSpace(body.Name), symbol, body.IsDefault, defaultStatus(body.Status)).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create currency.", "ERR_INTERNAL")
 			return
@@ -185,11 +207,12 @@ func updateCurrency(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		code := strings.ToUpper(strings.TrimSpace(body.CurrencyCode))
+		symbol := resolveCurrencySymbol(code, body.Symbol)
 		tag, err := tx.Exec(r.Context(), `
 			update public.quo_currencies set
-			  currency_code = $1, name = $2, is_default = $3, status = $4, updated_at = now()
-			where id = $5 and tenant_id = $6 and deleted_at is null`,
-			code, strings.TrimSpace(body.Name), body.IsDefault, defaultStatus(body.Status), id, tu.TenantID)
+			  currency_code = $1, name = $2, symbol = $3, is_default = $4, status = $5, updated_at = now()
+			where id = $6 and tenant_id = $7 and deleted_at is null`,
+			code, strings.TrimSpace(body.Name), symbol, body.IsDefault, defaultStatus(body.Status), id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Currency not found.", "ERR_NOT_FOUND")
 			return
@@ -214,10 +237,10 @@ func deleteCurrency(pool *pgxpool.Pool) http.HandlerFunc {
 func getCurrency(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Currency, error) {
 	var row Currency
 	err := pool.QueryRow(ctx, `
-		select id, currency_code, name, is_default, status
+		select id, currency_code, name, coalesce(nullif(trim(symbol), ''), currency_code), is_default, status
 		from public.quo_currencies
 		where id = $1 and tenant_id = $2 and deleted_at is null`, id, tenantID).
-		Scan(&row.ID, &row.CurrencyCode, &row.Name, &row.IsDefault, &row.Status)
+		Scan(&row.ID, &row.CurrencyCode, &row.Name, &row.Symbol, &row.IsDefault, &row.Status)
 	return row, err
 }
 
@@ -228,6 +251,10 @@ func validateCurrencyBody(b currencyBody, create bool) map[string]string {
 	}
 	if create && strings.TrimSpace(b.Name) == "" {
 		errs["name"] = "Name is required."
+	}
+	sym := strings.TrimSpace(b.Symbol)
+	if utf8.RuneCountInString(sym) > 8 {
+		errs["symbol"] = "Currency sign must be at most 8 characters."
 	}
 	if b.Status != "" && b.Status != "active" && b.Status != "inactive" {
 		errs["status"] = "Must be active or inactive."

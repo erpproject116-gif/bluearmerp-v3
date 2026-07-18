@@ -14,7 +14,7 @@ func ValidateDirectSale(p Policy, hasSOLinkedLine bool) map[string]string {
 		return nil
 	}
 	return map[string]string{
-		"lines": "Direct sales are disabled. Create a sales order and release stock first.",
+		"lines": "Direct sales are disabled by your process policy. Next: create a Sales Order (or Load Slip → Sales Order on a new invoice).",
 	}
 }
 
@@ -27,7 +27,7 @@ func ValidateSalesOrderCreate(p Policy, sourceQuotationID *int64) map[string]str
 		return nil
 	}
 	return map[string]string{
-		"source_quotation_id": "A quotation is required before creating a sales order.",
+		"source_quotation_id": "A quotation is required before creating a sales order. Next: open Quotations and confirm a quote first.",
 	}
 }
 
@@ -40,7 +40,7 @@ func ValidatePurchaseOrderCreate(p Policy, purchaseRequestID *int64) map[string]
 		return nil
 	}
 	return map[string]string{
-		"purchase_request_id": "A purchase request is required before creating a purchase order.",
+		"purchase_request_id": "A purchase request is required before creating a purchase order. Next: open Purchase Requests, then Load Slip → PR on the PO.",
 	}
 }
 
@@ -53,7 +53,7 @@ func ValidatePurchaseRequestForPO(p Policy, progressStatus string, approvedAt *t
 		return nil
 	}
 	return map[string]string{
-		"purchase_request_id": "Purchase request must be approved before creating a purchase order.",
+		"purchase_request_id": "This purchase request must be approved first. Next: open Approvals queue and confirm the PR.",
 	}
 }
 
@@ -65,7 +65,7 @@ func ValidateSupplierInvoiceLineSource(p Policy, hasGRLine bool) map[string]stri
 		return nil
 	}
 	return map[string]string{
-		"goods_receipt_line_id": "A posted goods receipt line is required before invoicing. Purchase order lines without a goods receipt are not allowed while the GR-before-invoice policy is enabled.",
+		"goods_receipt_line_id": "Receive the goods first (process policy). Next: open Goods Receipt, post it, then Load Slip → Goods Receipt on the purchase invoice.",
 	}
 }
 
@@ -81,7 +81,7 @@ func ValidateSalesOrderApproval(p Policy, hasRequest bool, requestStatus string)
 		return nil
 	}
 	return map[string]string{
-		"sales_order_id": "Sales order must be approved before it can be released or invoiced. Submit it for approval first.",
+		"sales_order_id": "Sales order must be approved before release/invoice. Next: open Approvals queue and confirm this SO.",
 	}
 }
 
@@ -93,7 +93,7 @@ func ValidatePurchaseOrderApproval(p Policy, hasRequest bool, requestStatus stri
 		return nil
 	}
 	return map[string]string{
-		"purchase_order_id": "Purchase order must be approved before this step. Submit it for approval first.",
+		"purchase_order_id": "Purchase order must be approved before this step. Next: open Approvals queue and confirm this PO.",
 	}
 }
 

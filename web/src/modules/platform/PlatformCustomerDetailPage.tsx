@@ -289,7 +289,7 @@ export default function PlatformCustomerDetailPage() {
                       {(inv) => (
                         <li class="flex items-center justify-between rounded-lg border border-stroke p-3">
                           <span>
-                            {String(inv.invoice_no)} · ₱{Number(inv.amount).toLocaleString()} · {String(inv.status)}
+                            {String(inv.invoice_no)} · {formatPeso(Number(inv.amount) || 0)} · {String(inv.status)}
                           </span>
                           <Show when={inv.status === "issued"}>
                             <button

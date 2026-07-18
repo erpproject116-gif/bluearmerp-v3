@@ -43,6 +43,7 @@ import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantCo
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
 import { WorkflowGuideBar } from "../shared/WorkflowGuideBar";
+import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -60,6 +61,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const shell = useShell();
   const crmTask = useCrmTaskModal();
   const branding = useBranding();
+  useBootstrapDisplayCurrency();
 
   const appTitle = () =>
     branding.settings().receipt.company_name?.trim() ||

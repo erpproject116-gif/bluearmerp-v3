@@ -5,6 +5,7 @@ import { apiFetch } from "../../../shared/api";
 import { createQuery } from "@tanstack/solid-query";
 import { FinanceLayout } from "../FinanceLayout";
 import type { DateRangeFilters } from "../../../shared/reports/useModuleReports";
+import { formatAmount } from "../../../shared/money";
 
 type BookIIRow = {
   partner_id: number;
@@ -111,10 +112,10 @@ export default function CustomerVendorBookIIPage(props: Props) {
               {(row) => (
                 <tr class="border-t border-stroke/60">
                   <td class="px-3 py-2">{row.partner_name}</td>
-                  <td class="px-3 py-2 text-right">{row.opening.toFixed(2)}</td>
-                  <td class="px-3 py-2 text-right">{row.debit.toFixed(2)}</td>
-                  <td class="px-3 py-2 text-right">{row.credit.toFixed(2)}</td>
-                  <td class="px-3 py-2 text-right font-medium">{row.closing.toFixed(2)}</td>
+                  <td class="px-3 py-2 text-right">{formatAmount(row.opening)}</td>
+                  <td class="px-3 py-2 text-right">{formatAmount(row.debit)}</td>
+                  <td class="px-3 py-2 text-right">{formatAmount(row.credit)}</td>
+                  <td class="px-3 py-2 text-right font-medium">{formatAmount(row.closing)}</td>
                 </tr>
               )}
             </For>

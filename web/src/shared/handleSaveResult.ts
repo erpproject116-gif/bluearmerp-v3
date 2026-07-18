@@ -1,4 +1,5 @@
 import type { ApiResult } from "./api";
+import { resolvePolicyActionHint } from "./policyActionHints";
 
 export function formatApiErrors(errors?: Record<string, string>): string {
   if (!errors) return "";
@@ -25,6 +26,13 @@ type ToastLike = {
   success: (message: string) => void;
   error: (message: string) => void;
   warning: (message: string) => void;
+  action?: (input: {
+    type?: "success" | "error" | "warning";
+    title: string;
+    message?: string;
+    actionLabel?: string;
+    href?: string;
+  }) => void;
 };
 
 export function handleSaveResult(
@@ -38,6 +46,17 @@ export function handleSaveResult(
   }
 
   const fieldErrors = formatApiErrors(res.errors);
+  const hint = resolvePolicyActionHint(res.errors);
+  if (fieldErrors && hint && toast.action) {
+    toast.action({
+      type: "warning",
+      title: fieldErrors,
+      message: "Use the button to continue the required step.",
+      actionLabel: hint.label,
+      href: hint.href,
+    });
+    return false;
+  }
   if (fieldErrors) {
     toast.error(fieldErrors);
     return false;

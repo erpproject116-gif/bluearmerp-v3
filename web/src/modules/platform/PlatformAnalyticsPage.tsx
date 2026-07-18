@@ -78,6 +78,24 @@ export default function PlatformAnalyticsPage() {
         </section>
       </Show>
 
+      <Show when={q.data?.adoption}>
+        {(ad) => (
+          <section class="rounded-xl border border-stroke bg-white p-4">
+            <h2 class="text-sm font-semibold">Adoption funnel ({ad().days}d)</h2>
+            <p class="mt-1 text-xs text-text-secondary">
+              Tenants that logged in → created a sale → goods receipt → official receipt in the window.
+            </p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-5">
+              <FunnelStat label="Active tenants" value={ad().active_tenants} />
+              <FunnelStat label="Logged in" value={ad().logged_in} />
+              <FunnelStat label="With sale" value={ad().first_sale} />
+              <FunnelStat label="With GR" value={ad().first_gr} />
+              <FunnelStat label="With OR" value={ad().first_or} />
+            </div>
+          </section>
+        )}
+      </Show>
+
       <section class="rounded-xl border border-stroke bg-white p-4">
         <h2 class="text-sm font-semibold">Daily sessions</h2>
         <Show when={trend().length === 0} fallback={
@@ -179,6 +197,15 @@ export default function PlatformAnalyticsPage() {
           Click a customer name above for that customer’s analytics (login/logout, inactivity, page journeys).
         </p>
       </section>
+    </div>
+  );
+}
+
+function FunnelStat(props: { label: string; value: number }) {
+  return (
+    <div class="rounded-lg border border-stroke/80 bg-slate-50 px-3 py-2">
+      <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">{props.label}</p>
+      <p class="mt-0.5 text-lg font-semibold tabular-nums">{props.value}</p>
     </div>
   );
 }

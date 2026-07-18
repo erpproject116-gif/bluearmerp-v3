@@ -2,6 +2,7 @@ import { createSignal, For, Show, createResource } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { formatPeso } from "../../shared/money";
 
 type PayItemType = { id: number; item_code: string; item_name: string; item_kind: string };
 type EmpPayItem = {
@@ -112,7 +113,7 @@ export function EmployeeExtrasPanel(props: { employeeId: number }) {
               <li class="flex justify-between gap-2">
                 <span>
                   {p.item_code} — {p.item_name}{" "}
-                  <span class="tabular-nums text-text-secondary">₱{p.amount.toFixed(2)}</span>
+                  <span class="tabular-nums text-text-secondary">{formatPeso(p.amount)}</span>
                 </span>
                 <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => void removePayItem(p.id)}>
                   Remove

@@ -70,6 +70,20 @@ export default function PlatformAccessPage() {
         </div>
       </section>
 
+      <section class="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 class="mb-2 text-sm font-semibold">Role matrix (what each role can do)</h3>
+        <ul class="space-y-1.5 text-xs text-slate-600">
+          <li><strong>support_viewer</strong> — read customers, tickets, onboarding, follow-ups (no writes).</li>
+          <li><strong>support_agent</strong> — tickets + follow-ups write; access logs.</li>
+          <li><strong>onboarding_specialist / customer_success</strong> — CS playbook, quick follow-ups, customer ops (per role grants).</li>
+          <li><strong>billing_operator</strong> — extend trial, subscriptions, invoices.</li>
+          <li><strong>superadmin</strong> — all platform permissions including staff invites.</li>
+        </ul>
+        <p class="mt-2 text-xs text-slate-500">
+          Follow-up SLA defaults to 48 hours; overdue items rank first on the Command overview.
+        </p>
+      </section>
+
       <section class="rounded-xl border border-slate-200 bg-white">
         <h3 class="border-b px-4 py-3 text-sm font-semibold">Active staff</h3>
         <ul class="divide-y">

@@ -1,41 +1,88 @@
-// Shared currency helpers. The platform's base currency is the Philippine Peso,
-// so amounts are shown with the peso sign instead of a currency code/name.
+// Shared currency helpers. Display formatting (sign, commas, 2 dp) is separate from
+// calculation helpers (roundMoney / parseNum) so UI polish never changes math.
 
 export const PESO_SIGN = "\u20B1"; // ₱
 
-/** Format a number as pesos, e.g. 1234.5 -> "₱1,234.50". Pass { sign: false } to omit the sign. */
-export function formatPeso(n: number, opts?: { sign?: boolean }): string {
+/** Active display sign for the tenant default currency. Defaults to Philippine Peso. */
+let displayCurrencySign = PESO_SIGN;
+
+/** Call after loading the tenant default currency (AppShell). Does not affect calculations. */
+export function setDisplayCurrencySign(sign: string | null | undefined): void {
+  const s = (sign ?? "").trim();
+  displayCurrencySign = s || PESO_SIGN;
+}
+
+export function getDisplayCurrencySign(): string {
+  return displayCurrencySign || PESO_SIGN;
+}
+
+export type FormatMoneyOpts = {
+  /** false = number only; string = override sign; omit = use tenant display sign */
+  sign?: boolean | string;
+};
+
+/**
+ * Format a money amount for display only: thousands separators + exactly 2 decimals.
+ * Example: 1234.5 → "₱1,234.50". Never use the return value in arithmetic — keep numbers raw.
+ */
+export function formatMoney(n: number, opts?: FormatMoneyOpts): string {
   const value = Number.isFinite(n) ? n : 0;
-  const s = value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return opts?.sign === false ? s : `${PESO_SIGN}${s}`;
+  const formatted = value.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (opts?.sign === false) return formatted;
+  const sign = typeof opts?.sign === "string" && opts.sign.trim() ? opts.sign.trim() : getDisplayCurrencySign();
+  return `${sign}${formatted}`;
 }
 
-/** Format without the peso sign — for spreadsheet cells and compact tables. */
+/** @deprecated Prefer formatMoney — kept as alias for existing call sites. */
+export function formatPeso(n: number, opts?: { sign?: boolean }): string {
+  return formatMoney(n, opts);
+}
+
+/** Format without currency sign — spreadsheet cells and compact tables. */
 export function formatAmount(n: number): string {
-  return formatPeso(n, { sign: false });
+  return formatMoney(n, { sign: false });
 }
 
-/** Match api roundMoney / taxcalc round4 (4 decimal places). */
+/** Match api roundMoney / taxcalc round4 (4 decimal places) — calculation only. */
 export function roundMoney(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.round(n * 10000) / 10000;
 }
 
+/**
+ * Strip display formatting (currency signs, thousand commas, spaces) before Number().
+ * Safe for pasted "₱1,234.50" without affecting how we store/calculate amounts.
+ */
+export function stripMoneyFormatting(raw: string): string {
+  return String(raw ?? "")
+    .trim()
+    .replace(/\u20B1/g, "") // ₱
+    .replace(/[$€£¥]/g, "")
+    .replace(/,/g, "")
+    .replace(/\s+/g, "");
+}
+
 /** Parse a numeric string for calculations; invalid/empty → 0 (grid totals, API payloads). */
 export function parseNum(s: string): number {
-  const v = s.trim();
-  if (!v || v === ".") return 0;
+  const v = stripMoneyFormatting(s);
+  if (!v || v === "." || v === "-" || v === "-.") return 0;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
 /**
- * Sanitize free-typed numeric input so users can type continuously (unlike a
- * native number input). Allows digits and a single decimal point only (max 2
- * fractional digits for currency).
+ * Sanitize free-typed currency input. Digits + one decimal point; max 2 fractional digits.
+ * Thousand commas and currency signs are stripped (not treated as decimal separators).
  */
 export function sanitizeDecimalInput(raw: string): string {
-  let v = raw.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  let v = stripMoneyFormatting(raw).replace(/[^0-9.-]/g, "");
+  // Keep a single leading minus for credit/debit entry if present.
+  const neg = v.startsWith("-");
+  v = v.replace(/-/g, "");
+  if (neg) v = "-" + v;
   const firstDot = v.indexOf(".");
   if (firstDot !== -1) {
     const intPart = v.slice(0, firstDot);
@@ -47,7 +94,7 @@ export function sanitizeDecimalInput(raw: string): string {
 
 /** Quantity fields — up to 4 fractional digits. */
 export function sanitizeQtyInput(raw: string): string {
-  let v = raw.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  let v = stripMoneyFormatting(raw).replace(/[^0-9.]/g, "");
   const firstDot = v.indexOf(".");
   if (firstDot !== -1) {
     const intPart = v.slice(0, firstDot);
@@ -64,8 +111,8 @@ export function sanitizeIntegerInput(raw: string): string {
 
 /** Parse a sanitized decimal string; null while the user is mid-entry (e.g. "" or "1."). */
 export function parseDecimalInput(raw: string): number | null {
-  const v = raw.trim();
-  if (!v || v === ".") return null;
+  const v = stripMoneyFormatting(raw).trim();
+  if (!v || v === "." || v === "-" || v === "-.") return null;
   if (v.endsWith(".")) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;

@@ -1,16 +1,21 @@
 import { A, useLocation } from "@solidjs/router";
 import { For, Show, createMemo, createSignal } from "solid-js";
 import { resolveWorkflowForPath } from "./workflowGuides";
+import { useOnboarding } from "./usePlatform";
 
 function expandedKey(guideId: string): string {
   return `workflow-guide-expanded:${guideId}`;
 }
 
-function readExpanded(guideId: string): boolean {
+function readExpanded(guideId: string, preferExpanded: boolean): boolean {
   try {
-    return localStorage.getItem(expandedKey(guideId)) === "1";
+    const raw = localStorage.getItem(expandedKey(guideId));
+    if (raw === "1") return true;
+    if (raw === "0") return false;
+    // First visit: expand during early onboarding so non-tech users see the path.
+    return preferExpanded;
   } catch {
-    return false;
+    return preferExpanded;
   }
 }
 
@@ -26,19 +31,27 @@ function writeExpanded(guideId: string, value: boolean) {
  * Plain-language "where am I in this workflow" strip shown at the top of
  * pages that belong to a start-to-finish business flow (selling, buying,
  * serial tracking). Collapsed it is a single line; expanded it walks the
- * user through every step with what to do and where to click.
+ * user through every step with what to do and where to click next.
+ * During the first ~14 days / incomplete playbook it defaults to expanded.
  */
 export function WorkflowGuideBar() {
   const loc = useLocation();
+  const onboarding = useOnboarding();
   const resolved = createMemo(() => resolveWorkflowForPath(loc.pathname));
 
-  // Store per-guide expansion so a user who hides the selling guide still
-  // sees the buying guide expanded the first time they meet it.
+  const preferExpanded = createMemo(() => {
+    const d = onboarding.data;
+    if (!d) return true;
+    if (d.show_setup_checklist) return true;
+    if (d.show_playbook && (d.overall_percent ?? 0) < 80) return true;
+    return false;
+  });
+
   const [expandedMap, setExpandedMap] = createSignal<Record<string, boolean>>({});
   const isExpanded = (guideId: string) => {
     const m = expandedMap();
     if (guideId in m) return m[guideId];
-    return readExpanded(guideId);
+    return readExpanded(guideId, preferExpanded());
   };
   const toggleExpanded = (guideId: string) => {
     const next = !isExpanded(guideId);
@@ -62,6 +75,11 @@ export function WorkflowGuideBar() {
                   Guide
                 </span>
                 <p class="truncate text-sm font-medium text-text-primary">{guide().title}</p>
+                <Show when={preferExpanded() && isExpanded(guide().id)}>
+                  <span class="hidden rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-700 shadow-sm sm:inline">
+                    Getting started
+                  </span>
+                </Show>
               </div>
 
               <div class="flex flex-wrap items-center gap-1 text-xs" aria-label="Workflow steps">

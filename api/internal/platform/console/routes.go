@@ -38,6 +38,10 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/customers/{id}/subscriptions", svc.createSubscription)
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/customers/{id}/extend-trial", svc.extendTrial)
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/customers/{id}/convert-demo", svc.convertDemo)
+		cr.With(requirePlatformPermission("platform.customers.write")).Post("/platform/console/customers/{id}/resend-invites", svc.resendTenantInvites)
+		cr.With(requirePlatformPermission("platform.followups.write")).Post("/platform/console/customers/{id}/quick-follow-up", svc.quickFollowUp)
+		cr.With(requirePlatformPermission("platform.onboarding.read")).Get("/platform/console/customers/{id}/playbook", svc.customerPlaybook)
+		cr.With(requirePlatformPermission("platform.followups.write")).Patch("/platform/console/customers/{id}/playbook/{code}", svc.patchCustomerPlaybookStep)
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/subscriptions/{id}/invoices", svc.createInvoice)
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/invoices/{id}/mark-paid", svc.markInvoicePaid)
 

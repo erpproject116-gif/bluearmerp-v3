@@ -2,6 +2,7 @@ import { For, Show, createMemo } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { formatPeso } from "../../../shared/money";
 
 export type SaleCommissionRow = {
   line_no: number;
@@ -69,8 +70,7 @@ export function SalesCommissionPanel(props: Props) {
           <h3 class="text-sm font-semibold text-text-primary">Commissions (TIC)</h3>
           <p class="text-xs text-text-secondary">
             Optional. Add one or more Tech in Charge people. Use % of gross sales or a fixed amount — amounts
-            recalculate from the invoice grand total (₱
-            {props.grandTotal().toLocaleString("en-PH", { minimumFractionDigits: 2 })}).
+            recalculate from the invoice grand total ({formatPeso(props.grandTotal())}).
           </p>
         </div>
         <button
@@ -148,7 +148,7 @@ export function SalesCommissionPanel(props: Props) {
                   <div class="flex flex-col justify-end sm:col-span-2">
                     <span class="mb-1 block text-sm font-medium text-text-primary">Commission</span>
                     <p class="rounded border border-stroke bg-slate-50 px-2 py-2 text-right text-sm tabular-nums font-medium">
-                      ₱{preview().toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                      {formatPeso(preview())}
                     </p>
                   </div>
                   <div class="flex items-end sm:col-span-1">
@@ -168,7 +168,7 @@ export function SalesCommissionPanel(props: Props) {
           <p class="text-right text-sm text-text-secondary">
             Total commissions:{" "}
             <span class="font-semibold tabular-nums text-text-primary">
-              ₱{totalCommission().toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+              {formatPeso(totalCommission())}
             </span>
           </p>
         </div>
