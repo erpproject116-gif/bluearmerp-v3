@@ -199,6 +199,33 @@ export const workflowGuides: WorkflowGuide[] = [
       },
     ],
   },
+  {
+    id: "pos",
+    title: "POS — set up the register, then sell",
+    summary:
+      "Administrators configure products and tax under Manage. Cashiers open a shift on Terminal, check out walk-in sales, then close the shift with counted cash.",
+    docHref: "/app/documentation/kb/pos-checkout-guide",
+    steps: [
+      {
+        id: "manage",
+        short: "Manage",
+        title: "Set up catalog and register (POS Manage)",
+        what: "Choose which products appear on the grid, set categories, default location, tax, tenders, and optional auto-post to accounting. Cashiers do not need this page.",
+        href: "/app/pos/manage",
+        routePrefixes: ["/app/pos/manage", "/app/pos/setup"],
+        moduleCode: "pos",
+      },
+      {
+        id: "terminal",
+        short: "Terminal",
+        title: "Sell at the counter (POS Terminal)",
+        what: "Open a shift, scan or tap items into the cart, take payment, hold bills if a customer steps away, then close the shift. Checkout creates a sales invoice and reduces stock.",
+        href: "/app/pos",
+        routePrefixes: ["/app/pos"],
+        moduleCode: "pos",
+      },
+    ],
+  },
 ];
 
 export type ResolvedWorkflow = {

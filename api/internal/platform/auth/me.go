@@ -75,7 +75,18 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 	tu.AutoEnableAllModules = autoEnableAll
 
 	rows, err := pool.Query(ctx, `
-		select mr.module_code, mr.module_name, coalesce(tm.is_enabled, false)
+		select mr.module_code, mr.module_name,
+		  coalesce(
+		    tm.is_enabled,
+		    (
+		      select bool_and(coalesce(ptm.is_enabled, false))
+		      from public.module_dependencies md
+		      left join public.tenant_modules ptm
+		        on ptm.module_code = md.depends_on_module_code and ptm.tenant_id = $1
+		      where md.module_code = mr.module_code
+		    ),
+		    false
+		  )
 		from public.module_registry mr
 		left join public.tenant_modules tm
 		  on tm.module_code = mr.module_code and tm.tenant_id = $1

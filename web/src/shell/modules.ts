@@ -442,7 +442,7 @@ export const appModules: AppModule[] = [
         label: "Acct. I",
         prefix: ACCT_I_PREFIX,
         href: "/app/finance/acct-i/journal-entries",
-        settingsHref: "/app/finance/official-receipts/settings",
+        settingsHref: "/app/finance/acct-i/journal-entries",
         featureCode: "finance.acct_i",
       },
       {

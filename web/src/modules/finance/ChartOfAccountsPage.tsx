@@ -97,6 +97,7 @@ export default function ChartOfAccountsPage() {
   );
   const [typeFilter, setTypeFilter] = createSignal("");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set<number>());
   const [modalOpen, setModalOpen] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [importing, setImporting] = createSignal(false);
@@ -331,7 +332,17 @@ export default function ChartOfAccountsPage() {
 
   const currentRows = createMemo(() => list.data?.rows ?? []);
   const isEmpty = createMemo(() => !list.isFetching && (list.data?.total ?? 0) === 0 && !q() && !typeFilter());
-  const selectedRow = createMemo(() => currentRows().find((r) => r.id === selectedId()) ?? null);
+  const resolvedIds = (): number[] => {
+    const multi = [...selectedIds()];
+    if (multi.length > 0) return multi;
+    const one = selectedId();
+    return one != null ? [one] : [];
+  };
+
+  const clearSelection = () => {
+    setSelectedId(null);
+    setSelectedIds(new Set<number>());
+  };
 
   const invalidate = () => {
     void client.invalidateQueries({ queryKey: ["finance-accounts"] });
@@ -443,59 +454,92 @@ export default function ChartOfAccountsPage() {
     invalidate();
   };
 
-  const deactivate = async () => {
-    const row = selectedRow();
-    if (!row) {
-      toast.warning("Select an account to deactivate.");
+  const setAccountsActive = async (active: boolean) => {
+    const ids = resolvedIds();
+    if (ids.length === 0) {
+      toast.warning(active ? "Select account(s) to activate." : "Select account(s) to deactivate.");
       return;
     }
-    if (!window.confirm(`Deactivate ${row.account_code} - ${row.account_name}?`)) return;
-    const res = await apiFetch<AccountRow>(`/api/v1/finance/accounts/${row.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ is_active: false }),
-    });
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to deactivate account.");
-      return;
+    const verb = active ? "Activate" : "Deactivate";
+    const noun = ids.length === 1 ? "account" : `${ids.length} accounts`;
+    if (!window.confirm(`${verb} ${noun}?`)) return;
+
+    let ok = 0;
+    let failed = 0;
+    for (const id of ids) {
+      const res = await apiFetch(`/api/v1/finance/accounts/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: active }),
+      });
+      if (res.success) ok += 1;
+      else failed += 1;
     }
-    setSelectedId(null);
+    clearSelection();
     invalidate();
+    if (failed) toast.warning(`${verb}d ${ok}; ${failed} failed.`);
+    else toast.success(`${verb}d ${ok} account(s).`);
   };
 
+  const deactivate = async () => setAccountsActive(false);
+  const activate = async () => setAccountsActive(true);
+
   const remove = async () => {
-    const row = selectedRow();
-    if (!row) {
-      toast.warning("Select an account to remove.");
+    const ids = resolvedIds();
+    if (ids.length === 0) {
+      toast.warning("Select account(s) to remove.");
       return;
     }
-    if (row.is_system) {
+    const rows = currentRows().filter((r) => ids.includes(r.id));
+    const system = rows.filter((r) => r.is_system);
+    if (system.length === ids.length) {
       toast.warning("System accounts cannot be removed. Deactivate instead.");
       return;
     }
-    if (!window.confirm(`Remove ${row.account_code} - ${row.account_name}? This soft-deletes the account.`)) return;
-    const res = await apiFetch(`/api/v1/finance/accounts/${row.id}`, { method: "DELETE" });
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to remove account.");
-      return;
+    const noun = ids.length === 1 ? "this account" : `${ids.length} accounts`;
+    if (!window.confirm(`Remove ${noun}? This soft-deletes them.`)) return;
+
+    let ok = 0;
+    let failed = 0;
+    let skippedSystem = 0;
+    for (const id of ids) {
+      const row = rows.find((r) => r.id === id) ?? currentRows().find((r) => r.id === id);
+      if (row?.is_system) {
+        skippedSystem += 1;
+        continue;
+      }
+      const res = await apiFetch(`/api/v1/finance/accounts/${id}`, { method: "DELETE" });
+      if (res.success) ok += 1;
+      else failed += 1;
     }
-    setSelectedId(null);
+    clearSelection();
     invalidate();
+    const parts = [`Removed ${ok}`];
+    if (skippedSystem) parts.push(`skipped ${skippedSystem} system`);
+    if (failed) parts.push(`${failed} failed`);
+    if (failed || skippedSystem) toast.warning(parts.join("; ") + ".");
+    else toast.success(`Removed ${ok} account(s).`);
   };
 
   const restore = async () => {
-    const row = selectedRow();
-    if (!row) {
-      toast.warning("Select a deleted account to restore.");
+    const ids = resolvedIds();
+    if (ids.length === 0) {
+      toast.warning("Select deleted account(s) to restore.");
       return;
     }
-    const res = await apiFetch<AccountRow>(`/api/v1/finance/accounts/${row.id}/restore`, { method: "POST" });
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to restore account.");
-      return;
+    if (!window.confirm(`Restore ${ids.length === 1 ? "this account" : `${ids.length} accounts`}?`)) return;
+
+    let ok = 0;
+    let failed = 0;
+    for (const id of ids) {
+      const res = await apiFetch(`/api/v1/finance/accounts/${id}/restore`, { method: "POST" });
+      if (res.success) ok += 1;
+      else failed += 1;
     }
-    setSelectedId(null);
+    clearSelection();
     setStatusFilter("");
     invalidate();
+    if (failed) toast.warning(`Restored ${ok}; ${failed} failed.`);
+    else toast.success(`Restored ${ok} account(s).`);
   };
 
   const importTemplate = async (replace = false) => {
@@ -669,6 +713,7 @@ export default function ChartOfAccountsPage() {
             value={typeFilter()}
             onChange={(e) => {
               setTypeFilter(e.currentTarget.value);
+              setSelectedIds(new Set<number>());
               setPage(1);
             }}
           >
@@ -683,6 +728,7 @@ export default function ChartOfAccountsPage() {
             value={statusFilter()}
             onChange={(e) => {
               setStatusFilter(e.currentTarget.value);
+              setSelectedIds(new Set<number>());
               setPage(1);
             }}
           >
@@ -694,10 +740,19 @@ export default function ChartOfAccountsPage() {
         </label>
         <button
           type="button"
-          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-40"
+          disabled={resolvedIds().length === 0}
+          onClick={() => void activate()}
+        >
+          Activate selected{resolvedIds().length > 0 ? ` (${resolvedIds().length})` : ""}
+        </button>
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-40"
+          disabled={resolvedIds().length === 0}
           onClick={() => void deactivate()}
         >
-          Deactivate selected
+          Deactivate selected{resolvedIds().length > 0 ? ` (${resolvedIds().length})` : ""}
         </button>
         <button
           type="button"
@@ -708,18 +763,20 @@ export default function ChartOfAccountsPage() {
         </button>
         <button
           type="button"
-          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-40"
+          disabled={resolvedIds().length === 0}
           onClick={() => void remove()}
         >
-          Remove selected
+          Remove selected{resolvedIds().length > 0 ? ` (${resolvedIds().length})` : ""}
         </button>
         <Show when={statusFilter() === "deleted"}>
           <button
             type="button"
-            class="rounded-lg border border-brand-300 px-3 py-2 text-sm text-brand-700 hover:bg-brand-50"
+            class="rounded-lg border border-brand-300 px-3 py-2 text-sm text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+            disabled={resolvedIds().length === 0}
             onClick={() => void restore()}
           >
-            Restore selected
+            Restore selected{resolvedIds().length > 0 ? ` (${resolvedIds().length})` : ""}
           </button>
         </Show>
         <Show when={isEmpty()}>
@@ -881,6 +938,9 @@ export default function ChartOfAccountsPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={selectedIds()}
+        onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={() => openCreate()}
         onEdit={openEdit}
         codeKey="account_code"

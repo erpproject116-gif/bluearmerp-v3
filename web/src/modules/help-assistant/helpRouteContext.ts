@@ -11,7 +11,8 @@ const ROUTE_TAG_RULES: Array<{ prefix: string; tags: string[] }> = [
   { prefix: "/app/inventory/serial-lot", tags: ["serial-lot", "serial", "inventory"] },
   { prefix: "/app/inventory", tags: ["inventory"] },
   { prefix: "/app/after-sales", tags: ["after-sales", "repair", "warranty"] },
-  { prefix: "/app/pos", tags: ["pos", "selling"] },
+  { prefix: "/app/pos/manage", tags: ["pos", "pos-manage", "settings", "catalog"] },
+  { prefix: "/app/pos", tags: ["pos", "selling", "checkout", "shift"] },
   { prefix: "/app/finance/acct-i/chart-of-accounts", tags: ["finance", "coa", "chart"] },
   { prefix: "/app/finance/acct-i", tags: ["finance", "journal", "bank"] },
   { prefix: "/app/finance", tags: ["finance"] },
@@ -122,8 +123,20 @@ export function suggestedPrompts(pathname: string): string[] {
       "How do delivery receipts work?",
     ];
   }
+  if (pathname.includes("/pos/manage") || pathname.includes("/pos/setup")) {
+    return [
+      "How do I set up POS products and categories?",
+      "How do I configure POS tax and tenders?",
+      "Where do I turn on POS auto-post to accounting?",
+    ];
+  }
   if (pathname.includes("/pos")) {
-    return ["How do I open a POS shift?", "How does POS checkout work?"];
+    return [
+      "How do I open a POS shift?",
+      "How does POS checkout work?",
+      "How do I close a POS shift?",
+      "POS serial scan at checkout",
+    ];
   }
   if (pathname.includes("/comms") || pathname.includes("/communications")) {
     return ["How do I email a document?", "How do I connect Gmail?", "Where is the sent documents log?"];

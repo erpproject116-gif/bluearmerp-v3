@@ -160,14 +160,16 @@ function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
   return (
     <A
       href={props.branch.href}
+      title={branchLabel()}
       class="flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors"
       classList={{
+        "justify-center": shell.collapsed(),
         "bg-brand-50 text-brand-600": branchActive(),
         "text-text-secondary hover:erp-panel hover:text-text-primary": !branchActive(),
       }}
     >
-      <Show when={!shell.collapsed()}>
-        <span class="truncate">{branchLabel()}</span>
+      <Show when={shell.collapsed()} fallback={<span class="truncate">{branchLabel()}</span>}>
+        <span class="text-[10px] font-semibold uppercase tracking-wide">{branchLabel().slice(0, 4)}</span>
       </Show>
     </A>
   );

@@ -742,26 +742,48 @@ export const documentationSections: DocSection[] = [
     id: "pos",
     title: "Point of sale",
     iconId: "pos",
-    intro: "Walk-in checkout with shift open, cart, and cash tender.",
+    intro: "Retail counter sales: set up the catalog under Manage, then open shifts and check out on Terminal.",
     primaryHref: "/app/pos",
     primaryLabel: "Open POS Terminal",
     blocks: [
       {
         type: "paragraph",
-        text: "POS is a full-screen terminal for retail walk-in sales. Open a shift, scan or search items into the cart, take cash payment, and close the shift when done. Checkout creates a sales invoice and reduces stock.",
+        text: "POS has two screens. Terminal (/app/pos) is the full-screen cashier register. Manage (/app/pos/manage) is for administrators — products, categories, modifiers, tax, tenders, branding, and GL auto-post.",
+      },
+      {
+        type: "heading",
+        text: "Terminal (cashiers)",
       },
       {
         type: "steps",
         items: [
-          "Open POS from the sidebar (or go to /app/pos).",
-          "Open shift with opening cash if prompted.",
-          "Add items to the cart and complete checkout.",
-          "Close shift at end of day for a summary.",
+          "Open POS from the sidebar (or /app/pos).",
+          "Choose the stock location and opening cash, then open the shift.",
+          "Scan barcodes or tap products on the grid. Serial-tracked items need a serial before checkout.",
+          "Checkout with cash, card, or split tenders. Hold a bill if the customer steps away.",
+          "Close the shift at end of day and enter counted cash for the shift report.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Manage (administrators)",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open POS → Manage (POS Management permission required).",
+          "Products & Categories — decide what appears on the cashier grid and at what price.",
+          "Settings — default location, tax type (inclusive/exclusive), tenders, order types, and optional sales/OR auto-post.",
+          "Modifiers and branding — optional add-ons and store look/labels.",
         ],
       },
       {
         type: "tip",
-        text: "Offline mode and receipt printers are not supported in the web POS MVP.",
+        text: "Checkout creates a sales invoice and reduces stock at the shift location. Map Sales / Receivable / Cash accounts under Chart of Accounts and enable auto-post in POS Settings or Process Policies so journals post immediately. Offline actions queue on the device and sync when the network returns.",
+      },
+      {
+        type: "tip",
+        text: "Step-by-step knowledge base: POS checkout guide and POS Manage settings under Help & guides → Point of Sale.",
       },
     ],
   },
