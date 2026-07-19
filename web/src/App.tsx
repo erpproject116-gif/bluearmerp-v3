@@ -196,6 +196,12 @@ import {
   PayrollRunsPage,
   RemittancesPage,
   AttendancePage,
+  LeavePage,
+  AbsenteeismPage,
+  DisciplinePage,
+  HireOnboardingPage,
+  PerformancePage,
+  LearningPage,
   PayItemsPage,
   SpecialRunsPage,
   EssSelfServicePage,
@@ -691,6 +697,24 @@ export default function App() {
           )} />
           <Route path="/hr/attendance" component={() => (
             <HrRoute><AttendancePage /></HrRoute>
+          )} />
+          <Route path="/hr/leave" component={() => (
+            <HrRoute><LeavePage /></HrRoute>
+          )} />
+          <Route path="/hr/absenteeism" component={() => (
+            <HrRoute><AbsenteeismPage /></HrRoute>
+          )} />
+          <Route path="/hr/discipline" component={() => (
+            <HrRoute><DisciplinePage /></HrRoute>
+          )} />
+          <Route path="/hr/hire-onboarding" component={() => (
+            <HrRoute><HireOnboardingPage /></HrRoute>
+          )} />
+          <Route path="/hr/evaluations" component={() => (
+            <HrRoute><PerformancePage /></HrRoute>
+          )} />
+          <Route path="/hr/learning" component={() => (
+            <HrRoute><LearningPage /></HrRoute>
           )} />
           <Route path="/fixed-assets" component={() => (
             <FixedAssetsRoute><FixedAssetsPage /></FixedAssetsRoute>

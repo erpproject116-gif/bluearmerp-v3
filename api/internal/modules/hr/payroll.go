@@ -271,8 +271,13 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 		if body.PayPeriodID != nil && *body.PayPeriodID > 0 {
 			periodID = *body.PayPeriodID
 			var status string
-			if err := tx.QueryRow(r.Context(), `select status from public.hr_pay_periods where id=$1 and tenant_id=$2`, periodID, tu.TenantID).Scan(&status); err != nil {
+			var lockedAt *time.Time
+			if err := tx.QueryRow(r.Context(), `select status, locked_at from public.hr_pay_periods where id=$1 and tenant_id=$2`, periodID, tu.TenantID).Scan(&status, &lockedAt); err != nil {
 				response.Err(w, http.StatusNotFound, "Pay period not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if lockedAt != nil {
+				response.Err(w, http.StatusConflict, "Pay period is locked. Unlock before re-running.", "ERR_CONFLICT")
 				return
 			}
 			if status == "processed" {
@@ -420,6 +425,29 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 
 func postPayrollAccrualJE(ctx context.Context, tx pgx.Tx, tenantID, periodID int64, totalGross, totalEmployer, totalNet float64, userID int64) (int64, error) {
 	eeDeductions := roundMoney(totalGross - totalNet)
+	// Prefer splitting EE statutory (2050) vs WHT (2051) when chart accounts exist.
+	var wht float64
+	_ = tx.QueryRow(ctx, `
+		select coalesce(sum(pl.amount),0)::float8
+		from public.hr_payslip_lines pl
+		join public.hr_payslips ps on ps.id = pl.payslip_id
+		where ps.tenant_id=$1 and ps.pay_period_id=$2 and pl.line_code in ('WHT','WITHHOLDING_TAX')`,
+		tenantID, periodID).Scan(&wht)
+	if wht < 0 {
+		wht = 0
+	}
+	if wht > eeDeductions {
+		wht = eeDeductions
+	}
+	statEE := roundMoney(eeDeductions - wht)
+
+	has2051 := false
+	var dummy int64
+	if err := tx.QueryRow(ctx, `
+		select id from public.fin_accounts where tenant_id=$1 and account_code='2051' and deleted_at is null`, tenantID).Scan(&dummy); err == nil {
+		has2051 = true
+	}
+
 	lines := []ledger.PostingLine{
 		{AccountCode: "5210", Debit: totalGross, Remarks: "Payroll salaries"},
 	}
@@ -427,13 +455,16 @@ func postPayrollAccrualJE(ctx context.Context, tx pgx.Tx, tenantID, periodID int
 		lines = append(lines, ledger.PostingLine{AccountCode: "5110", Debit: totalEmployer, Remarks: "Employer SSS/PHIC/HDMF"})
 		lines = append(lines, ledger.PostingLine{AccountCode: "2050", Credit: totalEmployer, Remarks: "Employer contributions payable"})
 	}
-	if eeDeductions > 0 {
+	if has2051 && wht > 0 {
+		if statEE > 0 {
+			lines = append(lines, ledger.PostingLine{AccountCode: "2050", Credit: statEE, Remarks: "EE statutory payable"})
+		}
+		lines = append(lines, ledger.PostingLine{AccountCode: "2051", Credit: wht, Remarks: "Withholding tax payable"})
+	} else if eeDeductions > 0 {
 		lines = append(lines, ledger.PostingLine{AccountCode: "2050", Credit: eeDeductions, Remarks: "EE statutory + WHT payable"})
 	}
 	lines = append(lines, ledger.PostingLine{AccountCode: "2120", Credit: totalNet, Remarks: "Net salaries payable"})
 
-	// Rebalance if WHT should hit 2051: keep simple single 2050 pool for EE+ER statutory GA-1;
-	// ensure debit == credit within tolerance.
 	var deb, cred float64
 	for _, ln := range lines {
 		deb += ln.Debit

@@ -395,6 +395,12 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees/settings" },
       { label: "Attendance / DTR", href: "/app/hr/attendance", settingsHref: "/app/hr/attendance" },
+      { label: "Leave", href: "/app/hr/leave", settingsHref: "/app/hr/leave" },
+      { label: "Absenteeism", href: "/app/hr/absenteeism", settingsHref: "/app/hr/absenteeism" },
+      { label: "Discipline", href: "/app/hr/discipline", settingsHref: "/app/hr/discipline" },
+      { label: "Hire onboarding", href: "/app/hr/hire-onboarding", settingsHref: "/app/hr/hire-onboarding" },
+      { label: "Evaluations", href: "/app/hr/evaluations", settingsHref: "/app/hr/evaluations" },
+      { label: "Learning", href: "/app/hr/learning", settingsHref: "/app/hr/learning" },
       { label: "Pay items", href: "/app/hr/pay-items", settingsHref: "/app/hr/pay-items" },
       { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
       { label: "13th / Final pay", href: "/app/hr/special-runs", settingsHref: "/app/hr/special-runs" },

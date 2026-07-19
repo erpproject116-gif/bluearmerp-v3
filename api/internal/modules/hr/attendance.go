@@ -51,6 +51,7 @@ type DTREntry struct {
 	HolidayID       *int64   `json:"holiday_id,omitempty"`
 	HolidayName     string   `json:"holiday_name,omitempty"`
 	HolidayType     string   `json:"holiday_type,omitempty"`
+	AbsenceReason   string   `json:"absence_reason,omitempty"`
 	Notes           *string  `json:"notes,omitempty"`
 }
 
@@ -64,6 +65,7 @@ func registerAttendanceRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/dtr", listDTR(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/dtr", upsertDTR(pool))
+	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Delete("/dtr/{id}", deleteDTR(pool))
 	registerAttendanceCSVRoutes(r, pool)
 }
 
@@ -277,7 +279,7 @@ func listDTR(pool *pgxpool.Pool) http.HandlerFunc {
 		q := fmt.Sprintf(`
 			select d.id, d.employee_id, e.employee_no, e.full_name, d.work_date::text, d.source, d.status,
 			  d.hours_worked::float8, d.ot_hours::float8, d.night_diff_hours::float8,
-			  d.holiday_id, coalesce(h.name,''), coalesce(h.holiday_type,''), d.notes,
+			  d.holiday_id, coalesce(h.name,''), coalesce(h.holiday_type,''), coalesce(d.absence_reason,''), d.notes,
 			  count(*) over()
 			from public.hr_dtr_entries d
 			join public.hr_employees e on e.id = d.employee_id
@@ -297,7 +299,7 @@ func listDTR(pool *pgxpool.Pool) http.HandlerFunc {
 			var row DTREntry
 			if err := rows.Scan(&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.WorkDate,
 				&row.Source, &row.Status, &row.HoursWorked, &row.OTHours, &row.NightDiffHours,
-				&row.HolidayID, &row.HolidayName, &row.HolidayType, &row.Notes, &total); err != nil {
+				&row.HolidayID, &row.HolidayName, &row.HolidayType, &row.AbsenceReason, &row.Notes, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read DTR.", "ERR_INTERNAL")
 				return
 			}
@@ -321,6 +323,7 @@ func upsertDTR(pool *pgxpool.Pool) http.HandlerFunc {
 			HoursWorked    float64  `json:"hours_worked"`
 			OTHours        float64  `json:"ot_hours"`
 			NightDiffHours float64  `json:"night_diff_hours"`
+			AbsenceReason  string   `json:"absence_reason"`
 			Notes          *string  `json:"notes"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -367,8 +370,8 @@ func upsertDTR(pool *pgxpool.Pool) http.HandlerFunc {
 		var id int64
 		err = pool.QueryRow(r.Context(), `
 			insert into public.hr_dtr_entries (
-			  tenant_id, employee_id, work_date, source, status, hours_worked, ot_hours, night_diff_hours, holiday_id, notes
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			  tenant_id, employee_id, work_date, source, status, hours_worked, ot_hours, night_diff_hours, holiday_id, absence_reason, notes
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 			on conflict (tenant_id, employee_id, work_date) do update set
 			  source = excluded.source,
 			  status = excluded.status,
@@ -376,17 +379,41 @@ func upsertDTR(pool *pgxpool.Pool) http.HandlerFunc {
 			  ot_hours = excluded.ot_hours,
 			  night_diff_hours = excluded.night_diff_hours,
 			  holiday_id = excluded.holiday_id,
+			  absence_reason = excluded.absence_reason,
 			  notes = excluded.notes,
 			  updated_at = now()
 			returning id`,
-			tu.TenantID, body.EmployeeID, d, src, st, body.HoursWorked, body.OTHours, body.NightDiffHours, holidayID, body.Notes,
+			tu.TenantID, body.EmployeeID, d, src, st, body.HoursWorked, body.OTHours, body.NightDiffHours, holidayID,
+			strings.TrimSpace(body.AbsenceReason), body.Notes,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save DTR.", "ERR_INTERNAL")
 			return
 		}
+		if st == "absent" || st == "awol" {
+			_, _ = evaluateAbsencesForTenant(r.Context(), pool, tu.TenantID)
+		}
 		response.OK(w, map[string]any{
 			"id": id, "status": st, "holiday_name": holName, "holiday_type": holType,
 		}, "Saved.")
+	}
+}
+
+func deleteDTR(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			delete from public.hr_dtr_entries where id=$1 and tenant_id=$2`, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "DTR entry not found.", "ERR_NOT_FOUND")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "hr.dtr.delete", "hr_dtr_entry", &id, nil, nil)
+		response.OK(w, map[string]any{"id": id}, "Deleted.")
 	}
 }

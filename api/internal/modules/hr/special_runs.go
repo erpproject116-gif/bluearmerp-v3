@@ -228,7 +228,9 @@ func computeFinalPayRow(ctx context.Context, tx pgx.Tx, tenantID, empID int64, s
 	daysInMonth := float64(time.Date(separationDate.Year(), separationDate.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day())
 	dayWorked := float64(separationDate.Day())
 	lastMonth := roundMoney(row.BaseSalary * (dayWorked / daysInMonth))
-	unusedLeave := 0.0
+	unusedLeaveDays, _ := sumCashableLeaveDays(ctx, tx, tenantID, empID, separationDate)
+	dailyRate := roundMoney(row.BaseSalary / daysInMonth)
+	unusedLeave := roundMoney(unusedLeaveDays * dailyRate)
 	months := int(separationDate.Month())
 	if hireDate.Year() == separationDate.Year() {
 		months = int(separationDate.Month()) - int(hireDate.Month()) + 1
@@ -240,7 +242,7 @@ func computeFinalPayRow(ctx context.Context, tx pgx.Tx, tenantID, empID int64, s
 	row.Amount = roundMoney(lastMonth + unusedLeave + thirteenth)
 	row.YTDBasic = lastMonth
 	row.MonthsWorked = float64(months)
-	row.Notes = fmt.Sprintf("Last month pro-rate ₱%.2f + 13th pro-rate ₱%.2f (leave cash-out pending leave balances)", lastMonth, thirteenth)
+	row.Notes = fmt.Sprintf("Last month pro-rate ₱%.2f + leave cash-out ₱%.2f (%.2f days) + 13th pro-rate ₱%.2f", lastMonth, unusedLeave, unusedLeaveDays, thirteenth)
 	return row, nil
 }
 
@@ -295,6 +297,11 @@ func runFinalPay(pool *pgxpool.Pool) http.HandlerFunc {
 		row, err := computeFinalPayRow(r.Context(), tx, tu.TenantID, *body.EmployeeID, sep)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
+			return
+		}
+		unusedLeaveDays, _ := sumCashableLeaveDays(r.Context(), tx, tu.TenantID, *body.EmployeeID, sep)
+		if err := cashOutLeaveOnFinalPay(r.Context(), tx, tu.TenantID, *body.EmployeeID, tu.AppUserID, sep, unusedLeaveDays); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to cash out leave.", "ERR_INTERNAL")
 			return
 		}
 		label := strings.TrimSpace(body.PeriodLabel)

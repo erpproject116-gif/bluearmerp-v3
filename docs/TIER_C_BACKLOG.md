@@ -26,19 +26,21 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 ## HR / Payroll
 
-**Status:** MVP shipped (migration 083) — employee list, payroll run, payslip stub, accrual JE.
+**Status:** Gap-close roadmap shipped (migration 193+) — leave, absenteeism, discipline/NTE, hire onboarding, evaluations, lite LMS, payroll depth (bank export, period lock, 2316/1601-C packs, GL 2050/2051 split), ESS expansion.
 
-**Purpose:** Employee master, attendance, leave, and payroll runs with statutory deductions.
+**Purpose:** Employee master, attendance, leave, ER cases, learning, and payroll runs with PH statutory deductions.
 
-**Core entities:** Employee, department assignment, pay period, payslip, deduction rules.
+**Core entities:** Employee, DTR, leave balances/requests, absence alerts, discipline cases, onboarding cases, performance reviews, courses/quizzes, pay period, payslip, remittance batches.
 
-**Dependencies:** User management (optional link), Finance (journal posting for payroll).
+**Dependencies:** User management (optional link / ESS), Finance (journal posting for payroll).
 
-**MVP slice:** Employee list, monthly payroll batch, payslip PDF, GL expense accrual stub.
+**MVP slice (current):** Employees + 201 docs, DTR edit/delete, leave cash-out on final pay, absenteeism alerts → discipline draft, hire onboarding auto-spawn, review cycles, built-in quizzes (no SCORM), bank CSV export, period lock, ESS leave/learning/discipline.
 
-**Risks:** Local tax/regulatory variance; PII and access control.
+**Risks:** Local tax/regulatory variance; PII and access control; BIR pack templates need accountant review (not certified eFPS).
 
-**Still deferred:** Country-specific tax tables, attendance/leave modules.
+**Still deferred / future:** Full SCORM/xAPI LMS, certified BIR eFPS gateway, 360/skills cloud, full biometric hardware ecosystem beyond API punch hours.
+
+**Workflow guide:** Hire → Onboard → Attend → Leave → Payroll → Remit (see in-app Documentation → HR).
 
 ---
 

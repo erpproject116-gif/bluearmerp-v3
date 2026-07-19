@@ -791,25 +791,32 @@ export const documentationSections: DocSection[] = [
     id: "hr",
     title: "HR and payroll",
     iconId: "hr",
-    intro: "Employee master and monthly payroll runs with payslip stub.",
+    intro: "Employees, leave, attendance, discipline, onboarding, evaluations, learning, and PH payroll.",
     primaryHref: "/app/hr/employees",
     primaryLabel: "Open Employees",
     blocks: [
       {
         type: "paragraph",
-        text: "HR maintains employees separately from app login users. Payroll runs generate payslips for a pay period and post a payroll accrual journal entry stub to finance.",
+        text: "Workflow: Hire → Onboard → Attend → Leave → Payroll → Remit. ESS (My HR) is for employees linked via user_id.",
       },
       {
         type: "steps",
         items: [
-          "Add employees with base salary and department.",
-          "Open Payroll Runs and run payroll for the period.",
-          "Review payslips; accrual posts to configured GL accounts.",
+          "Create employees (active hires auto-spawn hire onboarding + optional Day-1 orientation course).",
+          "Capture DTR (manual edit/delete or biometric punches with in/out hours).",
+          "Accrue leave balances, approve requests (stamps DTR leave); final pay cash-out uses cashable balances.",
+          "Review absenteeism alerts; escalate to NTE/discipline cases and store letters in 201.",
+          "Run payroll; export bank file; lock period; use remittance / 1601-C spreadsheet packs (not certified eFPS).",
+          "Close the loop with evaluations and mandatory learning compliance.",
         ],
       },
       {
         type: "tip",
-        text: "Statutory tax tables vary by country—configure rates with your accountant; this MVP uses simple withholding stubs.",
+        text: "Bank/BIR export packs are labeled as spreadsheet / field packs—accountant must review before filing. Discipline letters are templates, not DOLE legal advice.",
+      },
+      {
+        type: "tip",
+        text: "Nav: Leave, Absenteeism, Discipline, Hire onboarding, Evaluations, Learning under HR & Payroll.",
       },
     ],
   },

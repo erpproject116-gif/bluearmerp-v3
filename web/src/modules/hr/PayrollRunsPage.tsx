@@ -11,6 +11,7 @@ import {
   type PayrollPreviewResult,
 } from "../../shared/useHr";
 import { exportPayrollRegisterCsv } from "../../shared/hrCsvImport";
+import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { formatAmount, formatPeso } from "../../shared/money";
@@ -198,6 +199,45 @@ export default function PayrollRunsPage() {
             }}
           >
             Export payroll register (CSV)
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+            onClick={() => {
+              const id = selectedPeriodId();
+              if (!id) return;
+              window.open(`/api/v1/hr/pay-periods/${id}/bank-export?format=generic_csv`, "_blank");
+            }}
+          >
+            Export bank file
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+            onClick={() => {
+              const id = selectedPeriodId();
+              if (!id) return;
+              void apiFetch(`/api/v1/hr/pay-periods/${id}/lock`, { method: "POST", body: "{}" }).then((res) => {
+                if (!res.success) toast.warning(res.message ?? "Lock failed.");
+                else toast.success("Period locked.");
+              });
+            }}
+          >
+            Lock period
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+            onClick={() => {
+              const id = selectedPeriodId();
+              if (!id) return;
+              void apiFetch(`/api/v1/hr/pay-periods/${id}/unlock`, { method: "POST", body: "{}" }).then((res) => {
+                if (!res.success) toast.warning(res.message ?? "Unlock failed.");
+                else toast.success("Period unlocked.");
+              });
+            }}
+          >
+            Unlock period
           </button>
           <button
             type="button"
