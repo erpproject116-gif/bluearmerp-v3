@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -68,7 +69,7 @@ func QueueChangeAlert(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUs
 	}
 	if mode == "immediate" {
 		_ = sendImmediateDigest(ctx, pool, tenantID, []queueRow{{
-			ID: qid, Title: title, Body: body, ActionCode: actionCode,
+			ID: qid, Title: title, Body: body, ActionCode: actionCode, CreatedAt: time.Now().UTC(),
 		}})
 	}
 }
@@ -78,6 +79,7 @@ type queueRow struct {
 	Title      string
 	Body       string
 	ActionCode string
+	CreatedAt  time.Time
 }
 
 func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rows []queueRow) error {
@@ -89,7 +91,8 @@ func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 		log.Printf("change-alert: tenant=%d no digest recipient email; leaving queue pending", tenantID)
 		return nil
 	}
-	subject, html := formatDigest(rows)
+	company := tenantCompanyName(ctx, pool, tenantID)
+	subject, html := formatDigest(company, rows)
 
 	delivered := false
 	if smtpErr := trySendDigestSMTP(emails, subject, html); smtpErr == nil {
@@ -152,7 +155,6 @@ func digestGmailSenderUserID(ctx context.Context, pool *pgxpool.Pool, tenantID i
 }
 
 // digestRecipientEmails returns CHANGE_ALERT_DIGEST_TO when set; otherwise the tenant owner email.
-// Default override: erpproject116@gmail.com (product owner inbox) until CHANGE_ALERT_DIGEST_TO is set.
 func digestRecipientEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]string, error) {
 	if override := parseDigestToEnv(); len(override) > 0 {
 		return override, nil
@@ -162,12 +164,8 @@ func digestRecipientEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int
 
 func parseDigestToEnv() []string {
 	raw := strings.TrimSpace(os.Getenv("CHANGE_ALERT_DIGEST_TO"))
-	if raw == "" {
-		// Product-owner inbox for digests until an explicit env override is configured.
-		raw = "erpproject116@gmail.com"
-	}
-	if strings.EqualFold(raw, "owner") {
-		return nil // fall through to tenant owner
+	if raw == "" || strings.EqualFold(raw, "owner") {
+		return nil
 	}
 	parts := strings.FieldsFunc(raw, func(r rune) bool {
 		return r == ',' || r == ';' || r == ' '
@@ -205,22 +203,142 @@ func tenantOwnerEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) 
 	return []string{email}, nil
 }
 
-func formatDigest(rows []queueRow) (subject, html string) {
-	subject = fmt.Sprintf("BluearmERP owner activity digest (%d changes)", len(rows))
-	var b strings.Builder
-	b.WriteString("<html><body><h2>Transaction trail (hourly)</h2><ul>")
-	for _, r := range rows {
-		b.WriteString("<li><strong>")
-		b.WriteString(htmlEscape(r.Title))
-		b.WriteString("</strong> — ")
-		b.WriteString(htmlEscape(r.Body))
-		b.WriteString(" <code>")
-		b.WriteString(htmlEscape(r.ActionCode))
-		b.WriteString("</code></li>")
+func tenantCompanyName(ctx context.Context, pool *pgxpool.Pool, tenantID int64) string {
+	var name string
+	_ = pool.QueryRow(ctx, `
+		select coalesce(nullif(trim(company_name), ''), 'BluearmERP')
+		from public.tenants where id = $1`, tenantID).Scan(&name)
+	if strings.TrimSpace(name) == "" {
+		return "BluearmERP"
 	}
-	b.WriteString("</ul><p>Sent to the configured digest inbox (CHANGE_ALERT_DIGEST_TO). Turn digests off under change-alert preferences, or set digest_mode to off.</p>")
-	b.WriteString("<p><em>Delivery uses SMTP when available, otherwise a connected Gmail account.</em></p></body></html>")
+	return strings.TrimSpace(name)
+}
+
+type digestBodyParts struct {
+	Summary string
+	By      string
+	Doc     string
+	Changed string
+	At      string
+}
+
+func parseDigestBody(body string) digestBodyParts {
+	p := digestBodyParts{Summary: strings.TrimSpace(body)}
+	chunks := strings.Split(body, " · ")
+	if len(chunks) == 0 {
+		return p
+	}
+	p.Summary = strings.TrimSpace(chunks[0])
+	for _, chunk := range chunks[1:] {
+		chunk = strings.TrimSpace(chunk)
+		switch {
+		case strings.HasPrefix(chunk, "by "):
+			p.By = strings.TrimSpace(strings.TrimPrefix(chunk, "by "))
+		case strings.HasPrefix(chunk, "doc "):
+			p.Doc = strings.TrimSpace(strings.TrimPrefix(chunk, "doc "))
+		case strings.HasPrefix(chunk, "changed:"):
+			p.Changed = strings.TrimSpace(strings.TrimPrefix(chunk, "changed:"))
+		case strings.HasPrefix(chunk, "at "):
+			p.At = strings.TrimSpace(strings.TrimPrefix(chunk, "at "))
+		default:
+			if p.Summary != "" && chunk != "" {
+				p.Summary = p.Summary + " · " + chunk
+			}
+		}
+	}
+	return p
+}
+
+func formatEventWhen(r queueRow, parsedAt string) string {
+	if !r.CreatedAt.IsZero() {
+		return r.CreatedAt.UTC().Format("Jan 2, 2006 · 15:04 UTC")
+	}
+	if strings.TrimSpace(parsedAt) != "" {
+		return parsedAt
+	}
+	return "—"
+}
+
+func formatDigest(company string, rows []queueRow) (subject, html string) {
+	n := len(rows)
+	company = strings.TrimSpace(company)
+	if company == "" {
+		company = "BluearmERP"
+	}
+	subject = fmt.Sprintf("%s activity digest (%d changes)", company, n)
+
+	var b strings.Builder
+	b.WriteString(`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;"><tr><td align="center">`)
+	b.WriteString(`<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">`)
+
+	// Header
+	b.WriteString(`<tr><td style="background:#0f172a;color:#ffffff;padding:22px 24px;">`)
+	b.WriteString(`<div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;opacity:0.75;margin-bottom:6px;">Hourly activity digest</div>`)
+	b.WriteString(`<div style="font-size:20px;font-weight:700;line-height:1.3;">`)
+	b.WriteString(htmlEscape(company))
+	b.WriteString(`</div>`)
+	b.WriteString(fmt.Sprintf(`<div style="font-size:13px;opacity:0.85;margin-top:8px;">%d change%s since last digest</div>`, n, pluralS(n)))
+	b.WriteString(`</td></tr>`)
+
+	// Cards
+	b.WriteString(`<tr><td style="padding:18px 20px 8px;">`)
+	for i, r := range rows {
+		parts := parseDigestBody(r.Body)
+		when := formatEventWhen(r, parts.At)
+		b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;margin:0 0 12px;overflow:hidden;">`)
+		b.WriteString(`<tr><td style="padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">`)
+		b.WriteString(`<div style="font-size:12px;color:#64748b;margin-bottom:4px;">`)
+		b.WriteString(htmlEscape(when))
+		if i+1 <= n {
+			b.WriteString(fmt.Sprintf(` · #%d`, i+1))
+		}
+		b.WriteString(`</div>`)
+		b.WriteString(`<div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.35;">`)
+		b.WriteString(htmlEscape(strings.TrimSpace(r.Title)))
+		b.WriteString(`</div></td></tr>`)
+
+		b.WriteString(`<tr><td style="padding:10px 14px 12px;">`)
+		b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;line-height:1.45;color:#334155;">`)
+		writeDigestRow(&b, "What", parts.Summary)
+		writeDigestRow(&b, "By", parts.By)
+		writeDigestRow(&b, "Document", parts.Doc)
+		writeDigestRow(&b, "Changes", parts.Changed)
+		if strings.TrimSpace(r.ActionCode) != "" {
+			writeDigestRow(&b, "Action", r.ActionCode)
+		}
+		b.WriteString(`</table></td></tr></table>`)
+	}
+	b.WriteString(`</td></tr>`)
+
+	// Footer
+	b.WriteString(`<tr><td style="padding:8px 24px 22px;font-size:12px;color:#94a3b8;line-height:1.5;">`)
+	b.WriteString(`Sent to the tenant owner. To stop these emails, set digest mode to off in change-alert preferences.`)
+	b.WriteString(`</td></tr>`)
+
+	b.WriteString(`</table></td></tr></table></body></html>`)
 	return subject, b.String()
+}
+
+func writeDigestRow(b *strings.Builder, label, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	b.WriteString(`<tr>`)
+	b.WriteString(`<td style="padding:5px 10px 5px 0;width:88px;vertical-align:top;color:#64748b;font-weight:600;white-space:nowrap;">`)
+	b.WriteString(htmlEscape(label))
+	b.WriteString(`</td>`)
+	b.WriteString(`<td style="padding:5px 0;vertical-align:top;color:#1e293b;word-break:break-word;">`)
+	b.WriteString(htmlEscape(value))
+	b.WriteString(`</td></tr>`)
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
 
 func htmlEscape(s string) string {
@@ -256,7 +374,7 @@ func DrainHourlyDigests(ctx context.Context, pool *pgxpool.Pool) (tenants int, e
 	}
 	for _, tid := range tenantIDs {
 		qrows, qerr := pool.Query(ctx, `
-			select id, title, body, action_code
+			select id, title, body, action_code, created_at
 			from public.owner_change_alert_queue
 			where tenant_id = $1 and digested_at is null
 			order by created_at
@@ -267,7 +385,7 @@ func DrainHourlyDigests(ctx context.Context, pool *pgxpool.Pool) (tenants int, e
 		var batch []queueRow
 		for qrows.Next() {
 			var r queueRow
-			if err := qrows.Scan(&r.ID, &r.Title, &r.Body, &r.ActionCode); err != nil {
+			if err := qrows.Scan(&r.ID, &r.Title, &r.Body, &r.ActionCode, &r.CreatedAt); err != nil {
 				qrows.Close()
 				return tenants, events, err
 			}

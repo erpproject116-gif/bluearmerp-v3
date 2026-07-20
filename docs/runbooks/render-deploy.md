@@ -103,8 +103,8 @@ Document email and **owner hourly change digests** use `SMTP_HOST`, `SMTP_FROM`,
 
 Options:
 1. **Upgrade** the API service to any **paid** instance type (ports 465/587 work; port 25 stays blocked).
-2. Use **Gmail OAuth** for document email (HTTPS, not SMTP): set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT`, then **Communications → Settings → Connect Gmail**. Owner digests try SMTP first, then the same connected Gmail account. Set `CHANGE_ALERT_DIGEST_TO=erpproject116@gmail.com` (default in code) for the digest inbox.
-3. Cron: `POST /api/v1/platform/jobs/change-alert-digest` with `X-Change-Alert-Job-Secret` (or `X-CRM-Job-Secret`) every hour. Digests go to `CHANGE_ALERT_DIGEST_TO` (default `erpproject116@gmail.com`), or tenant owner when set to `owner`.
+2. Use **Gmail OAuth** for document email (HTTPS, not SMTP): set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT`, then **Communications → Settings → Connect Gmail**. Owner digests try SMTP first, then the same connected Gmail account.
+3. Cron: `POST /api/v1/platform/jobs/change-alert-digest` with `X-Change-Alert-Job-Secret` (or `X-CRM-Job-Secret`) every hour. Digests go to the **tenant owner** email (optional override: `CHANGE_ALERT_DIGEST_TO`).
 
 After changing SMTP / Google env vars, **redeploy** (or restart) so the process picks them up.
 
