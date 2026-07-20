@@ -1349,6 +1349,58 @@ export const moduleKbArticles: KbArticle[] = [
     relatedGuideIds: ["crm-follow-ups", "after-sales-repair"],
   },
   {
+    id: "migration-center",
+    title: "Migration Center — import CSV from other systems",
+    scenario: "You are moving partners, items, or chart of accounts from another platform into Bluearm.",
+    intro:
+      "Migration Center lets you upload CSV files, map foreign column names to Bluearm fields, save mapping profiles for reuse, and import into partners, items, or GL accounts.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open User Management → Migration Center.",
+          "Choose Chart of accounts, Customers & suppliers, or Products.",
+          "Upload a CSV, map each Bluearm field to a source column (required fields are marked).",
+          "Optionally save the mapping as a named profile for the next import.",
+          "Run Import, then open the destination list to review created rows.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Recommended order: accounts → partners → items. Profiles are per tenant and entity kind, so you can keep separate maps for QuickBooks, Xero, or spreadsheet exports.",
+      },
+    ],
+    primaryHref: "/app/user-management/migration-center",
+    primaryLabel: "Migration Center",
+    relatedGuideIds: ["setup-wizard", "onboarding-playbook", "chart-of-accounts-ph-template"],
+  },
+  {
+    id: "booking-services",
+    title: "Booking — services calendar and convert to quotation",
+    scenario: "You schedule service appointments or internal follow-ups and later turn them into quotations.",
+    intro:
+      "The Booking module manages resources (staff/rooms), priced services, and time-bound bookings. Convert a booking with a customer into a draft quotation in one step.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Enable the Booking module under Module & Features if it is not visible.",
+          "Open Booking → Bookings. Use the Resources and Services tabs to add capacities and priced services.",
+          "Create a booking with title, start/end, customer, resource, and service.",
+          "When ready to sell, click Convert to quotation — Bluearm creates a draft quote line from the service.",
+          "Open Quotation to confirm pricing, then continue Load Slip into sales order or invoice as usual.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Conversion requires a customer on the booking and active tax type + currency. Cancelled bookings cannot convert. A booking can only link to one quotation.",
+      },
+    ],
+    primaryHref: "/app/booking/bookings",
+    primaryLabel: "Bookings",
+    relatedGuideIds: ["load-slip-overview", "quotation-to-sales-flow"],
+  },
+  {
     id: "customer-portal",
     title: "Customer portal (read-only)",
     scenario: "Customers should view their orders and invoices without ERP access.",

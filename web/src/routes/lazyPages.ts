@@ -139,8 +139,10 @@ export const UserPermissionsPage = lazy(() => import("../modules/user-management
 export const ProcessPoliciesPage = lazy(() => import("../modules/user-management/process-policies/ProcessPoliciesPage"));
 export const ModuleSetupHubPage = lazy(() => import("../modules/shared/ModuleSetupHubPage"));
 export const MappingCenterPage = lazy(() => import("../modules/user-management/mapping-center/MappingCenterPage"));
+export const MigrationCenterPage = lazy(() => import("../modules/migration/MigrationCenterPage"));
 export const ModuleFeaturesPage = lazy(() => import("../modules/user-management/tenant-modules/ModuleFeaturesPage"));
 export const DemoDataPage = lazy(() => import("../modules/user-management/demo-data/DemoDataPage"));
+export const BookingsPage = lazy(() => import("../modules/booking/BookingsPage"));
 export const HelpFeedbackPage = lazy(() => import("../modules/user-management/help-feedback/HelpFeedbackPage"));
 export const ActivityLogListPage = lazy(() => import("../modules/activity-logs/ActivityLogListPage"));
 export const ChangeLogListPage = lazy(() => import("../modules/activity-logs/ChangeLogListPage"));
@@ -226,6 +228,7 @@ export const StockBalanceReportPage = lazy(() => import("../modules/inventory/re
 export const StockLedgerReportPage = lazy(() => import("../modules/inventory/reports/StockLedgerReportPage"));
 export const StockAgeingReportPage = lazy(() => import("../modules/inventory/reports/StockAgeingReportPage"));
 export const OnHandReportPage = lazy(() => import("../modules/inventory/reports/OnHandReportPage"));
+export const InventoryStatusReportPage = lazy(() => import("../modules/inventory/reports/InventoryStatusReportPage"));
 export const InvBookReportPage = lazy(() => import("../modules/inventory/reports/InvBookReportPage"));
 export const TrialBalanceReportPage = lazy(() => import("../modules/finance/reports/TrialBalanceReportPage"));
 export const GeneralLedgerReportPage = lazy(() => import("../modules/finance/reports/GeneralLedgerReportPage"));

@@ -42,19 +42,19 @@ const STEP_COPY: Record<string, { title: string; why: string; action: string; li
   },
   partners: {
     title: "Customers & suppliers",
-    why: "Add at least one partner before creating quotes or purchase requests.",
+    why: "Add at least one partner before creating quotes or purchase requests. Or import many via Migration Center.",
     action: "Add a partner",
     link: "/app/inventory/partners",
   },
   items: {
     title: "Products",
-    why: "Add your first product. Enable Track serial if you will scan serial numbers later.",
+    why: "Add your first product, or bulk-import from CSV in Migration Center. Enable Track serial if you will scan serial numbers later.",
     action: "Add a product",
     link: "/app/inventory/items",
   },
   team: {
     title: "Invite your team",
-    why: "Optional — invite colleagues when you are ready.",
+    why: "Optional — invite colleagues when you are ready. Use Migration Center (/app/user-management/migration-center) for chart of accounts, partners, and items first.",
     action: "Manage users",
     link: "/app/user-management/users",
   },

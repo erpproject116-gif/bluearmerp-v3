@@ -3,6 +3,7 @@ package ledger
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -76,13 +77,17 @@ func (jp JournalPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) er
 	if jp.RequireJEApproval {
 		status = "draft"
 	}
+	// postedAt is computed in Go on purpose. Reusing $3 in both the status
+	// column and `case when $3 = 'posted'` triggers PostgreSQL SQLSTATE 42P08
+	// (inconsistent types deduced for parameter) under pgx prepared statements.
+	postedAt := journalPostedAt(status)
 	var entryID int64
 	entryNo := EntryNo(ev.SourceType, ev.SourceID)
 	err := tx.QueryRow(ctx, `
 		insert into public.fin_journal_entries (tenant_id, entry_date, date_seq, entry_no, status, remarks, posted_at, created_by_user_id)
-		values ($1, current_date, 1, $2, $3, $4, case when $3 = 'posted' then now() end, null)
+		values ($1, current_date, 1, $2, $3, $4, $5, null)
 		returning id`,
-		ev.TenantID, entryNo, status, ev.SourceType).Scan(&entryID)
+		ev.TenantID, entryNo, status, ev.SourceType, postedAt).Scan(&entryID)
 	if err != nil {
 		return err
 	}
@@ -102,6 +107,17 @@ func (jp JournalPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) er
 		}
 	}
 	return nil
+}
+
+// journalPostedAt returns now when status is posted; otherwise nil.
+// Kept out of SQL so pgx never binds the same parameter as both a status
+// column value and a text comparison (SQLSTATE 42P08).
+func journalPostedAt(status string) *time.Time {
+	if status != "posted" {
+		return nil
+	}
+	now := time.Now().UTC()
+	return &now
 }
 
 func itoa(n int64) string {

@@ -22,24 +22,24 @@ import (
 )
 
 type Ticket struct {
-	ID              int64            `json:"id"`
-	TicketNo        string           `json:"ticket_no"`
-	TicketDate      string           `json:"ticket_date"`
-	Subject         string           `json:"subject"`
-	Description     *string          `json:"description,omitempty"`
-	PartnerID       *int64           `json:"partner_id,omitempty"`
-	PartnerName     string           `json:"partner_name,omitempty"`
-	WarrantyAssetID *int64           `json:"warranty_asset_id,omitempty"`
-	RepairOrderID   *int64           `json:"repair_order_id,omitempty"`
-	Category        string           `json:"category"`
-	Priority        string           `json:"priority"`
-	Status          string           `json:"status"`
-	AssignedUserID  *int64           `json:"assigned_user_id,omitempty"`
-	AssignedName    string           `json:"assigned_name,omitempty"`
-	CreatedByUserID *int64           `json:"created_by_user_id,omitempty"`
-	CreatedByName   string           `json:"created_by_name,omitempty"`
-	ResolvedAt      *string          `json:"resolved_at,omitempty"`
-	Comments        []TicketComment  `json:"comments,omitempty"`
+	ID              int64           `json:"id"`
+	TicketNo        string          `json:"ticket_no"`
+	TicketDate      string          `json:"ticket_date"`
+	Subject         string          `json:"subject"`
+	Description     *string         `json:"description,omitempty"`
+	PartnerID       *int64          `json:"partner_id,omitempty"`
+	PartnerName     string          `json:"partner_name,omitempty"`
+	WarrantyAssetID *int64          `json:"warranty_asset_id,omitempty"`
+	RepairOrderID   *int64          `json:"repair_order_id,omitempty"`
+	Category        string          `json:"category"`
+	Priority        string          `json:"priority"`
+	Status          string          `json:"status"`
+	AssignedUserID  *int64          `json:"assigned_user_id,omitempty"`
+	AssignedName    string          `json:"assigned_name,omitempty"`
+	CreatedByUserID *int64          `json:"created_by_user_id,omitempty"`
+	CreatedByName   string          `json:"created_by_name,omitempty"`
+	ResolvedAt      *string         `json:"resolved_at,omitempty"`
+	Comments        []TicketComment `json:"comments,omitempty"`
 }
 
 type TicketComment struct {
@@ -80,7 +80,8 @@ func registerTicketRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/tickets", listTickets(pool))
 	r.With(auth.RequirePermission("support.tickets_new", auth.AccessWrite)).Post("/tickets", createTicket(pool))
 	r.Get("/tickets/{id}", getTicket(pool))
-	r.With(auth.RequirePermission("support.tickets_assign", auth.AccessWrite)).Patch("/tickets/{id}", patchTicket(pool))
+	// Auth is enforced inside patchTicket: IT may update all fields; creators may edit subject/description.
+	r.Patch("/tickets/{id}", patchTicket(pool))
 	r.Post("/tickets/{id}/comments", addTicketComment(pool))
 	registerTicketAttachmentRoutes(r, pool)
 }
@@ -307,15 +308,25 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 			return ok
 		}
 
-		if !tu.CanManageAllSupportTickets() {
-			response.Err(w, http.StatusForbidden, "Only IT staff may update ticket status and fields.", "ERR_FORBIDDEN")
-			return
-		}
-
 		before, err := loadTicket(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
 			return
+		}
+
+		isManager := tu.CanManageAllSupportTickets()
+		isCreator := before.CreatedByUserID != nil && *before.CreatedByUserID == tu.AppUserID
+		if !isManager {
+			if !isCreator {
+				response.Err(w, http.StatusForbidden, "You may only edit tickets you opened.", "ERR_FORBIDDEN")
+				return
+			}
+			for key := range presentKeys {
+				if key != "subject" && key != "description" {
+					response.Err(w, http.StatusForbidden, "Only IT staff may update ticket status and assignment fields.", "ERR_FORBIDDEN")
+					return
+				}
+			}
 		}
 
 		subject := before.Subject
@@ -373,6 +384,8 @@ func patchTicket(pool *pgxpool.Pool) http.HandlerFunc {
 		ticket, _ := loadTicket(r.Context(), pool, tu.TenantID, id)
 		comments, _ := loadTicketComments(r.Context(), pool, id)
 		ticket.Comments = comments
+
+		notifyTicketUpdate(r.Context(), pool, tu, before, ticket)
 		response.OK(w, ticket, "Ticket updated.")
 	}
 }

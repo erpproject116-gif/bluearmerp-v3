@@ -20,6 +20,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/inventory/reports/stock-balance": "inventory.stock_movements",
   "/app/inventory/reports/stock-ledger": "inventory.stock_movements",
   "/app/inventory/reports/on-hand": "inventory.stock_movements",
+  "/app/inventory/reports/inventory-status": "inventory.stock_movements",
   "/app/inventory/reports/inv-book": "inventory.stock_movements",
   "/app/inventory/price-lists": "inventory.price_lists",
   "/app/sales/sales-returns": "sales.sales_returns",
@@ -153,9 +154,11 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/pos/setup": "settings.process_policies",
   "/app/finance/setup": "settings.process_policies",
   "/app/user-management/mapping-center": "user_management.users",
+  "/app/user-management/migration-center": "migration.center",
   "/app/user-management/tenant-modules": "settings.tenant_modules",
   "/app/user-management/demo-data": "settings.demo_data",
   "/app/user-management/help-feedback": "user_management.users",
+  "/app/booking/bookings": "booking.bookings",
   "/app/purchase-order/purchase-orders": "purchase_order.purchase_orders",
   "/app/purchase-order/rfq": "purchase_order.rfq",
   "/app/purchase-order/goods-receipt": "purchase_order.goods_receipts",
@@ -207,6 +210,8 @@ export function permissionCodeForHref(href: string): string | undefined {
   const path = href.split(/[?#]/)[0];
   if (hrefPermissionCode[path]) return hrefPermissionCode[path];
   if (path.startsWith("/app/support/tickets/")) return "support.tickets";
+  if (path.startsWith("/app/booking/")) return "booking.bookings";
+  if (path.startsWith("/app/user-management/migration-center")) return "migration.center";
   if (path.startsWith("/app/finance/budgets/")) return "finance.budget_read";
   const base = path.replace(/\/settings$/, "").replace(/\/new$/, "");
   return hrefPermissionCode[base];

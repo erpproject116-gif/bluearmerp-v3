@@ -341,6 +341,65 @@ export function useOnHandReport(params: () => ReportParams<OnHandFilters>) {
   });
 }
 
+// --- Inventory Status ---
+
+export type InventoryStatusFilters = {
+  q?: string;
+  status?: string;
+  category_id?: number;
+  location_id?: number;
+  branch_id?: number;
+};
+
+export type InventoryStatusRow = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_status: string;
+  category_id?: number | null;
+  category_name: string;
+  location_id: number;
+  location_name: string;
+  branch_name: string;
+  qty_on_hand: number;
+  qty_reserved: number;
+  available_qty: number;
+  reorder_level?: number;
+  stock_status: string;
+  last_sold_at?: string | null;
+  last_sold_by: string;
+  last_sold_ref_type: string;
+  last_sold_ref_id?: number | null;
+  last_movement_at?: string | null;
+  last_movement_type: string;
+};
+
+export function inventoryStatusExportUrl(filters: InventoryStatusFilters): string {
+  return exportUrl("/api/v1/inventory/reports/inventory-status/export", filters as Record<string, string | number>);
+}
+
+export function useInventoryStatusReport(params: () => ReportParams<InventoryStatusFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string | number>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-inventory-status", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<InventoryStatusRow[]>(`/api/v1/inventory/reports/inventory-status?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load inventory status");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
 // --- Inv. Book ---
 
 export type InvBookRow = {

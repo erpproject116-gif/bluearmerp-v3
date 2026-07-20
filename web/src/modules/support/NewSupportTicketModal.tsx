@@ -123,7 +123,7 @@ export function NewSupportTicketModal(props: Props) {
     // Keep modal open briefly so AttachmentsField can flush staged files to the new id.
     setCreatedTicketId(res.data.id);
     await draft.clearOnSave();
-    invalidate();
+    await invalidate();
     toast.success("Support ticket created.");
     const ticketId = res.data.id;
     // Allow pending uploads to flush via AttachmentsField's docId effect, then close.

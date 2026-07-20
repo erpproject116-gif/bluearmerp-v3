@@ -21,11 +21,19 @@ type ticketCreatedPayload struct {
 	NotifyStub     bool   `json:"notify_stub"`
 }
 
-// HandleOutboxEvent processes support outbox events and sends assignee email when SMTP is configured.
+// HandleOutboxEvent processes support outbox events and sends email when SMTP is configured.
 func HandleOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event) error {
-	if ev.EventType != "support.ticket_created" {
+	switch ev.EventType {
+	case "support.ticket_created":
+		return handleTicketCreatedEmail(ctx, pool, ev)
+	case "support.ticket_updated":
+		return handleTicketUpdatedEmail(ctx, pool, ev)
+	default:
 		return nil
 	}
+}
+
+func handleTicketCreatedEmail(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event) error {
 	var p ticketCreatedPayload
 	if len(ev.Payload) > 0 {
 		_ = json.Unmarshal(ev.Payload, &p)
@@ -49,8 +57,46 @@ func HandleOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event)
 	subject := fmt.Sprintf("[Support] New ticket %s: %s", p.TicketNo, p.Subject)
 	body := fmt.Sprintf("A new support ticket was created.\n\nTicket: %s\nSubject: %s\n\nOpen the ERP Support module to respond.",
 		p.TicketNo, p.Subject)
-	if err := outbox.SendEmail(cfg, toEmail, subject, body); err != nil {
-		return err
+	return outbox.SendEmail(cfg, toEmail, subject, body)
+}
+
+func handleTicketUpdatedEmail(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event) error {
+	var p ticketUpdatedPayload
+	if len(ev.Payload) > 0 {
+		_ = json.Unmarshal(ev.Payload, &p)
+	}
+	cfg := outbox.LoadSMTPConfig()
+	if !cfg.Enabled() {
+		log.Printf("support outbox: tenant=%d ticket=%s updated — SMTP not configured, skipping email",
+			ev.TenantID, p.TicketNo)
+		return nil
+	}
+
+	recipients := map[int64]struct{}{}
+	if p.CreatedByID != nil && *p.CreatedByID > 0 {
+		recipients[*p.CreatedByID] = struct{}{}
+	}
+	if p.AssignedUserID != nil && *p.AssignedUserID > 0 {
+		recipients[*p.AssignedUserID] = struct{}{}
+	}
+	delete(recipients, p.ActorUserID)
+
+	statusLabel := strings.ReplaceAll(p.Status, "_", " ")
+	subject := fmt.Sprintf("[Support] Ticket %s updated", p.TicketNo)
+	body := fmt.Sprintf("Ticket %s (%s) was updated.\n\nStatus: %s\nPriority: %s\nChanged: %s\n\nOpen the ERP Support module for details.",
+		p.TicketNo, p.Subject, statusLabel, p.Priority, strings.Join(p.ChangedFields, ", "))
+
+	for userID := range recipients {
+		var toEmail string
+		_ = pool.QueryRow(ctx, `
+			select coalesce(email, '') from public.users where id = $1 and tenant_id = $2`,
+			userID, ev.TenantID).Scan(&toEmail)
+		if strings.TrimSpace(toEmail) == "" {
+			continue
+		}
+		if err := outbox.SendEmail(cfg, toEmail, subject, body); err != nil {
+			return err
+		}
 	}
 	return nil
 }

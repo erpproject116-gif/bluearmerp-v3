@@ -75,6 +75,7 @@ export const appModules: AppModule[] = [
       { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation" },
       { label: "Stock Balance", href: "/app/inventory/reports/stock-balance", settingsHref: "/app/inventory/stock-movements" },
       { label: "On Hand", href: "/app/inventory/reports/on-hand", settingsHref: "/app/inventory/stock-movements" },
+      { label: "Inventory Status", href: "/app/inventory/reports/inventory-status", settingsHref: "/app/inventory/stock-movements" },
       { label: "Stock Ledger", href: "/app/inventory/reports/stock-ledger", settingsHref: "/app/inventory/stock-movements" },
       { label: "Inv. Book", href: "/app/inventory/reports/inv-book", settingsHref: "/app/inventory/stock-movements" },
       { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing", settingsHref: "/app/inventory/stock-movements" },
@@ -353,6 +354,15 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "booking",
+    label: "Booking",
+    href: "/app/booking/bookings",
+    basePath: "/app/booking",
+    features: [
+      { label: "Bookings", href: "/app/booking/bookings", settingsHref: "/app/booking/bookings" },
+    ],
+  },
+  {
     id: "comms",
     label: "Communications",
     href: "/app/comms/sent-documents",
@@ -551,6 +561,11 @@ export const appModules: AppModule[] = [
         label: "Mapping Center",
         href: "/app/user-management/mapping-center",
         settingsHref: "/app/user-management/mapping-center",
+      },
+      {
+        label: "Migration Center",
+        href: "/app/user-management/migration-center",
+        settingsHref: "/app/user-management/migration-center",
       },
       {
         label: "Demo Data",

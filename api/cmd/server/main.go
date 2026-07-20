@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/activitylog"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/bi"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/booking"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/buying"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/companybudget"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
@@ -30,6 +31,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/hr"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/manufacturing"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/migration"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/operations"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quality"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/jobcosting"
@@ -165,6 +167,8 @@ func main() {
 			usermgmt.RegisterRoutes(protected, pool)
 			crm.RegisterRoutes(protected, pool)
 			support.RegisterRoutes(protected, pool)
+			migration.RegisterRoutes(protected, pool)
+			booking.RegisterRoutes(protected, pool)
 			bi.RegisterRoutes(protected, pool, api)
 			fixedassets.RegisterRoutes(protected, pool)
 			jobcosting.RegisterRoutes(protected, pool)
