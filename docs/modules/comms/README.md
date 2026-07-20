@@ -50,6 +50,7 @@ Status check: `demo_comms_sent` on Demo Data screen.
 | `SMTP_HOST`, `SMTP_FROM` | Fallback email delivery (also `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT` | OAuth (Communications → Connect Gmail) |
 | `CHANGE_ALERT_JOB_SECRET` (or `CRM_JOB_SECRET`) | Hourly owner digest cron: `POST /api/v1/platform/jobs/change-alert-digest` |
+| `CHANGE_ALERT_DIGEST_TO` | Digest recipient(s), comma-separated. Default: `erpproject116@gmail.com`. Use `owner` for tenant owner email. |
 
 **Render free tier:** outbound SMTP ports are blocked. Prefer Gmail connect for document email, or a paid Render instance for SMTP (including owner digests) — see `docs/runbooks/render-deploy.md`.
 

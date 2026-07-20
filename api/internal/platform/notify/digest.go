@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -80,23 +81,31 @@ type queueRow struct {
 }
 
 func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rows []queueRow) error {
-	emails, err := tenantOwnerEmails(ctx, pool, tenantID)
+	emails, err := digestRecipientEmails(ctx, pool, tenantID)
 	if err != nil {
 		return err
 	}
 	if len(emails) == 0 {
-		log.Printf("change-alert: tenant=%d no owner email; leaving queue pending", tenantID)
+		log.Printf("change-alert: tenant=%d no digest recipient email; leaving queue pending", tenantID)
 		return nil
 	}
 	subject, html := formatDigest(rows)
-	cfg := outbox.LoadSMTPConfig()
-	if !cfg.Enabled() {
-		log.Printf("change-alert: tenant=%d SMTP not configured; leaving queue pending (use Gmail OAuth on free Render or paid SMTP)", tenantID)
+
+	delivered := false
+	if smtpErr := trySendDigestSMTP(emails, subject, html); smtpErr == nil {
+		delivered = true
+	} else {
+		log.Printf("change-alert: tenant=%d SMTP unavailable (%v); trying Gmail", tenantID, smtpErr)
+		if gmailErr := trySendDigestGmail(ctx, pool, tenantID, emails, subject, html); gmailErr != nil {
+			log.Printf("change-alert: tenant=%d Gmail digest failed: %v; leaving queue pending", tenantID, gmailErr)
+			return nil
+		}
+		delivered = true
+	}
+	if !delivered {
 		return nil
 	}
-	if err := outbox.SendEmailMIME(cfg, emails, nil, subject, html, nil); err != nil {
-		return err
-	}
+
 	ids := make([]int64, 0, len(rows))
 	for _, r := range rows {
 		ids = append(ids, r.ID)
@@ -108,6 +117,72 @@ func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 		update public.owner_change_alert_prefs set last_digest_at = now(), updated_at = now()
 		where tenant_id = $1`, tenantID)
 	return nil
+}
+
+func trySendDigestSMTP(emails []string, subject, html string) error {
+	cfg := outbox.LoadSMTPConfig()
+	if !cfg.Enabled() {
+		return fmt.Errorf("SMTP not configured")
+	}
+	return outbox.SendEmailMIME(cfg, emails, nil, subject, html, nil)
+}
+
+func trySendDigestGmail(ctx context.Context, pool *pgxpool.Pool, tenantID int64, emails []string, subject, html string) error {
+	senderID, err := digestGmailSenderUserID(ctx, pool, tenantID)
+	if err != nil || senderID <= 0 {
+		return fmt.Errorf("no active Gmail connection for tenant: %w", err)
+	}
+	return comms.SendHTMLViaGmail(ctx, pool, tenantID, senderID, emails, subject, html)
+}
+
+func digestGmailSenderUserID(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (int64, error) {
+	var ownerID int64
+	_ = pool.QueryRow(ctx, `
+		select coalesce(owner_user_id, 0) from public.tenants where id = $1`, tenantID).Scan(&ownerID)
+	if ownerID > 0 {
+		var ok int
+		err := pool.QueryRow(ctx, `
+			select 1 from public.com_gmail_connections
+			where tenant_id = $1 and user_id = $2 and status = 'active'`, tenantID, ownerID).Scan(&ok)
+		if err == nil {
+			return ownerID, nil
+		}
+	}
+	return comms.FirstActiveGmailUserID(ctx, pool, tenantID)
+}
+
+// digestRecipientEmails returns CHANGE_ALERT_DIGEST_TO when set; otherwise the tenant owner email.
+// Default override: erpproject116@gmail.com (product owner inbox) until CHANGE_ALERT_DIGEST_TO is set.
+func digestRecipientEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]string, error) {
+	if override := parseDigestToEnv(); len(override) > 0 {
+		return override, nil
+	}
+	return tenantOwnerEmails(ctx, pool, tenantID)
+}
+
+func parseDigestToEnv() []string {
+	raw := strings.TrimSpace(os.Getenv("CHANGE_ALERT_DIGEST_TO"))
+	if raw == "" {
+		// Product-owner inbox for digests until an explicit env override is configured.
+		raw = "erpproject116@gmail.com"
+	}
+	if strings.EqualFold(raw, "owner") {
+		return nil // fall through to tenant owner
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ';' || r == ' '
+	})
+	var out []string
+	seen := map[string]bool{}
+	for _, p := range parts {
+		p = strings.ToLower(strings.TrimSpace(p))
+		if p == "" || seen[p] || p == "owner" {
+			continue
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+	return out
 }
 
 // tenantOwnerEmails returns the tenant owner's email only (not store_admins / platform SAs).
@@ -143,8 +218,8 @@ func formatDigest(rows []queueRow) (subject, html string) {
 		b.WriteString(htmlEscape(r.ActionCode))
 		b.WriteString("</code></li>")
 	}
-	b.WriteString("</ul><p>Sent to the tenant owner only. Turn digests off under change-alert preferences, or set digest_mode to off.</p>")
-	b.WriteString("<p><em>Delivery requires SMTP (paid Render) or document email via Gmail OAuth on free Render.</em></p></body></html>")
+	b.WriteString("</ul><p>Sent to the configured digest inbox (CHANGE_ALERT_DIGEST_TO). Turn digests off under change-alert preferences, or set digest_mode to off.</p>")
+	b.WriteString("<p><em>Delivery uses SMTP when available, otherwise a connected Gmail account.</em></p></body></html>")
 	return subject, b.String()
 }
 
