@@ -3,6 +3,7 @@ package pos
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,6 +38,7 @@ type PosSettings struct {
 	TipEnabled         bool               `json:"tip_enabled"`
 	UiLabels           map[string]string  `json:"ui_labels"`
 	Theme              map[string]string  `json:"theme"`
+	HospitalityProfile string             `json:"hospitality_profile,omitempty"`
 }
 
 type posSettingsBody struct {
@@ -56,6 +58,7 @@ type posSettingsBody struct {
 	CardAccountID       *int64            `json:"card_account_id"`
 	UiLabels            map[string]string `json:"ui_labels"`
 	Theme               map[string]string `json:"theme"`
+	HospitalityProfile  *string           `json:"hospitality_profile"`
 }
 
 func registerSettingsRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -80,7 +83,8 @@ func loadPosSettings(pool *pgxpool.Pool, r *http.Request, tenantID int64) (PosSe
 		  coalesce(ps.privilege_pwd_pct, 20)::float8,
 		  coalesce(ps.tip_enabled, true),
 		  coalesce(ps.ui_labels, '{}'::jsonb),
-		  coalesce(ps.theme, '{}'::jsonb)
+		  coalesce(ps.theme, '{}'::jsonb),
+		  coalesce(ps.hospitality_profile, 'retail')
 		from public.pos_settings ps
 		left join public.quo_tax_types tt on tt.id = ps.default_tax_type_id and tt.tenant_id = ps.tenant_id
 		left join public.inv_locations loc on loc.id = ps.default_location_id and loc.tenant_id = ps.tenant_id
@@ -90,7 +94,7 @@ func loadPosSettings(pool *pgxpool.Pool, r *http.Request, tenantID int64) (PosSe
 			&s.AutoPostAccounting, &s.AutoCreateReceipt,
 			&s.SalesAccountID, &s.ReceivableAccountID, &s.CashAccountID, &s.CardAccountID,
 			&s.StudentDiscountPct, &s.PrivilegeSeniorPct, &s.PrivilegePwdPct, &s.TipEnabled,
-			&uiLabelsRaw, &themeRaw)
+			&uiLabelsRaw, &themeRaw, &s.HospitalityProfile)
 	if err != nil {
 		return s, err
 	}
@@ -195,13 +199,23 @@ func putPosSettings(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		uiLabelsJSON, _ := json.Marshal(uiLabels)
 		themeJSON, _ := json.Marshal(theme)
+		profile := "retail"
+		if existing, loadErr := loadPosSettings(pool, r, tu.TenantID); loadErr == nil && existing.HospitalityProfile != "" {
+			profile = existing.HospitalityProfile
+		}
+		if body.HospitalityProfile != nil {
+			p := strings.TrimSpace(*body.HospitalityProfile)
+			if p == "restaurant" || p == "retail" {
+				profile = p
+			}
+		}
 		_, err := pool.Exec(r.Context(), `
 			insert into public.pos_settings (tenant_id, default_location_id, default_tax_type_id, tax_inclusive,
 			  order_types, allowed_tenders, require_customer, enable_barcode, receipt_footer,
 			  auto_post_accounting, auto_create_receipt,
 			  sales_account_id, receivable_account_id, cash_account_id, card_account_id,
-			  ui_labels, theme, updated_at)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, now())
+			  ui_labels, theme, hospitality_profile, updated_at)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18, now())
 			on conflict (tenant_id) do update set
 			  default_location_id = excluded.default_location_id,
 			  default_tax_type_id = excluded.default_tax_type_id,
@@ -219,12 +233,13 @@ func putPosSettings(pool *pgxpool.Pool) http.HandlerFunc {
 			  card_account_id = excluded.card_account_id,
 			  ui_labels = excluded.ui_labels,
 			  theme = excluded.theme,
+			  hospitality_profile = excluded.hospitality_profile,
 			  updated_at = now()`,
 			tu.TenantID, body.DefaultLocationID, body.DefaultTaxTypeID, taxInclusive,
 			orderTypesJSON, allowedTendersJSON, requireCustomer, enableBarcode, body.ReceiptFooter,
 			autoPostAccounting, autoCreateReceipt,
 			body.SalesAccountID, body.ReceivableAccountID, body.CashAccountID, body.CardAccountID,
-			uiLabelsJSON, themeJSON)
+			uiLabelsJSON, themeJSON, profile)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save settings.", "ERR_INTERNAL")
 			return

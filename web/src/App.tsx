@@ -144,6 +144,7 @@ import {
   ModuleFeaturesPage,
   DemoDataPage,
   BookingsPage,
+  BookingCalendarPage,
   HelpFeedbackPage,
   ActivityLogListPage,
   ChangeLogListPage,
@@ -650,6 +651,9 @@ export default function App() {
           )} />
           <Route path="/support/tickets/:id" component={() => (
             <SupportRoute><TicketDetailPage /></SupportRoute>
+          )} />
+          <Route path="/booking/calendar" component={() => (
+            <BookingRoute><BookingCalendarPage /></BookingRoute>
           )} />
           <Route path="/booking/bookings" component={() => (
             <BookingRoute><BookingsPage /></BookingRoute>

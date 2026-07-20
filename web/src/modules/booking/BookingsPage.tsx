@@ -142,6 +142,9 @@ export default function BookingsPage() {
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
+        <A href="/app/booking/calendar" class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-brand-700">
+          Calendar
+        </A>
         <For each={["bookings", "resources", "services"] as const}>
           {(tab) => (
             <A

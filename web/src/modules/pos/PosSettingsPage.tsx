@@ -906,6 +906,50 @@ function SettingsTab() {
         </div>
 
         <div class="rounded-xl border border-stroke bg-white p-5">
+          <h3 class="mb-1 text-sm font-semibold text-text-primary">Hospitality profile</h3>
+          <p class="mb-3 text-xs text-text-secondary">
+            Restaurant mode emphasizes table / covers language on the register. Rooms and stays stay in Booking — not POS.
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
+              classList={{ "border-brand-500 bg-brand-50": (current().hospitality_profile ?? "retail") === "retail" }}
+              onClick={() =>
+                update({
+                  hospitality_profile: "retail",
+                  ui_labels: { ...(current().ui_labels ?? {}), table: "Table / seat", guests: "Guests" },
+                  order_types: current().order_types?.length ? current().order_types : ["dine_in", "take_away", "delivery", "pickup"],
+                })
+              }
+            >
+              Retail
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
+              classList={{ "border-brand-500 bg-brand-50": current().hospitality_profile === "restaurant" }}
+              onClick={() =>
+                update({
+                  hospitality_profile: "restaurant",
+                  ui_labels: {
+                    ...(current().ui_labels ?? {}),
+                    table: "Table number",
+                    guests: "Covers",
+                    save_bill: "Hold table",
+                    bills: "Open tables",
+                    open_shift_hint: "Open the shift, then take table orders and tenders.",
+                  },
+                  order_types: ["dine_in", "take_away", "delivery", "pickup"],
+                })
+              }
+            >
+              Restaurant
+            </button>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-stroke bg-white p-5">
           <h3 class="mb-1 text-sm font-semibold text-text-primary">Terminology &amp; button text</h3>
           <p class="mb-4 text-xs text-text-secondary">
             Customize labels shown on the POS register (header buttons, order panel, forms). Leave blank to use the default.
