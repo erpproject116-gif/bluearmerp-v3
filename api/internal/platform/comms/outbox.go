@@ -13,11 +13,19 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 )
 
+type documentEmailAttachment struct {
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Base64 string `json:"base64"`
+}
+
 type documentEmailPayload struct {
-	SentMessageID    int64  `json:"sent_message_id"`
-	AttachmentName   string `json:"attachment_name"`
-	AttachmentBase64 string `json:"attachment_base64,omitempty"`
-	AttachmentType   string `json:"attachment_type,omitempty"`
+	SentMessageID    int64                     `json:"sent_message_id"`
+	AttachmentName   string                    `json:"attachment_name"`
+	AttachmentBase64 string                    `json:"attachment_base64,omitempty"`
+	AttachmentType   string                    `json:"attachment_type,omitempty"`
+	Attachments      []documentEmailAttachment `json:"attachments,omitempty"`
+	BodyIsHTML       bool                      `json:"body_is_html,omitempty"`
 }
 
 // HandleOutboxEvent sends document emails via Gmail when connected, else SMTP fallback.
@@ -38,28 +46,12 @@ func HandleOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event)
 		return err
 	}
 
-	htmlBody := textToHTML(sm.BodyText)
-	var attachments []gmailAttachment
-	if p.AttachmentBase64 != "" {
-		data, decErr := base64.StdEncoding.DecodeString(strings.TrimSpace(p.AttachmentBase64))
-		if decErr != nil {
-			errMsg := decErr.Error()
-			_ = UpdateSentMessageStatus(ctx, pool, ev.TenantID, sm.ID, "failed", &errMsg)
-			return decErr
-		}
-		name := p.AttachmentName
-		if name == "" {
-			name = "document.pdf"
-		}
-		ct := p.AttachmentType
-		if ct == "" {
-			ct = "application/pdf"
-		}
-		attachments = append(attachments, gmailAttachment{
-			Filename:    name,
-			ContentType: ct,
-			Data:        data,
-		})
+	htmlBody := composeHTMLBody(sm.BodyText, p.BodyIsHTML)
+	attachments, attErr := collectOutboxAttachments(p)
+	if attErr != nil {
+		errMsg := attErr.Error()
+		_ = UpdateSentMessageStatus(ctx, pool, ev.TenantID, sm.ID, "failed", &errMsg)
+		return attErr
 	}
 
 	gmailCfg := LoadGmailConfig()
@@ -132,4 +124,60 @@ func textToHTML(text string) string {
 	text = strings.ReplaceAll(text, ">", "&gt;")
 	text = strings.ReplaceAll(text, "\n", "<br>")
 	return "<html><body><p>" + text + "</p></body></html>"
+}
+
+func composeHTMLBody(body string, isHTML bool) string {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return "<html><body><p></p></body></html>"
+	}
+	if isHTML || looksLikeHTML(body) {
+		if strings.Contains(strings.ToLower(body), "<html") {
+			return body
+		}
+		return "<html><body>" + body + "</body></html>"
+	}
+	return textToHTML(body)
+}
+
+func collectOutboxAttachments(p documentEmailPayload) ([]gmailAttachment, error) {
+	var attachments []gmailAttachment
+	seen := map[string]bool{}
+	add := func(name, ct, b64 string) error {
+		if strings.TrimSpace(b64) == "" {
+			return nil
+		}
+		data, decErr := base64.StdEncoding.DecodeString(strings.TrimSpace(b64))
+		if decErr != nil {
+			return decErr
+		}
+		if name == "" {
+			name = "attachment"
+		}
+		if ct == "" {
+			ct = "application/octet-stream"
+		}
+		key := name + "|" + fmt.Sprintf("%d", len(data))
+		if seen[key] {
+			return nil
+		}
+		seen[key] = true
+		attachments = append(attachments, gmailAttachment{
+			Filename:    name,
+			ContentType: ct,
+			Data:        data,
+		})
+		return nil
+	}
+	for _, a := range p.Attachments {
+		if err := add(a.Name, a.Type, a.Base64); err != nil {
+			return nil, err
+		}
+	}
+	if len(p.Attachments) == 0 && p.AttachmentBase64 != "" {
+		if err := add(p.AttachmentName, p.AttachmentType, p.AttachmentBase64); err != nil {
+			return nil, err
+		}
+	}
+	return attachments, nil
 }

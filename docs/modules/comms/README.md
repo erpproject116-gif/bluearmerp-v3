@@ -8,7 +8,7 @@ Transactional document email with PDF attachments, sent-message log, optional Gm
 |---------|-----------|-----|
 | Sent Documents | `/app/comms/sent-documents` | `GET /api/v1/comms/sent-messages` |
 | Inbox (Gmail sync) | `/app/comms/inbox` | `GET /api/v1/comms/inbox` |
-| Settings / Gmail | `/app/comms/settings` | `GET/POST /api/v1/comms/gmail/*` |
+| Settings / Gmail | `/app/comms/settings` | `GET/POST /api/v1/comms/gmail/*`, `GET/PUT /api/v1/comms/email-signature` |
 | Email from document | modal **Email** button | `POST .../{doc}/send-email` per module |
 | Doc email history | modal panel | `GET /api/v1/comms/doc-emails?doc_type=&doc_id=` |
 
@@ -30,9 +30,12 @@ Email history panels are on all of the above modals (buy-side added in phase 4).
 ## Delivery
 
 1. User clicks **Email** on a saved document (`comms.send` permission).
-2. API enqueues `com_sent_messages` row and generates PDF server-side.
-3. Outbox worker sends via Gmail API (if connected) or SMTP (`SMTP_HOST`, `SMTP_FROM`).
-4. Sent log and modal **Email history** show status and thread stubs.
+2. Compose UI supports rich text, optional signature, and extra file attachments (≤25 MB combined with the document PDF).
+3. API enqueues `com_sent_messages` row and generates PDF server-side (plus client attachments).
+4. Outbox worker sends via Gmail API (if connected) or SMTP (`SMTP_HOST`, `SMTP_FROM`).
+5. Sent log and modal **Email history** show status and thread stubs.
+
+Signatures are per-user (`com_email_signatures`); edit under **Communications → Settings**.
 
 ## Demo data
 

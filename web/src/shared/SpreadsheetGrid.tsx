@@ -593,6 +593,8 @@ export function EntityModal(props: {
   singleColumn?: boolean;
   /** Render above another modal (e.g. email over a transaction window). */
   stacked?: boolean;
+  /** Primary action label (default: Save changes). */
+  saveLabel?: string;
   /** Optional controls at the right of the title (e.g. History). */
   headerActions?: JSX.Element;
   children: JSX.Element;
@@ -635,7 +637,7 @@ export function EntityModal(props: {
                 disabled={props.saving}
                 onClick={() => props.onSave()}
               >
-                Save changes
+                {props.saveLabel ?? "Save changes"}
               </button>
             </div>
           </div>

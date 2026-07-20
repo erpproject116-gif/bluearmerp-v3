@@ -23,6 +23,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/comms", func(cr chi.Router) {
 		cr.With(auth.RequirePermission("comms.read", auth.AccessRead)).Get("/sent-messages", listSentMessages(pool))
 		cr.With(auth.RequirePermission("comms.read", auth.AccessRead)).Get("/doc-emails", listDocEmails(pool))
+		cr.With(auth.RequirePermission("comms.send", auth.AccessRead)).Get("/email-signature", getEmailSignature(pool))
+		cr.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Put("/email-signature", putEmailSignature(pool))
 		cr.With(auth.RequirePermission("comms.inbox", auth.AccessRead)).Get("/inbox", listInbox(pool))
 		cr.With(auth.RequirePermission("comms.admin", auth.AccessRead)).Get("/gmail/status", getGmailStatus(pool))
 		cr.With(auth.RequirePermission("comms.admin", auth.AccessWrite)).Get("/gmail/connect", startGmailConnect(pool))
