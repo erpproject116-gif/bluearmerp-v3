@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { GridExportButtons } from "../../shared/gridExport";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
@@ -143,6 +144,16 @@ export default function JournalEntriesPage() {
           >
             New draft
           </button>
+          <GridExportButtons
+            title="Journal Entries"
+            filename="journal-entries"
+            columns={[
+              { key: "entry_no", header: "Entry No", value: (r) => String(r.entry_no ?? "") },
+              { key: "status", header: "Status", value: (r) => String(r.status ?? "") },
+              { key: "remarks", header: "Remarks", value: (r) => String(r.remarks ?? "") },
+            ]}
+            rows={() => (list.data ?? []) as unknown as Record<string, unknown>[]}
+          />
         </div>
       </div>
 

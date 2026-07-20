@@ -1,11 +1,14 @@
 import { A, useLocation } from "@solidjs/router";
 import { Show } from "solid-js";
 import { hasPermission, useAuth } from "../shared/auth-context";
+import { isTenantFeatureEnabled } from "../shared/moduleAccess";
 import { acctIINavLinks, isAcctIINavLinkActive, isAcctIIPath } from "./acct-ii-nav";
 
 export function AcctIIHeaderNav() {
   const loc = useLocation();
   const auth = useAuth();
+
+  const featureOn = () => isTenantFeatureEnabled(auth.me, "finance.acct_ii", "finance");
 
   const visibleLinks = () =>
     acctIINavLinks.filter((link) => {
@@ -15,7 +18,7 @@ export function AcctIIHeaderNav() {
     });
 
   return (
-    <Show when={isAcctIIPath(loc.pathname)}>
+    <Show when={isAcctIIPath(loc.pathname) && featureOn()}>
       <nav class="erp-header-features mt-3" aria-label="Acct. II features">
         {visibleLinks().map((link) => (
           <A

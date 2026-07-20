@@ -167,6 +167,8 @@ export default function NotesPage() {
         total={filteredRows().length}
         search=""
         onSearchChange={() => {}}
+        exportFilename="notes-register"
+        exportTitle="Notes Register"
         onRefresh={invalidate}
       />
       <EntityModal

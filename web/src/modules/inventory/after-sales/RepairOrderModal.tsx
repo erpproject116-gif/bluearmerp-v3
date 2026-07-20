@@ -34,6 +34,11 @@ import {
   SalesOrderLinePickerModal,
   type PickedSalesOrderLine,
 } from "../../sales/sales/SalesOrderLinePickerModal";
+import {
+  QuotationLinePickerModal,
+  type PickedQuotationLine,
+} from "../../sales-order/sales-order/QuotationLinePickerModal";
+import { PurchaseRequestLinePickerModal, type PickedPurchaseRequestLine } from "../../purchase-request/purchase-order/PurchaseRequestLinePickerModal";
 
 export type RepairOrderDetail = {
   id: number;
@@ -159,6 +164,8 @@ export function RepairOrderModal(props: Props) {
   const [repairDetails, setRepairDetails] = createSignal("");
   const [lines, setLines] = createSignal<RepairLineRow[]>([emptyLine(1)]);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
+  const [prPickerOpen, setPrPickerOpen] = createSignal(false);
   const [attachments, setAttachments] = createSignal<RepairOrderAttachment[]>([]);
   const [uploading, setUploading] = createSignal(false);
 
@@ -324,6 +331,32 @@ export function RepairOrderModal(props: Props) {
         qty: String(row.balance_qty > 0 ? row.balance_qty : row.released_qty || 1),
         remark: row.remark ?? row.description ?? "",
         problem_issue: row.description ?? "",
+      })),
+    );
+  };
+
+  const mapLinesOntoRepair = (
+    rows: Array<{
+      item_id?: number | null;
+      item_code: string;
+      item_name: string;
+      qty: number;
+      remark?: string;
+    }>,
+  ) => {
+    if (rows.length === 0) return;
+    const mapped = rows.map((row, i) => ({
+      ...emptyLine(i + 1),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.qty || 1),
+      remark: row.remark ?? "",
+    }));
+    setLines(
+      [...lines().filter((ln) => ln.item_id || ln.item_code), ...mapped].map((ln, i) => ({
+        ...ln,
+        line_no: i + 1,
       })),
     );
   };
@@ -643,6 +676,8 @@ export function RepairOrderModal(props: Props) {
           options={filterLoadSlipOptions(REPAIR_LOAD_SLIP_OPTIONS, auth.me)}
           onSelect={(id) => {
             if (id === "so") setSoPickerOpen(true);
+            if (id === "quotation") setQuotationPickerOpen(true);
+            if (id === "pr") setPrPickerOpen(true);
           }}
         />
       </div>
@@ -656,6 +691,36 @@ export function RepairOrderModal(props: Props) {
       open={soPickerOpen()}
       onClose={() => setSoPickerOpen(false)}
       onConfirm={(picked) => applySalesOrderLines(picked)}
+    />
+    <QuotationLinePickerModal
+      open={quotationPickerOpen()}
+      onClose={() => setQuotationPickerOpen(false)}
+      onConfirm={(picked: PickedQuotationLine[]) =>
+        mapLinesOntoRepair(
+          picked.map((r) => ({
+            item_id: r.item_id,
+            item_code: r.item_code,
+            item_name: r.item_name,
+            qty: r.balance_qty > 0 ? r.balance_qty : r.qty,
+            remark: r.remark ?? r.description ?? "",
+          })),
+        )
+      }
+    />
+    <PurchaseRequestLinePickerModal
+      open={prPickerOpen()}
+      onClose={() => setPrPickerOpen(false)}
+      onConfirm={(picked: PickedPurchaseRequestLine[]) =>
+        mapLinesOntoRepair(
+          picked.map((r) => ({
+            item_id: r.item_id,
+            item_code: r.item_code,
+            item_name: r.item_name,
+            qty: r.balance_qty,
+            remark: r.remark ?? r.description ?? "",
+          })),
+        )
+      }
     />
 
     <QuickCustomerModal

@@ -4,6 +4,7 @@ import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useListState } from "../../../shared/useListState";
 import { useToast } from "../../../shared/toast";
+import { useAuth } from "../../../shared/auth-context";
 import { PermissionMatrix, type AccessLevel, type MatrixValue } from "../../../shared/PermissionMatrix";
 import {
   useInvalidateUserManagement,
@@ -28,6 +29,7 @@ function statusLabel(status: string) {
 }
 
 export default function UsersPage() {
+  const auth = useAuth();
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
     useListState("email");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -424,7 +426,8 @@ export default function UsersPage() {
           allowInherit
           roleDefaults={userPerms.data?.effective as Record<string, AccessLevel> | undefined}
           loading={registry.isLoading || userPerms.isLoading}
-          title="Per-user overrides across the entire app. Effective access is the highest from role, all groups, then these overrides."
+          title="Per-user overrides for modules that are turned on under Module & Features. Effective access is the highest from role, all groups, then these overrides."
+          enabledModuleCodes={auth.me?.enabled_module_codes ?? null}
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
         />
       </EntityModal>

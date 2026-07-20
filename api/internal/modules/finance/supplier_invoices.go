@@ -121,6 +121,8 @@ type openPOLineRow struct {
 	PurchaseOrderLineID int64   `json:"purchase_order_line_id"`
 	PurchaseOrderID     int64   `json:"purchase_order_id"`
 	PurchaseOrderNo     string  `json:"purchase_order_no"`
+	PartnerID           int64   `json:"partner_id"`
+	PartnerName         string  `json:"partner_name"`
 	ItemID              int64   `json:"item_id"`
 	ItemCode            string  `json:"item_code"`
 	ItemName            string  `json:"item_name"`
@@ -156,6 +158,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := fmt.Sprintf(`
 			select pol.id, po.id, po.purchase_order_no,
+			  po.partner_id, coalesce(p.company_name, ''),
 			  pol.item_id, pol.item_code, pol.item_name,
 			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
 			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
@@ -163,6 +166,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(i.track_serial, false)
 			from public.po_purchase_order_lines pol
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
+			left join public.inv_partners p on p.id = po.partner_id
 			left join public.inv_items i on i.id = pol.item_id
 			where %s
 			  and (pol.qty - coalesce(pol.billed_qty, 0)) > 0.0001
@@ -180,6 +184,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var row openPOLineRow
 			if err := rows.Scan(
 				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo,
+				&row.PartnerID, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
 				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial,
@@ -280,6 +285,8 @@ type openGRLineRow struct {
 	GoodsReceiptID      int64   `json:"goods_receipt_id"`
 	PurchaseOrderLineID int64   `json:"purchase_order_line_id"`
 	PurchaseOrderNo     string  `json:"purchase_order_no"`
+	PartnerID           int64   `json:"partner_id"`
+	PartnerName         string  `json:"partner_name"`
 	ItemID              int64   `json:"item_id"`
 	ItemCode            string  `json:"item_code"`
 	ItemName            string  `json:"item_name"`
@@ -354,9 +361,13 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *gid)
 			argN++
 		}
+		f := openlines.ParseFilters(r, 0)
+		f.PartnerID = nil
+		where, args, argN = f.Apply(where, args, argN, "", "gr.receipt_date", "po.purchase_order_no")
 
 		q := fmt.Sprintf(`
 			select grl.id, gr.id, pol.id, po.purchase_order_no,
+			  po.partner_id, coalesce(p.company_name, ''),
 			  pol.item_id, pol.item_code, pol.item_name,
 			  grl.received_qty::float8,
 			  coalesce(sl.billed, 0)::float8,
@@ -366,6 +377,7 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
 			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
+			left join public.inv_partners p on p.id = po.partner_id
 			left join (
 			  select goods_receipt_line_id, sum(qty) as billed
 			  from public.gr_goods_receipt_slip_lines
@@ -388,6 +400,7 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var row openGRLineRow
 			if err := rows.Scan(
 				&row.GoodsReceiptLineID, &row.GoodsReceiptID, &row.PurchaseOrderLineID, &row.PurchaseOrderNo,
+				&row.PartnerID, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.ReceivedQty, &row.BilledQty, &row.BalanceQty,
 				&row.UnitNonVat, &row.UnitVatInc,

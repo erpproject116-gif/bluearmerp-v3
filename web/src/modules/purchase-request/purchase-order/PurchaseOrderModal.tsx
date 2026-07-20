@@ -46,6 +46,14 @@ import {
   SupplierQuotationLinePickerModal,
   type PickedSupplierQuotationLine,
 } from "./SupplierQuotationLinePickerModal";
+import {
+  SalesOrderLinePickerModal as SalesSideOrderLinePickerModal,
+  type PickedSalesOrderLine,
+} from "../../sales/sales/SalesOrderLinePickerModal";
+import {
+  QuotationLinePickerModal,
+  type PickedQuotationLine,
+} from "../../sales-order/sales-order/QuotationLinePickerModal";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 import { LoadingText } from "../../../shared/LoadingText";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
@@ -218,6 +226,8 @@ export function PurchaseOrderModal(props: Props) {
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [prPickerOpen, setPrPickerOpen] = createSignal(false);
   const [sqPickerOpen, setSqPickerOpen] = createSignal(false);
+  const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
   const [showNewVendor, setShowNewVendor] = createSignal(false);
   const [newVendorName, setNewVendorName] = createSignal("");
   const [showNewLocation, setShowNewLocation] = createSignal(false);
@@ -480,6 +490,57 @@ export function PurchaseOrderModal(props: Props) {
       setLines(recalc);
     } else {
       setLines(newLines);
+    }
+  };
+
+  /** Cross-side map from Selling — never adopt customer as vendor. */
+  const mapSellingOntoPurchaseOrder = async (
+    rows: Array<{
+      item_id?: number | null;
+      item_code: string;
+      item_name: string;
+      balance_qty: number;
+      unit_vat_inc: number;
+      track_serial?: boolean;
+      location_id?: number;
+      location_name?: string;
+      tax_type_id?: number;
+      currency_id?: number;
+      pic_name?: string;
+    }>,
+  ) => {
+    if (rows.length === 0) return;
+    const first = rows[0];
+    if (first.tax_type_id && !taxTypeId()) {
+      setTaxTypeId(first.tax_type_id);
+      const meta0 = taxTypes().find((t) => t.id === first.tax_type_id);
+      if (meta0) setTaxTypeLabel(formatTaxTypeLabel(meta0.name, meta0.tax_mode, meta0.rate_percent));
+    }
+    if (first.currency_id && !currencyId()) setCurrencyId(first.currency_id);
+    if (first.location_id && !locationId()) {
+      setLocationId(first.location_id);
+      setLocationLabel(first.location_name ?? "");
+    }
+    if (first.pic_name && !picName()) setPicName(first.pic_name);
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const mapped = rows.map((row, i) => ({
+      ...emptyPurchaseRequestLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      track_serial: Boolean(row.track_serial),
+    }));
+    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...mapped].map((ln, i) => ({
+      ...ln,
+      line_no: i + 1,
+    }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculatePurchaseRequestLines(merged, taxTypeId()!, meta));
+    } else {
+      setLines(merged);
     }
   };
 
@@ -891,6 +952,8 @@ export function PurchaseOrderModal(props: Props) {
                   onSelect={(id) => {
                     if (id === "pr") setPrPickerOpen(true);
                     if (id === "rfq") setSqPickerOpen(true);
+                    if (id === "so") setSoPickerOpen(true);
+                    if (id === "quotation") setQuotationPickerOpen(true);
                   }}
                 />
               </div>
@@ -931,6 +994,47 @@ export function PurchaseOrderModal(props: Props) {
       open={sqPickerOpen()}
       onClose={() => setSqPickerOpen(false)}
       onConfirm={(picked) => void applySupplierQuotationLines(picked)}
+    />
+    <SalesSideOrderLinePickerModal
+      open={soPickerOpen()}
+      onClose={() => setSoPickerOpen(false)}
+      onConfirm={(picked: PickedSalesOrderLine[]) =>
+        void mapSellingOntoPurchaseOrder(
+          picked.map((r) => ({
+            item_id: r.item_id,
+            item_code: r.item_code,
+            item_name: r.item_name,
+            balance_qty: r.balance_qty,
+            unit_vat_inc: r.unit_vat_inc,
+            track_serial: r.track_serial,
+            location_id: r.location_id,
+            location_name: r.location_name,
+            tax_type_id: r.tax_type_id,
+            currency_id: r.currency_id,
+            pic_name: r.pic_name,
+          })),
+        )
+      }
+    />
+    <QuotationLinePickerModal
+      open={quotationPickerOpen()}
+      onClose={() => setQuotationPickerOpen(false)}
+      onConfirm={(picked: PickedQuotationLine[]) =>
+        void mapSellingOntoPurchaseOrder(
+          picked.map((r) => ({
+            item_id: r.item_id,
+            item_code: r.item_code,
+            item_name: r.item_name,
+            balance_qty: r.balance_qty > 0 ? r.balance_qty : r.qty,
+            unit_vat_inc: r.unit_vat_inc,
+            location_id: r.location_id,
+            location_name: r.location_name,
+            tax_type_id: r.tax_type_id,
+            currency_id: r.currency_id,
+            pic_name: r.pic_name,
+          })),
+        )
+      }
     />
     <QuickCustomerModal
       open={showNewVendor()}

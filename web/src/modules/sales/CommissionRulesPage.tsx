@@ -79,6 +79,7 @@ export default function CommissionRulesPage() {
   const setTab = (t: Tab) => setSearchParams({ tab: t });
 
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [checkedIds, setCheckedIds] = createSignal<Set<number>>(new Set());
   const [modalOpen, setModalOpen] = createSignal(false);
   const [name, setName] = createSignal("");
   const [ratePct, setRatePct] = createSignal("5");
@@ -223,6 +224,32 @@ export default function CommissionRulesPage() {
     void client.invalidateQueries({ queryKey: ["commission-accruals"] });
   };
 
+  const postGlSelected = async () => {
+    const ids = checkedIds();
+    const rows = (accruals.data?.rows ?? []).filter((r) => ids.has(r.id) && !r.journal_entry_id && r.status === "accrued");
+    if (rows.length === 0) {
+      toast.warning("Select accrued commissions that are not yet in GL.");
+      return;
+    }
+    if (!accounting.data?.accounts_mapped) {
+      toast.warning("Map expense and payable accounts under Accounting first.");
+      setTab("accounting");
+      return;
+    }
+    const salesIds = [...new Set(rows.map((r) => r.sales_id))];
+    let ok = 0;
+    for (const salesId of salesIds) {
+      const res = await apiFetch("/api/v1/sales/commission-accruals/post-gl", {
+        method: "POST",
+        body: JSON.stringify({ sales_id: salesId }),
+      });
+      if (res.success) ok += 1;
+    }
+    toast.success(`Posted GL for ${ok} of ${salesIds.length} sale(s).`);
+    setCheckedIds(new Set<number>());
+    void client.invalidateQueries({ queryKey: ["commission-accruals"] });
+  };
+
   const tabBtn = (id: Tab, label: string) => (
     <button
       type="button"
@@ -242,7 +269,7 @@ export default function CommissionRulesPage() {
           <div>
             <h2 class="text-lg font-semibold text-text-primary">Commissions</h2>
             <p class="mt-1 text-sm text-text-secondary">
-              Register of commissions per completed sale, automatic rules, and Chart of Accounts mapping.
+              Register of commissions per completed sale (whole invoice or per item), automatic rules, and Chart of Accounts mapping. Use checkboxes to Post GL into the mapped expense/payable accounts.
             </p>
           </div>
           <div class="flex flex-wrap gap-2">
@@ -290,38 +317,104 @@ export default function CommissionRulesPage() {
             />
           </label>
         </div>
+        <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+          <h3 class="text-sm font-semibold text-text-primary">Chart of accounts (tenant)</h3>
+          <p class="mt-1 text-xs text-text-secondary">
+            Checked rows post into these accounts. Change mapping here, save, then Post GL for selection.
+          </p>
+          <div class="mt-3 grid gap-3 md:grid-cols-2">
+            <LookupCombo
+              label="Commission expense"
+              value={() => expLabel()}
+              selectedId={() => expId()}
+              onInput={setExpLabel}
+              onSelect={(o) => {
+                setExpId(o.id);
+                setExpLabel(o.label);
+              }}
+              onClear={() => {
+                setExpId(null);
+                setExpLabel("");
+              }}
+              fetchOptions={(q) => fetchAccounts("expense", q)}
+              placeholder="Search expense account…"
+            />
+            <LookupCombo
+              label="Commission payable"
+              value={() => payLabel()}
+              selectedId={() => payId()}
+              onInput={setPayLabel}
+              onSelect={(o) => {
+                setPayId(o.id);
+                setPayLabel(o.label);
+              }}
+              onClear={() => {
+                setPayId(null);
+                setPayLabel("");
+              }}
+              fetchOptions={(q) => fetchAccounts("liability", q)}
+              placeholder="Search liability account…"
+            />
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+              disabled={saving()}
+              onClick={() => void saveAccounting()}
+            >
+              Save COA mapping
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+              disabled={checkedIds().size === 0}
+              onClick={() => void postGlSelected()}
+            >
+              Post GL for selected ({checkedIds().size})
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50" onClick={() => setTab("accounting")}>
+              Full accounting settings
+            </button>
+          </div>
+        </section>
         <SpreadsheetGrid<CommissionAccrual>
           columns={[
             {
               key: "sales_no",
               header: "Sale",
               clickable: true,
+              exportValue: (r) => r.sales_no || `#${r.sales_id}`,
               render: (r) => (
                 <A class="text-brand-700 underline" href={`/app/sales/sales?highlight=${r.sales_id}`}>
                   {r.sales_no || `#${r.sales_id}`}
                 </A>
               ),
             },
-            { key: "order_date", header: "Date", render: (r) => r.order_date ?? "—" },
+            { key: "order_date", header: "Date", render: (r) => r.order_date ?? "—", exportValue: (r) => r.order_date ?? "" },
             {
               key: "beneficiary_name",
               header: "Person",
               render: (r) => r.beneficiary_name || "—",
+              exportValue: (r) => r.beneficiary_name || "",
             },
             {
               key: "source",
               header: "Source",
               render: (r) => (r.source === "line" ? "Sale line" : r.rule_name || "Rule"),
+              exportValue: (r) => (r.source === "line" ? "Sale line" : r.rule_name || "Rule"),
             },
             {
               key: "base_amount",
               header: "Base",
               render: (r) => money(r.base_amount),
+              exportValue: (r) => r.base_amount,
             },
             {
               key: "commission_amount",
               header: "Commission",
               render: (r) => money(r.commission_amount),
+              exportValue: (r) => r.commission_amount,
             },
             {
               key: "journal_entry_no",
@@ -334,11 +427,13 @@ export default function CommissionRulesPage() {
                 ) : (
                   <span class="text-text-secondary">—</span>
                 ),
+              exportValue: (r) => r.journal_entry_no ?? "",
             },
             {
               key: "status",
               header: "Status",
               render: (r) => <span class="capitalize">{r.status}</span>,
+              exportValue: (r) => r.status,
             },
             {
               key: "actions",
@@ -372,6 +467,9 @@ export default function CommissionRulesPage() {
           loading={accruals.isFetching}
           selectedId={null}
           onSelect={() => {}}
+          selectable
+          selectedIds={checkedIds()}
+          onSelectionChange={setCheckedIds}
           onNew={() => setTab("rules")}
           onEdit={() => {}}
           codeKey="sales_no"
@@ -380,6 +478,8 @@ export default function CommissionRulesPage() {
           search=""
           onSearchChange={() => {}}
           onRefresh={() => void client.invalidateQueries({ queryKey: ["commission-accruals"] })}
+          exportFilename="commissions-register"
+          exportTitle="Commissions register"
         />
       </Show>
 
@@ -388,7 +488,7 @@ export default function CommissionRulesPage() {
           <h3 class="text-base font-semibold text-text-primary">Automatic commission rules</h3>
           <p class="mt-1 text-sm text-text-secondary">
             Accrue on completed sales by salesperson (PIC), item category, or both. Per-sale TIC lines on the Sales form
-            also appear in the Register.
+            (whole sale or per item) also appear in the Register.
           </p>
         </section>
         <SpreadsheetGrid<CommissionRule>

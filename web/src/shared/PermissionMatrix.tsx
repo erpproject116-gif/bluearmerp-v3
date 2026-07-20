@@ -16,9 +16,18 @@ type Props = {
   onCancelChange?: (code: string, enabled: boolean) => void;
   loading?: boolean;
   title?: string;
+  /** When set, hide modules/features turned off under Module & Features (same as sidebar). */
+  enabledModuleCodes?: string[] | null;
 };
 
 export function PermissionMatrix(props: Props) {
+  const visibleGroups = () => {
+    const codes = props.enabledModuleCodes;
+    if (!codes?.length) return props.groups;
+    const set = new Set(codes);
+    return props.groups.filter((g) => set.has(g.module_code));
+  };
+
   const columns = () => {
     if (props.allowInherit) {
       return [
@@ -64,7 +73,7 @@ export function PermissionMatrix(props: Props) {
             </tr>
           </thead>
           <tbody>
-            <For each={props.groups}>
+            <For each={visibleGroups()}>
               {(group) => (
                 <For each={group.permissions}>
                   {(perm) => {

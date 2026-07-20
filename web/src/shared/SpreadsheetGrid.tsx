@@ -10,11 +10,14 @@ import { useResizableColumns } from "./useResizableColumns";
 import { useToast } from "./toast";
 import { brandingPlaceholder } from "./branding/brandingStore";
 import { uiLabel } from "./branding/uiLabel";
+import { GridExportButtons, type GridExportColumn } from "./gridExport";
 
 export type Column<T> = {
   key: string;
   header: string;
   render?: (row: T) => JSX.Element;
+  /** Plain value for CSV/Excel/print export when render is complex. */
+  exportValue?: (row: T) => string | number;
   clickable?: boolean;
   sortable?: boolean;
   width?: number;
@@ -59,6 +62,9 @@ type Props<T extends { id: number }> = {
   toolbarExtra?: JSX.Element;
   itemsCsvImport?: boolean;
   onImportComplete?: () => void;
+  /** When set, shows Print/PDF, CSV, Excel for the current page rows. */
+  exportFilename?: string;
+  exportTitle?: string;
 };
 
 function selectionSet(ids?: Set<number> | number[]): Set<number> {
@@ -334,6 +340,29 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           </Show>
           <span class="hidden flex-1 pb-2 text-sm text-text-secondary lg:inline">{uiLabel("common.grid_hint")}</span>
           <div class="ml-auto flex shrink-0 items-center gap-2 pb-0.5">
+            <Show when={props.exportFilename}>
+              <GridExportButtons
+                title={props.exportTitle ?? props.exportFilename ?? "Export"}
+                filename={props.exportFilename!}
+                columns={props.columns
+                  .filter((c) => c.key !== "actions")
+                  .map(
+                    (c): GridExportColumn => ({
+                      key: c.key,
+                      header: c.header,
+                      value: (row) => {
+                        const typed = row as unknown as T;
+                        if (c.exportValue) return c.exportValue(typed);
+                        const raw = (typed as Record<string, unknown>)[c.key];
+                        if (raw == null) return "";
+                        if (typeof raw === "string" || typeof raw === "number") return raw;
+                        return String(raw);
+                      },
+                    }),
+                  )}
+                rows={() => displayRows() as unknown as Record<string, unknown>[]}
+              />
+            </Show>
             {props.toolbarExtra}
             <Show when={props.itemsCsvImport}>
               <button

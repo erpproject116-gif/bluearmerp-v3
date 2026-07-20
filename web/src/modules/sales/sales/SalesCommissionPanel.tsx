@@ -4,6 +4,8 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { formatPeso } from "../../../shared/money";
 
+export type SaleCommissionScope = "transaction" | "item";
+
 export type SaleCommissionRow = {
   line_no: number;
   tic_user_id?: number | null;
@@ -11,6 +13,16 @@ export type SaleCommissionRow = {
   calc_mode: "percent" | "fixed";
   rate_value: string;
   notes?: string;
+  scope: SaleCommissionScope;
+  sales_line_no?: number | null;
+  sales_line_id?: number | null;
+};
+
+export type CommissionSaleLineOption = {
+  line_no: number;
+  id?: number | null;
+  label: string;
+  line_total: number;
 };
 
 export function emptyCommissionRow(lineNo: number): SaleCommissionRow {
@@ -21,6 +33,9 @@ export function emptyCommissionRow(lineNo: number): SaleCommissionRow {
     calc_mode: "percent",
     rate_value: "",
     notes: "",
+    scope: "transaction",
+    sales_line_no: null,
+    sales_line_id: null,
   };
 }
 
@@ -34,15 +49,24 @@ type Props = {
   rows: Accessor<SaleCommissionRow[]>;
   onChange: Setter<SaleCommissionRow[]>;
   grandTotal: Accessor<number>;
+  saleLines: Accessor<CommissionSaleLineOption[]>;
   fetchUsers: (q: string) => Promise<LookupOption[]>;
   disabled?: boolean;
 };
 
 export function SalesCommissionPanel(props: Props) {
+  const baseFor = (row: SaleCommissionRow) => {
+    if (row.scope === "item" && row.sales_line_no) {
+      const ln = props.saleLines().find((l) => l.line_no === row.sales_line_no);
+      return ln?.line_total ?? 0;
+    }
+    return props.grandTotal();
+  };
+
   const totalCommission = createMemo(() =>
     props.rows().reduce((s, r) => {
       const rate = r.rate_value === "" ? 0 : Number(r.rate_value);
-      return s + computeCommissionPreview(r.calc_mode, rate, props.grandTotal());
+      return s + computeCommissionPreview(r.calc_mode, rate, baseFor(r));
     }, 0),
   );
 
@@ -50,8 +74,14 @@ export function SalesCommissionPanel(props: Props) {
     props.onChange(props.rows().map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   };
 
-  const addRow = () => {
-    props.onChange([...props.rows(), emptyCommissionRow(props.rows().length + 1)]);
+  const addRow = (scope: SaleCommissionScope = "transaction") => {
+    props.onChange([
+      ...props.rows(),
+      {
+        ...emptyCommissionRow(props.rows().length + 1),
+        scope,
+      },
+    ]);
   };
 
   const removeRow = (idx: number) => {
@@ -69,18 +99,29 @@ export function SalesCommissionPanel(props: Props) {
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Commissions (TIC)</h3>
           <p class="text-xs text-text-secondary">
-            Optional. Add one or more Tech in Charge people. Use % of gross sales or a fixed amount — amounts
-            recalculate from the invoice grand total ({formatPeso(props.grandTotal())}).
+            Flexible: pay TIC on the whole invoice (transaction) or on a single item line. Percent uses that
+            base; fixed is a flat amount. Invoice total: {formatPeso(props.grandTotal())}.
           </p>
         </div>
-        <button
-          type="button"
-          class="rounded border border-stroke bg-white px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
-          disabled={props.disabled}
-          onClick={addRow}
-        >
-          Add TIC
-        </button>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="rounded border border-stroke bg-white px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
+            disabled={props.disabled}
+            onClick={() => addRow("transaction")}
+          >
+            + Per transaction
+          </button>
+          <button
+            type="button"
+            class="rounded border border-stroke bg-white px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
+            disabled={props.disabled || props.saleLines().length === 0}
+            title={props.saleLines().length === 0 ? "Add sale lines first" : undefined}
+            onClick={() => addRow("item")}
+          >
+            + Per item
+          </button>
+        </div>
       </div>
 
       <Show when={props.rows().length === 0}>
@@ -95,11 +136,11 @@ export function SalesCommissionPanel(props: Props) {
                 computeCommissionPreview(
                   row.calc_mode,
                   row.rate_value === "" ? 0 : Number(row.rate_value),
-                  props.grandTotal(),
+                  baseFor(row),
                 );
               return (
                 <div class="grid gap-2 rounded-lg border border-stroke bg-white p-3 sm:grid-cols-12">
-                  <div class="sm:col-span-5">
+                  <div class="sm:col-span-3">
                     <LookupCombo
                       label="TIC"
                       value={() => row.tic_name}
@@ -112,6 +153,56 @@ export function SalesCommissionPanel(props: Props) {
                       placeholder="Search user or type name…"
                     />
                   </div>
+                  <div class="sm:col-span-2">
+                    <label class="block">
+                      <span class="mb-1 block text-sm font-medium text-text-primary">Applies to</span>
+                      <select
+                        class={inputClass}
+                        disabled={props.disabled}
+                        value={row.scope}
+                        onChange={(e) => {
+                          const scope = e.currentTarget.value as SaleCommissionScope;
+                          update(idx(), {
+                            scope,
+                            sales_line_no: scope === "transaction" ? null : row.sales_line_no,
+                            sales_line_id: scope === "transaction" ? null : row.sales_line_id,
+                          });
+                        }}
+                      >
+                        <option value="transaction">Whole sale</option>
+                        <option value="item">Item line</option>
+                      </select>
+                    </label>
+                  </div>
+                  <Show when={row.scope === "item"}>
+                    <div class="sm:col-span-3">
+                      <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-text-primary">Sale line</span>
+                        <select
+                          class={inputClass}
+                          disabled={props.disabled}
+                          value={row.sales_line_no ?? ""}
+                          onChange={(e) => {
+                            const no = Number(e.currentTarget.value) || null;
+                            const ln = props.saleLines().find((l) => l.line_no === no);
+                            update(idx(), {
+                              sales_line_no: no,
+                              sales_line_id: ln?.id ?? null,
+                            });
+                          }}
+                        >
+                          <option value="">Select line…</option>
+                          <For each={props.saleLines()}>
+                            {(ln) => (
+                              <option value={ln.line_no}>
+                                #{ln.line_no} {ln.label} ({formatPeso(ln.line_total)})
+                              </option>
+                            )}
+                          </For>
+                        </select>
+                      </label>
+                    </div>
+                  </Show>
                   <div class="sm:col-span-2">
                     <label class="block">
                       <span class="mb-1 block text-sm font-medium text-text-primary">Mode</span>
@@ -146,8 +237,13 @@ export function SalesCommissionPanel(props: Props) {
                     </label>
                   </div>
                   <div class="flex flex-col justify-end sm:col-span-2">
-                    <span class="mb-1 block text-sm font-medium text-text-primary">Commission</span>
-                    <p class="rounded border border-stroke bg-slate-50 px-2 py-2 text-right text-sm tabular-nums font-medium">
+                    <span class="mb-1 block text-sm font-medium text-text-primary">
+                      Commission
+                      <span class="ml-1 font-normal text-text-secondary">
+                        (base {formatPeso(baseFor(row))})
+                      </span>
+                    </span>
+                    <p class="rounded border border-stroke bg-slate-50 px-2 py-2 text-right text-sm font-medium tabular-nums">
                       {formatPeso(preview())}
                     </p>
                   </div>

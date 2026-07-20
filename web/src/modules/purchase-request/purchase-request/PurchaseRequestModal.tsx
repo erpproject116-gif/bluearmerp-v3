@@ -30,6 +30,8 @@ import {
   type PickedQuotationLine,
 } from "../../sales-order/sales-order/QuotationLinePickerModal";
 import { LoadSlipMenu, PURCHASE_REQUEST_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
+import { OpenPOLinePickerModal } from "../../finance/supplier-invoices/OpenPOLinePickerModal";
+import type { OpenPOLine } from "../../../shared/useSupplierInvoiceList";
 import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
@@ -170,6 +172,7 @@ export function PurchaseRequestModal(props: Props) {
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
+  const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [showNewLocation, setShowNewLocation] = createSignal(false);
   const [newLocationName, setNewLocationName] = createSignal("");
   const [showNewTaxType, setShowNewTaxType] = createSignal(false);
@@ -336,6 +339,30 @@ export function PurchaseRequestModal(props: Props) {
       setLines(await recalculatePurchaseRequestLines(newLines, first.tax_type_id, meta));
     } else {
       setLines(newLines);
+    }
+  };
+
+  const mapPoOntoPurchaseRequest = async (picked: OpenPOLine[]) => {
+    if (picked.length === 0) return;
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const mapped = picked.map((row, i) => ({
+      ...emptyPurchaseRequestLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      track_serial: Boolean(row.track_serial),
+    }));
+    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...mapped].map((ln, i) => ({
+      ...ln,
+      line_no: i + 1,
+    }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculatePurchaseRequestLines(merged, taxTypeId()!, meta));
+    } else {
+      setLines(merged);
     }
   };
 
@@ -741,6 +768,7 @@ export function PurchaseRequestModal(props: Props) {
           onSelect={(id) => {
             if (id === "so") setSoPickerOpen(true);
             if (id === "quotation") setQuotationPickerOpen(true);
+            if (id === "po") setPoPickerOpen(true);
           }}
         />
       </div>
@@ -767,6 +795,12 @@ export function PurchaseRequestModal(props: Props) {
       open={quotationPickerOpen()}
       onClose={() => setQuotationPickerOpen(false)}
       onConfirm={(picked) => void applyQuotationLines(picked)}
+    />
+    <OpenPOLinePickerModal
+      open={poPickerOpen()}
+      mapOnly
+      onClose={() => setPoPickerOpen(false)}
+      onConfirm={(picked) => void mapPoOntoPurchaseRequest(picked)}
     />
     <QuickLocationModal
       open={showNewLocation()}

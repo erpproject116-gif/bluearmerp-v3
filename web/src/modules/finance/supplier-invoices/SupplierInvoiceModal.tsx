@@ -33,6 +33,14 @@ import type { OpenGRLine, OpenPOLine, OpenSupplierQuotationInvoiceLine, Supplier
 import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
 import { OpenPOLinePickerModal } from "./OpenPOLinePickerModal";
 import { OpenSupplierQuotationLinePickerModal } from "./OpenSupplierQuotationLinePickerModal";
+import {
+  SalesOrderLinePickerModal as SalesSideOrderLinePickerModal,
+  type PickedSalesOrderLine,
+} from "../../sales/sales/SalesOrderLinePickerModal";
+import {
+  QuotationLinePickerModal,
+  type PickedQuotationLine,
+} from "../../sales-order/sales-order/QuotationLinePickerModal";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
@@ -140,6 +148,8 @@ export function SupplierInvoiceModal(props: Props) {
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [rfqPickerOpen, setRfqPickerOpen] = createSignal(false);
+  const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [showNewVendor, setShowNewVendor] = createSignal(false);
   const [newVendorName, setNewVendorName] = createSignal("");
@@ -389,6 +399,40 @@ export function SupplierInvoiceModal(props: Props) {
 
   const applySupplierQuotationLines = async (picked: OpenSupplierQuotationInvoiceLine[]) => {
     await applyPOLines(picked);
+  };
+
+  const mapSellingOntoPurchase = async (
+    rows: Array<{
+      item_id?: number | null;
+      item_code: string;
+      item_name: string;
+      balance_qty: number;
+      unit_vat_inc: number;
+      track_serial?: boolean;
+    }>,
+  ) => {
+    if (rows.length === 0) return;
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const start = lines().filter((ln) => ln.item_id || ln.item_code).length;
+    const mapped = rows.map((row, i) => ({
+      ...emptyPurchaseRequestLine(start + i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      track_serial: Boolean(row.track_serial),
+    }));
+    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...mapped].map((ln, i) => ({
+      ...ln,
+      line_no: i + 1,
+    }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculatePurchaseRequestLines(merged, taxTypeId()!, meta));
+    } else {
+      setLines(merged);
+    }
   };
 
   const save = async () => {
@@ -791,10 +835,12 @@ export function SupplierInvoiceModal(props: Props) {
                 if (id === "po") setPoPickerOpen(true);
                 if (id === "gr") setGrPickerOpen(true);
                 if (id === "rfq") setRfqPickerOpen(true);
+                if (id === "so") setSoPickerOpen(true);
+                if (id === "quotation") setQuotationPickerOpen(true);
               }}
             />
             <p class="text-xs text-text-secondary">
-              Tip: select a Vendor to narrow open PO/GR lines, or leave blank and filter inside the load-slip monitor.
+              Buying and Selling sources. PO/GR/RFQ apply residual qty; SO/Quotation map item lines without adopting the customer as vendor. Browse all partners in the monitor.
             </p>
           </div>
           <PurchaseRequestLineGrid
@@ -826,6 +872,7 @@ export function SupplierInvoiceModal(props: Props) {
       <OpenGRLinePickerModal
         open={grPickerOpen()}
         partnerId={partnerId()}
+        partnerLabel={vendorLabel()}
         onClose={() => setGrPickerOpen(false)}
         onConfirm={(picked) => void applyGRLines(picked)}
       />
@@ -833,6 +880,7 @@ export function SupplierInvoiceModal(props: Props) {
       <OpenPOLinePickerModal
         open={poPickerOpen()}
         partnerId={partnerId()}
+        partnerLabel={vendorLabel()}
         onClose={() => setPoPickerOpen(false)}
         onConfirm={(picked) => void applyPOLines(picked)}
       />
@@ -842,6 +890,39 @@ export function SupplierInvoiceModal(props: Props) {
         partnerId={partnerId()}
         onClose={() => setRfqPickerOpen(false)}
         onConfirm={(picked) => void applySupplierQuotationLines(picked)}
+      />
+
+      <SalesSideOrderLinePickerModal
+        open={soPickerOpen()}
+        onClose={() => setSoPickerOpen(false)}
+        onConfirm={(picked: PickedSalesOrderLine[]) =>
+          void mapSellingOntoPurchase(
+            picked.map((r) => ({
+              item_id: r.item_id,
+              item_code: r.item_code,
+              item_name: r.item_name,
+              balance_qty: r.balance_qty,
+              unit_vat_inc: r.unit_vat_inc,
+              track_serial: r.track_serial,
+            })),
+          )
+        }
+      />
+
+      <QuotationLinePickerModal
+        open={quotationPickerOpen()}
+        onClose={() => setQuotationPickerOpen(false)}
+        onConfirm={(picked: PickedQuotationLine[]) =>
+          void mapSellingOntoPurchase(
+            picked.map((r) => ({
+              item_id: r.item_id,
+              item_code: r.item_code,
+              item_name: r.item_name,
+              balance_qty: r.balance_qty > 0 ? r.balance_qty : r.qty,
+              unit_vat_inc: r.unit_vat_inc,
+            })),
+          )
+        }
       />
 
       <HistoryLogModal

@@ -47,6 +47,10 @@ import {
   SalesOrderLinePickerModal,
   type PickedSalesOrderLine,
 } from "./SalesOrderLinePickerModal";
+import { PurchaseRequestLinePickerModal, type PickedPurchaseRequestLine } from "../../purchase-request/purchase-order/PurchaseRequestLinePickerModal";
+import { OpenPOLinePickerModal } from "../../finance/supplier-invoices/OpenPOLinePickerModal";
+import { OpenGRLinePickerModal } from "../../finance/supplier-invoices/OpenGRLinePickerModal";
+import type { OpenGRLine, OpenPOLine } from "../../../shared/useSupplierInvoiceList";
 import {
   SalesLineGrid,
   emptySalesLine,
@@ -125,6 +129,9 @@ export type SalesDetail = {
     base_amount?: number;
     commission_amount?: number;
     notes?: string | null;
+    scope?: "transaction" | "item";
+    sales_line_id?: number | null;
+    sales_line_no?: number | null;
   }>;
 };
 
@@ -216,6 +223,9 @@ export function SalesModal(props: Props) {
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
   const [shippingPickerOpen, setShippingPickerOpen] = createSignal(false);
+  const [prPickerOpen, setPrPickerOpen] = createSignal(false);
+  const [poPickerOpen, setPoPickerOpen] = createSignal(false);
+  const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [createdSale, setCreatedSale] = createSignal<SalesDetail | null>(null);
   const [postSaveOpen, setPostSaveOpen] = createSignal(false);
   const [cashInOpen, setCashInOpen] = createSignal(false);
@@ -376,6 +386,9 @@ export function SalesModal(props: Props) {
         calc_mode: c.calc_mode === "fixed" ? "fixed" : "percent",
         rate_value: c.rate_value != null ? String(c.rate_value) : "",
         notes: c.notes ?? "",
+        scope: c.scope === "item" ? "item" : "transaction",
+        sales_line_no: c.sales_line_no ?? null,
+        sales_line_id: c.sales_line_id ?? null,
       })),
     );
   };
@@ -668,6 +681,70 @@ export function SalesModal(props: Props) {
     }
   };
 
+  /** Cross-side map: copy item/qty only — never adopt vendor as customer or consume buying residual FKs. */
+  const mapBuyingLinesOntoSale = async (
+    rows: Array<{
+      item_id?: number | null;
+      item_code: string;
+      item_name: string;
+      balance_qty: number;
+      unit_vat_inc: number;
+      track_serial?: boolean;
+    }>,
+  ) => {
+    if (rows.length === 0) return;
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const start = lines().filter((ln) => ln.item_id || ln.item_code).length;
+    const mapped: SalesLineRow[] = rows.map((row, i) => ({
+      ...emptySalesLine(start + i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      track_serial: Boolean(row.track_serial),
+    }));
+    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...mapped].map((ln, i) => ({
+      ...ln,
+      line_no: i + 1,
+    }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculateSalesLines(merged, taxTypeId()!, meta, templateCode()));
+    } else {
+      setLines(merged);
+    }
+  };
+
+  const applyMappedPrLines = async (picked: PickedPurchaseRequestLine[]) => {
+    await mapBuyingLinesOntoSale(
+      picked.map((r) => ({
+        item_id: r.item_id,
+        item_code: r.item_code,
+        item_name: r.item_name,
+        balance_qty: r.balance_qty,
+        unit_vat_inc: r.unit_vat_inc,
+        track_serial: r.track_serial,
+      })),
+    );
+  };
+
+  const applyMappedPoLines = async (picked: OpenPOLine[]) => {
+    await mapBuyingLinesOntoSale(picked);
+  };
+
+  const applyMappedGrLines = async (picked: OpenGRLine[]) => {
+    await mapBuyingLinesOntoSale(
+      picked.map((r) => ({
+        item_id: r.item_id,
+        item_code: r.item_code,
+        item_name: r.item_name,
+        balance_qty: r.balance_qty,
+        unit_vat_inc: r.unit_vat_inc,
+      })),
+    );
+  };
+
   const save = async () => {
     if (props.readOnly) return;
     if (!taxTypeId()) {
@@ -766,6 +843,9 @@ export function SalesModal(props: Props) {
           calc_mode: c.calc_mode,
           rate_value: c.rate_value === "" ? 0 : Number(c.rate_value),
           notes: c.notes || null,
+          scope: c.scope === "item" ? "item" : "transaction",
+          sales_line_id: c.scope === "item" ? c.sales_line_id || null : null,
+          sales_line_no: c.scope === "item" ? c.sales_line_no || null : null,
         })),
     };
 
@@ -1094,10 +1174,13 @@ export function SalesModal(props: Props) {
               if (id === "so") setSoPickerOpen(true);
               if (id === "quotation") setQuotationPickerOpen(true);
               if (id === "shipping") setShippingPickerOpen(true);
+              if (id === "pr") setPrPickerOpen(true);
+              if (id === "po") setPoPickerOpen(true);
+              if (id === "gr") setGrPickerOpen(true);
             }}
           />
           <p class="text-xs text-text-secondary">
-            Load Slip opens the open-transaction monitor (search, date range, multi-select). Tip: pick a Customer first to pre-filter, or browse all partners inside the monitor.
+            Load Slip spans Selling and Buying. Same-side sources apply residual qty; cross-side sources map item/qty without mixing ledgers. Browse all partners inside the monitor.
           </p>
           <Show when={!props.editing}>
             <button
@@ -1126,6 +1209,16 @@ export function SalesModal(props: Props) {
           rows={commissions}
           onChange={setCommissions}
           grandTotal={() => lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0)}
+          saleLines={() =>
+            lines()
+              .filter((ln) => ln.item_id || ln.item_code)
+              .map((ln) => ({
+                line_no: ln.line_no,
+                id: detailLines().find((d) => d.line_no === ln.line_no)?.id ?? null,
+                label: `${ln.item_code} — ${ln.item_name}`.trim(),
+                line_total: Number(ln.line_total) || 0,
+              }))
+          }
           fetchUsers={fetchUsers}
           disabled={progressStatus() === "e_approval"}
         />
@@ -1213,6 +1306,26 @@ export function SalesModal(props: Props) {
         partnerId={partnerId()}
         onClose={() => setShippingPickerOpen(false)}
         onConfirm={(picked) => void applyShippingLines(picked)}
+      />
+
+      <PurchaseRequestLinePickerModal
+        open={prPickerOpen()}
+        onClose={() => setPrPickerOpen(false)}
+        onConfirm={(picked) => void applyMappedPrLines(picked)}
+      />
+
+      <OpenPOLinePickerModal
+        open={poPickerOpen()}
+        mapOnly
+        onClose={() => setPoPickerOpen(false)}
+        onConfirm={(picked) => void applyMappedPoLines(picked)}
+      />
+
+      <OpenGRLinePickerModal
+        open={grPickerOpen()}
+        mapOnly
+        onClose={() => setGrPickerOpen(false)}
+        onConfirm={(picked) => void applyMappedGrLines(picked)}
       />
 
       <QuickCustomerModal

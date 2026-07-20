@@ -939,6 +939,8 @@ export default function ChartOfAccountsPage() {
         selectedId={selectedId()}
         onSelect={setSelectedId}
         selectable
+        exportFilename="chart-of-accounts"
+        exportTitle="Chart of Accounts"
         selectedIds={selectedIds()}
         onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={() => openCreate()}

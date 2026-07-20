@@ -18,16 +18,23 @@ type SaleCommissionLine struct {
 	BaseAmount       float64 `json:"base_amount"`
 	CommissionAmount float64 `json:"commission_amount"`
 	Notes            *string `json:"notes,omitempty"`
+	Scope            string  `json:"scope"` // transaction | item
+	SalesLineID      *int64  `json:"sales_line_id,omitempty"`
+	SalesLineNo      *int    `json:"sales_line_no,omitempty"`
+	ItemLabel        string  `json:"item_label,omitempty"`
 }
 
 // CommissionLineInput is the public payload for writing commission lines (Sales + POS).
 type CommissionLineInput struct {
-	LineNo    int     `json:"line_no"`
-	TicUserID *int64  `json:"tic_user_id"`
-	TicName   string  `json:"tic_name"`
-	CalcMode  string  `json:"calc_mode"`
-	RateValue float64 `json:"rate_value"`
-	Notes     *string `json:"notes"`
+	LineNo      int     `json:"line_no"`
+	TicUserID   *int64  `json:"tic_user_id"`
+	TicName     string  `json:"tic_name"`
+	CalcMode    string  `json:"calc_mode"`
+	RateValue   float64 `json:"rate_value"`
+	Notes       *string `json:"notes"`
+	Scope       string  `json:"scope"` // transaction | item (default transaction)
+	SalesLineID *int64  `json:"sales_line_id"`
+	SalesLineNo *int    `json:"sales_line_no"`
 }
 
 type saleCommissionLineBody = CommissionLineInput
@@ -38,6 +45,13 @@ func normalizeCalcMode(mode string) string {
 		return "fixed"
 	}
 	return "percent"
+}
+
+func normalizeCommissionScope(scope string) string {
+	if strings.ToLower(strings.TrimSpace(scope)) == "item" {
+		return "item"
+	}
+	return "transaction"
 }
 
 func computeCommissionAmount(mode string, rateValue, baseAmount float64) float64 {
@@ -75,8 +89,46 @@ func validateCommissionBodies(lines []saleCommissionLineBody) map[string]string 
 		if name == "" && (ln.TicUserID == nil || *ln.TicUserID <= 0) {
 			return map[string]string{fmt.Sprintf("commissions[%d].tic_name", i): "TIC name or user is required when adding a commission line."}
 		}
+		scope := normalizeCommissionScope(ln.Scope)
+		if scope == "item" {
+			hasLine := (ln.SalesLineID != nil && *ln.SalesLineID > 0) || (ln.SalesLineNo != nil && *ln.SalesLineNo > 0)
+			if !hasLine {
+				return map[string]string{fmt.Sprintf("commissions[%d].sales_line_no", i): "Pick a sale line for per-item commission."}
+			}
+		}
 	}
 	return nil
+}
+
+func resolveCommissionBase(ctx context.Context, tx pgx.Tx, salesID int64, grandTotal float64, b saleCommissionLineBody) (base float64, scope string, salesLineID *int64, salesLineNo *int, err error) {
+	scope = normalizeCommissionScope(b.Scope)
+	base = grandTotal
+	if scope != "item" {
+		return base, scope, nil, nil, nil
+	}
+	var lineID int64
+	var lineNo int
+	var lineTotal float64
+	if b.SalesLineID != nil && *b.SalesLineID > 0 {
+		err = tx.QueryRow(ctx, `
+			select id, line_no, line_total::float8
+			from public.sa_sales_lines
+			where sales_id = $1 and id = $2`, salesID, *b.SalesLineID).Scan(&lineID, &lineNo, &lineTotal)
+	} else if b.SalesLineNo != nil && *b.SalesLineNo > 0 {
+		err = tx.QueryRow(ctx, `
+			select id, line_no, line_total::float8
+			from public.sa_sales_lines
+			where sales_id = $1 and line_no = $2`, salesID, *b.SalesLineNo).Scan(&lineID, &lineNo, &lineTotal)
+	} else {
+		return 0, scope, nil, nil, fmt.Errorf("sales line required for item commission")
+	}
+	if err != nil {
+		return 0, scope, nil, nil, fmt.Errorf("sale line not found for item commission")
+	}
+	base = lineTotal
+	salesLineID = &lineID
+	salesLineNo = &lineNo
+	return base, scope, salesLineID, salesLineNo, nil
 }
 
 func replaceSaleCommissions(ctx context.Context, tx pgx.Tx, tenantID, salesID int64, grandTotal float64, bodies []saleCommissionLineBody) error {
@@ -97,18 +149,36 @@ func replaceSaleCommissions(ctx context.Context, tx pgx.Tx, tenantID, salesID in
 		if name == "" {
 			continue // skip empty optional rows
 		}
+		base, scope, salesLineID, salesLineNo, err := resolveCommissionBase(ctx, tx, salesID, grandTotal, b)
+		if err != nil {
+			return err
+		}
 		mode := normalizeCalcMode(b.CalcMode)
-		amt := computeCommissionAmount(mode, b.RateValue, grandTotal)
+		amt := computeCommissionAmount(mode, b.RateValue, base)
 		lineNo := b.LineNo
 		if lineNo <= 0 {
 			lineNo = i + 1
 		}
 		if _, err := tx.Exec(ctx, `
 			insert into public.sa_sales_commission_lines (
-			  tenant_id, sales_id, line_no, tic_user_id, tic_name, calc_mode, rate_value, base_amount, commission_amount, notes
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-			tenantID, salesID, lineNo, b.TicUserID, name, mode, b.RateValue, grandTotal, amt, b.Notes,
+			  tenant_id, sales_id, line_no, tic_user_id, tic_name, calc_mode, rate_value,
+			  base_amount, commission_amount, notes, scope, sales_line_id, sales_line_no
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+			tenantID, salesID, lineNo, b.TicUserID, name, mode, b.RateValue,
+			base, amt, b.Notes, scope, salesLineID, salesLineNo,
 		); err != nil {
+			// Pre-migration: fall back without scope columns.
+			if strings.Contains(err.Error(), "scope") || strings.Contains(err.Error(), "sales_line") || strings.Contains(err.Error(), "42703") {
+				if _, err2 := tx.Exec(ctx, `
+					insert into public.sa_sales_commission_lines (
+					  tenant_id, sales_id, line_no, tic_user_id, tic_name, calc_mode, rate_value, base_amount, commission_amount, notes
+					) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+					tenantID, salesID, lineNo, b.TicUserID, name, mode, b.RateValue, base, amt, b.Notes,
+				); err2 != nil {
+					return err2
+				}
+				continue
+			}
 			return err
 		}
 	}
@@ -119,13 +189,48 @@ func loadSaleCommissions(ctx context.Context, q interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }, tenantID, salesID int64) ([]SaleCommissionLine, error) {
 	rows, err := q.Query(ctx, `
+		select c.id, c.line_no, c.tic_user_id, c.tic_name, c.calc_mode, c.rate_value::float8,
+		  c.base_amount::float8, c.commission_amount::float8, c.notes,
+		  coalesce(c.scope, 'transaction'), c.sales_line_id, c.sales_line_no,
+		  coalesce(nullif(trim(sl.item_code || ' — ' || sl.item_name), ' — '), '')
+		from public.sa_sales_commission_lines c
+		left join public.sa_sales_lines sl on sl.id = c.sales_line_id
+		where c.tenant_id = $1 and c.sales_id = $2
+		order by c.line_no, c.id`, tenantID, salesID)
+	if err != nil {
+		// Table may not exist yet / columns missing — try legacy select.
+		if strings.Contains(err.Error(), "sa_sales_commission_lines") || strings.Contains(err.Error(), "scope") || strings.Contains(err.Error(), "42703") {
+			return loadSaleCommissionsLegacy(ctx, q, tenantID, salesID)
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SaleCommissionLine
+	for rows.Next() {
+		var ln SaleCommissionLine
+		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.TicUserID, &ln.TicName, &ln.CalcMode, &ln.RateValue,
+			&ln.BaseAmount, &ln.CommissionAmount, &ln.Notes,
+			&ln.Scope, &ln.SalesLineID, &ln.SalesLineNo, &ln.ItemLabel); err != nil {
+			return nil, err
+		}
+		out = append(out, ln)
+	}
+	if out == nil {
+		out = []SaleCommissionLine{}
+	}
+	return out, nil
+}
+
+func loadSaleCommissionsLegacy(ctx context.Context, q interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}, tenantID, salesID int64) ([]SaleCommissionLine, error) {
+	rows, err := q.Query(ctx, `
 		select id, line_no, tic_user_id, tic_name, calc_mode, rate_value::float8,
 		  base_amount::float8, commission_amount::float8, notes
 		from public.sa_sales_commission_lines
 		where tenant_id = $1 and sales_id = $2
 		order by line_no, id`, tenantID, salesID)
 	if err != nil {
-		// Table may not exist yet before migration — treat as empty.
 		if strings.Contains(err.Error(), "sa_sales_commission_lines") {
 			return []SaleCommissionLine{}, nil
 		}
@@ -139,6 +244,7 @@ func loadSaleCommissions(ctx context.Context, q interface {
 			&ln.BaseAmount, &ln.CommissionAmount, &ln.Notes); err != nil {
 			return nil, err
 		}
+		ln.Scope = "transaction"
 		out = append(out, ln)
 	}
 	if out == nil {
