@@ -22,6 +22,7 @@ import { QuotationModal, type QuotationDetail } from "./QuotationModal";
 import { formatMoney, fetchQuotationPrint, openQuotationPrint } from "./quotationPrint";
 import { progressStatusLabel, voucherStatusLabel } from "./progressStatus";
 import { SendEmailModal } from "../../comms/SendEmailModal";
+import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName, itemNameFromSummary } from "../../comms/documentEmailSubject";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 
@@ -60,6 +61,8 @@ export function QuotationListPageInner(props: PageOptions = {}) {
   const [emailOpen, setEmailOpen] = createSignal(false);
   const [emailQuotationId, setEmailQuotationId] = createSignal<number | null>(null);
   const [emailDefaultTo, setEmailDefaultTo] = createSignal("");
+  const [emailDefaultSubject, setEmailDefaultSubject] = createSignal("");
+  const [emailDefaultBody, setEmailDefaultBody] = createSignal("");
 
   const lifecycle = useDocumentLifecycle({
     apiBase: "/api/v1/quotation/quotations",
@@ -121,7 +124,31 @@ export function QuotationListPageInner(props: PageOptions = {}) {
 
   const openEmail = async (row: QuotationRow) => {
     const res = await fetchQuotationPrint(row.id);
+    const q = res.data?.quotation;
     setEmailDefaultTo(res.data?.partner.email ?? "");
+    setEmailDefaultSubject(
+      buildDocumentEmailSubject(
+        itemNameFromSummary(row.item_name_summary) || firstLineItemName(q?.lines),
+        "Quotation",
+        auth.me?.tenant.company_name ?? res.data?.tenant.company_name,
+      ),
+    );
+    setEmailDefaultBody(
+      buildDocumentEmailBody({
+        docTypeLabel: "Quotation",
+        partyLabel: "Customer",
+        partyName: res.data?.partner.company_name ?? row.customer_name,
+        referenceNo: q?.reference_no ?? row.reference_no,
+        dateLabel: "Date",
+        date: q?.order_date ?? row.order_date,
+        currencyCode: q?.currency_code ?? row.currency_code,
+        grandTotal: q?.grand_total ?? row.grand_total,
+        paymentTerms: q?.payment_terms,
+        notes: q?.notes,
+        lines: q?.lines,
+        companyName: auth.me?.tenant.company_name ?? res.data?.tenant.company_name,
+      }),
+    );
     setEmailQuotationId(row.id);
     setEmailOpen(true);
   };
@@ -320,6 +347,8 @@ export function QuotationListPageInner(props: PageOptions = {}) {
         title="Email quotation"
         sendUrl={`/api/v1/quotation/quotations/${emailQuotationId() ?? 0}/send-email`}
         defaultTo={emailDefaultTo()}
+        defaultSubject={emailDefaultSubject()}
+        defaultBody={emailDefaultBody()}
         onSent={invalidate}
       />
     </QuotationLayout>

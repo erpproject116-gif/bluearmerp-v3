@@ -23,6 +23,7 @@ import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { SendEmailModal } from "../../comms/SendEmailModal";
+import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { fetchQuotationPrint } from "./quotationPrint";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
@@ -860,6 +861,25 @@ export function QuotationModal(props: Props) {
       title="Email quotation"
       sendUrl={`/api/v1/quotation/quotations/${effectiveEditing()?.id ?? 0}/send-email`}
       defaultTo={emailDefaultTo()}
+      defaultSubject={buildDocumentEmailSubject(
+        firstLineItemName(lines()),
+        "Quotation",
+        auth.me?.tenant.company_name,
+      )}
+      defaultBody={buildDocumentEmailBody({
+        docTypeLabel: "Quotation",
+        partyLabel: "Customer",
+        partyName: customerLabel(),
+        referenceNo: referenceNo(),
+        dateLabel: "Date",
+        date: orderDate(),
+        currencyCode: currencies().find((c) => c.id === currencyId())?.currency_code,
+        grandTotal: lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0),
+        paymentTerms: paymentTerms(),
+        notes: notes(),
+        lines: lines(),
+        companyName: auth.me?.tenant.company_name,
+      })}
     />
 
     <Show when={rfqImportOpen()}>

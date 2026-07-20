@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -223,6 +224,14 @@ func postQuotationSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		bodyHTML, bodyIsHTML := comms.ResolveComposeBody(r.Context(), pool, tu.TenantID, tu.AppUserID, body)
 
+		itemName := ""
+		for _, ln := range payload.Quotation.Lines {
+			if n := strings.TrimSpace(ln.ItemName); n != "" {
+				itemName = n
+				break
+			}
+		}
+
 		userID := tu.AppUserID
 		sent, err := comms.SendDocumentEmail(r.Context(), pool, comms.SendDocumentEmailParams{
 			TenantID:         tu.TenantID,
@@ -244,6 +253,8 @@ func postQuotationSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 				"company_name":  payload.Tenant.CompanyName,
 				"grand_total":   fmt.Sprintf("%.2f", payload.Quotation.GrandTotal),
 				"doc_type":      "Quotation",
+				"item_name":     itemName,
+				"doc_date":      payload.Quotation.OrderDate,
 			},
 		})
 		if err != nil {

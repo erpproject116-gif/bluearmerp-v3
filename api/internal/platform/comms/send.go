@@ -51,6 +51,15 @@ func SendDocumentEmail(ctx context.Context, pool *pgxpool.Pool, p SendDocumentEm
 	subject := strings.TrimSpace(p.Subject)
 	body := strings.TrimSpace(p.BodyText)
 	bodyIsHTML := p.BodyIsHTML
+	if subject == "" {
+		subject = DefaultDocumentSubject(p.TemplateVars)
+	}
+	if body == "" {
+		body = DefaultDocumentBody(p.TemplateVars)
+		if body != "" {
+			bodyIsHTML = false
+		}
+	}
 	if subject == "" || body == "" {
 		tplSubject, tplBody, err := loadEmailTemplate(ctx, pool, p.TenantID, p.DocType)
 		if err != nil {
@@ -160,6 +169,72 @@ func SendDocumentEmail(ctx context.Context, pool *pgxpool.Pool, p SendDocumentEm
 		return sm, fmt.Errorf("email queued but not delivered yet (check SMTP/Gmail configuration)")
 	}
 	return sm, nil
+}
+
+// DefaultDocumentSubject builds "{item_name} {doc_type} - {company_name}".
+func DefaultDocumentSubject(vars TemplateVars) string {
+	item := strings.TrimSpace(vars["item_name"])
+	doc := strings.TrimSpace(vars["doc_type"])
+	company := strings.TrimSpace(vars["company_name"])
+	head := strings.TrimSpace(strings.Join([]string{item, doc}, " "))
+	if company != "" {
+		if head != "" {
+			return head + " - " + company
+		}
+		return company
+	}
+	return head
+}
+
+// DefaultDocumentBody builds a plain-text summary from template vars when no body is provided.
+func DefaultDocumentBody(vars TemplateVars) string {
+	party := strings.TrimSpace(vars["customer_name"])
+	if party == "" {
+		party = strings.TrimSpace(vars["supplier_name"])
+	}
+	doc := strings.TrimSpace(vars["doc_type"])
+	if doc == "" {
+		doc = "document"
+	}
+	ref := strings.TrimSpace(vars["reference_no"])
+	company := strings.TrimSpace(vars["company_name"])
+	total := strings.TrimSpace(vars["grand_total"])
+	item := strings.TrimSpace(vars["item_name"])
+	date := strings.TrimSpace(vars["doc_date"])
+
+	var b strings.Builder
+	if party != "" {
+		fmt.Fprintf(&b, "Dear %s,\n\n", party)
+	} else {
+		b.WriteString("Hello,\n\n")
+	}
+	if ref != "" {
+		fmt.Fprintf(&b, "Please find attached our %s %s. A summary is below.\n\n", doc, ref)
+	} else {
+		fmt.Fprintf(&b, "Please find attached our %s. A summary is below.\n\n", doc)
+	}
+	if ref != "" {
+		fmt.Fprintf(&b, "%s no.: %s\n", doc, ref)
+	}
+	if date != "" {
+		fmt.Fprintf(&b, "Date: %s\n", date)
+	}
+	if party != "" {
+		fmt.Fprintf(&b, "Party: %s\n", party)
+	}
+	if item != "" {
+		fmt.Fprintf(&b, "Item: %s\n", item)
+	}
+	if total != "" {
+		fmt.Fprintf(&b, "Grand total: %s\n", total)
+	}
+	b.WriteString("\nThe PDF document is attached to this email.\n")
+	if company != "" {
+		fmt.Fprintf(&b, "\nThank you,\n%s\n", company)
+	} else {
+		b.WriteString("\nThank you.\n")
+	}
+	return strings.TrimSpace(b.String())
 }
 
 func loadEmailTemplate(ctx context.Context, pool *pgxpool.Pool, tenantID int64, docType string) (subject, body string, err error) {

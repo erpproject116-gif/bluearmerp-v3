@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -138,6 +139,13 @@ func postSalesSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		sale := payload.Sales
+		itemName := ""
+		for _, ln := range sale.Lines {
+			if n := strings.TrimSpace(ln.ItemName); n != "" {
+				itemName = n
+				break
+			}
+		}
 		comms.HandleDocumentSendEmail(w, r, pool, body, comms.DocumentSendParams{
 			DocType:        "sales",
 			DocID:          id,
@@ -148,7 +156,9 @@ func postSalesSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 				"customer_name": payload.Partner.CompanyName,
 				"company_name":  payload.Tenant.CompanyName,
 				"grand_total":   fmt.Sprintf("%.2f", sale.GrandTotal),
-				"doc_type":      "Sales Invoice",
+				"doc_type":      "Sales",
+				"item_name":     itemName,
+				"doc_date":      sale.OrderDate,
 			},
 		})
 	}

@@ -7,6 +7,8 @@ export type DocumentEmailToolbarProps = {
   sendUrl: string;
   title?: string;
   defaultTo?: string;
+  defaultSubject?: string;
+  defaultBody?: string;
 };
 
 export function DocumentEmailToolbar(props: DocumentEmailToolbarProps) {
@@ -31,6 +33,8 @@ export function DocumentEmailToolbar(props: DocumentEmailToolbarProps) {
           title={props.title ?? "Send by email"}
           sendUrl={props.sendUrl.replace("{id}", String(docId()))}
           defaultTo={props.defaultTo}
+          defaultSubject={props.defaultSubject}
+          defaultBody={props.defaultBody}
         />
       </>
     </Show>
