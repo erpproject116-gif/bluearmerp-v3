@@ -45,7 +45,7 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
 
   // P2
   { query: "issue components complete work order", path: "/app/manufacturing", expectArticleId: "manufacturing-wo-issue-complete" },
-  { query: "link expenses to job costing project", path: "/app/job-costing", expectArticleId: "job-costing-link-expenses" },
+  { query: "link expenses to job costing project", path: "/app/operations/job-costing", expectArticleId: "job-costing-link-expenses" },
   { query: "ncr to capa loop quality", path: "/app/quality", expectArticleId: "quality-ncr-capa-loop" },
   { query: "where is pre-invoicing status report", path: "/app/selling", expectArticleId: "where-status-reports-live" },
   { query: "collective group invoicing edge cases", path: "/app/sales", expectArticleId: "collective-invoice-edge-cases" },

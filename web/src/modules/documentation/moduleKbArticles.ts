@@ -1496,7 +1496,7 @@ export const moduleKbArticles: KbArticle[] = [
         ],
       },
     ],
-    primaryHref: "/app/job-costing",
+    primaryHref: "/app/operations/job-costing",
     primaryLabel: "Job costing",
   },
   {

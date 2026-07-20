@@ -786,8 +786,6 @@ export function SupplierInvoiceModal(props: Props) {
           </div>
           <div class="col-span-full mb-2 mt-2 flex flex-wrap items-center gap-2">
             <LoadSlipMenu
-              disabled={!partnerId()}
-              partnerLabel="vendor"
               options={filterLoadSlipOptions(PURCHASE_LOAD_SLIP_OPTIONS, auth.me)}
               onSelect={(id) => {
                 if (id === "po") setPoPickerOpen(true);
@@ -795,6 +793,9 @@ export function SupplierInvoiceModal(props: Props) {
                 if (id === "rfq") setRfqPickerOpen(true);
               }}
             />
+            <p class="text-xs text-text-secondary">
+              Tip: select a Vendor to narrow open PO/GR lines, or leave blank and filter inside the load-slip monitor.
+            </p>
           </div>
           <PurchaseRequestLineGrid
             lines={lines}

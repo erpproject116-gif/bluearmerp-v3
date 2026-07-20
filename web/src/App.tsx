@@ -694,6 +694,11 @@ export default function App() {
           <Route path="/operations/automation" component={() => (
             <OperationsRoute><OperationsAutomationPage /></OperationsRoute>
           )} />
+          <Route path="/operations/job-costing" component={() => (
+            <OperationsRoute>
+              <JobCostingRoute><JobCostingPage /></JobCostingRoute>
+            </OperationsRoute>
+          )} />
           <Route path="/operations" component={() => (
             <OperationsRoute><OperationsHubPage /></OperationsRoute>
           )} />
@@ -740,9 +745,7 @@ export default function App() {
           <Route path="/fixed-assets" component={() => (
             <FixedAssetsRoute><FixedAssetsPage /></FixedAssetsRoute>
           )} />
-          <Route path="/job-costing" component={() => (
-            <JobCostingRoute><JobCostingPage /></JobCostingRoute>
-          )} />
+          <Route path="/job-costing" component={() => <Navigate href="/app/operations/job-costing" />} />
           <Route path="/sales/commission-rules" component={CommissionRulesPage} />
           <Route path="/quality/qc-requests" component={() => (
             <QualityRoute><QcRequestsPage /></QualityRoute>

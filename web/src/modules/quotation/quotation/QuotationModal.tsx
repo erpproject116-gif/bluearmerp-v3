@@ -30,6 +30,7 @@ import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeCon
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
+import { LoadSlipMenu, QUOTATION_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import {
   QuotationLineGrid,
@@ -39,6 +40,10 @@ import {
 } from "./QuotationLineGrid";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
+import {
+  QuotationLinePickerModal,
+  type PickedQuotationLine,
+} from "../../sales-order/sales-order/QuotationLinePickerModal";
 
 const RfqImportModal = lazy(() =>
   import("./RfqImportModal").then((m) => ({ default: m.RfqImportModal })),
@@ -205,6 +210,7 @@ export function QuotationModal(props: Props) {
   const [progressStatus, setProgressStatus] = createSignal("unconfirmed");
   const [lines, setLines] = createSignal<QuotationLineRow[]>([emptyQuotationLine(1)]);
   const [rfqImportOpen, setRfqImportOpen] = createSignal(false);
+  const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
 
@@ -280,6 +286,36 @@ export function QuotationModal(props: Props) {
     if (!newId || !meta) return;
     const recalc = await recalculateQuotationLines(lines(), newId, meta);
     setLines(recalc);
+  };
+
+  const applyPriorQuotationLines = async (picked: PickedQuotationLine[]) => {
+    if (picked.length === 0) return;
+    const first = picked[0];
+    setPartnerId(first.partner_id);
+    setCustomerLabel(first.customer_name);
+    setLocationId(first.location_id);
+    setLocationLabel(first.location_name);
+    setTaxTypeId(first.tax_type_id);
+    setCurrencyId(first.currency_id);
+    if (first.pic_name) setPicName(first.pic_name);
+    const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const newLines: QuotationLineRow[] = picked.map((row, i) => ({
+      ...emptyQuotationLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      description: row.description ?? "",
+      qty: String(row.balance_qty > 0 ? row.balance_qty : row.qty),
+      unit_price: String(row.unit_vat_inc),
+      remark: row.remark ?? "",
+    }));
+    if (meta && first.tax_type_id) {
+      setLines(await recalculateQuotationLines(newLines, first.tax_type_id, meta));
+    } else {
+      setLines(newLines);
+    }
   };
 
   const loadPreview = async (date: string) => {
@@ -721,14 +757,14 @@ export function QuotationModal(props: Props) {
         onChange={setCustom}
       />
       </div>
-      <div class="col-span-full mb-2 flex justify-end">
-        <button
-          type="button"
-          class="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100"
-          onClick={() => setRfqImportOpen(true)}
-        >
-          Import from RFQ (PDF / images)
-        </button>
+      <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">
+        <LoadSlipMenu
+          options={filterLoadSlipOptions(QUOTATION_LOAD_SLIP_OPTIONS, auth.me)}
+          onSelect={(id) => {
+            if (id === "quotation") setQuotationPickerOpen(true);
+            if (id === "rfq") setRfqImportOpen(true);
+          }}
+        />
       </div>
       <QuotationLineGrid
         lines={lines}
@@ -818,6 +854,11 @@ export function QuotationModal(props: Props) {
         />
       </Suspense>
     </Show>
+    <QuotationLinePickerModal
+      open={quotationPickerOpen()}
+      onClose={() => setQuotationPickerOpen(false)}
+      onConfirm={(picked) => void applyPriorQuotationLines(picked)}
+    />
     </>
   );
 }

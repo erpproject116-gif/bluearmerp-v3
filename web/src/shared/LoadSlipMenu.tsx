@@ -42,7 +42,6 @@ export function LoadSlipMenu(props: Props) {
 
   const empty = () => props.options.length === 0;
   const needsPartner = () => Boolean(props.disabled && props.partnerLabel);
-  /** Native disabled only when there is nothing useful to click for (empty modules, no partner hint). */
   const hardDisabled = () => empty() && !props.partnerLabel;
   const locked = () => Boolean(props.disabled) || empty();
   const showGuide = () => needsPartner() || (nudge() && locked());
@@ -50,7 +49,7 @@ export function LoadSlipMenu(props: Props) {
   const guideText = () => {
     if (props.disabled && props.partnerLabel) return partnerHintText(props.partnerLabel);
     if (empty()) {
-      return "No Load Slip sources available. Enable Quotation, Sales Order, and/or Purchase Order under User Management → Module & Features.";
+      return "No Load Slip sources configured for this screen.";
     }
     if (props.disabled) return "Load Slip is not available on this document right now.";
     return "";
@@ -132,29 +131,49 @@ export function LoadSlipMenu(props: Props) {
   );
 }
 
-export const PURCHASE_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "po", label: "Purchase Order", group: "Purchases", hint: "Open PO lines with residual qty" },
-  { id: "gr", label: "Goods Receipt (Receiving)", group: "Purchases", hint: "Posted GR lines not yet invoiced" },
-  { id: "pr", label: "Purchase Request", group: "Purchases", hint: "Open PR lines (use on new PO)", disabled: true },
-  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Purchases", hint: "PO lines sourced from accepted vendor quotes" },
-];
-
-export const PURCHASE_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "pr", label: "Purchase Request", group: "Purchases", hint: "Open PR lines with balance qty" },
-  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Purchases", hint: "Accepted vendor quotes not yet on a PO" },
-];
-
+/** New Sale / sales invoice — pull from any prior selling document. */
 export const SALES_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "so", label: "Sales Order", group: "Sales", hint: "Open SO lines for invoicing" },
-  { id: "quotation", label: "Quotation", group: "Sales", hint: "Open quotation lines (populate invoice)" },
-  { id: "shipping", label: "Shipping Order", group: "Sales", hint: "SO lines linked to a shipping order" },
+  { id: "so", label: "Sales Order", group: "Selling", hint: "Open SO lines for invoicing" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines (populate invoice)" },
+  { id: "shipping", label: "Shipping Order", group: "Selling", hint: "SO lines linked to a shipping order" },
 ];
 
+/** New Sales Order. */
 export const SALES_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "quotation", label: "Quotation", group: "Sales", hint: "Open quotation lines with balance qty" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines with balance qty" },
 ];
 
-/** Map Load Slip option id → tenant module that must be enabled. */
+/** New Quotation — copy / import. */
+export const QUOTATION_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
+  { id: "quotation", label: "Prior Quotation", group: "Selling", hint: "Copy open lines from another quotation" },
+  { id: "rfq", label: "RFQ (PDF / images)", group: "Import", hint: "Extract line items from vendor RFQ files" },
+];
+
+/** New Purchase Request. */
+export const PURCHASE_REQUEST_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
+  { id: "so", label: "Sales Order", group: "Selling", hint: "Customer demand lines still open on SO" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: "Quoted demand not yet purchased" },
+];
+
+/** New Purchase Order. */
+export const PURCHASE_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
+  { id: "pr", label: "Purchase Request", group: "Buying", hint: "Open PR lines with balance qty" },
+  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "Accepted vendor quotes not yet on a PO" },
+];
+
+/** New Purchases / supplier invoice. */
+export const PURCHASE_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
+  { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines with residual qty" },
+  { id: "gr", label: "Goods Receipt (Receiving)", group: "Buying", hint: "Posted GR lines not yet invoiced" },
+  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "PO lines sourced from accepted vendor quotes" },
+];
+
+/** Inventory After-Sales repair order. */
+export const REPAIR_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
+  { id: "so", label: "Sales Order", group: "Selling", hint: "Copy item lines from an open sales order" },
+];
+
+/** Map Load Slip option id → tenant module (hint only when soft-disable is requested). */
 const LOAD_SLIP_MODULE: Record<string, string> = {
   quotation: "quotation",
   so: "sales_order",
@@ -165,14 +184,16 @@ const LOAD_SLIP_MODULE: Record<string, string> = {
   rfq: "purchase_order",
 };
 
-/** Drop or disable Load Slip sources whose module is turned off.
- * Default "disable" keeps the menu visible with a hint instead of looking "gone".
+/**
+ * Soft-annotate options whose module is off. Default mode is "keep" — always show
+ * every source so Load Slip stays flexible across workspaces.
  */
 export function filterLoadSlipOptions(
   options: LoadSlipOption[],
   me: MeData | null | undefined,
-  mode: "omit" | "disable" = "disable",
+  mode: "keep" | "omit" | "disable" = "keep",
 ): LoadSlipOption[] {
+  if (mode === "keep") return options;
   return options
     .map((opt) => {
       const mod = LOAD_SLIP_MODULE[opt.id];

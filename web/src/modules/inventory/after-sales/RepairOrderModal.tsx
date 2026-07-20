@@ -29,6 +29,11 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
+import { LoadSlipMenu, REPAIR_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
+import {
+  SalesOrderLinePickerModal,
+  type PickedSalesOrderLine,
+} from "../../sales/sales/SalesOrderLinePickerModal";
 
 export type RepairOrderDetail = {
   id: number;
@@ -153,6 +158,7 @@ export function RepairOrderModal(props: Props) {
   const [latestUpdate, setLatestUpdate] = createSignal("");
   const [repairDetails, setRepairDetails] = createSignal("");
   const [lines, setLines] = createSignal<RepairLineRow[]>([emptyLine(1)]);
+  const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [attachments, setAttachments] = createSignal<RepairOrderAttachment[]>([]);
   const [uploading, setUploading] = createSignal(false);
 
@@ -297,6 +303,28 @@ export function RepairOrderModal(props: Props) {
             }
           : ln,
       ),
+    );
+  };
+
+  const applySalesOrderLines = (picked: PickedSalesOrderLine[]) => {
+    if (picked.length === 0) return;
+    const first = picked[0];
+    setPartnerId(first.partner_id);
+    setCustomerLabel(first.customer_name);
+    if (first.location_id) {
+      setLocationId(first.location_id);
+      setLocationLabel(first.location_name);
+    }
+    setLines(
+      picked.map((row, i) => ({
+        ...emptyLine(i + 1),
+        item_id: row.item_id ?? null,
+        item_code: row.item_code,
+        item_name: row.item_name,
+        qty: String(row.balance_qty > 0 ? row.balance_qty : row.released_qty || 1),
+        remark: row.remark ?? row.description ?? "",
+        problem_issue: row.description ?? "",
+      })),
     );
   };
 
@@ -610,11 +638,25 @@ export function RepairOrderModal(props: Props) {
           )}
         </ModalField>
       </div>
+      <div class="mb-2">
+        <LoadSlipMenu
+          options={filterLoadSlipOptions(REPAIR_LOAD_SLIP_OPTIONS, auth.me)}
+          onSelect={(id) => {
+            if (id === "so") setSoPickerOpen(true);
+          }}
+        />
+      </div>
       <EditableLineGrid lines={lines} onChange={setLines} onSerialLotBlur={onSerialLotBlur} />
       <CustomFieldsSection entityType={INVENTORY_ENTITY.repairOrder} values={customValues} onChange={setCustom} />
       <ChangeLogPanel targetType="inv_repair_order" targetId={effectiveEditing()?.id} />
       </div>
     </WideEntityModal>
+
+    <SalesOrderLinePickerModal
+      open={soPickerOpen()}
+      onClose={() => setSoPickerOpen(false)}
+      onConfirm={(picked) => applySalesOrderLines(picked)}
+    />
 
     <QuickCustomerModal
       open={showNewCustomer()}

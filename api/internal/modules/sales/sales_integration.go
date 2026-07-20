@@ -14,6 +14,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -78,6 +79,9 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
+
+		f := openlines.ParseFilters(r, 0)
+		where, args, argN = f.Apply(where, args, argN, "so.partner_id", "so.order_date", "so.sales_order_no")
 
 		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
 			CustomerColumn: "so.partner_id",

@@ -18,6 +18,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -148,6 +149,10 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *poid)
 			argN++
 		}
+		f := openlines.ParseFilters(r, 0)
+		// partner already applied above when present; still apply dates/doc_no
+		f.PartnerID = nil
+		where, args, argN = f.Apply(where, args, argN, "", "po.order_date", "po.purchase_order_no")
 
 		q := fmt.Sprintf(`
 			select pol.id, po.id, po.purchase_order_no,

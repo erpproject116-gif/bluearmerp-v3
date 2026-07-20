@@ -769,7 +769,7 @@ export const helpScenarioArticles: KbArticle[] = [
         text: "Costs without a job code will not appear on the project — set the reference before posting.",
       },
     ],
-    primaryHref: "/app/job-costing",
+    primaryHref: "/app/operations/job-costing",
     primaryLabel: "Job costing",
     relatedGuideIds: ["job-costing-projects", "operations-hub-intro"],
   },

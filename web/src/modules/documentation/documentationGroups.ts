@@ -30,13 +30,13 @@ export const documentationGroups: DocGroup[] = [
     id: "accounts",
     title: "Finance & reports",
     description: "Receivables, payables, Acct I/II, assets, and analytics.",
-    sectionIds: ["finance", "reports", "bi", "fixed-assets", "job-costing"],
+    sectionIds: ["finance", "reports", "bi", "fixed-assets"],
   },
   {
     id: "service",
     title: "CRM & service",
     description: "Follow-ups, support tickets, repairs, HR, and portal.",
-    sectionIds: ["crm", "operations", "comms", "support", "after-sales", "hr", "portal"],
+    sectionIds: ["crm", "operations", "job-costing", "comms", "support", "after-sales", "hr", "portal"],
   },
   {
     id: "retail",

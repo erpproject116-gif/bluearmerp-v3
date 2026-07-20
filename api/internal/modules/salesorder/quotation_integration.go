@@ -13,6 +13,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -61,6 +62,9 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
+
+		f := openlines.ParseFilters(r, 0)
+		where, args, argN = f.Apply(where, args, argN, "q.partner_id", "q.order_date", "q.reference_no")
 
 		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
 			CustomerColumn: "q.partner_id",

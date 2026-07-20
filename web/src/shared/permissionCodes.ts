@@ -137,6 +137,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/quality/qc-requests": "quality.qc_requests",
   "/app/quality/capa": "quality.capa_read",
   "/app/fixed-assets": "fixed_assets.assets",
+  "/app/operations/job-costing": "job_costing.projects",
   "/app/job-costing": "job_costing.projects",
   "/app/activity-logs": "activity_logs.logs",
   "/app/activity-logs/changes": "activity_logs.changes",

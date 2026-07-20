@@ -805,13 +805,14 @@ export function SalesOrderModal(props: Props) {
         </div>
         <div class="col-span-full mb-2">
           <LoadSlipMenu
-            disabled={!partnerId()}
-            partnerLabel="customer"
             options={filterLoadSlipOptions(SALES_ORDER_LOAD_SLIP_OPTIONS, auth.me)}
             onSelect={(id) => {
               if (id === "quotation") setQuotationPickerOpen(true);
             }}
           />
+          <p class="mt-1 text-xs text-text-secondary">
+            Opens the quotation open-line monitor — search, date range, select lines, Apply Residual Qty.
+          </p>
         </div>
         <SalesOrderLineGrid
           lines={lines}
@@ -835,6 +836,8 @@ export function SalesOrderModal(props: Props) {
         open={quotationPickerOpen()}
         onClose={() => setQuotationPickerOpen(false)}
         onConfirm={(picked) => void applyQuotationLines(picked)}
+        partnerId={partnerId()}
+        partnerLabel={customerLabel()}
       />
 
       <QuickCustomerModal

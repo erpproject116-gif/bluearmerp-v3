@@ -1089,8 +1089,6 @@ export function SalesModal(props: Props) {
         </div>
         <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">
           <LoadSlipMenu
-            disabled={!partnerId()}
-            partnerLabel="customer"
             options={filterLoadSlipOptions(SALES_LOAD_SLIP_OPTIONS, auth.me)}
             onSelect={(id) => {
               if (id === "so") setSoPickerOpen(true);
@@ -1098,6 +1096,9 @@ export function SalesModal(props: Props) {
               if (id === "shipping") setShippingPickerOpen(true);
             }}
           />
+          <p class="text-xs text-text-secondary">
+            Load Slip opens the open-transaction monitor (search, date range, multi-select). Tip: pick a Customer first to pre-filter, or browse all partners inside the monitor.
+          </p>
           <Show when={!props.editing}>
             <button
               type="button"
@@ -1195,12 +1196,16 @@ export function SalesModal(props: Props) {
         open={soPickerOpen()}
         onClose={() => setSoPickerOpen(false)}
         onConfirm={(picked) => void applySalesOrderLines(picked)}
+        partnerId={partnerId()}
+        partnerLabel={customerLabel()}
       />
 
       <QuotationLinePickerModal
         open={quotationPickerOpen()}
         onClose={() => setQuotationPickerOpen(false)}
         onConfirm={(picked) => void applyQuotationLines(picked)}
+        partnerId={partnerId()}
+        partnerLabel={customerLabel()}
       />
 
       <ShippingOrderLinePickerModal
