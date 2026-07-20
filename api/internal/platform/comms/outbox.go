@@ -63,8 +63,14 @@ func HandleOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event)
 	}
 
 	gmailCfg := LoadGmailConfig()
-	if sm.SentByUserID != nil && !gmailCfg.StubMode && gmailCfg.OAuthConfigured() {
-		msgID, threadID, gmailErr := SendViaGmail(ctx, pool, gmailCfg, ev.TenantID, *sm.SentByUserID, sm.ToAddrs, sm.CcAddrs, sm.Subject, htmlBody, attachments)
+	var gmailErr error
+	if sm.SentByUserID == nil {
+		gmailErr = fmt.Errorf("sender user missing on sent message")
+	} else if gmailCfg.StubMode || !gmailCfg.OAuthConfigured() {
+		gmailErr = fmt.Errorf("Gmail OAuth not configured on API (set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT on Render and redeploy)")
+	} else {
+		var msgID, threadID string
+		msgID, threadID, gmailErr = SendViaGmail(ctx, pool, gmailCfg, ev.TenantID, *sm.SentByUserID, sm.ToAddrs, sm.CcAddrs, sm.Subject, htmlBody, attachments)
 		if gmailErr == nil {
 			_ = UpdateSentMessageGmailIDs(ctx, pool, ev.TenantID, sm.ID, msgID, threadID)
 			_ = UpdateSentMessageStatus(ctx, pool, ev.TenantID, sm.ID, "sent", nil)
@@ -76,8 +82,11 @@ func HandleOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event)
 	cfg := outbox.LoadSMTPConfig()
 	if !cfg.Enabled() {
 		errMsg := "SMTP not configured and Gmail send unavailable"
+		if gmailErr != nil {
+			errMsg = fmt.Sprintf("Gmail unavailable (%v); SMTP not configured", gmailErr)
+		}
 		_ = UpdateSentMessageStatus(ctx, pool, ev.TenantID, sm.ID, "failed", &errMsg)
-		log.Printf("comms outbox: tenant=%d message=%d — no delivery channel", ev.TenantID, sm.ID)
+		log.Printf("comms outbox: tenant=%d message=%d — no delivery channel: %s", ev.TenantID, sm.ID, errMsg)
 		return nil
 	}
 

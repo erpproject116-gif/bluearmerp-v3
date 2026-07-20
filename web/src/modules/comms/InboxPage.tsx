@@ -93,6 +93,7 @@ export default function CommsInboxPage() {
         onSearchChange={setQ}
         searchPlaceholder="Search subject, sender, snippet…"
         onRefresh={() => void refetch()}
+        settingsHref="/app/comms/settings"
       />
     </CommsLayout>
   );

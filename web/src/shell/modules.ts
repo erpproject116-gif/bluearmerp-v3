@@ -374,6 +374,7 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Inbox", href: "/app/comms/inbox", settingsHref: "/app/comms/settings" },
       { label: "Sent Documents", href: "/app/comms/sent-documents", settingsHref: "/app/comms/settings" },
+      { label: "Settings", href: "/app/comms/settings", settingsHref: "/app/comms/settings" },
     ],
   },
   {
