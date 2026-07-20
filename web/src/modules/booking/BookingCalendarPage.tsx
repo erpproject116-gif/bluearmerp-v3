@@ -4,7 +4,6 @@ import { A } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import {
   addDays,
-  CalView,
   eventOnDate,
   formatHourLabel,
   HOUR_H,
@@ -12,9 +11,10 @@ import {
   layoutTimed,
   monthMatrix,
   startOfWeek,
-  TimedEventLike,
   toISODate,
   WEEKDAYS,
+  type CalView,
+  type TimedEventLike,
 } from "../../shared/calendar/dateUtils";
 
 type Booking = TimedEventLike & {
@@ -79,7 +79,9 @@ export default function BookingCalendarPage() {
     setCursor(c);
   };
 
-  const columns = createMemo(() => (view() === "day" ? [cursor()] : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cursor()), i)));
+  const columns = createMemo(() =>
+    view() === "day" ? [cursor()] : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cursor()), i)),
+  );
 
   return (
     <div class="mx-auto max-w-7xl p-6">
