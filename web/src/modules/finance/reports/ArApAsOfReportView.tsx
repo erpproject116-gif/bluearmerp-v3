@@ -8,6 +8,7 @@ import {
   type ArApStatusRow,
 } from "../../../shared/reports/useModuleReports";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { GridExportButtons } from "../../../shared/gridExport";
 
 type Mode = "receivable" | "payable";
 
@@ -133,7 +134,25 @@ export function ArApAsOfReportView(props: Props) {
             <span>
               Page {page()} / {totalPages()}
             </span>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <GridExportButtons
+                title={props.title}
+                filename={`${props.mode}-aging-details`}
+                columns={[
+                  {
+                    key: "partner_name",
+                    header: props.mode === "receivable" ? "Customer" : "Vendor",
+                    value: (r) => String(r.partner_name ?? ""),
+                  },
+                  { key: "partner_kind", header: "Kind", value: (r) => String(r.partner_kind ?? "") },
+                  {
+                    key: "balance",
+                    header: "Open balance",
+                    value: (r) => Number(props.mode === "receivable" ? r.ar_balance : r.ap_balance) || 0,
+                  },
+                ]}
+                rows={() => (report.data?.rows ?? []) as unknown as Record<string, unknown>[]}
+              />
               <button
                 type="button"
                 class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
@@ -161,7 +180,7 @@ export function ArApAsOfReportView(props: Props) {
                   )
                 }
               >
-                Export CSV
+                API CSV
               </button>
             </div>
           </div>

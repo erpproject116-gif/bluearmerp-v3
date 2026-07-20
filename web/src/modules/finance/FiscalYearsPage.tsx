@@ -2,6 +2,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { GridExportButtons } from "../../shared/gridExport";
 import { useToast } from "../../shared/toast";
 import { FinanceLayout } from "./FinanceLayout";
 import { uiLabel } from "../../shared/branding/uiLabel";
@@ -78,14 +79,30 @@ export default function FiscalYearsPage() {
 
   return (
     <FinanceLayout>
-      <div class="mb-3 flex items-center justify-between">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p class="text-sm text-slate-600">
           Backdated posting policy:{" "}
           <span class="font-medium">
             {settings.data?.accounts_block_backdated_post ? "Blocked" : "Allowed"}
           </span>
         </p>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <GridExportButtons
+            title="Fiscal Years"
+            filename="fiscal-years"
+            columns={[
+              { key: "year_code", header: "Code", value: (r) => String(r.year_code ?? "") },
+              { key: "year_name", header: "Name", value: (r) => String(r.year_name ?? "") },
+              { key: "start_date", header: "Start", value: (r) => String(r.start_date ?? "") },
+              { key: "end_date", header: "End", value: (r) => String(r.end_date ?? "") },
+              {
+                key: "status",
+                header: "Status",
+                value: (r) => (r.is_closed ? "Closed" : r.is_active ? "Active" : "Inactive"),
+              },
+            ]}
+            rows={() => (list.data ?? []) as unknown as Record<string, unknown>[]}
+          />
           <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={refresh}>
             Refresh
           </button>
