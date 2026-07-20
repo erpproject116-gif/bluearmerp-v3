@@ -26,6 +26,11 @@ import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { PurchaseRequestApprovalPanel } from "./PurchaseRequestApprovalPanel";
 import { SalesOrderLinePickerModal, type PickedSalesOrderLine } from "./SalesOrderLinePickerModal";
 import {
+  QuotationLinePickerModal,
+  type PickedQuotationLine,
+} from "../../sales-order/sales-order/QuotationLinePickerModal";
+import { LoadSlipMenu, PURCHASE_REQUEST_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
+import {
   PurchaseRequestLineGrid,
   emptyPurchaseRequestLine,
   recalculatePurchaseRequestLines,
@@ -164,6 +169,7 @@ export function PurchaseRequestModal(props: Props) {
   const [saving, setSaving] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
   const [showNewLocation, setShowNewLocation] = createSignal(false);
   const [newLocationName, setNewLocationName] = createSignal("");
   const [showNewTaxType, setShowNewTaxType] = createSignal(false);
@@ -300,6 +306,34 @@ export function PurchaseRequestModal(props: Props) {
     if (meta && first.tax_type_id) {
       const recalc = await recalculatePurchaseRequestLines(newLines, first.tax_type_id, meta);
       setLines(recalc);
+    } else {
+      setLines(newLines);
+    }
+  };
+
+  const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
+    if (picked.length === 0) return;
+    const first = picked[0];
+    setTaxTypeId(first.tax_type_id);
+    setCurrencyId(first.currency_id);
+    setLocationId(first.location_id);
+    setLocationLabel(first.location_name);
+    if (first.pic_name) setPicName(first.pic_name);
+    const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+    setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
+      ...emptyPurchaseRequestLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      description: row.description ?? "",
+      qty: String(row.balance_qty > 0 ? row.balance_qty : row.qty),
+      unit_price: String(row.unit_vat_inc),
+      remark: row.remark ?? "",
+    }));
+    if (meta && first.tax_type_id) {
+      setLines(await recalculatePurchaseRequestLines(newLines, first.tax_type_id, meta));
     } else {
       setLines(newLines);
     }
@@ -702,13 +736,13 @@ export function PurchaseRequestModal(props: Props) {
       </Show>
       </div>
       <div class="col-span-full mb-2">
-        <button
-          type="button"
-          class="rounded border border-stroke px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
-          onClick={() => setSoPickerOpen(true)}
-        >
-          Load Slip (from Sales Order)
-        </button>
+        <LoadSlipMenu
+          options={filterLoadSlipOptions(PURCHASE_REQUEST_LOAD_SLIP_OPTIONS, auth.me)}
+          onSelect={(id) => {
+            if (id === "so") setSoPickerOpen(true);
+            if (id === "quotation") setQuotationPickerOpen(true);
+          }}
+        />
       </div>
       <PurchaseRequestLineGrid
         lines={lines}
@@ -728,6 +762,11 @@ export function PurchaseRequestModal(props: Props) {
       open={soPickerOpen()}
       onClose={() => setSoPickerOpen(false)}
       onConfirm={(picked) => void applySalesOrderLines(picked)}
+    />
+    <QuotationLinePickerModal
+      open={quotationPickerOpen()}
+      onClose={() => setQuotationPickerOpen(false)}
+      onConfirm={(picked) => void applyQuotationLines(picked)}
     />
     <QuickLocationModal
       open={showNewLocation()}

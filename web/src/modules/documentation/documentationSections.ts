@@ -671,7 +671,7 @@ export const documentationSections: DocSection[] = [
     title: "Job costing",
     iconId: "job_costing",
     intro: "Project budgets, timesheets, and budget vs actual—separate from inventory Projects dimension.",
-    primaryHref: "/app/job-costing",
+    primaryHref: "/app/operations/job-costing",
     primaryLabel: "Open Job Costing",
     blocks: [
       {

@@ -386,6 +386,7 @@ export const appModules: AppModule[] = [
       { label: "Calendar", href: "/app/operations/calendar", settingsHref: "/app/operations/calendar" },
       { label: "Timeline", href: "/app/operations/timeline", settingsHref: "/app/operations/timeline" },
       { label: "Project dashboard", href: "/app/operations/dashboard", settingsHref: "/app/operations/dashboard" },
+      { label: "Job costing", href: "/app/operations/job-costing", settingsHref: "/app/operations/job-costing" },
       { label: "Automation", href: "/app/operations/automation", settingsHref: "/app/operations/automation" },
     ],
   },
@@ -431,15 +432,6 @@ export const appModules: AppModule[] = [
     ],
   },
   {
-    id: "job_costing",
-    label: "Job Costing",
-    href: "/app/job-costing",
-    basePath: "/app/job-costing",
-    features: [
-      { label: "Overview", href: "/app/job-costing", settingsHref: "/app/job-costing" },
-    ],
-  },
-  {
     id: "finance",
     label: "Accounting Dept",
     href: "/app/finance",
@@ -453,7 +445,6 @@ export const appModules: AppModule[] = [
       { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
       { label: "Remittances", href: "/app/hr/remittances", settingsHref: "/app/hr/remittances" },
       { label: "Assets", href: "/app/fixed-assets", settingsHref: "/app/fixed-assets" },
-      { label: "Job costing", href: "/app/job-costing", settingsHref: "/app/job-costing" },
       setupFeatureTab("/app/finance"),
     ],
     subBranches: [
@@ -594,8 +585,6 @@ export function resolveModule(pathname: string): AppModule | undefined {
     pathname.startsWith("/app/hr/payroll-runs/") ||
     pathname === "/app/fixed-assets" ||
     pathname.startsWith("/app/fixed-assets/") ||
-    pathname === "/app/job-costing" ||
-    pathname.startsWith("/app/job-costing/") ||
     pathname === "/app/sales/reports/ar-by-customer" ||
     pathname === "/app/sales/reports/official-receipt-status" ||
     pathname === "/app/sales/reports/si-receipt-status" ||
