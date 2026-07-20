@@ -11,9 +11,10 @@ type Props = {
   onConfirm: (lines: OpenSupplierQuotationInvoiceLine[]) => void;
 };
 
-async function fetchOpenLines(partnerId: number) {
+async function fetchOpenLines(partnerId: number | null) {
+  const qs = partnerId ? `?partner_id=${partnerId}` : "";
   const res = await apiFetch<OpenSupplierQuotationInvoiceLine[]>(
-    `/api/v1/finance/supplier-invoices/open-supplier-quotation-lines?partner_id=${partnerId}`,
+    `/api/v1/finance/supplier-invoices/open-supplier-quotation-lines${qs}`,
   );
   if (!res.success) throw new Error(res.message ?? "Failed to load supplier quotation lines");
   return res.data ?? [];
@@ -31,8 +32,8 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
   });
 
   const [data] = createResource(
-    () => (props.open && props.partnerId ? props.partnerId : null),
-    async (pid) => fetchOpenLines(pid!),
+    () => (props.open ? props.partnerId ?? 0 : null),
+    async (pid) => fetchOpenLines(pid === 0 ? null : pid),
   );
 
   const filtered = () => {
@@ -87,7 +88,9 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
           </div>
 
           <Show when={!props.partnerId}>
-            <p class="p-5 text-sm text-amber-700">Select a vendor on the purchase first.</p>
+            <p class="px-5 pt-3 text-xs text-text-secondary">
+              No vendor selected — showing open RFQ lines for all vendors. Pick a vendor on the purchase to narrow the list.
+            </p>
           </Show>
 
           <div class="max-h-[50vh] overflow-auto px-5 py-3">

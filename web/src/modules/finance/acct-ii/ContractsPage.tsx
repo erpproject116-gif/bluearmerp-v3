@@ -304,6 +304,8 @@ export default function ContractsPage() {
         search=""
         onSearchChange={() => {}}
         onRefresh={invalidate}
+        exportFilename="contracts"
+        exportTitle="Contracts"
       />
 
       <Show when={viewMode() === "board"}>

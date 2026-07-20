@@ -182,6 +182,8 @@ export default function CheckRegisterPage() {
         nameKey="payee_name"
         total={list.data?.total ?? 0}
         search=""
+        exportFilename="check-register"
+        exportTitle="Check Register"
         onSearchChange={() => {}}
         onRefresh={invalidate}
       />

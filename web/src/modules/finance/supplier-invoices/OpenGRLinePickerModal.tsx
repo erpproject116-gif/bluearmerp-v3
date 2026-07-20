@@ -1,151 +1,140 @@
-import { createResource, createSignal, For, Show, createEffect } from "solid-js";
+import { createEffect, createResource, createSignal } from "solid-js";
 import { apiFetch } from "../../../shared/api";
-import { inputClass } from "../../../shared/SpreadsheetGrid";
-import { modalDismissClass } from "../../../shared/Modal";
+import {
+  OpenTransactionMonitor,
+  buildOpenLineQuery,
+  defaultMonitorDates,
+  type OpenMonitorFilters,
+} from "../../../shared/OpenTransactionMonitor";
 import type { OpenGRLine } from "../../../shared/useSupplierInvoiceList";
 
 type Props = {
   open: boolean;
-  partnerId: number | null;
+  partnerId?: number | null;
+  partnerLabel?: string;
   onClose: () => void;
   onConfirm: (lines: OpenGRLine[]) => void;
+  mapOnly?: boolean;
 };
 
-async function fetchOpenLines(partnerId: number) {
-  const res = await apiFetch<OpenGRLine[]>(`/api/v1/finance/supplier-invoices/open-gr-lines?partner_id=${partnerId}`);
-  if (!res.success) throw new Error(res.message ?? "Failed to load goods receipt lines");
-  return res.data ?? [];
-}
+const pageSize = 50;
 
 export function OpenGRLinePickerModal(props: Props) {
-  const [q, setQ] = createSignal("");
-  const [selected, setSelected] = createSignal<Set<number>>(new Set());
+  const dates = defaultMonitorDates(30);
+  const [filters, setFilters] = createSignal<OpenMonitorFilters>({
+    q: "",
+    dateFrom: dates.dateFrom,
+    dateTo: dates.dateTo,
+    docNo: "",
+    partnerId: null,
+    partnerLocked: false,
+    partnerLabel: "",
+  });
+  const [page, setPage] = createSignal(1);
+  const [selected, setSelected] = createSignal(new Set<number>());
 
   createEffect(() => {
-    if (!props.open) {
-      setQ("");
-      setSelected(new Set<number>());
-    }
+    if (!props.open) return;
+    setSelected(new Set<number>());
+    setPage(1);
+    const d = defaultMonitorDates(30);
+    setFilters({
+      q: "",
+      dateFrom: d.dateFrom,
+      dateTo: d.dateTo,
+      docNo: "",
+      partnerId: props.partnerId ?? null,
+      partnerLocked: Boolean(props.partnerId),
+      partnerLabel: props.partnerLabel ?? "",
+    });
   });
 
   const [data] = createResource(
-    () => (props.open && props.partnerId ? props.partnerId : null),
-    async (pid) => fetchOpenLines(pid!),
+    () => (props.open ? { filters: filters(), page: page() } : null),
+    async (p) => {
+      const qs = buildOpenLineQuery({ page: p!.page, pageSize, filters: p!.filters });
+      const res = await apiFetch<OpenGRLine[]>(`/api/v1/finance/supplier-invoices/open-gr-lines?${qs}`);
+      if (!res.success) throw new Error(res.message ?? "Failed to load goods receipt lines");
+      return { rows: res.data ?? [], total: res.meta?.total ?? (res.data?.length ?? 0) };
+    },
   );
 
-  const filtered = () => {
-    const needle = q().trim().toLowerCase();
-    const rows = data() ?? [];
-    if (!needle) return rows;
-    return rows.filter(
-      (r) =>
-        r.purchase_order_no.toLowerCase().includes(needle) ||
-        r.item_code.toLowerCase().includes(needle) ||
-        r.item_name.toLowerCase().includes(needle),
-    );
-  };
+  const rows = () => (data()?.rows ?? []) as unknown as Record<string, unknown>[];
 
-  const toggleRow = (lineId: number) => {
+  const toggleRow = (id: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(lineId)) next.delete(lineId);
-      else next.add(lineId);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const confirm = () => {
-    const rows = data() ?? [];
-    const picked = rows.filter((r) => selected().has(r.goods_receipt_line_id));
+  const toggleAll = () => {
+    const list = data()?.rows ?? [];
+    if (selected().size === list.length) setSelected(new Set());
+    else setSelected(new Set(list.map((r) => r.goods_receipt_line_id)));
+  };
+
+  const apply = () => {
+    const list = data()?.rows ?? [];
+    const picked = list.filter((r) => selected().has(r.goods_receipt_line_id));
     if (picked.length === 0) return;
     props.onConfirm(picked);
     props.onClose();
-    setSelected(new Set<number>());
+    setSelected(new Set());
   };
 
   return (
-    <Show when={props.open}>
-      <div class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
-        <div class="w-full max-w-5xl rounded-2xl border border-stroke bg-white shadow-xl">
-          <div class="flex items-center justify-between border-b border-stroke px-5 py-3">
-            <h2 class="text-lg font-semibold text-text-primary">Load Slip (from Goods Receipt) — open lines</h2>
-            <button type="button" class={modalDismissClass} onClick={() => props.onClose()}>
-              Close
-            </button>
-          </div>
-
-          <div class="border-b border-stroke px-5 py-3">
-            <input
-              class={inputClass}
-              placeholder="Search PO, item code, or name…"
-              value={q()}
-              onInput={(e) => setQ(e.currentTarget.value)}
-            />
-          </div>
-
-          <Show when={!props.partnerId}>
-            <p class="p-5 text-sm text-amber-700">Select a vendor on the invoice first.</p>
-          </Show>
-
-          <div class="max-h-[50vh] overflow-auto px-5 py-3">
-            <Show when={data.loading}>
-              <p class="text-sm text-text-secondary">Loading open lines…</p>
-            </Show>
-            <Show when={data.error}>
-              <p class="text-sm text-red-600">Failed to load open lines.</p>
-            </Show>
-            <Show when={!data.loading && !data.error && filtered().length === 0}>
-              <p class="text-sm text-text-secondary">No open goods receipt lines for this vendor.</p>
-            </Show>
-            <table class="min-w-full text-sm">
-              <thead class="sticky top-0 bg-white text-left text-xs uppercase text-text-secondary">
-                <tr>
-                  <th class="py-2 pr-2" />
-                  <th class="py-2 pr-2">PO</th>
-                  <th class="py-2 pr-2">Item</th>
-                  <th class="py-2 pr-2 text-right">Balance</th>
-                  <th class="py-2 text-right">Unit (VAT inc.)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={filtered()}>
-                  {(row) => (
-                    <tr class="border-t border-stroke/60">
-                      <td class="py-2 pr-2">
-                        <input
-                          type="checkbox"
-                          checked={selected().has(row.goods_receipt_line_id)}
-                          onChange={() => toggleRow(row.goods_receipt_line_id)}
-                        />
-                      </td>
-                      <td class="py-2 pr-2">{row.purchase_order_no}</td>
-                      <td class="py-2 pr-2">
-                        {row.item_code} — {row.item_name}
-                      </td>
-                      <td class="py-2 pr-2 text-right">{row.balance_qty}</td>
-                      <td class="py-2 text-right">{row.unit_vat_inc}</td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="flex justify-end gap-2 border-t border-stroke px-5 py-3">
-            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => props.onClose()}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              disabled={selected().size === 0}
-              onClick={confirm}
-            >
-              Apply residual qty ({selected().size || 0})
-            </button>
-          </div>
-        </div>
-      </div>
-    </Show>
+    <OpenTransactionMonitor
+      title={props.mapOnly ? "Map from Goods Receipt — open lines" : "Load Slip (from Goods Receipt) — open lines"}
+      open={props.open}
+      onClose={props.onClose}
+      filters={filters()}
+      onFiltersChange={setFilters}
+      loading={data.loading}
+      error={data.error}
+      total={data()?.total ?? 0}
+      page={page()}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      rows={rows()}
+      rowKey={(row) => Number(row.goods_receipt_line_id)}
+      selected={selected()}
+      onToggleRow={toggleRow}
+      onToggleAll={toggleAll}
+      columns={[
+        {
+          key: "po",
+          header: "PO",
+          cell: (r) => String(r.purchase_order_no ?? ""),
+        },
+        {
+          key: "partner",
+          header: "Vendor",
+          cell: (r) => String(r.partner_name ?? ""),
+        },
+        {
+          key: "item",
+          header: "Item",
+          cell: (r) => `${r.item_code ?? ""} — ${r.item_name ?? ""}`,
+        },
+        {
+          key: "balance",
+          header: "Balance",
+          class: "text-right",
+          cell: (r) => Number(r.balance_qty ?? 0),
+        },
+        {
+          key: "unit",
+          header: "Unit (VAT inc.)",
+          class: "text-right",
+          cell: (r) => Number(r.unit_vat_inc ?? 0),
+        },
+      ]}
+      onApply={apply}
+      applyLabel={props.mapOnly ? "Map selected lines" : undefined}
+      emptyHint="No open GR lines for these filters. Clear dates or show all partners."
+    />
   );
 }

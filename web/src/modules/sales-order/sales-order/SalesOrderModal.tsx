@@ -35,6 +35,9 @@ import {
   QuotationLinePickerModal,
   type PickedQuotationLine,
 } from "./QuotationLinePickerModal";
+import { PurchaseRequestLinePickerModal, type PickedPurchaseRequestLine } from "../../purchase-request/purchase-order/PurchaseRequestLinePickerModal";
+import { OpenPOLinePickerModal } from "../../finance/supplier-invoices/OpenPOLinePickerModal";
+import type { OpenPOLine } from "../../../shared/useSupplierInvoiceList";
 import {
   SalesOrderLineGrid,
   emptySalesOrderLine,
@@ -176,6 +179,8 @@ export function SalesOrderModal(props: Props) {
   const [createdSalesOrder, setCreatedSalesOrder] = createSignal<SalesOrderDetail | null>(null);
   const effectiveEditing = () => props.editing ?? createdSalesOrder();
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
+  const [prPickerOpen, setPrPickerOpen] = createSignal(false);
+  const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [showNewLocation, setShowNewLocation] = createSignal(false);
   const [newLocationName, setNewLocationName] = createSignal("");
@@ -424,6 +429,39 @@ export function SalesOrderModal(props: Props) {
       setLines(recalc);
     } else {
       setLines(newLines);
+    }
+  };
+
+  const mapBuyingOntoSalesOrder = async (
+    rows: Array<{
+      item_id?: number | null;
+      item_code: string;
+      item_name: string;
+      balance_qty: number;
+      unit_vat_inc: number;
+      track_serial?: boolean;
+    }>,
+  ) => {
+    if (rows.length === 0) return;
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const mapped = rows.map((row, i) => ({
+      ...emptySalesOrderLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+      track_serial: Boolean(row.track_serial),
+    }));
+    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...mapped].map((ln, i) => ({
+      ...ln,
+      line_no: i + 1,
+    }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculateSalesOrderLines(merged, taxTypeId()!, meta));
+    } else {
+      setLines(merged);
     }
   };
 
@@ -808,10 +846,12 @@ export function SalesOrderModal(props: Props) {
             options={filterLoadSlipOptions(SALES_ORDER_LOAD_SLIP_OPTIONS, auth.me)}
             onSelect={(id) => {
               if (id === "quotation") setQuotationPickerOpen(true);
+              if (id === "pr") setPrPickerOpen(true);
+              if (id === "po") setPoPickerOpen(true);
             }}
           />
           <p class="mt-1 text-xs text-text-secondary">
-            Opens the quotation open-line monitor — search, date range, select lines, Apply Residual Qty.
+            Selling and Buying sources. Quotation applies residual qty; PR/PO map item lines across modules.
           </p>
         </div>
         <SalesOrderLineGrid
@@ -838,6 +878,30 @@ export function SalesOrderModal(props: Props) {
         onConfirm={(picked) => void applyQuotationLines(picked)}
         partnerId={partnerId()}
         partnerLabel={customerLabel()}
+      />
+
+      <PurchaseRequestLinePickerModal
+        open={prPickerOpen()}
+        onClose={() => setPrPickerOpen(false)}
+        onConfirm={(picked) =>
+          void mapBuyingOntoSalesOrder(
+            picked.map((r) => ({
+              item_id: r.item_id,
+              item_code: r.item_code,
+              item_name: r.item_name,
+              balance_qty: r.balance_qty,
+              unit_vat_inc: r.unit_vat_inc,
+              track_serial: r.track_serial,
+            })),
+          )
+        }
+      />
+
+      <OpenPOLinePickerModal
+        open={poPickerOpen()}
+        mapOnly
+        onClose={() => setPoPickerOpen(false)}
+        onConfirm={(picked: OpenPOLine[]) => void mapBuyingOntoSalesOrder(picked)}
       />
 
       <QuickCustomerModal

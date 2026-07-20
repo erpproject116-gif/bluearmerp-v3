@@ -17,13 +17,13 @@ type Props = {
   options: LoadSlipOption[];
   onSelect: (id: string) => void;
   disabled?: boolean;
-  /** When set, shows a guided hint while Load Slip is disabled (no partner selected). */
+  /** Optional guided hint when the form prefers a partner first (filter only — not a hard lock). */
   partnerLabel?: PartnerKind;
 };
 
 function partnerHintText(kind: PartnerKind): string {
   const noun = kind === "vendor" ? "Vendor" : "Customer";
-  return `Select a ${noun} first — Load Slip stays locked until then so it only lists open lines for that ${noun.toLowerCase()}.`;
+  return `Tip: pick a ${noun} to pre-filter open lines, or leave blank and browse all partners inside the Load Slip monitor (Selling and Buying sources).`;
 }
 
 export function LoadSlipMenu(props: Props) {
@@ -85,7 +85,7 @@ export function LoadSlipMenu(props: Props) {
         </button>
         <Show when={open() && !locked()}>
           <div class="fixed inset-0 z-[55]" onClick={() => setOpen(false)} />
-          <div class="absolute left-0 top-full z-[56] mt-1 max-h-[60vh] w-72 overflow-auto rounded-lg border border-stroke bg-white py-1 shadow-lg">
+          <div class="absolute left-0 top-full z-[56] mt-1 max-h-[60vh] w-80 overflow-auto rounded-lg border border-stroke bg-white py-1 shadow-lg">
             <For each={groups()}>
               {([group, opts]) => (
                 <div class="border-b border-stroke/60 last:border-0">
@@ -131,46 +131,77 @@ export function LoadSlipMenu(props: Props) {
   );
 }
 
-/** New Sale / sales invoice — pull from any prior selling document. */
+const MAP_HINT = "Map item/qty (does not consume the other side’s residual ledger)";
+
+/** Shared Selling sources — usable from buying docs as map/copy. */
+export const SELLING_LOAD_SLIP_SOURCES: LoadSlipOption[] = [
+  { id: "so", label: "Sales Order", group: "Selling", hint: "Open SO lines" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines" },
+  { id: "shipping", label: "Shipping Order", group: "Selling", hint: "SO lines linked to a shipping order" },
+];
+
+/** Shared Buying sources — usable from selling docs as map/copy. */
+export const BUYING_LOAD_SLIP_SOURCES: LoadSlipOption[] = [
+  { id: "pr", label: "Purchase Request", group: "Buying", hint: "Open PR lines with balance qty" },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines with residual qty" },
+  { id: "gr", label: "Goods Receipt (Receiving)", group: "Buying", hint: "Posted GR lines not yet invoiced" },
+  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "Accepted vendor quotes / PO lines from RFQ" },
+];
+
+/** New Sale / sales invoice — Selling fulfill + Buying map. */
 export const SALES_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "so", label: "Sales Order", group: "Selling", hint: "Open SO lines for invoicing" },
   { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines (populate invoice)" },
   { id: "shipping", label: "Shipping Order", group: "Selling", hint: "SO lines linked to a shipping order" },
+  { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
+  { id: "gr", label: "Goods Receipt", group: "Buying", hint: MAP_HINT },
 ];
 
-/** New Sales Order. */
+/** New Sales Order — Quotation fulfill + Buying map. */
 export const SALES_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines with balance qty" },
+  { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
 ];
 
-/** New Quotation — copy / import. */
+/** New Quotation — prior quote / import + Buying map. */
 export const QUOTATION_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "quotation", label: "Prior Quotation", group: "Selling", hint: "Copy open lines from another quotation" },
+  { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
   { id: "rfq", label: "RFQ (PDF / images)", group: "Import", hint: "Extract line items from vendor RFQ files" },
 ];
 
-/** New Purchase Request. */
+/** New Purchase Request — Selling demand + Buying map. */
 export const PURCHASE_REQUEST_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "so", label: "Sales Order", group: "Selling", hint: "Customer demand lines still open on SO" },
   { id: "quotation", label: "Quotation", group: "Selling", hint: "Quoted demand not yet purchased" },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
 ];
 
-/** New Purchase Order. */
+/** New Purchase Order — Buying fulfill + Selling map. */
 export const PURCHASE_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "pr", label: "Purchase Request", group: "Buying", hint: "Open PR lines with balance qty" },
   { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "Accepted vendor quotes not yet on a PO" },
+  { id: "so", label: "Sales Order", group: "Selling", hint: MAP_HINT },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },
 ];
 
-/** New Purchases / supplier invoice. */
+/** New Purchases / supplier invoice — Buying fulfill + Selling map. */
 export const PURCHASE_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines with residual qty" },
   { id: "gr", label: "Goods Receipt (Receiving)", group: "Buying", hint: "Posted GR lines not yet invoiced" },
   { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "PO lines sourced from accepted vendor quotes" },
+  { id: "so", label: "Sales Order", group: "Selling", hint: MAP_HINT },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },
 ];
 
 /** Inventory After-Sales repair order. */
 export const REPAIR_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "so", label: "Sales Order", group: "Selling", hint: "Copy item lines from an open sales order" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },
+  { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
 ];
 
 /** Map Load Slip option id → tenant module (hint only when soft-disable is requested). */

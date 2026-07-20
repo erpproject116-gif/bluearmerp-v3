@@ -3,6 +3,7 @@ import { apiFetch } from "../../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
+import { useAuth } from "../../../shared/auth-context";
 import { PermissionMatrix, type MatrixValue } from "../../../shared/PermissionMatrix";
 import { useTenantUserList } from "../../../shared/useUserManagement";
 import {
@@ -16,6 +17,7 @@ import {
 } from "../../../shared/usePermissions";
 
 export default function UserGroupsPage() {
+  const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [permOpen, setPermOpen] = createSignal(false);
@@ -211,7 +213,8 @@ export default function UserGroupsPage() {
           groups={registry.data ?? []}
           values={permValues()}
           loading={registry.isLoading || groupPerms.isLoading}
-          title="Bulk permission template for this group. Members inherit the highest access from their role and all groups they belong to."
+          title="Bulk permission template for this group (modules on under Module & Features). Members inherit the highest access from role and groups."
+          enabledModuleCodes={auth.me?.enabled_module_codes ?? null}
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
         />
       </EntityModal>

@@ -120,6 +120,7 @@ export const appModules: AppModule[] = [
       { label: "Workspace", href: "/app/selling", settingsHref: "/app/selling" },
       { label: "Sales Status", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings" },
       { label: "Receivable Status", href: "/app/selling/reports/receivable-status", settingsHref: "/app/sales/sales/settings" },
+      { label: "Commissions", href: "/app/selling/commissions", settingsHref: "/app/selling/commissions" },
       setupFeatureTab("/app/selling"),
     ],
   },

@@ -101,6 +101,8 @@ export default function WithholdingCodesPage() {
         search=""
         onSearchChange={() => {}}
         onRefresh={invalidate}
+        exportFilename="withholding-codes"
+        exportTitle="Withholding Tax Codes"
       />
       <EntityModal
         open={modalOpen()}

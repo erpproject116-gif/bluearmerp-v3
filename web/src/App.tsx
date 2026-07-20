@@ -478,6 +478,7 @@ export default function App() {
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationListPage} />
           <Route path="/selling/setup" component={ModuleSetupHubPage} />
+          <Route path="/selling/commissions" component={CommissionRulesPage} />
           <Route path="/selling/reports/receivable-status" component={ReceivableStatusReportPage} />
           <Route path="/selling/reports" component={SellingReportsPage} />
           <Route path="/selling" component={SellingWorkspacePage} />

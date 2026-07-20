@@ -3,6 +3,7 @@ import { apiFetch } from "../../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
+import { useAuth } from "../../../shared/auth-context";
 import { PermissionMatrix, type MatrixValue } from "../../../shared/PermissionMatrix";
 import {
   useInvalidateUserManagement,
@@ -17,6 +18,7 @@ import {
 } from "../../../shared/usePermissions";
 
 export default function RolesPage() {
+  const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [permModalOpen, setPermModalOpen] = createSignal(false);
@@ -265,7 +267,8 @@ export default function RolesPage() {
           groups={registry.data ?? []}
           values={permValues()}
           loading={registry.isLoading || rolePerms.isLoading}
-          title="App-wide defaults for this role. Users also inherit permissions from any groups they belong to."
+          title="Defaults for this role (modules turned on under Module & Features). Users also inherit from groups."
+          enabledModuleCodes={auth.me?.enabled_module_codes ?? null}
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
           submitFlags={submitFlags()}
           cancelFlags={cancelFlags()}

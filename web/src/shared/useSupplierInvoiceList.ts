@@ -62,6 +62,8 @@ export type OpenGRLine = {
   goods_receipt_id: number;
   purchase_order_line_id?: number;
   purchase_order_no: string;
+  partner_id?: number;
+  partner_name?: string;
   item_id?: number;
   item_code: string;
   item_name: string;
@@ -74,6 +76,8 @@ export type OpenPOLine = {
   purchase_order_line_id: number;
   purchase_order_id: number;
   purchase_order_no: string;
+  partner_id?: number;
+  partner_name?: string;
   item_id: number;
   item_code: string;
   item_name: string;

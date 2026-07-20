@@ -31,6 +31,9 @@ import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import { LoadSlipMenu, QUOTATION_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
+import { PurchaseRequestLinePickerModal } from "../../purchase-request/purchase-order/PurchaseRequestLinePickerModal";
+import { OpenPOLinePickerModal } from "../../finance/supplier-invoices/OpenPOLinePickerModal";
+import type { OpenPOLine } from "../../../shared/useSupplierInvoiceList";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import {
   QuotationLineGrid,
@@ -211,6 +214,8 @@ export function QuotationModal(props: Props) {
   const [lines, setLines] = createSignal<QuotationLineRow[]>([emptyQuotationLine(1)]);
   const [rfqImportOpen, setRfqImportOpen] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
+  const [prPickerOpen, setPrPickerOpen] = createSignal(false);
+  const [poPickerOpen, setPoPickerOpen] = createSignal(false);
 
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
 
@@ -315,6 +320,37 @@ export function QuotationModal(props: Props) {
       setLines(await recalculateQuotationLines(newLines, first.tax_type_id, meta));
     } else {
       setLines(newLines);
+    }
+  };
+
+  const mapBuyingOntoQuotation = async (
+    rows: Array<{
+      item_id?: number | null;
+      item_code: string;
+      item_name: string;
+      balance_qty: number;
+      unit_vat_inc: number;
+    }>,
+  ) => {
+    if (rows.length === 0) return;
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const mapped = rows.map((row, i) => ({
+      ...emptyQuotationLine(i + 1, String(row.unit_vat_inc), basis),
+      item_id: row.item_id ?? null,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      qty: String(row.balance_qty),
+      unit_price: String(row.unit_vat_inc),
+    }));
+    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...mapped].map((ln, i) => ({
+      ...ln,
+      line_no: i + 1,
+    }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculateQuotationLines(merged, taxTypeId()!, meta));
+    } else {
+      setLines(merged);
     }
   };
 
@@ -762,6 +798,8 @@ export function QuotationModal(props: Props) {
           options={filterLoadSlipOptions(QUOTATION_LOAD_SLIP_OPTIONS, auth.me)}
           onSelect={(id) => {
             if (id === "quotation") setQuotationPickerOpen(true);
+            if (id === "pr") setPrPickerOpen(true);
+            if (id === "po") setPoPickerOpen(true);
             if (id === "rfq") setRfqImportOpen(true);
           }}
         />
@@ -858,6 +896,27 @@ export function QuotationModal(props: Props) {
       open={quotationPickerOpen()}
       onClose={() => setQuotationPickerOpen(false)}
       onConfirm={(picked) => void applyPriorQuotationLines(picked)}
+    />
+    <PurchaseRequestLinePickerModal
+      open={prPickerOpen()}
+      onClose={() => setPrPickerOpen(false)}
+      onConfirm={(picked) =>
+        void mapBuyingOntoQuotation(
+          picked.map((r) => ({
+            item_id: r.item_id,
+            item_code: r.item_code,
+            item_name: r.item_name,
+            balance_qty: r.balance_qty,
+            unit_vat_inc: r.unit_vat_inc,
+          })),
+        )
+      }
+    />
+    <OpenPOLinePickerModal
+      open={poPickerOpen()}
+      mapOnly
+      onClose={() => setPoPickerOpen(false)}
+      onConfirm={(picked: OpenPOLine[]) => void mapBuyingOntoQuotation(picked)}
     />
     </>
   );

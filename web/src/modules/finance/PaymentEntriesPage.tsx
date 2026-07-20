@@ -50,6 +50,8 @@ export default function PaymentEntriesPage() {
         ]}
         rows={rows()}
         loading={list.isFetching}
+        exportFilename="payment-entries"
+        exportTitle="Payment Entries"
         selectedId={selectedId()}
         onSelect={setSelectedId}
         onEdit={() => {}}

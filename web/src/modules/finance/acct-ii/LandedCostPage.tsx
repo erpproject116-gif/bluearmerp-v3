@@ -137,6 +137,8 @@ export default function LandedCostPage() {
         onSelect={setSelectedId}
         onNew={openNew}
         onEdit={() => {}}
+        exportFilename="landed-cost"
+        exportTitle="Landed Cost"
         codeKey="id"
         nameKey="reference"
         total={list.data?.total ?? 0}
