@@ -787,6 +787,7 @@ export function SupplierInvoiceModal(props: Props) {
           <div class="col-span-full mb-2 mt-2 flex flex-wrap items-center gap-2">
             <LoadSlipMenu
               disabled={!partnerId()}
+              partnerLabel="vendor"
               options={filterLoadSlipOptions(PURCHASE_LOAD_SLIP_OPTIONS, auth.me)}
               onSelect={(id) => {
                 if (id === "po") setPoPickerOpen(true);

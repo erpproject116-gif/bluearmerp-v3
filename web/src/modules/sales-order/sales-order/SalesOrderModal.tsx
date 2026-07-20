@@ -805,6 +805,8 @@ export function SalesOrderModal(props: Props) {
         </div>
         <div class="col-span-full mb-2">
           <LoadSlipMenu
+            disabled={!partnerId()}
+            partnerLabel="customer"
             options={filterLoadSlipOptions(SALES_ORDER_LOAD_SLIP_OPTIONS, auth.me)}
             onSelect={(id) => {
               if (id === "quotation") setQuotationPickerOpen(true);

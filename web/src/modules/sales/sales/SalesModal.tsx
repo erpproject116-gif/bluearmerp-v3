@@ -1090,6 +1090,7 @@ export function SalesModal(props: Props) {
         <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">
           <LoadSlipMenu
             disabled={!partnerId()}
+            partnerLabel="customer"
             options={filterLoadSlipOptions(SALES_LOAD_SLIP_OPTIONS, auth.me)}
             onSelect={(id) => {
               if (id === "so") setSoPickerOpen(true);
