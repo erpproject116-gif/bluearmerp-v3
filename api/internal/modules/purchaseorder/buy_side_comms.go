@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/pdf"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -142,7 +143,9 @@ func getPurchaseOrderPDF(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
 			return
 		}
-		data, err := pdf.RenderGenericDocumentPDF(poToPDF(payload))
+		in := poToPDF(payload)
+		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
+		data, err := pdf.RenderGenericDocumentPDF(in)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return
@@ -169,7 +172,9 @@ func postPurchaseOrderSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
 			return
 		}
-		pdfBytes, err := pdf.RenderGenericDocumentPDF(poToPDF(payload))
+		in := poToPDF(payload)
+		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
+		pdfBytes, err := pdf.RenderGenericDocumentPDF(in)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return
@@ -204,7 +209,9 @@ func getRFQPDF(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "RFQ not found.", "ERR_NOT_FOUND")
 			return
 		}
-		data, err := pdf.RenderGenericDocumentPDF(rfqToPDF(payload))
+		in := rfqToPDF(payload)
+		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
+		data, err := pdf.RenderGenericDocumentPDF(in)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return
@@ -231,7 +238,9 @@ func postRFQSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "RFQ not found.", "ERR_NOT_FOUND")
 			return
 		}
-		pdfBytes, err := pdf.RenderGenericDocumentPDF(rfqToPDF(payload))
+		in := rfqToPDF(payload)
+		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
+		pdfBytes, err := pdf.RenderGenericDocumentPDF(in)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return
@@ -264,7 +273,9 @@ func getSupplierQuotationPDF(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Supplier quotation not found.", "ERR_NOT_FOUND")
 			return
 		}
-		data, err := pdf.RenderGenericDocumentPDF(sqToPDF(payload))
+		in := sqToPDF(payload)
+		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
+		data, err := pdf.RenderGenericDocumentPDF(in)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return
@@ -291,7 +302,9 @@ func postSupplierQuotationSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Supplier quotation not found.", "ERR_NOT_FOUND")
 			return
 		}
-		pdfBytes, err := pdf.RenderGenericDocumentPDF(sqToPDF(payload))
+		in := sqToPDF(payload)
+		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
+		pdfBytes, err := pdf.RenderGenericDocumentPDF(in)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return

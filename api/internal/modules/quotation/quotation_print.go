@@ -12,6 +12,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/pdf"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -165,6 +166,7 @@ func getQuotationPDF(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Quotation not found.", "ERR_NOT_FOUND")
 			return
 		}
+		pdfIn.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
 		data, err := pdf.RenderQuotationPDF(pdfIn)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
@@ -209,6 +211,7 @@ func postQuotationSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		pdfIn.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
 		pdfBytes, err := pdf.RenderQuotationPDF(pdfIn)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")

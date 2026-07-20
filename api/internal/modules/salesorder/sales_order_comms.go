@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/pdf"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -100,7 +101,9 @@ func getSalesOrderPDF(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Sales order not found.", "ERR_NOT_FOUND")
 			return
 		}
-		data, err := pdf.RenderGenericDocumentPDF(soToPDF(payload))
+		in := soToPDF(payload)
+		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
+		data, err := pdf.RenderGenericDocumentPDF(in)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return
@@ -127,7 +130,9 @@ func postSalesOrderSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Sales order not found.", "ERR_NOT_FOUND")
 			return
 		}
-		pdfBytes, err := pdf.RenderGenericDocumentPDF(soToPDF(payload))
+		in := soToPDF(payload)
+		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
+		pdfBytes, err := pdf.RenderGenericDocumentPDF(in)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return

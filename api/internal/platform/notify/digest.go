@@ -80,18 +80,18 @@ type queueRow struct {
 }
 
 func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rows []queueRow) error {
-	emails, err := tenantAdminEmails(ctx, pool, tenantID)
+	emails, err := tenantOwnerEmails(ctx, pool, tenantID)
 	if err != nil {
 		return err
 	}
 	if len(emails) == 0 {
-		log.Printf("change-alert: tenant=%d no tenant-admin emails; leaving queue pending", tenantID)
+		log.Printf("change-alert: tenant=%d no owner email; leaving queue pending", tenantID)
 		return nil
 	}
 	subject, html := formatDigest(rows)
 	cfg := outbox.LoadSMTPConfig()
 	if !cfg.Enabled() {
-		log.Printf("change-alert: tenant=%d SMTP not configured; leaving queue pending", tenantID)
+		log.Printf("change-alert: tenant=%d SMTP not configured; leaving queue pending (use Gmail OAuth on free Render or paid SMTP)", tenantID)
 		return nil
 	}
 	if err := outbox.SendEmailMIME(cfg, emails, nil, subject, html, nil); err != nil {
@@ -110,47 +110,30 @@ func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 	return nil
 }
 
-// tenantAdminEmails returns distinct emails for this tenant's owner and store_admins.
-// Platform superadmins are not included unless they are also a member of this tenant
-// as owner/store_admin — digests stay per-business.
-func tenantAdminEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]string, error) {
-	rows, err := pool.Query(ctx, `
-		select distinct lower(trim(u.email)) as email
-		from public.users u
-		join public.tenants t on t.id = u.tenant_id
-		where u.tenant_id = $1
+// tenantOwnerEmails returns the tenant owner's email only (not store_admins / platform SAs).
+func tenantOwnerEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]string, error) {
+	var email string
+	err := pool.QueryRow(ctx, `
+		select lower(trim(u.email))
+		from public.tenants t
+		join public.users u on u.id = t.owner_user_id
+		where t.id = $1
 		  and u.status = 'active'
-		  and coalesce(trim(u.email), '') <> ''
-		  and (
-		    t.owner_user_id = u.id
-		    or u.tenant_role = 'store_admin'
-		  )
-		order by 1`, tenantID)
+		  and coalesce(trim(u.email), '') <> ''`, tenantID).Scan(&email)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []string
-	seen := map[string]bool{}
-	for rows.Next() {
-		var email string
-		if err := rows.Scan(&email); err != nil {
-			return nil, err
-		}
-		email = strings.TrimSpace(email)
-		if email == "" || seen[email] {
-			continue
-		}
-		seen[email] = true
-		out = append(out, email)
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return nil, nil
 	}
-	return out, rows.Err()
+	return []string{email}, nil
 }
 
 func formatDigest(rows []queueRow) (subject, html string) {
-	subject = fmt.Sprintf("BluearmERP activity digest (%d changes)", len(rows))
+	subject = fmt.Sprintf("BluearmERP owner activity digest (%d changes)", len(rows))
 	var b strings.Builder
-	b.WriteString("<html><body><h2>Recent changes</h2><ul>")
+	b.WriteString("<html><body><h2>Transaction trail (hourly)</h2><ul>")
 	for _, r := range rows {
 		b.WriteString("<li><strong>")
 		b.WriteString(htmlEscape(r.Title))
@@ -160,7 +143,8 @@ func formatDigest(rows []queueRow) (subject, html string) {
 		b.WriteString(htmlEscape(r.ActionCode))
 		b.WriteString("</code></li>")
 	}
-	b.WriteString("</ul><p>You can turn digests off under tenant change-alert preferences.</p></body></html>")
+	b.WriteString("</ul><p>Sent to the tenant owner only. Turn digests off under change-alert preferences, or set digest_mode to off.</p>")
+	b.WriteString("<p><em>Delivery requires SMTP (paid Render) or document email via Gmail OAuth on free Render.</em></p></body></html>")
 	return subject, b.String()
 }
 

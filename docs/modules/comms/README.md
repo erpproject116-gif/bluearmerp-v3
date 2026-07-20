@@ -46,8 +46,11 @@ Status check: `demo_comms_sent` on Demo Data screen.
 |----------|---------|
 | `SMTP_HOST`, `SMTP_FROM` | Fallback email delivery (also `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT` | OAuth (Communications → Connect Gmail) |
+| `CHANGE_ALERT_JOB_SECRET` (or `CRM_JOB_SECRET`) | Hourly owner digest cron: `POST /api/v1/platform/jobs/change-alert-digest` |
 
-**Render free tier:** outbound SMTP ports are blocked. Prefer Gmail connect or a paid Render instance — see `docs/runbooks/render-deploy.md`.
+**Render free tier:** outbound SMTP ports are blocked. Prefer Gmail connect for document email, or a paid Render instance for SMTP (including owner digests) — see `docs/runbooks/render-deploy.md`.
+
+**Owner digests:** queued from audit trails (quotation, SO, sales, PO, purchases, etc.); emailed hourly to the **tenant owner only**.
 
 ## In-app documentation
 

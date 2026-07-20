@@ -1,5 +1,7 @@
 import { type Accessor, type JSX, Show } from "solid-js";
 import { useAuth } from "../auth-context";
+import { PrintBrandingFooter } from "../branding/PrintBrandingFooter";
+import { PrintBrandingHeader } from "../branding/PrintBrandingHeader";
 import { uiLabel } from "../branding/uiLabel";
 import { GridExportButtons } from "../gridExport";
 
@@ -83,9 +85,11 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
       <Show when={props.submitted}>
         <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
           <div class="flex flex-wrap items-start justify-between gap-3 border-b border-stroke px-5 py-4">
-            <div class="text-center sm:text-left">
-              <h2 class="text-xl font-bold">{props.title}</h2>
-              <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
+            <div class="min-w-0 flex-1">
+              <PrintBrandingHeader
+                docTitle={props.title}
+                tenantFallbackName={auth.me?.tenant.company_name}
+              />
             </div>
             <GridExportButtons
               title={props.title}
@@ -95,43 +99,45 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
               scrapeRoot={() => reportBodyEl}
             />
           </div>
-          <div class="overflow-x-auto" ref={(el) => (reportBodyEl = el)}>
+          <div class="overflow-x-auto px-5" ref={(el) => (reportBodyEl = el)}>
             {props.children}
           </div>
-          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
-            <span>
-              {uiLabel("reports.generated_prefix")} {(props.generatedAt ?? new Date()).toLocaleString()}
+          <div class="border-t border-stroke px-5 py-3">
+            <PrintBrandingFooter
+              defaultFooter={`${uiLabel("reports.generated_prefix")} ${(props.generatedAt ?? new Date()).toLocaleString()}`}
+            />
+            <div class="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm">
               <Show when={props.loading}>
-                <span class="ml-2 text-text-secondary">{uiLabel("common.loading")}</span>
+                <span class="text-text-secondary">{uiLabel("common.loading")}</span>
               </Show>
-            </span>
-            <div class="flex flex-wrap items-center gap-2">
-              <Show when={props.onExportCsv}>
-                <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => props.onExportCsv!()}>
-                  {uiLabel("reports.export_csv")} (API)
-                </button>
-              </Show>
-              <Show when={props.onPageChange && props.page && props.totalPages}>
-                <button
-                  type="button"
-                  class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
-                  disabled={(props.page ?? 1) <= 1}
-                  onClick={() => props.onPageChange!(props.page! - 1)}
-                >
-                  {uiLabel("reports.prev_page")}
-                </button>
-                <span>
-                  Page {props.page} / {props.totalPages}
-                </span>
-                <button
-                  type="button"
-                  class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
-                  disabled={(props.page ?? 1) >= (props.totalPages ?? 1)}
-                  onClick={() => props.onPageChange!(props.page! + 1)}
-                >
-                  {uiLabel("reports.next_page")}
-                </button>
-              </Show>
+              <div class="ml-auto flex flex-wrap items-center gap-2">
+                <Show when={props.onExportCsv}>
+                  <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => props.onExportCsv!()}>
+                    {uiLabel("reports.export_csv")} (API)
+                  </button>
+                </Show>
+                <Show when={props.onPageChange && props.page && props.totalPages}>
+                  <button
+                    type="button"
+                    class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
+                    disabled={(props.page ?? 1) <= 1}
+                    onClick={() => props.onPageChange!(props.page! - 1)}
+                  >
+                    {uiLabel("reports.prev_page")}
+                  </button>
+                  <span>
+                    Page {props.page} / {props.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
+                    disabled={(props.page ?? 1) >= (props.totalPages ?? 1)}
+                    onClick={() => props.onPageChange!(props.page! + 1)}
+                  >
+                    {uiLabel("reports.next_page")}
+                  </button>
+                </Show>
+              </div>
             </div>
           </div>
         </section>

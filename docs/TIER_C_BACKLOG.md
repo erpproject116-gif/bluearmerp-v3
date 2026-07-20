@@ -76,9 +76,11 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 ## Owner change alerts
 
-**Status:** Shipped (migration 197) — in-app bell (existing) + hourly email digest to tenant owner via SMTP.
+**Status:** Gap-close shipped (migration 197+) — audit trail queue + hourly digest to **tenant owner only** (not store_admins). Bodies include actor, document ref, and changed-field summaries for selling/buying docs.
 
 **Cron:** `POST /api/v1/platform/jobs/change-alert-digest` with `X-Change-Alert-Job-Secret` or `X-CRM-Job-Secret`.
+
+**Delivery:** SMTP (`SMTP_HOST`/`SMTP_FROM`) required for digests. On Render free tier SMTP is blocked — upgrade or leave digests queued until SMTP works. Document email can use Gmail OAuth instead.
 
 **Still deferred:** Per-user prefs UI, module prefix picker in settings.
 
