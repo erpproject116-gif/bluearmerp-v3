@@ -35,7 +35,7 @@ import {
   QuotationLinePickerModal,
   type PickedQuotationLine,
 } from "./QuotationLinePickerModal";
-import { PurchaseRequestLinePickerModal, type PickedPurchaseRequestLine } from "../../purchase-request/purchase-order/PurchaseRequestLinePickerModal";
+import { PurchaseRequestLinePickerModal } from "../../purchase-request/purchase-order/PurchaseRequestLinePickerModal";
 import { OpenPOLinePickerModal } from "../../finance/supplier-invoices/OpenPOLinePickerModal";
 import type { OpenPOLine } from "../../../shared/useSupplierInvoiceList";
 import {

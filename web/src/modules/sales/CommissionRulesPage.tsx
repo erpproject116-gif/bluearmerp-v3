@@ -246,7 +246,7 @@ export default function CommissionRulesPage() {
       if (res.success) ok += 1;
     }
     toast.success(`Posted GL for ${ok} of ${salesIds.length} sale(s).`);
-    setCheckedIds(new Set());
+    setCheckedIds(new Set<number>());
     void client.invalidateQueries({ queryKey: ["commission-accruals"] });
   };
 

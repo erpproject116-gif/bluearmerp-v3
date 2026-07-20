@@ -73,7 +73,7 @@ export function OpenPOLinePickerModal(props: Props) {
 
   const toggleAll = () => {
     const list = data()?.rows ?? [];
-    if (selected().size === list.length) setSelected(new Set());
+    if (selected().size === list.length) setSelected(new Set<number>());
     else setSelected(new Set(list.map((r) => r.purchase_order_line_id)));
   };
 
@@ -83,7 +83,7 @@ export function OpenPOLinePickerModal(props: Props) {
     if (picked.length === 0) return;
     props.onConfirm(picked);
     props.onClose();
-    setSelected(new Set());
+    setSelected(new Set<number>());
   };
 
   return (
