@@ -152,12 +152,15 @@ export default function CommsSettingsPage() {
               <LoadingText class="text-sm text-text-secondary" as="p" />
             </Show>
             <Show when={!sig.loading}>
-              <RichTextEditor
-                value={sigHtml()}
-                onChange={setSigHtml}
-                placeholder="Your name, title, phone, company…"
-                minHeightClass="min-h-[120px]"
-              />
+              <div class="space-y-1">
+                <span class="mb-1 block text-sm font-medium text-text-primary">Signature</span>
+                <RichTextEditor
+                  value={sigHtml()}
+                  onChange={setSigHtml}
+                  placeholder="Your name, title, phone, company…"
+                  minHeightClass="min-h-[120px]"
+                />
+              </div>
               <label class="flex items-center gap-2 text-sm text-text-secondary">
                 <input
                   type="checkbox"

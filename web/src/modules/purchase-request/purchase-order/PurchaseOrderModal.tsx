@@ -32,6 +32,7 @@ import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
 import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
@@ -654,6 +655,24 @@ export function PurchaseOrderModal(props: Props) {
             docId={effectivePoId()}
             sendUrl="/api/v1/purchase-order/purchase-orders/{id}/send-email"
             title="Email purchase order"
+            defaultSubject={buildDocumentEmailSubject(
+              firstLineItemName(lines()),
+              "Purchase Order",
+              auth.me?.tenant.company_name,
+            )}
+            defaultBody={buildDocumentEmailBody({
+              docTypeLabel: "Purchase Order",
+              partyLabel: "Vendor",
+              partyName: partnerLabel(),
+              referenceNo: po()?.purchase_order_no,
+              dateLabel: "Order date",
+              date: orderDate(),
+              currencyCode: currencies().find((c) => c.id === currencyId())?.currency_code,
+              grandTotal: lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0),
+              notes: notes(),
+              lines: lines(),
+              companyName: auth.me?.tenant.company_name,
+            })}
           />
           <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
             History

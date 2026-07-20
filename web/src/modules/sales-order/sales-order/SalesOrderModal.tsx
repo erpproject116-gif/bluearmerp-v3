@@ -29,6 +29,7 @@ import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../
 import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { LoadSlipMenu, SALES_ORDER_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import {
@@ -592,6 +593,26 @@ export function SalesOrderModal(props: Props) {
               docId={effectiveEditing()?.id}
               sendUrl="/api/v1/sales-order/sales-orders/{id}/send-email"
               title="Email sales order"
+              defaultSubject={buildDocumentEmailSubject(
+                firstLineItemName(lines()),
+                "Sales Order",
+                auth.me?.tenant.company_name,
+              )}
+              defaultBody={buildDocumentEmailBody({
+                docTypeLabel: "Sales Order",
+                partyLabel: "Customer",
+                partyName: customerLabel(),
+                referenceNo: salesOrderNo(),
+                dateLabel: "Order date",
+                date: orderDate(),
+                dueDate: dueDate(),
+                currencyCode: currencies().find((c) => c.id === currencyId())?.currency_code,
+                grandTotal: lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0),
+                paymentTerms: paymentTerms(),
+                notes: notes(),
+                lines: lines(),
+                companyName: auth.me?.tenant.company_name,
+              })}
             />
             <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
               History

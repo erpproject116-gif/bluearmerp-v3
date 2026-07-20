@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createResource, createSignal } from "solid-js";
+import { For, Show, createEffect, createResource, createSignal, on } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { handleSaveResult } from "../../shared/handleSaveResult";
@@ -89,15 +89,20 @@ export function SendEmailModal(props: SendEmailModalProps) {
     },
   );
 
-  createEffect(() => {
-    if (!props.open) return;
-    setToAddrs(props.defaultTo ?? "");
-    setCcAddrs(props.defaultCc ?? "");
-    setSubject(props.defaultSubject ?? "");
-    const def = props.defaultBody?.trim() ?? "";
-    setBodyHtml(def ? (def.includes("<") ? def : `<p>${def.replace(/\n/g, "<br>")}</p>`) : "");
-    setFiles([]);
-  });
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (!open) return;
+        setToAddrs(props.defaultTo ?? "");
+        setCcAddrs(props.defaultCc ?? "");
+        setSubject(props.defaultSubject ?? "");
+        const def = props.defaultBody?.trim() ?? "";
+        setBodyHtml(def ? (def.includes("<") ? def : `<p>${def.replace(/\n/g, "<br>")}</p>`) : "");
+        setFiles([]);
+      },
+    ),
+  );
 
   createEffect(() => {
     if (!props.open) return;
@@ -206,14 +211,17 @@ export function SendEmailModal(props: SendEmailModalProps) {
           onInput={(e) => setSubject(e.currentTarget.value)}
         />
       </Field>
-      <Field label="Message" span="full">
+      <div class="col-span-full space-y-1">
+        <span class="mb-1 block text-sm font-medium" style={{ color: "var(--color-label, var(--color-text-primary))" }}>
+          Message
+        </span>
         <RichTextEditor
           value={bodyHtml()}
           onChange={setBodyHtml}
           placeholder="Write your message… (leave blank to use template)"
           minHeightClass="min-h-[160px]"
         />
-      </Field>
+      </div>
 
       <div class="col-span-full space-y-2">
         <label class="flex items-center gap-2 text-sm text-text-secondary">

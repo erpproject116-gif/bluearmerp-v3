@@ -27,6 +27,7 @@ import { tryAutoSaveSalesInvoice } from "../../../shared/invoiceApi";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
@@ -910,6 +911,26 @@ export function SalesModal(props: Props) {
               docId={effectiveEditing()?.id}
               sendUrl="/api/v1/sales/{id}/send-email"
               title="Email sales invoice"
+              defaultSubject={buildDocumentEmailSubject(
+                firstLineItemName(lines()),
+                "Sales",
+                auth.me?.tenant.company_name,
+              )}
+              defaultBody={buildDocumentEmailBody({
+                docTypeLabel: "Sales",
+                partyLabel: "Customer",
+                partyName: customerLabel(),
+                referenceNo: salesNo(),
+                dateLabel: "Invoice date",
+                date: orderDate(),
+                dueDate: dueDate(),
+                currencyCode: currencies().find((c) => c.id === currencyId())?.currency_code,
+                grandTotal: lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0),
+                paymentTerms: paymentTerms(),
+                notes: notes(),
+                lines: lines(),
+                companyName: auth.me?.tenant.company_name,
+              })}
             />
             <button
               type="button"

@@ -42,6 +42,7 @@ import {
   type PickedQuotationLine,
 } from "../../sales-order/sales-order/QuotationLinePickerModal";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
+import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
@@ -576,6 +577,26 @@ export function SupplierInvoiceModal(props: Props) {
               docId={effectiveEditing()?.id}
               sendUrl="/api/v1/finance/supplier-invoices/{id}/send-email"
               title="Email purchase"
+              defaultSubject={buildDocumentEmailSubject(
+                firstLineItemName(lines()),
+                "Purchase",
+                auth.me?.tenant.company_name,
+              )}
+              defaultBody={buildDocumentEmailBody({
+                docTypeLabel: "Purchase",
+                partyLabel: "Vendor",
+                partyName: vendorLabel(),
+                referenceNo: invoiceNo(),
+                dateLabel: "Invoice date",
+                date: invoiceDate(),
+                dueDate: dueDate(),
+                currencyCode: currencies().find((c) => c.id === currencyId())?.currency_code,
+                grandTotal: lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0),
+                paymentTerms: paymentTerms() || termsOfPayment(),
+                notes: notes(),
+                lines: lines(),
+                companyName: auth.me?.tenant.company_name,
+              })}
             />
             <button
               type="button"
