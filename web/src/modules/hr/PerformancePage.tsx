@@ -2,6 +2,8 @@ import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { Modal } from "../../shared/Modal";
+import { SignaturePad } from "../../shared/SignaturePad";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 
@@ -21,6 +23,9 @@ export default function PerformancePage() {
   const [editId, setEditId] = createSignal<number | null>(null);
   const [score, setScore] = createSignal("");
   const [comments, setComments] = createSignal("");
+  const [ackId, setAckId] = createSignal<number | null>(null);
+  const [signedName, setSignedName] = createSignal("");
+  const [sigUrl, setSigUrl] = createSignal<string | null>(null);
 
   const cycles = createQuery(() => ({
     queryKey: ["hr-review-cycles"],
@@ -70,10 +75,30 @@ export default function PerformancePage() {
     void qc.invalidateQueries({ queryKey: ["hr-reviews"] });
   };
 
+  const submitAck = async () => {
+    const id = ackId();
+    if (!id) return;
+    if (!sigUrl()) return toast.warning("Draw a signature before acknowledging.");
+    if (!signedName().trim()) return toast.warning("Typed name is required.");
+    const res = await apiFetch(`/api/v1/hr/performance/reviews/${id}/acknowledge`, {
+      method: "POST",
+      body: JSON.stringify({
+        signature_data_url: sigUrl(),
+        signed_name: signedName().trim(),
+      }),
+    });
+    if (!res.success) return toast.warning(res.message ?? "Failed.");
+    toast.success("Acknowledged with signature — stored in 201.");
+    setAckId(null);
+    setSigUrl(null);
+    setSignedName("");
+    void qc.invalidateQueries({ queryKey: ["hr-reviews"] });
+  };
+
   return (
     <HrLayout>
       <h1 class="mb-1 text-2xl font-semibold">Evaluations</h1>
-      <p class="mb-6 text-sm text-text-secondary">Review cycles, manager scoring, acknowledgment, and 201 store.</p>
+      <p class="mb-6 text-sm text-text-secondary">Review cycles, manager scoring, signature acknowledgment, and 201 store.</p>
 
       <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">New cycle</h2>
@@ -142,9 +167,11 @@ export default function PerformancePage() {
                   <button
                     type="button"
                     class="rounded border border-stroke px-2 py-1 text-xs"
-                    onClick={() => void apiFetch(`/api/v1/hr/performance/reviews/${r.id}/acknowledge`, { method: "POST", body: "{}" }).then(() => {
-                      void qc.invalidateQueries({ queryKey: ["hr-reviews"] });
-                    })}
+                    onClick={() => {
+                      setAckId(r.id);
+                      setSignedName(r.employee_name ?? "");
+                      setSigUrl(null);
+                    }}
                   >
                     Acknowledge
                   </button>
@@ -161,6 +188,21 @@ export default function PerformancePage() {
           </For>
         </section>
       </Show>
+
+      <Modal open={ackId() != null} onClose={() => setAckId(null)} title="Acknowledge with signature">
+        <div class="space-y-3">
+          <Field label="Full name (typed)">
+            <input class={inputClass} value={signedName()} onInput={(e) => setSignedName(e.currentTarget.value)} />
+          </Field>
+          <div>
+            <p class="mb-1 text-xs font-medium text-text-secondary">Draw signature</p>
+            <SignaturePad onChange={(url) => setSigUrl(url)} />
+          </div>
+          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void submitAck()}>
+            Confirm acknowledgment
+          </button>
+        </div>
+      </Modal>
     </HrLayout>
   );
 }

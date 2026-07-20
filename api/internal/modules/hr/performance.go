@@ -1,6 +1,8 @@
 package hr
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -247,15 +249,41 @@ func ackReview(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		var body struct {
+			SignatureDataURL string `json:"signature_data_url"`
+			SignedName       string `json:"signed_name"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		signedName := strings.TrimSpace(body.SignedName)
+		var sig []byte
+		if strings.TrimSpace(body.SignatureDataURL) != "" {
+			sig, err = decodePNGDataURL(body.SignatureDataURL)
+			if err != nil {
+				response.Validation(w, map[string]string{"signature_data_url": err.Error()})
+				return
+			}
+		}
+		clientIP := r.RemoteAddr
+		if xf := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xf != "" {
+			clientIP = strings.Split(xf, ",")[0]
+		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.hr_performance_reviews
-			set status='acknowledged', acknowledged_at=now(), updated_at=now()
-			where id=$1 and tenant_id=$2`, id, tu.TenantID)
+			set status='acknowledged', acknowledged_at=now(), updated_at=now(),
+			    signature_png=$3, signed_name=nullif($4,''), signed_ip=$5
+			where id=$1 and tenant_id=$2`, id, tu.TenantID, sig, signedName, strings.TrimSpace(clientIP))
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Review not found.", "ERR_NOT_FOUND")
 			return
 		}
-		response.OK(w, map[string]any{"id": id}, "Acknowledged.")
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "hr.review.acknowledge", "hr_performance_review", &id, nil, map[string]any{
+			"signed_name": signedName, "has_signature": len(sig) > 0,
+		})
+		// Auto-store signed HTML into 201 when a signature was captured.
+		if len(sig) > 0 {
+			storeSignedReviewDoc(r.Context(), pool, tu.TenantID, id, signedName)
+		}
+		response.OK(w, map[string]any{"id": id, "has_signature": len(sig) > 0}, "Acknowledged.")
 	}
 }
 
@@ -308,3 +336,76 @@ func storeReviewPDF(pool *pgxpool.Pool) http.HandlerFunc {
 		response.OK(w, map[string]any{"document_id": docID}, "Stored in 201.")
 	}
 }
+
+func decodePNGDataURL(dataURL string) ([]byte, error) {
+	dataURL = strings.TrimSpace(dataURL)
+	const prefix = "data:image/png;base64,"
+	if !strings.HasPrefix(dataURL, prefix) {
+		return nil, fmt.Errorf("expected PNG data URL")
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(dataURL, prefix))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) < 8 || string(raw[:8]) != "\x89PNG\r\n\x1a\n" {
+		return nil, fmt.Errorf("invalid PNG")
+	}
+	if len(raw) > 400_000 {
+		return nil, fmt.Errorf("signature too large")
+	}
+	return raw, nil
+}
+
+func storeSignedReviewDoc(ctx context.Context, pool *pgxpool.Pool, tenantID, reviewID int64, signedName string) {
+	var empID int64
+	var name, selfC, mgrC string
+	var score *float64
+	var sig []byte
+	var ackAt *time.Time
+	err := pool.QueryRow(ctx, `
+		select r.employee_id, e.full_name, r.self_comments, r.manager_comments, r.overall_score::float8,
+		       r.signature_png, r.acknowledged_at
+		from public.hr_performance_reviews r
+		join public.hr_employees e on e.id=r.employee_id
+		where r.id=$1 and r.tenant_id=$2`, reviewID, tenantID,
+	).Scan(&empID, &name, &selfC, &mgrC, &score, &sig, &ackAt)
+	if err != nil {
+		return
+	}
+	sc := "n/a"
+	if score != nil {
+		sc = fmt.Sprintf("%.2f", *score)
+	}
+	ack := ""
+	if ackAt != nil {
+		ack = ackAt.Format(time.RFC3339)
+	}
+	sigHTML := ""
+	if len(sig) > 0 {
+		sigHTML = fmt.Sprintf(`<p><strong>Signature:</strong></p><img alt="signature" src="data:image/png;base64,%s" style="max-width:280px;border:1px solid #ccc"/>`,
+			base64.StdEncoding.EncodeToString(sig))
+	}
+	html := fmt.Sprintf(`<!DOCTYPE html><html><body>
+<h1>Performance Review (signed)</h1>
+<p><strong>Employee:</strong> %s</p>
+<p><strong>Overall score:</strong> %s</p>
+<p><strong>Self comments:</strong> %s</p>
+<p><strong>Manager comments:</strong> %s</p>
+<p><strong>Signed by:</strong> %s</p>
+<p><strong>Acknowledged at:</strong> %s</p>
+%s
+</body></html>`, name, sc, selfC, mgrC, signedName, ack, sigHTML)
+	var docID int64
+	err = pool.QueryRow(ctx, `
+		insert into public.hr_employee_documents (tenant_id, employee_id, doc_type, title, notes, file_bytes)
+		values ($1,$2,'review',$3,$4,convert_to($5,'UTF8')) returning id`,
+		tenantID, empID, "Signed review #"+strconv.FormatInt(reviewID, 10), "Employee-signed acknowledgment", html,
+	).Scan(&docID)
+	if err != nil {
+		return
+	}
+	_, _ = pool.Exec(ctx, `
+		update public.hr_performance_reviews set document_id=$3, updated_at=now() where id=$1 and tenant_id=$2`,
+		reviewID, tenantID, docID)
+}
+

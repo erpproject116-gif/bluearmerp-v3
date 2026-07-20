@@ -61,6 +61,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/formfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/health"
 	platformmw "github.com/bluearm/bluearm-erp-v3/api/internal/platform/middleware"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/notify"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/onboard"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/onboarding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/setupreadiness"
@@ -118,6 +119,7 @@ func main() {
 		billing.RegisterWebhookRoutes(api, pool)
 		comms.RegisterPublicRoutes(api, pool, cfg)
 		comms.RegisterJobRoutes(api, pool, cfg)
+		notify.RegisterJobRoutes(api, pool)
 		portal.RegisterRoutes(api, pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret)
 		hr.RegisterPublicRoutes(api, pool)
 		demoonboard.RegisterRoutes(api, pool, cfg)

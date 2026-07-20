@@ -35,6 +35,7 @@ func FromAudit(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID in
 		values ($1, null, null, 'info', $2, $3, $4, $5, $6, $7)
 		on conflict (tenant_id, dedupe_key) do nothing`,
 		tenantID, title, body, nullIfEmpty(targetType), entityID, dedupe, actor)
+	QueueChangeAlert(ctx, pool, tenantID, actorUserID, actionCode, title, body, targetType, targetID)
 }
 
 func shouldNotify(actionCode string) bool {
@@ -63,7 +64,7 @@ func shouldNotify(actionCode string) bool {
 	prefixes := []string{
 		"quotation.", "sales.", "sales_order.", "purchase.", "purchase_order.", "purchase_request.",
 		"goods_receipt.", "delivery_receipt.", "finance.", "inventory.", "crm.", "support.",
-		"hr.", "pos.", "operations.", "shipping.",
+		"hr.", "pos.", "operations.", "shipping.", "booking.",
 	}
 	for _, p := range prefixes {
 		if strings.HasPrefix(actionCode, p) {

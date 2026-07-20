@@ -62,6 +62,28 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 ---
 
+## Booking
+
+**Status:** Gap-close shipped (migration 197+) — audit trail, resource conflict + buffer, status machine, calendar views, owner digest queue includes `booking.`.
+
+**Purpose:** Schedule staff/rooms/vehicles, priced services, convert to quotation.
+
+**MVP slice (current):** Resources, services (buffer_minutes), bookings list + calendar, conflict detection, to-quotation.
+
+**Still deferred:** Deposits, waitlist, multi-resource assignment, enterprise PMS parity, property listings module.
+
+---
+
+## Owner change alerts
+
+**Status:** Shipped (migration 197) — in-app bell (existing) + hourly email digest to tenant owner via SMTP.
+
+**Cron:** `POST /api/v1/platform/jobs/change-alert-digest` with `X-Change-Alert-Job-Secret` or `X-CRM-Job-Secret`.
+
+**Still deferred:** Per-user prefs UI, module prefix picker in settings.
+
+---
+
 ## Fixed Assets
 
 **Status:** MVP shipped (migration 078) — asset register, straight-line monthly depreciation, posted JE.

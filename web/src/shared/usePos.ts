@@ -181,6 +181,8 @@ export type PosSettings = {
   ui_labels?: Record<string, string>;
   /** POS color palette (primary, accent, header_bg, …). */
   theme?: Record<string, string>;
+  /** retail | restaurant — drives label presets. */
+  hospitality_profile?: string;
 };
 
 export function usePosCatalogCategories() {

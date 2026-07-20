@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -418,6 +419,17 @@ func createBooking(pool *pgxpool.Pool) http.HandlerFunc {
 		if status == "" {
 			status = "scheduled"
 		}
+		if err := validateStatusTransition("", status); err != nil {
+			response.Validation(w, map[string]string{"status": err.Error()})
+			return
+		}
+		if conflict, otherNo, err := resourceConflict(r.Context(), pool, tu.TenantID, body.ResourceID, starts, ends, 0); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to check conflicts.", "ERR_INTERNAL")
+			return
+		} else if conflict {
+			response.Err(w, http.StatusConflict, fmt.Sprintf("Resource conflicts with booking %s (including service buffer).", otherNo), "ERR_CONFLICT")
+			return
+		}
 		bookingNo := fmt.Sprintf("BK-%s-%d", starts.Format("20060102"), time.Now().Unix()%100000)
 		var id int64
 		err := pool.QueryRow(r.Context(), `
@@ -433,6 +445,7 @@ func createBooking(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create booking.", "ERR_INTERNAL")
 			return
 		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "booking.booking.create", "book_booking", &id, nil, body)
 		row, _ := loadBooking(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Created.")
 	}
@@ -457,6 +470,27 @@ func updateBooking(pool *pgxpool.Pool) http.HandlerFunc {
 		if status == "" {
 			status = "scheduled"
 		}
+		var prevStatus string
+		err := pool.QueryRow(r.Context(), `
+			select status from public.book_bookings where id=$1 and tenant_id=$2`, id, tu.TenantID,
+		).Scan(&prevStatus)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Booking not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := validateStatusTransition(prevStatus, status); err != nil {
+			response.Validation(w, map[string]string{"status": err.Error()})
+			return
+		}
+		if status != "cancelled" {
+			if conflict, otherNo, err := resourceConflict(r.Context(), pool, tu.TenantID, body.ResourceID, starts, ends, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to check conflicts.", "ERR_INTERNAL")
+				return
+			} else if conflict {
+				response.Err(w, http.StatusConflict, fmt.Sprintf("Resource conflicts with booking %s (including service buffer).", otherNo), "ERR_CONFLICT")
+				return
+			}
+		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.book_bookings set
 			  booking_date=$2::date, starts_at=$3, ends_at=$4, status=$5,
@@ -470,6 +504,7 @@ func updateBooking(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Booking not found.", "ERR_NOT_FOUND")
 			return
 		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "booking.booking.update", "book_booking", &id, map[string]any{"status": prevStatus}, body)
 		row, _ := loadBooking(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Updated.")
 	}

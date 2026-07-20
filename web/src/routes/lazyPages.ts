@@ -143,6 +143,7 @@ export const MigrationCenterPage = lazy(() => import("../modules/migration/Migra
 export const ModuleFeaturesPage = lazy(() => import("../modules/user-management/tenant-modules/ModuleFeaturesPage"));
 export const DemoDataPage = lazy(() => import("../modules/user-management/demo-data/DemoDataPage"));
 export const BookingsPage = lazy(() => import("../modules/booking/BookingsPage"));
+export const BookingCalendarPage = lazy(() => import("../modules/booking/BookingCalendarPage"));
 export const HelpFeedbackPage = lazy(() => import("../modules/user-management/help-feedback/HelpFeedbackPage"));
 export const ActivityLogListPage = lazy(() => import("../modules/activity-logs/ActivityLogListPage"));
 export const ChangeLogListPage = lazy(() => import("../modules/activity-logs/ChangeLogListPage"));

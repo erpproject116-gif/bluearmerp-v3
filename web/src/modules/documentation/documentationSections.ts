@@ -797,14 +797,15 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Find Booking in the sidebar (below CRM). Use Bookings, Resources, and Services — each has its own sidebar link and URL.",
+        text: "Find Booking in the sidebar (below CRM). Use Calendar, Bookings, Resources, and Services — each has its own sidebar link and URL.",
       },
       {
         type: "steps",
         items: [
           "Enable Booking under User Management → Module & Features if it is missing (migration 195/196).",
-          "Add Resources (staff/rooms) and Services (duration + price).",
-          "Create a booking with customer, start/end, resource, and service.",
+          "Add Resources (staff/rooms) and Services (duration, buffer minutes, and price).",
+          "Create a booking with customer, start/end, resource, and service — overlapping resource slots are blocked (buffer honored).",
+          "Use Calendar for week/day/month views; list view for search and convert-to-quotation.",
           "Convert confirmed bookings with a customer to a draft quotation.",
         ],
       },

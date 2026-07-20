@@ -359,6 +359,7 @@ export const appModules: AppModule[] = [
     href: "/app/booking/bookings",
     basePath: "/app/booking",
     features: [
+      { label: "Calendar", href: "/app/booking/calendar", settingsHref: "/app/booking/calendar" },
       { label: "Bookings", href: "/app/booking/bookings", settingsHref: "/app/booking/bookings" },
       { label: "Resources", href: "/app/booking/resources", settingsHref: "/app/booking/resources" },
       { label: "Services", href: "/app/booking/services", settingsHref: "/app/booking/services" },
