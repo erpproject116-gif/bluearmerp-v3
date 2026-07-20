@@ -68,7 +68,7 @@ func QueueChangeAlert(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUs
 		return
 	}
 	if mode == "immediate" {
-		_ = sendImmediateDigest(ctx, pool, tenantID, []queueRow{{
+		_, _, _, _ = sendImmediateDigest(ctx, pool, tenantID, []queueRow{{
 			ID: qid, Title: title, Body: body, ActionCode: actionCode, CreatedAt: time.Now().UTC(),
 		}})
 	}
@@ -82,31 +82,27 @@ type queueRow struct {
 	CreatedAt  time.Time
 }
 
-func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rows []queueRow) error {
+func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rows []queueRow) (delivered bool, recipients []string, via string, err error) {
 	emails, err := digestRecipientEmails(ctx, pool, tenantID)
 	if err != nil {
-		return err
+		return false, nil, "", err
 	}
 	if len(emails) == 0 {
 		log.Printf("change-alert: tenant=%d no digest recipient email; leaving queue pending", tenantID)
-		return nil
+		return false, nil, "", nil
 	}
 	company := tenantCompanyName(ctx, pool, tenantID)
 	subject, html := formatDigest(company, rows)
 
-	delivered := false
 	if smtpErr := trySendDigestSMTP(emails, subject, html); smtpErr == nil {
-		delivered = true
+		via = "smtp"
 	} else {
 		log.Printf("change-alert: tenant=%d SMTP unavailable (%v); trying Gmail", tenantID, smtpErr)
 		if gmailErr := trySendDigestGmail(ctx, pool, tenantID, emails, subject, html); gmailErr != nil {
-			log.Printf("change-alert: tenant=%d Gmail digest failed: %v; leaving queue pending", tenantID, gmailErr)
-			return nil
+			log.Printf("change-alert: tenant=%d delivery failed (SMTP + Gmail): %v; leaving queue pending", tenantID, gmailErr)
+			return false, emails, "", nil
 		}
-		delivered = true
-	}
-	if !delivered {
-		return nil
+		via = "gmail"
 	}
 
 	ids := make([]int64, 0, len(rows))
@@ -119,7 +115,7 @@ func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 	_, _ = pool.Exec(ctx, `
 		update public.owner_change_alert_prefs set last_digest_at = now(), updated_at = now()
 		where tenant_id = $1`, tenantID)
-	return nil
+	return true, emails, via, nil
 }
 
 func trySendDigestSMTP(emails []string, subject, html string) error {
@@ -350,7 +346,7 @@ func htmlEscape(s string) string {
 }
 
 // DrainHourlyDigests sends pending queue rows for tenants due for an hourly digest.
-func DrainHourlyDigests(ctx context.Context, pool *pgxpool.Pool) (tenants int, events int, err error) {
+func DrainHourlyDigests(ctx context.Context, pool *pgxpool.Pool) (tenants int, events int, details []map[string]any, err error) {
 	rows, err := pool.Query(ctx, `
 		select p.tenant_id
 		from public.owner_change_alert_prefs p
@@ -361,14 +357,14 @@ func DrainHourlyDigests(ctx context.Context, pool *pgxpool.Pool) (tenants int, e
 		  )
 		  and (p.last_digest_at is null or p.last_digest_at < now() - interval '55 minutes')`)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	defer rows.Close()
 	var tenantIDs []int64
 	for rows.Next() {
 		var id int64
 		if err := rows.Scan(&id); err != nil {
-			return tenants, events, err
+			return tenants, events, details, err
 		}
 		tenantIDs = append(tenantIDs, id)
 	}
@@ -380,14 +376,14 @@ func DrainHourlyDigests(ctx context.Context, pool *pgxpool.Pool) (tenants int, e
 			order by created_at
 			limit 200`, tid)
 		if qerr != nil {
-			return tenants, events, qerr
+			return tenants, events, details, qerr
 		}
 		var batch []queueRow
 		for qrows.Next() {
 			var r queueRow
 			if err := qrows.Scan(&r.ID, &r.Title, &r.Body, &r.ActionCode, &r.CreatedAt); err != nil {
 				qrows.Close()
-				return tenants, events, err
+				return tenants, events, details, err
 			}
 			batch = append(batch, r)
 		}
@@ -395,14 +391,29 @@ func DrainHourlyDigests(ctx context.Context, pool *pgxpool.Pool) (tenants int, e
 		if len(batch) == 0 {
 			continue
 		}
-		if err := sendImmediateDigest(ctx, pool, tid, batch); err != nil {
-			log.Printf("change-alert digest tenant=%d: %v", tid, err)
+		ok, recipients, via, sendErr := sendImmediateDigest(ctx, pool, tid, batch)
+		if sendErr != nil {
+			log.Printf("change-alert digest tenant=%d: %v", tid, sendErr)
+			details = append(details, map[string]any{
+				"tenant_id": tid, "pending": len(batch), "delivered": false, "error": sendErr.Error(),
+			})
+			continue
+		}
+		if !ok {
+			details = append(details, map[string]any{
+				"tenant_id": tid, "pending": len(batch), "delivered": false,
+				"recipients": recipients,
+				"error":      "no delivery channel (connect Gmail under Communications → Settings, or configure SMTP)",
+			})
 			continue
 		}
 		tenants++
 		events += len(batch)
+		details = append(details, map[string]any{
+			"tenant_id": tid, "events": len(batch), "delivered": true, "via": via, "recipients": recipients,
+		})
 	}
-	return tenants, events, nil
+	return tenants, events, details, nil
 }
 
 // RegisterJobRoutes mounts the change-alert digest cron endpoint.
@@ -428,11 +439,15 @@ func changeAlertDigestJob(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Invalid job secret.", "ERR_UNAUTHORIZED")
 			return
 		}
-		tenants, events, err := DrainHourlyDigests(r.Context(), pool)
+		tenants, events, details, err := DrainHourlyDigests(r.Context(), pool)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Digest failed.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, map[string]any{"tenants": tenants, "events": events}, "Digested.")
+		response.OK(w, map[string]any{
+			"tenants":  tenants,
+			"events":   events,
+			"details":  details,
+		}, "Digested.")
 	}
 }

@@ -16,13 +16,21 @@ import (
 )
 
 // SendViaGmail delivers a MIME message using the sender's connected Gmail account.
+// If the sender has no connection, falls back to any active Gmail connection on the tenant.
 func SendViaGmail(ctx context.Context, pool *pgxpool.Pool, cfg GmailConfig, tenantID, senderUserID int64, to, cc []string, subject, htmlBody string, attachments []gmailAttachment) (messageID, threadID string, err error) {
 	if cfg.StubMode || !cfg.OAuthConfigured() {
 		return "", "", fmt.Errorf("Gmail OAuth not configured")
 	}
 	row, err := loadGmailConnectionForUser(ctx, pool, tenantID, senderUserID)
 	if err != nil {
-		return "", "", fmt.Errorf("Gmail not connected for sender")
+		fallbackID, ferr := FirstActiveGmailUserID(ctx, pool, tenantID)
+		if ferr != nil || fallbackID <= 0 {
+			return "", "", fmt.Errorf("Gmail not connected — open Communications → Settings → Connect Gmail (same user who sends, or any user on this business)")
+		}
+		row, err = loadGmailConnectionForUser(ctx, pool, tenantID, fallbackID)
+		if err != nil {
+			return "", "", fmt.Errorf("Gmail not connected — open Communications → Settings → Connect Gmail")
+		}
 	}
 	accessToken, err := ensureAccessToken(ctx, pool, cfg, row)
 	if err != nil {
