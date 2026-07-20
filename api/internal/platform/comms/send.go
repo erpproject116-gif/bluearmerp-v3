@@ -98,7 +98,21 @@ func SendDocumentEmail(ctx context.Context, pool *pgxpool.Pool, p SendDocumentEm
 	}
 
 	_ = DrainOutbox(ctx, pool)
-	return loadSentMessage(ctx, pool, p.TenantID, sentID)
+	sm, err := loadSentMessage(ctx, pool, p.TenantID, sentID)
+	if err != nil {
+		return SentMessage{}, err
+	}
+	if sm.Status == "failed" {
+		msg := "Email delivery failed"
+		if sm.ErrorMessage != nil && strings.TrimSpace(*sm.ErrorMessage) != "" {
+			msg = strings.TrimSpace(*sm.ErrorMessage)
+		}
+		return sm, fmt.Errorf("%s", msg)
+	}
+	if sm.Status == "pending" {
+		return sm, fmt.Errorf("email queued but not delivered yet (check SMTP/Gmail configuration)")
+	}
+	return sm, nil
 }
 
 func loadEmailTemplate(ctx context.Context, pool *pgxpool.Pool, tenantID int64, docType string) (subject, body string, err error) {

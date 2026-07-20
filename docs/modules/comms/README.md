@@ -44,9 +44,10 @@ Status check: `demo_comms_sent` on Demo Data screen.
 
 | Variable | Purpose |
 |----------|---------|
-| `SMTP_HOST`, `SMTP_FROM` | Fallback email delivery |
-| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` | OAuth (Communications → Connect Gmail) |
-| `GMAIL_OAUTH_REDIRECT_URL` | Must match Supabase/API callback URL |
+| `SMTP_HOST`, `SMTP_FROM` | Fallback email delivery (also `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT` | OAuth (Communications → Connect Gmail) |
+
+**Render free tier:** outbound SMTP ports are blocked. Prefer Gmail connect or a paid Render instance — see `docs/runbooks/render-deploy.md`.
 
 ## In-app documentation
 
