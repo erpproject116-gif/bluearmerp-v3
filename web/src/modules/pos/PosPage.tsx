@@ -51,6 +51,7 @@ import {
   peekPosOfflineQueue,
   removePosOfflineAction,
 } from "../../shared/posOfflineQueue";
+import { PosModuleGuide } from "./PosModuleGuide";
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "25" });
@@ -756,6 +757,13 @@ export default function PosPage() {
               {posLabel("manage")}
             </A>
           </Show>
+          <A
+            href="/app/documentation/kb/pos-checkout-guide"
+            class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+            title="POS user guide and knowledge base"
+          >
+            Help
+          </A>
           <Show when={session.data}>
             <button
               type="button"
@@ -795,7 +803,8 @@ export default function PosPage() {
       <Show
         when={session.data}
         fallback={
-          <div class="flex flex-1 items-center justify-center p-6">
+          <div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+            <PosModuleGuide variant="terminal" class="w-full max-w-2xl" />
             <section class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 class="mb-1 text-lg font-semibold">{posLabel("open_shift")}</h2>
               <p class="mb-5 text-sm text-slate-500">{posLabel("open_shift_hint")}</p>

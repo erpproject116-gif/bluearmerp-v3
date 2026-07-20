@@ -207,6 +207,10 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		before, _ := listTenantModuleRows(r.Context(), pool, tu)
+		beforeMap := map[string]bool{}
+		for _, row := range before {
+			beforeMap[row.ModuleCode] = row.IsEnabled
+		}
 
 		// Build intended enable map
 		nextMap := map[string]bool{}
@@ -249,6 +253,18 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 		for code, on := range upsertCodes {
 			if err := upsertTenantModule(r.Context(), tx, tu.TenantID, code, on); err != nil {
 				response.Validation(w, map[string]string{code: err.Error()})
+				return
+			}
+		}
+
+		// When a parent module is turned back on, revive direct feature children that
+		// cascade-disabled left off (e.g. finance → finance.acct_i / acct_ii).
+		for code, on := range upsertCodes {
+			if !on || beforeMap[code] {
+				continue
+			}
+			if err := enableDirectFeatureChildren(r.Context(), tx, tu.TenantID, code); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to enable dependent features.", "ERR_INTERNAL")
 				return
 			}
 		}
@@ -302,7 +318,17 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 func listTenantModuleRows(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) ([]tenantModuleRow, error) {
 	rows, err := pool.Query(ctx, `
 		select mr.module_code, mr.module_name, mr.module_type,
-		  coalesce(tm.is_enabled, false),
+		  coalesce(
+		    tm.is_enabled,
+		    (
+		      select bool_and(coalesce(ptm.is_enabled, false))
+		      from public.module_dependencies md
+		      left join public.tenant_modules ptm
+		        on ptm.module_code = md.depends_on_module_code and ptm.tenant_id = $1
+		      where md.module_code = mr.module_code
+		    ),
+		    false
+		  ),
 		  coalesce(mr.tenant_enableable, true)
 		from public.module_registry mr
 		left join public.tenant_modules tm
@@ -400,6 +426,23 @@ func (e simpleErr) Error() string { return string(e) }
 
 func errNotToggleable(code string) error {
 	return simpleErr("Module cannot be toggled: " + code)
+}
+
+// enableDirectFeatureChildren turns on registry features that depend on parentCode.
+// Used when the parent itself was just flipped from off → on so Acct. I / II etc. return with it.
+func enableDirectFeatureChildren(ctx context.Context, tx pgx.Tx, tenantID int64, parentCode string) error {
+	_, err := tx.Exec(ctx, `
+		insert into public.tenant_modules (tenant_id, module_code, is_enabled, enabled_at, disabled_at)
+		select $1, md.module_code, true, now(), null
+		from public.module_dependencies md
+		join public.module_registry mr on mr.module_code = md.module_code
+		where md.depends_on_module_code = $2
+		  and mr.module_type = 'feature'
+		  and coalesce(mr.tenant_enableable, true) = true
+		on conflict (tenant_id, module_code) do update
+		set is_enabled = true, enabled_at = now(), disabled_at = null`,
+		tenantID, parentCode)
+	return err
 }
 
 func cascadeModuleDependencies(ctx context.Context, tx pgx.Tx, tenantID int64) error {

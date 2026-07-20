@@ -1326,4 +1326,36 @@ export const helpScenarioArticles: KbArticle[] = [
     primaryLabel: "Items",
     relatedGuideIds: ["activity-logs-audit", "inventory-master-data", "after-sales-repair", "serial-lot-registry"],
   },
+  {
+    id: "pos-cannot-open-shift",
+    title: "Cannot open a POS shift",
+    scenario: "You open POS Terminal and cannot start a session, or checkout fails after scanning.",
+    intro:
+      "POS needs a stock location, catalog items configured under Manage, and (for serial items) serials already in stock. Permission and module enablement also matter.",
+    questions: [
+      "cannot open pos shift",
+      "pos open session failed",
+      "pos checkout blocked",
+      "no products on pos grid",
+    ],
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Confirm Point of Sale is enabled under Modules & Features.",
+          "Ask an admin to open POS → Manage and set a default location plus products/categories.",
+          "On Terminal, pick the location that holds sellable stock and enter opening cash.",
+          "If checkout fails on serials, receive those units on Goods Receipt first, then scan the serial at POS.",
+          "If Manage is missing, request the POS Management permission.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Empty grid usually means products are not assigned to a POS category — fix that under Manage → Products / Categories.",
+      },
+    ],
+    primaryHref: "/app/pos",
+    primaryLabel: "POS Terminal",
+    relatedGuideIds: ["pos-checkout-guide", "pos-manage-settings"],
+  },
 ];

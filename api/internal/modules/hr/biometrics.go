@@ -23,20 +23,18 @@ type biometricPunchBody struct {
 }
 
 type biometricPunchResult struct {
-	EmployeeID int64  `json:"employee_id"`
-	WorkDate   string `json:"work_date"`
-	DTRID      int64  `json:"dtr_id,omitempty"`
-	Status     string `json:"status"`
-	Message    string `json:"message"`
+	EmployeeID  int64   `json:"employee_id"`
+	WorkDate    string  `json:"work_date"`
+	DTRID       int64   `json:"dtr_id,omitempty"`
+	Status      string  `json:"status"`
+	HoursWorked float64 `json:"hours_worked"`
+	Message     string  `json:"message"`
 }
 
 func registerBiometricRoutes(r chi.Router, pool *pgxpool.Pool) {
-	// Device/API key auth can be added later; for now HR attendance write.
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/biometrics/punches", ingestBiometricPunch(pool))
 }
 
-// ingestBiometricPunch records a punch and upserts a minimal DTR day (source=punch).
-// Full time-pair → hours calculation is Phase 4; this creates/updates the attendance row so payroll sees the day.
 func ingestBiometricPunch(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -71,34 +69,91 @@ func ingestBiometricPunch(pool *pgxpool.Pool) http.HandlerFunc {
 				punchAt = t
 			}
 		}
+		punchType := strings.ToLower(strings.TrimSpace(body.PunchType))
+		if punchType == "" {
+			punchType = "in"
+		}
+		validPunch := map[string]bool{"in": true, "out": true, "break_in": true, "break_out": true}
+		if !validPunch[punchType] {
+			punchType = "in"
+		}
 		workDate := punchAt.Format("2006-01-02")
+		_, err := pool.Exec(r.Context(), `
+			insert into public.hr_biometric_punches (tenant_id, employee_id, punch_at, punch_type, device_id)
+			values ($1,$2,$3,$4,$5)`,
+			tu.TenantID, empID, punchAt, punchType, strings.TrimSpace(body.DeviceID))
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store punch.", "ERR_INTERNAL")
+			return
+		}
+		hours := reconstructPunchHours(r, pool, tu.TenantID, empID, workDate)
+		if hours <= 0 {
+			hours = 8 // default until second punch arrives
+		}
 		notes := "biometric punch"
 		if body.DeviceID != "" {
 			notes += " device=" + body.DeviceID
 		}
-		if body.PunchType != "" {
-			notes += " type=" + body.PunchType
-		}
+		notes += " type=" + punchType
 		var dtrID int64
-		err := pool.QueryRow(r.Context(), `
+		err = pool.QueryRow(r.Context(), `
 			insert into public.hr_dtr_entries
 			  (tenant_id, employee_id, work_date, source, status, hours_worked, notes)
-			values ($1,$2,$3::date,'punch','present',8,$4)
+			values ($1,$2,$3::date,'punch','present',$4,$5)
 			on conflict (tenant_id, employee_id, work_date) do update set
 			  source = 'punch',
+			  hours_worked = excluded.hours_worked,
 			  notes = coalesce(public.hr_dtr_entries.notes,'') || E'\n' || excluded.notes,
 			  updated_at = now()
 			returning id`,
-			tu.TenantID, empID, workDate, notes,
+			tu.TenantID, empID, workDate, hours, notes,
 		).Scan(&dtrID)
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to record punch.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to record punch DTR.", "ERR_INTERNAL")
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "hr.biometric_punch", "hr_dtr_entry", &dtrID, nil, body)
 		response.OK(w, biometricPunchResult{
 			EmployeeID: empID, WorkDate: workDate, DTRID: dtrID, Status: "accepted",
-			Message: "Punch recorded. Pair in/out → hours calculation coming in a later release.",
-		}, "Punch accepted.")
+			HoursWorked: hours, Message: "Punch stored; hours reconstructed from in/out pairs when available.",
+		}, "OK")
 	}
+}
+
+func reconstructPunchHours(r *http.Request, pool *pgxpool.Pool, tenantID, empID int64, workDate string) float64 {
+	rows, err := pool.Query(r.Context(), `
+		select punch_at, punch_type from public.hr_biometric_punches
+		where tenant_id=$1 and employee_id=$2 and punch_at::date = $3::date
+		order by punch_at`, tenantID, empID, workDate)
+	if err != nil {
+		return 0
+	}
+	defer rows.Close()
+	var lastIn *time.Time
+	var total time.Duration
+	for rows.Next() {
+		var at time.Time
+		var typ string
+		if err := rows.Scan(&at, &typ); err != nil {
+			continue
+		}
+		switch typ {
+		case "in", "break_out":
+			t := at
+			lastIn = &t
+		case "out", "break_in":
+			if lastIn != nil && at.After(*lastIn) {
+				total += at.Sub(*lastIn)
+				lastIn = nil
+			}
+		}
+	}
+	hours := total.Hours()
+	if hours < 0 {
+		hours = 0
+	}
+	if hours > 24 {
+		hours = 24
+	}
+	return roundMoney(hours)
 }

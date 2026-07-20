@@ -7,7 +7,7 @@ const SYNONYM_MAP: Record<string, string[]> = {
   pr: ["purchase request", "purchaserequest"],
   rfq: ["request for quotation", "supplier quotation", "boq", "bill of quantities"],
   dr: ["delivery receipt", "delivery note", "delivery"],
-  pos: ["point of sale", "checkout", "shift"],
+  pos: ["point of sale", "checkout", "shift", "register", "cashier", "terminal", "pos manage"],
   ap: ["accounts payable", "supplier invoice", "payment voucher"],
   ar: ["accounts receivable", "collection", "official receipt"],
   or: ["official receipt", "cash in", "collection", "receipt"],

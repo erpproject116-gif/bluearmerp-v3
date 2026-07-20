@@ -42,6 +42,13 @@ export type TicketListParams = {
   order?: "asc" | "desc";
 };
 
+type TicketListCache = { rows: Ticket[]; total: number };
+
+function listRowFromTicket(t: Ticket): Ticket {
+  const { comments: _comments, ...row } = t;
+  return row;
+}
+
 export function useSupportTickets(params: () => TicketListParams) {
   return createQuery(() => {
     const p = params();
@@ -61,6 +68,7 @@ export function useSupportTickets(params: () => TicketListParams) {
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
       staleTime: 15_000,
+      refetchOnMount: "always" as const,
     };
   });
 }
@@ -77,6 +85,7 @@ export function useSupportTicket(id: () => number | null) {
         return res.data!;
       },
       staleTime: 10_000,
+      refetchOnMount: "always" as const,
     };
   });
 }
@@ -117,10 +126,27 @@ export async function addTicketComment(id: number, body: string) {
   });
 }
 
+/** Optimistically patch list/detail caches, then invalidate so remounted list is fresh. */
 export function useInvalidateSupportTickets() {
   const client = useQueryClient();
-  return () => {
-    void client.invalidateQueries({ queryKey: ["support-tickets"] });
-    void client.invalidateQueries({ queryKey: ["support-ticket"] });
+  return async (updated?: Ticket) => {
+    if (updated) {
+      client.setQueryData(["support-ticket", updated.id], updated);
+      client.setQueriesData<TicketListCache>(
+        { queryKey: ["support-tickets"] },
+        (old) => {
+          if (!old?.rows) return old;
+          const nextRow = listRowFromTicket(updated);
+          return {
+            ...old,
+            rows: old.rows.map((r) => (r.id === updated.id ? { ...r, ...nextRow } : r)),
+          };
+        },
+      );
+    }
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ["support-tickets"] }),
+      client.invalidateQueries({ queryKey: ["support-ticket"] }),
+    ]);
   };
 }

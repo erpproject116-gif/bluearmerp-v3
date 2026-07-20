@@ -223,6 +223,10 @@ func createEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "hr.employee.create", "hr_employee", &id, nil, body)
+		status := normalizeEmployeeStatus(body.Status)
+		if status == "active" {
+			_, _ = spawnHireOnboarding(r.Context(), pool, tu.TenantID, id, nil)
+		}
 		row, _ := loadEmployee(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Created.")
 	}

@@ -118,9 +118,20 @@ export default function ModuleFeaturesPage() {
   const toggle = (code: string) => {
     if (!canManage()) return;
     setMode("customize");
-    setRows((prev) =>
-      prev.map((r) => (r.module_code === code ? { ...r, is_enabled: !r.is_enabled } : r)),
-    );
+    setRows((prev) => {
+      const current = prev.find((r) => r.module_code === code);
+      if (!current) return prev;
+      const nextOn = !current.is_enabled;
+      return prev.map((r) => {
+        if (r.module_code === code) return { ...r, is_enabled: nextOn };
+        // Turning a parent on also turns its feature children on in the draft.
+        // Turning a parent off is enforced by API cascade on save.
+        if (nextOn && r.module_type === "feature" && r.depends_on?.includes(code)) {
+          return { ...r, is_enabled: true };
+        }
+        return r;
+      });
+    });
   };
 
   const applyPresetLocally = (preset: "simple_store" | "full_process") => {

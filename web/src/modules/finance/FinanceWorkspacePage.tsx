@@ -2,6 +2,7 @@ import { uiLabel } from "../../shared/branding/uiLabel";
 import { A } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { useAuth } from "../../shared/auth-context";
+import { isTenantFeatureEnabled } from "../../shared/moduleAccess";
 import { useFinanceWorkspace } from "../../shared/reports/useModuleReports";
 import { acctINavLinks } from "../../shell/acct-i-nav";
 import { acctIINavLinks } from "../../shell/acct-ii-nav";
@@ -36,6 +37,8 @@ const operationalLinks = [
 export default function FinanceWorkspacePage() {
   const auth = useAuth();
   const workspace = useFinanceWorkspace();
+  const showAcctI = () => isTenantFeatureEnabled(auth.me, "finance.acct_i", "finance");
+  const showAcctII = () => isTenantFeatureEnabled(auth.me, "finance.acct_ii", "finance");
 
   return (
     <div class="space-y-6">
@@ -64,37 +67,41 @@ export default function FinanceWorkspacePage() {
       </section>
 
       <div class="grid gap-6 lg:grid-cols-2">
-        <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-          <h3 class="mb-1 text-sm font-semibold text-text-primary">Acct. I — Core accounting</h3>
-          <p class="mb-4 text-xs text-text-secondary">Journal, chart of accounts, bank recon, financial statements</p>
-          <ul class="grid gap-2 sm:grid-cols-2">
-            <For each={acctINavLinks}>
-              {(link) => (
-                <li>
-                  <A href={link.href} class="text-sm font-medium text-brand-600 hover:underline">
-                    {link.label}
-                  </A>
-                </li>
-              )}
-            </For>
-          </ul>
-        </section>
+        <Show when={showAcctI()}>
+          <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+            <h3 class="mb-1 text-sm font-semibold text-text-primary">Acct. I — Core accounting</h3>
+            <p class="mb-4 text-xs text-text-secondary">Journal, chart of accounts, bank recon, financial statements</p>
+            <ul class="grid gap-2 sm:grid-cols-2">
+              <For each={acctINavLinks}>
+                {(link) => (
+                  <li>
+                    <A href={link.href} class="text-sm font-medium text-brand-600 hover:underline">
+                      {link.label}
+                    </A>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </section>
+        </Show>
 
-        <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-          <h3 class="mb-1 text-sm font-semibold text-text-primary">Acct. II — Extended accounting</h3>
-          <p class="mb-4 text-xs text-text-secondary">Receivable/payable depth, checks, budget, withholding, import, contracts</p>
-          <ul class="grid gap-2 sm:grid-cols-2">
-            <For each={acctIINavLinks}>
-              {(link) => (
-                <li>
-                  <A href={link.href} class="text-sm font-medium text-brand-600 hover:underline">
-                    {link.label}
-                  </A>
-                </li>
-              )}
-            </For>
-          </ul>
-        </section>
+        <Show when={showAcctII()}>
+          <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+            <h3 class="mb-1 text-sm font-semibold text-text-primary">Acct. II — Extended accounting</h3>
+            <p class="mb-4 text-xs text-text-secondary">Receivable/payable depth, checks, budget, withholding, import, contracts</p>
+            <ul class="grid gap-2 sm:grid-cols-2">
+              <For each={acctIINavLinks}>
+                {(link) => (
+                  <li>
+                    <A href={link.href} class="text-sm font-medium text-brand-600 hover:underline">
+                      {link.label}
+                    </A>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </section>
+        </Show>
       </div>
 
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">

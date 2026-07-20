@@ -182,8 +182,8 @@ export default function SpecialRunsPage() {
       <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="mb-1 text-lg font-medium">Final pay</h2>
         <p class="mb-3 text-sm text-text-secondary">
-          Last-month pro-rate + pro-rated 13th. Unused leave cash-out waits on leave balances (coming next).
-          Posting marks the employee terminated.
+          Last-month pro-rate + leave cash-out (cashable balances) + pro-rated 13th.
+          Posting marks the employee terminated and writes leave cash-out to the ledger.
         </p>
         <div class="mb-3 grid gap-3 sm:grid-cols-3">
           <Field label="Employee">

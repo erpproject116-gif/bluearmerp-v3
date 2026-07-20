@@ -75,6 +75,7 @@ export const appModules: AppModule[] = [
       { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation" },
       { label: "Stock Balance", href: "/app/inventory/reports/stock-balance", settingsHref: "/app/inventory/stock-movements" },
       { label: "On Hand", href: "/app/inventory/reports/on-hand", settingsHref: "/app/inventory/stock-movements" },
+      { label: "Inventory Status", href: "/app/inventory/reports/inventory-status", settingsHref: "/app/inventory/stock-movements" },
       { label: "Stock Ledger", href: "/app/inventory/reports/stock-ledger", settingsHref: "/app/inventory/stock-movements" },
       { label: "Inv. Book", href: "/app/inventory/reports/inv-book", settingsHref: "/app/inventory/stock-movements" },
       { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing", settingsHref: "/app/inventory/stock-movements" },
@@ -353,6 +354,15 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "booking",
+    label: "Booking",
+    href: "/app/booking/bookings",
+    basePath: "/app/booking",
+    features: [
+      { label: "Bookings", href: "/app/booking/bookings", settingsHref: "/app/booking/bookings" },
+    ],
+  },
+  {
     id: "comms",
     label: "Communications",
     href: "/app/comms/sent-documents",
@@ -395,6 +405,12 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees/settings" },
       { label: "Attendance / DTR", href: "/app/hr/attendance", settingsHref: "/app/hr/attendance" },
+      { label: "Leave", href: "/app/hr/leave", settingsHref: "/app/hr/leave" },
+      { label: "Absenteeism", href: "/app/hr/absenteeism", settingsHref: "/app/hr/absenteeism" },
+      { label: "Discipline", href: "/app/hr/discipline", settingsHref: "/app/hr/discipline" },
+      { label: "Hire onboarding", href: "/app/hr/hire-onboarding", settingsHref: "/app/hr/hire-onboarding" },
+      { label: "Evaluations", href: "/app/hr/evaluations", settingsHref: "/app/hr/evaluations" },
+      { label: "Learning", href: "/app/hr/learning", settingsHref: "/app/hr/learning" },
       { label: "Pay items", href: "/app/hr/pay-items", settingsHref: "/app/hr/pay-items" },
       { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
       { label: "13th / Final pay", href: "/app/hr/special-runs", settingsHref: "/app/hr/special-runs" },
@@ -442,7 +458,7 @@ export const appModules: AppModule[] = [
         label: "Acct. I",
         prefix: ACCT_I_PREFIX,
         href: "/app/finance/acct-i/journal-entries",
-        settingsHref: "/app/finance/official-receipts/settings",
+        settingsHref: "/app/finance/acct-i/journal-entries",
         featureCode: "finance.acct_i",
       },
       {
@@ -545,6 +561,11 @@ export const appModules: AppModule[] = [
         label: "Mapping Center",
         href: "/app/user-management/mapping-center",
         settingsHref: "/app/user-management/mapping-center",
+      },
+      {
+        label: "Migration Center",
+        href: "/app/user-management/migration-center",
+        settingsHref: "/app/user-management/migration-center",
       },
       {
         label: "Demo Data",

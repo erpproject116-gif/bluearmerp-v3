@@ -140,8 +140,10 @@ import {
   ProcessPoliciesPage,
   ModuleSetupHubPage,
   MappingCenterPage,
+  MigrationCenterPage,
   ModuleFeaturesPage,
   DemoDataPage,
+  BookingsPage,
   HelpFeedbackPage,
   ActivityLogListPage,
   ChangeLogListPage,
@@ -196,6 +198,12 @@ import {
   PayrollRunsPage,
   RemittancesPage,
   AttendancePage,
+  LeavePage,
+  AbsenteeismPage,
+  DisciplinePage,
+  HireOnboardingPage,
+  PerformancePage,
+  LearningPage,
   PayItemsPage,
   SpecialRunsPage,
   EssSelfServicePage,
@@ -221,6 +229,7 @@ import {
   StockLedgerReportPage,
   StockAgeingReportPage,
   OnHandReportPage,
+  InventoryStatusReportPage,
   InvBookReportPage,
   TrialBalanceReportPage,
   GeneralLedgerReportPage,
@@ -416,6 +425,7 @@ export default function App() {
           <Route path="/inventory/reports/stock-ledger" component={StockLedgerReportPage} />
           <Route path="/inventory/reports/stock-ageing" component={StockAgeingReportPage} />
           <Route path="/inventory/reports/on-hand" component={OnHandReportPage} />
+          <Route path="/inventory/reports/inventory-status" component={InventoryStatusReportPage} />
           <Route path="/inventory/reports/inv-book" component={InvBookReportPage} />
           <Route path="/inventory/stock-movements" component={StockMovementsPage} />
           <Route path="/inventory/stock-entries" component={StockEntriesPage} />
@@ -640,6 +650,7 @@ export default function App() {
           <Route path="/support/tickets/:id" component={() => (
             <SupportRoute><TicketDetailPage /></SupportRoute>
           )} />
+          <Route path="/booking/bookings" component={BookingsPage} />
           <Route path="/comms/inbox" component={() => (
             <CommsRoute><CommsInboxPage /></CommsRoute>
           )} />
@@ -691,6 +702,24 @@ export default function App() {
           )} />
           <Route path="/hr/attendance" component={() => (
             <HrRoute><AttendancePage /></HrRoute>
+          )} />
+          <Route path="/hr/leave" component={() => (
+            <HrRoute><LeavePage /></HrRoute>
+          )} />
+          <Route path="/hr/absenteeism" component={() => (
+            <HrRoute><AbsenteeismPage /></HrRoute>
+          )} />
+          <Route path="/hr/discipline" component={() => (
+            <HrRoute><DisciplinePage /></HrRoute>
+          )} />
+          <Route path="/hr/hire-onboarding" component={() => (
+            <HrRoute><HireOnboardingPage /></HrRoute>
+          )} />
+          <Route path="/hr/evaluations" component={() => (
+            <HrRoute><PerformancePage /></HrRoute>
+          )} />
+          <Route path="/hr/learning" component={() => (
+            <HrRoute><LearningPage /></HrRoute>
           )} />
           <Route path="/fixed-assets" component={() => (
             <FixedAssetsRoute><FixedAssetsPage /></FixedAssetsRoute>
@@ -763,6 +792,11 @@ export default function App() {
           <Route path="/user-management/mapping-center" component={() => (
             <AdminModuleRoute>
               <MappingCenterPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/migration-center" component={() => (
+            <AdminModuleRoute>
+              <MigrationCenterPage />
             </AdminModuleRoute>
           )} />
           <Route path="/user-management/demo-data" component={() => (

@@ -820,16 +820,45 @@ export const moduleKbArticles: KbArticle[] = [
   {
     id: "pos-checkout-guide",
     title: "POS: checkout, serials, and shift close",
-    scenario: "You sell at a retail counter with barcode scanning.",
-    intro: "Point of Sale runs in an open session per location. Barcode scans add catalog items; serial-tracked items require a serial scan.",
+    scenario: "You sell at a retail counter with barcode scanning and need a clear open → sell → close path.",
+    intro:
+      "Point of Sale runs as an open shift per location. Cashiers use Terminal (/app/pos). Administrators configure catalog and tax under Manage. Checkout creates a sales invoice and reduces stock at the shift location.",
     blocks: [
+      {
+        type: "heading",
+        text: "Open a shift",
+      },
       {
         type: "steps",
         items: [
-          "Open POS → Terminal. Start or resume a session with opening cash.",
-          "Scan item codes to add products. For serial-tracked items, scan the serial number when the item code does not match.",
-          "Apply discounts or hold bills if needed. Checkout with cash, card, or split tenders.",
-          "At end of shift, close the session and enter counted cash — the shift report shows sales and tenders.",
+          "Open POS → Terminal (/app/pos).",
+          "Confirm the location (stock is deducted from here) and enter opening cash.",
+          "Click Open session. You can resume an already-open session for your user/location.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Sell and check out",
+      },
+      {
+        type: "steps",
+        items: [
+          "Scan item codes or tap products on the category grid.",
+          "For serial-tracked items, attach exactly one serial per unit before checkout.",
+          "Optional: discount, privilege (senior/PWD/student), tip, table/order type, or customer.",
+          "Hold a bill if the customer steps away; resume it later from Bills.",
+          "Checkout with cash, card, or split tenders. Change is calculated for cash.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Close the shift",
+      },
+      {
+        type: "steps",
+        items: [
+          "Click Close shift and enter counted cash in the drawer.",
+          "Review the shift report: sales by tender, expected vs counted cash, and variance.",
         ],
       },
       {
@@ -846,35 +875,70 @@ export const moduleKbArticles: KbArticle[] = [
       },
       {
         type: "paragraph",
-        text: "When enabled in POS → Manage → Settings, checkout automatically creates a sales invoice journal (DR A/R, CR sales, CR VAT) and an official receipt (DR cash/card, CR A/R). Stock still comes from buying (GR) or stock entries — not from POS.",
+        text: "When enabled in POS → Manage → Settings, checkout can create the sales invoice journal (DR A/R, CR sales, CR VAT) and an official receipt (DR cash/card, CR A/R). Map default accounts under Chart of Accounts first. Stock still comes from buying (GR) or stock entries — POS does not invent inventory.",
       },
       {
         type: "tip",
-        text: "Configure GL accounts and auto-post under POS → Manage → Settings. Enable accounts_auto_post_sales and accounts_auto_post_or in Process Policies to post journals immediately.",
+        text: "If the network drops, POS may queue actions offline and sync when you are back online. Use Sync now on the amber banner when connected.",
+      },
+      {
+        type: "tip",
+        text: "Enable accounts_auto_post_sales and accounts_auto_post_or under Process Policies (or POS Settings auto-post) so journals post immediately.",
       },
     ],
     primaryHref: "/app/pos",
     primaryLabel: "Open POS terminal",
-    relatedGuideIds: ["serial-barcode-scanning"],
+    relatedGuideIds: ["pos-manage-settings", "serial-barcode-scanning", "sales-cash-in-after-save"],
   },
   {
     id: "pos-manage-settings",
-    title: "POS Manage: catalog, tax, and hardware",
-    scenario: "You need to configure what appears on the POS and how tax is calculated.",
-    intro: "POS Manage is for administrators: categories, item catalog, modifiers, default tax type, and barcode scanning.",
+    title: "POS Manage: catalog, tax, tenders, and branding",
+    scenario: "You need to configure what cashiers see on the register and how tax and payments work.",
+    intro:
+      "POS Manage (/app/pos/manage) is for administrators with the POS Management permission. Cashiers should use Terminal only. Tabs cover products, categories, modifiers, settings, and logs.",
     blocks: [
+      {
+        type: "heading",
+        text: "Products & categories",
+      },
       {
         type: "steps",
         items: [
-          "Open POS → Manage (admin permission required).",
-          "Set default location, tax type, and whether prices are tax-inclusive.",
-          "Enable barcode scanning to accept item_code scans at the terminal.",
-          "Assign items to POS categories so they appear on the quick grid.",
+          "Open POS → Manage.",
+          "Products — set sales price, VIP price, category, and whether the item appears on POS.",
+          "Categories — build the quick-pick grid cashiers tap during a sale (icons/colors optional).",
         ],
+      },
+      {
+        type: "heading",
+        text: "Settings (register behavior)",
+      },
+      {
+        type: "steps",
+        items: [
+          "Set default location (prefilled when cashiers open a shift).",
+          "Choose tax type / rate and whether prices are tax-inclusive.",
+          "Enable the tenders and order types your store uses (cash, card, dine-in, takeaway, etc.).",
+          "Optional: auto-post sales invoice and official receipt journals on checkout.",
+          "Optional: privilege discount percents (senior / PWD / student) and UI labels / theme colors.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Modifiers & logs",
+      },
+      {
+        type: "paragraph",
+        text: "Modifiers are optional add-ons (size, toppings) linked to products. Logs show recent POS actions for troubleshooting failed checkouts or permission issues.",
+      },
+      {
+        type: "tip",
+        text: "After changing catalog or tax, open Terminal and start a test shift with a small sale to confirm prices and stock deduction at the expected location.",
       },
     ],
     primaryHref: "/app/pos/manage",
     primaryLabel: "POS Manage",
+    relatedGuideIds: ["pos-checkout-guide", "finance-accounts-overview"],
   },
   {
     id: "finance-accounts-overview",
@@ -1283,6 +1347,58 @@ export const moduleKbArticles: KbArticle[] = [
     primaryHref: "/app/support/tickets",
     primaryLabel: "Support tickets",
     relatedGuideIds: ["crm-follow-ups", "after-sales-repair"],
+  },
+  {
+    id: "migration-center",
+    title: "Migration Center — import CSV from other systems",
+    scenario: "You are moving partners, items, or chart of accounts from another platform into Bluearm.",
+    intro:
+      "Migration Center lets you upload CSV files, map foreign column names to Bluearm fields, save mapping profiles for reuse, and import into partners, items, or GL accounts.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open User Management → Migration Center.",
+          "Choose Chart of accounts, Customers & suppliers, or Products.",
+          "Upload a CSV, map each Bluearm field to a source column (required fields are marked).",
+          "Optionally save the mapping as a named profile for the next import.",
+          "Run Import, then open the destination list to review created rows.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Recommended order: accounts → partners → items. Profiles are per tenant and entity kind, so you can keep separate maps for QuickBooks, Xero, or spreadsheet exports.",
+      },
+    ],
+    primaryHref: "/app/user-management/migration-center",
+    primaryLabel: "Migration Center",
+    relatedGuideIds: ["setup-wizard", "onboarding-playbook", "chart-of-accounts-ph-template"],
+  },
+  {
+    id: "booking-services",
+    title: "Booking — services calendar and convert to quotation",
+    scenario: "You schedule service appointments or internal follow-ups and later turn them into quotations.",
+    intro:
+      "The Booking module manages resources (staff/rooms), priced services, and time-bound bookings. Convert a booking with a customer into a draft quotation in one step.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Enable the Booking module under Module & Features if it is not visible.",
+          "Open Booking → Bookings. Use the Resources and Services tabs to add capacities and priced services.",
+          "Create a booking with title, start/end, customer, resource, and service.",
+          "When ready to sell, click Convert to quotation — Bluearm creates a draft quote line from the service.",
+          "Open Quotation to confirm pricing, then continue Load Slip into sales order or invoice as usual.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Conversion requires a customer on the booking and active tax type + currency. Cancelled bookings cannot convert. A booking can only link to one quotation.",
+      },
+    ],
+    primaryHref: "/app/booking/bookings",
+    primaryLabel: "Bookings",
+    relatedGuideIds: ["load-slip-overview", "quotation-to-sales-flow"],
   },
   {
     id: "customer-portal",

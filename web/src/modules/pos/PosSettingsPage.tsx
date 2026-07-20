@@ -1,5 +1,5 @@
 import { createResource, createSignal, For, Show } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch, apiAbsoluteUrl, getAccessToken } from "../../shared/api";
 import { AuthImage } from "../../shared/AuthImage";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
@@ -14,6 +14,7 @@ import {
   POS_UI_LABEL_DEFAULTS,
   resolvePosTheme,
 } from "./posBranding";
+import { PosModuleGuide } from "./PosModuleGuide";
 
 type ItemRow = {
   id: number;
@@ -98,8 +99,14 @@ export default function PosSettingsPage() {
     <div class="mx-auto max-w-6xl p-6">
       <h1 class="text-xl font-semibold text-text-primary">POS management</h1>
       <p class="mt-1 text-sm text-text-secondary">
-        Manage products, categories, register behavior, terminology, and branding for this store.
+        Manage products, categories, register behavior, terminology, and branding for this store. Cashiers sell from{" "}
+        <A href="/app/pos" class="font-medium text-brand-600 hover:underline">
+          POS Terminal
+        </A>
+        ; this page is for administrators.
       </p>
+
+      <PosModuleGuide variant="manage" class="mt-4" />
 
       <div class="mt-5 flex gap-1 border-b border-stroke">
         <For each={TAB_LABELS}>

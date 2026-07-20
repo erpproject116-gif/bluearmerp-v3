@@ -59,6 +59,7 @@ export default function AttendancePage() {
   const [dtrHours, setDtrHours] = createSignal("8");
   const [dtrOt, setDtrOt] = createSignal("0");
   const [dtrNightDiff, setDtrNightDiff] = createSignal("0");
+  const [dtrReason, setDtrReason] = createSignal("");
   const [selectedDtrId, setSelectedDtrId] = createSignal<number | null>(null);
   const [importingDtr, setImportingDtr] = createSignal(false);
   const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
@@ -179,6 +180,7 @@ export default function AttendancePage() {
         hours_worked: Number(dtrHours()) || 0,
         ot_hours: Number(dtrOt()) || 0,
         night_diff_hours: Number(dtrNightDiff()) || 0,
+        absence_reason: dtrReason().trim() || undefined,
       }),
     });
     if (!res.success) {
@@ -347,10 +349,50 @@ export default function AttendancePage() {
           <Field label="Hours"><input class={inputClass} value={dtrHours()} onInput={(e) => setDtrHours(e.currentTarget.value)} /></Field>
           <Field label="OT hours"><input class={inputClass} value={dtrOt()} onInput={(e) => setDtrOt(e.currentTarget.value)} /></Field>
           <Field label="Night diff hours"><input class={inputClass} value={dtrNightDiff()} onInput={(e) => setDtrNightDiff(e.currentTarget.value)} /></Field>
+          <Field label="Absence reason"><input class={inputClass} value={dtrReason()} onInput={(e) => setDtrReason(e.currentTarget.value)} placeholder="Optional" /></Field>
         </div>
-        <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => void saveDtr()}>
-          Save DTR
-        </button>
+        <div class="mb-4 flex flex-wrap gap-2">
+          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => void saveDtr()}>
+            Save DTR
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-4 py-2 text-sm disabled:opacity-50"
+            disabled={!selectedDtrId()}
+            onClick={() => {
+              const row = (dtr.data ?? []).find((r) => r.id === selectedDtrId());
+              if (!row) return;
+              setDtrEmp(row.employee_id);
+              setDtrDate(row.work_date);
+              setDtrStatus(row.status);
+              setDtrHours(String(row.hours_worked));
+              setDtrOt(String(row.ot_hours));
+              setDtrNightDiff(String(row.night_diff_hours));
+            }}
+          >
+            Load selected for edit
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-amber-300 px-4 py-2 text-sm text-amber-900 disabled:opacity-50"
+            disabled={!selectedDtrId()}
+            onClick={() => {
+              const id = selectedDtrId();
+              if (!id) return;
+              void apiFetch(`/api/v1/hr/dtr/${id}`, { method: "DELETE" }).then((res) => {
+                if (!res.success) {
+                  toast.warning(res.message ?? "Delete failed.");
+                  return;
+                }
+                toast.success("DTR deleted.");
+                setSelectedDtrId(null);
+                void qc.invalidateQueries({ queryKey: ["hr-dtr"] });
+              });
+            }}
+          >
+            Delete selected
+          </button>
+        </div>
         <SpreadsheetGrid
           columns={[
             { key: "work_date", header: "Date" },
@@ -365,9 +407,26 @@ export default function AttendancePage() {
           loading={dtr.isFetching}
           selectedId={selectedDtrId()}
           onSelect={setSelectedDtrId}
-          onEdit={() => {}}
-          onNew={() => {}}
-          showNew={false}
+          onEdit={(row) => {
+            setSelectedDtrId(row.id);
+            setDtrEmp(row.employee_id);
+            setDtrDate(row.work_date);
+            setDtrStatus(row.status);
+            setDtrHours(String(row.hours_worked));
+            setDtrOt(String(row.ot_hours));
+            setDtrNightDiff(String(row.night_diff_hours));
+          }}
+          onNew={() => {
+            setSelectedDtrId(null);
+            setDtrEmp(null);
+            setDtrDate(new Date().toISOString().slice(0, 10));
+            setDtrStatus("present");
+            setDtrHours("8");
+            setDtrOt("0");
+            setDtrNightDiff("0");
+            setDtrReason("");
+          }}
+          showNew={true}
           codeKey="work_date"
           nameKey="employee_name"
           page={1}

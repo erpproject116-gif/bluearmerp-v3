@@ -1,4 +1,5 @@
-import { createSignal } from "solid-js";
+import { createSignal, onMount } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
@@ -32,12 +33,18 @@ function formatWhen(iso: string) {
 
 export default function StockMovementsPage() {
   const qc = useQueryClient();
+  const [searchParams] = useSearchParams();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("created_at", 25, { defaultOrder: "desc" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
   const [movementType, setMovementType] = createSignal("");
   const [dateFrom, setDateFrom] = createSignal("");
   const [dateTo, setDateTo] = createSignal("");
+
+  onMount(() => {
+    const urlQ = searchParams.q;
+    if (typeof urlQ === "string" && urlQ.trim()) setQ(urlQ.trim());
+  });
 
   const list = createQuery(() => ({
     queryKey: ["stock-movements", page(), sort(), order(), q(), movementType(), dateFrom(), dateTo()],

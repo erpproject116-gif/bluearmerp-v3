@@ -39,6 +39,9 @@ export default function TicketDetailPage() {
 
   const [comment, setComment] = createSignal("");
   const [saving, setSaving] = createSignal(false);
+  const [editing, setEditing] = createSignal(false);
+  const [editSubject, setEditSubject] = createSignal("");
+  const [editDescription, setEditDescription] = createSignal("");
   const [warrantyLabel, setWarrantyLabel] = createSignal("");
   const [assigneeLabel, setAssigneeLabel] = createSignal("");
   const [repairOrderLabel, setRepairOrderLabel] = createSignal("");
@@ -53,6 +56,7 @@ export default function TicketDetailPage() {
     if (canManage()) return true;
     return t.created_by_user_id != null && t.created_by_user_id === me.user.id;
   };
+  const canEditDetails = () => canInteract();
 
   const attachmentBytesUsed = () => attachments().reduce((sum, a) => sum + (a.size_bytes || 0), 0);
 
@@ -66,6 +70,39 @@ export default function TicketDetailPage() {
     if (id) void loadAttachments(id);
   });
 
+  const startEdit = () => {
+    const t = ticket.data;
+    if (!t) return;
+    setEditSubject(t.subject);
+    setEditDescription(t.description ?? "");
+    setEditing(true);
+  };
+
+  const cancelEdit = () => setEditing(false);
+
+  const saveEdit = async () => {
+    const id = ticketId();
+    if (!id) return;
+    const subject = editSubject().trim();
+    if (!subject) {
+      toast.warning("Subject is required.");
+      return;
+    }
+    setSaving(true);
+    const res = await patchTicket(id, {
+      subject,
+      description: editDescription().trim() || null,
+    });
+    setSaving(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Update failed.");
+      return;
+    }
+    setEditing(false);
+    await invalidate(res.data);
+    toast.success("Ticket details saved.");
+  };
+
   const updateField = async (patch: Parameters<typeof patchTicket>[1]) => {
     const id = ticketId();
     if (!id) return;
@@ -76,7 +113,7 @@ export default function TicketDetailPage() {
       toast.warning(res.message ?? "Update failed.");
       return;
     }
-    invalidate();
+    await invalidate(res.data);
   };
 
   const postComment = async () => {
@@ -91,7 +128,7 @@ export default function TicketDetailPage() {
       return;
     }
     setComment("");
-    invalidate();
+    await invalidate(res.data);
   };
 
   return (
@@ -111,9 +148,21 @@ export default function TicketDetailPage() {
           <div class="grid gap-6 lg:grid-cols-[1fr_320px]">
             <div class="rounded-xl border border-stroke bg-white p-6">
               <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div class="min-w-0 flex-1">
                   <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">{t().ticket_no}</p>
-                  <h1 class="text-xl font-semibold text-text-primary">{t().subject}</h1>
+                  <Show
+                    when={editing()}
+                    fallback={<h1 class="text-xl font-semibold text-text-primary">{t().subject}</h1>}
+                  >
+                    <Field label="Subject">
+                      <input
+                        class={inputClass}
+                        value={editSubject()}
+                        disabled={saving()}
+                        onInput={(e) => setEditSubject(e.currentTarget.value)}
+                      />
+                    </Field>
+                  </Show>
                   <p class="mt-1 text-sm text-text-secondary">
                     <Show when={t().partner_name} fallback={<span>No customer linked</span>}>
                       {t().partner_name}
@@ -122,18 +171,63 @@ export default function TicketDetailPage() {
                     <Show when={t().created_by_name}> by {t().created_by_name}</Show>
                   </p>
                 </div>
-                <Show when={t().warranty_asset_id}>
-                  <A
-                    href={`/app/crm/warranty-assets?q=${encodeURIComponent(t().ticket_no)}`}
-                    class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
-                  >
-                    View warranty coverage
-                  </A>
-                </Show>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Show when={canEditDetails() && !editing()}>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
+                      onClick={startEdit}
+                    >
+                      Edit
+                    </button>
+                  </Show>
+                  <Show when={editing()}>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
+                      disabled={saving()}
+                      onClick={cancelEdit}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                      disabled={saving()}
+                      onClick={() => void saveEdit()}
+                    >
+                      Save
+                    </button>
+                  </Show>
+                  <Show when={t().warranty_asset_id}>
+                    <A
+                      href={`/app/crm/warranty-assets?q=${encodeURIComponent(t().ticket_no)}`}
+                      class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
+                    >
+                      View warranty coverage
+                    </A>
+                  </Show>
+                </div>
               </div>
 
-              <Show when={t().description}>
+              <Show when={editing()}>
+                <div class="mb-6">
+                  <Field label="Description">
+                    <textarea
+                      class={inputClass}
+                      rows={5}
+                      value={editDescription()}
+                      disabled={saving()}
+                      onInput={(e) => setEditDescription(e.currentTarget.value)}
+                    />
+                  </Field>
+                </div>
+              </Show>
+              <Show when={!editing() && t().description}>
                 <div class="mb-6 rounded-lg bg-slate-50 p-4 text-sm whitespace-pre-wrap">{t().description}</div>
+              </Show>
+              <Show when={!editing() && !t().description}>
+                <p class="mb-6 text-sm text-text-secondary">No description.</p>
               </Show>
 
               <Show when={t().repair_order_id}>
