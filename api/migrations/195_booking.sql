@@ -86,9 +86,9 @@ insert into public.permission_registry (permission_code, module_code, feature_ke
 on conflict (permission_code) do nothing;
 
 insert into public.tenant_role_permissions (tenant_id, role_code, permission_code, access_level)
-select t.id, r.role_code, pr.permission_code, 'write'
+select t.id, 'store_admin', pr.permission_code, 'write'
 from public.tenants t
-cross join (values ('store_admin'), ('owner'), ('superadmin')) as r(role_code)
+join public.tenant_roles tr on tr.tenant_id = t.id and tr.role_code = 'store_admin'
 cross join public.permission_registry pr
 where pr.module_code = 'booking'
 on conflict (tenant_id, role_code, permission_code) do update
