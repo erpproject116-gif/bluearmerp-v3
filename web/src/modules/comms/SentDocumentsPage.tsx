@@ -100,6 +100,7 @@ export default function SentDocumentsPage() {
         onSearchChange={setQ}
         searchPlaceholder="Search subject or recipient…"
         onRefresh={() => void refetch()}
+        settingsHref="/app/comms/settings"
       />
     </CommsLayout>
   );
