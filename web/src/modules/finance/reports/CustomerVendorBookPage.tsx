@@ -4,6 +4,7 @@ import { formatPeso } from "../../../shared/money";
 import { getAccessToken } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { GridExportButtons } from "../../../shared/gridExport";
 import type { PartnerBookType } from "./partnerBookFilters";
 import { defaultPartnerBookFilters, formatDisplayDate, partnerBookExportUrl } from "./partnerBookFilters";
 import { usePartnerBookReport } from "../../../shared/usePartnerBookReport";
@@ -126,7 +127,7 @@ export default function CustomerVendorBookPage(props: Props) {
             />
           </Field>
         </div>
-        <div class="mt-4 flex flex-wrap gap-2">
+        <div class="mt-4 flex flex-wrap items-center gap-2">
           <button type="button" class="rounded bg-brand-600 px-4 py-2 text-sm text-white" onClick={search}>
             Search (F8)
           </button>
@@ -134,8 +135,23 @@ export default function CustomerVendorBookPage(props: Props) {
             Reset
           </button>
           <Show when={submittedFilters()}>
+            <GridExportButtons
+              title={title()}
+              filename={`customer-vendor-book-${props.bookType}`}
+              columns={[
+                { key: "txn_date", header: "Date", value: (r) => String(r.txn_date ?? "") },
+                { key: "slip_type", header: "Slip Type", value: (r) => String(r.slip_type ?? "") },
+                { key: "slip_no", header: "Slip No", value: (r) => String(r.date_no_display || r.slip_no || "") },
+                { key: "partner_name", header: "Partner", value: (r) => String(r.partner_name ?? "") },
+                { key: "description", header: "Description", value: (r) => String(r.description ?? "") },
+                { key: "debit", header: "Debit", value: (r) => Number(r.debit ?? 0) },
+                { key: "credit", header: "Credit", value: (r) => Number(r.credit ?? 0) },
+                { key: "balance", header: "Balance", value: (r) => Number(r.balance ?? 0) },
+              ]}
+              rows={() => rowsWithBalance() as unknown as Record<string, unknown>[]}
+            />
             <button type="button" class="rounded border border-stroke px-4 py-2 text-sm" onClick={() => void downloadCsv()}>
-              Excel
+              API CSV
             </button>
           </Show>
         </div>

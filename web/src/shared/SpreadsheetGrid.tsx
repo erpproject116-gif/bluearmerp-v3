@@ -62,9 +62,11 @@ type Props<T extends { id: number }> = {
   toolbarExtra?: JSX.Element;
   itemsCsvImport?: boolean;
   onImportComplete?: () => void;
-  /** When set, shows Print/PDF, CSV, Excel for the current page rows. */
-  exportFilename?: string;
+  /** When set, shows Print / CSV / Excel / PDF. Defaults to "data-export" so lists always exportable. */
+  exportFilename?: string | false;
   exportTitle?: string;
+  /** Force-hide export controls (overrides default). */
+  hideExport?: boolean;
 };
 
 function selectionSet(ids?: Set<number> | number[]): Set<number> {
@@ -339,13 +341,13 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             </label>
           </Show>
           <span class="hidden flex-1 pb-2 text-sm text-text-secondary lg:inline">{uiLabel("common.grid_hint")}</span>
-          <div class="ml-auto flex shrink-0 items-center gap-2 pb-0.5">
-            <Show when={props.exportFilename}>
+          <div class="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 pb-0.5">
+            <Show when={!props.hideExport && props.exportFilename !== false}>
               <GridExportButtons
-                title={props.exportTitle ?? props.exportFilename ?? "Export"}
-                filename={props.exportFilename!}
+                title={props.exportTitle ?? String(props.exportFilename || "Export")}
+                filename={typeof props.exportFilename === "string" && props.exportFilename ? props.exportFilename : "data-export"}
                 columns={props.columns
-                  .filter((c) => c.key !== "actions")
+                  .filter((c) => c.key !== "actions" && c.key !== "id" && c.header !== "")
                   .map(
                     (c): GridExportColumn => ({
                       key: c.key,
@@ -355,7 +357,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                         if (c.exportValue) return c.exportValue(typed);
                         const raw = (typed as Record<string, unknown>)[c.key];
                         if (raw == null) return "";
-                        if (typeof raw === "string" || typeof raw === "number") return raw;
+                        if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") return String(raw);
                         return String(raw);
                       },
                     }),

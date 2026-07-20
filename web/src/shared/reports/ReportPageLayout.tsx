@@ -1,6 +1,7 @@
 import { type Accessor, type JSX, Show } from "solid-js";
 import { useAuth } from "../auth-context";
 import { uiLabel } from "../branding/uiLabel";
+import { GridExportButtons } from "../gridExport";
 
 export type ReportPageLayoutProps = {
   title: string;
@@ -12,6 +13,7 @@ export type ReportPageLayoutProps = {
   showDateFilters?: boolean;
   onSearch: () => void;
   onReset: () => void;
+  /** Optional API CSV download (kept alongside client Print/CSV/Excel/PDF). */
   onExportCsv?: () => void;
   submitted: boolean;
   loading?: boolean;
@@ -21,11 +23,18 @@ export type ReportPageLayoutProps = {
   onPageChange?: (page: number) => void;
   filterExtra?: JSX.Element;
   children: JSX.Element;
+  /** Filename stem for client-side exports from the on-screen table. */
+  exportFilename?: string;
 };
 
 export function ReportPageLayout(props: ReportPageLayoutProps) {
   const auth = useAuth();
   const showDates = () => props.showDateFilters !== false && props.dateFrom && props.dateTo;
+  let reportBodyEl: HTMLDivElement | undefined;
+
+  const exportName = () =>
+    (props.exportFilename ?? props.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")) ||
+    "report";
 
   return (
     <>
@@ -73,11 +82,22 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
 
       <Show when={props.submitted}>
         <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
-          <div class="border-b border-stroke px-5 py-4 text-center">
-            <h2 class="text-xl font-bold">{props.title}</h2>
-            <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
+          <div class="flex flex-wrap items-start justify-between gap-3 border-b border-stroke px-5 py-4">
+            <div class="text-center sm:text-left">
+              <h2 class="text-xl font-bold">{props.title}</h2>
+              <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
+            </div>
+            <GridExportButtons
+              title={props.title}
+              filename={exportName()}
+              columns={[]}
+              rows={() => []}
+              scrapeRoot={() => reportBodyEl}
+            />
           </div>
-          <div class="overflow-x-auto">{props.children}</div>
+          <div class="overflow-x-auto" ref={(el) => (reportBodyEl = el)}>
+            {props.children}
+          </div>
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
             <span>
               {uiLabel("reports.generated_prefix")} {(props.generatedAt ?? new Date()).toLocaleString()}
@@ -85,10 +105,10 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                 <span class="ml-2 text-text-secondary">{uiLabel("common.loading")}</span>
               </Show>
             </span>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap items-center gap-2">
               <Show when={props.onExportCsv}>
                 <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => props.onExportCsv!()}>
-                  {uiLabel("reports.export_csv")}
+                  {uiLabel("reports.export_csv")} (API)
                 </button>
               </Show>
               <Show when={props.onPageChange && props.page && props.totalPages}>

@@ -2,6 +2,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { inputClass } from "../../shared/SpreadsheetGrid";
+import { GridExportButtons } from "../../shared/gridExport";
 import { useToast } from "../../shared/toast";
 import { FinanceLayout } from "./FinanceLayout";
 import { uiLabel } from "../../shared/branding/uiLabel";
@@ -161,6 +162,28 @@ export default function BankReconciliationPage() {
         <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={refresh}>
           Refresh
         </button>
+        <GridExportButtons
+          title="Bank Reconciliation — Unmatched Statement Lines"
+          filename="bank-recon-statement-lines"
+          columns={[
+            { key: "statement_date", header: "Date", value: (r) => String(r.statement_date ?? "") },
+            { key: "reference", header: "Reference", value: (r) => String(r.reference_no || r.description || "") },
+            { key: "amount", header: "Amount", value: (r) => Number(r.amount ?? 0) },
+          ]}
+          rows={() => (statements.data ?? []) as unknown as Record<string, unknown>[]}
+        />
+        <GridExportButtons
+          title="Bank Reconciliation — Unmatched Payments"
+          filename="bank-recon-unmatched-payments"
+          columns={[
+            { key: "payment_date", header: "Date", value: (r) => String(r.payment_date ?? "") },
+            { key: "document_no", header: "Document", value: (r) => String(r.document_no ?? "") },
+            { key: "partner_name", header: "Partner", value: (r) => String(r.partner_name ?? "") },
+            { key: "payment_method", header: "Method", value: (r) => String(r.payment_method ?? "") },
+            { key: "amount", header: "Amount", value: (r) => Number(r.amount ?? 0) },
+          ]}
+          rows={() => (unmatched.data ?? []) as unknown as Record<string, unknown>[]}
+        />
       </div>
 
       <div class="grid gap-4 lg:grid-cols-2">
