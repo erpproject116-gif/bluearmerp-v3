@@ -80,9 +80,13 @@ type queueRow struct {
 }
 
 func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rows []queueRow) error {
-	email, err := tenantOwnerEmail(ctx, pool, tenantID)
-	if err != nil || email == "" {
+	emails, err := tenantAdminEmails(ctx, pool, tenantID)
+	if err != nil {
 		return err
+	}
+	if len(emails) == 0 {
+		log.Printf("change-alert: tenant=%d no tenant-admin emails; leaving queue pending", tenantID)
+		return nil
 	}
 	subject, html := formatDigest(rows)
 	cfg := outbox.LoadSMTPConfig()
@@ -90,7 +94,7 @@ func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 		log.Printf("change-alert: tenant=%d SMTP not configured; leaving queue pending", tenantID)
 		return nil
 	}
-	if err := outbox.SendEmailMIME(cfg, []string{email}, nil, subject, html, nil); err != nil {
+	if err := outbox.SendEmailMIME(cfg, emails, nil, subject, html, nil); err != nil {
 		return err
 	}
 	ids := make([]int64, 0, len(rows))
@@ -106,14 +110,41 @@ func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 	return nil
 }
 
-func tenantOwnerEmail(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (string, error) {
-	var email string
-	err := pool.QueryRow(ctx, `
-		select coalesce(u.email, '')
-		from public.tenants t
-		left join public.users u on u.id = t.owner_user_id
-		where t.id = $1`, tenantID).Scan(&email)
-	return strings.TrimSpace(email), err
+// tenantAdminEmails returns distinct emails for this tenant's owner and store_admins.
+// Platform superadmins are not included unless they are also a member of this tenant
+// as owner/store_admin — digests stay per-business.
+func tenantAdminEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]string, error) {
+	rows, err := pool.Query(ctx, `
+		select distinct lower(trim(u.email)) as email
+		from public.users u
+		join public.tenants t on t.id = u.tenant_id
+		where u.tenant_id = $1
+		  and u.status = 'active'
+		  and coalesce(trim(u.email), '') <> ''
+		  and (
+		    t.owner_user_id = u.id
+		    or u.tenant_role = 'store_admin'
+		  )
+		order by 1`, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	seen := map[string]bool{}
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, err
+		}
+		email = strings.TrimSpace(email)
+		if email == "" || seen[email] {
+			continue
+		}
+		seen[email] = true
+		out = append(out, email)
+	}
+	return out, rows.Err()
 }
 
 func formatDigest(rows []queueRow) (subject, html string) {
