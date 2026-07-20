@@ -57,6 +57,27 @@ func loadGmailConnectionForUser(ctx context.Context, pool *pgxpool.Pool, tenantI
 	return row, err
 }
 
+// FirstActiveGmailUserID returns any user in the tenant with an active Gmail connection.
+func FirstActiveGmailUserID(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (int64, error) {
+	var userID int64
+	err := pool.QueryRow(ctx, `
+		select user_id from public.com_gmail_connections
+		where tenant_id = $1 and status = 'active'
+		order by updated_at desc nulls last, id desc
+		limit 1`, tenantID).Scan(&userID)
+	if err == pgx.ErrNoRows {
+		return 0, err
+	}
+	return userID, err
+}
+
+// SendHTMLViaGmail sends an HTML email using a connected Gmail account (no attachments).
+func SendHTMLViaGmail(ctx context.Context, pool *pgxpool.Pool, tenantID, senderUserID int64, to []string, subject, htmlBody string) error {
+	cfg := LoadGmailConfig()
+	_, _, err := SendViaGmail(ctx, pool, cfg, tenantID, senderUserID, to, nil, subject, htmlBody, nil)
+	return err
+}
+
 func connectionToPublic(row gmailConnectionRow, cfg GmailConfig) GmailConnection {
 	out := GmailConnection{
 		ID:              row.ID,
