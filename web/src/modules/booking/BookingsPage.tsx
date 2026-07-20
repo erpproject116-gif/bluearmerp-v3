@@ -60,6 +60,7 @@ export default function BookingsPage() {
   );
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Booking | null>(null);
+  const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [setupTab, setSetupTab] = createSignal<"bookings" | "resources" | "services">("bookings");
 
   const list = createQuery(() => ({
@@ -79,11 +80,11 @@ export default function BookingsPage() {
     },
   }));
 
-  const [resources] = createResource(async () => {
+  const [resources, { refetch: refetchResources }] = createResource(async () => {
     const res = await apiFetch<Resource[]>("/api/v1/booking/resources");
     return res.success ? (res.data ?? []) : [];
   });
-  const [services] = createResource(async () => {
+  const [services, { refetch: refetchServices }] = createResource(async () => {
     const res = await apiFetch<Service[]>("/api/v1/booking/services");
     return res.success ? (res.data ?? []) : [];
   });
@@ -164,6 +165,8 @@ export default function BookingsPage() {
           ]}
           rows={list.data?.rows ?? []}
           loading={list.isFetching}
+          selectedId={selectedId()}
+          onSelect={setSelectedId}
           onEdit={(row) => {
             setEditing(row);
             setModalOpen(true);
@@ -186,10 +189,10 @@ export default function BookingsPage() {
       </Show>
 
       <Show when={setupTab() === "resources"}>
-        <SetupResourcesList rows={resources() ?? []} onSaved={() => resources.refetch()} />
+        <SetupResourcesList rows={resources() ?? []} onSaved={() => void refetchResources()} />
       </Show>
       <Show when={setupTab() === "services"}>
-        <SetupServicesList rows={services() ?? []} onSaved={() => services.refetch()} />
+        <SetupServicesList rows={services() ?? []} onSaved={() => void refetchServices()} />
       </Show>
 
       <BookingModal
