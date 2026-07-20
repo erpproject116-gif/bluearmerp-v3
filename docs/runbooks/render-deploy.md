@@ -95,6 +95,19 @@ You must see `access-control-allow-origin: https://bluearmerp-v3.vercel.app`. If
 
 After deploying the latest API, Vercel preview URLs (`*.vercel.app`) are allowed automatically when your production Vercel URL is in `CORS_ORIGIN`.
 
+## Email / SMTP on Render
+
+Document email uses `SMTP_HOST`, `SMTP_FROM`, and usually `SMTP_USER` / `SMTP_PASS` / `SMTP_PORT` (default `587`).
+
+**Render free web services block outbound SMTP** on ports `25`, `465`, and `587`. Env vars can be set correctly and send-email will still fail (often a hang → 500, or a timeout error after deploy of the short SMTP dial).
+
+Options:
+1. **Upgrade** the API service to any **paid** instance type (ports 465/587 work; port 25 stays blocked).
+2. Use **Gmail OAuth** instead (HTTPS, not SMTP): set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT`, then **Communications → Settings → Connect Gmail**.
+3. Use a transactional provider over **HTTPS API** (SendGrid/Resend/etc.) — not wired yet; SMTP or Gmail only today.
+
+After changing SMTP env vars, **redeploy** (or restart) so the process picks them up.
+
 ## Passwords with special characters
 
 If `SUPABASE_DB_PASSWORD` contains `$`, `@`, or `#`, paste the value **literally** in the Render Environment UI. No shell quoting needed in the dashboard.
