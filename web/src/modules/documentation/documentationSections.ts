@@ -788,6 +788,29 @@ export const documentationSections: DocSection[] = [
     ],
   },
   {
+    id: "booking",
+    title: "Booking",
+    iconId: "booking",
+    intro: "Resources, priced services, and bookings that convert to quotations.",
+    primaryHref: "/app/booking/bookings",
+    primaryLabel: "Open Bookings",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Find Booking in the sidebar (below CRM). Use Bookings, Resources, and Services — each has its own sidebar link and URL.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Enable Booking under User Management → Module & Features if it is missing (migration 195/196).",
+          "Add Resources (staff/rooms) and Services (duration + price).",
+          "Create a booking with customer, start/end, resource, and service.",
+          "Convert confirmed bookings with a customer to a draft quotation.",
+        ],
+      },
+    ],
+  },
+  {
     id: "hr",
     title: "HR and payroll",
     iconId: "hr",

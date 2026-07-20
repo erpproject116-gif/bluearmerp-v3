@@ -1,5 +1,5 @@
 import { createSignal, createResource, For, Show, createEffect } from "solid-js";
-import { A } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
@@ -37,6 +37,19 @@ type Service = {
 };
 
 const STATUSES = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
+type BookingTab = "bookings" | "resources" | "services";
+
+function tabFromPath(pathname: string): BookingTab {
+  if (pathname.includes("/resources")) return "resources";
+  if (pathname.includes("/services")) return "services";
+  return "bookings";
+}
+
+function pathForTab(tab: BookingTab) {
+  if (tab === "resources") return "/app/booking/resources";
+  if (tab === "services") return "/app/booking/services";
+  return "/app/booking/bookings";
+}
 
 function toLocalInput(iso: string) {
   const d = new Date(iso);
@@ -53,6 +66,8 @@ function fromLocalInput(local: string) {
 export default function BookingsPage() {
   const toast = useToast();
   const qc = useQueryClient();
+  const loc = useLocation();
+  const navigate = useNavigate();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, statusFilter, setStatusFilter } = useListState(
     "starts_at",
     25,
@@ -61,7 +76,16 @@ export default function BookingsPage() {
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Booking | null>(null);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const [setupTab, setSetupTab] = createSignal<"bookings" | "resources" | "services">("bookings");
+  const [setupTab, setSetupTab] = createSignal<BookingTab>(tabFromPath(loc.pathname));
+
+  createEffect(() => {
+    setSetupTab(tabFromPath(loc.pathname));
+  });
+
+  const goTab = (tab: BookingTab) => {
+    setSetupTab(tab);
+    navigate(pathForTab(tab));
+  };
 
   const list = createQuery(() => ({
     queryKey: ["bookings", page(), q(), sort(), order(), statusFilter()],
@@ -111,16 +135,25 @@ export default function BookingsPage() {
 
   return (
     <div class="space-y-4">
+      <div>
+        <h1 class="text-2xl font-semibold text-text-primary">Booking</h1>
+        <p class="mt-1 text-sm text-text-secondary">
+          Schedule resources and services, then convert bookings to quotations when ready.
+        </p>
+      </div>
       <div class="flex flex-wrap gap-2">
         <For each={["bookings", "resources", "services"] as const}>
           {(tab) => (
-            <button
-              type="button"
+            <A
+              href={pathForTab(tab)}
               class={`rounded-lg px-3 py-1.5 text-sm ${setupTab() === tab ? "bg-brand-600 text-white" : "border border-stroke"}`}
-              onClick={() => setSetupTab(tab)}
+              onClick={(e) => {
+                e.preventDefault();
+                goTab(tab);
+              }}
             >
               {tab[0]!.toUpperCase() + tab.slice(1)}
-            </button>
+            </A>
           )}
         </For>
       </div>

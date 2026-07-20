@@ -287,6 +287,7 @@ import { CommsRoute } from "./shared/CommsRoute";
 import { OperationsRoute } from "./shared/OperationsRoute";
 import { PosRoute } from "./shared/PosRoute";
 import { HrRoute } from "./shared/HrRoute";
+import { BookingRoute } from "./shared/BookingRoute";
 import { FixedAssetsRoute } from "./shared/FixedAssetsRoute";
 import { JobCostingRoute } from "./shared/JobCostingRoute";
 import { ManufacturingRoute } from "./shared/ManufacturingRoute";
@@ -650,7 +651,18 @@ export default function App() {
           <Route path="/support/tickets/:id" component={() => (
             <SupportRoute><TicketDetailPage /></SupportRoute>
           )} />
-          <Route path="/booking/bookings" component={BookingsPage} />
+          <Route path="/booking/bookings" component={() => (
+            <BookingRoute><BookingsPage /></BookingRoute>
+          )} />
+          <Route path="/booking/resources" component={() => (
+            <BookingRoute><BookingsPage /></BookingRoute>
+          )} />
+          <Route path="/booking/services" component={() => (
+            <BookingRoute><BookingsPage /></BookingRoute>
+          )} />
+          <Route path="/booking" component={() => (
+            <BookingRoute><BookingsPage /></BookingRoute>
+          )} />
           <Route path="/comms/inbox" component={() => (
             <CommsRoute><CommsInboxPage /></CommsRoute>
           )} />
