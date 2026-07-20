@@ -15,20 +15,29 @@ import (
 // TemplateVars are substituted into email templates ({{key}}).
 type TemplateVars map[string]string
 
+// EmailFileAttachment is a binary file to attach to outbound mail.
+type EmailFileAttachment struct {
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
 // SendDocumentEmailParams configures a document email send.
 type SendDocumentEmailParams struct {
-	TenantID       int64
-	SentByUserID   *int64
-	DocType        string
-	DocID          int64
-	ToAddrs        []string
-	CcAddrs        []string
-	Subject        string
-	BodyText       string
-	AttachmentName string
-	AttachmentData []byte
-	AttachmentType string
-	TemplateVars   TemplateVars
+	TenantID         int64
+	SentByUserID     *int64
+	DocType          string
+	DocID            int64
+	ToAddrs          []string
+	CcAddrs          []string
+	Subject          string
+	BodyText         string
+	BodyIsHTML       bool
+	AttachmentName   string
+	AttachmentData   []byte
+	AttachmentType   string
+	ExtraAttachments []EmailFileAttachment
+	TemplateVars     TemplateVars
 }
 
 // SendDocumentEmail logs the send, enqueues outbox delivery, and drains pending events.
@@ -41,6 +50,7 @@ func SendDocumentEmail(ctx context.Context, pool *pgxpool.Pool, p SendDocumentEm
 
 	subject := strings.TrimSpace(p.Subject)
 	body := strings.TrimSpace(p.BodyText)
+	bodyIsHTML := p.BodyIsHTML
 	if subject == "" || body == "" {
 		tplSubject, tplBody, err := loadEmailTemplate(ctx, pool, p.TenantID, p.DocType)
 		if err != nil {
@@ -51,6 +61,7 @@ func SendDocumentEmail(ctx context.Context, pool *pgxpool.Pool, p SendDocumentEm
 		}
 		if body == "" {
 			body = applyTemplate(tplBody, p.TemplateVars)
+			bodyIsHTML = false
 		}
 	}
 	if subject == "" {
@@ -82,13 +93,49 @@ func SendDocumentEmail(ctx context.Context, pool *pgxpool.Pool, p SendDocumentEm
 	}
 
 	payload := documentEmailPayload{
-		SentMessageID:  sentID,
-		AttachmentName: p.AttachmentName,
-		AttachmentType: p.AttachmentType,
+		SentMessageID: sentID,
+		BodyIsHTML:    bodyIsHTML,
 	}
+	var atts []documentEmailAttachment
 	if len(p.AttachmentData) > 0 {
-		payload.AttachmentBase64 = base64.StdEncoding.EncodeToString(p.AttachmentData)
+		name := p.AttachmentName
+		if name == "" {
+			name = "document.pdf"
+		}
+		ct := p.AttachmentType
+		if ct == "" {
+			ct = "application/pdf"
+		}
+		atts = append(atts, documentEmailAttachment{
+			Name:   name,
+			Type:   ct,
+			Base64: base64.StdEncoding.EncodeToString(p.AttachmentData),
+		})
+		// Legacy single-attachment fields for older workers.
+		payload.AttachmentName = name
+		payload.AttachmentType = ct
+		payload.AttachmentBase64 = atts[0].Base64
 	}
+	for _, extra := range p.ExtraAttachments {
+		if len(extra.Data) == 0 {
+			continue
+		}
+		name := strings.TrimSpace(extra.Filename)
+		if name == "" {
+			name = "attachment"
+		}
+		ct := strings.TrimSpace(extra.ContentType)
+		if ct == "" {
+			ct = "application/octet-stream"
+		}
+		atts = append(atts, documentEmailAttachment{
+			Name:   name,
+			Type:   ct,
+			Base64: base64.StdEncoding.EncodeToString(extra.Data),
+		})
+	}
+	payload.Attachments = atts
+
 	key := fmt.Sprintf("document.email:%s:%d:%d", p.DocType, p.DocID, sentID)
 	if err := outbox.EnqueueTx(ctx, tx, p.TenantID, "document.email", key, payload); err != nil {
 		return SentMessage{}, err

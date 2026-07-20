@@ -12,6 +12,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/pdf"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -165,6 +166,7 @@ func getQuotationPDF(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Quotation not found.", "ERR_NOT_FOUND")
 			return
 		}
+		pdfIn.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
 		data, err := pdf.RenderQuotationPDF(pdfIn)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
@@ -177,13 +179,6 @@ func getQuotationPDF(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-type sendQuotationEmailBody struct {
-	ToAddrs  []string `json:"to_addrs"`
-	CcAddrs  []string `json:"cc_addrs"`
-	Subject  string   `json:"subject"`
-	BodyText string   `json:"body_text"`
-}
-
 func postQuotationSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -192,13 +187,12 @@ func postQuotationSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
-		var body sendQuotationEmailBody
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		body, err := comms.DecodeSendEmailBody(r)
+		if err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		to := body.ToAddrs
-		if len(to) == 0 {
+		if len(body.ToAddrs) == 0 {
 			response.Validation(w, map[string]string{"to_addrs": "At least one recipient is required."})
 			return
 		}
@@ -209,25 +203,41 @@ func postQuotationSendEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		pdfIn.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)
 		pdfBytes, err := pdf.RenderQuotationPDF(pdfIn)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to render PDF.", "ERR_INTERNAL")
 			return
 		}
 
+		extras, totalExtra, err := comms.DecodeClientAttachments(body.Attachments)
+		if err != nil {
+			response.Validation(w, map[string]string{"attachments": err.Error()})
+			return
+		}
+		if len(pdfBytes)+totalExtra > comms.MaxEmailAttachmentsBytes {
+			response.Validation(w, map[string]string{
+				"attachments": fmt.Sprintf("Attachments exceed %d MB combined limit.", comms.MaxEmailAttachmentsBytes/(1024*1024)),
+			})
+			return
+		}
+		bodyHTML, bodyIsHTML := comms.ResolveComposeBody(r.Context(), pool, tu.TenantID, tu.AppUserID, body)
+
 		userID := tu.AppUserID
 		sent, err := comms.SendDocumentEmail(r.Context(), pool, comms.SendDocumentEmailParams{
-			TenantID:       tu.TenantID,
-			SentByUserID:   &userID,
-			DocType:        "quotation",
-			DocID:          id,
-			ToAddrs:        to,
-			CcAddrs:        body.CcAddrs,
-			Subject:        body.Subject,
-			BodyText:       body.BodyText,
-			AttachmentName: fmt.Sprintf("quotation-%s.pdf", pdfIn.Quotation.ReferenceNo),
-			AttachmentData: pdfBytes,
-			AttachmentType: "application/pdf",
+			TenantID:         tu.TenantID,
+			SentByUserID:     &userID,
+			DocType:          "quotation",
+			DocID:            id,
+			ToAddrs:          body.ToAddrs,
+			CcAddrs:          body.CcAddrs,
+			Subject:          body.Subject,
+			BodyText:         bodyHTML,
+			BodyIsHTML:       bodyIsHTML,
+			AttachmentName:   fmt.Sprintf("quotation-%s.pdf", pdfIn.Quotation.ReferenceNo),
+			AttachmentData:   pdfBytes,
+			AttachmentType:   "application/pdf",
+			ExtraAttachments: extras,
 			TemplateVars: comms.TemplateVars{
 				"reference_no":  payload.Quotation.ReferenceNo,
 				"customer_name": payload.Partner.CompanyName,

@@ -97,16 +97,16 @@ After deploying the latest API, Vercel preview URLs (`*.vercel.app`) are allowed
 
 ## Email / SMTP on Render
 
-Document email uses `SMTP_HOST`, `SMTP_FROM`, and usually `SMTP_USER` / `SMTP_PASS` / `SMTP_PORT` (default `587`).
+Document email and **owner hourly change digests** use `SMTP_HOST`, `SMTP_FROM`, and usually `SMTP_USER` / `SMTP_PASS` / `SMTP_PORT` (default `587`).
 
-**Render free web services block outbound SMTP** on ports `25`, `465`, and `587`. Env vars can be set correctly and send-email will still fail (often a hang → 500, or a timeout error after deploy of the short SMTP dial).
+**Render free web services block outbound SMTP** on ports `25`, `465`, and `587`. Env vars can be set correctly and send-email / digests will still fail (often a hang → timeout error).
 
 Options:
 1. **Upgrade** the API service to any **paid** instance type (ports 465/587 work; port 25 stays blocked).
-2. Use **Gmail OAuth** instead (HTTPS, not SMTP): set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT`, then **Communications → Settings → Connect Gmail**.
-3. Use a transactional provider over **HTTPS API** (SendGrid/Resend/etc.) — not wired yet; SMTP or Gmail only today.
+2. Use **Gmail OAuth** for document email (HTTPS, not SMTP): set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT`, then **Communications → Settings → Connect Gmail**. Owner digests still need SMTP (or a future Gmail digest path); until then digests stay queued when SMTP is unavailable.
+3. Cron: `POST /api/v1/platform/jobs/change-alert-digest` with `X-Change-Alert-Job-Secret` (or `X-CRM-Job-Secret`) every hour. Digests go to the **tenant owner only**.
 
-After changing SMTP env vars, **redeploy** (or restart) so the process picks them up.
+After changing SMTP / Google env vars, **redeploy** (or restart) so the process picks them up.
 
 ## Passwords with special characters
 

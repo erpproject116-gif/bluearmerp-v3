@@ -189,7 +189,7 @@ func insertOne(ctx context.Context, pool *pgxpool.Pool, ev logEvent) error {
 	if err != nil {
 		return err
 	}
-	notify.FromAudit(ctx, pool, ev.tenantID, ev.actorUserID, ev.actionCode, ev.targetType, ev.targetID)
+	notify.FromAudit(ctx, pool, ev.tenantID, ev.actorUserID, ev.actionCode, ev.targetType, ev.targetID, ev.oldJSON, ev.newJSON)
 	return nil
 }
 

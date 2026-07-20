@@ -47,6 +47,7 @@ type QuotationPrintInput struct {
 	Partner     Party
 	Quotation   QuotationDoc
 	GeneratedAt *time.Time
+	Chrome      PrintChrome
 }
 
 func formatMoney(amount float64, currencyCode string) string {
@@ -105,7 +106,8 @@ func progressStatusLabel(s string) string {
 func RenderQuotationPDF(in QuotationPrintInput) ([]byte, error) {
 	q := in.Quotation
 	d := NewDocLayout()
-	d.RenderHeader("Quotation", q.ReferenceNo, in.Tenant.CompanyName)
+	ApplyChromeToParty(&in.Tenant, in.Chrome)
+	d.RenderBrandedHeader("Quotation", q.ReferenceNo, in.Tenant.CompanyName, in.Chrome)
 
 	details := []PartyField{
 		{Label: "Date-no", Value: q.DateNoDisplay},
@@ -169,6 +171,6 @@ func RenderQuotationPDF(in QuotationPrintInput) ([]byte, error) {
 	if in.GeneratedAt != nil {
 		generatedAt = *in.GeneratedAt
 	}
-	d.RenderFooter(fmt.Sprintf("Generated from BluearmERP · %s", generatedAt.Format("2006-01-02 15:04")))
+	d.RenderFooter(in.Chrome.footerOrDefault(DefaultGeneratedFooter(generatedAt)))
 	return d.Bytes()
 }
