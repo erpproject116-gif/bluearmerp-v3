@@ -360,6 +360,8 @@ export const appModules: AppModule[] = [
     basePath: "/app/booking",
     features: [
       { label: "Bookings", href: "/app/booking/bookings", settingsHref: "/app/booking/bookings" },
+      { label: "Resources", href: "/app/booking/resources", settingsHref: "/app/booking/resources" },
+      { label: "Services", href: "/app/booking/services", settingsHref: "/app/booking/services" },
     ],
   },
   {

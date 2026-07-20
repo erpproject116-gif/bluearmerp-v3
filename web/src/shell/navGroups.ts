@@ -100,6 +100,7 @@ export const navGroups: NavGroup[] = [
 /** Shown after collapsible groups (below Misc). */
 export const belowGroupModuleIds = [
   "crm",
+  "booking",
   "comms",
   "operations",
   "quality",
