@@ -28,9 +28,10 @@ export const ProtectedRoute: ParentComponent = (props) => {
   const otpGateHref = () => {
     const email = getPendingLoginOtpEmail() || auth.me?.user.email?.trim() || "";
     if (email) setPendingLoginOtpEmail(email);
+    // otp=1: ask SignIn to send a code (session was already open without verification).
     return email
-      ? `/signin?step=verify&email=${encodeURIComponent(email)}`
-      : "/signin?step=verify";
+      ? `/signin?step=verify&email=${encodeURIComponent(email)}&otp=1`
+      : "/signin?step=verify&otp=1";
   };
 
   return (
@@ -38,10 +39,10 @@ export const ProtectedRoute: ParentComponent = (props) => {
       when={auth.bootstrapping}
       fallback={
         <Show
-          when={auth.me && isLoginOtpVerified()}
+          when={auth.me && isLoginOtpVerified(auth.me.user.email)}
           fallback={
             <Show
-              when={auth.me && !isLoginOtpVerified()}
+              when={auth.me && !isLoginOtpVerified(auth.me.user.email)}
               fallback={
                 <Show
                   when={needsSignInRedirect(auth)}

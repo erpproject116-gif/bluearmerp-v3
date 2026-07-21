@@ -3,7 +3,9 @@ import { useNavigate } from "@solidjs/router";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "../../shared/api";
 import { setActiveTenantId } from "../../shared/activeContext";
 import type { MeData } from "../../shared/auth-context";
-import { setPendingLoginOtpEmail } from "./loginOtpGate";
+import { setPendingLoginOtpEmail, hasValidLoginOtpTrust, markLoginOtpVerified } from "./loginOtpGate";
+import { useAuth } from "../../shared/auth-context";
+import { resolveAppEntryPath } from "../../shared/resolveAppEntryPath";
 
 async function fetchMeWithRetry(maxAttempts = 4): Promise<Awaited<ReturnType<typeof apiFetch<MeData>>>> {
   let lastErr: unknown;
@@ -44,6 +46,7 @@ async function recordIntake(email: string, fullName: string) {
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
+  const auth = useAuth();
 
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
@@ -80,7 +83,7 @@ export default function AuthCallbackPage() {
       return;
     }
 
-    // Ensure workspace exists (trial) before email OTP — still require code before app entry.
+    // Ensure workspace exists (trial) before app entry.
     try {
       let me = await fetchMeWithRetry();
       if (!me.success && (me.status === 403 || me.code === "ERR_FORBIDDEN")) {
@@ -112,6 +115,15 @@ export default function AuthCallbackPage() {
       return;
     }
 
+    // Already verified earlier today — skip the email code.
+    if (hasValidLoginOtpTrust(email)) {
+      markLoginOtpVerified(email);
+      await auth.refresh();
+      const href = await resolveAppEntryPath(auth.me);
+      navigate(href, { replace: true });
+      return;
+    }
+
     setPendingLoginOtpEmail(email);
     await supabase.auth.signOut();
     const { error: otpErr } = await supabase.auth.signInWithOtp({
@@ -122,14 +134,16 @@ export default function AuthCallbackPage() {
       navigate(`/signin?error=${encodeURIComponent(otpErr.message)}`, { replace: true });
       return;
     }
-    navigate(`/signin?step=verify&email=${encodeURIComponent(email)}`, { replace: true });
+    // otp=0: code already sent — SignIn must not send a second email.
+    navigate(`/signin?step=verify&email=${encodeURIComponent(email)}&otp=0`, { replace: true });
   });
 
   return (
     <div class="flex min-h-screen items-center justify-center bg-body">
       <div class="rounded-xl border border-stroke bg-white px-8 py-6 text-center shadow-sm">
         <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        <p class="text-sm text-text-secondary">Completing sign-in…</p>
+        <p class="text-sm font-medium text-text-primary">Almost there</p>
+        <p class="mt-1 text-sm text-text-secondary">Finishing Google sign-in…</p>
       </div>
     </div>
   );
