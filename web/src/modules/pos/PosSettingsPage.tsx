@@ -14,7 +14,6 @@ import {
   POS_UI_LABEL_DEFAULTS,
   resolvePosTheme,
 } from "./posBranding";
-import { PosModuleGuide } from "./PosModuleGuide";
 
 type ItemRow = {
   id: number;
@@ -105,8 +104,6 @@ export default function PosSettingsPage() {
         </A>
         ; this page is for administrators.
       </p>
-
-      <PosModuleGuide variant="manage" class="mt-4" />
 
       <div class="mt-5 flex gap-1 border-b border-stroke">
         <For each={TAB_LABELS}>

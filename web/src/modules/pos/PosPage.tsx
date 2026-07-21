@@ -51,7 +51,7 @@ import {
   peekPosOfflineQueue,
   removePosOfflineAction,
 } from "../../shared/posOfflineQueue";
-import { PosModuleGuide } from "./PosModuleGuide";
+import { WorkflowGuideHeaderControl } from "../../shared/WorkflowGuideHeader";
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "25" });
@@ -749,6 +749,10 @@ export default function PosPage() {
               })()}
             </button>
           </Show>
+          <WorkflowGuideHeaderControl
+            compact
+            class="relative inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+          />
           <Show when={hasPermission(auth.me, "pos.manage", "read")}>
             <A
               href="/app/pos/manage"
@@ -804,7 +808,6 @@ export default function PosPage() {
         when={session.data}
         fallback={
           <div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-            <PosModuleGuide variant="terminal" class="w-full max-w-2xl" />
             <section class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 class="mb-1 text-lg font-semibold">{posLabel("open_shift")}</h2>
               <p class="mb-5 text-sm text-slate-500">{posLabel("open_shift_hint")}</p>

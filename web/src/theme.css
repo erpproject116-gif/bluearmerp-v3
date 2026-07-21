@@ -18,21 +18,34 @@
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Dark surfaces — brand --color-brand-* stay from @theme / branding */
+/*
+  Dark surfaces — higher contrast than the first pass so body text, muted labels,
+  and icons stay readable on panels. Brand --color-brand-500/600/700 stay from branding.
+*/
 html[data-theme="dark"] {
-  --color-stroke: #2a3344;
-  --color-body: #0f1419;
+  --color-stroke: #3d4f66;
+  --color-body: #0b1017;
   --color-surface: #1a2332;
-  --color-panel: #151c28;
-  --color-panel-strong: #243044;
-  --color-text-primary: #e8eef7;
-  --color-text-secondary: #94a3b8;
-  --color-label: #cbd5e1;
-  --color-brand-50: #1e293b;
-  --color-brand-100: #273549;
+  --color-panel: #121922;
+  --color-panel-strong: #2a3a4f;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #b6c2d3;
+  --color-label: #d5deea;
+  --color-accent: #38bdf8;
+  --color-secondary: #94a3b8;
+  /* Selected / soft brand fills — keep blue tint, not near-black */
+  --color-brand-50: #1e2f55;
+  --color-brand-100: #274076;
 }
 
 html[data-theme="dark"] body {
   background-color: var(--color-body);
   color: var(--color-text-primary);
+}
+
+/* Form controls inherit readable colors when browsers paint native widgets */
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+  color-scheme: dark;
 }

@@ -783,7 +783,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "tip",
-        text: "Step-by-step knowledge base: POS checkout guide and POS Manage settings under Help & guides → Point of Sale.",
+        text: "Step-by-step knowledge base: POS checkout guide and POS Manage settings under Help & guides → Point of Sale. On Terminal and Manage, use Guide in the header for the short Manage → Terminal path.",
       },
     ],
   },

@@ -25,7 +25,7 @@ export function WideEntityModal(props: {
     <Show when={props.open}>
       <Portal>
         <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6">
-          <div class="my-4 w-full max-w-6xl rounded-2xl border border-stroke bg-white p-6 shadow-xl">
+          <div class="my-4 w-full max-w-6xl rounded-2xl border border-stroke bg-surface p-6 shadow-xl">
             <div class="flex items-center justify-between gap-3">
               <div class="flex min-w-0 items-center gap-2">
                 <Show when={props.icon}>

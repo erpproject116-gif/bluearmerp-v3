@@ -104,7 +104,7 @@ export function UserAccountMenu() {
           <Show when={open()}>
             <div
               role="menu"
-              class="absolute z-50 w-64 rounded-xl border border-stroke bg-white shadow-lg"
+              class="absolute z-50 w-64 rounded-xl border border-stroke bg-surface shadow-lg"
               classList={{
                 "bottom-full left-0 right-0 mb-2": !shell.collapsed(),
                 "bottom-0 left-full ml-2": shell.collapsed(),

@@ -20,9 +20,16 @@ export function applyBrandingTheme(settings: BrandingSettings) {
   const stroke = c.stroke?.trim() || "#e2e8f0";
   const dark = resolveTheme() === "dark";
 
-  setVar(root, "--color-brand-500", primary);
-  setVar(root, "--color-brand-600", primary);
-  setVar(root, "--color-brand-700", c.primary_hover || primary);
+  if (dark) {
+    // Lighten brand hues so links/icons stay readable on dark surfaces.
+    setVar(root, "--color-brand-500", mixWithWhite(primary, 0.32));
+    setVar(root, "--color-brand-600", mixWithWhite(primary, 0.38));
+    setVar(root, "--color-brand-700", mixWithWhite(c.primary_hover || primary, 0.45));
+  } else {
+    setVar(root, "--color-brand-500", primary);
+    setVar(root, "--color-brand-600", primary);
+    setVar(root, "--color-brand-700", c.primary_hover || primary);
+  }
   if (!dark) {
     setVar(root, "--color-brand-50", mixWithWhite(primary, 0.92));
     setVar(root, "--color-brand-100", mixWithWhite(primary, 0.85));
@@ -50,14 +57,18 @@ export function applyBrandingTheme(settings: BrandingSettings) {
     clearVar(root, "--color-surface");
     clearVar(root, "--color-panel");
     clearVar(root, "--color-panel-strong");
+    clearVar(root, "--color-accent");
+    clearVar(root, "--color-secondary");
     if (body) {
       body.style.backgroundColor = "";
       body.style.color = "";
     }
   }
 
-  setVar(root, "--color-accent", c.accent);
-  setVar(root, "--color-secondary", c.secondary);
+  if (!dark) {
+    setVar(root, "--color-accent", c.accent);
+    setVar(root, "--color-secondary", c.secondary);
+  }
 
   root.setAttribute("data-branded", "true");
 
