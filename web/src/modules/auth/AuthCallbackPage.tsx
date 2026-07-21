@@ -2,9 +2,7 @@ import { onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "../../shared/api";
 import { setActiveTenantId } from "../../shared/activeContext";
-import type { MeData } from "../../shared/auth-context";
-import { setPendingLoginOtpEmail, hasValidLoginOtpTrust, markLoginOtpVerified } from "./loginOtpGate";
-import { useAuth } from "../../shared/auth-context";
+import { useAuth, type MeData } from "../../shared/auth-context";
 import { resolveAppEntryPath } from "../../shared/resolveAppEntryPath";
 
 async function fetchMeWithRetry(maxAttempts = 4): Promise<Awaited<ReturnType<typeof apiFetch<MeData>>>> {
@@ -78,12 +76,6 @@ export default function AuthCallbackPage() {
     const { email, fullName } = profileFromSession(data.session);
     void recordIntake(email, fullName);
 
-    if (!email) {
-      navigate(`/signin?error=${encodeURIComponent("Google account has no email.")}`, { replace: true });
-      return;
-    }
-
-    // Ensure workspace exists (trial) before app entry.
     try {
       let me = await fetchMeWithRetry();
       if (!me.success && (me.status === 403 || me.code === "ERR_FORBIDDEN")) {
@@ -100,6 +92,7 @@ export default function AuthCallbackPage() {
           return;
         }
       }
+
       if (!me.success) {
         navigate(
           `/signin?error=${encodeURIComponent(me.message ?? "Account not provisioned yet.")}`,
@@ -107,43 +100,23 @@ export default function AuthCallbackPage() {
         );
         return;
       }
+
+      await auth.refresh();
+      const href = await resolveAppEntryPath(auth.me);
+      navigate(href, { replace: true });
     } catch {
       navigate(
         `/signin?error=${encodeURIComponent(apiNetworkErrorMessage())}`,
         { replace: true },
       );
-      return;
     }
-
-    // Already verified earlier today — skip the email code.
-    if (hasValidLoginOtpTrust(email)) {
-      markLoginOtpVerified(email);
-      await auth.refresh();
-      const href = await resolveAppEntryPath(auth.me);
-      navigate(href, { replace: true });
-      return;
-    }
-
-    setPendingLoginOtpEmail(email);
-    await supabase.auth.signOut();
-    const { error: otpErr } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false },
-    });
-    if (otpErr) {
-      navigate(`/signin?error=${encodeURIComponent(otpErr.message)}`, { replace: true });
-      return;
-    }
-    // otp=0: code already sent — SignIn must not send a second email.
-    navigate(`/signin?step=verify&email=${encodeURIComponent(email)}&otp=0`, { replace: true });
   });
 
   return (
     <div class="flex min-h-screen items-center justify-center bg-body">
       <div class="rounded-xl border border-stroke bg-white px-8 py-6 text-center shadow-sm">
         <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        <p class="text-sm font-medium text-text-primary">Almost there</p>
-        <p class="mt-1 text-sm text-text-secondary">Finishing Google sign-in…</p>
+        <p class="text-sm text-text-secondary">Completing sign-in…</p>
       </div>
     </div>
   );

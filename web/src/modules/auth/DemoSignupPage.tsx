@@ -3,7 +3,6 @@ import { useNavigate } from "@solidjs/router";
 import { apiFetch, supabase, supabaseConfigured } from "../../shared/api";
 import { setActiveTenantId } from "../../shared/activeContext";
 import { useAuth } from "../../shared/auth-context";
-import { markLoginOtpVerified } from "./loginOtpGate";
 
 type DemoTemplate = {
   industry_code: string;
@@ -101,7 +100,6 @@ export default function DemoSignupPage() {
       return;
     }
 
-    markLoginOtpVerified(email().trim());
     // Session established — provision the isolated demo workspace, then enter it.
     setStep("provisioning");
     const res = await apiFetch<{ tenant_id: number; company_code: string }>(
