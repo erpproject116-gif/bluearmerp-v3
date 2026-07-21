@@ -257,6 +257,9 @@ import {
   ReceivableStatusReportPage,
   SellingWorkspacePage,
   SellingReportsPage,
+  BuyingReportsHubPage,
+  SalesOrderReportsHubPage,
+  FinanceReportsHubPage,
   FinanceWorkspacePage,
   PortalLoginPage,
   PortalDashboardPage,
@@ -488,12 +491,14 @@ export default function App() {
           <Route path="/buying/reports/payable-status" component={PayableStatusReportPage} />
           <Route path="/buying/reports/purchase-status" component={PurchaseStatusPage} />
           <Route path="/buying/reports/pre-invoicing" component={PurchasePreInvoicingPage} />
+          <Route path="/buying/reports" component={BuyingReportsHubPage} />
           <Route path="/buying" component={BuyingWorkspacePage} />
           <Route path="/sales-order/setup" component={ModuleSetupHubPage} />
           <Route path="/sales-order/reports/so-analysis" component={SOAnalysisReportPage} />
           <Route path="/sales-order/reports/shipment-status" component={ShipmentStatusPage} />
           <Route path="/sales-order/reports/pending-shipment" component={PendingShipmentPage} />
           <Route path="/sales-order/reports/shipping-order-status" component={ShippingOrderStatusPage} />
+          <Route path="/sales-order/reports" component={SalesOrderReportsHubPage} />
           <Route path="/sales-order/sales-orders/new" component={SalesOrderNewPage} />
           <Route path="/sales-order/sales-orders/status" component={SalesOrderStatusPage} />
           <Route path="/sales-order/sales-orders/outstanding" component={OutstandingSOStatusPage} />
@@ -608,6 +613,7 @@ export default function App() {
           <Route path="/finance/reports/customer-vendor-book-ap" component={CustomerVendorBookApPage} />
           <Route path="/finance/reports/receipt-status" component={ReceiptStatusPage} />
           <Route path="/finance/reports/official-receipt-status" component={OfficialReceiptStatusPage} />
+          <Route path="/finance/reports" component={FinanceReportsHubPage} />
           <Route path="/finance/setup" component={ModuleSetupHubPage} />
           <Route path="/finance" component={FinanceWorkspacePage} />
           <Route path="/crm/dashboard" component={() => (

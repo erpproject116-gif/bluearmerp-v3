@@ -23,6 +23,8 @@ type BrandingContextValue = {
   logoPreviewUrl: () => string | undefined;
   loading: () => boolean;
   refresh: () => Promise<void>;
+  /** Re-run theme CSS vars after light/dark preference changes. */
+  reapplyTheme: () => void;
   save: (patch: Partial<BrandingSettings>) => Promise<boolean>;
   uploadLogo: (file: File) => Promise<boolean>;
   uploadAvatar: (file: File) => Promise<string | null>;
@@ -141,6 +143,7 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
     logoPreviewUrl,
     loading,
     refresh,
+    reapplyTheme: () => applyBrandingTheme(settings()),
     save,
     uploadLogo,
     uploadAvatar,

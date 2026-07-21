@@ -1,5 +1,6 @@
 import { For, Show, createContext, useContext, type ParentProps } from "solid-js";
 import { createStore } from "solid-js/store";
+import { StatusIcon } from "./icons/StatusIcon";
 
 export type ToastType = "success" | "error" | "warning";
 
@@ -44,12 +45,6 @@ const styles: Record<ToastType, string> = {
   success: "border-emerald-200 bg-emerald-50 text-emerald-900",
   error: "border-red-200 bg-red-50 text-red-900",
   warning: "border-amber-200 bg-amber-50 text-amber-950",
-};
-
-const icons: Record<ToastType, string> = {
-  success: "✓",
-  error: "✕",
-  warning: "!",
 };
 
 export function ToastProvider(props: ParentProps) {
@@ -111,8 +106,8 @@ export function ToastProvider(props: ParentProps) {
               role="alert"
             >
               <div class="flex items-start gap-3">
-                <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/70 text-xs font-bold">
-                  {icons[toast.type]}
+                <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+                  <StatusIcon kind={toast.type} size="md" />
                 </span>
                 <div class="min-w-0 flex-1">
                   <Show when={toast.title}>

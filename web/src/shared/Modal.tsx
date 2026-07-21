@@ -13,6 +13,8 @@ type Props = {
   wide?: boolean;
   /** Use above other modals (e.g. History / RFQ import over a transaction window). */
   stacked?: boolean;
+  /** Optional leading icon beside the title. */
+  icon?: JSX.Element;
 };
 
 export function Modal(props: Props) {
@@ -26,8 +28,15 @@ export function Modal(props: Props) {
           aria-label={props.title}
         >
           <div class={`my-4 w-full rounded-2xl border border-stroke bg-white p-6 shadow-xl ${props.wide ? "max-w-5xl" : "max-w-lg"}`}>
-            <div class="mb-4 flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-2">
+                <Show when={props.icon}>
+                  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                    {props.icon}
+                  </span>
+                </Show>
+                <h2 class="truncate text-lg font-semibold text-text-primary">{props.title}</h2>
+              </div>
               <button type="button" class={modalDismissClass} onClick={props.onClose} aria-label="Close">
                 ×
               </button>

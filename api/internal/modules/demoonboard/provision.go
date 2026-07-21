@@ -257,11 +257,13 @@ func (s *service) createDemoTenant(ctx context.Context, a createDemoArgs) (int64
 		return 0, err
 	}
 
-	// Chart of accounts starts empty. Tenants import the PH SME market template
-	// from Finance → Chart of accounts (seed_ph_sme_chart_of_accounts). Do not
-	// auto-fill the legacy full chart.
-
+	// Chart of accounts: load Philippine SME template so receipts/invoices can post.
+	// Bank accounts (cash books) remain a separate concern — not created here.
 	if _, err := tx.Exec(ctx, `select public.seed_tenant_base_config($1)`, tenantID); err != nil {
+		return 0, err
+	}
+
+	if _, err := tx.Exec(ctx, `select public.seed_ph_sme_chart_of_accounts($1)`, tenantID); err != nil {
 		return 0, err
 	}
 

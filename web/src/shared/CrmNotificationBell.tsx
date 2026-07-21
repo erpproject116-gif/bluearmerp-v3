@@ -9,15 +9,22 @@ import {
   type CrmNotification,
 } from "./useCrmNotifications";
 import { LoadingText } from "./LoadingText";
+import { StatusIcon, type StatusIconKind } from "./icons/StatusIcon";
 
 type Props = {
   enabled: boolean;
 };
 
-const severityDot: Record<CrmNotification["severity"], string> = {
-  info: "bg-brand-500",
-  warning: "bg-amber-500",
-  critical: "bg-red-500",
+function severityKind(severity: CrmNotification["severity"]): StatusIconKind {
+  if (severity === "critical") return "error";
+  if (severity === "warning") return "warning";
+  return "info";
+}
+
+const severityTone: Record<CrmNotification["severity"], string> = {
+  info: "text-brand-600",
+  warning: "text-amber-600",
+  critical: "text-red-600",
 };
 
 export function CrmNotificationBell(props: Props) {
@@ -126,7 +133,9 @@ export function CrmNotificationBell(props: Props) {
                     onClick={() => void openNotification(n)}
                   >
                     <div class="flex items-start gap-2">
-                      <span class={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${severityDot[n.severity]}`} />
+                      <span class={`mt-0.5 shrink-0 ${severityTone[n.severity]}`}>
+                        <StatusIcon kind={severityKind(n.severity)} size="sm" />
+                      </span>
                       <div class="min-w-0 flex-1">
                         <p class="text-sm font-medium text-text-primary">{n.title}</p>
                         <Show when={n.body}>

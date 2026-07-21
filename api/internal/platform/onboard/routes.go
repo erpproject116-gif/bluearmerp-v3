@@ -254,6 +254,10 @@ func (s *service) createTrialTenant(ctx context.Context, a trialArgs) (int64, er
 		return 0, err
 	}
 
+	if _, err := tx.Exec(ctx, `select public.seed_ph_sme_chart_of_accounts($1)`, tenantID); err != nil {
+		return 0, err
+	}
+
 	if _, err := tx.Exec(ctx, `
 		insert into public.user_active_tenant (auth_user_id, tenant_id)
 		values ($1::uuid, $2)

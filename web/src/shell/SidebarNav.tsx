@@ -16,6 +16,7 @@ import {
   subBranchByFeature,
   belowGroupModuleIds,
   ungroupedModuleIds,
+  isFinanceUnderSalesReportPath,
   type NavGroupEntry,
 } from "./navGroups";
 import { isAnySubBranchPath, isSubBranchPath } from "./sub-branch-nav";
@@ -28,20 +29,13 @@ function brandedLabel(labels: Record<string, string>, key: string, fallback: str
   return v?.trim() ? v : fallback;
 }
 
-function isFinanceModulePath(pathname: string): boolean {
+export function isFinanceModulePath(pathname: string): boolean {
   if (pathname === "/app/finance" || pathname.startsWith("/app/finance/")) return true;
   if (isReviewPurchasesPath(pathname)) return true;
   if (isTaxMngtPath(pathname)) return true;
   if (pathname === "/app/hr/payroll-runs" || pathname.startsWith("/app/hr/payroll-runs/")) return true;
   if (pathname === "/app/fixed-assets" || pathname.startsWith("/app/fixed-assets/")) return true;
-  if (
-    pathname === "/app/sales/reports/ar-by-customer" ||
-    pathname === "/app/sales/reports/official-receipt-status" ||
-    pathname === "/app/sales/reports/si-receipt-status" ||
-    pathname === "/app/sales/reports/customer-credit-balance"
-  ) {
-    return true;
-  }
+  if (isFinanceUnderSalesReportPath(pathname)) return true;
   return false;
 }
 
@@ -54,6 +48,14 @@ function readExpanded(groupId: string, defaultExpanded: boolean): boolean {
     /* ignore */
   }
   return defaultExpanded;
+}
+
+function writeExpanded(groupId: string, value: boolean) {
+  try {
+    localStorage.setItem(navGroupStorageKey(groupId), value ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
 }
 
 function NavModuleLink(props: { module: AppModule }) {
@@ -160,9 +162,10 @@ function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
     <A
       href={props.branch.href}
       title={branchLabel()}
-      class="flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+      class="flex items-center rounded-lg text-sm font-medium transition-colors"
       classList={{
-        "justify-center": shell.collapsed(),
+        "justify-center px-2 py-2.5": shell.collapsed(),
+        "px-3 py-2": !shell.collapsed(),
         "bg-brand-50 text-brand-600": branchActive(),
         "text-text-secondary hover:erp-panel hover:text-text-primary": !branchActive(),
       }}
@@ -196,16 +199,19 @@ function navEntryMatchesPath(entry: NavGroupEntry, pathname: string): boolean {
   return pathname === branch.href || pathname === branch.settingsHref;
 }
 
+/** Icon id for sub-branch feature codes — unused; Zoho-style text-only children. */
+
 function NavGroupBlock(props: {
   groupId: string;
   label: string;
-  defaultExpanded: boolean;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
   entries: NavGroupEntry[];
 }) {
   const auth = useAuth();
   const shell = useShell();
   const loc = useLocation();
-  const [open, setOpen] = createSignal(readExpanded(props.groupId, props.defaultExpanded));
 
   const visibleEntries = () =>
     props.entries.filter((entry) => {
@@ -220,14 +226,7 @@ function NavGroupBlock(props: {
       () => [loc.pathname, visibleEntries().length] as const,
       ([pathname]) => {
         if (visibleEntries().some((entry) => navEntryMatchesPath(entry, pathname))) {
-          if (!open()) {
-            setOpen(true);
-            try {
-              localStorage.setItem(navGroupStorageKey(props.groupId), "1");
-            } catch {
-              /* ignore */
-            }
-          }
+          if (!props.open) props.onOpen();
         }
       },
     ),
@@ -249,13 +248,8 @@ function NavGroupBlock(props: {
   };
 
   const toggle = () => {
-    const next = !open();
-    setOpen(next);
-    try {
-      localStorage.setItem(navGroupStorageKey(props.groupId), next ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
+    if (props.open) props.onClose();
+    else props.onOpen();
   };
 
   return (
@@ -269,17 +263,18 @@ function NavGroupBlock(props: {
             type="button"
             class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary hover:bg-slate-50"
             onClick={toggle}
+            aria-expanded={props.open}
           >
             <span
               class="text-[10px] transition-transform"
-              classList={{ "rotate-90": open() }}
+              classList={{ "rotate-90": props.open }}
               aria-hidden="true"
             >
               ▶
             </span>
             <span class="truncate">{props.label}</span>
           </button>
-          <Show when={open()}>
+          <Show when={props.open}>
             <div class="ml-2 space-y-0.5 border-l border-stroke pl-2">
               <For each={visibleEntries()}>{(entry) => renderEntry(entry)}</For>
             </div>
@@ -290,11 +285,31 @@ function NavGroupBlock(props: {
   );
 }
 
+function initialOpenGroupId(): string | null {
+  for (const group of navGroups) {
+    if (readExpanded(group.id, group.defaultExpanded)) return group.id;
+  }
+  return null;
+}
+
 export function SidebarNav() {
   const auth = useAuth();
   const loc = useLocation();
   let navEl: HTMLElement | undefined;
   let savedScrollTop = 0;
+  const [openGroupId, setOpenGroupId] = createSignal<string | null>(initialOpenGroupId());
+
+  const openGroup = (groupId: string) => {
+    const prev = openGroupId();
+    if (prev && prev !== groupId) writeExpanded(prev, false);
+    setOpenGroupId(groupId);
+    writeExpanded(groupId, true);
+  };
+
+  const closeGroup = (groupId: string) => {
+    if (openGroupId() === groupId) setOpenGroupId(null);
+    writeExpanded(groupId, false);
+  };
 
   createEffect(
     on(
@@ -332,7 +347,9 @@ export function SidebarNav() {
           <NavGroupBlock
             groupId={group.id}
             label={group.label}
-            defaultExpanded={group.defaultExpanded}
+            open={openGroupId() === group.id}
+            onOpen={() => openGroup(group.id)}
+            onClose={() => closeGroup(group.id)}
             entries={group.entries}
           />
         )}

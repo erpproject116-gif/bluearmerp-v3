@@ -5,6 +5,7 @@ import { DashboardLayout } from "./DashboardLayout";
 import { ReconciliationBanner } from "../../shared/ReconciliationBanner";
 import { OnboardingChecklist } from "../../shared/OnboardingChecklist";
 import { DayJobsPanel } from "../../shared/DayJobsPanel";
+import { HomeFinanceOverview } from "./HomeFinanceOverview";
 import {
   useDashboardInventoryTrend,
   useDashboardRedFlags,
@@ -201,7 +202,7 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-text-secondary">
-          Business overview — sales, inventory, purchasing, and operational red flags.
+          Home — unpaid invoices, bills owed, cash flow, then sales and stock snapshots.
         </p>
         <A
           href="/app/dashboard/approvals"
@@ -219,10 +220,13 @@ export default function DashboardPage() {
 
       <DayJobsPanel />
 
+      <HomeFinanceOverview />
+
       <Show when={loading()}>
         <p class="text-sm text-text-secondary">Loading dashboard…</p>
       </Show>
 
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Operations snapshot</p>
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <For each={kpiTiles}>
           {(tile) => {

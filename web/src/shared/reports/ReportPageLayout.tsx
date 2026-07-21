@@ -45,8 +45,11 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
         <Show when={props.description}>
           <p class="text-sm text-text-secondary">{props.description}</p>
         </Show>
+        <Show when={showDates() || props.filterExtra}>
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-text-secondary">Filters</p>
+        </Show>
         <Show when={showDates()}>
-          <div class="mt-4 flex flex-wrap items-end gap-3">
+          <div class="mt-2 flex flex-wrap items-end gap-3">
             <label class="text-sm">
               <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
               <input
@@ -74,7 +77,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
             class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white"
             onClick={() => props.onSearch()}
           >
-            {uiLabel("reports.search_button")}
+            {uiLabel("reports.search_button", "Run Report")}
           </button>
           <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => props.onReset()}>
             {uiLabel("reports.reset_button")}
