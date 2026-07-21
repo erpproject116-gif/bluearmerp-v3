@@ -71,7 +71,7 @@ function liveStockPreview(ln: BomLine, convs: Conversion[]): { qty: number; code
   };
 }
 
-async function fetchItems(q: string): Promise<LookupOption[]> { {
+async function fetchItems(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", sort: "item_code", order: "asc" });
   if (q) qs.set("q", q);
   const res = await apiFetch<{ id: number; item_code: string; item_name: string; base_unit_id?: number; base_unit_code?: string }[]>(
