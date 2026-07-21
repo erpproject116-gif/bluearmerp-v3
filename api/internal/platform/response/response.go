@@ -36,7 +36,9 @@ func OKList(w http.ResponseWriter, data any, page, perPage int, total int64) {
 }
 
 func OKListWithMeta(w http.ResponseWriter, data any, page, perPage int, total int64, unreadTotal *int64) {
-	w.Header().Set("Cache-Control", "private, max-age=30, stale-while-revalidate=60")
+	// Lists must not be browser-cached: after create/update, refetch must see fresh rows
+	// (max-age caused "saved successfully" while the grid stayed empty for ~30–60s).
+	w.Header().Set("Cache-Control", "private, no-cache, no-store, must-revalidate")
 	JSON(w, http.StatusOK, Envelope{
 		Success: true,
 		Message: "OK",
