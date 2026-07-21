@@ -256,6 +256,9 @@ export const PurchaseStatusPage = lazy(() => import("../modules/buying/reports/P
 export const PurchasePreInvoicingPage = lazy(() => import("../modules/buying/reports/PurchasePreInvoicingPage"));
 export const PayableStatusReportPage = lazy(() => import("../modules/buying/reports/PayableStatusReportPage"));
 export const SellingReportsPage = lazy(() => import("../modules/selling/reports/SellingReportsPage"));
+export const BuyingReportsHubPage = lazy(() => import("../modules/buying/reports/BuyingReportsHubPage"));
+export const SalesOrderReportsHubPage = lazy(() => import("../modules/sales-order/reports/SalesOrderReportsHubPage"));
+export const FinanceReportsHubPage = lazy(() => import("../modules/finance/reports/FinanceReportsHubPage"));
 export const FinanceWorkspacePage = lazy(() => import("../modules/finance/FinanceWorkspacePage"));
 export const PortalLoginPage = lazy(() => import("../modules/portal/PortalLoginPage"));
 export const PortalDashboardPage = lazy(() => import("../modules/portal/PortalDashboardPage"));

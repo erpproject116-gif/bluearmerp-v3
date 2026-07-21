@@ -199,26 +199,30 @@ export const helpScenarioArticles: KbArticle[] = [
   },
   {
     id: "chart-of-accounts-ph-template",
-    title: "Chart of Accounts — empty COA and PH SME template",
+    title: "Chart of Accounts — standard PH SME chart and mappings",
     scenario:
-      "A new tenant has an empty chart of accounts, or you want to import Philippine SME default accounts.",
+      "You need to review the default chart of accounts, reload the Philippine SME template on an empty chart, or fix Purchases / COGS mappings.",
     intro:
-      "New businesses start without seeded GL accounts. Import the PH SME template from Chart of Accounts, or create accounts manually. Then open Default account mappings and set Purchases / COGS (expense 5010), sales revenue, cash, AR/AP, and VAT accounts.",
+      "New workspaces receive a standard Philippine SME chart of accounts automatically (general ledger only — not bank account registers). If the chart was cleared, import the PH SME template again. Then open Default account mappings and set Purchases / COGS (expense 5010), sales revenue, cash, AR/AP, and VAT accounts.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Finance → Acct I → Chart of Accounts (/app/finance/acct-i/chart-of-accounts).",
-          "If the list is empty, use Import PH SME template (or equivalent import action) to load standard account codes.",
+          "Open Accounting Dept → General ledger → Chart of accounts (/app/finance/acct-i/chart-of-accounts).",
+          "If the list is empty, choose Use standard Philippine chart to reload accounts and default mappings.",
           "Review account types (asset, liability, equity, income, expense) and rename codes to match your books if needed.",
-          "Open Default account mappings (Acct I → Account mappings). Set Purchases / COGS to an expense account — usually 5010 Cost of Goods Sold. Do not use inventory asset 1469 here.",
-          "If the Purchases / COGS dropdown is empty, use Create Purchases / COGS (5010) or import the PH template so expense accounts exist.",
+          "Open Default account mappings. Set Purchases / COGS to an expense account — usually 5010 Cost of Goods Sold. Do not use inventory asset 1469 here.",
+          "If the Purchases / COGS dropdown is empty, use Create Purchases / COGS (5010) or re-import the PH template so expense accounts exist.",
           "Click Save mappings. Soft-deleted accounts stay hidden from pickers until restored.",
         ],
       },
       {
         type: "tip",
-        text: "On supplier invoices the field is labeled Purchases / COGS (Acct I). It only lists expense accounts. Inventory merchandise (1469) is an asset and will not appear in that list.",
+        text: "Bank accounts (for deposits and transfers) are a separate banking setup. Chart of accounts cash lines are GL posting accounts only.",
+      },
+      {
+        type: "tip",
+        text: "On supplier invoices the field is labeled Purchases / COGS. It only lists expense accounts. Inventory merchandise (1469) is an asset and will not appear in that list.",
       },
     ],
     primaryHref: "/app/finance/acct-i/chart-of-accounts?focus=purchase#default-account-mappings",
@@ -235,7 +239,7 @@ export const helpScenarioArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Finance → Acct I → Chart of Accounts.",
+          "Open Accounting Dept → General ledger → Chart of accounts.",
           "Find the account and use Delete / Archive (soft delete).",
           "Confirm it no longer appears in active pickers for new journals or documents.",
           "To restore, show inactive/deleted accounts (filter) and Restore the row.",
@@ -549,7 +553,7 @@ export const helpScenarioArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Finance → Acct I → Bank reconciliation.",
+          "Open Accounting Dept → General ledger → Bank reconciliation.",
           "Import or enter statement lines for the bank account and period.",
           "For each line, match to an official receipt (inflow) or payment voucher (outflow) with the same amount.",
           "If nothing matches, create the missing OR/PV first, then return to reconciliation.",
@@ -575,7 +579,7 @@ export const helpScenarioArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Finance → Acct I → Journal entries and open the draft.",
+          "Open Accounting Dept → General ledger → Journal entries and open the draft.",
           "Check line debits and credits sum to the same total.",
           "Replace soft-deleted or blank accounts with active Chart of Accounts codes.",
           "Confirm the posting date is inside an open fiscal year/period.",
@@ -584,7 +588,7 @@ export const helpScenarioArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Empty COA is a common new-tenant issue — import the PH SME template first, then post.",
+        text: "Empty COA is uncommon on new tenants (a standard chart is loaded automatically). If accounts were cleared, use Use standard Philippine chart, then post.",
       },
     ],
     primaryHref: "/app/finance/acct-i/journal-entries",

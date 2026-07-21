@@ -525,7 +525,7 @@ export const moduleKbArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Finance → Acct. II → Customer/Vendor Book I (AR) or (AP).",
+          "Open Accounting Dept → Receivables & payables → Customer/Vendor Book I (AR) or (AP).",
           "Set date from / date to and optional partner ID, then Search (F8).",
           "Export CSV with Excel when results are displayed.",
         ],
@@ -951,15 +951,15 @@ export const moduleKbArticles: KbArticle[] = [
         items: [
           "Customer payments: Official Receipts apply cash to sales invoices.",
           "Vendor payments: Payment Vouchers apply cash to supplier invoices.",
-          "Review Chart of Accounts and post Journal Entries for adjustments.",
-          "Use Trial Balance, P&L, and Balance Sheet under finance reports.",
-          "Acct. I and Acct. II sub-modules add journal workflows and check register.",
+          "Review Chart of accounts under General ledger and post Journal entries for adjustments.",
+          "Use Trial balance, Profit & loss, and Balance sheet under Accounting reports.",
+          "General ledger and Receivables & payables areas add journals, checks, and aging books.",
         ],
       },
     ],
     primaryHref: "/app/finance",
-    primaryLabel: "Finance workspace",
-    relatedGuideIds: ["finance-je-draft-to-post", "receivable-payable-status"],
+    primaryLabel: "Accounting workspace",
+    relatedGuideIds: ["finance-je-draft-to-post", "receivable-payable-status", "chart-of-accounts-ph-template"],
   },
   {
     id: "finance-je-draft-to-post",

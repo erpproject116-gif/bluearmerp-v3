@@ -150,7 +150,12 @@ export function setupScopeFromPath(pathname: string): string | null {
   return null;
 }
 
-export function setupFeatureTab(moduleBase: string): { label: string; href: string; settingsHref: string } {
+export function setupFeatureTab(moduleBase: string): {
+  label: string;
+  href: string;
+  settingsHref: string;
+  headerPriority: "primary";
+} {
   const href = `${moduleBase.replace(/\/$/, "")}/setup`;
-  return { label: "Setup", href, settingsHref: href };
+  return { label: "Setup", href, settingsHref: href, headerPriority: "primary" };
 }

@@ -243,7 +243,7 @@ export const knowledgebaseArticles: KbArticle[] = [
     title: "Workspace setup wizard",
     scenario: "You are setting up a new business before creating quotes or purchases.",
     intro:
-      "BluearmERP provisions COA, PHP currency, VAT types, and a Main location automatically. The setup wizard requires you to confirm each seeded default, then add partners and products before transactions are allowed.",
+      "BluearmERP provisions a standard Philippine SME chart of accounts (general ledger), PHP currency, VAT types, and a Main location automatically. Bank account registers are separate from the GL. The setup wizard requires you to confirm each seeded default, then add partners and products before transactions are allowed.",
     blocks: [
       {
         type: "flow",

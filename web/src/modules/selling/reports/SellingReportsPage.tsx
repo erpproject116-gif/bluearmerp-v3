@@ -15,10 +15,17 @@ import { defaultStatusFilters, type SalesStatusFilters } from "../../sales/sales
 import type { SalesTemplateCode } from "../../sales/sales/SalesLineGrid";
 
 const reportLinks = [
-  { label: "A/R by Customer", href: "/app/sales/reports/ar-by-customer" },
-  { label: "Receipt Status", href: "/app/finance/reports/receipt-status" },
-  { label: "Receivable Status", href: "/app/selling/reports/receivable-status" },
-  { label: "SO Analysis", href: "/app/sales-order/reports/so-analysis" },
+  { label: "Sales invoice status", href: "/app/sales/sales/status" },
+  { label: "A/R by customer (Accounting)", href: "/app/sales/reports/ar-by-customer" },
+  { label: "Customer credit (Accounting)", href: "/app/sales/reports/customer-credit-balance" },
+  { label: "SI receipt status (Accounting)", href: "/app/sales/reports/si-receipt-status" },
+  { label: "Official receipt status (Accounting)", href: "/app/sales/reports/official-receipt-status" },
+  { label: "Receipt status", href: "/app/finance/reports/receipt-status" },
+  { label: "Receivable status", href: "/app/selling/reports/receivable-status" },
+  { label: "SO analysis", href: "/app/sales-order/reports/so-analysis" },
+  { label: "Discount status", href: "/app/sales/reports/discount-status" },
+  { label: "Print slips", href: "/app/sales/reports/print-slips" },
+  { label: "Quotation status", href: "/app/quotation/quotations/status" },
 ];
 
 export default function SellingReportsPage() {

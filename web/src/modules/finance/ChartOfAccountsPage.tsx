@@ -645,26 +645,27 @@ export default function ChartOfAccountsPage() {
     <FinanceLayout>
       <Show when={isEmpty()}>
         <div class="mb-4 rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-slate-700">
-          <p class="font-medium text-brand-800">Start with an empty chart of accounts</p>
+          <p class="font-medium text-brand-800">Set up your accounts</p>
           <p class="mt-1">
-            Philippine SME code bands: Assets 1000–1999, Liabilities 2000–2999, Equity 3000–3999, Revenue 4000–4999,
-            Expenses 5000–5999.
+            Load a standard Philippine SME chart (Assets 1000–1999, Liabilities 2000–2999, Equity 3000–3999,
+            Revenue 4000–4999, Expenses 5000–5999) so receipts and invoices can post. You can edit any account later.
+            Bank accounts used for deposits and transfers are set up separately — this chart is the general ledger only.
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
-              onClick={() => openCreate()}
-            >
-              Add first account
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               disabled={importing()}
               onClick={() => void importTemplate(false)}
             >
-              {importing() ? "Importing…" : "Import Philippine SME template"}
+              {importing() ? "Loading…" : "Use standard Philippine chart"}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke bg-white px-3 py-2 text-sm hover:bg-slate-50"
+              onClick={() => openCreate()}
+            >
+              Start empty — add first account
             </button>
           </div>
         </div>

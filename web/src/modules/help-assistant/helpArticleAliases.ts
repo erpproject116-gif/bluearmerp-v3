@@ -80,6 +80,17 @@ export const helpArticleAliases: Record<string, HelpArticleAlias> = {
       "import ph sme accounts",
       "philippines coa template",
       "no gl accounts",
+      "standard philippine chart of accounts",
+      "use standard philippine chart",
+      "default chart of accounts new tenant",
+    ],
+  },
+  "dashboard": {
+    questions: [
+      "dashboard receivables payables",
+      "home unpaid invoices",
+      "total receivables overview",
+      "cash flow on home",
     ],
   },
   "coa-soft-delete-restore": {

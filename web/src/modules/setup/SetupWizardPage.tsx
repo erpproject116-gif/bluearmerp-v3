@@ -14,8 +14,8 @@ const STEP_COPY: Record<string, { title: string; why: string; action: string; li
   },
   chart_of_accounts: {
     title: "Chart of accounts",
-    why: "Your chart starts empty. Import the Philippine SME (PH market) template, or add accounts manually, then continue.",
-    action: "Set up accounts",
+    why: "A standard Philippine SME chart was loaded for this workspace. Review the accounts and default mappings (cash, A/R, A/P, sales, VAT), then confirm. Bank accounts for banking are separate from this general ledger.",
+    action: "Review accounts",
     link: "/app/finance/acct-i/chart-of-accounts",
     ackStep: "chart_of_accounts",
   },

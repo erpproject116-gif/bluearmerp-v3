@@ -33,5 +33,5 @@ export function isAcctIINavLinkActive(pathname: string, link: AcctNavLink): bool
 
 export function acctIIHeaderTitle(pathname: string): string {
   const link = acctIINavLinks.find((l) => isAcctIINavLinkActive(pathname, l));
-  return link?.label ?? "Acct. II";
+  return link?.label ?? "Receivables & payables";
 }

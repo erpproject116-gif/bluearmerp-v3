@@ -15,6 +15,7 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModuleIcon } from "../../../shell/ModuleIcon";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
@@ -898,6 +899,7 @@ export function SalesModal(props: Props) {
       <WideEntityModal
         open={props.open}
         title={effectiveEditing() ? (props.readOnly ? "View Sales Invoice (deleted)" : "Edit Sales Invoice") : "New Sales Invoice"}
+        icon={<ModuleIcon id="sales" class="h-5 w-5" />}
         onClose={() => props.onClose()}
         onSave={activeTab() === "details" ? () => void save() : undefined}
         readOnly={props.readOnly}

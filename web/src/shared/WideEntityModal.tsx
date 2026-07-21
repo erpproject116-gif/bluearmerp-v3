@@ -11,6 +11,8 @@ export function WideEntityModal(props: {
   onSave?: () => void;
   saving?: boolean;
   readOnly?: boolean;
+  /** Optional leading icon beside the title. */
+  icon?: JSX.Element;
   /** Optional tab strip shown under the title. Parent controls tab content. */
   tabs?: ModalTab[];
   activeTab?: string;
@@ -25,7 +27,14 @@ export function WideEntityModal(props: {
         <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6">
           <div class="my-4 w-full max-w-6xl rounded-2xl border border-stroke bg-white p-6 shadow-xl">
             <div class="flex items-center justify-between gap-3">
-              <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
+              <div class="flex min-w-0 items-center gap-2">
+                <Show when={props.icon}>
+                  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                    {props.icon}
+                  </span>
+                </Show>
+                <h2 class="truncate text-lg font-semibold text-text-primary">{props.title}</h2>
+              </div>
               <Show when={props.headerActions}>
                 <div class="flex items-center gap-2">{props.headerActions}</div>
               </Show>

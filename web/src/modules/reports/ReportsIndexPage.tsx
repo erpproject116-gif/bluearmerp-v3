@@ -1,7 +1,8 @@
 import { A } from "@solidjs/router";
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
+
 type ReportCatalogEntry = {
   key: string;
   label: string;
@@ -13,19 +14,24 @@ type ReportCatalogEntry = {
   description?: string;
 };
 
-type ModuleGroup = {
-  module: string;
-  label: string;
-  reports: ReportCatalogEntry[];
-};
-
 const moduleLabels: Record<string, string> = {
-  "sales-order": "Sales Order",
-  "purchase-order": "Purchase Order",
+  "sales-order": "Sales orders",
+  "purchase-order": "Purchasing",
   inventory: "Inventory",
-  finance: "Finance",
+  finance: "Accounting",
   sales: "Sales",
   crm: "CRM",
+  buying: "Purchasing",
+  selling: "Sales",
+};
+
+const plainBlurbs: Record<string, string> = {
+  "ar-aging": "Who owes us, and how long.",
+  "ap-aging": "What we still owe suppliers.",
+  "profit-and-loss": "Income and expenses for a period.",
+  "balance-sheet": "What we own and owe.",
+  "cash-flow-statement": "Cash in and cash out.",
+  "trial-balance": "Account balances that should sum to zero.",
 };
 
 function useReportCatalog() {
@@ -56,36 +62,75 @@ function useSavedViews() {
 export default function ReportsIndexPage() {
   const catalog = useReportCatalog();
   const savedViews = useSavedViews();
-  const groups = createMemo<ModuleGroup[]>(() => {
-    const byModule = new Map<string, ReportCatalogEntry[]>();
-    for (const report of catalog.data ?? []) {
-      const list = byModule.get(report.module) ?? [];
-      list.push(report);
-      byModule.set(report.module, list);
+  const [q, setQ] = createSignal("");
+  const [category, setCategory] = createSignal<string>("all");
+
+  const categories = createMemo(() => {
+    const set = new Map<string, string>();
+    for (const r of catalog.data ?? []) {
+      set.set(r.module, moduleLabels[r.module] ?? r.module);
     }
-    return [...byModule.entries()]
-      .map(([module, reports]) => ({
-        module,
-        label: moduleLabels[module] ?? module,
-        reports: [...reports].sort((a, b) => a.label.localeCompare(b.label)),
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return [...set.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  });
+
+  const filtered = createMemo(() => {
+    const needle = q().trim().toLowerCase();
+    let list = catalog.data ?? [];
+    if (category() !== "all") list = list.filter((r) => r.module === category());
+    if (needle) {
+      list = list.filter(
+        (r) =>
+          r.label.toLowerCase().includes(needle) ||
+          (r.description ?? "").toLowerCase().includes(needle) ||
+          (plainBlurbs[r.key] ?? "").toLowerCase().includes(needle) ||
+          (moduleLabels[r.module] ?? r.module).toLowerCase().includes(needle),
+      );
+    }
+    return [...list].sort((a, b) => a.label.localeCompare(b.label));
   });
 
   return (
     <div class="space-y-6">
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">Reports catalog</h2>
-        <p class="text-sm text-text-secondary">
-          Browse analytics and status reports registered across modules.
-        </p>
+      <section class="rounded-xl border border-stroke bg-surface p-5 shadow-sm">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold text-text-primary">Reports Center</h2>
+            <p class="mt-1 text-sm text-text-secondary">
+              Find sales, purchasing, inventory, and accounting reports by name or category.
+            </p>
+          </div>
+          <label class="block w-full max-w-md">
+            <span class="sr-only">Search reports</span>
+            <input
+              type="search"
+              class="w-full rounded-lg border border-stroke bg-panel px-3 py-2 text-sm"
+              placeholder="Search reports…"
+              value={q()}
+              onInput={(e) => setQ(e.currentTarget.value)}
+            />
+          </label>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-2 text-sm">
+          <A href="/app/selling/reports" class="rounded-lg border border-stroke px-3 py-1.5 hover:bg-brand-50">
+            Sales reports
+          </A>
+          <A href="/app/buying/reports" class="rounded-lg border border-stroke px-3 py-1.5 hover:bg-brand-50">
+            Purchasing reports
+          </A>
+          <A href="/app/finance/reports" class="rounded-lg border border-stroke px-3 py-1.5 hover:bg-brand-50">
+            Accounting reports
+          </A>
+          <A href="/app/sales-order/reports" class="rounded-lg border border-stroke px-3 py-1.5 hover:bg-brand-50">
+            Sales order reports
+          </A>
+        </div>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-5 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-lg font-semibold text-text-primary">Saved views</h2>
-            <p class="text-sm text-text-secondary">Quick access to your named report filter sets.</p>
+            <p class="text-sm text-text-secondary">Named filter sets you use often.</p>
           </div>
           <A href="/app/reports/saved-views" class="text-sm font-medium text-brand-600 hover:underline">
             Manage saved views
@@ -105,41 +150,98 @@ export default function ReportsIndexPage() {
         </Show>
       </section>
 
-      <Show when={catalog.isLoading} fallback={null}>        <p class="text-sm text-text-secondary">Loading catalog…</p>
+      <Show when={catalog.isLoading}>
+        <p class="text-sm text-text-secondary">Loading catalog…</p>
       </Show>
-
       <Show when={catalog.isError}>
         <p class="text-sm text-red-600">{(catalog.error as Error)?.message ?? "Failed to load catalog."}</p>
       </Show>
 
       <Show when={!catalog.isLoading && !catalog.isError}>
-        <For each={groups()}>
-          {(group) => (
-            <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-              <h3 class="mb-4 text-sm font-semibold text-text-primary">{group.label}</h3>
-              <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <For each={group.reports}>
-                  {(report) => (
-                    <li class="rounded-lg border border-stroke/80 p-3">
-                      <Show
-                        when={report.web_path}
-                        fallback={<span class="text-sm font-medium text-text-primary">{report.label}</span>}
-                      >
-                        <A href={report.web_path!} class="text-sm font-medium text-brand-600 hover:underline">
-                          {report.label}
-                        </A>
-                      </Show>
-                      <p class="mt-1 text-xs text-text-secondary">{report.tier}</p>
-                      <Show when={report.description}>
-                        <p class="mt-2 text-xs text-text-secondary">{report.description}</p>
-                      </Show>
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </section>
-          )}
-        </For>
+        <div class="grid gap-6 lg:grid-cols-[14rem_1fr]">
+          <aside class="rounded-xl border border-stroke bg-surface p-3 shadow-sm">
+            <p class="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Report category
+            </p>
+            <nav class="space-y-0.5">
+              <button
+                type="button"
+                class="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors"
+                classList={{
+                  "bg-brand-50 text-brand-600": category() === "all",
+                  "text-text-secondary hover:erp-panel": category() !== "all",
+                }}
+                onClick={() => setCategory("all")}
+              >
+                All reports
+              </button>
+              <For each={categories()}>
+                {([id, label]) => (
+                  <button
+                    type="button"
+                    class="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors"
+                    classList={{
+                      "bg-brand-50 text-brand-600": category() === id,
+                      "text-text-secondary hover:erp-panel": category() !== id,
+                    }}
+                    onClick={() => setCategory(id)}
+                  >
+                    {label}
+                  </button>
+                )}
+              </For>
+            </nav>
+          </aside>
+
+          <section class="rounded-xl border border-stroke bg-surface p-5 shadow-sm">
+            <div class="mb-4 flex items-center gap-2">
+              <h3 class="text-lg font-semibold text-text-primary">
+                {category() === "all" ? "All reports" : moduleLabels[category()] ?? category()}
+              </h3>
+              <span class="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
+                {filtered().length}
+              </span>
+            </div>
+            <Show when={filtered().length === 0}>
+              <p class="text-sm text-text-secondary">No reports match your search.</p>
+            </Show>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead class="border-b border-stroke text-left text-xs uppercase tracking-wide text-text-secondary">
+                  <tr>
+                    <th class="px-2 py-2 font-semibold">Report name</th>
+                    <th class="px-2 py-2 font-semibold">Category</th>
+                    <th class="px-2 py-2 font-semibold">About</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={filtered()}>
+                    {(report) => (
+                      <tr class="border-b border-stroke/60">
+                        <td class="px-2 py-3">
+                          <Show
+                            when={report.web_path}
+                            fallback={<span class="font-medium text-text-primary">{report.label}</span>}
+                          >
+                            <A href={report.web_path!} class="font-medium text-brand-600 hover:underline">
+                              {report.label}
+                            </A>
+                          </Show>
+                        </td>
+                        <td class="px-2 py-3 text-text-secondary">
+                          {moduleLabels[report.module] ?? report.module}
+                        </td>
+                        <td class="px-2 py-3 text-text-secondary">
+                          {plainBlurbs[report.key] ?? report.description ?? "—"}
+                        </td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </Show>
     </div>
   );

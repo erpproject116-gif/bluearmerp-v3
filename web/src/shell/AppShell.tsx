@@ -1,6 +1,6 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { Show } from "solid-js";
+import { Show, createSignal, For, onCleanup } from "solid-js";
 import { useAuth, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
@@ -11,7 +11,12 @@ import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
 import { IdleLogoutGuard } from "../shared/IdleLogoutGuard";
 import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ShellProvider, useShell } from "./shell-context";
-import { resolveFeature, resolveModule, resolveSubBranch, visibleHeaderFeatures } from "./modules";
+import { resolveFeature, resolveModule, resolveSubBranch, splitHeaderFeatures } from "./modules";
+import type { ModuleFeature } from "./modules";
+import {
+  isFinanceUnderSalesReportPath,
+  navGroupForModuleId,
+} from "./navGroups";
 import { isSubBranchPath } from "./sub-branch-nav";
 import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
 import { CollectiveInvoicingHeaderNav } from "./CollectiveInvoicingHeaderNav";
@@ -44,6 +49,7 @@ import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
 import { WorkflowGuideBar } from "../shared/WorkflowGuideBar";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
+import { ThemeSwitcher } from "../shared/ThemeSwitcher";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -53,6 +59,141 @@ function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === ACCT_I_PREFIX) return acctIHeaderTitle(pathname);
   if (prefix === ACCT_II_PREFIX) return acctIIHeaderTitle(pathname);
   return "Sub-module";
+}
+
+function featurePassesGates(
+  feature: ModuleFeature,
+  modId: string,
+  me: ReturnType<typeof useAuth>["me"],
+): boolean {
+  if (modId === "crm") {
+    if (feature.analyticsOnly && !canViewCrmAnalytics(me)) return false;
+    if (feature.managersOnly && !canManageCrmRules(me)) return false;
+  }
+  const code = permissionCodeForHref(feature.href);
+  if (code && me?.user?.permissions && Object.keys(me.user.permissions).length > 0) {
+    return hasPermission(me, code, "read");
+  }
+  return true;
+}
+
+function featureIsActive(feature: ModuleFeature, pathname: string, all: ModuleFeature[]): boolean {
+  const hasExactTab = all.some((f) => f.href === pathname || f.settingsHref === pathname);
+  return (
+    pathname === feature.href ||
+    pathname === feature.settingsHref ||
+    (!hasExactTab && feature.prefix != null && isSubBranchPath(pathname, feature.prefix))
+  );
+}
+
+function HeaderFeatureTabs(props: {
+  modId: string;
+  moduleLabel: string;
+  featureLabel: (feature: ModuleFeature) => string;
+}) {
+  const loc = useLocation();
+  const auth = useAuth();
+  const [moreOpen, setMoreOpen] = createSignal(false);
+  let moreRoot: HTMLDivElement | undefined;
+
+  const mod = () => resolveModule(loc.pathname);
+  const split = () => {
+    const m = mod();
+    if (!m) return { primary: [] as ModuleFeature[], overflow: [] as ModuleFeature[] };
+    const raw = splitHeaderFeatures(m, auth.me);
+    return {
+      primary: raw.primary.filter((f) => featurePassesGates(f, props.modId, auth.me)),
+      overflow: raw.overflow.filter((f) => featurePassesGates(f, props.modId, auth.me)),
+    };
+  };
+  const allVisible = () => [...split().primary, ...split().overflow];
+  const overflowActive = () =>
+    split().overflow.some((f) => featureIsActive(f, loc.pathname, allVisible()));
+
+  const onDocClick = (e: MouseEvent) => {
+    if (!moreRoot?.contains(e.target as Node)) setMoreOpen(false);
+  };
+  if (typeof document !== "undefined") {
+    document.addEventListener("click", onDocClick);
+    onCleanup(() => document.removeEventListener("click", onDocClick));
+  }
+
+  return (
+    <Show when={allVisible().length > 0}>
+      <nav class="erp-header-features mt-3 flex flex-wrap items-center gap-1" aria-label={`${props.moduleLabel} features`}>
+        <For each={split().primary}>
+          {(feature) => {
+            const active = () => featureIsActive(feature, loc.pathname, allVisible());
+            return (
+              <A
+                href={feature.href}
+                class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                classList={{
+                  "bg-brand-50 text-brand-600": active(),
+                  "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),
+                }}
+              >
+                {props.featureLabel(feature)}
+              </A>
+            );
+          }}
+        </For>
+        <Show when={split().overflow.length > 0}>
+          <div class="relative" ref={moreRoot}>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              classList={{
+                "bg-brand-50 text-brand-600": overflowActive() || moreOpen(),
+                "text-text-secondary hover:erp-panel hover:text-text-primary": !overflowActive() && !moreOpen(),
+              }}
+              aria-expanded={moreOpen()}
+              aria-haspopup="menu"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMoreOpen((v) => !v);
+              }}
+            >
+              More
+              <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
+            <Show when={moreOpen()}>
+              <div
+                role="menu"
+                class="absolute left-0 z-50 mt-1 max-h-80 min-w-[14rem] overflow-y-auto rounded-lg border border-stroke bg-surface py-1 shadow-lg"
+              >
+                <For each={split().overflow}>
+                  {(feature) => {
+                    const active = () => featureIsActive(feature, loc.pathname, allVisible());
+                    return (
+                      <A
+                        href={feature.href}
+                        role="menuitem"
+                        class="block px-3 py-2 text-sm transition-colors"
+                        classList={{
+                          "bg-brand-50 text-brand-600": active(),
+                          "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),
+                        }}
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        {props.featureLabel(feature)}
+                      </A>
+                    );
+                  }}
+                </For>
+              </div>
+            </Show>
+          </div>
+        </Show>
+      </nav>
+    </Show>
+  );
 }
 
 function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
@@ -183,7 +324,19 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                   </>
                 }
               >
-                {(mod) => (
+                {(mod) => {
+                  const breadcrumbDept = () => {
+                    if (isFinanceUnderSalesReportPath(loc.pathname)) {
+                      return navGroupForModuleId("finance")?.label;
+                    }
+                    return navGroupForModuleId(mod().id)?.label;
+                  };
+                  const crumbSep = () => (
+                    <span class="mx-1.5 text-text-secondary/50" aria-hidden="true">
+                      ›
+                    </span>
+                  );
+                  return (
                   <>
                     <p class="text-xs font-medium text-text-secondary">
                       <Show
@@ -191,16 +344,38 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                         fallback={
                           <>
                             <SetupBreadcrumbHint />
+                            <Show when={breadcrumbDept()}>
+                              {(dept) => (
+                                <>
+                                  <span>{dept()}</span>
+                                  {crumbSep()}
+                                </>
+                              )}
+                            </Show>
                             <span>{moduleLabel(mod())}</span>
+                            <Show when={activeFeature()}>
+                              {(feat) => (
+                                <>
+                                  {crumbSep()}
+                                  <span>{featureLabel(mod().id, feat())}</span>
+                                </>
+                              )}
+                            </Show>
                           </>
                         }
                       >
                         {(branch) => (
                           <>
+                            <Show when={breadcrumbDept()}>
+                              {(dept) => (
+                                <>
+                                  <span>{dept()}</span>
+                                  {crumbSep()}
+                                </>
+                              )}
+                            </Show>
                             <span>{moduleLabel(mod())}</span>
-                            <span class="mx-1.5 text-text-secondary/50" aria-hidden="true">
-                              ›
-                            </span>
+                            {crumbSep()}
                             <span>{featureLabel(mod().id, branch())}</span>
                           </>
                         )}
@@ -222,7 +397,8 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                             : moduleLabel(mod())}
                     </h1>
                   </>
-                )}
+                  );
+                }}
               </Show>
             </div>
             <div class="flex shrink-0 items-center gap-2">
@@ -248,51 +424,17 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 </button>
               </Show>
               <CrmNotificationBell enabled={Boolean(auth.me)} />
+              <ThemeSwitcher />
             </div>
           </div>
           <SetupReminderBar />
           <Show when={featureNavModule()}>
             {(mod) => (
-              <Show when={visibleHeaderFeatures(mod(), auth.me).length > 0}>
-                <nav class="erp-header-features mt-3" aria-label={`${moduleLabel(mod())} features`}>
-                  {visibleHeaderFeatures(mod(), auth.me)
-                    .filter((feature) => {
-                      if (mod().id === "crm") {
-                        if (feature.analyticsOnly && !canViewCrmAnalytics(auth.me)) return false;
-                        if (feature.managersOnly && !canManageCrmRules(auth.me)) return false;
-                      }
-                      const code = permissionCodeForHref(feature.href);
-                      if (code && auth.me?.user?.permissions && Object.keys(auth.me.user.permissions).length > 0) {
-                        return hasPermission(auth.me, code, "read");
-                      }
-                      return true;
-                    })
-                    .map((feature) => {
-                      const features = visibleHeaderFeatures(mod(), auth.me);
-                      const hasExactTab = features.some(
-                        (f) => f.href === loc.pathname || f.settingsHref === loc.pathname,
-                      );
-                      const active =
-                        loc.pathname === feature.href ||
-                        loc.pathname === feature.settingsHref ||
-                        (!hasExactTab &&
-                          feature.prefix != null &&
-                          isSubBranchPath(loc.pathname, feature.prefix));
-                      return (
-                      <A
-                        href={feature.href}
-                        class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
-                        classList={{
-                          "bg-brand-50 text-brand-600": active,
-                          "text-text-secondary hover:erp-panel hover:text-text-primary": !active,
-                        }}
-                      >
-                        {featureLabel(mod().id, feature)}
-                      </A>
-                      );
-                    })}
-                </nav>
-              </Show>
+              <HeaderFeatureTabs
+                modId={mod().id}
+                moduleLabel={moduleLabel(mod())}
+                featureLabel={(feature) => featureLabel(mod().id, feature)}
+              />
             )}
           </Show>
           <TaxMngtHeaderNav />

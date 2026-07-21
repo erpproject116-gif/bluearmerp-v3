@@ -24,6 +24,11 @@ export type ModuleFeature = {
   analyticsOnly?: boolean;
   /** Hidden unless user can manage CRM alert rules. */
   managersOnly?: boolean;
+  /**
+   * Header tab tier. When any feature on a module sets this, unmarked features
+   * go to the More menu. Modules with no priorities keep all tabs primary.
+   */
+  headerPriority?: "primary" | "overflow";
 };
 
 export type AppModule = {
@@ -64,15 +69,15 @@ export const appModules: AppModule[] = [
     href: "/app/inventory",
     basePath: "/app/inventory",
     features: [
-      { label: "Workspace", href: "/app/inventory", settingsHref: "/app/inventory" },
-      { label: "Partners", href: "/app/inventory/partners", settingsHref: "/app/inventory/partners/settings" },
+      { label: "Workspace", href: "/app/inventory", settingsHref: "/app/inventory", headerPriority: "primary" },
+      { label: "Partners", href: "/app/inventory/partners", settingsHref: "/app/inventory/partners/settings", headerPriority: "primary" },
       { label: "Locations", href: "/app/inventory/locations", settingsHref: "/app/inventory/locations/settings" },
       { label: "Units", href: "/app/inventory/units", settingsHref: "/app/inventory/units" },
       { label: "Projects", href: "/app/inventory/projects", settingsHref: "/app/inventory/projects/settings" },
       { label: "Departments", href: "/app/inventory/departments", settingsHref: "/app/inventory/departments/settings" },
-      { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings" },
-      { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements" },
-      { label: "Stock Entries", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries" },
+      { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings", headerPriority: "primary" },
+      { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements", headerPriority: "primary" },
+      { label: "Stock Entries", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries", headerPriority: "primary" },
       { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation" },
       { label: "Stock Balance", href: "/app/inventory/reports/stock-balance", settingsHref: "/app/inventory/stock-movements" },
       { label: "On Hand", href: "/app/inventory/reports/on-hand", settingsHref: "/app/inventory/stock-movements" },
@@ -85,14 +90,14 @@ export const appModules: AppModule[] = [
     ],
     subBranches: [
       {
-        label: "Serial & Lot",
+        label: "Batch & serial tracking",
         prefix: SERIAL_LOT_PREFIX,
         href: "/app/inventory/serial-lot/registry",
         settingsHref: "/app/inventory/serial-lot/settings",
         featureCode: "inventory.serial_lot",
       },
       {
-        label: "WMS",
+        label: "Warehouse",
         prefix: WMS_PREFIX,
         href: "/app/inventory/wms/scheduled-receipts",
         settingsHref: "/app/inventory/wms/scheduled-receipts",
@@ -106,7 +111,8 @@ export const appModules: AppModule[] = [
     href: "/app/buying",
     basePath: "/app/buying",
     features: [
-      { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying" },
+      { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying", headerPriority: "primary" },
+      { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/buying", headerPriority: "primary" },
       { label: "Purchase Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Pre-Invoicing (Purchases)", href: "/app/purchases/purchases/pre-invoicing", settingsHref: "/app/purchases/purchases/settings" },
       setupFeatureTab("/app/buying"),
@@ -118,7 +124,8 @@ export const appModules: AppModule[] = [
     href: "/app/selling",
     basePath: "/app/selling",
     features: [
-      { label: "Workspace", href: "/app/selling", settingsHref: "/app/selling" },
+      { label: "Workspace", href: "/app/selling", settingsHref: "/app/selling", headerPriority: "primary" },
+      { label: "Reports", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
       { label: "Sales Status", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings" },
       { label: "Receivable Status", href: "/app/selling/reports/receivable-status", settingsHref: "/app/sales/sales/settings" },
       { label: "Commissions", href: "/app/selling/commissions", settingsHref: "/app/selling/commissions" },
@@ -136,6 +143,7 @@ export const appModules: AppModule[] = [
         href: "/app/after-sales/repair-orders",
         settingsHref: "/app/after-sales/repair-orders/settings",
         prefix: "/app/after-sales/repair-orders",
+        headerPriority: "primary",
       },
       {
         label: "Status",
@@ -147,6 +155,7 @@ export const appModules: AppModule[] = [
         href: "/app/after-sales/register-repair",
         settingsHref: "/app/after-sales/repair-orders/settings",
         prefix: "/app/after-sales/register-repair",
+        headerPriority: "primary",
       },
       {
         label: "Intake Status",
@@ -171,7 +180,7 @@ export const appModules: AppModule[] = [
     href: "/app/quotation/quotations",
     basePath: "/app/quotation",
     features: [
-      { label: "List", href: "/app/quotation/quotations", settingsHref: "/app/quotation/quotations/settings" },
+      { label: "List", href: "/app/quotation/quotations", settingsHref: "/app/quotation/quotations/settings", headerPriority: "primary" },
       { label: "Status", href: "/app/quotation/quotations/status", settingsHref: "/app/quotation/quotations/settings" },
       {
         label: "Open quotes",
@@ -192,7 +201,8 @@ export const appModules: AppModule[] = [
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
-      { label: "Sales Invoice List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Invoice List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
+      { label: "Reports", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
       { label: "Sales Invoice Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
       {
         label: "Pre-invoicing",
@@ -215,7 +225,7 @@ export const appModules: AppModule[] = [
     ],
     subBranches: [
       {
-        label: "Group / Tax Invoicing",
+        label: "Combined invoices",
         prefix: COLLECTIVE_INVOICING_PREFIX,
         href: "/app/sales/collective-invoicing/list",
         settingsHref: "/app/sales/sales/settings",
@@ -229,7 +239,8 @@ export const appModules: AppModule[] = [
     href: "/app/sales-order/sales-orders",
     basePath: "/app/sales-order",
     features: [
-      { label: "List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings", headerPriority: "primary" },
+      { label: "Reports", href: "/app/sales-order/reports", settingsHref: "/app/sales-order/sales-orders/settings", headerPriority: "primary" },
       { label: "Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
       {
         label: "Open orders",
@@ -262,7 +273,7 @@ export const appModules: AppModule[] = [
     href: "/app/purchase-request/purchase-requests",
     basePath: "/app/purchase-request",
     features: [
-      { label: "List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings" },
+      { label: "List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings", headerPriority: "primary" },
       { label: "Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       setupFeatureTab("/app/purchase-request"),
     ],
@@ -273,7 +284,8 @@ export const appModules: AppModule[] = [
     href: "/app/purchase-order/purchase-orders",
     basePath: "/app/purchase-order",
     features: [
-      { label: "List", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings" },
+      { label: "List", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings", headerPriority: "primary" },
+      { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/purchase-order/purchase-orders/settings", headerPriority: "primary" },
       {
         label: "RFQ",
         href: "/app/purchase-order/rfq",
@@ -295,7 +307,8 @@ export const appModules: AppModule[] = [
     href: "/app/purchases/purchases",
     basePath: "/app/purchases",
     features: [
-      { label: "Purchase Invoice List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
+      { label: "Purchase Invoice List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
+      { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
       { label: "Purchase Invoice Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       {
         label: "Pre-invoicing",
@@ -440,7 +453,8 @@ export const appModules: AppModule[] = [
     href: "/app/finance",
     basePath: "/app/finance",
     features: [
-      { label: "Workspace", href: "/app/finance", settingsHref: "/app/finance/official-receipts/settings" },
+      { label: "Workspace", href: "/app/finance", settingsHref: "/app/finance/official-receipts/settings", headerPriority: "primary" },
+      { label: "Reports", href: "/app/finance/reports", settingsHref: "/app/finance/official-receipts/settings", headerPriority: "primary" },
       { label: "Receipts", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Vouchers", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Purchases", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
@@ -452,14 +466,14 @@ export const appModules: AppModule[] = [
     ],
     subBranches: [
       {
-        label: "Acct. I",
+        label: "General ledger",
         prefix: ACCT_I_PREFIX,
         href: "/app/finance/acct-i/journal-entries",
         settingsHref: "/app/finance/acct-i/journal-entries",
         featureCode: "finance.acct_i",
       },
       {
-        label: "Acct. II",
+        label: "Receivables & payables",
         prefix: ACCT_II_PREFIX,
         href: "/app/finance/acct-ii/checks",
         settingsHref: "/app/finance/acct-ii/checks",
@@ -473,7 +487,7 @@ export const appModules: AppModule[] = [
         featureCode: "quotation.tax_mngt",
       },
       {
-        label: "AP Review",
+        label: "Review supplier payments",
         prefix: REVIEW_PURCHASES_SUB_BRANCH,
         href: "/app/finance/payment-vouchers",
         settingsHref: "/app/finance/official-receipts/settings",
@@ -652,4 +666,22 @@ export function visibleHeaderFeatures(module: AppModule, me?: MeData | null): Mo
     return [];
   }
   return features;
+}
+
+export type HeaderFeatureSplit = {
+  primary: ModuleFeature[];
+  overflow: ModuleFeature[];
+};
+
+/** Split visible header features into primary tabs vs More menu. */
+export function splitHeaderFeatures(module: AppModule, me?: MeData | null): HeaderFeatureSplit {
+  const all = visibleHeaderFeatures(module, me);
+  const hasExplicit = all.some((f) => f.headerPriority != null);
+  if (!hasExplicit) {
+    return { primary: all, overflow: [] };
+  }
+  return {
+    primary: all.filter((f) => f.headerPriority === "primary"),
+    overflow: all.filter((f) => f.headerPriority !== "primary"),
+  };
 }

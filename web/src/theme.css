@@ -1,5 +1,5 @@
 @theme {
-  /* BluearmERP design tokens (light only) — overridden per tenant via applyBrandingTheme() */
+  /* BluearmERP design tokens (light defaults) — brand hues overridden per tenant via applyBrandingTheme() */
   --color-brand-50: #ecf3ff;
   --color-brand-100: #dde9ff;
   --color-brand-500: #3c50e0;
@@ -16,4 +16,23 @@
   --color-accent: #0ea5e9;
   --color-secondary: #64748b;
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Dark surfaces — brand --color-brand-* stay from @theme / branding */
+html[data-theme="dark"] {
+  --color-stroke: #2a3344;
+  --color-body: #0f1419;
+  --color-surface: #1a2332;
+  --color-panel: #151c28;
+  --color-panel-strong: #243044;
+  --color-text-primary: #e8eef7;
+  --color-text-secondary: #94a3b8;
+  --color-label: #cbd5e1;
+  --color-brand-50: #1e293b;
+  --color-brand-100: #273549;
+}
+
+html[data-theme="dark"] body {
+  background-color: var(--color-body);
+  color: var(--color-text-primary);
 }

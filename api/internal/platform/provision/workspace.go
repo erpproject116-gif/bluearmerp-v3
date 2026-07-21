@@ -72,8 +72,8 @@ func LookupAuthUserID(ctx context.Context, pool *pgxpool.Pool, email string) str
 	return ""
 }
 
-// CreateProductionTenant creates a non-demo tenant, owner user, and modules (empty chart of accounts).
-// When AuthUserID is empty the owner is created as invited with a pending user_invites row.
+// CreateProductionTenant creates a non-demo tenant, owner user, modules, and a
+// standard Philippine SME chart of accounts (editable afterward).
 func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArgs) (TenantResult, error) {
 	email := strings.ToLower(strings.TrimSpace(a.Email))
 	fullName := strings.TrimSpace(a.FullName)
@@ -174,6 +174,11 @@ func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArg
 	}
 
 	if _, err := tx.Exec(ctx, `select public.seed_tenant_base_config($1)`, tenantID); err != nil {
+		return TenantResult{}, err
+	}
+
+	// Standard Philippine SME chart of accounts + default account mappings.
+	if _, err := tx.Exec(ctx, `select public.seed_ph_sme_chart_of_accounts($1)`, tenantID); err != nil {
 		return TenantResult{}, err
 	}
 

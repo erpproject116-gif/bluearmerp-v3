@@ -16,6 +16,7 @@ import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../share
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModuleIcon } from "../../../shell/ModuleIcon";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
@@ -562,6 +563,7 @@ export function QuotationModal(props: Props) {
     <WideEntityModal
       open={props.open}
       title={effectiveEditing() ? (props.readOnly ? "View Quotation (deleted)" : "Edit Quotation") : "New Quotation"}
+      icon={<ModuleIcon id="quotation" class="h-5 w-5" />}
       onClose={() => props.onClose()}
       onSave={() => void save()}
       readOnly={props.readOnly}

@@ -72,13 +72,13 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Every new trial workspace is provisioned with a chart of accounts, PHP currency, standard VAT types, and a default Main location. The setup wizard makes you review and confirm those seeds, then add at least one partner and one product. Until required steps are done, the API blocks new selling and buying documents.",
+        text: "Every new workspace is provisioned with a standard Philippine SME chart of accounts (general ledger), PHP currency, standard VAT types, and a default Main location. Bank accounts for banking are a separate setup — they are not the same as GL cash accounts. The setup wizard makes you review and confirm those seeds, then add at least one partner and one product. Until required steps are done, the API blocks new selling and buying documents.",
       },
       {
         type: "steps",
         items: [
           "Company — open branding, set your legal name and logo, then click Confirm.",
-          "Chart of accounts — review seeded GL accounts, then Looks good.",
+          "Chart of accounts — review the standard GL accounts and default mappings (cash, A/R, A/P, sales, VAT), then Looks good.",
           "Currency & tax — open tax types, adjust if needed, then Confirm.",
           "Process policies — review quotation/SO/GR gates and release mode, then Confirm.",
           "Location — confirm Main or add branches, then Confirm.",
@@ -107,15 +107,15 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "The Business Dashboard shows sales totals, stock warnings, open purchase orders, and other alerts in one place. It is meant for people who oversee the whole store, not just one salesperson. While workspace setup is incomplete, a Start here checklist appears at the top for administrators.",
+        text: "The Business Dashboard opens with a home overview like a finance desk: total receivables (unpaid invoices, current vs overdue), total payables (unpaid bills), and cash flow for this year. Below that, operations tiles summarize sales, stock warnings, open purchase orders, and other alerts. While workspace setup is incomplete, a Start here checklist appears at the top for administrators.",
       },
       {
         type: "paragraph",
-        text: "The number tiles at the top summarize this month’s sales, low-stock items, customers who still owe money, quotes that expired, and similar items. Click a tile to jump to the related list when you need to take action.",
+        text: "Receivables and payables cards use aging totals — click through to A/R or A/P aging for detail. Cash flow summarizes posted cash journals (incoming, outgoing, net). Bank account registers are a separate concern from the general ledger chart of accounts.",
       },
       {
         type: "paragraph",
-        text: "Charts show how sales and stock movement changed month by month. The red flags section lists items that need attention—such as stock counts that do not match serial numbers, purchase orders not fully received, sales that exceed what was released from a sales order, reservations without delivery receipts, delivery receipts without invoices, goods receipts without supplier invoices, or supplier payments over-applied.",
+        text: "Operations tiles and charts show how sales and stock movement changed month by month. The red flags section lists items that need attention—such as stock counts that do not match serial numbers, purchase orders not fully received, or delivery receipts without invoices.",
       },
       {
         type: "tip",
@@ -452,24 +452,24 @@ export const documentationSections: DocSection[] = [
     id: "finance",
     title: "Finance and accounts",
     iconId: "finance",
-    intro: "Receipts, payables, general ledger, Acct. I core GL, and Acct. II extended accounting.",
+    intro: "Receipts, payables, general ledger (bookkeeping), and receivables & payables tools.",
     primaryHref: "/app/finance",
-    primaryLabel: "Open Accounts Workspace",
+    primaryLabel: "Open Accounting Workspace",
     blocks: [
       {
         type: "paragraph",
-        text: "The Accounts workspace summarizes open receivables, payables, and shortcuts into Acct. I (core GL) and Acct. II (extended PH-style accounting).",
+        text: "The Accounting workspace summarizes open receivables, payables, and shortcuts into General ledger (journals, chart of accounts, financial statements) and Receivables & payables (checks, withholding, books, aging details).",
       },
-      { type: "heading", text: "Acct. I — core ledger" },
+      { type: "heading", text: "General ledger — journals and statements" },
       {
         type: "steps",
         items: [
-          "Journal Entries, Chart of Accounts, Trial Balance, P&L, and Balance Sheet.",
-          "Payment Receipts (customer collections) and Payment Vouchers (vendor payments).",
-          "Supplier invoices matched to goods receipts; bank reconciliation.",
+          "Journal entries, Chart of accounts, Trial balance, Profit & loss, and Balance sheet.",
+          "Official receipts (customer collections) and Payment vouchers (vendor payments).",
+          "Supplier invoices matched to goods receipts; bank reconciliation (reconciles GL cash — bank account master lists are separate).",
         ],
       },
-      { type: "heading", text: "Acct. II — checks, withholding, import cost" },
+      { type: "heading", text: "Receivables & payables — checks, withholding, import cost" },
       {
         type: "steps",
         items: [
@@ -505,28 +505,28 @@ export const documentationSections: DocSection[] = [
     id: "reports",
     title: "Reports catalog",
     iconId: "reports",
-    intro: "Find module reports and saved filter views in one place.",
+    intro: "Search and browse reports by category with plain-language descriptions.",
     primaryHref: "/app/reports",
-    primaryLabel: "Open Reports Catalog",
+    primaryLabel: "Open Reports Center",
     blocks: [
       {
         type: "paragraph",
-        text: "The Reports catalog lists analytics and status reports across selling, stock, buying, finance, and CRM. Each entry links to the live report screen and supports CSV export where available.",
+        text: "Reports Center lists analytics and status reports across selling, stock, buying, finance, and CRM. Use search or the category sidebar to find a report; each row shows a short plain-language blurb and links to the live screen (CSV export where available). Department hubs also link to focused report pages under Selling, Buying, and Accounting.",
       },
       {
         type: "steps",
         items: [
-          "Open Reports → Catalog to browse by module.",
+          "Open Reports → Catalog (Reports Center) and type a keyword, or pick a category.",
           "Selling: Receivable Status · Sales pre-invoicing (unbilled SO lines).",
           "Buying: Purchase Status · Payable Status · Purchase pre-invoicing (unbilled GR lines).",
-          "Finance: Customer/Vendor Book I (AR/AP) · Trial Balance · AR/AP Status.",
-          "Open a report, set filters, press Search (F8), and export CSV when available.",
+          "Finance: Customer/Vendor Book I (AR/AP) · Trial Balance · AR/AP Status · Cash flow.",
+          "Open a report, set filters, Run Report / Search (F8), and export CSV when available.",
           "Open Saved Views to store named filter sets on catalog reports (Ad-hoc BI).",
         ],
       },
       {
         type: "tip",
-        text: "For step-by-step help on Load Slip, attachments, or RFQ, open Documentation → Knowledge base.",
+        text: "Home shows Total Receivables, Total Payables, and Cash Flow cards; click through for full aging and cash-flow reports.",
       },
     ],
   },
@@ -1033,7 +1033,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Most day-to-day BluearmERP features are live: document generation (Mapping Center), approvals with email, company budgets, Data Center, WMS, shipping rules, Acct II (withholding/2307, landed cost, checks), sales commission, and CAPA.",
+        text: "Most day-to-day BluearmERP features are live: document generation (Mapping Center), approvals with email, company budgets, Data Center, WMS, shipping rules, Receivables & payables (withholding/2307, landed cost, checks), sales commission, and CAPA.",
       },
       {
         type: "paragraph",

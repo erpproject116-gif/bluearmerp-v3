@@ -1,8 +1,13 @@
 import type { BrandingSettings } from "./types";
 import { STAGE_KEYS } from "./defaults";
+import { resolveTheme } from "../theme-preference";
 
 function setVar(root: HTMLElement, name: string, value?: string) {
   if (value?.trim()) root.style.setProperty(name, value.trim());
+}
+
+function clearVar(root: HTMLElement, name: string) {
+  root.style.removeProperty(name);
 }
 
 export function applyBrandingTheme(settings: BrandingSettings) {
@@ -13,27 +18,46 @@ export function applyBrandingTheme(settings: BrandingSettings) {
   const surface = c.surface?.trim() || "#ffffff";
   const background = c.background?.trim() || "#f1f5f9";
   const stroke = c.stroke?.trim() || "#e2e8f0";
+  const dark = resolveTheme() === "dark";
 
   setVar(root, "--color-brand-500", primary);
   setVar(root, "--color-brand-600", primary);
   setVar(root, "--color-brand-700", c.primary_hover || primary);
-  setVar(root, "--color-brand-50", mixWithWhite(primary, 0.92));
-  setVar(root, "--color-brand-100", mixWithWhite(primary, 0.85));
-  setVar(root, "--color-text-primary", c.heading || c.text);
-  setVar(root, "--color-text-secondary", c.text_secondary);
-  setVar(root, "--color-body", background);
-  setVar(root, "--color-stroke", stroke);
+  if (!dark) {
+    setVar(root, "--color-brand-50", mixWithWhite(primary, 0.92));
+    setVar(root, "--color-brand-100", mixWithWhite(primary, 0.85));
+    setVar(root, "--color-text-primary", c.heading || c.text);
+    setVar(root, "--color-text-secondary", c.text_secondary);
+    setVar(root, "--color-body", background);
+    setVar(root, "--color-stroke", stroke);
+    setVar(root, "--color-label", c.label);
+    setVar(root, "--color-surface", surface);
+    setVar(root, "--color-panel", mixHex(surface, background, 0.35));
+    setVar(root, "--color-panel-strong", mixHex(surface, stroke, 0.55));
+    if (body) {
+      body.style.backgroundColor = background;
+      body.style.color = (c.heading || c.text)?.trim() || "";
+    }
+  } else {
+    // Let [data-theme="dark"] CSS tokens own surfaces/text; keep brand hues only.
+    clearVar(root, "--color-brand-50");
+    clearVar(root, "--color-brand-100");
+    clearVar(root, "--color-text-primary");
+    clearVar(root, "--color-text-secondary");
+    clearVar(root, "--color-body");
+    clearVar(root, "--color-stroke");
+    clearVar(root, "--color-label");
+    clearVar(root, "--color-surface");
+    clearVar(root, "--color-panel");
+    clearVar(root, "--color-panel-strong");
+    if (body) {
+      body.style.backgroundColor = "";
+      body.style.color = "";
+    }
+  }
+
   setVar(root, "--color-accent", c.accent);
   setVar(root, "--color-secondary", c.secondary);
-  setVar(root, "--color-label", c.label);
-  setVar(root, "--color-surface", surface);
-  setVar(root, "--color-panel", mixHex(surface, background, 0.35));
-  setVar(root, "--color-panel-strong", mixHex(surface, stroke, 0.55));
-
-  if (body) {
-    body.style.backgroundColor = background;
-    body.style.color = (c.heading || c.text)?.trim() || "";
-  }
 
   root.setAttribute("data-branded", "true");
 

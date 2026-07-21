@@ -29,7 +29,7 @@ export const documentationGroups: DocGroup[] = [
   {
     id: "accounts",
     title: "Finance & reports",
-    description: "Receivables, payables, Acct I/II, assets, and analytics.",
+    description: "Receivables, payables, general ledger, assets, and analytics.",
     sectionIds: ["finance", "reports", "bi", "fixed-assets"],
   },
   {

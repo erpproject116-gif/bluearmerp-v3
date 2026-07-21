@@ -39,16 +39,16 @@ export const navGroups: NavGroup[] = [
     label: "Stock",
     defaultExpanded: false,
     entries: [
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "WMS" },
+      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "Warehouse" },
       { kind: "module", moduleId: "inventory" },
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Serial & Lot" },
+      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Batch & serial tracking" },
       { kind: "module", moduleId: "after_sales" },
     ],
   },
   {
     id: "sales_process",
     label: "Sales Dept",
-    defaultExpanded: true,
+    defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "selling" },
       { kind: "module", moduleId: "quotation" },
@@ -58,14 +58,14 @@ export const navGroups: NavGroup[] = [
         kind: "subBranch",
         moduleId: "sales",
         featureCode: "sales.collective_invoicing",
-        branchLabel: "Group Invoicing",
+        branchLabel: "Combined invoices",
       },
     ],
   },
   {
     id: "procurement_process",
     label: "Purchasing Dept",
-    defaultExpanded: true,
+    defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "buying" },
       { kind: "module", moduleId: "purchase_request" },
@@ -76,13 +76,29 @@ export const navGroups: NavGroup[] = [
   {
     id: "accounting_dept",
     label: "Accounting Dept",
-    defaultExpanded: true,
+    defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "finance" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "Acct. I" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Acct. II" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "General ledger" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Receivables & payables" },
       { kind: "subBranch", moduleId: "finance", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "AP Review" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "Review supplier payments" },
+    ],
+  },
+  {
+    id: "more_apps",
+    label: "More apps",
+    defaultExpanded: false,
+    entries: [
+      { kind: "module", moduleId: "crm" },
+      { kind: "module", moduleId: "booking" },
+      { kind: "module", moduleId: "comms" },
+      { kind: "module", moduleId: "operations" },
+      { kind: "module", moduleId: "quality" },
+      { kind: "module", moduleId: "reports" },
+      { kind: "module", moduleId: "support" },
+      { kind: "module", moduleId: "pos" },
+      { kind: "module", moduleId: "hr" },
     ],
   },
   {
@@ -97,18 +113,8 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
-/** Shown after collapsible groups (below Misc). */
-export const belowGroupModuleIds = [
-  "crm",
-  "booking",
-  "comms",
-  "operations",
-  "quality",
-  "reports",
-  "support",
-  "pos",
-  "hr",
-] as const;
+/** Shown after collapsible groups. Empty — rare apps live in More apps. */
+export const belowGroupModuleIds = [] as const;
 
 /** Modules shown above collapsible groups. */
 export const ungroupedModuleIds = ["dashboard"] as const;
@@ -125,4 +131,25 @@ export function subBranchByFeature(module: AppModule, featureCode: string) {
 
 export function navGroupStorageKey(groupId: string) {
   return `erp-nav-group:${groupId}`;
+}
+
+/** Dept group that contains a module id (for breadcrumbs). */
+export function navGroupForModuleId(moduleId: string): NavGroup | undefined {
+  return navGroups.find((g) =>
+    g.entries.some((e) => e.kind === "module" || e.kind === "subBranch" || e.kind === "link"
+      ? e.moduleId === moduleId
+      : false),
+  );
+}
+
+/** Accounting-facing report paths that live under /app/sales/reports. */
+export const FINANCE_UNDER_SALES_REPORT_PATHS = [
+  "/app/sales/reports/ar-by-customer",
+  "/app/sales/reports/official-receipt-status",
+  "/app/sales/reports/si-receipt-status",
+  "/app/sales/reports/customer-credit-balance",
+] as const;
+
+export function isFinanceUnderSalesReportPath(pathname: string): boolean {
+  return (FINANCE_UNDER_SALES_REPORT_PATHS as readonly string[]).includes(pathname);
 }
