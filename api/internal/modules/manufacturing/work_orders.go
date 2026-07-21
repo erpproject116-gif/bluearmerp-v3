@@ -41,16 +41,16 @@ type WorkOrder struct {
 }
 
 type MaterialNeedLine struct {
-	ComponentItemID   int64   `json:"component_item_id"`
-	ComponentCode     string  `json:"component_code"`
-	ComponentName     string  `json:"component_name"`
-	BomQty            float64 `json:"bom_qty"`
-	BomUnitCode       string  `json:"bom_unit_code"`
-	ScrapPct          float64 `json:"scrap_pct"`
-	StockToIssue      float64 `json:"stock_to_issue"`
-	StockUnitCode     string  `json:"stock_unit_code"`
-	QtyOnHand         float64 `json:"qty_on_hand"`
-	Shortage          float64 `json:"shortage"`
+	ComponentItemID int64   `json:"component_item_id"`
+	ComponentCode   string  `json:"component_code"`
+	ComponentName   string  `json:"component_name"`
+	BomQty          float64 `json:"bom_qty"`
+	BomUnitCode     string  `json:"bom_unit_code"`
+	ScrapQty        float64 `json:"scrap_qty"`
+	StockToIssue    float64 `json:"stock_to_issue"`
+	StockUnitCode   string  `json:"stock_unit_code"`
+	QtyOnHand       float64 `json:"qty_on_hand"`
+	Shortage        float64 `json:"shortage"`
 }
 
 type MaterialNeeds struct {
@@ -479,7 +479,7 @@ func getWorkOrderMaterialNeeds(pool *pgxpool.Pool) http.HandlerFunc {
 				ComponentName:   ln.ComponentName,
 				BomQty:          ln.Qty,
 				BomUnitCode:     unitCodeBom,
-				ScrapPct:        ln.ScrapPct,
+				ScrapQty:        ln.ScrapQty,
 				StockToIssue:    stock,
 				StockUnitCode:   unitCode,
 				QtyOnHand:       onHand,

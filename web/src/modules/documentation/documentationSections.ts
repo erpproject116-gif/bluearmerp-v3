@@ -698,20 +698,20 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Manufacturing covers in-house production under Stock → Serial & Lot. Define a BOM (finished item, output qty/UoM, yield %, and component lines with UoM and scrap %), create a work order, review materials needed, release it, then complete it to backflush components (converted to stock UoM) and receive finished goods.",
+        text: "Manufacturing covers in-house production under Stock → Serial & Lot. Define a BOM (finished item, output qty/UoM, yield %, and component lines with used qty, UoM, and scrap/spare qty), create a work order, review materials needed (on hand vs to issue), release it, then complete it to backflush components and receive finished goods.",
       },
       {
         type: "steps",
         items: [
           "Set item base units and conversions under Inventory → Units.",
-          "Create a BOM with output qty/UoM, yield %, and component lines (qty, UoM, scrap %).",
+          "Create a BOM with output qty/UoM, yield %, and component lines (used qty, UoM, scrap/spare qty).",
           "Create a work order, review materials needed vs on-hand, then release when ready.",
-          "Complete the work order to issue converted stock (with scrap/yield) and receipt finished goods.",
+          "Complete the work order to issue converted stock (used + scrap/spare) and receive finished goods.",
         ],
       },
       {
         type: "tip",
-        text: "Complete always reloads the live BOM. Multi-level BOMs, routings, and WIP lot/serial pick are deferred—use single-level BOMs only.",
+        text: "Complete always reloads the live BOM. Used is what goes into the product; scrap/spare is extra measurable qty in the same UoM. Multi-level BOMs and routings are deferred.",
       },
     ],
   },

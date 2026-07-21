@@ -19,7 +19,7 @@ type BomLine = {
   qty: number;
   unit_id?: number | null;
   unit_code?: string;
-  scrap_pct?: number;
+  scrap_qty?: number;
   stock_qty_preview?: number;
   base_unit_id?: number;
   base_unit_code?: string;
@@ -59,13 +59,14 @@ function convertClient(fromId: number, toId: number, qty: number, convs: Convers
 function liveStockPreview(ln: BomLine, convs: Conversion[]): { qty: number; code: string; missing?: boolean } | null {
   const baseId = ln.base_unit_id;
   const fromId = ln.unit_id ?? baseId;
-  if (!baseId || !fromId || !(ln.qty > 0)) return null;
-  const converted = convertClient(fromId, baseId, Number(ln.qty), convs);
+  const need = Number(ln.qty) + Number(ln.scrap_qty ?? 0);
+  if (!baseId || !fromId || !(need > 0)) return null;
+  const converted = convertClient(fromId, baseId, need, convs);
   if (converted == null) {
     return { qty: 0, code: ln.base_unit_code ?? "", missing: true };
   }
   return {
-    qty: converted * (1 + Number(ln.scrap_pct ?? 0) / 100),
+    qty: converted,
     code: ln.base_unit_code ?? "",
   };
 }
@@ -91,7 +92,7 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 }
 
 function emptyLine(): BomLine {
-  return { line_no: 1, component_item_id: 0, qty: 1, scrap_pct: 0, unit_id: null };
+  return { line_no: 1, component_item_id: 0, qty: 1, scrap_qty: 0, unit_id: null };
 }
 
 export default function BomsPage() {
@@ -239,14 +240,19 @@ export default function BomsPage() {
       toast.warning("BOM code, name, and finished item are required.");
       return;
     }
-    const bodyLines = lines()
-      .filter((ln) => ln.component_item_id > 0 && Number(ln.qty) > 0)
-      .map((ln) => ({
-        component_item_id: ln.component_item_id,
-        qty: Number(ln.qty),
-        unit_id: ln.unit_id || null,
-        scrap_pct: Number(ln.scrap_pct ?? 0),
-      }));
+    const finishedId = finishedItemId()!;
+    const rawLines = lines().filter((ln) => ln.component_item_id > 0 && Number(ln.qty) > 0);
+    const sameAsFinished = rawLines.find((ln) => ln.component_item_id === finishedId);
+    if (sameAsFinished) {
+      toast.warning("A component cannot be the same item as the finished good. Pick a different component.");
+      return;
+    }
+    const bodyLines = rawLines.map((ln) => ({
+      component_item_id: ln.component_item_id,
+      qty: Number(ln.qty),
+      unit_id: ln.unit_id || null,
+      scrap_qty: Number(ln.scrap_qty ?? 0),
+    }));
     if (bodyLines.length === 0) {
       toast.warning("Add at least one component line.");
       return;
@@ -404,7 +410,7 @@ export default function BomsPage() {
           </Field>
         </div>
         <p class="col-span-full text-xs text-text-secondary">
-          Complete uses the live BOM (convert × scrap × WO qty / output qty ÷ yield). Set conversions under Inventory → Units.
+          Per output batch: <strong>Used</strong> goes into the finished good; <strong>Scrap/spare</strong> is extra measurable qty in the same UoM (waste or allowance). Stock issue = convert(used + scrap) × WO/output ÷ yield.
         </p>
         <div class="col-span-full space-y-2">
           <p class="text-sm font-medium text-text-primary">Components (per output batch)</p>
@@ -412,7 +418,7 @@ export default function BomsPage() {
             {(ln, idx) => {
               const preview = () => liveStockPreview(ln, conversions() ?? []);
               return (
-                <div class="grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_4.5rem_auto]">
+                <div class="grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_5rem_auto]">
                   <LookupCombo
                     label={`Line ${idx() + 1}`}
                     required
@@ -420,6 +426,10 @@ export default function BomsPage() {
                     selectedId={() => ln.component_item_id || null}
                     onInput={(v) => setLineLabels((p) => ({ ...p, [idx()]: v }))}
                     onSelect={(o) => {
+                      if (finishedItemId() && o.id === finishedItemId()) {
+                        toast.warning("That item is the finished good — pick a different component.");
+                        return;
+                      }
                       const meta = o.meta as { base_unit_id?: number; base_unit_code?: string } | undefined;
                       setLines((prev) =>
                         prev.map((row, i) =>
@@ -450,7 +460,7 @@ export default function BomsPage() {
                     fetchOptions={fetchItems}
                   />
                   <label class="text-sm">
-                    <span class="text-text-secondary">Qty</span>
+                    <span class="text-text-secondary">Used</span>
                     <input
                       type="number"
                       class={`${inputClass} mt-1`}
@@ -480,15 +490,15 @@ export default function BomsPage() {
                     }}
                   />
                   <label class="text-sm">
-                    <span class="text-text-secondary">Scrap %</span>
+                    <span class="text-text-secondary">Scrap/spare</span>
                     <input
                       type="number"
                       class={`${inputClass} mt-1`}
                       min="0"
-                      value={ln.scrap_pct ?? 0}
+                      value={ln.scrap_qty ?? 0}
                       onInput={(e) => {
                         const v = Number(e.currentTarget.value);
-                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_pct: v } : row)));
+                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_qty: v } : row)));
                       }}
                     />
                   </label>
