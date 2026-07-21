@@ -1,6 +1,7 @@
 import { createSignal, For, createResource } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { UnitLookupCombo, formatUnitLabel } from "../../shared/UnitLookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
@@ -43,7 +44,6 @@ type Bom = {
   lines?: BomLine[];
 };
 
-type UnitOpt = { id: number; code: string; name: string };
 type Conversion = { from_unit_id: number; to_unit_id: number; factor: number };
 
 function convertClient(fromId: number, toId: number, qty: number, convs: Conversion[]): number | null {
@@ -108,20 +108,17 @@ export default function BomsPage() {
   const [locationLabel, setLocationLabel] = createSignal("");
   const [outputQty, setOutputQty] = createSignal("1");
   const [outputUnitId, setOutputUnitId] = createSignal<number | null>(null);
+  const [outputUnitLabel, setOutputUnitLabel] = createSignal("");
   const [yieldPct, setYieldPct] = createSignal("100");
   const [notes, setNotes] = createSignal("");
   const [lines, setLines] = createSignal<BomLine[]>([emptyLine()]);
   const [lineLabels, setLineLabels] = createSignal<Record<number, string>>({});
+  const [lineUnitLabels, setLineUnitLabels] = createSignal<Record<number, string>>({});
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const client = useQueryClient();
 
-  const [units] = createResource(async () => {
-    const res = await apiFetch<UnitOpt[]>("/api/v1/inventory/units?page=1&pageSize=200&status=active&sort=code");
-    return res.data ?? [];
-  });
-
-  const [conversions] = createResource(async () => {
+  const [conversions, { refetch: refreshConversions }] = createResource(async () => {
     const res = await apiFetch<Conversion[]>("/api/v1/inventory/unit-conversions");
     return res.data ?? [];
   });
@@ -158,10 +155,12 @@ export default function BomsPage() {
     setLocationLabel("");
     setOutputQty("1");
     setOutputUnitId(null);
+    setOutputUnitLabel("");
     setYieldPct("100");
     setNotes("");
     setLines([emptyLine()]);
     setLineLabels({});
+    setLineUnitLabels({});
     setModalOpen(true);
   };
 
@@ -182,11 +181,13 @@ export default function BomsPage() {
     setLocationLabel(detail.default_location_name ?? "");
     setOutputQty(String(detail.output_qty ?? 1));
     setOutputUnitId(detail.output_unit_id ?? null);
+    setOutputUnitLabel(detail.output_unit_code ?? "");
     setYieldPct(String(detail.yield_pct ?? 100));
     setNotes(detail.notes ?? "");
     const loaded = detail.lines?.length ? detail.lines : [emptyLine()];
     setLines(loaded);
     setLineLabels(Object.fromEntries(loaded.map((ln, i) => [i, [ln.component_code, ln.component_name].filter(Boolean).join(" — ")])));
+    setLineUnitLabels(Object.fromEntries(loaded.map((ln, i) => [i, ln.unit_code ? formatUnitLabel({ code: ln.unit_code, name: ln.unit_code }) : ""])));
     setModalOpen(true);
   };
 
@@ -203,10 +204,12 @@ export default function BomsPage() {
       location_label: locationLabel(),
       output_qty: outputQty(),
       output_unit_id: outputUnitId(),
+      output_unit_label: outputUnitLabel(),
       yield_pct: yieldPct(),
       notes: notes(),
       lines: lines(),
       line_labels: lineLabels(),
+      line_unit_labels: lineUnitLabels(),
     }),
     onApply: (payload) => {
       setBomCode(payload.bom_code);
@@ -218,10 +221,12 @@ export default function BomsPage() {
       setLocationLabel(payload.location_label);
       setOutputQty(payload.output_qty ?? "1");
       setOutputUnitId(payload.output_unit_id ?? null);
+      setOutputUnitLabel(payload.output_unit_label ?? "");
       setYieldPct(payload.yield_pct ?? "100");
       setNotes(payload.notes ?? "");
       setLines(payload.lines?.length ? payload.lines : [emptyLine()]);
       setLineLabels(payload.line_labels ?? {});
+      setLineUnitLabels(payload.line_unit_labels ?? {});
     },
     enabled: () => modalOpen(),
     autoApply: () => modalOpen() && !editing(),
@@ -329,48 +334,39 @@ export default function BomsPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
         saving={saving()}
-        singleColumn
       >
-        <draft.DraftBanner />
+        <div class="col-span-full">
+          <draft.DraftBanner />
+        </div>
         <Field label="BOM code *">
           <input class={inputClass} value={bomCode()} onInput={(e) => setBomCode(e.currentTarget.value)} />
         </Field>
         <Field label="Name *">
           <input class={inputClass} value={bomName()} onInput={(e) => setBomName(e.currentTarget.value)} />
         </Field>
-        <LookupCombo
-          label="Finished item"
-          required
-          value={finishedItemLabel}
-          selectedId={finishedItemId}
-          onInput={setFinishedItemLabel}
-          onSelect={(o) => {
-            setFinishedItemId(o.id);
-            setFinishedItemLabel(o.label);
-            const meta = o.meta as { base_unit_id?: number } | undefined;
-            if (meta?.base_unit_id) setOutputUnitId(meta.base_unit_id);
-          }}
-          onClear={() => { setFinishedItemId(null); setFinishedItemLabel(""); }}
-          fetchOptions={fetchItems}
-        />
-        <div class="mt-3 flex flex-wrap gap-3">
-          <Field label="Output qty *">
-            <input class={inputClass} type="number" min="0" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
-          </Field>
-          <label class="text-sm">
-            <span class="text-text-secondary">Output UoM</span>
-            <select
-              class={`${inputClass} mt-1`}
-              value={outputUnitId() ?? ""}
-              onChange={(e) => setOutputUnitId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
-            >
-              <option value="">— finished base —</option>
-              <For each={units() ?? []}>{(u) => <option value={u.id}>{u.code}</option>}</For>
-            </select>
-          </label>
-          <Field label="Yield %">
-            <input class={inputClass} type="number" min="0" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
-          </Field>
+        <label class="flex items-end gap-2 pb-2 text-sm">
+          <input type="checkbox" checked={isActive()} onChange={(e) => setIsActive(e.currentTarget.checked)} />
+          Active
+        </label>
+        <div class="sm:col-span-2 lg:col-span-2">
+          <LookupCombo
+            label="Finished item"
+            required
+            value={finishedItemLabel}
+            selectedId={finishedItemId}
+            onInput={setFinishedItemLabel}
+            onSelect={(o) => {
+              setFinishedItemId(o.id);
+              setFinishedItemLabel(o.label);
+              const meta = o.meta as { base_unit_id?: number; base_unit_code?: string } | undefined;
+              if (meta?.base_unit_id) {
+                setOutputUnitId(meta.base_unit_id);
+                setOutputUnitLabel(meta.base_unit_code ? formatUnitLabel({ code: meta.base_unit_code, name: meta.base_unit_code }) : "");
+              }
+            }}
+            onClear={() => { setFinishedItemId(null); setFinishedItemLabel(""); }}
+            fetchOptions={fetchItems}
+          />
         </div>
         <LookupCombo
           label="Default production location"
@@ -381,22 +377,42 @@ export default function BomsPage() {
           onClear={() => { setLocationId(null); setLocationLabel(""); }}
           fetchOptions={fetchLocations}
         />
-        <Field label="Notes">
-          <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
+        <Field label="Output qty *">
+          <input class={inputClass} type="number" min="0" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
         </Field>
-        <label class="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={isActive()} onChange={(e) => setIsActive(e.currentTarget.checked)} />
-          Active
-        </label>
-        <p class="mt-2 text-xs text-text-secondary">
+        <UnitLookupCombo
+          label="Output UoM"
+          selectedId={outputUnitId}
+          value={outputUnitLabel}
+          onInput={setOutputUnitLabel}
+          onSelect={(u) => {
+            setOutputUnitId(u.id);
+            setOutputUnitLabel(formatUnitLabel(u));
+            refreshConversions();
+          }}
+          onClear={() => {
+            setOutputUnitId(null);
+            setOutputUnitLabel("");
+          }}
+        />
+        <Field label="Yield %">
+          <input class={inputClass} type="number" min="0" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
+        </Field>
+        <div class="col-span-full sm:col-span-2 lg:col-span-3">
+          <Field label="Notes">
+            <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
+          </Field>
+        </div>
+        <p class="col-span-full text-xs text-text-secondary">
           Complete uses the live BOM (convert × scrap × WO qty / output qty ÷ yield). Set conversions under Inventory → Units.
         </p>
-        <div class="mt-4 space-y-3">
+        <div class="col-span-full space-y-2">
           <p class="text-sm font-medium text-text-primary">Components (per output batch)</p>
           <For each={lines()}>
-            {(ln, idx) => (
-              <div class="flex flex-wrap items-end gap-2 rounded border border-stroke p-2">
-                <div class="min-w-[200px] flex-1">
+            {(ln, idx) => {
+              const preview = () => liveStockPreview(ln, conversions() ?? []);
+              return (
+                <div class="grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_4.5rem_auto]">
                   <LookupCombo
                     label={`Line ${idx() + 1}`}
                     required
@@ -420,6 +436,12 @@ export default function BomsPage() {
                         ),
                       );
                       setLineLabels((p) => ({ ...p, [idx()]: o.label }));
+                      if (meta?.base_unit_code) {
+                        setLineUnitLabels((p) => ({
+                          ...p,
+                          [idx()]: formatUnitLabel({ code: meta.base_unit_code!, name: meta.base_unit_code! }),
+                        }));
+                      }
                     }}
                     onClear={() => {
                       setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, component_item_id: 0 } : row)));
@@ -427,61 +449,61 @@ export default function BomsPage() {
                     }}
                     fetchOptions={fetchItems}
                   />
+                  <label class="text-sm">
+                    <span class="text-text-secondary">Qty</span>
+                    <input
+                      type="number"
+                      class={`${inputClass} mt-1`}
+                      min="0"
+                      value={ln.qty}
+                      onInput={(e) => {
+                        const v = Number(e.currentTarget.value);
+                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, qty: v } : row)));
+                      }}
+                    />
+                  </label>
+                  <UnitLookupCombo
+                    label="UoM"
+                    selectedId={() => ln.unit_id ?? null}
+                    value={() => lineUnitLabels()[idx()] ?? ln.unit_code ?? ""}
+                    onInput={(v) => setLineUnitLabels((p) => ({ ...p, [idx()]: v }))}
+                    onSelect={(u) => {
+                      setLines((prev) =>
+                        prev.map((row, i) => (i === idx() ? { ...row, unit_id: u.id, unit_code: u.code } : row)),
+                      );
+                      setLineUnitLabels((p) => ({ ...p, [idx()]: formatUnitLabel(u) }));
+                      refreshConversions();
+                    }}
+                    onClear={() => {
+                      setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, unit_id: null, unit_code: "" } : row)));
+                      setLineUnitLabels((p) => ({ ...p, [idx()]: "" }));
+                    }}
+                  />
+                  <label class="text-sm">
+                    <span class="text-text-secondary">Scrap %</span>
+                    <input
+                      type="number"
+                      class={`${inputClass} mt-1`}
+                      min="0"
+                      value={ln.scrap_pct ?? 0}
+                      onInput={(e) => {
+                        const v = Number(e.currentTarget.value);
+                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_pct: v } : row)));
+                      }}
+                    />
+                  </label>
+                  {(() => {
+                    const prev = preview();
+                    if (!prev) return <span class="hidden sm:block" />;
+                    return (
+                      <span class={`pb-2 text-xs leading-tight sm:max-w-[9rem] ${prev.missing ? "text-amber-700" : "text-text-secondary"}`}>
+                        {prev.missing ? "Need conversion" : `Stock ≈ ${prev.qty.toFixed(4)} ${prev.code}`}
+                      </span>
+                    );
+                  })()}
                 </div>
-                <label class="text-sm">
-                  <span class="text-text-secondary">Qty</span>
-                  <input
-                    type="number"
-                    class={`${inputClass} mt-1 w-24`}
-                    min="0"
-                    value={ln.qty}
-                    onInput={(e) => {
-                      const v = Number(e.currentTarget.value);
-                      setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, qty: v } : row)));
-                    }}
-                  />
-                </label>
-                <label class="text-sm">
-                  <span class="text-text-secondary">UoM</span>
-                  <select
-                    class={`${inputClass} mt-1 w-28`}
-                    value={ln.unit_id ?? ""}
-                    onChange={(e) => {
-                      const id = e.currentTarget.value ? Number(e.currentTarget.value) : null;
-                      const code = (units() ?? []).find((u) => u.id === id)?.code;
-                      setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, unit_id: id, unit_code: code } : row)));
-                    }}
-                  >
-                    <option value="">—</option>
-                    <For each={units() ?? []}>{(u) => <option value={u.id}>{u.code}</option>}</For>
-                  </select>
-                </label>
-                <label class="text-sm">
-                  <span class="text-text-secondary">Scrap %</span>
-                  <input
-                    type="number"
-                    class={`${inputClass} mt-1 w-20`}
-                    min="0"
-                    value={ln.scrap_pct ?? 0}
-                    onInput={(e) => {
-                      const v = Number(e.currentTarget.value);
-                      setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_pct: v } : row)));
-                    }}
-                  />
-                </label>
-                {(() => {
-                  const prev = liveStockPreview(ln, conversions() ?? []);
-                  if (!prev) return null;
-                  return (
-                    <span class={`pb-2 text-xs ${prev.missing ? "text-amber-700" : "text-text-secondary"}`}>
-                      {prev.missing
-                        ? "Add conversion for line UoM → stock UoM"
-                        : `Stock ≈ ${prev.qty.toFixed(4)} ${prev.code}`}
-                    </span>
-                  );
-                })()}
-              </div>
-            )}
+              );
+            }}
           </For>
           <button type="button" class="text-sm text-brand-600 hover:underline" onClick={addLine}>
             + Add component

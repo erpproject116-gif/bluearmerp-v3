@@ -1,7 +1,6 @@
 import { A } from "@solidjs/router";
-import { For, Show, createResource } from "solid-js";
+import { For, Show, createSignal, createEffect } from "solid-js";
 import type { Accessor, JSX, Setter } from "solid-js";
-import { apiFetch } from "../../shared/api";
 import { DecimalInput } from "../../shared/DecimalInput";
 import { CustomFieldsSection } from "../../shared/CustomFieldsSection";
 import { INVENTORY_ENTITY } from "../../shared/entityTypes";
@@ -22,6 +21,7 @@ import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { parseNum } from "../../shared/money";
 import type { FormFieldSetting } from "../../shared/useFormFieldSettings";
+import { UnitLookupCombo, formatUnitLabel } from "../../shared/UnitLookupCombo";
 
 export type ItemCategory = { id: number; code: string; name: string };
 
@@ -110,11 +110,15 @@ type Props = {
 
 export function ItemMasterModal(props: Props) {
   const setForm = (fn: (f: ItemFormState) => ItemFormState) => props.setForm(fn(props.form()));
-  const [units] = createResource(async () => {
-    const res = await apiFetch<{ id: number; code: string; name: string }[]>(
-      "/api/v1/inventory/units?page=1&pageSize=200&status=active&sort=code",
-    );
-    return res.data ?? [];
+  const [unitLabel, setUnitLabel] = createSignal("");
+
+  createEffect(() => {
+    const f = props.form();
+    if (f.base_unit_id && f.unit) {
+      setUnitLabel(formatUnitLabel({ code: f.unit, name: f.unit }));
+    } else if (!f.base_unit_id) {
+      setUnitLabel(f.unit || "");
+    }
   });
 
   return (
@@ -227,30 +231,28 @@ export function ItemMasterModal(props: Props) {
             onInput={(e) => setForm((f) => ({ ...f, spec_name: e.currentTarget.value }))}
           />
         </Field>
-        <Field label="Base unit">
-          <select
-            class={inputClass}
-            value={props.form().base_unit_id ?? ""}
-            onChange={(e) => {
-              const id = e.currentTarget.value ? Number(e.currentTarget.value) : null;
-              const u = (units() ?? []).find((x) => x.id === id);
-              setForm((f) => ({
-                ...f,
-                base_unit_id: id,
-                unit: u ? u.code : f.unit,
-              }));
+        <div>
+          <UnitLookupCombo
+            label="Base unit"
+            selectedId={() => props.form().base_unit_id}
+            value={unitLabel}
+            onInput={setUnitLabel}
+            onSelect={(u) => {
+              setForm((f) => ({ ...f, base_unit_id: u.id, unit: u.code }));
+              setUnitLabel(formatUnitLabel(u));
             }}
-          >
-            <option value="">— Select stock unit —</option>
-            <For each={units() ?? []}>{(u) => <option value={u.id}>{u.code} — {u.name}</option>}</For>
-          </select>
+            onClear={() => {
+              setForm((f) => ({ ...f, base_unit_id: null, unit: "" }));
+              setUnitLabel("");
+            }}
+          />
           <p class="mt-1 text-xs text-text-secondary">
-            Stock quantities use this unit.{" "}
+            Stock quantities use this unit. Search or type to add a custom UoM (mm, ft, roll…).{" "}
             <A href="/app/inventory/units" class="text-brand-600 hover:underline">
-              Manage units
+              Manage units & conversions
             </A>
           </p>
-        </Field>
+        </div>
         <Field label="Unit label (optional)">
           <input
             class={inputClass}
