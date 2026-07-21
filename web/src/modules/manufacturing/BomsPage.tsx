@@ -1,4 +1,4 @@
-import { createSignal, For, Show, createResource } from "solid-js";
+import { createSignal, For, createResource } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
