@@ -60,7 +60,7 @@ export function useQuotationList(params: () => QuotationListParams) {
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 30_000,
+      staleTime: 0,
       placeholderData: (prev) => prev,
     };
   });

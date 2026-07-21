@@ -12,6 +12,9 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
     "collective-invoices",
     "sales-price-batch",
     "selling-workspace",
+    "commission-rules",
+    "commission-accruals",
+    "commission-accounting",
   ],
   salesOrder: [
     "sales-orders",
@@ -25,7 +28,6 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
   goodsReceipt: ["goods-receipts", "report-items-to-receive"],
   inventory: [
     "inventory",
-    // Sidebar branch switcher lists inv_locations via /auth/branches.
     "auth-branches",
     "serial-units",
     "serial-events",
@@ -39,6 +41,10 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
     "report-stock-ageing",
     "report-on-hand",
     "report-inv-book",
+    "inv-units",
+    "inv-units-all",
+    "inv-unit-conversions",
+    "repair-orders",
   ],
   finance: [
     "supplier-invoices",
@@ -47,24 +53,58 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
     "finance-workspace",
     "finance-bank-recon-statements",
     "finance-bank-recon-unmatched",
+    "finance-bank-accounts-options",
     "finance-contracts",
+    "finance-contract-milestones",
     "finance-notes",
     "finance-checks",
+    "finance-fiscal-years",
+    "finance-fiscal-settings",
+    "finance-accounts",
+    "finance-accounts-parent-options",
+    "finance-account-defaults",
+    "finance-accounts-picker",
+    "journal-entries",
     "landed-costs",
     "withholding-codes",
     "supplier-payment-status",
     "ap-by-vendor",
     "budget-vs-actual",
   ],
-  quotation: ["quotations", "quotation-status-report"],
-  pos: ["pos-current-session", "pos-catalog-items", "pos-catalog-categories"],
-  dashboard: ["dashboard-summary", "dashboard-sales-trend", "dashboard-inventory-trend", "dashboard-red-flags", "dashboard-top-customers", "dashboard-top-vendors", "dashboard-top-items", "reconciliation-summary"],
+  quotation: ["quotations", "quotation-status-report", "quotation-tax-types"],
+  pos: ["pos-current-session", "pos-catalog-items", "pos-catalog-categories", "pos-settings"],
+  dashboard: [
+    "dashboard-summary",
+    "dashboard-sales-trend",
+    "dashboard-inventory-trend",
+    "dashboard-red-flags",
+    "dashboard-top-customers",
+    "dashboard-top-vendors",
+    "dashboard-top-items",
+    "reconciliation-summary",
+  ],
   shipping: ["shipping-orders", "shipping-rules", "delivery-trips"],
   quality: ["qc-requests", "capa-records", "qms-ncrs"],
   manufacturing: ["mfg-boms", "mfg-work-orders"],
-  hr: ["hr-employees", "hr-pay-periods", "hr-payslips"],
+  hr: [
+    "hr-employees",
+    "hr-pay-periods",
+    "hr-payslips",
+    "hr-review-cycles",
+    "hr-reviews",
+    "hr-leave",
+    "hr-attendance",
+  ],
   platform: ["onboarding", "setup-readiness"],
-  crm: ["crm-warranty", "crm-task-summaries", "crm-sales-team", "crm-notifications", "crm-dashboard", "crm-follow-up-tasks"],
+  crm: [
+    "crm-warranty",
+    "crm-task-summaries",
+    "crm-sales-team",
+    "crm-notifications",
+    "crm-dashboard",
+    "crm-follow-up-tasks",
+    "crm-leads",
+  ],
   operations: [
     "operations-workspaces",
     "operations-columns",
@@ -74,6 +114,14 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
     "operations-widget-data",
     "operations-industry-packs",
   ],
+  booking: ["bookings", "booking-calendar"],
+  support: ["support-tickets"],
+  selling: ["selling-workspace"],
+  wms: ["wms-scheduled-receipts"],
+  fixedAssets: ["fixed-assets", "fixed-asset-depreciation"],
+  jobCosting: ["job-cost-projects", "job-cost-timesheets"],
+  bi: ["bi-saved-views"],
+  companyBudget: ["company-budget"],
 };
 
 type MutationRule = {
@@ -83,23 +131,32 @@ type MutationRule = {
 
 /** Invalidate only the primary list/workspace domain per API area (no cross-module fan-out). */
 const MUTATION_RULES: MutationRule[] = [
-  { test: (p) => p.startsWith("/api/v1/sales"), domains: ["sales"] },
-  { test: (p) => p.startsWith("/api/v1/sales-order"), domains: ["salesOrder"] },
+  { test: (p) => p.startsWith("/api/v1/sales"), domains: ["sales", "dashboard"] },
+  { test: (p) => p.startsWith("/api/v1/sales-order"), domains: ["salesOrder", "dashboard"] },
   { test: (p) => p.startsWith("/api/v1/purchase-request"), domains: ["purchaseRequest"] },
   { test: (p) => p.startsWith("/api/v1/purchase-order"), domains: ["purchaseOrder", "goodsReceipt"] },
-  { test: (p) => p.startsWith("/api/v1/goods-receipt"), domains: ["goodsReceipt", "purchaseOrder"] },
-  { test: (p) => p.startsWith("/api/v1/finance"), domains: ["finance"] },
-  { test: (p) => p.startsWith("/api/v1/inventory"), domains: ["inventory"] },
+  { test: (p) => p.startsWith("/api/v1/goods-receipt"), domains: ["goodsReceipt", "purchaseOrder", "inventory"] },
+  { test: (p) => p.startsWith("/api/v1/finance"), domains: ["finance", "dashboard"] },
+  { test: (p) => p.startsWith("/api/v1/inventory"), domains: ["inventory", "dashboard"] },
   { test: (p) => p.startsWith("/api/v1/quotation"), domains: ["quotation"] },
   { test: (p) => p.startsWith("/api/v1/pos"), domains: ["pos", "sales", "inventory"] },
   { test: (p) => p.startsWith("/api/v1/shipping"), domains: ["shipping", "salesOrder"] },
   { test: (p) => p.startsWith("/api/v1/quality"), domains: ["quality"] },
-  { test: (p) => p.startsWith("/api/v1/manufacturing"), domains: ["manufacturing"] },
+  { test: (p) => p.startsWith("/api/v1/manufacturing"), domains: ["manufacturing", "inventory"] },
   { test: (p) => p.startsWith("/api/v1/crm"), domains: ["crm"] },
   { test: (p) => p.startsWith("/api/v1/operations"), domains: ["operations"] },
   { test: (p) => p.startsWith("/api/v1/hr"), domains: ["hr"] },
   { test: (p) => p.startsWith("/api/v1/platform/onboarding"), domains: ["platform"] },
   { test: (p) => p.startsWith("/api/v1/platform/setup"), domains: ["platform"] },
+  { test: (p) => p.startsWith("/api/v1/booking"), domains: ["booking"] },
+  { test: (p) => p.startsWith("/api/v1/support"), domains: ["support"] },
+  { test: (p) => p.startsWith("/api/v1/selling"), domains: ["selling", "sales"] },
+  { test: (p) => p.startsWith("/api/v1/wms"), domains: ["wms", "inventory"] },
+  { test: (p) => p.startsWith("/api/v1/fixed-assets"), domains: ["fixedAssets", "finance"] },
+  { test: (p) => p.startsWith("/api/v1/job-costing"), domains: ["jobCosting"] },
+  { test: (p) => p.startsWith("/api/v1/bi"), domains: ["bi"] },
+  { test: (p) => p.startsWith("/api/v1/company-budget"), domains: ["companyBudget", "finance"] },
+  { test: (p) => p.startsWith("/api/v1/delivery-receipt"), domains: ["salesOrder"] },
 ];
 
 /** Stock-moving or approval flows that should refresh dashboard KPIs. */
@@ -112,13 +169,14 @@ const DASHBOARD_MUTATION_RULES: MutationRule[] = [
         p.startsWith("/api/v1/purchase-order") ||
         p.startsWith("/api/v1/goods-receipt") ||
         p.startsWith("/api/v1/finance/supplier-invoices") ||
-        p.startsWith("/api/v1/quotation")),
+        p.startsWith("/api/v1/quotation") ||
+        p.startsWith("/api/v1/manufacturing")),
     domains: ["dashboard"],
   },
   {
     test: (p, m) =>
       m === "PATCH" &&
-      (/\/progress-status$/.test(p) || /\/confirm$/.test(p) || /\/approve$/.test(p) || /\/reject$/.test(p)),
+      (/\/progress-status$/.test(p) || /\/confirm$/.test(p) || /\/approve$/.test(p) || /\/reject$/.test(p) || /\/complete$/.test(p)),
     domains: ["dashboard"],
   },
 ];
@@ -133,6 +191,7 @@ const READ_ONLY_POST_PATH_MARKERS = [
   "/follow-up-tasks/summaries",
   "/resolve-scan",
   "/items/search",
+  "/send-report-email",
 ] as const;
 
 /** True when a mutating request should not fan out cache invalidation. */
@@ -153,6 +212,7 @@ export function shouldSkipMutationInvalidation(path: string, method: string): bo
   if (path.startsWith("/api/v1/settings/")) return true;
   if (path.startsWith("/api/v1/form-field-settings")) return true;
   if (path.startsWith("/api/v1/column-label-settings")) return true;
+  if (path.startsWith("/api/v1/comms/send-report-email")) return true;
   if (m === "POST") {
     for (const marker of READ_ONLY_POST_PATH_MARKERS) {
       if (path.includes(marker)) return true;
@@ -184,22 +244,39 @@ function matchesPrefix(queryKey: unknown, prefix: string): boolean {
   if (prefix.startsWith("serial-report") && head.startsWith("serial-report")) return true;
   if (prefix.startsWith("report-") && head.startsWith("report-")) return true;
   if (prefix.startsWith("dashboard") && head.startsWith("dashboard")) return true;
+  if (prefix.startsWith("finance-") && head.startsWith("finance-")) return true;
+  if (prefix.startsWith("hr-") && head.startsWith("hr-")) return true;
+  if (prefix.startsWith("inv-") && head.startsWith("inv-")) return true;
+  if (prefix.startsWith("mfg-") && head.startsWith("mfg-")) return true;
+  if (prefix.startsWith("crm-") && head.startsWith("crm-")) return true;
+  if (prefix.startsWith("operations-") && head.startsWith("operations-")) return true;
+  if (prefix.startsWith("commission-") && head.startsWith("commission-")) return true;
   return false;
 }
 
-export function invalidateQueryPrefixes(client: QueryClient, prefixes: Iterable<string>) {
+function predicateForPrefixes(prefixes: Iterable<string>) {
   const set = new Set(prefixes);
-  void client.invalidateQueries({
-    predicate: (q) => {
-      for (const prefix of set) {
-        if (matchesPrefix(q.queryKey, prefix)) return true;
-      }
-      return false;
-    },
-  });
+  return (q: { queryKey: unknown }) => {
+    for (const prefix of set) {
+      if (matchesPrefix(q.queryKey, prefix)) return true;
+    }
+    return false;
+  };
 }
 
-export function invalidateAfterMutation(path: string, method?: string) {
+export function invalidateQueryPrefixes(client: QueryClient, prefixes: Iterable<string>) {
+  const predicate = predicateForPrefixes(prefixes);
+  void client.invalidateQueries({ predicate });
+}
+
+/** Invalidate and refetch active queries so lists update without a hard refresh. */
+export async function refetchQueryPrefixes(client: QueryClient, prefixes: Iterable<string>): Promise<void> {
+  const predicate = predicateForPrefixes(prefixes);
+  await client.invalidateQueries({ predicate, refetchType: "active" });
+  await client.refetchQueries({ predicate, type: "active" });
+}
+
+export async function invalidateAfterMutation(path: string, method?: string): Promise<void> {
   const m = (method ?? "GET").toUpperCase();
   if (skipInvalidation(path, m)) return;
 
@@ -212,12 +289,12 @@ export function invalidateAfterMutation(path: string, method?: string) {
   }
   if (domains.size === 0) return;
 
-  invalidateQueryPrefixes(queryClient, collectKeys([...domains]));
+  await refetchQueryPrefixes(queryClient, collectKeys([...domains]));
 }
 
 /** Manually refresh related lists after a modal save (optional extra keys). */
 export function invalidateDomains(...domains: (keyof typeof DOMAIN_KEYS)[]) {
-  invalidateQueryPrefixes(queryClient, collectKeys(domains));
+  void refetchQueryPrefixes(queryClient, collectKeys(domains));
 }
 
 export { DOMAIN_KEYS };

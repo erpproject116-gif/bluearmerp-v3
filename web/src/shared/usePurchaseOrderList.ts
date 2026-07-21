@@ -69,7 +69,7 @@ export function usePurchaseOrderList(params: () => PurchaseOrderListParams) {
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 30_000,
+      staleTime: 0,
       placeholderData: (prev) => prev,
     };
   });

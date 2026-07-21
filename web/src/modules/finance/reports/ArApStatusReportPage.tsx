@@ -3,6 +3,7 @@ import { formatPeso } from "../../../shared/money";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { arApStatusExportUrl, useArApStatusReport, type ArApStatusFilters } from "../../../shared/reports/useModuleReports";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { GridExportButtons } from "../../../shared/gridExport";
 import { FinanceLayout } from "../FinanceLayout";
 
 const TYPE_TABS = [
@@ -47,6 +48,7 @@ export default function ArApStatusReportPage() {
   };
 
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  let reportBodyEl: HTMLDivElement | undefined;
 
   return (
     <FinanceLayout>
@@ -79,7 +81,16 @@ export default function ArApStatusReportPage() {
 
       <Show when={submitted()}>
         <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
-          <div class="overflow-x-auto">
+          <div class="flex flex-wrap items-center justify-end gap-2 border-b border-stroke px-5 py-3">
+            <GridExportButtons
+              title="AR/AP Status"
+              filename="ar-ap-status"
+              columns={[]}
+              rows={() => []}
+              scrapeRoot={() => reportBodyEl}
+            />
+          </div>
+          <div class="overflow-x-auto" ref={(el) => (reportBodyEl = el)}>
             <table class="erp-grid min-w-full text-left text-sm">
               <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
                 <tr>

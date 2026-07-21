@@ -1,6 +1,7 @@
 import { A, useNavigate } from "@solidjs/router";
 import { createMemo, createSignal, Show } from "solid-js";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
@@ -137,6 +138,10 @@ export default function GoodsReceiptListPage() {
             Purchase orders
           </A>
         </div>
+      </div>
+
+      <div class="mb-4">
+        <ModalFormGuide guideId="goods_receipt" />
       </div>
 
       <SpreadsheetGrid<GoodsReceiptRow>

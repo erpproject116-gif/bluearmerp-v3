@@ -25,5 +25,11 @@ export async function signOutApp(reason: "logout" | "idle_timeout" = "logout") {
   } catch {
     /* ignore */
   }
+  try {
+    const { clearLoginOtpGate } = await import("../modules/auth/loginOtpGate");
+    clearLoginOtpGate();
+  } catch {
+    /* otp gate clear is best-effort */
+  }
   await supabase.auth.signOut();
 }

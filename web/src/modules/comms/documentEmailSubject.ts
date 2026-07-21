@@ -127,35 +127,35 @@ export function buildDocumentEmailBody(s: DocumentEmailSnapshot): string {
   }
 
   const parts: string[] = [];
-  parts.push(`<p>${greeting}</p>`);
+  parts.push(`<p style="margin:0 0 12px 0">${greeting}</p>`);
   parts.push(
-    `<p>Please find attached our ${escapeHtml(doc)}${ref ? ` <strong>${escapeHtml(ref)}</strong>` : ""}. A summary from the transaction is below.</p>`,
+    `<p style="margin:0 0 12px 0">Please find attached our ${escapeHtml(doc)}${ref ? ` <strong>${escapeHtml(ref)}</strong>` : ""}. A summary from the transaction is below.</p>`,
   );
   if (facts.length) {
-    parts.push(`<ul>${facts.join("")}</ul>`);
+    parts.push(`<ul style="margin:0 0 12px 0;padding-left:20px">${facts.join("")}</ul>`);
   }
   if (shown.length) {
-    parts.push("<p><strong>Items:</strong></p>");
+    parts.push(`<p style="margin:0 0 8px 0"><strong>Items:</strong></p>`);
     const lis = shown.map((ln) => {
       const name = escapeHtml((ln.item_name ?? "").trim());
       const qty = formatQty(ln.qty);
       const amt = parseAmount(ln.line_total);
       const qtyBit = qty ? ` × ${escapeHtml(qty)}` : "";
       const amtBit = amt > 0 ? ` — ${escapeHtml(formatMoney(amt, s.currencyCode))}` : "";
-      return `<li>${name}${qtyBit}${amtBit}</li>`;
+      return `<li style="margin:0.15em 0">${name}${qtyBit}${amtBit}</li>`;
     });
-    if (more > 0) lis.push(`<li><em>+${more} more item${more === 1 ? "" : "s"} (see attached PDF)</em></li>`);
-    parts.push(`<ul>${lis.join("")}</ul>`);
+    if (more > 0) lis.push(`<li style="margin:0.15em 0"><em>+${more} more item${more === 1 ? "" : "s"} (see attached PDF)</em></li>`);
+    parts.push(`<ul style="margin:0 0 12px 0;padding-left:20px">${lis.join("")}</ul>`);
   }
   const notes = (s.notes ?? "").trim();
   if (notes) {
-    parts.push(`<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>`);
+    parts.push(`<p style="margin:0 0 12px 0"><strong>Notes:</strong> ${escapeHtml(notes)}</p>`);
   }
-  parts.push("<p>The PDF document is attached to this email.</p>");
+  parts.push(`<p style="margin:0 0 12px 0">The PDF document is attached to this email.</p>`);
   if (company) {
-    parts.push(`<p>Thank you,<br>${escapeHtml(company)}</p>`);
+    parts.push(`<p style="margin:0">Thank you,<br>${escapeHtml(company)}</p>`);
   } else {
-    parts.push("<p>Thank you.</p>");
+    parts.push(`<p style="margin:0">Thank you.</p>`);
   }
-  return parts.join("");
+  return parts.join("<p style=\"margin:0 0 8px 0\"><br></p>");
 }

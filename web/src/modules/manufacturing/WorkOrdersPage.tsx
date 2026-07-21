@@ -2,6 +2,7 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
@@ -359,6 +360,7 @@ export default function WorkOrdersPage() {
         <Show when={!editing()}>
           <draft.DraftBanner />
         </Show>
+        <ModalFormGuide guideId="mfg_work_order" spanFull />
         <LookupCombo
           label="BOM"
           required

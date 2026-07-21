@@ -1,4 +1,8 @@
 import * as XLSX from "xlsx";
+import { createSignal, Show } from "solid-js";
+import { apiFetch } from "./api";
+import { EntityModal, Field, inputClass } from "./SpreadsheetGrid";
+import { useToast } from "./toast";
 
 export type GridExportColumn = {
   key: string;
@@ -35,6 +39,23 @@ export function exportRowsToCsv(filename: string, columns: GridExportColumn[], r
     ...rows.map((row) => columns.map((c) => esc(c.value(row))).join(",")),
   ];
   downloadBlob(filename.endsWith(".csv") ? filename : `${filename}.csv`, withBom(lines.join("\r\n")));
+}
+
+/** CSV text (no BOM) for email attachments. */
+export function rowsToCsvString(columns: GridExportColumn[], rows: Record<string, unknown>[]): string {
+  const esc = (v: string | number) => {
+    const s = String(v ?? "");
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  return [
+    columns.map((c) => esc(c.header)).join(","),
+    ...rows.map((row) => columns.map((c) => esc(c.value(row))).join(",")),
+  ].join("\r\n");
+}
+
+export function rowsToPrintHtml(title: string, columns: GridExportColumn[], rows: Record<string, unknown>[]): string {
+  return buildPrintHtml(title, columns, rows);
 }
 
 export function exportRowsToXlsx(filename: string, columns: GridExportColumn[], rows: Record<string, unknown>[]) {
@@ -184,6 +205,18 @@ export function GridExportButtons(props: {
   scrapeRoot?: () => HTMLElement | null | undefined;
   class?: string;
 }) {
+  const toast = useToast();
+  const [emailOpen, setEmailOpen] = createSignal(false);
+  const [toAddrs, setToAddrs] = createSignal("");
+  const [ccAddrs, setCcAddrs] = createSignal("");
+  const [subject, setSubject] = createSignal("");
+  const [bodyHtml, setBodyHtml] = createSignal("");
+  const [sending, setSending] = createSignal(false);
+  const [pendingPayload, setPendingPayload] = createSignal<{
+    columns: GridExportColumn[];
+    rows: Record<string, unknown>[];
+  } | null>(null);
+
   const resolve = (): { columns: GridExportColumn[]; rows: Record<string, unknown>[] } | null => {
     if (props.scrapeRoot) {
       const scraped = scrapeTableForExport(props.scrapeRoot());
@@ -200,62 +233,167 @@ export function GridExportButtons(props: {
     return { columns, rows };
   };
 
+  const openEmail = () => {
+    const data = resolve();
+    if (!data) return;
+    setPendingPayload(data);
+    setSubject(`${props.title} — ${new Date().toLocaleDateString()}`);
+    setBodyHtml(
+      `<p>Please find attached the report <strong>${props.title}</strong> (${data.rows.length} row${data.rows.length === 1 ? "" : "s"}).</p>`,
+    );
+    setToAddrs("");
+    setCcAddrs("");
+    setEmailOpen(true);
+  };
+
+  const sendEmail = async () => {
+    const data = pendingPayload();
+    if (!data) return;
+    const to = toAddrs()
+      .split(/[,;]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (to.length === 0) {
+      toast.warning("Enter at least one recipient email.");
+      return;
+    }
+    const csv = rowsToCsvString(data.columns, data.rows);
+    const html = rowsToPrintHtml(props.title, data.columns, data.rows);
+    const b64 = (text: string) => btoa(unescape(encodeURIComponent(text)));
+    const base = props.filename.replace(/\.(pdf|html?|csv|xlsx)$/i, "") || "report";
+    setSending(true);
+    const res = await apiFetch(
+      "/api/v1/comms/send-report-email",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          to_addrs: to,
+          cc_addrs: ccAddrs()
+            .split(/[,;]/)
+            .map((s) => s.trim())
+            .filter(Boolean),
+          subject: subject().trim() || props.title,
+          body_html: bodyHtml(),
+          attachments: [
+            { filename: `${base}.csv`, content_type: "text/csv; charset=utf-8", data_base64: b64(csv) },
+            { filename: `${base}.html`, content_type: "text/html; charset=utf-8", data_base64: b64(html) },
+          ],
+        }),
+      },
+      { silent: true },
+    );
+    setSending(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to send report email.");
+      return;
+    }
+    toast.success(res.message ?? "Report emailed.");
+    setEmailOpen(false);
+  };
+
   const btnClass =
     props.class ??
     "rounded-lg border border-stroke bg-white px-2.5 py-1.5 text-xs font-medium text-text-primary transition hover:bg-slate-50 disabled:opacity-50";
 
   return (
-    <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Export and print">
-      <button
-        type="button"
-        class={btnClass}
-        onClick={() => {
-          const data = resolve();
-          if (!data) return;
-          printRows(props.title, data.columns, data.rows);
-        }}
-      >
-        Print
-      </button>
-      <button
-        type="button"
-        class={btnClass}
-        onClick={() => {
-          const data = resolve();
-          if (!data) return;
-          exportRowsToCsv(props.filename, data.columns, data.rows);
-        }}
-      >
-        Download CSV
-      </button>
-      <button
-        type="button"
-        class={btnClass}
-        onClick={() => {
-          const data = resolve();
-          if (!data) return;
-          try {
-            exportRowsToXlsx(props.filename, data.columns, data.rows);
-          } catch (err) {
-            console.error(err);
-            window.alert("Excel download failed. Try Download CSV instead.");
-          }
-        }}
-      >
-        Download Excel
-      </button>
-      <button
-        type="button"
-        class={btnClass}
-        title="Downloads a printable file and opens Print — choose Save as PDF"
-        onClick={() => {
-          const data = resolve();
-          if (!data) return;
-          downloadRowsAsPdf(props.title, data.columns, data.rows, props.filename);
-        }}
-      >
-        Download PDF
-      </button>
-    </div>
+    <>
+      <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Export and print">
+        <button
+          type="button"
+          class={btnClass}
+          onClick={() => {
+            const data = resolve();
+            if (!data) return;
+            printRows(props.title, data.columns, data.rows);
+          }}
+        >
+          Print
+        </button>
+        <button
+          type="button"
+          class={btnClass}
+          onClick={() => {
+            const data = resolve();
+            if (!data) return;
+            exportRowsToCsv(props.filename, data.columns, data.rows);
+          }}
+        >
+          Download CSV
+        </button>
+        <button
+          type="button"
+          class={btnClass}
+          onClick={() => {
+            const data = resolve();
+            if (!data) return;
+            try {
+              exportRowsToXlsx(props.filename, data.columns, data.rows);
+            } catch (err) {
+              console.error(err);
+              window.alert("Excel download failed. Try Download CSV instead.");
+            }
+          }}
+        >
+          Download Excel
+        </button>
+        <button
+          type="button"
+          class={btnClass}
+          title="Downloads a printable file and opens Print — choose Save as PDF"
+          onClick={() => {
+            const data = resolve();
+            if (!data) return;
+            downloadRowsAsPdf(props.title, data.columns, data.rows, props.filename);
+          }}
+        >
+          Download PDF
+        </button>
+        <button type="button" class={btnClass} onClick={openEmail}>
+          Email report
+        </button>
+      </div>
+
+      <Show when={emailOpen()}>
+        <EntityModal
+          open={emailOpen()}
+          title={`Email — ${props.title}`}
+          onClose={() => setEmailOpen(false)}
+          onSave={() => void sendEmail()}
+          saving={sending()}
+          saveLabel="Send"
+          singleColumn
+        >
+          <Field label="To *">
+            <input
+              class={inputClass}
+              value={toAddrs()}
+              onInput={(e) => setToAddrs(e.currentTarget.value)}
+              placeholder="name@company.com"
+            />
+          </Field>
+          <Field label="Cc">
+            <input
+              class={inputClass}
+              value={ccAddrs()}
+              onInput={(e) => setCcAddrs(e.currentTarget.value)}
+              placeholder="Optional"
+            />
+          </Field>
+          <Field label="Subject">
+            <input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} />
+          </Field>
+          <Field label="Message" span="full">
+            <textarea
+              class={`${inputClass} min-h-[80px]`}
+              value={bodyHtml().replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}
+              onInput={(e) => setBodyHtml(`<p>${e.currentTarget.value}</p>`)}
+            />
+          </Field>
+          <p class="col-span-full text-xs text-text-secondary">
+            CSV and HTML copies of the on-screen report will be attached automatically.
+          </p>
+        </EntityModal>
+      </Show>
+    </>
   );
 }

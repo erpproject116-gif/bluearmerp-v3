@@ -30,6 +30,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		cr.With(auth.RequirePermission("comms.admin", auth.AccessWrite)).Get("/gmail/connect", startGmailConnect(pool))
 		cr.With(auth.RequirePermission("comms.admin", auth.AccessWrite)).Post("/gmail/disconnect", disconnectGmail(pool))
 		cr.With(auth.RequirePermission("comms.admin", auth.AccessWrite)).Post("/gmail/sync", triggerGmailSync(pool))
+		cr.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/send-report-email", sendReportEmail(pool))
 	})
 }
 

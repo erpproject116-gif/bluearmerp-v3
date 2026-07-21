@@ -86,14 +86,21 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let lastEmittedSearch = props.search ?? "";
 
-  // Keep last rows visible while a search/page refetch returns empty interim data.
+  // Keep last rows visible only while a refetch is in flight (avoid empty flash).
+  // When loading finishes, always sync — including empty results after create/delete.
   const [staleRows, setStaleRows] = createSignal<T[]>(props.rows);
   const [staleTotal, setStaleTotal] = createSignal<number | undefined>(props.total);
 
   createEffect(() => {
+    const loading = !!props.loading;
     const rows = props.rows;
-    if (rows.length > 0) setStaleRows(rows);
     const total = props.total;
+    if (!loading) {
+      setStaleRows(rows);
+      if (total !== undefined) setStaleTotal(total);
+      return;
+    }
+    if (rows.length > 0) setStaleRows(rows);
     if (total !== undefined) setStaleTotal(total);
   });
 

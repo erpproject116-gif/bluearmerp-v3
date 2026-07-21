@@ -120,7 +120,7 @@ export function useSupplierInvoiceList(params: () => {
         if (!res.success) throw new Error(res.message ?? "Failed to load");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 30_000,
+      staleTime: 0,
       placeholderData: (prev) => prev,
     };
   });

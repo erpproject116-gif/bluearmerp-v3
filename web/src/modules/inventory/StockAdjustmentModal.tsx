@@ -2,6 +2,7 @@ import { createSignal } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { submitEntity } from "../../shared/handleSaveResult";
 import { useToast } from "../../shared/toast";
@@ -124,6 +125,7 @@ export function StockAdjustmentModal(props: Props) {
       saving={saving()}
     >
       <draft.DraftBanner />
+      <ModalFormGuide guideId="stock_adjustment" spanFull />
       <LookupCombo
         label="Item *"
         value={itemLabel}

@@ -102,7 +102,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "buying",
-    label: "Buying",
+    label: "Purchasing Dept",
     href: "/app/buying",
     basePath: "/app/buying",
     features: [
@@ -114,7 +114,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "selling",
-    label: "Selling",
+    label: "Sales Dept",
     href: "/app/selling",
     basePath: "/app/selling",
     features: [

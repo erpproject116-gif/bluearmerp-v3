@@ -47,7 +47,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "sales_process",
-    label: "Selling",
+    label: "Sales Dept",
     defaultExpanded: true,
     entries: [
       { kind: "module", moduleId: "selling" },
@@ -64,7 +64,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "procurement_process",
-    label: "Buying",
+    label: "Purchasing Dept",
     defaultExpanded: true,
     entries: [
       { kind: "module", moduleId: "buying" },
