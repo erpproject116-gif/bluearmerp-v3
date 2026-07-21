@@ -726,25 +726,24 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Manufacturing: issue components and complete a work order",
     scenario: "You assemble finished goods and need to issue BOM components then complete the work order into stock.",
     intro:
-      "Work orders consume component qty from inventory and produce finished items. Issue components first, then complete/receive the output.",
+      "Work orders backflush component stock (converted to each item’s base UoM, with scrap and yield) and receive finished goods in the finished item’s base unit.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Maintain a BOM on the finished item under Manufacturing.",
-          "Create a work order for the output qty.",
-          "Issue / consume component lines from the supplying warehouse.",
-          "Complete the work order so finished goods increase on-hand.",
-          "Trace serial/lot on components or output when those flags are enabled.",
+          "Set item base units and conversions under Inventory → Units.",
+          "Maintain a BOM with output qty/UoM, yield %, and component lines (qty, UoM, scrap %).",
+          "Create a work order, review materials needed vs on-hand, then release.",
+          "Complete the work order to issue converted stock and receive finished goods.",
         ],
       },
       {
         type: "tip",
-        text: "Insufficient component stock blocks issue — transfer or receive components first.",
+        text: "Insufficient converted stock blocks complete — transfer/receive components or fix conversions first. Complete always uses the live BOM.",
       },
     ],
-    primaryHref: "/app/manufacturing",
-    primaryLabel: "Manufacturing",
+    primaryHref: "/app/inventory/serial-lot/manufacturing/work-orders",
+    primaryLabel: "Work Orders",
     relatedGuideIds: ["manufacturing-bom", "serial-lot-registry"],
   },
   {

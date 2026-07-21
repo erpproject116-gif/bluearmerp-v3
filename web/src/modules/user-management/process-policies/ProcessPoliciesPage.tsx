@@ -44,12 +44,12 @@ const BOOLEAN_FIELDS: PolicyField[] = [
   {
     key: "sales_require_quotation",
     label: "Require quotation before sales order",
-    help: "When on, standalone sales orders without a source quotation are blocked.",
+    help: "Off by default. When on, sales orders without a source quotation are blocked. Leave off so New Sales / sales orders can start freely (Load Slip from a quote remains optional).",
   },
   {
     key: "sales_require_so",
     label: "Require sales order before invoice",
-    help: "When on, direct sales invoices (without SO lines) are blocked.",
+    help: "Off by default. When on, New Sales without SO lines is blocked. Leave off so users can free-transact New Sales like New Purchases (Load Slip → Sales Order remains optional).",
   },
   {
     key: "sales_require_reservation",

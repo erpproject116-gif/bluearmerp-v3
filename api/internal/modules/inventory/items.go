@@ -23,6 +23,8 @@ type Item struct {
 	ItemName               string             `json:"item_name"`
 	SpecName               string             `json:"spec_name,omitempty"`
 	Unit                   string             `json:"unit,omitempty"`
+	BaseUnitID             *int64             `json:"base_unit_id,omitempty"`
+	BaseUnitCode           string             `json:"base_unit_code,omitempty"`
 	ItemCategory           string             `json:"item_category,omitempty"`
 	ItemType               string             `json:"item_type,omitempty"`
 	ProductionProcess      *string            `json:"production_process,omitempty"`
@@ -50,6 +52,7 @@ type itemBody struct {
 	ItemName               string             `json:"item_name"`
 	SpecName               *string            `json:"spec_name"`
 	Unit                   *string            `json:"unit"`
+	BaseUnitID             *int64             `json:"base_unit_id"`
 	ItemCategory           *string            `json:"item_category"`
 	ItemType               *string            `json:"item_type"`
 	ProductionProcess      *string            `json:"production_process"`
@@ -112,6 +115,7 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 			orderCol = "i." + col
 		}
 		q := fmt.Sprintf(`select i.id, i.item_code, i.item_name, coalesce(i.spec_name, ''), coalesce(i.unit, ''),
+			i.base_unit_id, coalesce(bu.code, ''),
 			coalesce(i.item_category, 'merchandise'), coalesce(i.item_type, 'item'), i.production_process,
 			i.purchase_price::float8, i.sales_price::float8, i.vip_price::float8,
 			i.price_levels, i.safety_stock_by_doc, i.oe_price::float8, i.standard_costs,
@@ -119,6 +123,7 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 			coalesce(cat.name, ''), count(*) over()
 			from public.inv_items i
 			left join public.inv_item_categories cat on cat.id = i.item_category_id and cat.tenant_id = i.tenant_id
+			left join public.inv_units bu on bu.id = i.base_unit_id
 			where %s order by %s %s limit $%d offset $%d`,
 			where, orderCol, orderSQL(p.Order), len(args)+1, len(args)+2)
 		args = append(args, p.PageSize, offset)
@@ -134,6 +139,7 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 			var row Item
 			var priceLevelsJSON, safetyJSON, standardJSON []byte
 			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit,
+				&row.BaseUnitID, &row.BaseUnitCode,
 				&row.ItemCategory, &row.ItemType, &row.ProductionProcess,
 				&row.PurchasePrice, &row.SalesPrice, &row.VipPrice,
 				&priceLevelsJSON, &safetyJSON, &row.OePrice, &standardJSON,
@@ -185,16 +191,33 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			specName, unit, itemCategory, itemType, productionProcess, oePrice, standardCosts := itemBodyScalars(body)
 			standardJSON, _ := marshalJSONMap(standardCosts)
-			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, item_category, item_type, production_process, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, oe_price, standard_costs, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
-				returning id, item_code, item_name, coalesce(spec_name,''), coalesce(unit,''), coalesce(item_category,'merchandise'), coalesce(item_type,'item'), production_process, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, oe_price::float8, standard_costs, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id`,
-				tu.TenantID, code, strings.TrimSpace(body.ItemName), specName, unit, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), body.ItemCategoryID).
-				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit, &row.ItemCategory, &row.ItemType, &row.ProductionProcess, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.OePrice, &standardJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
+			baseUnitID := body.BaseUnitID
+			if baseUnitID != nil && *baseUnitID > 0 {
+				var ok bool
+				_ = tx.QueryRow(ctx, `select exists(select 1 from public.inv_units where id=$1 and tenant_id=$2 and is_active)`, *baseUnitID, tu.TenantID).Scan(&ok)
+				if !ok {
+					return 0, Item{}, fmt.Errorf("invalid base unit")
+				}
+				if unit == "" {
+					_ = tx.QueryRow(ctx, `select code from public.inv_units where id=$1`, *baseUnitID).Scan(&unit)
+				}
+			} else {
+				baseUnitID = nil
+			}
+			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, base_unit_id, item_category, item_type, production_process, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, oe_price, standard_costs, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+				returning id, item_code, item_name, coalesce(spec_name,''), coalesce(unit,''), base_unit_id, coalesce(item_category,'merchandise'), coalesce(item_type,'item'), production_process, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, oe_price::float8, standard_costs, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id`,
+				tu.TenantID, code, strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), body.ItemCategoryID).
+				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit, &row.BaseUnitID, &row.ItemCategory, &row.ItemType, &row.ProductionProcess, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.OePrice, &standardJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
 			row.PriceLevels = unmarshalJSONFloatMap(priceJSON)
 			row.SafetyStockByDoc = unmarshalJSONFloatMap(safetyJSON)
 			row.StandardCosts = unmarshalJSONFloatMap(standardJSON)
 			return row.ID, row, err
 		})
 		if err != nil {
+			if strings.Contains(err.Error(), "invalid base unit") {
+				response.Validation(w, map[string]string{"base_unit_id": "Base unit must belong to this business."})
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
 			return
 		}
@@ -280,9 +303,22 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 		specName, unit, itemCategory, itemType, productionProcess, oePrice, standardCosts := itemBodyScalars(body)
 		standardJSON, _ := marshalJSONMap(standardCosts)
 
-		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, spec_name=$2, unit=$3, item_category=$4, item_type=$5, production_process=$6, purchase_price=$7, sales_price=$8, vip_price=$9, price_levels=$10, safety_stock_by_doc=$11, oe_price=$12, standard_costs=$13, warranty_duration_months=$14, reorder_level=$15, track_serial=$16, track_lot=$17, serial_policy=$18, lot_policy=$19, track_inventory_qty=$20, status=$21, item_category_id=$24, updated_at=now()
-			where id=$22 and tenant_id=$23 and deleted_at is null`,
-			strings.TrimSpace(body.ItemName), specName, unit, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
+		baseUnitID := body.BaseUnitID
+		if baseUnitID != nil && *baseUnitID > 0 {
+			var ok bool
+			_ = tx.QueryRow(r.Context(), `select exists(select 1 from public.inv_units where id=$1 and tenant_id=$2)`, *baseUnitID, tu.TenantID).Scan(&ok)
+			if !ok {
+				response.Validation(w, map[string]string{"base_unit_id": "Base unit must belong to this business."})
+				return
+			}
+			if unit == "" {
+				_ = tx.QueryRow(r.Context(), `select code from public.inv_units where id=$1`, *baseUnitID).Scan(&unit)
+			}
+		}
+
+		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, spec_name=$2, unit=$3, base_unit_id=$4, item_category=$5, item_type=$6, production_process=$7, purchase_price=$8, sales_price=$9, vip_price=$10, price_levels=$11, safety_stock_by_doc=$12, oe_price=$13, standard_costs=$14, warranty_duration_months=$15, reorder_level=$16, track_serial=$17, track_lot=$18, serial_policy=$19, lot_policy=$20, track_inventory_qty=$21, status=$22, item_category_id=$25, updated_at=now()
+			where id=$23 and tenant_id=$24 and deleted_at is null`,
+			strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
 			return

@@ -31,6 +31,8 @@ type Item = {
   item_name: string;
   spec_name?: string;
   unit?: string;
+  base_unit_id?: number | null;
+  base_unit_code?: string;
   item_category?: string;
   item_type?: string;
   production_process?: string | null;
@@ -66,7 +68,8 @@ function rowToForm(row: Item): ItemFormState {
   return {
     item_name: row.item_name,
     spec_name: row.spec_name ?? "",
-    unit: row.unit ?? "",
+    unit: row.unit ?? row.base_unit_code ?? "",
+    base_unit_id: row.base_unit_id ?? null,
     item_category: row.item_category ?? "merchandise",
     item_type: row.item_type ?? "item",
     production_process: row.production_process ?? "",
@@ -203,6 +206,7 @@ export default function ItemsPage() {
       ...f,
       spec_name: f.spec_name || null,
       unit: f.unit || null,
+      base_unit_id: f.base_unit_id || null,
       item_category: f.item_category || "merchandise",
       item_type: f.item_type || "item",
       production_process: f.production_process || null,
