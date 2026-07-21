@@ -49,8 +49,9 @@ type conversionBody struct {
 func registerUnitRoutes(r chi.Router, pool *pgxpool.Pool) {
 	// List: inventory.items so BOM/item UIs can load dropdowns without a separate grant.
 	r.With(auth.RequirePermission("inventory.items", auth.AccessRead)).Get("/units", listUnits(pool))
-	r.With(auth.RequirePermission("inventory.units", auth.AccessWrite)).Post("/units", createUnit(pool))
-	r.With(auth.RequirePermission("inventory.units", auth.AccessWrite)).Patch("/units/{id}", updateUnit(pool))
+	// Create/update: item editors can add custom UoMs on the fly (BOM / item master).
+	r.With(auth.RequirePermission("inventory.items", auth.AccessWrite)).Post("/units", createUnit(pool))
+	r.With(auth.RequirePermission("inventory.items", auth.AccessWrite)).Patch("/units/{id}", updateUnit(pool))
 	r.With(auth.RequirePermission("inventory.items", auth.AccessRead)).Get("/unit-conversions", listUnitConversions(pool))
 	r.With(auth.RequirePermission("inventory.units", auth.AccessWrite)).Post("/unit-conversions", upsertUnitConversion(pool))
 	r.With(auth.RequirePermission("inventory.units", auth.AccessWrite)).Delete("/unit-conversions/{id}", deleteUnitConversion(pool))
