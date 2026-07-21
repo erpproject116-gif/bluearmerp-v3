@@ -1,6 +1,6 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { Show, createSignal, For, onCleanup } from "solid-js";
+import { Show, createSignal, For, onCleanup, onMount } from "solid-js";
 import { useAuth, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
@@ -94,7 +94,6 @@ function HeaderFeatureTabs(props: {
   const loc = useLocation();
   const auth = useAuth();
   const [moreOpen, setMoreOpen] = createSignal(false);
-  let moreRoot: HTMLDivElement | undefined;
 
   const mod = () => resolveModule(loc.pathname);
   const split = () => {
@@ -110,17 +109,25 @@ function HeaderFeatureTabs(props: {
   const overflowActive = () =>
     split().overflow.some((f) => featureIsActive(f, loc.pathname, allVisible()));
 
-  const onDocClick = (e: MouseEvent) => {
-    if (!moreRoot?.contains(e.target as Node)) setMoreOpen(false);
-  };
-  if (typeof document !== "undefined") {
+  onMount(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest("[data-header-more-menu]")) setMoreOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpen(false);
+    };
     document.addEventListener("click", onDocClick);
-    onCleanup(() => document.removeEventListener("click", onDocClick));
-  }
+    document.addEventListener("keydown", onKey);
+    onCleanup(() => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    });
+  });
 
   return (
     <Show when={allVisible().length > 0}>
-      <nav class="erp-header-features mt-3 flex flex-wrap items-center gap-1" aria-label={`${props.moduleLabel} features`}>
+      <nav class="erp-header-features mt-3 items-center" aria-label={`${props.moduleLabel} features`}>
         <For each={split().primary}>
           {(feature) => {
             const active = () => featureIsActive(feature, loc.pathname, allVisible());
@@ -139,7 +146,7 @@ function HeaderFeatureTabs(props: {
           }}
         </For>
         <Show when={split().overflow.length > 0}>
-          <div class="relative" ref={moreRoot}>
+          <div class="relative" data-header-more-menu>
             <button
               type="button"
               class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
@@ -166,7 +173,7 @@ function HeaderFeatureTabs(props: {
             <Show when={moreOpen()}>
               <div
                 role="menu"
-                class="absolute left-0 z-50 mt-1 max-h-80 min-w-[14rem] overflow-y-auto rounded-lg border border-stroke bg-surface py-1 shadow-lg"
+                class="absolute left-0 z-[60] mt-1 max-h-80 min-w-[14rem] overflow-y-auto rounded-lg border border-stroke bg-surface py-1 shadow-lg"
               >
                 <For each={split().overflow}>
                   {(feature) => {
@@ -175,7 +182,7 @@ function HeaderFeatureTabs(props: {
                       <A
                         href={feature.href}
                         role="menuitem"
-                        class="block px-3 py-2 text-sm transition-colors"
+                        class="block whitespace-normal px-3 py-2 text-sm transition-colors"
                         classList={{
                           "bg-brand-50 text-brand-600": active(),
                           "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),

@@ -9,7 +9,7 @@ export function readThemePreference(): ThemePreference {
   } catch {
     /* ignore */
   }
-  return "system";
+  return "light";
 }
 
 export function writeThemePreference(value: ThemePreference) {
