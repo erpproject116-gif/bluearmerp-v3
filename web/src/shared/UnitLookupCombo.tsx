@@ -61,9 +61,10 @@ export function UnitLookupCombo(props: Props) {
   const [creating, setCreating] = createSignal(false);
 
   const handleCreate = async (query: string) => {
-    const code = query.trim();
+    // Prefer the code before an em dash (label format "code — name").
+    const code = query.split("—")[0]?.trim().slice(0, 30) ?? "";
     if (!code) {
-      toast.warning("Type a unit code to add (e.g. mm, ft, roll).");
+      toast.warning("Type a unit code first (e.g. mm, ft, roll), then choose Add unit.");
       return;
     }
     setCreating(true);

@@ -102,21 +102,22 @@ export function LookupCombo(props: Props) {
                 </li>
               )}
             </For>
-            <Show when={props.onCreate}>
+            <Show when={props.onCreate && props.value().trim()}>
               <li class="sticky bottom-0 border-t border-stroke bg-white">
                 <button
                   type="button"
                   class="flex w-full items-center gap-1 px-3 py-2 text-left text-sm font-medium text-brand-600 hover:bg-brand-50"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
-                    props.onCreate!(props.value().trim());
+                    const q = props.value().trim();
+                    if (!q) return;
+                    props.onCreate!(q);
                     setOpen(false);
                   }}
                 >
                   <span class="text-base leading-none">+</span>
                   <span>
-                    {props.createLabel ?? "Add new"}
-                    {props.value().trim() ? ` "${props.value().trim()}"` : ""}
+                    {props.createLabel ?? "Add new"} "{props.value().trim()}"
                   </span>
                 </button>
               </li>
