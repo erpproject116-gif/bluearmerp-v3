@@ -347,7 +347,9 @@ function WorkflowJourneys() {
       <h2 class="text-sm font-semibold text-text-primary">Follow a workflow from start to finish</h2>
       <p class="mt-1 max-w-2xl text-xs leading-relaxed text-text-secondary">
         Not sure where to begin? Pick a journey below. Each one walks you through every step in order — what to do,
-        why, and where to click. The same guide also appears at the top of each page while you work.
+        why, and where to click. While you work on that flow, open{" "}
+        <span class="font-semibold text-text-primary">Guide</span> in the header for the same steps (selling, buying,
+        stock, accounting, CRM, projects, and more).
       </p>
       <div class="mt-3 grid gap-3 lg:grid-cols-3">
         <For each={workflowGuides}>

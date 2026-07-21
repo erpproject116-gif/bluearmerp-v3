@@ -47,7 +47,7 @@ import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
 import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
-import { WorkflowGuideBar } from "../shared/WorkflowGuideBar";
+import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
 import { ThemeSwitcher } from "../shared/ThemeSwitcher";
 
@@ -419,6 +419,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 <span class="hidden sm:inline">Help &amp; guides</span>
                 <span class="sm:hidden">Help</span>
               </A>
+              <WorkflowGuideHeaderControl />
               <PresenceAvatars />
               <CrmNotificationPoller enabled={Boolean(auth.me)} />
               <Show when={canViewCrm(auth.me)}>
@@ -455,7 +456,6 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         <main class="flex-1 p-6">
           <DemoTenantBanner />
           <EntitlementBanner />
-          <WorkflowGuideBar />
           <ModuleAccessGate>{props.children}</ModuleAccessGate>
         </main>
       </div>

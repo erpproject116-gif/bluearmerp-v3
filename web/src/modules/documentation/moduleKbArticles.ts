@@ -275,6 +275,10 @@ export const moduleKbArticles: KbArticle[] = [
           "Record customer payment under Accounts → Payment Receipt.",
         ],
       },
+      {
+        type: "tip",
+        text: "While you work on selling screens, open Guide in the header to see which step you are on and jump to the next page.",
+      },
     ],
     primaryHref: "/app/quotation/quotations/new",
     primaryLabel: "New quotation",
@@ -299,6 +303,10 @@ export const moduleKbArticles: KbArticle[] = [
           "Create a supplier invoice under Buying → Supplier Invoices. Use Load Slip (from Goods Receipt) to pull open GR lines, or PO / RFQ when GR is not required.",
           "Pay the vendor with a payment voucher under Accounts.",
         ],
+      },
+      {
+        type: "tip",
+        text: "On buying screens, open Guide in the header to see the request → pay path and jump to the next step.",
       },
     ],
     primaryHref: "/app/purchase-request/purchase-requests/new",
@@ -956,6 +964,10 @@ export const moduleKbArticles: KbArticle[] = [
           "General ledger and Receivables & payables areas add journals, checks, and aging books.",
         ],
       },
+      {
+        type: "tip",
+        text: "On General ledger or Receivables & payables screens, open Guide in the header for the accounting journey. Receipts and vouchers stay on the Selling / Buying guides.",
+      },
     ],
     primaryHref: "/app/finance",
     primaryLabel: "Accounting workspace",
@@ -1558,6 +1570,10 @@ export const moduleKbArticles: KbArticle[] = [
           "Use Product Bundles to sell kits that explode into component lines.",
           "Open History on any master row (or History in the edit modal) to see who created or changed that record.",
         ],
+      },
+      {
+        type: "tip",
+        text: "On Stock screens, open Guide in the header for partners → items → locations → movements. Serial & lot has its own Guide when you open Batch & serial tracking.",
       },
       {
         type: "tip",
