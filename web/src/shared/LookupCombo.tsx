@@ -2,7 +2,7 @@ import { createSignal, For, Show, onMount } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
 import { LoadingText } from "../shared/LoadingText";
 
-export type LookupOption = { id: number; label: string; sublabel?: string };
+export type LookupOption = { id: number; label: string; sublabel?: string; meta?: Record<string, unknown> };
 
 type Props = {
   label: string;

@@ -67,6 +67,7 @@ export const appModules: AppModule[] = [
       { label: "Workspace", href: "/app/inventory", settingsHref: "/app/inventory" },
       { label: "Partners", href: "/app/inventory/partners", settingsHref: "/app/inventory/partners/settings" },
       { label: "Locations", href: "/app/inventory/locations", settingsHref: "/app/inventory/locations/settings" },
+      { label: "Units", href: "/app/inventory/units", settingsHref: "/app/inventory/units" },
       { label: "Projects", href: "/app/inventory/projects", settingsHref: "/app/inventory/projects/settings" },
       { label: "Departments", href: "/app/inventory/departments", settingsHref: "/app/inventory/departments/settings" },
       { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings" },

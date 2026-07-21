@@ -8,19 +8,19 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 ## Manufacturing
 
-**Status:** MVP shipped (migration 080) — single-level BOM, work order release/complete with backflush.
+**Status:** MVP shipped (migration 080) + UoM/scrap/yield (migrations 201–202) — single-level BOM with units master, line UoM, scrap/yield backflush, work-order material preview.
 
 **Purpose:** Plan and execute production—BOMs, work orders, material consumption, and finished-goods receipt.
 
 **Core entities:** Bill of materials, routing/work centers, production order, material issue, finished goods receipt.
 
-**Dependencies:** Inventory (items, stock movements), optional Sales Order for make-to-order.
+**Dependencies:** Inventory (items, stock movements, units/conversions), optional Sales Order for make-to-order.
 
-**MVP slice:** Single-level BOM, manual work order release, backflush consumption on completion.
+**MVP slice:** Single-level BOM, manual work order release, backflush consumption on completion with convert × scrap × yield.
 
 **Risks:** Lot/serial trace through WIP; costing method alignment with finance.
 
-**Still deferred:** Multi-level BOM, routing, in-process QC integration.
+**Still deferred:** Multi-level BOM, routing, alternates, serial/lot pick on issue, costing/WIP GL, partial complete, in-process QC integration.
 
 ---
 

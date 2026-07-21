@@ -19,6 +19,7 @@ export const PurchaseInvoicePrintPage = lazy(() =>
 
 export const PartnersPage = lazy(() => import("../modules/inventory/PartnersPage"));
 export const LocationsPage = lazy(() => import("../modules/inventory/LocationsPage"));
+export const UnitsPage = lazy(() => import("../modules/inventory/UnitsPage"));
 export const ProjectsPage = lazy(() => import("../modules/inventory/ProjectsPage"));
 export const DepartmentsPage = lazy(() => import("../modules/inventory/DepartmentsPage"));
 export const ItemsPage = lazy(() => import("../modules/inventory/ItemsPage"));

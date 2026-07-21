@@ -692,26 +692,26 @@ export const documentationSections: DocSection[] = [
     id: "manufacturing",
     title: "Manufacturing",
     iconId: "manufacturing",
-    intro: "Single-level bills of material and work orders with backflush on completion (under Stock → Serial & Lot).",
+    intro: "Single-level BOMs with units of measure, scrap/yield, and work-order material preview (under Stock → Serial & Lot).",
     primaryHref: "/app/inventory/serial-lot/manufacturing/boms",
     primaryLabel: "Open Bills of Material",
     blocks: [
       {
         type: "paragraph",
-        text: "Manufacturing covers in-house production under Stock → Serial & Lot. Define a BOM (finished item plus component quantities), create a work order, release it, then complete it to backflush components and receive finished goods into stock.",
+        text: "Manufacturing covers in-house production under Stock → Serial & Lot. Define a BOM (finished item, output qty/UoM, yield %, and component lines with UoM and scrap %), create a work order, review materials needed, release it, then complete it to backflush components (converted to stock UoM) and receive finished goods.",
       },
       {
         type: "steps",
         items: [
-          "Create a BOM with one finished item and component lines.",
-          "Create a work order from the BOM and set quantity to produce.",
-          "Release the work order when ready to start.",
-          "Complete the work order to issue components and receipt finished goods.",
+          "Set item base units and conversions under Inventory → Units.",
+          "Create a BOM with output qty/UoM, yield %, and component lines (qty, UoM, scrap %).",
+          "Create a work order, review materials needed vs on-hand, then release when ready.",
+          "Complete the work order to issue converted stock (with scrap/yield) and receipt finished goods.",
         ],
       },
       {
         type: "tip",
-        text: "Multi-level BOMs, routings, and WIP lot trace are not in this MVP—use single-level BOMs only.",
+        text: "Complete always reloads the live BOM. Multi-level BOMs, routings, and WIP lot/serial pick are deferred—use single-level BOMs only.",
       },
     ],
   },

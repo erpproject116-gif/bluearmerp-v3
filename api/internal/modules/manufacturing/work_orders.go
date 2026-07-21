@@ -20,23 +20,47 @@ import (
 )
 
 type WorkOrder struct {
-	ID               int64   `json:"id"`
-	WorkOrderNo      string  `json:"work_order_no"`
-	BomID            int64   `json:"bom_id"`
-	BomCode          string  `json:"bom_code,omitempty"`
-	BomName          string  `json:"bom_name,omitempty"`
-	FinishedItemID   int64   `json:"finished_item_id"`
-	FinishedItemCode string  `json:"finished_item_code,omitempty"`
-	FinishedItemName string  `json:"finished_item_name,omitempty"`
-	LocationID       int64   `json:"location_id"`
-	LocationName     string  `json:"location_name,omitempty"`
-	QtyToProduce     float64 `json:"qty_to_produce"`
-	QtyProduced      float64 `json:"qty_produced"`
-	Status           string  `json:"status"`
-	OrderDate        string  `json:"order_date"`
-	Notes            *string `json:"notes,omitempty"`
-	ReleasedAt       *string `json:"released_at,omitempty"`
-	CompletedAt      *string `json:"completed_at,omitempty"`
+	ID                 int64   `json:"id"`
+	WorkOrderNo        string  `json:"work_order_no"`
+	BomID              int64   `json:"bom_id"`
+	BomCode            string  `json:"bom_code,omitempty"`
+	BomName            string  `json:"bom_name,omitempty"`
+	FinishedItemID     int64   `json:"finished_item_id"`
+	FinishedItemCode   string  `json:"finished_item_code,omitempty"`
+	FinishedItemName   string  `json:"finished_item_name,omitempty"`
+	FinishedBaseUnit   string  `json:"finished_base_unit_code,omitempty"`
+	LocationID         int64   `json:"location_id"`
+	LocationName       string  `json:"location_name,omitempty"`
+	QtyToProduce       float64 `json:"qty_to_produce"`
+	QtyProduced        float64 `json:"qty_produced"`
+	Status             string  `json:"status"`
+	OrderDate          string  `json:"order_date"`
+	Notes              *string `json:"notes,omitempty"`
+	ReleasedAt         *string `json:"released_at,omitempty"`
+	CompletedAt        *string `json:"completed_at,omitempty"`
+}
+
+type MaterialNeedLine struct {
+	ComponentItemID   int64   `json:"component_item_id"`
+	ComponentCode     string  `json:"component_code"`
+	ComponentName     string  `json:"component_name"`
+	BomQty            float64 `json:"bom_qty"`
+	BomUnitCode       string  `json:"bom_unit_code"`
+	ScrapPct          float64 `json:"scrap_pct"`
+	StockToIssue      float64 `json:"stock_to_issue"`
+	StockUnitCode     string  `json:"stock_unit_code"`
+	QtyOnHand         float64 `json:"qty_on_hand"`
+	Shortage          float64 `json:"shortage"`
+}
+
+type MaterialNeeds struct {
+	WorkOrderID          int64              `json:"work_order_id"`
+	QtyToProduce         float64            `json:"qty_to_produce"`
+	FinishedBaseUnitCode string             `json:"finished_base_unit_code"`
+	OutputQty            float64            `json:"output_qty"`
+	YieldPct             float64            `json:"yield_pct"`
+	ReceiveQty           float64            `json:"receive_qty"`
+	Lines                []MaterialNeedLine `json:"lines"`
 }
 
 type workOrderBody struct {
@@ -90,6 +114,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		q := fmt.Sprintf(`
 			select wo.id, wo.work_order_no, wo.bom_id, b.bom_code, b.bom_name,
 			  wo.finished_item_id, coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
+			  coalesce(bu.code, coalesce(nullif(trim(fi.unit), ''), 'ea')),
 			  wo.location_id, coalesce(loc.location_name, ''),
 			  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status,
 			  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text,
@@ -97,6 +122,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			from public.mfg_work_orders wo
 			join public.mfg_boms b on b.id = wo.bom_id
 			join public.inv_items fi on fi.id = wo.finished_item_id
+			left join public.inv_units bu on bu.id = fi.base_unit_id
 			left join public.inv_locations loc on loc.id = wo.location_id
 			where %s
 			order by %s %s
@@ -119,7 +145,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			var released, completed *string
 			if err := rows.Scan(
 				&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName,
-				&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName,
+				&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 				&row.LocationID, &row.LocationName,
 				&row.QtyToProduce, &row.QtyProduced, &row.Status,
 				&row.OrderDate, &notes, &released, &completed, &total,
@@ -358,9 +384,21 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		for _, ln := range bom.Lines {
-			issueQty := ln.Qty * wo.QtyToProduce
-			if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, -issueQty, tu.AppUserID, "mfg_work_order", id, "wo_backflush_issue"); err != nil {
+			issueQty, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
+			if err != nil {
 				response.Validation(w, map[string]string{"stock": err.Error()})
+				return
+			}
+			if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, -issueQty, tu.AppUserID, "mfg_work_order", id, "wo_backflush_issue"); err != nil {
+				label := ln.ComponentCode
+				if label == "" {
+					label = fmt.Sprintf("item %d", ln.ComponentItemID)
+				}
+				msg := err.Error()
+				if strings.Contains(msg, "insufficient") || strings.Contains(msg, "no balance") {
+					msg = fmt.Sprintf("insufficient stock for %s: need %.4f %s at location", label, issueQty, unitCode)
+				}
+				response.Validation(w, map[string]string{"stock": msg})
 				return
 			}
 		}
@@ -389,6 +427,69 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func getWorkOrderMaterialNeeds(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		wo, err := loadWorkOrder(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		bom, err := loadBom(r.Context(), pool, tu.TenantID, wo.BomID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "BOM not found.", "ERR_INTERNAL")
+			return
+		}
+		out := MaterialNeeds{
+			WorkOrderID:          wo.ID,
+			QtyToProduce:         wo.QtyToProduce,
+			FinishedBaseUnitCode: wo.FinishedBaseUnit,
+			OutputQty:            bom.OutputQty,
+			YieldPct:             bom.YieldPct,
+			ReceiveQty:           wo.QtyToProduce,
+			Lines:                []MaterialNeedLine{},
+		}
+		for _, ln := range bom.Lines {
+			stock, unitCode, err := StockIssueForLine(r.Context(), pool, tu.TenantID, ln, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
+			if err != nil {
+				response.Validation(w, map[string]string{"lines": err.Error()})
+				return
+			}
+			var onHand float64
+			_ = pool.QueryRow(r.Context(), `
+				select coalesce(qty_on_hand, 0)::float8 from public.inv_item_location_balances
+				where tenant_id=$1 and item_id=$2 and location_id=$3`,
+				tu.TenantID, ln.ComponentItemID, wo.LocationID).Scan(&onHand)
+			shortage := 0.0
+			if stock > onHand+0.0001 {
+				shortage = stock - onHand
+			}
+			unitCodeBom := ln.UnitCode
+			if unitCodeBom == "" {
+				unitCodeBom = ln.BaseUnitCode
+			}
+			out.Lines = append(out.Lines, MaterialNeedLine{
+				ComponentItemID: ln.ComponentItemID,
+				ComponentCode:   ln.ComponentCode,
+				ComponentName:   ln.ComponentName,
+				BomQty:          ln.Qty,
+				BomUnitCode:     unitCodeBom,
+				ScrapPct:        ln.ScrapPct,
+				StockToIssue:    stock,
+				StockUnitCode:   unitCode,
+				QtyOnHand:       onHand,
+				Shortage:        shortage,
+			})
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
 func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (WorkOrder, error) {
 	var row WorkOrder
 	var notes *string
@@ -396,16 +497,18 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 	err := pool.QueryRow(ctx, `
 		select wo.id, wo.work_order_no, wo.bom_id, b.bom_code, b.bom_name,
 		  wo.finished_item_id, coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
+		  coalesce(bu.code, coalesce(nullif(trim(fi.unit), ''), 'ea')),
 		  wo.location_id, coalesce(loc.location_name, ''),
 		  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status,
 		  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text
 		from public.mfg_work_orders wo
 		join public.mfg_boms b on b.id = wo.bom_id
 		join public.inv_items fi on fi.id = wo.finished_item_id
+		left join public.inv_units bu on bu.id = fi.base_unit_id
 		left join public.inv_locations loc on loc.id = wo.location_id
 		where wo.id=$1 and wo.tenant_id=$2`, id, tenantID).Scan(
 		&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName,
-		&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName,
+		&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 		&row.LocationID, &row.LocationName,
 		&row.QtyToProduce, &row.QtyProduced, &row.Status,
 		&row.OrderDate, &notes, &released, &completed)

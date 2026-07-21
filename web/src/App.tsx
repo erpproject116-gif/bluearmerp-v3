@@ -22,6 +22,7 @@ import {
   PurchaseInvoicePrintPage,
   PartnersPage,
   LocationsPage,
+  UnitsPage,
   ProjectsPage,
   DepartmentsPage,
   ItemsPage,
@@ -417,6 +418,7 @@ export default function App() {
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
           <Route path="/inventory/locations" component={LocationsPage} />
           <Route path="/inventory/locations/settings" component={LocationsSettingsPage} />
+          <Route path="/inventory/units" component={UnitsPage} />
           <Route path="/inventory/projects" component={ProjectsPage} />
           <Route path="/inventory/projects/settings" component={ProjectsSettingsPage} />
           <Route path="/inventory/departments" component={DepartmentsPage} />
