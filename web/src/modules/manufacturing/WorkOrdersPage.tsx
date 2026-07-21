@@ -35,7 +35,7 @@ type MaterialNeedLine = {
   component_name: string;
   bom_qty: number;
   bom_unit_code: string;
-  scrap_pct: number;
+  scrap_qty: number;
   stock_to_issue: number;
   stock_unit_code: string;
   qty_on_hand: number;
@@ -255,7 +255,7 @@ export default function WorkOrdersPage() {
       `Complete ${row.work_order_no}?`,
       `Will receive ${row.qty_to_produce} ${unit} finished.`,
       linesSummary ? `\nMaterials to issue:\n${linesSummary}` : "",
-      "\nUses live BOM (convert × scrap × yield).",
+      "\nUses live BOM (used + scrap/spare, convert, yield).",
     ].join("\n");
     if (!window.confirm(msg)) return;
     setActionId(row.id);
@@ -405,9 +405,9 @@ export default function WorkOrdersPage() {
                   <thead class="bg-slate-50 text-text-secondary">
                     <tr>
                       <th class="px-2 py-1.5">Component</th>
-                      <th class="px-2 py-1.5">BOM qty</th>
-                      <th class="px-2 py-1.5">Scrap %</th>
-                      <th class="px-2 py-1.5">Stock to issue</th>
+                      <th class="px-2 py-1.5">Used</th>
+                      <th class="px-2 py-1.5">Scrap/spare</th>
+                      <th class="px-2 py-1.5">To issue (stock)</th>
                       <th class="px-2 py-1.5">On hand</th>
                     </tr>
                   </thead>
@@ -417,7 +417,7 @@ export default function WorkOrdersPage() {
                         <tr class={ln.shortage > 0 ? "bg-red-50 text-red-800" : ""}>
                           <td class="px-2 py-1.5">{ln.component_code} — {ln.component_name}</td>
                           <td class="px-2 py-1.5">{ln.bom_qty} {ln.bom_unit_code}</td>
-                          <td class="px-2 py-1.5">{ln.scrap_pct}</td>
+                          <td class="px-2 py-1.5">{ln.scrap_qty} {ln.bom_unit_code}</td>
                           <td class="px-2 py-1.5">{ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}</td>
                           <td class="px-2 py-1.5">
                             {ln.qty_on_hand.toFixed(4)}

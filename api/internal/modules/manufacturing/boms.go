@@ -29,7 +29,7 @@ type BomLine struct {
 	Qty             float64 `json:"qty"`
 	UnitID          *int64  `json:"unit_id,omitempty"`
 	UnitCode        string  `json:"unit_code,omitempty"`
-	ScrapPct        float64 `json:"scrap_pct"`
+	ScrapQty        float64 `json:"scrap_qty"`
 	BaseUnitID      int64   `json:"base_unit_id,omitempty"`
 	BaseUnitCode    string  `json:"base_unit_code,omitempty"`
 	StockQtyPreview float64 `json:"stock_qty_preview,omitempty"`
@@ -71,7 +71,7 @@ type bomLineBody struct {
 	ComponentItemID int64    `json:"component_item_id"`
 	Qty             float64  `json:"qty"`
 	UnitID          *int64   `json:"unit_id"`
-	ScrapPct        *float64 `json:"scrap_pct"`
+	ScrapQty        *float64 `json:"scrap_qty"`
 }
 
 func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
@@ -352,7 +352,7 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 	}
 	lines, err := q.Query(ctx, `
 		select l.id, l.line_no, l.component_item_id, coalesce(i.item_code, ''), coalesce(i.item_name, ''),
-		  l.qty::float8, l.unit_id, coalesce(u.code, ''), l.scrap_pct::float8,
+		  l.qty::float8, l.unit_id, coalesce(u.code, ''), coalesce(l.scrap_qty, 0)::float8,
 		  coalesce(i.base_unit_id, 0), coalesce(bu.code, coalesce(nullif(trim(i.unit), ''), 'ea'))
 		from public.mfg_bom_lines l
 		left join public.inv_items i on i.id = l.component_item_id
@@ -368,16 +368,17 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		var ln BomLine
 		if err := lines.Scan(
 			&ln.ID, &ln.LineNo, &ln.ComponentItemID, &ln.ComponentCode, &ln.ComponentName,
-			&ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.ScrapPct, &ln.BaseUnitID, &ln.BaseUnitCode,
+			&ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.ScrapQty, &ln.BaseUnitID, &ln.BaseUnitCode,
 		); err != nil {
 			return Bom{}, err
 		}
+		need := ln.Qty + ln.ScrapQty
 		if ln.UnitID != nil && ln.BaseUnitID > 0 {
-			if stock, err := inventory.ConvertQty(ctx, q, tenantID, *ln.UnitID, ln.BaseUnitID, ln.Qty); err == nil {
-				ln.StockQtyPreview = stock * (1 + ln.ScrapPct/100)
+			if stock, err := inventory.ConvertQty(ctx, q, tenantID, *ln.UnitID, ln.BaseUnitID, need); err == nil {
+				ln.StockQtyPreview = stock
 			}
 		} else if ln.BaseUnitID > 0 && (ln.UnitID == nil || *ln.UnitID == ln.BaseUnitID) {
-			ln.StockQtyPreview = ln.Qty * (1 + ln.ScrapPct/100)
+			ln.StockQtyPreview = need
 		}
 		row.Lines = append(row.Lines, ln)
 	}
@@ -439,15 +440,16 @@ func validateBomBody(b bomBody) map[string]string {
 	for i, ln := range b.Lines {
 		if ln.ComponentItemID <= 0 {
 			errs[fmt.Sprintf("lines[%d].component_item_id", i)] = "Component item is required."
+			continue
 		}
 		if ln.Qty <= 0 {
-			errs[fmt.Sprintf("lines[%d].qty", i)] = "Quantity must be greater than zero."
+			errs[fmt.Sprintf("lines[%d].qty", i)] = "Used quantity must be greater than zero."
 		}
-		if ln.ScrapPct != nil && *ln.ScrapPct < 0 {
-			errs[fmt.Sprintf("lines[%d].scrap_pct", i)] = "Scrap % cannot be negative."
+		if ln.ScrapQty != nil && *ln.ScrapQty < 0 {
+			errs[fmt.Sprintf("lines[%d].scrap_qty", i)] = "Scrap/spare quantity cannot be negative."
 		}
-		if ln.ComponentItemID == b.FinishedItemID {
-			errs[fmt.Sprintf("lines[%d].component_item_id", i)] = "Component cannot be the finished item."
+		if b.FinishedItemID > 0 && ln.ComponentItemID == b.FinishedItemID {
+			errs[fmt.Sprintf("lines[%d].component_item_id", i)] = "A component cannot be the same item as the finished good."
 		}
 	}
 	if len(errs) > 0 {
@@ -482,19 +484,21 @@ func replaceBomLines(ctx context.Context, tx pgx.Tx, tenantID, bomID int64, line
 				return fmt.Errorf("unit for component %s must belong to this business", itemCode)
 			}
 		}
+		needQty := ln.Qty
+		scrapQty := 0.0
+		if ln.ScrapQty != nil {
+			scrapQty = *ln.ScrapQty
+		}
+		needQty += scrapQty
 		if unitID != nil && baseUnitID > 0 && *unitID != baseUnitID {
-			if _, err := inventory.ConvertQty(ctx, tx, tenantID, *unitID, baseUnitID, ln.Qty); err != nil {
+			if _, err := inventory.ConvertQty(ctx, tx, tenantID, *unitID, baseUnitID, needQty); err != nil {
 				return fmt.Errorf("%s: %w", itemCode, err)
 			}
 		}
-		scrap := 0.0
-		if ln.ScrapPct != nil {
-			scrap = *ln.ScrapPct
-		}
 		if _, err := tx.Exec(ctx, `
-			insert into public.mfg_bom_lines (bom_id, line_no, component_item_id, qty, unit_id, scrap_pct)
+			insert into public.mfg_bom_lines (bom_id, line_no, component_item_id, qty, unit_id, scrap_qty)
 			values ($1,$2,$3,$4,$5,$6)`,
-			bomID, i+1, ln.ComponentItemID, ln.Qty, unitID, scrap); err != nil {
+			bomID, i+1, ln.ComponentItemID, ln.Qty, unitID, scrapQty); err != nil {
 			return err
 		}
 	}
@@ -502,6 +506,7 @@ func replaceBomLines(ctx context.Context, tx pgx.Tx, tenantID, bomID int64, line
 }
 
 // StockIssueForLine computes stock qty to issue in component base UoM for a WO qty.
+// Need per batch = used qty + scrap/spare qty (same line UoM), then scale by WO/output/yield.
 func StockIssueForLine(ctx context.Context, q inventory.UnitQuerier, tenantID int64, line BomLine, woQty, outputQty, yieldPct float64) (float64, string, error) {
 	if outputQty <= 0 {
 		outputQty = 1
@@ -528,12 +533,16 @@ func StockIssueForLine(ctx context.Context, q inventory.UnitQuerier, tenantID in
 	if toUnit <= 0 {
 		return 0, line.BaseUnitCode, fmt.Errorf("component %s has no base unit — set it on the item master", line.ComponentCode)
 	}
-	converted, err := inventory.ConvertQty(ctx, q, tenantID, fromUnit, toUnit, line.Qty)
+	need := line.Qty + line.ScrapQty
+	if need < 0 {
+		need = 0
+	}
+	converted, err := inventory.ConvertQty(ctx, q, tenantID, fromUnit, toUnit, need)
 	if err != nil {
 		return 0, line.BaseUnitCode, err
 	}
 	eps := 1e-9
 	yieldFactor := math.Max(yieldPct/100, eps)
-	stock := converted * (1 + line.ScrapPct/100) * (woQty / outputQty) / yieldFactor
+	stock := converted * (woQty / outputQty) / yieldFactor
 	return stock, line.BaseUnitCode, nil
 }
