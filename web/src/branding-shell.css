@@ -54,3 +54,26 @@
   border-color: var(--color-brand-600, #3c50e0);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-50, #ecf3ff) 80%, transparent);
 }
+
+/* Subtle discovery pulse on header Guide button (unseen / early onboarding) */
+@keyframes erp-guide-pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand-600, #3c50e0) 28%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-brand-600, #3c50e0) 0%, transparent);
+  }
+}
+
+.erp-guide-pulse {
+  animation: erp-guide-pulse-ring 2.4s ease-in-out infinite;
+  border-color: color-mix(in srgb, var(--color-brand-600, #3c50e0) 45%, var(--color-stroke, #e2e8f0));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-guide-pulse {
+    animation: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-600, #3c50e0) 22%, transparent);
+  }
+}

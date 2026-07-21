@@ -175,6 +175,9 @@ export function WorkflowGuideHeaderControl(props?: { class?: string; compact?: b
         <>
           <button
             type="button"
+            classList={{
+              "erp-guide-pulse": showBadge(),
+            }}
             class={
               props?.class ??
               "relative inline-flex items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50"

@@ -18,6 +18,8 @@ export type NavGroupEntry =
 export type NavGroup = {
   id: string;
   label: string;
+  /** Icon id passed to ModuleIcon (group-level sidebar glyph). */
+  iconId: string;
   defaultExpanded: boolean;
   entries: NavGroupEntry[];
 };
@@ -37,6 +39,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "stocks_management",
     label: "Stock",
+    iconId: "inventory",
     defaultExpanded: false,
     entries: [
       { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "Warehouse" },
@@ -48,6 +51,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "sales_process",
     label: "Sales Dept",
+    iconId: "selling",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "selling" },
@@ -65,6 +69,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "procurement_process",
     label: "Purchasing Dept",
+    iconId: "buying",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "buying" },
@@ -76,6 +81,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "accounting_dept",
     label: "Accounting Dept",
+    iconId: "finance",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "finance" },
@@ -88,6 +94,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "more_apps",
     label: "More apps",
+    iconId: "more_apps",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "crm" },
@@ -104,6 +111,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "misc",
     label: "Setup",
+    iconId: "setup",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "activity_logs" },

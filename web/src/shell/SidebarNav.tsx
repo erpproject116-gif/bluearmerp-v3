@@ -204,6 +204,7 @@ function navEntryMatchesPath(entry: NavGroupEntry, pathname: string): boolean {
 function NavGroupBlock(props: {
   groupId: string;
   label: string;
+  iconId: string;
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
@@ -261,18 +262,19 @@ function NavGroupBlock(props: {
         >
           <button
             type="button"
-            class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary hover:bg-slate-50"
+            class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary hover:bg-slate-50 hover:text-text-primary"
             onClick={toggle}
             aria-expanded={props.open}
           >
+            <ModuleIcon id={props.iconId} class="h-4 w-4 shrink-0 opacity-80" />
+            <span class="min-w-0 flex-1 truncate">{props.label}</span>
             <span
-              class="text-[10px] transition-transform"
+              class="text-[10px] text-text-secondary/70 transition-transform"
               classList={{ "rotate-90": props.open }}
               aria-hidden="true"
             >
               ▶
             </span>
-            <span class="truncate">{props.label}</span>
           </button>
           <Show when={props.open}>
             <div class="ml-2 space-y-0.5 border-l border-stroke pl-2">
@@ -347,6 +349,7 @@ export function SidebarNav() {
           <NavGroupBlock
             groupId={group.id}
             label={group.label}
+            iconId={group.iconId}
             open={openGroupId() === group.id}
             onOpen={() => openGroup(group.id)}
             onClose={() => closeGroup(group.id)}
