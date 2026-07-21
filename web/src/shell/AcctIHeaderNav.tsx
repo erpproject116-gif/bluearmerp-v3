@@ -1,5 +1,5 @@
 import { A, useLocation } from "@solidjs/router";
-import { For, Show, createSignal, onCleanup } from "solid-js";
+import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { hasPermission, useAuth } from "../shared/auth-context";
 import { isTenantFeatureEnabled } from "../shared/moduleAccess";
 import {
@@ -13,7 +13,6 @@ export function AcctIHeaderNav() {
   const loc = useLocation();
   const auth = useAuth();
   const [moreOpen, setMoreOpen] = createSignal(false);
-  let moreRoot: HTMLDivElement | undefined;
 
   const featureOn = () => isTenantFeatureEnabled(auth.me, "finance.acct_i", "finance");
 
@@ -28,13 +27,21 @@ export function AcctIHeaderNav() {
   const overflow = () => visibleLinks().filter((l) => l.headerPriority !== "primary");
   const overflowActive = () => overflow().some((l) => isAcctINavLinkActive(loc.pathname, l));
 
-  const onDocClick = (e: MouseEvent) => {
-    if (!moreRoot?.contains(e.target as Node)) setMoreOpen(false);
-  };
-  if (typeof document !== "undefined") {
+  onMount(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest("[data-header-more-menu]")) setMoreOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpen(false);
+    };
     document.addEventListener("click", onDocClick);
-    onCleanup(() => document.removeEventListener("click", onDocClick));
-  }
+    document.addEventListener("keydown", onKey);
+    onCleanup(() => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    });
+  });
 
   const linkClass = (link: AcctNavLink) => {
     const active = isAcctINavLinkActive(loc.pathname, link);
@@ -46,7 +53,7 @@ export function AcctIHeaderNav() {
 
   return (
     <Show when={isAcctIPath(loc.pathname) && featureOn()}>
-      <nav class="erp-header-features mt-3 flex flex-wrap items-center gap-1" aria-label="General ledger features">
+      <nav class="erp-header-features mt-3 items-center" aria-label="General ledger features">
         <For each={primary()}>
           {(link) => (
             <A href={link.href} class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors" classList={linkClass(link)}>
@@ -55,7 +62,7 @@ export function AcctIHeaderNav() {
           )}
         </For>
         <Show when={overflow().length > 0}>
-          <div class="relative" ref={moreRoot}>
+          <div class="relative" data-header-more-menu>
             <button
               type="button"
               class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
@@ -64,6 +71,7 @@ export function AcctIHeaderNav() {
                 "text-text-secondary hover:erp-panel hover:text-text-primary": !overflowActive() && !moreOpen(),
               }}
               aria-expanded={moreOpen()}
+              aria-haspopup="menu"
               onClick={(e) => {
                 e.stopPropagation();
                 setMoreOpen((v) => !v);
@@ -79,12 +87,16 @@ export function AcctIHeaderNav() {
               </svg>
             </button>
             <Show when={moreOpen()}>
-              <div class="absolute left-0 z-50 mt-1 max-h-80 min-w-[14rem] overflow-y-auto rounded-lg border border-stroke bg-surface py-1 shadow-lg">
+              <div
+                role="menu"
+                class="absolute left-0 z-[60] mt-1 max-h-80 min-w-[14rem] overflow-y-auto rounded-lg border border-stroke bg-surface py-1 shadow-lg"
+              >
                 <For each={overflow()}>
                   {(link) => (
                     <A
                       href={link.href}
-                      class="block px-3 py-2 text-sm transition-colors"
+                      role="menuitem"
+                      class="block whitespace-normal px-3 py-2 text-sm transition-colors"
                       classList={linkClass(link)}
                       onClick={() => setMoreOpen(false)}
                     >
