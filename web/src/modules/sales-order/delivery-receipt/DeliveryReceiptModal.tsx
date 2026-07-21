@@ -7,6 +7,7 @@ import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { useOpenDeliveryLines, type OpenDeliveryLine } from "../../../shared/useDeliveryReceiptList";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 
@@ -175,6 +176,7 @@ export function DeliveryReceiptModal(props: Props) {
       saving={saving()}
     >
       <draft.DraftBanner />
+      <ModalFormGuide guideId="delivery_receipt" />
       <div class="grid gap-4 md:grid-cols-3">
         <Field label="Delivery date">
           <DateInput value={deliveryDate()} onChange={setDeliveryDate} class={inputClass} />

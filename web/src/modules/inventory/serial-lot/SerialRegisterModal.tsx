@@ -3,6 +3,7 @@ import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { DEFAULT_SERIAL_SLIP_TYPE, SERIAL_SLIP_TYPES } from "../../../shared/serialSlipTypes";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
@@ -119,6 +120,7 @@ export function SerialRegisterModal(props: Props) {
       onSave={() => void save()}
       saving={saving()}
     >
+      <ModalFormGuide guideId="serial_register" spanFull />
       <Field label="Date *">
         <DateInput value={registerDate()} onInput={(e) => setRegisterDate(e.currentTarget.value)} />
       </Field>

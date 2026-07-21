@@ -135,6 +135,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
             left: 0.75rem;
             top: 0.5rem;
           }
+          .email-rte p { margin: 0 0 0.75em; }
+          .email-rte ul, .email-rte ol { margin: 0 0 0.75em; padding-left: 1.25rem; }
+          .email-rte li { margin: 0.15em 0; }
+          .email-rte p:last-child { margin-bottom: 0; }
         `}</style>
       </div>
     </div>

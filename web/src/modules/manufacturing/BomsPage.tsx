@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { UnitLookupCombo, formatUnitLabel } from "../../shared/UnitLookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
@@ -135,7 +136,6 @@ export default function BomsPage() {
   const [lines, setLines] = createSignal<BomLine[]>([emptyLine()]);
   const [lineLabels, setLineLabels] = createSignal<Record<number, string>>({});
   const [lineUnitLabels, setLineUnitLabels] = createSignal<Record<number, string>>({});
-  const [showGuide, setShowGuide] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const client = useQueryClient();
@@ -374,44 +374,7 @@ export default function BomsPage() {
         <div class="col-span-full">
           <draft.DraftBanner />
         </div>
-        <div class="col-span-full rounded-lg border border-stroke bg-slate-50/80">
-          <button
-            type="button"
-            class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary"
-            onClick={() => setShowGuide((v) => !v)}
-          >
-            <span>How this BOM works</span>
-            <span class="text-xs font-normal text-text-secondary">{showGuide() ? "Hide" : "Show"}</span>
-          </button>
-          <Show when={showGuide()}>
-            <div class="space-y-2 border-t border-stroke px-3 py-2 text-xs leading-relaxed text-text-secondary">
-              <p>
-                <strong class="text-text-primary">Finished item</strong> is what you produce. Components can be any items
-                you consume — including the same SKU when that matches your process (rework, remanufacture, etc.).
-              </p>
-              <p>
-                <strong class="text-text-primary">Output qty / UoM / Yield %</strong> describe one BOM batch. Work order
-                qty is in the finished item’s stock (base) unit. Yield below 100% increases material needed.
-              </p>
-              <ul class="list-disc space-y-1 pl-4">
-                <li>
-                  <strong class="text-text-primary">Used</strong> — quantity that goes into the product (per output batch), in the line UoM.
-                </li>
-                <li>
-                  <strong class="text-text-primary">Scrap/spare</strong> — optional extra quantity in the same UoM (trim, waste, allowance). Leave blank for none; only numbers are used in stock math (invalid text is treated as 0).
-                </li>
-                <li>
-                  <strong class="text-text-primary">Stock ≈</strong> — preview of stock to issue after converting Used + Scrap/spare to the component’s base unit.
-                </li>
-              </ul>
-              <p>
-                On complete, the system issues{" "}
-                <code class="rounded bg-white px-1">convert(used + scrap) × (WO qty ÷ output qty) ÷ (yield % ÷ 100)</code>{" "}
-                and receives the WO qty of finished goods. Set unit conversions under Inventory → Units when line UoM ≠ stock UoM.
-              </p>
-            </div>
-          </Show>
-        </div>
+        <ModalFormGuide guideId="mfg_bom" spanFull />
         <Field label="BOM code *">
           <input class={inputClass} value={bomCode()} onInput={(e) => setBomCode(e.currentTarget.value)} />
         </Field>

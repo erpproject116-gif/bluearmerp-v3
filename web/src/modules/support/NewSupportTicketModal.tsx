@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { LookupCombo } from "../../shared/LookupCombo";
 import { AttachmentsField } from "../../shared/AttachmentsField";
 import { QuickCustomerModal } from "../../shared/QuickCustomerModal";
@@ -147,6 +148,7 @@ export function NewSupportTicketModal(props: Props) {
       >
         <Show when={props.open}>
           <draft.DraftBanner />
+          <ModalFormGuide guideId="support_ticket" spanFull />
           <Field label="Subject">
             <input
               class={inputClass}

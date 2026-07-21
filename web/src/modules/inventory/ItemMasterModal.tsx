@@ -18,6 +18,7 @@ import {
   type StandardCosts,
 } from "../../shared/itemMasterConstants";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { parseNum } from "../../shared/money";
 import type { FormFieldSetting } from "../../shared/useFormFieldSettings";
@@ -138,6 +139,7 @@ export function ItemMasterModal(props: Props) {
       }
     >
       {props.draftBanner}
+      <ModalFormGuide guideId="item_master" spanFull />
       <div class="col-span-full mb-3 flex flex-wrap gap-2 border-b border-stroke pb-3">
         <For each={TABS}>
           {(tab) => (

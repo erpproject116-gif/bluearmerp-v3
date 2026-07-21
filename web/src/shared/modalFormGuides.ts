@@ -114,6 +114,109 @@ export const MODAL_FORM_GUIDES: Record<string, ModalFormGuideDef> = {
       "Save — you can use them on invoices right away.",
     ],
   },
+  delivery_receipt: {
+    id: "delivery_receipt",
+    title: "Creating a delivery receipt",
+    summary: "A delivery receipt records goods you shipped to a customer from released sales orders.",
+    steps: [
+      "Set the delivery date.",
+      "Select the released lines you are delivering now.",
+      "Save to confirm the shipment quantities.",
+    ],
+    docHref: "/docs/selling",
+  },
+  goods_receipt: {
+    id: "goods_receipt",
+    title: "Recording a goods receipt",
+    summary: "A goods receipt records stock that arrived from a supplier against a purchase order.",
+    steps: [
+      "Choose the purchase order or lines you received.",
+      "Confirm quantities and the receiving location.",
+      "Save so inventory on-hand updates.",
+    ],
+    docHref: "/docs/buying",
+  },
+  mfg_bom: {
+    id: "mfg_bom",
+    title: "Creating a bill of materials (BOM)",
+    summary: "A BOM lists what materials you need to make one finished product (or batch).",
+    steps: [
+      "Choose the finished item you will produce.",
+      "Set how much one batch makes (output qty), its unit, and yield %.",
+      "Add component lines: used qty, unit, and optional scrap/spare.",
+      "Save — work orders will use this recipe when you produce.",
+    ],
+  },
+  mfg_work_order: {
+    id: "mfg_work_order",
+    title: "Creating a work order",
+    summary: "A work order tells the floor how much to produce using a BOM.",
+    steps: [
+      "Pick the BOM (recipe) and production location.",
+      "Enter how many finished units to make.",
+      "Create as draft, release when ready, then complete to issue materials and receive finished goods.",
+    ],
+  },
+  repair_order: {
+    id: "repair_order",
+    title: "Creating a repair order",
+    summary: "A repair order tracks after-sales service work on a customer’s item.",
+    steps: [
+      "Select the customer and item being repaired.",
+      "Add parts or labor lines as needed.",
+      "Save, then update status as work progresses.",
+    ],
+  },
+  stock_adjustment: {
+    id: "stock_adjustment",
+    title: "Adjusting stock",
+    summary: "Use this when physical count does not match the system quantity.",
+    steps: [
+      "Pick the item and warehouse location.",
+      "Enter the quantity change (increase or decrease).",
+      "Add a short reason, then save.",
+    ],
+  },
+  item_master: {
+    id: "item_master",
+    title: "Adding an inventory item",
+    summary: "Items are the products or materials you buy, sell, or stock.",
+    steps: [
+      "Enter the item name and choose a base unit of measure.",
+      "Set pricing and tracking options if needed.",
+      "Save — you can use the item on documents right away.",
+    ],
+  },
+  serial_register: {
+    id: "serial_register",
+    title: "Registering a serial number",
+    summary: "Register a unique serial so you can track one unit through stock and sales.",
+    steps: [
+      "Choose the item, location, and slip type.",
+      "Enter the serial number (quantity is always 1).",
+      "Save to place the unit on hand.",
+    ],
+  },
+  journal_entry: {
+    id: "journal_entry",
+    title: "Creating a journal entry",
+    summary: "A journal entry records accounting debits and credits that are not from invoices or receipts.",
+    steps: [
+      "Add a short remark describing the entry.",
+      "Add lines with account, debit, and credit (totals must balance).",
+      "Save as draft, then post when ready.",
+    ],
+  },
+  support_ticket: {
+    id: "support_ticket",
+    title: "Opening a support ticket",
+    summary: "Tell the Bluearm team about a problem or request so they can help.",
+    steps: [
+      "Write a clear subject and describe what happened.",
+      "Attach screenshots if they help.",
+      "Submit — you will get updates as the ticket is handled.",
+    ],
+  },
 };
 
 export function getModalFormGuide(id: string): ModalFormGuideDef | undefined {

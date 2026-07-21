@@ -150,7 +150,7 @@ export async function apiFetch<T>(
     );
   }
   if (body.success) {
-    invalidateAfterMutation(path, init.method);
+    await invalidateAfterMutation(path, init.method);
   }
   return result;
 }

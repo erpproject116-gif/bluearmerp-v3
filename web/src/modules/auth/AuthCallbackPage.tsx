@@ -2,8 +2,8 @@ import { onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "../../shared/api";
 import { setActiveTenantId } from "../../shared/activeContext";
-import { useAuth, type MeData } from "../../shared/auth-context";
-import { resolveAppEntryPath } from "../../shared/resolveAppEntryPath";
+import type { MeData } from "../../shared/auth-context";
+import { setPendingLoginOtpEmail } from "./loginOtpGate";
 
 async function fetchMeWithRetry(maxAttempts = 4): Promise<Awaited<ReturnType<typeof apiFetch<MeData>>>> {
   let lastErr: unknown;
@@ -44,7 +44,6 @@ async function recordIntake(email: string, fullName: string) {
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
-  const auth = useAuth();
 
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
@@ -76,6 +75,12 @@ export default function AuthCallbackPage() {
     const { email, fullName } = profileFromSession(data.session);
     void recordIntake(email, fullName);
 
+    if (!email) {
+      navigate(`/signin?error=${encodeURIComponent("Google account has no email.")}`, { replace: true });
+      return;
+    }
+
+    // Ensure workspace exists (trial) before email OTP — still require code before app entry.
     try {
       let me = await fetchMeWithRetry();
       if (!me.success && (me.status === 403 || me.code === "ERR_FORBIDDEN")) {
@@ -92,7 +97,6 @@ export default function AuthCallbackPage() {
           return;
         }
       }
-
       if (!me.success) {
         navigate(
           `/signin?error=${encodeURIComponent(me.message ?? "Account not provisioned yet.")}`,
@@ -100,16 +104,25 @@ export default function AuthCallbackPage() {
         );
         return;
       }
-
-      await auth.refresh();
-      const href = await resolveAppEntryPath(auth.me);
-      navigate(href, { replace: true });
     } catch {
       navigate(
         `/signin?error=${encodeURIComponent(apiNetworkErrorMessage())}`,
         { replace: true },
       );
+      return;
     }
+
+    setPendingLoginOtpEmail(email);
+    await supabase.auth.signOut();
+    const { error: otpErr } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
+    if (otpErr) {
+      navigate(`/signin?error=${encodeURIComponent(otpErr.message)}`, { replace: true });
+      return;
+    }
+    navigate(`/signin?step=verify&email=${encodeURIComponent(email)}`, { replace: true });
   });
 
   return (

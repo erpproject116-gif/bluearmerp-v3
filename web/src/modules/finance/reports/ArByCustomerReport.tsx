@@ -6,6 +6,7 @@ import { arByCustomerExportUrl } from "../../../shared/useArByCustomerReport";
 import type { ArByCustomerRow } from "../../../shared/useArByCustomerReport";
 import { formatDisplayDate, type ArByCustomerFilters } from "./arByCustomerFilters";
 import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
+import { GridExportButtons } from "../../../shared/gridExport";
 
 type Props = {
   filters: ArByCustomerFilters;
@@ -24,6 +25,7 @@ export function ArByCustomerReport(props: Props) {
   const auth = useAuth();
   const companyName = () => auth.me?.tenant.company_name ?? "Company";
   const totalPages = () => Math.max(1, Math.ceil(props.totalRows / props.pageSize));
+  let reportBodyEl: HTMLDivElement | undefined;
 
   const downloadCsv = async () => {
     const token = await getAccessToken();
@@ -62,6 +64,15 @@ export function ArByCustomerReport(props: Props) {
   return (
     <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
       <div class="border-b border-stroke px-5 py-4 text-center">
+        <div class="mb-3 flex justify-end">
+          <GridExportButtons
+            title="A/R by Customer"
+            filename="ar-by-customer"
+            columns={[]}
+            rows={() => []}
+            scrapeRoot={() => reportBodyEl}
+          />
+        </div>
         <h2 class="text-xl font-bold text-text-primary">A/R by Customer</h2>
         <div class="mt-2 flex flex-wrap justify-between gap-2 text-sm text-text-secondary">
           <span>Company Name : {companyName()}</span>
@@ -69,7 +80,7 @@ export function ArByCustomerReport(props: Props) {
         </div>
       </div>
 
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto" ref={(el) => (reportBodyEl = el)}>
         <table class="erp-grid min-w-full text-left text-sm">
           <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
             <tr>

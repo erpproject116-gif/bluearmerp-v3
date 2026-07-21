@@ -26,6 +26,7 @@ import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../share
 import { type SerialTraceResult } from "../../../shared/useSerialLotList";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
@@ -454,6 +455,7 @@ export function RepairOrderModal(props: Props) {
       }
     >
       <div class="space-y-4">
+      <ModalFormGuide guideId="repair_order" />
       <draft.DraftBanner />
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Field label="Date-no">

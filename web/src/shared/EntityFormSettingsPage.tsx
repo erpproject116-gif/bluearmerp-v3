@@ -1,4 +1,4 @@
-import { createSignal, createEffect, createMemo, For, Show } from "solid-js";
+import { createSignal, createEffect, createMemo, For, Index, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { apiFetch } from "./api";
 import { FIELD_TYPES, isCustomFieldType, type CustomFieldType } from "./CustomFieldsSection";
@@ -276,78 +276,78 @@ export function EntityFormSettingsPage(props: Props) {
                 </td>
               </tr>
             </Show>
-            <For each={sortedRows()}>
+            <Index each={sortedRows()}>
               {(row) => (
                 <tr>
                   <td class="px-4 py-3">
-                    <span class="font-medium text-text-primary">{row.field_key}</span>
-                    <span class="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-text-secondary">{row.kind}</span>
+                    <span class="font-medium text-text-primary">{row().field_key}</span>
+                    <span class="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-text-secondary">{row().kind}</span>
                   </td>
-                  <td class="px-4 py-3 text-text-secondary">{row.field_type}</td>
+                  <td class="px-4 py-3 text-text-secondary">{row().field_type}</td>
                   <td class="px-4 py-3">
                     <input
                       class={inputClass}
-                      value={row.label}
+                      value={row().label}
                       disabled={!canEdit()}
-                      onInput={(e) => updateRow(row.field_key, { label: e.currentTarget.value })}
+                      onInput={(e) => updateRow(row().field_key, { label: e.currentTarget.value })}
                     />
                   </td>
                   <td class="px-4 py-3">
                     <input
                       class={inputClass}
-                      value={row.placeholder ?? ""}
+                      value={row().placeholder ?? ""}
                       disabled={!canEdit()}
                       placeholder="Optional"
-                      onInput={(e) => updateRow(row.field_key, { placeholder: e.currentTarget.value })}
+                      onInput={(e) => updateRow(row().field_key, { placeholder: e.currentTarget.value })}
                     />
                   </td>
                   <td class="px-4 py-3">
                     <input
                       type="checkbox"
-                      checked={row.is_visible}
+                      checked={row().is_visible}
                       disabled={!canEdit()}
-                      onChange={(e) => updateRow(row.field_key, { is_visible: e.currentTarget.checked })}
+                      onChange={(e) => updateRow(row().field_key, { is_visible: e.currentTarget.checked })}
                     />
                   </td>
                   <td class="px-4 py-3">
                     <input
                       type="checkbox"
-                      checked={row.is_required}
+                      checked={row().is_required}
                       disabled={!canEdit()}
-                      onChange={(e) => updateRow(row.field_key, { is_required: e.currentTarget.checked })}
+                      onChange={(e) => updateRow(row().field_key, { is_required: e.currentTarget.checked })}
                     />
                   </td>
                   <td class="px-4 py-3">
-                    <Show when={row.kind === "standard"} fallback={<span class="text-text-secondary">—</span>}>
+                    <Show when={row().kind === "standard"} fallback={<span class="text-text-secondary">—</span>}>
                       <input
                         type="checkbox"
-                        checked={row.is_disabled}
+                        checked={row().is_disabled}
                         disabled={!canEdit()}
-                        onChange={(e) => updateRow(row.field_key, { is_disabled: e.currentTarget.checked })}
+                        onChange={(e) => updateRow(row().field_key, { is_disabled: e.currentTarget.checked })}
                       />
                     </Show>
                   </td>
                   <td class="px-4 py-3">
-                    <Show when={row.kind === "custom"} fallback={<span class="text-text-secondary">—</span>}>
+                    <Show when={row().kind === "custom"} fallback={<span class="text-text-secondary">—</span>}>
                       <input
                         type="checkbox"
-                        checked={row.is_active}
+                        checked={row().is_active}
                         disabled={!canEdit()}
                         onChange={(e) =>
-                          updateRow(row.field_key, {
+                          updateRow(row().field_key, {
                             is_active: e.currentTarget.checked,
-                            is_visible: e.currentTarget.checked ? row.is_visible : false,
+                            is_visible: e.currentTarget.checked ? row().is_visible : false,
                           })
                         }
                       />
                     </Show>
                   </td>
                   <td class="px-4 py-3">
-                    <Show when={row.kind === "custom" && canEdit()}>
+                    <Show when={row().kind === "custom" && canEdit()}>
                       <button
                         type="button"
                         class="text-xs text-red-600 hover:underline"
-                        onClick={() => void removeCustomField(row.id, row.label)}
+                        onClick={() => void removeCustomField(row().id, row().label)}
                       >
                         Remove
                       </button>
@@ -355,7 +355,7 @@ export function EntityFormSettingsPage(props: Props) {
                   </td>
                 </tr>
               )}
-            </For>
+            </Index>
           </tbody>
         </table>
       </div>
@@ -374,21 +374,21 @@ export function EntityFormSettingsPage(props: Props) {
               </tr>
             </thead>
             <tbody>
-              <For each={sortedColumnRows()}>
+              <Index each={sortedColumnRows()}>
                 {(row) => (
                   <tr>
-                    <td class="px-4 py-3 font-medium text-text-primary">{row.column_key}</td>
+                    <td class="px-4 py-3 font-medium text-text-primary">{row().column_key}</td>
                     <td class="px-4 py-3">
                       <input
                         class={inputClass}
-                        value={row.label}
+                        value={row().label}
                         disabled={!canEdit()}
-                        onInput={(e) => updateColumnRow(row.column_key, e.currentTarget.value)}
+                        onInput={(e) => updateColumnRow(row().column_key, e.currentTarget.value)}
                       />
                     </td>
                   </tr>
                 )}
-              </For>
+              </Index>
             </tbody>
           </table>
         </div>

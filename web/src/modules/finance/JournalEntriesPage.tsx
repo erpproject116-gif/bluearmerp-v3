@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { GridExportButtons } from "../../shared/gridExport";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useToast } from "../../shared/toast";
@@ -199,6 +200,7 @@ export default function JournalEntriesPage() {
         wide
       >
         <draft.DraftBanner />
+        <ModalFormGuide guideId="journal_entry" spanFull />
         <Field label="Remarks">
           <input class={inputClass} value={remarks()} onInput={(e) => setRemarks(e.currentTarget.value)} />
         </Field>
