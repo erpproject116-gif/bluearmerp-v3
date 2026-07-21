@@ -101,7 +101,7 @@ export default function DemoSignupPage() {
       return;
     }
 
-    markLoginOtpVerified();
+    markLoginOtpVerified(email().trim());
     // Session established — provision the isolated demo workspace, then enter it.
     setStep("provisioning");
     const res = await apiFetch<{ tenant_id: number; company_code: string }>(
