@@ -1,4 +1,4 @@
-import { createSignal, For, createResource } from "solid-js";
+import { createSignal, For, Show, createResource } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { UnitLookupCombo, formatUnitLabel } from "../../shared/UnitLookupCombo";
@@ -19,6 +19,8 @@ type BomLine = {
   qty: number;
   unit_id?: number | null;
   unit_code?: string;
+  /** Textbox value; parsed safely for stock math (blank/invalid → 0). */
+  scrap_input?: string;
   scrap_qty?: number;
   stock_qty_preview?: number;
   base_unit_id?: number;
@@ -46,6 +48,20 @@ type Bom = {
 
 type Conversion = { from_unit_id: number; to_unit_id: number; factor: number };
 
+/** Parse qty from a free textbox without breaking calc (empty / non-numeric → 0). */
+function parseQtyInput(raw: string | number | undefined | null): number {
+  if (raw == null || raw === "") return 0;
+  if (typeof raw === "number") return Number.isFinite(raw) && raw >= 0 ? raw : 0;
+  const n = Number(String(raw).replace(/,/g, "").trim());
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+function lineScrapQty(ln: BomLine): number {
+  if (ln.scrap_input != null) return parseQtyInput(ln.scrap_input);
+  return parseQtyInput(ln.scrap_qty);
+}
+
 function convertClient(fromId: number, toId: number, qty: number, convs: Conversion[]): number | null {
   if (!fromId || !toId) return null;
   if (fromId === toId) return qty;
@@ -59,7 +75,7 @@ function convertClient(fromId: number, toId: number, qty: number, convs: Convers
 function liveStockPreview(ln: BomLine, convs: Conversion[]): { qty: number; code: string; missing?: boolean } | null {
   const baseId = ln.base_unit_id;
   const fromId = ln.unit_id ?? baseId;
-  const need = Number(ln.qty) + Number(ln.scrap_qty ?? 0);
+  const need = Number(ln.qty) + lineScrapQty(ln);
   if (!baseId || !fromId || !(need > 0)) return null;
   const converted = convertClient(fromId, baseId, need, convs);
   if (converted == null) {
@@ -92,7 +108,7 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 }
 
 function emptyLine(): BomLine {
-  return { line_no: 1, component_item_id: 0, qty: 1, scrap_qty: 0, unit_id: null };
+  return { line_no: 1, component_item_id: 0, qty: 1, scrap_input: "", unit_id: null };
 }
 
 export default function BomsPage() {
@@ -115,6 +131,7 @@ export default function BomsPage() {
   const [lines, setLines] = createSignal<BomLine[]>([emptyLine()]);
   const [lineLabels, setLineLabels] = createSignal<Record<number, string>>({});
   const [lineUnitLabels, setLineUnitLabels] = createSignal<Record<number, string>>({});
+  const [showGuide, setShowGuide] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const client = useQueryClient();
@@ -186,7 +203,12 @@ export default function BomsPage() {
     setYieldPct(String(detail.yield_pct ?? 100));
     setNotes(detail.notes ?? "");
     const loaded = detail.lines?.length ? detail.lines : [emptyLine()];
-    setLines(loaded);
+    setLines(
+      loaded.map((ln) => ({
+        ...ln,
+        scrap_input: ln.scrap_qty != null && ln.scrap_qty !== 0 ? String(ln.scrap_qty) : ln.scrap_input ?? "",
+      })),
+    );
     setLineLabels(Object.fromEntries(loaded.map((ln, i) => [i, [ln.component_code, ln.component_name].filter(Boolean).join(" — ")])));
     setLineUnitLabels(Object.fromEntries(loaded.map((ln, i) => [i, ln.unit_code ? formatUnitLabel({ code: ln.unit_code, name: ln.unit_code }) : ""])));
     setModalOpen(true);
@@ -240,19 +262,14 @@ export default function BomsPage() {
       toast.warning("BOM code, name, and finished item are required.");
       return;
     }
-    const finishedId = finishedItemId()!;
-    const rawLines = lines().filter((ln) => ln.component_item_id > 0 && Number(ln.qty) > 0);
-    const sameAsFinished = rawLines.find((ln) => ln.component_item_id === finishedId);
-    if (sameAsFinished) {
-      toast.warning("A component cannot be the same item as the finished good. Pick a different component.");
-      return;
-    }
-    const bodyLines = rawLines.map((ln) => ({
-      component_item_id: ln.component_item_id,
-      qty: Number(ln.qty),
-      unit_id: ln.unit_id || null,
-      scrap_qty: Number(ln.scrap_qty ?? 0),
-    }));
+    const bodyLines = lines()
+      .filter((ln) => ln.component_item_id > 0 && Number(ln.qty) > 0)
+      .map((ln) => ({
+        component_item_id: ln.component_item_id,
+        qty: Number(ln.qty),
+        unit_id: ln.unit_id || null,
+        scrap_qty: lineScrapQty(ln),
+      }));
     if (bodyLines.length === 0) {
       toast.warning("Add at least one component line.");
       return;
@@ -344,6 +361,44 @@ export default function BomsPage() {
         <div class="col-span-full">
           <draft.DraftBanner />
         </div>
+        <div class="col-span-full rounded-lg border border-stroke bg-slate-50/80">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary"
+            onClick={() => setShowGuide((v) => !v)}
+          >
+            <span>How this BOM works</span>
+            <span class="text-xs font-normal text-text-secondary">{showGuide() ? "Hide" : "Show"}</span>
+          </button>
+          <Show when={showGuide()}>
+            <div class="space-y-2 border-t border-stroke px-3 py-2 text-xs leading-relaxed text-text-secondary">
+              <p>
+                <strong class="text-text-primary">Finished item</strong> is what you produce. Components can be any items
+                you consume — including the same SKU when that matches your process (rework, remanufacture, etc.).
+              </p>
+              <p>
+                <strong class="text-text-primary">Output qty / UoM / Yield %</strong> describe one BOM batch. Work order
+                qty is in the finished item’s stock (base) unit. Yield below 100% increases material needed.
+              </p>
+              <ul class="list-disc space-y-1 pl-4">
+                <li>
+                  <strong class="text-text-primary">Used</strong> — quantity that goes into the product (per output batch), in the line UoM.
+                </li>
+                <li>
+                  <strong class="text-text-primary">Scrap/spare</strong> — optional extra quantity in the same UoM (trim, waste, allowance). Leave blank for none; only numbers are used in stock math (invalid text is treated as 0).
+                </li>
+                <li>
+                  <strong class="text-text-primary">Stock ≈</strong> — preview of stock to issue after converting Used + Scrap/spare to the component’s base unit.
+                </li>
+              </ul>
+              <p>
+                On complete, the system issues{" "}
+                <code class="rounded bg-white px-1">convert(used + scrap) × (WO qty ÷ output qty) ÷ (yield % ÷ 100)</code>{" "}
+                and receives the WO qty of finished goods. Set unit conversions under Inventory → Units when line UoM ≠ stock UoM.
+              </p>
+            </div>
+          </Show>
+        </div>
         <Field label="BOM code *">
           <input class={inputClass} value={bomCode()} onInput={(e) => setBomCode(e.currentTarget.value)} />
         </Field>
@@ -410,7 +465,7 @@ export default function BomsPage() {
           </Field>
         </div>
         <p class="col-span-full text-xs text-text-secondary">
-          Per output batch: <strong>Used</strong> goes into the finished good; <strong>Scrap/spare</strong> is extra measurable qty in the same UoM (waste or allowance). Stock issue = convert(used + scrap) × WO/output ÷ yield.
+          Stock issue uses <strong>Used + Scrap/spare</strong> (numeric only). Blank scrap/spare is fine.
         </p>
         <div class="col-span-full space-y-2">
           <p class="text-sm font-medium text-text-primary">Components (per output batch)</p>
@@ -418,7 +473,7 @@ export default function BomsPage() {
             {(ln, idx) => {
               const preview = () => liveStockPreview(ln, conversions() ?? []);
               return (
-                <div class="grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_5rem_auto]">
+                <div class="grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_5.5rem_auto]">
                   <LookupCombo
                     label={`Line ${idx() + 1}`}
                     required
@@ -426,10 +481,6 @@ export default function BomsPage() {
                     selectedId={() => ln.component_item_id || null}
                     onInput={(v) => setLineLabels((p) => ({ ...p, [idx()]: v }))}
                     onSelect={(o) => {
-                      if (finishedItemId() && o.id === finishedItemId()) {
-                        toast.warning("That item is the finished good — pick a different component.");
-                        return;
-                      }
                       const meta = o.meta as { base_unit_id?: number; base_unit_code?: string } | undefined;
                       setLines((prev) =>
                         prev.map((row, i) =>
@@ -492,13 +543,14 @@ export default function BomsPage() {
                   <label class="text-sm">
                     <span class="text-text-secondary">Scrap/spare</span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       class={`${inputClass} mt-1`}
-                      min="0"
-                      value={ln.scrap_qty ?? 0}
+                      placeholder="0"
+                      value={ln.scrap_input ?? ""}
                       onInput={(e) => {
-                        const v = Number(e.currentTarget.value);
-                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_qty: v } : row)));
+                        const v = e.currentTarget.value;
+                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_input: v } : row)));
                       }}
                     />
                   </label>

@@ -448,9 +448,6 @@ func validateBomBody(b bomBody) map[string]string {
 		if ln.ScrapQty != nil && *ln.ScrapQty < 0 {
 			errs[fmt.Sprintf("lines[%d].scrap_qty", i)] = "Scrap/spare quantity cannot be negative."
 		}
-		if b.FinishedItemID > 0 && ln.ComponentItemID == b.FinishedItemID {
-			errs[fmt.Sprintf("lines[%d].component_item_id", i)] = "A component cannot be the same item as the finished good."
-		}
 	}
 	if len(errs) > 0 {
 		return errs
