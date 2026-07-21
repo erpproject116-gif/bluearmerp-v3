@@ -59,6 +59,7 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
     "finance-notes",
     "finance-checks",
     "finance-fiscal-years",
+    "finance-fiscal-periods",
     "finance-fiscal-settings",
     "finance-accounts",
     "finance-accounts-parent-options",

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 )
 
 // Line is one leg of the journal entry. Exactly one of Debit/Credit is non-zero.
@@ -139,6 +140,9 @@ func SyncTx(ctx context.Context, tx pgx.Tx, tenantID, userID int64, entryDate ti
 			return 0, err
 		}
 		if !requireJEApproval {
+			if err := fiscalyear.ErrIfClosed(ctx, tx, tenantID, entryDate); err != nil {
+				return 0, err
+			}
 			if _, err := tx.Exec(ctx,
 				`update public.fin_journal_entries set status = 'posted', posted_at = now(), updated_at = now() where id = $1 and status = 'draft'`,
 				jeID); err != nil {

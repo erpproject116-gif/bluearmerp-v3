@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 )
 
 // PostingLine is one side of a double-entry posting event.
@@ -77,6 +79,12 @@ func (jp JournalPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) er
 	if jp.RequireJEApproval {
 		status = "draft"
 	}
+	entryDate := time.Now().UTC().Truncate(24 * time.Hour)
+	if status == "posted" {
+		if err := fiscalyear.ErrIfClosed(ctx, tx, ev.TenantID, entryDate); err != nil {
+			return err
+		}
+	}
 	// postedAt is computed in Go on purpose. Reusing $3 in both the status
 	// column and `case when $3 = 'posted'` triggers PostgreSQL SQLSTATE 42P08
 	// (inconsistent types deduced for parameter) under pgx prepared statements.
@@ -85,9 +93,9 @@ func (jp JournalPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) er
 	entryNo := EntryNo(ev.SourceType, ev.SourceID)
 	err := tx.QueryRow(ctx, `
 		insert into public.fin_journal_entries (tenant_id, entry_date, date_seq, entry_no, status, remarks, posted_at, created_by_user_id)
-		values ($1, current_date, 1, $2, $3, $4, $5, null)
+		values ($1, $6::date, 1, $2, $3, $4, $5, null)
 		returning id`,
-		ev.TenantID, entryNo, status, ev.SourceType, postedAt).Scan(&entryID)
+		ev.TenantID, entryNo, status, ev.SourceType, postedAt, entryDate).Scan(&entryID)
 	if err != nil {
 		return err
 	}

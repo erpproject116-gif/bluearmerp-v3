@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/ledger"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -483,7 +484,10 @@ func postPayrollAccrualJE(ctx context.Context, tx pgx.Tx, tenantID, periodID int
 	if err := (ledger.AuditPoster{}).Post(ctx, tx, ev); err != nil {
 		return 0, err
 	}
-	runDate := time.Now()
+	runDate := time.Now().UTC().Truncate(24 * time.Hour)
+	if err := fiscalyear.ErrIfClosed(ctx, tx, tenantID, runDate); err != nil {
+		return 0, err
+	}
 	var dateSeq int
 	if err := tx.QueryRow(ctx, `
 		select coalesce(max(date_seq), 0) + 1 from public.fin_journal_entries

@@ -16,6 +16,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/ledger"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -375,6 +376,9 @@ func postDepreciationJournal(ctx context.Context, tx pgx.Tx, tenantID, runID int
 		Lines:      lines,
 	}
 	if err := (ledger.AuditPoster{}).Post(ctx, tx, ev); err != nil {
+		return 0, err
+	}
+	if err := fiscalyear.ErrIfClosed(ctx, tx, tenantID, runDate); err != nil {
 		return 0, err
 	}
 	var dateSeq int
