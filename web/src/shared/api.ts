@@ -128,7 +128,8 @@ export async function apiFetch<T>(
   const base = apiBase || "";
   let res: Response;
   try {
-    res = await fetch(`${base}${path}`, { ...init, headers });
+    // Avoid stale list grids after mutations (browser HTTP cache ignored Cache-Control on some paths).
+    res = await fetch(`${base}${path}`, { ...init, headers, cache: init.cache ?? "no-store" });
   } catch {
     throw new Error("ERR_NETWORK");
   }

@@ -107,15 +107,15 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			select b.id, b.bom_code, b.bom_name, b.finished_item_id,
 			  coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
 			  b.default_location_id, coalesce(loc.location_name, ''),
-			  b.output_qty::float8, b.output_unit_id, coalesce(ou.code, ''),
-			  b.yield_pct::float8, b.is_active, b.notes,
+			  coalesce(b.output_qty, 1)::float8, b.output_unit_id, coalesce(ou.code, ''),
+			  coalesce(b.yield_pct, 100)::float8, b.is_active, b.notes,
 			  string_agg(
 			    coalesce(ci.item_code, '') || ' × ' || l.qty::text || ' ' || coalesce(lu.code, coalesce(nullif(trim(ci.unit), ''), '')),
 			    ', ' order by l.line_no
 			  ),
 			  count(*) over()
 			from public.mfg_boms b
-			join public.inv_items fi on fi.id = b.finished_item_id
+			left join public.inv_items fi on fi.id = b.finished_item_id and fi.tenant_id = b.tenant_id
 			left join public.inv_locations loc on loc.id = b.default_location_id
 			left join public.inv_units ou on ou.id = b.output_unit_id
 			left join public.mfg_bom_lines l on l.bom_id = b.id
@@ -201,6 +201,17 @@ func createBom(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
+		var finishedOK bool
+		_ = tx.QueryRow(r.Context(), `
+			select exists(
+			  select 1 from public.inv_items
+			  where id=$1 and tenant_id=$2 and deleted_at is null
+			)`, body.FinishedItemID, tu.TenantID).Scan(&finishedOK)
+		if !finishedOK {
+			response.Validation(w, map[string]string{"finished_item_id": "Finished item not found for this business."})
+			return
+		}
+
 		outputQty, yieldPct, outputUnitID, err := resolveBomHeaderDefaults(r.Context(), tx, tu.TenantID, body)
 		if err != nil {
 			response.Validation(w, map[string]string{"output_unit_id": err.Error()})
@@ -219,6 +230,10 @@ func createBom(pool *pgxpool.Pool) http.HandlerFunc {
 			outputQty, outputUnitID, yieldPct, body.IsActive == nil || *body.IsActive, body.Notes,
 		).Scan(&id)
 		if err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(err.Error(), "23505") {
+				response.Validation(w, map[string]string{"bom_code": "A BOM with this code already exists."})
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to create BOM.", "ERR_INTERNAL")
 			return
 		}
@@ -233,7 +248,12 @@ func createBom(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.bom_create", "mfg_bom", &id, nil, body)
-		row, _ := loadBom(r.Context(), pool, tu.TenantID, id)
+		row, err := loadBom(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			// Row is committed; return id so the client can still refresh the list.
+			response.OK(w, map[string]any{"id": id, "bom_code": strings.TrimSpace(body.BomCode)}, "BOM created.")
+			return
+		}
 		response.OK(w, row, "BOM created.")
 	}
 }
@@ -262,6 +282,17 @@ func updateBom(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
+
+		var finishedOK bool
+		_ = tx.QueryRow(r.Context(), `
+			select exists(
+			  select 1 from public.inv_items
+			  where id=$1 and tenant_id=$2 and deleted_at is null
+			)`, body.FinishedItemID, tu.TenantID).Scan(&finishedOK)
+		if !finishedOK {
+			response.Validation(w, map[string]string{"finished_item_id": "Finished item not found for this business."})
+			return
+		}
 
 		outputQty, yieldPct, outputUnitID, err := resolveBomHeaderDefaults(r.Context(), tx, tu.TenantID, body)
 		if err != nil {
@@ -335,10 +366,10 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		select b.id, b.bom_code, b.bom_name, b.finished_item_id,
 		  coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
 		  b.default_location_id, coalesce(loc.location_name, ''),
-		  b.output_qty::float8, b.output_unit_id, coalesce(ou.code, ''),
-		  b.yield_pct::float8, b.is_active, b.notes
+		  coalesce(b.output_qty, 1)::float8, b.output_unit_id, coalesce(ou.code, ''),
+		  coalesce(b.yield_pct, 100)::float8, b.is_active, b.notes
 		from public.mfg_boms b
-		join public.inv_items fi on fi.id = b.finished_item_id
+		left join public.inv_items fi on fi.id = b.finished_item_id and fi.tenant_id = b.tenant_id
 		left join public.inv_locations loc on loc.id = b.default_location_id
 		left join public.inv_units ou on ou.id = b.output_unit_id
 		where b.id=$1 and b.tenant_id=$2`, id, tenantID).

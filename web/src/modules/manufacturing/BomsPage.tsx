@@ -112,7 +112,11 @@ function emptyLine(): BomLine {
 }
 
 export default function BomsPage() {
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("bom_code");
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+    "updated_at",
+    25,
+    { defaultOrder: "desc" },
+  );
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Bom | null>(null);
@@ -160,7 +164,10 @@ export default function BomsPage() {
     };
   });
 
-  const invalidate = () => void client.invalidateQueries({ queryKey: ["mfg-boms"] });
+  const invalidate = async () => {
+    await client.invalidateQueries({ queryKey: ["mfg-boms"] });
+    await client.refetchQueries({ queryKey: ["mfg-boms"] });
+  };
 
   const openNew = () => {
     setEditing(null);
@@ -302,7 +309,10 @@ export default function BomsPage() {
     toast.success(ed ? "BOM updated." : "BOM created.");
     await draft.clearOnSave();
     setModalOpen(false);
-    invalidate();
+    setQ("");
+    setStatusFilter("active");
+    setPage(1);
+    await invalidate();
   };
 
   return (
@@ -348,8 +358,11 @@ export default function BomsPage() {
           { value: "active", label: "Active" },
           { value: "inactive", label: "Inactive" },
         ]}
-        onRefresh={invalidate}
+        onRefresh={() => void invalidate()}
       />
+      <Show when={list.isError}>
+        <p class="mt-2 text-sm text-red-600">{list.error instanceof Error ? list.error.message : "Failed to load BOMs."}</p>
+      </Show>
 
       <EntityModal
         open={modalOpen()}
