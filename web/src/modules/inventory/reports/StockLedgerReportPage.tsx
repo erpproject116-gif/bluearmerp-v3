@@ -1,5 +1,5 @@
 import { createSignal, For, onMount, Show } from "solid-js";
-import { A } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { defaultReportDateRange, ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -11,6 +11,7 @@ import {
 } from "../../../shared/reports/useModuleReports";
 
 export default function StockLedgerReportPage() {
+  const [searchParams] = useSearchParams();
   const defaults = defaultReportDateRange();
   const [submitted, setSubmitted] = createSignal(false);
   const [page, setPage] = createSignal(1);
@@ -27,7 +28,29 @@ export default function StockLedgerReportPage() {
     enabled: submitted(),
   }));
 
+  const search = () => {
+    setSubmitted(true);
+    setPage(1);
+    setGeneratedAt(new Date());
+  };
+
   onMount(() => {
+    const one = (key: string) => {
+      const v = searchParams[key];
+      return typeof v === "string" ? v.trim() : "";
+    };
+    const itemId = Number(one("item_id"));
+    const locationId = Number(one("location_id"));
+    const q = one("q");
+    const fromUrl: Partial<StockLedgerFilters> = {};
+    if (Number.isFinite(itemId) && itemId > 0) fromUrl.item_id = itemId;
+    if (Number.isFinite(locationId) && locationId > 0) fromUrl.location_id = locationId;
+    if (q) fromUrl.q = q;
+    if (Object.keys(fromUrl).length > 0) {
+      setFilters((prev) => ({ ...prev, ...fromUrl }));
+      setSubmitted(true);
+      setGeneratedAt(new Date());
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
         e.preventDefault();
@@ -37,12 +60,6 @@ export default function StockLedgerReportPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-
-  const search = () => {
-    setSubmitted(true);
-    setPage(1);
-    setGeneratedAt(new Date());
-  };
 
   const patch = (p: Partial<StockLedgerFilters>) => setFilters((prev) => ({ ...prev, ...p }));
 

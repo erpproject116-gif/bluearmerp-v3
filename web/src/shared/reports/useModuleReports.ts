@@ -349,6 +349,7 @@ export type InventoryStatusFilters = {
   category_id?: number;
   location_id?: number;
   branch_id?: number;
+  in_stock_only?: number | boolean;
 };
 
 export type InventoryStatusRow = {
@@ -356,6 +357,7 @@ export type InventoryStatusRow = {
   item_code: string;
   item_name: string;
   item_status: string;
+  unit_code?: string;
   category_id?: number | null;
   category_name: string;
   location_id: number;
@@ -364,8 +366,11 @@ export type InventoryStatusRow = {
   qty_on_hand: number;
   qty_reserved: number;
   available_qty: number;
+  sales_price: number;
+  company_available_qty: number;
   reorder_level?: number;
   stock_status: string;
+  track_serial?: boolean;
   last_sold_at?: string | null;
   last_sold_by: string;
   last_sold_ref_type: string;

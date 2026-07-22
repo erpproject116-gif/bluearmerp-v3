@@ -11,7 +11,6 @@ import {
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ReportEmptyMessage } from "../../../shared/reports/ReportTableStates";
 import { apiFetch } from "../../../shared/api";
-import { inventoryRefLink } from "../../../shared/inventoryRefLink";
 
 type CategoryOpt = { id: number; name: string };
 type LocationOpt = { id: number; location_name: string };
@@ -33,14 +32,16 @@ function defaultFilters(): InventoryStatusFilters {
   return {};
 }
 
-function soldRef(r: InventoryStatusRow) {
-  if (!r.last_sold_ref_type) return null;
-  return inventoryRefLink(r.last_sold_ref_type, r.last_sold_ref_id ?? null);
+function ledgerHref(r: InventoryStatusRow) {
+  const qs = new URLSearchParams({
+    item_id: String(r.item_id),
+    location_id: String(r.location_id),
+  });
+  return `/app/inventory/reports/stock-ledger?${qs}`;
 }
 
-function movementsHref(r: InventoryStatusRow) {
-  const qs = new URLSearchParams({ q: r.item_code });
-  return `/app/inventory/stock-movements?${qs}`;
+function itemHref(r: InventoryStatusRow) {
+  return `/app/inventory/items?q=${encodeURIComponent(r.item_code)}`;
 }
 
 function normalizeFilters(raw: InventoryStatusFilters): InventoryStatusFilters {
@@ -49,6 +50,7 @@ function normalizeFilters(raw: InventoryStatusFilters): InventoryStatusFilters {
   if (!next.status) delete next.status;
   if (!next.category_id) delete next.category_id;
   if (!next.location_id) delete next.location_id;
+  if (!next.in_stock_only) delete next.in_stock_only;
   return next;
 }
 
@@ -66,7 +68,17 @@ function filtersFromSearchParams(params: Record<string, string | string[] | unde
   if (Number.isFinite(categoryId) && categoryId > 0) out.category_id = categoryId;
   const locationId = Number(one("location_id") || one("branch_id"));
   if (Number.isFinite(locationId) && locationId > 0) out.location_id = locationId;
+  const inStock = one("in_stock_only").toLowerCase();
+  if (inStock === "1" || inStock === "true" || inStock === "yes") out.in_stock_only = 1;
   return out;
+}
+
+function fmtQty(n: number) {
+  return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "—";
+}
+
+function fmtMoney(n: number) {
+  return Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
 }
 
 export default function InventoryStatusReportPage() {
@@ -109,7 +121,6 @@ export default function InventoryStatusReportPage() {
       setSubmitted(normalizeFilters(fromUrl));
       setGeneratedAt(new Date());
     } else {
-      // Auto-run with current draft (all inventory) so users see data immediately.
       search();
     }
     const onKey = (e: KeyboardEvent) => {
@@ -128,8 +139,8 @@ export default function InventoryStatusReportPage() {
 
   return (
     <ReportPageLayout
-      title="Inventory Status"
-      description="Search by item, category, branch/location, and stock status. See last sale, who sold it, and movements — Search (F8)."
+      title="Find Stock"
+      description="Cross-branch inquiry: qty, price, and company total. Balances update from stock movements — Search (F8)."
       showDateFilters={false}
       submitted={submitted() !== null}
       loading={report.isFetching}
@@ -143,111 +154,127 @@ export default function InventoryStatusReportPage() {
         setSubmitted(null);
         setPage(1);
       }}
-      onExportCsv={() => void downloadReportCsv(inventoryStatusExportUrl(filters()), "inventory-status.csv")}
+      onExportCsv={() => void downloadReportCsv(inventoryStatusExportUrl(filters()), "find-stock.csv")}
       filterExtra={
-        <div class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Field label="Search">
+        <div class="mt-4 space-y-3">
+          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Field label="Search">
+              <input
+                class={inputClass}
+                placeholder="Item code or name…"
+                value={draft().q ?? ""}
+                onInput={(e) => patch({ q: e.currentTarget.value })}
+              />
+            </Field>
+            <Field label="Branch">
+              <select
+                class={inputClass}
+                value={draft().location_id ?? ""}
+                onChange={(e) =>
+                  patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
+                }
+              >
+                <option value="">All branches</option>
+                <For each={locations() ?? []}>{(l) => <option value={l.id}>{l.location_name}</option>}</For>
+              </select>
+            </Field>
+            <Field label="Category">
+              <select
+                class={inputClass}
+                value={draft().category_id ?? ""}
+                onChange={(e) =>
+                  patch({ category_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
+                }
+              >
+                <option value="">All categories</option>
+                <For each={categories() ?? []}>{(c) => <option value={c.id}>{c.name}</option>}</For>
+              </select>
+            </Field>
+            <Field label="Stock status">
+              <select
+                class={inputClass}
+                value={draft().status ?? ""}
+                onChange={(e) => patch({ status: e.currentTarget.value || undefined })}
+              >
+                <For each={STOCK_STATUS_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
+              </select>
+            </Field>
+          </div>
+          <label class="inline-flex items-center gap-2 text-sm text-text-secondary">
             <input
-              class={inputClass}
-              placeholder="Item code, name, category…"
-              value={draft().q ?? ""}
-              onInput={(e) => patch({ q: e.currentTarget.value })}
+              type="checkbox"
+              checked={Boolean(draft().in_stock_only)}
+              onChange={(e) => patch({ in_stock_only: e.currentTarget.checked ? 1 : undefined })}
             />
-          </Field>
-          <Field label="Stock status">
-            <select
-              class={inputClass}
-              value={draft().status ?? ""}
-              onChange={(e) => patch({ status: e.currentTarget.value || undefined })}
-            >
-              <For each={STOCK_STATUS_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
-            </select>
-          </Field>
-          <Field label="Category">
-            <select
-              class={inputClass}
-              value={draft().category_id ?? ""}
-              onChange={(e) =>
-                patch({ category_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
-              }
-            >
-              <option value="">All categories</option>
-              <For each={categories() ?? []}>{(c) => <option value={c.id}>{c.name}</option>}</For>
-            </select>
-          </Field>
-          <Field label="Branch / location">
-            <select
-              class={inputClass}
-              value={draft().location_id ?? ""}
-              onChange={(e) =>
-                patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
-              }
-            >
-              <option value="">All branches</option>
-              <For each={locations() ?? []}>{(l) => <option value={l.id}>{l.location_name}</option>}</For>
-            </select>
-          </Field>
+            In stock only (available &gt; 0)
+          </label>
         </div>
       }
     >
       <Show when={(report.data?.rows.length ?? 0) === 0 && submitted() !== null && !report.isFetching}>
-        <ReportEmptyMessage />
+        <ReportEmptyMessage message="No stock matches — try All branches or clear filters." />
       </Show>
       <Show when={(report.data?.rows.length ?? 0) > 0}>
         <div class="overflow-x-auto">
           <table class="erp-grid min-w-full text-left text-sm">
-            <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+            <thead class="sticky top-0 bg-brand-50 text-xs font-semibold uppercase text-brand-700">
               <tr>
                 <th class="px-3 py-2">Item</th>
-                <th class="px-3 py-2">Category</th>
+                <th class="px-3 py-2">Unit</th>
                 <th class="px-3 py-2">Branch</th>
                 <th class="px-3 py-2 text-right">On hand</th>
                 <th class="px-3 py-2 text-right">Reserved</th>
                 <th class="px-3 py-2 text-right">Available</th>
+                <th class="px-3 py-2 text-right">Sales price</th>
+                <th class="px-3 py-2 text-right">Company avail.</th>
                 <th class="px-3 py-2">Status</th>
-                <th class="px-3 py-2">Last sold</th>
-                <th class="px-3 py-2">Sold by</th>
-                <th class="px-3 py-2">Last movement</th>
+                <th class="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
               <For each={report.data?.rows ?? []}>
                 {(r) => {
-                  const link = soldRef(r);
+                  const muted = r.available_qty <= 0;
+                  const otherBranches = r.available_qty <= 0 && r.company_available_qty > 0;
                   return (
-                    <tr class="border-t border-stroke/60">
+                    <tr class={`border-t border-stroke/60 ${muted ? "text-text-secondary" : ""}`}>
                       <td class="px-3 py-2">
                         <div class="font-medium text-text-primary">{r.item_code}</div>
                         <div class="text-xs text-text-secondary">{r.item_name}</div>
-                        <A href={movementsHref(r)} class="text-xs text-brand-600 hover:underline">
-                          View movements
-                        </A>
+                        <Show when={r.category_name}>
+                          <div class="text-[11px] text-text-secondary">{r.category_name}</div>
+                        </Show>
                       </td>
-                      <td class="px-3 py-2">{r.category_name || "—"}</td>
+                      <td class="px-3 py-2">{r.unit_code || "—"}</td>
                       <td class="px-3 py-2">{r.branch_name}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{r.qty_on_hand}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{r.qty_reserved}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{r.available_qty}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.qty_on_hand)}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.qty_reserved)}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">
+                        <div>{fmtQty(r.available_qty)}</div>
+                        <Show when={otherBranches}>
+                          <div class="text-[11px] text-amber-700">Other branches</div>
+                        </Show>
+                      </td>
+                      <td class="px-3 py-2 text-right tabular-nums">{fmtMoney(r.sales_price)}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.company_available_qty)}</td>
                       <td class="px-3 py-2">{statusLabel(r.stock_status)}</td>
                       <td class="px-3 py-2">
-                        <Show when={r.last_sold_at} fallback="—">
-                          <div>{r.last_sold_at}</div>
-                          <Show when={link?.href}>
-                            <A href={link!.href!} class="text-xs text-brand-600 hover:underline">
-                              {link!.label}
+                        <div class="flex flex-col gap-0.5 text-xs">
+                          <A href={itemHref(r)} class="text-brand-600 hover:underline">
+                            Open item
+                          </A>
+                          <A href={ledgerHref(r)} class="text-brand-600 hover:underline">
+                            Movements
+                          </A>
+                          <Show when={r.track_serial}>
+                            <A
+                              href={`/app/inventory/serial-lot/registry?q=${encodeURIComponent(r.item_code)}`}
+                              class="text-brand-600 hover:underline"
+                            >
+                              Serials
                             </A>
                           </Show>
-                          <Show when={link && !link.href}>
-                            <div class="text-xs text-text-secondary">{link!.label}</div>
-                          </Show>
-                        </Show>
-                      </td>
-                      <td class="px-3 py-2">{r.last_sold_by || "—"}</td>
-                      <td class="px-3 py-2">
-                        <Show when={r.last_movement_at} fallback="—">
-                          <div>{r.last_movement_at}</div>
-                          <div class="text-xs text-text-secondary">{r.last_movement_type}</div>
-                        </Show>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -432,6 +432,7 @@ export default function App() {
           <Route path="/inventory/reports/stock-ledger" component={StockLedgerReportPage} />
           <Route path="/inventory/reports/stock-ageing" component={StockAgeingReportPage} />
           <Route path="/inventory/reports/on-hand" component={OnHandReportPage} />
+          <Route path="/inventory/find-stock" component={InventoryStatusReportPage} />
           <Route path="/inventory/reports/inventory-status" component={InventoryStatusReportPage} />
           <Route path="/inventory/reports/inv-book" component={InvBookReportPage} />
           <Route path="/inventory/stock-movements" component={StockMovementsPage} />
@@ -555,6 +556,7 @@ export default function App() {
           <Route path="/finance/acct-ii/notes" component={NotesPage} />
           <Route path="/finance/acct-ii/withholding-codes" component={WithholdingCodesPage} />
           <Route path="/finance/acct-ii/checks" component={CheckRegisterPage} />
+          <Route path="/finance/acct-ii/setup" component={ModuleSetupHubPage} />
           <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
           <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
           <Route path="/finance/acct-i/reports/cash-flow-statement" component={CashFlowStatementPage} />

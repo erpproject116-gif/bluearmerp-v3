@@ -139,7 +139,6 @@ func parseQuotationStatusFilters(r *http.Request, tu auth.TenantUser) (quotation
 	if validity == "active" || validity == "expired" || validity == "all" {
 		f.Validity = validity
 	}
-	f.LocationID = datascope.ResolveLocationFilter(tu, f.LocationID)
 	return f, nil
 }
 
@@ -156,16 +155,24 @@ func appendValidityFilter(where string, validity string, argN int) (string, int)
 	}
 }
 
+func appendQuotationStatusScopes(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f quotationStatusFilters, where string, args []any) (string, []any, error) {
+	argN := len(args) + 1
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		CustomerColumn:     "q.partner_id",
+		LocationColumn:     "q.location_id",
+		ExplicitLocationID: f.LocationID,
+	}, argN, &args)
+	if err != nil {
+		return where, args, err
+	}
+	return where + frag, args, nil
+}
+
 func buildQuotationStatusWhere(f quotationStatusFilters, tenantID int64) (string, []any) {
 	where := `q.tenant_id = $1 and q.deleted_at is null
 		and q.order_date >= $2::date and q.order_date <= $3::date`
 	args := []any{tenantID, f.DateFrom, f.DateTo}
 	argN := 4
-	if f.LocationID != nil {
-		where += fmt.Sprintf(" and q.location_id = $%d", argN)
-		args = append(args, *f.LocationID)
-		argN++
-	}
 	if f.ProjectID != nil {
 		where += fmt.Sprintf(" and q.project_id = $%d", argN)
 		args = append(args, *f.ProjectID)
@@ -233,8 +240,13 @@ func quotationStatusOrderBy(sort, order string) string {
 	return fmt.Sprintf("%s %s, ln.line_no asc", col, orderSQL(order))
 }
 
-func queryQuotationStatusRows(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f quotationStatusFilters, sort, order string, limit, offset int) ([]quotationStatusRow, int64, error) {
-	where, args := buildQuotationStatusWhere(f, tenantID)
+func queryQuotationStatusRows(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f quotationStatusFilters, sort, order string, limit, offset int) ([]quotationStatusRow, int64, error) {
+	where, args := buildQuotationStatusWhere(f, tu.TenantID)
+	var err error
+	where, args, err = appendQuotationStatusScopes(ctx, pool, tu, f, where, args)
+	if err != nil {
+		return nil, 0, err
+	}
 	orderClause := quotationStatusOrderBy(sort, order)
 	q := fmt.Sprintf(`
 		select q.id, ln.id, q.order_date, q.date_seq, q.reference_no, q.progress_status,
@@ -278,12 +290,17 @@ func queryQuotationStatusRows(ctx context.Context, pool *pgxpool.Pool, tenantID 
 	return out, total, nil
 }
 
-func queryQuotationStatusSummary(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f quotationStatusFilters) (quotationStatusSummary, error) {
-	where, args := buildQuotationStatusWhere(f, tenantID)
+func queryQuotationStatusSummary(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f quotationStatusFilters) (quotationStatusSummary, error) {
+	where, args := buildQuotationStatusWhere(f, tu.TenantID)
+	var err error
+	where, args, err = appendQuotationStatusScopes(ctx, pool, tu, f, where, args)
+	if err != nil {
+		return quotationStatusSummary{}, err
+	}
 	q := fmt.Sprintf(`select coalesce(sum(ln.qty), 0)::float8, coalesce(sum(ln.line_total), 0)::float8 %s where %s`,
 		quotationStatusFromClause(), where)
 	var summary quotationStatusSummary
-	err := pool.QueryRow(ctx, q, args...).Scan(&summary.TotalQty, &summary.TotalAmount)
+	err = pool.QueryRow(ctx, q, args...).Scan(&summary.TotalQty, &summary.TotalAmount)
 	return summary, err
 }
 
@@ -314,12 +331,12 @@ func listQuotationStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			sortKey = "order_date"
 		}
 
-		rows, total, err := queryQuotationStatusRows(r.Context(), pool, tu.TenantID, f, sortKey, p.Order, p.PageSize, offset)
+		rows, total, err := queryQuotationStatusRows(r.Context(), pool, tu, f, sortKey, p.Order, p.PageSize, offset)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load status report.", "ERR_INTERNAL")
 			return
 		}
-		summary, err := queryQuotationStatusSummary(r.Context(), pool, tu.TenantID, f)
+		summary, err := queryQuotationStatusSummary(r.Context(), pool, tu, f)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load status summary.", "ERR_INTERNAL")
 			return
@@ -346,7 +363,7 @@ func exportQuotationStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, errs)
 			return
 		}
-		rows, _, err := queryQuotationStatusRows(r.Context(), pool, tu.TenantID, f, "order_date", "desc", statusReportExportMaxRows, 0)
+		rows, _, err := queryQuotationStatusRows(r.Context(), pool, tu, f, "order_date", "desc", statusReportExportMaxRows, 0)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to export status report.", "ERR_INTERNAL")
 			return

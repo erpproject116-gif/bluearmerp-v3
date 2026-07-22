@@ -190,8 +190,8 @@ export function WorkflowGuideHeaderControl(props?: { class?: string; compact?: b
             <GuideBookIcon />
             <span>Guide</span>
             <Show when={!props?.compact}>
-              <span class="hidden text-text-secondary sm:inline">
-                · Step {r().stepIndex + 1}/{r().guide.steps.length}
+              <span class="inline-flex items-center rounded-md bg-brand-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-brand-800">
+                Step {r().stepIndex + 1}/{r().guide.steps.length}
               </span>
             </Show>
             <Show when={showBadge()}>

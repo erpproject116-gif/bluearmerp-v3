@@ -139,8 +139,19 @@ func parsePurchaseRequestStatusFilters(r *http.Request, tu auth.TenantUser) (pur
 	if isValidProgressStatus(progress) {
 		f.ProgressStatus = progress
 	}
-	f.LocationID = datascope.ResolveLocationFilter(tu, f.LocationID)
 	return f, nil
+}
+
+func appendPurchaseRequestStatusScopes(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f purchaseRequestStatusFilters, where string, args []any) (string, []any, error) {
+	argN := len(args) + 1
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		LocationColumn:     "pr.location_id",
+		ExplicitLocationID: f.LocationID,
+	}, argN, &args)
+	if err != nil {
+		return where, args, err
+	}
+	return where + frag, args, nil
 }
 
 func buildPurchaseRequestStatusWhere(f purchaseRequestStatusFilters, tenantID int64) (string, []any) {
@@ -148,11 +159,6 @@ func buildPurchaseRequestStatusWhere(f purchaseRequestStatusFilters, tenantID in
 		and pr.request_date >= $2::date and pr.request_date <= $3::date`
 	args := []any{tenantID, f.DateFrom, f.DateTo}
 	argN := 4
-	if f.LocationID != nil {
-		where += fmt.Sprintf(" and pr.location_id = $%d", argN)
-		args = append(args, *f.LocationID)
-		argN++
-	}
 	if f.ProjectID != nil {
 		where += fmt.Sprintf(" and pr.project_id = $%d", argN)
 		args = append(args, *f.ProjectID)
@@ -217,8 +223,13 @@ func purchaseRequestStatusOrderBy(sort, order string) string {
 	return fmt.Sprintf("%s %s, ln.line_no asc", col, orderSQL(order))
 }
 
-func queryPurchaseRequestStatusRows(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f purchaseRequestStatusFilters, sort, order string, limit, offset int) ([]purchaseRequestStatusRow, int64, error) {
-	where, args := buildPurchaseRequestStatusWhere(f, tenantID)
+func queryPurchaseRequestStatusRows(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f purchaseRequestStatusFilters, sort, order string, limit, offset int) ([]purchaseRequestStatusRow, int64, error) {
+	where, args := buildPurchaseRequestStatusWhere(f, tu.TenantID)
+	var err error
+	where, args, err = appendPurchaseRequestStatusScopes(ctx, pool, tu, f, where, args)
+	if err != nil {
+		return nil, 0, err
+	}
 	orderClause := purchaseRequestStatusOrderBy(sort, order)
 	q := fmt.Sprintf(`
 		select pr.id, ln.id, pr.request_date, pr.date_seq, pr.purchase_request_no, pr.progress_status,
@@ -270,12 +281,17 @@ func queryPurchaseRequestStatusRows(ctx context.Context, pool *pgxpool.Pool, ten
 	return out, total, nil
 }
 
-func queryPurchaseRequestStatusSummary(ctx context.Context, pool *pgxpool.Pool, tenantID int64, f purchaseRequestStatusFilters) (purchaseRequestStatusSummary, error) {
-	where, args := buildPurchaseRequestStatusWhere(f, tenantID)
+func queryPurchaseRequestStatusSummary(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f purchaseRequestStatusFilters) (purchaseRequestStatusSummary, error) {
+	where, args := buildPurchaseRequestStatusWhere(f, tu.TenantID)
+	var err error
+	where, args, err = appendPurchaseRequestStatusScopes(ctx, pool, tu, f, where, args)
+	if err != nil {
+		return purchaseRequestStatusSummary{}, err
+	}
 	q := fmt.Sprintf(`select coalesce(sum(ln.qty), 0)::float8, coalesce(sum(ln.line_total), 0)::float8 %s where %s`,
 		purchaseRequestStatusFromClause(), where)
 	var summary purchaseRequestStatusSummary
-	err := pool.QueryRow(ctx, q, args...).Scan(&summary.TotalQty, &summary.TotalAmount)
+	err = pool.QueryRow(ctx, q, args...).Scan(&summary.TotalQty, &summary.TotalAmount)
 	return summary, err
 }
 
@@ -306,12 +322,12 @@ func listPurchaseRequestStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			sortKey = "request_date"
 		}
 
-		rows, total, err := queryPurchaseRequestStatusRows(r.Context(), pool, tu.TenantID, f, sortKey, p.Order, p.PageSize, offset)
+		rows, total, err := queryPurchaseRequestStatusRows(r.Context(), pool, tu, f, sortKey, p.Order, p.PageSize, offset)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load status report.", "ERR_INTERNAL")
 			return
 		}
-		summary, err := queryPurchaseRequestStatusSummary(r.Context(), pool, tu.TenantID, f)
+		summary, err := queryPurchaseRequestStatusSummary(r.Context(), pool, tu, f)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load status summary.", "ERR_INTERNAL")
 			return
@@ -338,7 +354,7 @@ func exportPurchaseRequestStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, errs)
 			return
 		}
-		rows, _, err := queryPurchaseRequestStatusRows(r.Context(), pool, tu.TenantID, f, "request_date", "desc", statusReportExportMaxRows, 0)
+		rows, _, err := queryPurchaseRequestStatusRows(r.Context(), pool, tu, f, "request_date", "desc", statusReportExportMaxRows, 0)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to export status report.", "ERR_INTERNAL")
 			return

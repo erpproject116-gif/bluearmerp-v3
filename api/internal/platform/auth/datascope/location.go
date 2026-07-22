@@ -1,8 +1,14 @@
 package datascope
 
-import "github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+import (
+	"context"
 
-// ResolveLocationFilter returns the location id to apply on list queries.
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+)
+
+// ResolveLocationFilter returns the location id to apply when user data scopes are already on.
 // Explicit ?location_id= takes precedence over the active branch (X-Branch-ID).
 func ResolveLocationFilter(tu auth.TenantUser, explicit *int64) *int64 {
 	if explicit != nil && *explicit > 0 {
@@ -13,4 +19,40 @@ func ResolveLocationFilter(tu auth.TenantUser, explicit *int64) *int64 {
 		return &id
 	}
 	return nil
+}
+
+// RoleAppliesUserScopes reports whether the tenant role enforces user_data_scopes.
+// Owners and platform superadmins never apply scopes.
+func RoleAppliesUserScopes(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) (bool, error) {
+	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+		return false, nil
+	}
+	var apply bool
+	err := pool.QueryRow(ctx, `
+		select coalesce(tr.apply_user_scopes, false)
+		from public.tenant_roles tr
+		where tr.tenant_id = $1 and tr.role_code = $2`,
+		tu.TenantID, tu.TenantRole).Scan(&apply)
+	if err != nil {
+		return false, err
+	}
+	return apply, nil
+}
+
+// ResolveReportLocationFilter applies explicit ?location_id= for everyone.
+// Active branch is applied only when the role enforces user data scopes — owners and
+// company-wide roles see all branches unless they pass an explicit location filter.
+func ResolveReportLocationFilter(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, explicit *int64) (*int64, error) {
+	if explicit != nil && *explicit > 0 {
+		return explicit, nil
+	}
+	apply, err := RoleAppliesUserScopes(ctx, pool, tu)
+	if err != nil {
+		return nil, err
+	}
+	if apply && tu.ActiveBranchID > 0 {
+		id := tu.ActiveBranchID
+		return &id, nil
+	}
+	return nil, nil
 }

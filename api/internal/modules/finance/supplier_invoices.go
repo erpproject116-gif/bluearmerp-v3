@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
@@ -448,6 +449,20 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *pid)
 			argN++
 		}
+		var explicitLoc *int64
+		if id, ok := optionalInt64Query(r, "location_id"); ok {
+			explicitLoc = id
+		}
+		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			CustomerColumn:     "si.partner_id",
+			LocationColumn:     "si.location_id",
+			ExplicitLocationID: explicitLoc,
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply data scopes.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
 		progress := strings.TrimSpace(r.URL.Query().Get("progress_status"))
 		if progress == "unconfirmed" || progress == "e_approval" || progress == "completed" {
 			where += fmt.Sprintf(" and si.progress_status = $%d", argN)

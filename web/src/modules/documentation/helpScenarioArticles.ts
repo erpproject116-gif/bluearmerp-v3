@@ -600,15 +600,15 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Active branch vs document location",
     scenario: "Stock lists look wrong for a warehouse, or a document posts to the unexpected branch.",
     intro:
-      "Active branch drives defaults and many stock reports. Each transaction can still pick a location/branch on the document header or lines.",
+      "Active branch sets the default location on new documents and switcher context. Owners and company admins still see all branches on document lists unless they filter. Branch-scoped staff (role with Apply user data scopes + assigned locations) only see their assigned branch documents.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Switch Active branch from the branch switcher to the warehouse you are working in.",
+          "Switch Active branch from the branch switcher to the warehouse you are working in — new quotes, orders, and receipts default to that location.",
           "When creating SO, GR, transfers, or issues, confirm the location field matches that branch.",
           "Use Stock transfer between branches when goods physically move — do not only switch active branch.",
-          "Re-run on-hand / stock reports after switching branch to verify filters.",
+          "Use Find Stock (or Inventory Status with Branch = All) to inquire qty across branches; document write access remains scoped for branch staff.",
         ],
       },
       {
@@ -1174,24 +1174,24 @@ export const helpScenarioArticles: KbArticle[] = [
   },
   {
     id: "empty-list-wrong-branch",
-    title: "Empty list — wrong active branch",
+    title: "Empty list — branch scope or filters",
     scenario: "Partners, stock, or documents disappear from a list even though you know they exist.",
     intro:
-      "Many grids and on-hand views filter by Active branch. Working in the wrong warehouse looks like “missing data” when records live on another branch.",
+      "Owners and company admins see documents across all branches; Active branch alone does not empty their grids. Branch-scoped staff only see documents for locations assigned under Data scopes. Stock inquiry (Find Stock) can still show qty at every branch.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Check the Active branch switcher in the header — switch to the warehouse you expect.",
-          "Clear list filters (date, status, partner) after switching branch.",
+          "If you are branch staff: ask an admin to confirm your role has Apply user data scopes and that your user has the correct location(s) under Data scopes.",
+          "Clear list filters (date, status, partner, location) that may hide rows.",
           "Open the document and confirm its location/branch field; change it only when you intend to.",
-          "Use Stock transfer when goods physically moved — switching branch alone does not move inventory.",
+          "Use Stock transfer when goods physically moved — switching Active branch alone does not move inventory.",
           "If the whole company looks empty, you may have switched business (tenant), not branch.",
         ],
       },
       {
         type: "tip",
-        text: "Empty Load Slip pickers and zero on-hand are often the same root cause: active branch ≠ document location.",
+        text: "Empty Load Slip pickers are often partner/process filters or a mismatched document location — not “owner grid empty because of Active branch.”",
       },
     ],
     primaryHref: "/app/inventory",

@@ -411,6 +411,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             <div class="flex shrink-0 items-center gap-2">
               <PresenceHeartbeat />
               <IdleLogoutGuard />
+              <WorkflowGuideHeaderControl />
               <A
                 href="/app/documentation"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
@@ -419,7 +420,6 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 <span class="hidden sm:inline">Help &amp; guides</span>
                 <span class="sm:hidden">Help</span>
               </A>
-              <WorkflowGuideHeaderControl />
               <PresenceAvatars />
               <CrmNotificationPoller enabled={Boolean(auth.me)} />
               <Show when={canViewCrm(auth.me)}>

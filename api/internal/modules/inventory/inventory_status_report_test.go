@@ -3,6 +3,7 @@ package inventory
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -15,30 +16,30 @@ func TestParseInventoryStatusFilters(t *testing.T) {
 		return &http.Request{URL: u}
 	}
 
-	q, status, cat, loc, errs := parseInventoryStatusFilters(req(""))
-	if errs != nil || q != "" || status != "" || cat != nil || loc != nil {
-		t.Fatalf("empty filters: q=%q status=%q cat=%v loc=%v errs=%v", q, status, cat, loc, errs)
+	q, status, cat, loc, inStock, errs := parseInventoryStatusFilters(req(""))
+	if errs != nil || q != "" || status != "" || cat != nil || loc != nil || inStock {
+		t.Fatalf("empty filters: q=%q status=%q cat=%v loc=%v inStock=%v errs=%v", q, status, cat, loc, inStock, errs)
 	}
 
-	q, status, cat, loc, errs = parseInventoryStatusFilters(req("q=mouse&status=below_safety&category_id=3&location_id=9"))
+	q, status, cat, loc, inStock, errs = parseInventoryStatusFilters(req("q=mouse&status=below_safety&category_id=3&location_id=9&in_stock_only=1"))
 	if errs != nil {
 		t.Fatalf("valid filters returned errs: %v", errs)
 	}
-	if q != "mouse" || status != "below_safety" || cat == nil || *cat != 3 || loc == nil || *loc != 9 {
-		t.Fatalf("unexpected: q=%q status=%q cat=%v loc=%v", q, status, cat, loc)
+	if q != "mouse" || status != "below_safety" || cat == nil || *cat != 3 || loc == nil || *loc != 9 || !inStock {
+		t.Fatalf("unexpected: q=%q status=%q cat=%v loc=%v inStock=%v", q, status, cat, loc, inStock)
 	}
 
-	_, _, _, loc, errs = parseInventoryStatusFilters(req("branch_id=12"))
+	_, _, _, loc, _, errs = parseInventoryStatusFilters(req("branch_id=12"))
 	if errs != nil || loc == nil || *loc != 12 {
 		t.Fatalf("branch_id alias: loc=%v errs=%v", loc, errs)
 	}
 
-	_, _, _, _, errs = parseInventoryStatusFilters(req("status=bogus"))
+	_, _, _, _, _, errs = parseInventoryStatusFilters(req("status=bogus"))
 	if errs == nil || errs["status"] == "" {
 		t.Fatal("expected invalid status error")
 	}
 
-	_, _, _, _, errs = parseInventoryStatusFilters(req("category_id=abc"))
+	_, _, _, _, _, errs = parseInventoryStatusFilters(req("category_id=abc"))
 	if errs == nil || errs["category_id"] == "" {
 		t.Fatal("expected invalid category_id error")
 	}
@@ -47,11 +48,17 @@ func TestParseInventoryStatusFilters(t *testing.T) {
 func TestInventoryStatusSQLArgCount(t *testing.T) {
 	cat := int64(2)
 	loc := int64(5)
-	sql, args := inventoryStatusSQL(1, "sku", "in_stock", &cat, &loc)
+	sql, args := inventoryStatusSQL(1, "sku", "in_stock", &cat, &loc, true)
 	if len(args) != 5 {
 		t.Fatalf("want 5 args (tenant,q,cat,loc,status), got %d: %v", len(args), args)
 	}
 	if sql == "" || args[0].(int64) != 1 {
 		t.Fatalf("bad sql/args: %s %v", sql, args)
+	}
+	if !strings.Contains(sql, "available_qty > 0") {
+		t.Fatalf("expected in_stock_only predicate in sql: %s", sql)
+	}
+	if !strings.Contains(sql, "sales_price") || !strings.Contains(sql, "company_available_qty") {
+		t.Fatalf("expected sales_price and company_available_qty in sql: %s", sql)
 	}
 }

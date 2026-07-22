@@ -15,14 +15,29 @@ type ListFilter struct {
 	CustomerColumn string // e.g. "so.partner_id"
 	LocationColumn string // e.g. "so.location_id"
 	// ExplicitLocationID is set from ?location_id= when the caller wants to override
-	// the active branch header. When nil, ApplyUserScopesSQL uses X-Branch-ID.
+	// the active branch header. When nil, ApplyUserScopesSQL uses X-Branch-ID only
+	// for roles that enforce user data scopes.
 	ExplicitLocationID *int64
 }
 
+// applyExplicitLocationSQL appends an equality filter when the client asked for a
+// voluntary ?location_id= (owners and unscoped roles can still narrow the grid).
+func applyExplicitLocationSQL(f ListFilter, argIdx int, args *[]any) (string, int) {
+	if f.ExplicitLocationID == nil || *f.ExplicitLocationID <= 0 || f.LocationColumn == "" {
+		return "", argIdx
+	}
+	frag := fmt.Sprintf(" and %s = $%d", f.LocationColumn, argIdx)
+	*args = append(*args, *f.ExplicitLocationID)
+	return frag, argIdx + 1
+}
+
 // ApplyUserScopesSQL appends AND fragments when the user's role enforces data scopes.
+// Owners, platform superadmins, and roles without apply_user_scopes still honor
+// ExplicitLocationID so voluntary UI filters work company-wide.
 func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f ListFilter, argIdx int, args *[]any) (string, int, error) {
 	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
-		return "", argIdx, nil
+		frag, argIdx := applyExplicitLocationSQL(f, argIdx, args)
+		return frag, argIdx, nil
 	}
 	var apply bool
 	err := pool.QueryRow(ctx, `
@@ -30,8 +45,12 @@ func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 		from public.tenant_roles tr
 		where tr.tenant_id = $1 and tr.role_code = $2`,
 		tu.TenantID, tu.TenantRole).Scan(&apply)
-	if err != nil || !apply {
+	if err != nil {
 		return "", argIdx, err
+	}
+	if !apply {
+		frag, argIdx := applyExplicitLocationSQL(f, argIdx, args)
+		return frag, argIdx, nil
 	}
 
 	rows, err := pool.Query(ctx, `
