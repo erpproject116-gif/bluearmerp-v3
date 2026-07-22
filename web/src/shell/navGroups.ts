@@ -50,7 +50,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "sales_process",
-    label: "Sales Dept",
+    label: "Sales",
     iconId: "selling",
     defaultExpanded: false,
     entries: [
@@ -68,7 +68,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "procurement_process",
-    label: "Purchasing Dept",
+    label: "Purchasing",
     iconId: "buying",
     defaultExpanded: false,
     entries: [
@@ -80,7 +80,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "accounting_dept",
-    label: "Accounting Dept",
+    label: "Accounting",
     iconId: "finance",
     defaultExpanded: false,
     entries: [
