@@ -130,21 +130,21 @@ export const knowledgebaseArticles: KbArticle[] = [
   {
     id: "switch-active-branch",
     title: "How do I work in a different branch?",
-    scenario: "You have multiple locations and want lists and entry screens to reflect one branch.",
+    scenario: "You have multiple locations and want new documents and stock inquiry defaults to reflect one branch.",
     intro:
-      "The active branch filter sits next to the business switcher in the sidebar footer. It scopes stock-aware screens to the location you select.",
+      "The Active branch control sits next to the business switcher in the sidebar footer. It sets the default location on new documents. It does not hide other branches’ documents for owners or company admins.",
     blocks: [
       {
         type: "steps",
         items: [
           "Make sure at least two active locations exist under Stock → Locations.",
           "In the sidebar footer, under Active branch, pick the warehouse or store you are working in.",
-          "BluearmERP refreshes cached lists on the current page. Stock balances, movements, and location defaults follow the branch you chose.",
+          "BluearmERP refreshes cached lists on the current page. New quotes, orders, and receipts default to that branch.",
         ],
       },
       {
         type: "paragraph",
-        text: "Documents such as sales orders and quotations still let you pick a location per transaction. The active branch mainly drives defaults and stock reports.",
+        text: "Company-wide roles (owner, store_admin without Apply user data scopes) keep seeing all branch documents. Branch-only staff need Apply user data scopes plus assigned locations. Use Find Stock to inquire qty across branches.",
       },
       {
         type: "tip",

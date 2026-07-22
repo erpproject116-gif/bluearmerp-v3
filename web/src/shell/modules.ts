@@ -79,6 +79,7 @@ export const appModules: AppModule[] = [
       { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements", headerPriority: "primary" },
       { label: "Stock Entries", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries", headerPriority: "primary" },
       { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation" },
+      { label: "Find Stock", href: "/app/inventory/find-stock", settingsHref: "/app/inventory/stock-movements", headerPriority: "primary" },
       { label: "Stock Balance", href: "/app/inventory/reports/stock-balance", settingsHref: "/app/inventory/stock-movements" },
       { label: "On Hand", href: "/app/inventory/reports/on-hand", settingsHref: "/app/inventory/stock-movements" },
       { label: "Inventory Status", href: "/app/inventory/reports/inventory-status", settingsHref: "/app/inventory/stock-movements" },
@@ -476,7 +477,7 @@ export const appModules: AppModule[] = [
         label: "Receivables & payables",
         prefix: ACCT_II_PREFIX,
         href: "/app/finance/acct-ii/checks",
-        settingsHref: "/app/finance/acct-ii/checks",
+        settingsHref: "/app/finance/acct-ii/setup",
         featureCode: "finance.acct_ii",
       },
       {

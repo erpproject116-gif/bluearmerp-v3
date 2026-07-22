@@ -20,10 +20,10 @@ export function ReportEmptyRow(props: { colSpan: number; class?: string }) {
   );
 }
 
-export function ReportEmptyMessage(props: { class?: string }) {
+export function ReportEmptyMessage(props: { class?: string; message?: string }) {
   return (
     <p class={props.class ?? "px-5 py-8 text-center text-sm text-text-secondary"}>
-      {uiLabel("reports.no_filter_match")}
+      {props.message ?? uiLabel("reports.no_filter_match")}
     </p>
   );
 }

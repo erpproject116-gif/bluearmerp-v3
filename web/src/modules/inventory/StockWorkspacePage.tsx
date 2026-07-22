@@ -20,6 +20,7 @@ const tiles: KpiTile[] = [
 ];
 
 const reportLinks = [
+  { label: "Find Stock", href: "/app/inventory/find-stock" },
   { label: "Inventory Balance (on hand)", href: "/app/inventory/reports/on-hand" },
   { label: "Inventory Status", href: "/app/inventory/reports/inventory-status" },
   { label: "Inv. Book", href: "/app/inventory/reports/inv-book" },

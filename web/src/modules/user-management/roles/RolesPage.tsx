@@ -232,8 +232,12 @@ export default function RolesPage() {
               checked={applyUserScopes()}
               onChange={(e) => setApplyUserScopes(e.currentTarget.checked)}
             />
-            Restrict lists to customers/locations assigned per user
+            Restrict document lists to customers/locations assigned per user
           </label>
+          <p class="mt-1 text-xs text-text-secondary">
+            Leave off for company admins (for example seeded <code class="text-[11px]">store_admin</code>) who should
+            see all branches. Turn on for branch-only staff, then assign locations under User permissions → Data scopes.
+          </p>
           <Show when={applyUserScopes()}>
             <p class="mt-1 text-xs text-amber-700">
               Fail-closed: a user with this role sees <strong>no records</strong> until you assign them
