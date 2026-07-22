@@ -202,6 +202,77 @@ export function ModuleIcon(props: Props): JSX.Element {
           <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       );
+    case "sub_warehouse":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M3.75 21h16.5M4.5 3l7.5 4.5L19.5 3v18H4.5V3zM9 21v-6h6v6"
+          />
+        </svg>
+      );
+    case "sub_serial_lot":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M3.75 4.5h16.5M3.75 9.75h16.5M3.75 15h10.5M3.75 19.5h6"
+          />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 13.5l1.5 1.5 3-3" />
+        </svg>
+      );
+    case "sub_combined_invoices":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M6 6.75h12M6 10.5h12M6 14.25h8M8.25 3.75h7.5A2.25 2.25 0 0118 6v13.5l-3-1.5-3 1.5-3-1.5-3 1.5V6a2.25 2.25 0 012.25-2.25z"
+          />
+        </svg>
+      );
+    case "sub_general_ledger":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M4.5 6.75h15M4.5 12h15M4.5 17.25h9M19.5 15.75v3.75M17.625 17.625h3.75"
+          />
+        </svg>
+      );
+    case "sub_ar_ap":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M7.5 7.5L4.5 12l3 4.5M16.5 7.5l3 4.5-3 4.5M9.75 6l1.5 12M12.75 6l1.5 12"
+          />
+        </svg>
+      );
+    case "sub_taxes":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M9 14.25h6m-6-3.75h6M6.75 21l2.25-2.25L12 21l3-2.25L18.25 21V5.25A2.25 2.25 0 0016 3H8a2.25 2.25 0 00-2.25 2.25V21z"
+          />
+        </svg>
+      );
+    case "sub_supplier_payments":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5z"
+          />
+        </svg>
+      );
     default:
       return (
         <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">

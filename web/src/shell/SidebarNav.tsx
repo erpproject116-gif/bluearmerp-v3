@@ -141,7 +141,29 @@ function NavCustomLink(props: { label: string; href: string; basePath: string; i
   );
 }
 
-function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
+/** Icon ids for sidebar sub-branch entries (feature codes). */
+function subBranchIconId(featureCode: string | undefined): string {
+  switch (featureCode) {
+    case "inventory.wms":
+      return "sub_warehouse";
+    case "inventory.serial_lot":
+      return "sub_serial_lot";
+    case "sales.collective_invoicing":
+      return "sub_combined_invoices";
+    case "finance.acct_i":
+      return "sub_general_ledger";
+    case "finance.acct_ii":
+      return "sub_ar_ap";
+    case "quotation.tax_mngt":
+      return "sub_taxes";
+    case "finance.payment_vouchers":
+      return "sub_supplier_payments";
+    default:
+      return featureCode?.split(".")[0] || "dashboard";
+  }
+}
+
+function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature; featureCode?: string }) {
   const loc = useLocation();
   const shell = useShell();
   const branding = useBranding();
@@ -151,6 +173,7 @@ function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
       navFeatureLabelKey(props.module.id, props.branch.href),
       props.branch.label,
     );
+  const iconId = () => subBranchIconId(props.featureCode ?? props.branch.featureCode);
   const branchActive = () =>
     props.branch.prefix != null
       ? props.branch.href === loc.pathname ||
@@ -161,17 +184,26 @@ function NavSubBranchLink(props: { module: AppModule; branch: ModuleFeature }) {
   return (
     <A
       href={props.branch.href}
-      title={branchLabel()}
+      title={shell.collapsed() ? branchLabel() : undefined}
       class="flex items-center rounded-lg text-sm font-medium transition-colors"
       classList={{
         "justify-center px-2 py-2.5": shell.collapsed(),
-        "px-3 py-2": !shell.collapsed(),
+        "gap-3 px-3 py-2.5": !shell.collapsed(),
         "bg-brand-50 text-brand-600": branchActive(),
         "text-text-secondary hover:erp-panel hover:text-text-primary": !branchActive(),
       }}
     >
-      <Show when={shell.collapsed()} fallback={<span class="truncate">{branchLabel()}</span>}>
-        <span class="text-[10px] font-semibold uppercase tracking-wide">{branchLabel().slice(0, 4)}</span>
+      <span
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        classList={{
+          "bg-brand-100 text-brand-600": branchActive(),
+          "erp-panel text-text-secondary": !branchActive(),
+        }}
+      >
+        <ModuleIcon id={iconId()} />
+      </span>
+      <Show when={!shell.collapsed()}>
+        <span class="truncate">{branchLabel()}</span>
       </Show>
     </A>
   );
@@ -198,8 +230,6 @@ function navEntryMatchesPath(entry: NavGroupEntry, pathname: string): boolean {
   }
   return pathname === branch.href || pathname === branch.settingsHref;
 }
-
-/** Icon id for sub-branch feature codes — unused; Zoho-style text-only children. */
 
 function NavGroupBlock(props: {
   groupId: string;
@@ -245,7 +275,9 @@ function NavGroupBlock(props: {
       return <NavModuleLink module={mod} />;
     }
     const branch = subBranchByFeature(mod, entry.featureCode);
-    return branch ? <NavSubBranchLink module={mod} branch={branch} /> : null;
+    return branch ? (
+      <NavSubBranchLink module={mod} branch={branch} featureCode={entry.featureCode} />
+    ) : null;
   };
 
   const toggle = () => {
