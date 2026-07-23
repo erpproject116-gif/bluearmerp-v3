@@ -30,6 +30,8 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 
 7. Entity tags: type **@** in the composer to search and tag items, customers, vendors, serials, invoices, quotations, POs, SOs, and load-slip refs (`@[type:id|label]`). Ask e.g. “generate quotation for @…”, “create follow-up for @…”, “send email quotation @…”, then **Approve** (writes never auto-post; quote/email open the UI).
 
+8. **Auto-escalate:** if intent is “docs” but guides/KB return no hit, `INSUFFICIENT_CONTEXT`, or only an ungrounded title list, Copilot automatically runs live tools (financial health, etc.) and prefixes the reply that guides weren’t enough.
+
 ## Permissions (Phase 2)
 
 | Tool | Permission |

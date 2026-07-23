@@ -52,11 +52,16 @@ func classifyIntent(query string) string {
 		}
 	}
 	opsHints := []string{
-		"overdue", "cash", "receivable", "payable", "financial health", "how much",
+		"overdue", "cash", "receivable", "payable", "financial health", "how much", "how many",
 		"stock", "inventory", "on hand", "find stock", "follow up", "follow-up", "pipeline",
 		"what is due", "what's due", "ar aging", "cash flow",
 		"look up", "lookup", "find customer", "find vendor", "find item", "serial",
 		"invoice", "load slip", "transaction",
+		"expense", "expenses", "revenue", "profit", "margin", "burn", "cost", "costs",
+		"sales this", "ytd", "mtd", "as of today", "as of now",
+		"projection", "forecast", "predict", "estimate", "run rate", "run-rate",
+		"project my", "project how", "project revenue", "project the",
+		"balance", "aging", "kpi", "dashboard",
 	}
 	for _, h := range opsHints {
 		if strings.Contains(q, h) {
@@ -108,7 +113,18 @@ func toolsForQuery(query string, entities []EntityRef) []struct {
 	if strings.Contains(q, "overdue") || strings.Contains(q, "receivable") || strings.Contains(q, "ar aging") {
 		add("list_overdue_ar", nil)
 	}
-	if strings.Contains(q, "cash") || strings.Contains(q, "financial") || strings.Contains(q, "payable") || strings.Contains(q, "pipeline") {
+	wantsFinance := strings.Contains(q, "cash") || strings.Contains(q, "financial") ||
+		strings.Contains(q, "payable") || strings.Contains(q, "pipeline") ||
+		strings.Contains(q, "expense") || strings.Contains(q, "revenue") ||
+		strings.Contains(q, "profit") || strings.Contains(q, "margin") ||
+		strings.Contains(q, "burn") || strings.Contains(q, "how much") ||
+		strings.Contains(q, "forecast") || strings.Contains(q, "projection") ||
+		strings.Contains(q, "predict") || strings.Contains(q, "estimate") ||
+		strings.Contains(q, "ytd") || strings.Contains(q, "mtd") ||
+		strings.Contains(q, "as of today") || strings.Contains(q, "run rate") ||
+		strings.Contains(q, "run-rate") || strings.Contains(q, "cost") ||
+		(strings.Contains(q, "project") && (strings.Contains(q, "revenue") || strings.Contains(q, "sales") || strings.Contains(q, "year") || strings.Contains(q, "cash") || strings.Contains(q, "income")))
+	if wantsFinance {
 		add("get_financial_health", nil)
 	}
 	if strings.Contains(q, "follow") || strings.Contains(q, "crm") {
@@ -170,6 +186,11 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 		switch mode {
 		case "docs":
 			result := askDocs(r.Context(), pool, tu, cfg, query, pathname, body)
+			if docsInsufficient(result) {
+				ops := askOps(r.Context(), pool, tu, cfg, query, pathname, body, entities)
+				response.OK(w, mergeDocsEscalation(result, ops), "OK")
+				return
+			}
 			response.OK(w, result, "OK")
 		case "action":
 			result := askAction(r.Context(), pool, tu, cfg, query, pathname, body, entities)
@@ -179,6 +200,64 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 			response.OK(w, result, "OK")
 		}
 	}
+}
+
+// docsInsufficient is true when guides/KB cannot ground a useful answer — escalate to live tools.
+func docsInsufficient(r askResult) bool {
+	if r.Mode != "docs" {
+		return false
+	}
+	msg := strings.TrimSpace(r.Message)
+	// Keep a successful grounded compose even if retrieve score was modest.
+	if r.UsedAI && msg != "" && !strings.EqualFold(msg, "INSUFFICIENT_CONTEXT") {
+		return false
+	}
+	if len(r.Hits) == 0 {
+		return true
+	}
+	if msg == "" || strings.EqualFold(msg, "INSUFFICIENT_CONTEXT") {
+		return true
+	}
+	if strings.HasPrefix(msg, "I could not find a matching Bluearm guide") {
+		return true
+	}
+	if strings.HasPrefix(msg, "Here are the closest guides:") {
+		return true
+	}
+	if topHitScore(r.Hits) > 0 && topHitScore(r.Hits) < 1.8 {
+		return true
+	}
+	return !r.UsedAI
+}
+
+func topHitScore(hits []map[string]any) float64 {
+	if len(hits) == 0 {
+		return 0
+	}
+	switch v := hits[0]["score"].(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int:
+		return float64(v)
+	default:
+		return 0
+	}
+}
+
+func mergeDocsEscalation(docs, ops askResult) askResult {
+	ops.Hits = docs.Hits
+	ops.ArticleIDs = docs.ArticleIDs
+	prefix := "Guides/KB weren’t enough for a solid answer, so I checked live ERP data:\n\n"
+	if strings.TrimSpace(ops.Message) == "" {
+		ops.Message = prefix + "I couldn’t pull useful live figures either. Try rephrasing, or open Dashboard / Documentation."
+	} else if !strings.HasPrefix(ops.Message, "Guides/KB") {
+		ops.Message = prefix + ops.Message
+	}
+	// Keep mode as ops so the UI shows live-data framing; hits remain for guide chips.
+	ops.Mode = "ops"
+	return ops
 }
 
 func askDocs(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody) askResult {
@@ -307,9 +386,11 @@ Rules:
 - Use ONLY the tool JSON provided. Do not invent numbers.
 - Format with Markdown: short ## headings when useful, **bold** key figures, bullet lists for clarity.
 - Prefer deep links as Markdown [Label](/app/...) when helpful.
-- Be concise (under 160 words).
+- Be concise (under 180 words).
 - If a tool was denied, say permission is required.
-- Do not claim you posted or changed anything.`
+- Do not claim you posted or changed anything.
+- For expenses: prefer recurring.monthly_burn / yearly_burn and cash.outflow_mtd / outflow_ytd (and as_of).
+- For revenue / year-end projections: you do NOT have a crystal ball. Give a transparent estimate from live figures only — e.g. YTD inflow/revenue run-rate × remaining months, plus open pipeline / open quotations if present. Label it clearly as an estimate, list assumptions, and never present it as a booked forecast.`
 
 func summarizeTools(ctx context.Context, cfg helpassistant.Config, query string, tools []toolResult, atts []helpassistant.ComposeAttachment) (string, llm.Usage, string, bool) {
 	raw, _ := json.Marshal(tools)

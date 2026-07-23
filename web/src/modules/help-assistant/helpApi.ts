@@ -367,11 +367,12 @@ export async function denyCopilotAction(draft: CopilotActionDraft, sessionId?: n
 }
 
 const OPS_HINT =
-  /\b(overdue|cash|stock|inventory|follow[- ]?up|financial health|receivable|payable|pipeline|on hand|look\s*up|serial|invoice|load\s*slip|transaction|customer|vendor|item code)\b/i;
+  /\b(overdue|cash|stock|inventory|follow[- ]?up|financial health|receivable|payable|pipeline|on hand|look\s*up|serial|invoice|load\s*slip|transaction|customer|vendor|item code|expense|expenses|revenue|profit|margin|forecast|projection|predict|estimate|how much|how many|ytd|mtd|burn|kpi|aging|as of today)\b/i;
 const ACTION_HINT =
   /\b(create recurring|add recurring|import rfq|upload rfq|rfq pdf|generate quotation|create quotation|new quotation|send email|email quotation|send quotation|create follow[- ]?up|schedule follow[- ]?up)\b/i;
 const MENTION_HINT = /@\[|[^\S\r\n]@\w|^\s*@/;
 
+/** Kept for tests / callers; Copilot UI now routes all asks to /copilot/ask when enabled. */
 export function shouldUseCopilotAsk(query: string): boolean {
   return OPS_HINT.test(query) || ACTION_HINT.test(query) || MENTION_HINT.test(query);
 }
