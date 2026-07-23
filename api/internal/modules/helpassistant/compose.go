@@ -119,9 +119,8 @@ func postCompose(pool *pgxpool.Pool) http.HandlerFunc {
 
 		msg, articleIDs, usage, model, err := groundedCompose(r.Context(), cfg, query, pathname, body.Hits, body.Personalization)
 		if err != nil {
-			// Log provider detail server-side; keep client message generic.
 			fmt.Printf("help compose dashscope error: %v\n", err)
-			response.Err(w, http.StatusBadGateway, "Help AI request failed. Check DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL (compatible-mode/v1), and HELP_AI_MODEL on the API host.", "ERR_HELP_AI_FAILED")
+			response.Err(w, http.StatusBadGateway, helpAIFailMessage(err), "ERR_HELP_AI_FAILED")
 			return
 		}
 		recordUsage(r.Context(), pool, tenantID, usage)
@@ -149,6 +148,22 @@ func postCompose(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func helpAIFailMessage(err error) string {
+	detail := strings.TrimSpace(err.Error())
+	// Never echo API keys if somehow present.
+	detail = strings.ReplaceAll(detail, "Bearer ", "Bearer ***")
+	if idx := strings.Index(strings.ToLower(detail), "sk-"); idx >= 0 {
+		detail = detail[:idx] + "sk-***"
+	}
+	if len(detail) > 280 {
+		detail = detail[:280] + "…"
+	}
+	if detail == "" {
+		return "Help AI request failed. Check DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL (compatible-mode/v1), and HELP_AI_MODEL on the API host."
+	}
+	return "Help AI request failed: " + detail
+}
+
 func streamCompose(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, cfg Config, tenantID int64, query, pathname string, body composeBody) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -157,7 +172,7 @@ func streamCompose(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, c
 		msg, articleIDs, usage, model, err := groundedCompose(r.Context(), cfg, query, pathname, body.Hits, body.Personalization)
 		if err != nil {
 			fmt.Printf("help compose dashscope error: %v\n", err)
-			response.Err(w, http.StatusBadGateway, "Help AI request failed. Check DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL (compatible-mode/v1), and HELP_AI_MODEL on the API host.", "ERR_HELP_AI_FAILED")
+			response.Err(w, http.StatusBadGateway, helpAIFailMessage(err), "ERR_HELP_AI_FAILED")
 			return
 		}
 		recordUsage(r.Context(), pool, tenantID, usage)

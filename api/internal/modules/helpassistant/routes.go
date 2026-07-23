@@ -24,15 +24,19 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 func getAIConfig() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c := ConfigFromEnv()
+		base := c.BaseURL
+		// Expose host only so operators can verify region without leaking the full secret URL path unnecessarily.
 		writeOK(w, map[string]any{
-			"enabled":       c.Available(),
-			"copilot":       c.CopilotAvailable(),
-			"provider":      "dashscope",
-			"model":         c.Model,
-			"small_model":   c.SmallModel,
-			"medium_model":  c.MediumModel,
-			"daily_cap":     c.DailyCap,
-			"corpus_count":  CorpusChunkCount(),
+			"enabled":      c.Available(),
+			"copilot":      c.CopilotAvailable(),
+			"provider":     "dashscope",
+			"model":        c.Model,
+			"small_model":  c.SmallModel,
+			"medium_model": c.MediumModel,
+			"daily_cap":    c.DailyCap,
+			"corpus_count": CorpusChunkCount(),
+			"base_url":     base,
+			"has_api_key":  c.APIKey != "",
 		}, "OK")
 	}
 }
