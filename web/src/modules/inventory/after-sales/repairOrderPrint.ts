@@ -1,4 +1,5 @@
 import { apiFetch } from "../../../shared/api";
+import { formatMoney as formatMoneyShared } from "../../../shared/money";
 import type { RepairOrderDetail } from "./RepairOrderModal";
 
 export type PrintParty = {
@@ -34,7 +35,7 @@ export function formatPrintDate(iso?: string | null): string {
 }
 
 export function formatMoney(amount: number): string {
-  return amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatMoneyShared(amount);
 }
 
 export function partyContact(p: PrintParty): string {

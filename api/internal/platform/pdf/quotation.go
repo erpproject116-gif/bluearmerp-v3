@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/money"
 )
 
 type Party struct {
@@ -51,21 +53,7 @@ type QuotationPrintInput struct {
 }
 
 func formatMoney(amount float64, currencyCode string) string {
-	sign := ""
-	if amount < 0 {
-		sign = "-"
-		amount = -amount
-	}
-	intPart := int64(amount)
-	frac := int64((amount - float64(intPart)) * 100)
-	if frac < 0 {
-		frac = -frac
-	}
-	formatted := fmt.Sprintf("%s%d.%02d", sign, intPart, frac)
-	if currencyCode != "" {
-		return currencyCode + " " + formatted
-	}
-	return formatted
+	return money.Format(amount, currencyCode)
 }
 
 func partyContact(p Party) string {

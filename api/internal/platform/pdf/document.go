@@ -1,6 +1,8 @@
 package pdf
 
-import "fmt"
+import (
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/money"
+)
 
 // GenericDocumentInput renders any ERP document with shared layout primitives.
 type GenericDocumentInput struct {
@@ -72,9 +74,5 @@ func partyFields(p Party) []PartyField {
 }
 
 func FormatMoney(amount float64, currencyCode string) string {
-	s := fmt.Sprintf("%.2f", amount)
-	if currencyCode != "" {
-		return currencyCode + " " + s
-	}
-	return s
+	return money.Format(amount, currencyCode)
 }

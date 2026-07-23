@@ -16,11 +16,9 @@ import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { uiLabel } from "../../shared/branding/uiLabel";
 
-const BUDGET_CATEGORIES = ["labor", "materials", "overhead", "other"];
+import { formatMoney } from "../../shared/money";
 
-function formatMoney(n: number) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+const BUDGET_CATEGORIES = ["labor", "materials", "overhead", "other"];
 
 export default function JobCostingPage() {
   const auth = useAuth();

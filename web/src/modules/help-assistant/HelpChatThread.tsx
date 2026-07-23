@@ -122,6 +122,7 @@ export function HelpChatThread(props: {
   pathname: string;
   onAsk?: (text: string) => void;
   streamingText?: string;
+  busy?: boolean;
 }) {
   return (
     <div class="flex flex-col gap-4">
@@ -153,6 +154,17 @@ export function HelpChatThread(props: {
         <div class="flex justify-start">
           <div class="max-w-[min(42rem,95%)] rounded-2xl rounded-bl-md border border-dashed border-stroke bg-slate-50 px-4 py-3">
             <HelpMarkdown content={props.streamingText || ""} class="text-text-secondary" />
+          </div>
+        </div>
+      </Show>
+      <Show when={props.busy && !props.streamingText}>
+        <div class="flex justify-start" aria-live="polite" aria-busy="true">
+          <div class="inline-flex max-w-[min(42rem,95%)] items-center gap-2.5 rounded-2xl rounded-bl-md border border-stroke bg-white px-4 py-3 text-sm text-text-secondary shadow-sm">
+            <span
+              class="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"
+              aria-hidden="true"
+            />
+            <span>Copilot is thinking…</span>
           </div>
         </div>
       </Show>

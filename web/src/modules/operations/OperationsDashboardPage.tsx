@@ -3,6 +3,7 @@ import {
   useOperationsDashboards,
   useOperationsWidgetData,
 } from "../../shared/useOperations";
+import { formatMoney } from "../../shared/money";
 import { OperationsLayout } from "./OperationsLayout";
 import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 import { uiLabel } from "../../shared/branding/uiLabel";
@@ -22,10 +23,6 @@ type SummaryData = {
   done?: number;
   blocked?: number;
 };
-
-function formatMoney(n?: number) {
-  return (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export default function OperationsDashboardPage() {
   const { workspaceId } = useOperationsWorkspace();
@@ -62,15 +59,15 @@ export default function OperationsDashboardPage() {
                         <div class="grid grid-cols-3 gap-2">
                           <div>
                             <p class="text-xs text-text-secondary">Budget</p>
-                            <p class="font-medium">{formatMoney(data.total_budget)}</p>
+                            <p class="font-medium">{formatMoney(data.total_budget ?? 0)}</p>
                           </div>
                           <div>
                             <p class="text-xs text-text-secondary">Actual</p>
-                            <p class="font-medium">{formatMoney(data.total_actual)}</p>
+                            <p class="font-medium">{formatMoney(data.total_actual ?? 0)}</p>
                           </div>
                           <div>
                             <p class="text-xs text-text-secondary">Variance</p>
-                            <p class="font-medium">{formatMoney(data.variance)}</p>
+                            <p class="font-medium">{formatMoney(data.variance ?? 0)}</p>
                           </div>
                         </div>
                         <table class="mt-2 w-full text-xs">

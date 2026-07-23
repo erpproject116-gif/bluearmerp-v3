@@ -1,6 +1,7 @@
 import { createResource, createSignal, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { LoadingText } from "../../shared/LoadingText";
+import { formatMoney } from "../../shared/money";
 import {
   clearPortalToken,
   fetchPortalSession,
@@ -34,10 +35,6 @@ type PortalTicket = {
 
 const tabs = ["orders", "invoices", "tickets"] as const;
 type Tab = (typeof tabs)[number];
-
-function formatMoney(n: number) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export default function PortalDashboardPage() {
   const navigate = useNavigate();

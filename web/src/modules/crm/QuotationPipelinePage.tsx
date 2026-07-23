@@ -15,11 +15,10 @@ import {
 } from "../../shared/useQuotationPipeline";
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
+import { formatMoney } from "../../shared/money";
 import { CrmLayout } from "./CrmLayout";
 
 const STORAGE_KEY = "crm-quotation-pipeline-view";
-
-const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function humanizeStatus(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -28,7 +27,7 @@ function humanizeStatus(value: string) {
 function quoteCardDetails(card: QuotationPipelineCard): KanbanDetailRow[] {
   const rows: KanbanDetailRow[] = [];
   if (card.item_name_summary) rows.push({ label: "Items", value: card.item_name_summary });
-  rows.push({ label: "Total", value: `₱ ${money(card.grand_total)}` });
+  rows.push({ label: "Total", value: formatMoney(card.grand_total) });
   if (card.valid_until) rows.push({ label: "Valid until", value: card.valid_until });
   if (card.pic_name) rows.push({ label: "PIC", value: card.pic_name });
   rows.push({ label: "Progress", value: humanizeStatus(card.progress_status) });
@@ -132,7 +131,7 @@ export default function QuotationPipelinePage() {
             { key: "pipeline_stage", header: "Stage", render: (r) => PIPELINE_STAGE_LABELS[r.pipeline_stage] },
             { key: "valid_until", header: "Valid until", render: (r) => r.valid_until ?? "—" },
             { key: "progress_status", header: "Progress", render: (r) => humanizeStatus(r.progress_status) },
-            { key: "grand_total", header: "Total", render: (r) => money(r.grand_total) },
+            { key: "grand_total", header: "Total", render: (r) => formatMoney(r.grand_total) },
           ]}
           rows={pagedRows()}
           loading={pipeline.isFetching}
