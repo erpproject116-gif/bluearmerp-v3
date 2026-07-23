@@ -45,6 +45,14 @@ func classifyIntent(query string) string {
 		"create recurring", "add recurring", "draft expense", "import rfq", "upload rfq", "rfq pdf",
 		"generate quotation", "create quotation", "new quotation", "send email", "email quotation",
 		"send quotation", "create follow-up", "create follow up", "schedule follow-up", "schedule follow up",
+		"crm task", "create sales order", "new sales order", "create so", "new so",
+		"new sales", "create sales", "sales invoice", "create purchase request", "new purchase request", "create pr",
+		"create purchase order", "new purchase order", "create po", "new po",
+		"create rfq", "new rfq", "request for quotation",
+		"new purchase", "supplier invoice", "create purchase",
+		"bulk inventory", "import items", "csv import", "stock entry",
+		"pc build", "product bundle", "item build", "bill of materials", "create bom", "new bom",
+		"compose email", "email sales", "email the",
 	}
 	for _, h := range actionHints {
 		if strings.Contains(q, h) {
@@ -62,6 +70,8 @@ func classifyIntent(query string) string {
 		"projection", "forecast", "predict", "estimate", "run rate", "run-rate",
 		"project my", "project how", "project revenue", "project the",
 		"balance", "aging", "kpi", "dashboard",
+		"notification", "alert", "recommend", "recommendation", "compare price", "price compare",
+		"pricing", "suggest item", "item search",
 	}
 	for _, h := range opsHints {
 		if strings.Contains(q, h) {
@@ -95,6 +105,15 @@ func toolsForQuery(query string, entities []EntityRef) []struct {
 		strings.Contains(q, "find item") || strings.Contains(q, "serial") ||
 		strings.Contains(q, "load slip") || strings.Contains(q, "invoice") {
 		add("lookup_entities", map[string]any{"q": query, "entities": entities})
+	}
+	if strings.Contains(q, "recommend") || strings.Contains(q, "suggest item") || strings.Contains(q, "item search") {
+		add("recommend_items", map[string]any{"q": extractRecommendQuery(query)})
+	}
+	if strings.Contains(q, "compare price") || strings.Contains(q, "price compare") || strings.Contains(q, "pricing") {
+		add("compare_pricing", map[string]any{"q": extractRecommendQuery(query)})
+	}
+	if strings.Contains(q, "notification") || strings.Contains(q, "alert") {
+		add("smart_notifications", nil)
 	}
 	if strings.Contains(q, "stock") || strings.Contains(q, "inventory") || strings.Contains(q, "on hand") {
 		stockQ := extractStockQuery(query)
@@ -140,6 +159,20 @@ func toolsForQuery(query string, entities []EntityRef) []struct {
 	return out
 }
 
+func extractRecommendQuery(query string) string {
+	lower := strings.ToLower(query)
+	for _, prefix := range []string{
+		"recommend items ", "recommend ", "suggest item ", "suggest items ", "item search ",
+		"compare pricing ", "compare price ", "price compare ", "pricing for ", "pricing ",
+		"find item ", "search item ",
+	} {
+		if i := strings.Index(lower, prefix); i >= 0 {
+			return strings.TrimSpace(query[i+len(prefix):])
+		}
+	}
+	return extractStockQuery(query)
+}
+
 func extractStockQuery(query string) string {
 	lower := strings.ToLower(query)
 	for _, prefix := range []string{"find stock ", "stock of ", "inventory of ", "stock for ", "find "} {
@@ -162,6 +195,10 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
 			return
 		}
+		if !allowCopilotRate(tu.TenantID, tu.AppUserID, "ask") {
+			response.Err(w, http.StatusTooManyRequests, "Too many Copilot asks. Please wait a moment.", "ERR_COPILOT_RATE")
+			return
+		}
 		var body askBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
@@ -172,6 +209,15 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"query": "Query is required."})
 			return
 		}
+		if len(query) > 4000 {
+			response.Validation(w, map[string]string{"query": "Query is too long (max 4000 characters)."})
+			return
+		}
+		if len(body.Attachments) > 4 {
+			response.Validation(w, map[string]string{"attachments": "Too many attachments (max 4)."})
+			return
+		}
+		body.Attachments = PackAttachments(body.Attachments, defaultPackAttPerFile, defaultPackAttTotal)
 		if err := helpassistant.CheckDailyCap(r.Context(), pool, tu.TenantID, cfg.DailyCap); err != nil {
 			if errors.Is(err, helpassistant.ErrDailyTokenCap) {
 				response.Err(w, http.StatusTooManyRequests, "Daily AI token cap reached.", "ERR_COPILOT_CAP")
@@ -188,18 +234,29 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 			result := askDocs(r.Context(), pool, tu, cfg, query, pathname, body)
 			if docsInsufficient(result) {
 				ops := askOps(r.Context(), pool, tu, cfg, query, pathname, body, entities)
-				response.OK(w, mergeDocsEscalation(result, ops), "OK")
+				response.OK(w, finalizeAskResult(mergeDocsEscalation(result, ops)), "OK")
 				return
 			}
-			response.OK(w, result, "OK")
+			response.OK(w, finalizeAskResult(result), "OK")
 		case "action":
 			result := askAction(r.Context(), pool, tu, cfg, query, pathname, body, entities)
-			response.OK(w, result, "OK")
+			response.OK(w, finalizeAskResult(result), "OK")
 		default:
 			result := askOps(r.Context(), pool, tu, cfg, query, pathname, body, entities)
-			response.OK(w, result, "OK")
+			response.OK(w, finalizeAskResult(result), "OK")
 		}
 	}
+}
+
+func finalizeAskResult(r askResult) askResult {
+	r.DeepLinks = SanitizeDeepLinks(r.DeepLinks)
+	for i := range r.Tools {
+		r.Tools[i] = sanitizeToolResult(r.Tools[i])
+	}
+	if r.ActionDraft != nil {
+		r.ActionDraft.Payload = sanitizeDraftPayload(r.ActionDraft.Type, r.ActionDraft.Payload)
+	}
+	return r
 }
 
 // docsInsufficient is true when guides/KB cannot ground a useful answer — escalate to live tools.
@@ -347,26 +404,19 @@ func askOps(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg hel
 }
 
 func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody, entities []EntityRef) askResult {
-	q := strings.ToLower(query)
-	var tr toolResult
-	switch {
-	case strings.Contains(q, "rfq"):
-		tr = runTool(ctx, pool, tu, "import_rfq_pdf", map[string]any{"note": query})
-	case strings.Contains(q, "send email") || strings.Contains(q, "email quotation") || strings.Contains(q, "send quotation"):
-		tr = runTool(ctx, pool, tu, "draft_send_quotation_email", map[string]any{"q": query, "entities": entities})
-	case strings.Contains(q, "generate quotation") || strings.Contains(q, "create quotation") || strings.Contains(q, "new quotation"):
-		tr = runTool(ctx, pool, tu, "draft_generate_quotation", map[string]any{"q": query, "entities": entities})
-	case strings.Contains(q, "follow-up") || strings.Contains(q, "follow up"):
-		tr = runTool(ctx, pool, tu, "draft_follow_up", map[string]any{"q": query, "entities": entities})
-	default:
-		tr = runTool(ctx, pool, tu, "draft_recurring_expense", map[string]any{
-			"name":   "Suggested recurring expense",
-			"amount": 0,
-		})
+	toolName, kind := matchActionTool(query)
+	args := map[string]any{"q": query, "entities": entities, "note": query}
+	if kind != "" {
+		args["kind"] = kind
 	}
-	msg := "I prepared an action draft. Review it and Approve to post — nothing is saved until you confirm."
+	if toolName == "draft_recurring_expense" {
+		args["name"] = "Suggested recurring expense"
+		args["amount"] = 0
+	}
+	tr := runTool(ctx, pool, tu, toolName, args)
+	msg := "I prepared an action draft. Review it and Approve — nothing is posted until you confirm."
 	if tr.ActionDraft != nil {
-		msg = tr.ActionDraft.Summary + "\n\nNothing is saved until you Approve."
+		msg = tr.ActionDraft.Summary + "\n\nNothing is posted until you Approve."
 	}
 	sid := helpassistant.PersistSession(ctx, pool, tu, body.SessionID, pathname, query, msg, nil, "", llm.Usage{})
 	return askResult{
@@ -385,31 +435,54 @@ const opsSystemPrompt = `You are Bluearm Copilot summarizing live ERP tool JSON 
 Rules:
 - Use ONLY the tool JSON provided. Do not invent numbers.
 - Format with Markdown: short ## headings when useful, **bold** key figures, bullet lists for clarity.
-- Prefer deep links as Markdown [Label](/app/...) when helpful.
+- Prefer deep links as Markdown [Label](/app/...) when helpful. Never invent external URLs.
 - Be concise (under 180 words).
 - If a tool was denied, say permission is required.
-- Do not claim you posted or changed anything.
+- Do not claim you posted, emailed, or changed anything unless an Approve result explicitly says so.
+- Never ask for passwords, API keys, card data, or other secrets.
+- Never propose editing application source code or running shell/SQL.
 - For expenses: prefer recurring.monthly_burn / yearly_burn and cash.outflow_mtd / outflow_ytd (and as_of).
 - For revenue / year-end projections: you do NOT have a crystal ball. Give a transparent estimate from live figures only — e.g. YTD inflow/revenue run-rate × remaining months, plus open pipeline / open quotations if present. Label it clearly as an estimate, list assumptions, and never present it as a booked forecast.
 - Always format money with the Philippine peso sign ₱ and thousands separators (example ₱1,234.50). Never use $ or the letters PHP as a currency prefix.`
 
 func summarizeTools(ctx context.Context, cfg helpassistant.Config, query string, tools []toolResult, atts []helpassistant.ComposeAttachment) (string, llm.Usage, string, bool) {
-	raw, _ := json.Marshal(tools)
+	packed, unpackedN, packedN := PackTools(tools, defaultPackToolsMaxBytes)
+	atts = PackAttachments(atts, defaultPackAttPerFile, defaultPackAttTotal)
+	useful := false
+	for _, t := range tools {
+		if t.OK && !t.Denied {
+			useful = true
+			break
+		}
+	}
+	if !useful || strings.TrimSpace(packed) == "" || packed == "[]" {
+		var b strings.Builder
+		b.WriteString("Live data summary:\n")
+		for _, t := range tools {
+			if t.Denied {
+				fmt.Fprintf(&b, "- %s: permission denied\n", t.Name)
+				continue
+			}
+			if !t.OK {
+				fmt.Fprintf(&b, "- %s: %s\n", t.Name, t.Error)
+				continue
+			}
+			fmt.Fprintf(&b, "- %s: ok (see links)\n", t.Name)
+		}
+		if b.Len() == 0 || strings.TrimSpace(b.String()) == "Live data summary:" {
+			return "No live tool data was available for that question.", llm.Usage{}, "", false
+		}
+		return b.String(), llm.Usage{}, "", false
+	}
 	var attNote strings.Builder
 	if len(atts) > 0 {
 		attNote.WriteString("\n\nUser file excerpts:\n")
-		for i, a := range atts {
-			if i >= 2 {
-				break
-			}
-			text := a.Text
-			if len(text) > 4000 {
-				text = text[:4000] + "…"
-			}
-			fmt.Fprintf(&attNote, "\n--- %s ---\n%s\n", a.Name, text)
+		for _, a := range atts {
+			fmt.Fprintf(&attNote, "\n--- %s ---\n%s\n", a.Name, a.Text)
 		}
 	}
-	user := fmt.Sprintf("User question: %s\n\nTool results JSON:\n%s%s\n\nWrite a short Markdown answer.", query, string(raw), attNote.String())
+	user := fmt.Sprintf("User question: %s\n\nTool results JSON (%s):\n%s%s\n\nWrite a short Markdown answer.",
+		query, FormatPackAudit(unpackedN, packedN), packed, attNote.String())
 	client := cfg.NewDashScopeClient()
 	model := cfg.MediumModel
 	out, err := client.ChatCompletionWithUsage(ctx, llm.ChatRequest{
@@ -422,7 +495,6 @@ func summarizeTools(ctx context.Context, cfg helpassistant.Config, query string,
 		MaxTokens:   600,
 	})
 	if err != nil {
-		// Deterministic fallback
 		var b strings.Builder
 		b.WriteString("Live data summary:\n")
 		for _, t := range tools {

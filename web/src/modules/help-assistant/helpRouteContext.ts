@@ -83,9 +83,9 @@ export function suggestedPrompts(pathname: string): string[] {
   }
   if (pathname.includes("/quotation")) {
     return [
+      "Generate quotation for @",
       "How do I create a quotation?",
-      "Why can't I confirm a quotation?",
-      "What is progress status on a quotation?",
+      "Send email quotation",
     ];
   }
   if (pathname.includes("/serial-lot")) {
@@ -163,8 +163,9 @@ export function suggestedPrompts(pathname: string): string[] {
     ];
   }
   return [
-    "How do I switch between businesses?",
-    "Why can't I confirm a document?",
-    "Where is the onboarding playbook?",
+    "How much is my expenses as of today?",
+    "Recommend items for laptop",
+    "Create sales order for @",
+    "Show my notifications",
   ];
 }

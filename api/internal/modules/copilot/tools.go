@@ -38,32 +38,56 @@ type actionDraft struct {
 
 func runTool(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, name string, args map[string]any) toolResult {
 	name = strings.TrimSpace(strings.ToLower(name))
+	if cached, ok := getCachedTool(tu.TenantID, tu.AppUserID, name, args); ok {
+		return sanitizeToolResult(cached)
+	}
+	var tr toolResult
 	switch name {
 	case "get_financial_health":
-		return toolFinancialHealth(ctx, pool, tu)
+		tr = toolFinancialHealth(ctx, pool, tu)
 	case "list_overdue_ar":
-		return toolOverdueAR(ctx, pool, tu)
+		tr = toolOverdueAR(ctx, pool, tu)
 	case "find_stock":
 		q, _ := args["q"].(string)
-		return toolFindStock(ctx, pool, tu, q)
+		tr = toolFindStock(ctx, pool, tu, q)
 	case "crm_follow_ups":
-		return toolCRMFollowUps(ctx, pool, tu)
+		tr = toolCRMFollowUps(ctx, pool, tu)
 	case "lookup_entities":
 		q, _ := args["q"].(string)
-		return toolLookupEntities(ctx, pool, tu, entitiesFromArgs(args), q)
+		tr = toolLookupEntities(ctx, pool, tu, entitiesFromArgs(args), q)
+	case "smart_notifications":
+		tr = toolSmartNotifications(ctx, pool, tu)
+	case "recommend_items":
+		q, _ := args["q"].(string)
+		tr = toolRecommendItems(ctx, pool, tu, q)
+	case "compare_pricing":
+		q, _ := args["q"].(string)
+		tr = toolComparePricing(ctx, pool, tu, q)
 	case "draft_recurring_expense":
-		return toolDraftRecurring(args)
+		tr = toolDraftRecurring(args)
 	case "import_rfq_pdf":
-		return toolImportRFQ(args)
+		tr = toolImportRFQ(args)
 	case "draft_follow_up":
-		return toolDraftFollowUp(args)
+		tr = toolDraftFollowUp(args)
 	case "draft_generate_quotation":
-		return toolDraftGenerateQuotation(args)
-	case "draft_send_quotation_email":
-		return toolDraftSendQuotationEmail(args)
+		tr = toolDraftOpenDocument("quotation", args)
+	case "draft_send_quotation_email", "draft_send_document_email":
+		tr = toolDraftSendDocumentEmail(args)
+	case "draft_open_document":
+		kind, _ := args["kind"].(string)
+		if kind == "" {
+			kind = "quotation"
+		}
+		tr = toolDraftOpenDocument(kind, args)
 	default:
-		return toolResult{Name: name, OK: false, Error: "Unknown tool."}
+		if strings.HasPrefix(name, "draft_open_") {
+			tr = toolDraftOpenDocument(strings.TrimPrefix(name, "draft_open_"), args)
+		} else {
+			tr = toolResult{Name: name, OK: false, Error: "Unknown tool."}
+		}
 	}
+	putCachedTool(tu.TenantID, tu.AppUserID, name, args, tr)
+	return sanitizeToolResult(tr)
 }
 
 func entitiesFromArgs(args map[string]any) []EntityRef {

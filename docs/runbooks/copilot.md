@@ -10,6 +10,19 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 4. Writes never auto-post.
 5. No second Python service.
 
+## Chat window hard limits
+
+- **No source-code / repo revision** from chat (no write/edit/bash against application source).
+- **No autopost** of journals, stock posts, payments, or document email send. Approve opens UI or only low-risk creates already allowed (CRM follow-up, recurring expense).
+- **No free-form SQL / shell / arbitrary HTTP** tools for the model.
+- **No secrets** in chat (passwords, API keys, card data).
+- **Tenant + permission only** (no cross-tenant elevation).
+- **No SSRF** (no server fetch of arbitrary external URLs).
+- Approve `next` navigation is resolved **only** from the server action catalog — client `payload.ui` is ignored.
+- Deep links must be `/app/...` (server `SafeAppPath` + client allowlist). External `https://` markdown links show an “opens outside Bluearm” note.
+- Ask query ≤ 4000 chars; attachments capped (count + packed text). Per-user rate limits on ask/approve; `COPILOT_DAILY_TOKEN_CAP` remains the hard token ceiling.
+- Tool JSON is **packed** before the medium model (null/empty stripped, truncated with `…[truncated]`). Debug/audit may show `pack_bytes` vs `unpacked_bytes`. Idempotent reads (`get_financial_health`, `lookup_entities`, etc.) use a short in-process session cache.
+
 ## Day-to-day after Phase 1
 
 1. Content owners edit KB/scenario articles in web source; redeploy web **and** re-export corpus:
@@ -31,6 +44,8 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 7. Entity tags: type **@** in the composer to search and tag items, customers, vendors, serials, invoices, quotations, POs, SOs, and load-slip refs (`@[type:id|label]`). Ask e.g. “generate quotation for @…”, “create follow-up for @…”, “send email quotation @…”, then **Approve** (writes never auto-post; quote/email open the UI).
 
 8. **Auto-escalate:** if intent is “docs” but guides/KB return no hit, `INSUFFICIENT_CONTEXT`, or only an ungrounded title list, Copilot automatically runs live tools (financial health, etc.) and prefixes the reply that guides weren’t enough.
+
+9. **Action catalog (approve-to-act):** quotation, sales order, sales invoice, purchase request, RFQ, purchase order, purchases, email send, bulk inventory (import/stock UI), product bundle / PC build, manufacturing BOM, CRM follow-up (full create). Document actions open the ERP form with tagged @entities — they do **not** auto-post. Ops tools: recommend items, compare pricing, smart notifications.
 
 ## Permissions (Phase 2)
 
