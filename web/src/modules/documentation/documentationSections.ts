@@ -107,7 +107,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "The Business Dashboard opens with a home overview like a finance desk: total receivables (unpaid invoices, current vs overdue), total payables (unpaid bills), and cash flow for this year. Below that, operations tiles summarize sales, stock warnings, open purchase orders, and other alerts. While workspace setup is incomplete, a Start here checklist appears at the top for administrators.",
+        text: "The Business Dashboard opens with Financial health: cash in vs out, overdue invoice alerts, profit by product/project, recurring expense burn, and sales pipeline. Below that, receivables/payables cards and operations tiles summarize sales, stock warnings, open purchase orders, and other alerts. While workspace setup is incomplete, a Start here checklist appears at the top for administrators.",
       },
       {
         type: "paragraph",

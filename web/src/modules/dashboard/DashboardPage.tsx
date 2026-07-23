@@ -6,6 +6,7 @@ import { ReconciliationBanner } from "../../shared/ReconciliationBanner";
 import { OnboardingChecklist } from "../../shared/OnboardingChecklist";
 import { DayJobsPanel } from "../../shared/DayJobsPanel";
 import { HomeFinanceOverview } from "./HomeFinanceOverview";
+import { FinancialHealthPanel } from "./FinancialHealthPanel";
 import {
   useDashboardInventoryTrend,
   useDashboardRedFlags,
@@ -56,6 +57,7 @@ const redFlagLinks: Record<string, string> = {
   gr_without_supplier_invoice: "/app/purchases/purchases/new",
   ap_over_application: "/app/finance/payment-vouchers",
   budget_overrun: "/app/finance/reports/budget-vs-actual",
+  overdue_ar: "/app/finance/reports/ar-aging",
 };
 
 function CssBarChart(props: { title: string; points: DashboardTrendPoint[]; valueFormat?: "money" | "int" }) {
@@ -202,7 +204,7 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-text-secondary">
-          Home — unpaid invoices, bills owed, cash flow, then sales and stock snapshots.
+          Home — financial health, unpaid invoices, cash flow, then sales and stock snapshots.
         </p>
         <A
           href="/app/dashboard/approvals"
@@ -219,6 +221,8 @@ export default function DashboardPage() {
       </div>
 
       <DayJobsPanel />
+
+      <FinancialHealthPanel />
 
       <HomeFinanceOverview />
 
