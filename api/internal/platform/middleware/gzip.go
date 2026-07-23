@@ -35,6 +35,11 @@ func SelectiveGzip(enabled bool) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
+			// SSE / streaming endpoints must not be buffered (captureWriter is not a Flusher).
+			if strings.Contains(r.URL.Path, "/help/compose") || strings.Contains(r.URL.Path, "/copilot/") {
+				next.ServeHTTP(w, r)
+				return
+			}
 			cw := &captureWriter{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(cw, r)
 			body := cw.buf.Bytes()

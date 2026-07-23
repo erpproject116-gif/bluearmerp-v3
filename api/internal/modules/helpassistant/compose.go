@@ -152,12 +152,33 @@ func postCompose(pool *pgxpool.Pool) http.HandlerFunc {
 func streamCompose(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, cfg Config, tenantID int64, query, pathname string, body composeBody) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		response.Err(w, http.StatusInternalServerError, "Streaming not supported.", "ERR_INTERNAL")
+		// Middleware (e.g. response buffering) may hide Flusher — serve JSON instead of 500.
+		body.Stream = false
+		msg, articleIDs, usage, model, err := groundedCompose(r.Context(), cfg, query, pathname, body.Hits, body.Personalization)
+		if err != nil {
+			fmt.Printf("help compose dashscope error: %v\n", err)
+			response.Err(w, http.StatusBadGateway, "Help AI request failed. Check DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL (compatible-mode/v1), and HELP_AI_MODEL on the API host.", "ERR_HELP_AI_FAILED")
+			return
+		}
+		recordUsage(r.Context(), pool, tenantID, usage)
+		sessionID := persistComposeSession(r.Context(), pool, tenantID, body.SessionID, pathname, query, msg, articleIDs, model, usage)
+		if msg == "" || strings.EqualFold(strings.TrimSpace(msg), "INSUFFICIENT_CONTEXT") {
+			response.OK(w, composeResult{
+				UsedAI: false, Message: "", ArticleIDs: articleIDs,
+				Provider: "dashscope", Model: model, SessionID: sessionID,
+			}, "Insufficient grounded context.")
+			return
+		}
+		response.OK(w, composeResult{
+			UsedAI: true, Message: strings.TrimSpace(msg), ArticleIDs: articleIDs,
+			Provider: "dashscope", Model: model, SessionID: sessionID,
+		}, "OK")
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
 	writeSSE := func(event string, payload any) {
@@ -192,6 +213,7 @@ func streamCompose(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, c
 		return nil
 	})
 	if err != nil {
+		fmt.Printf("help compose stream dashscope error: %v\n", err)
 		writeSSE("error", map[string]string{"message": "Help AI request failed."})
 		return
 	}
