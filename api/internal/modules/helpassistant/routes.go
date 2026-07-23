@@ -13,7 +13,9 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/help", func(hr chi.Router) {
 		hr.Get("/ai-config", getAIConfig())
 		hr.Post("/feedback", postFeedback(pool))
-		hr.Post("/compose", postCompose())
+		hr.Post("/compose", postCompose(pool))
+		hr.Post("/retrieve", postRetrieve(pool))
+		hr.Get("/retrieve", getRetrieveQuery(pool))
 		hr.With(auth.RequirePermission("user_management.users", auth.AccessRead)).Get("/feedback", listFeedback(pool))
 		hr.With(auth.RequirePermission("user_management.users", auth.AccessRead)).Get("/feedback/summary", summarizeFeedback(pool))
 	})
@@ -23,9 +25,14 @@ func getAIConfig() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c := ConfigFromEnv()
 		writeOK(w, map[string]any{
-			"enabled":  c.Available(),
-			"provider": "dashscope",
-			"model":    c.Model,
+			"enabled":       c.Available(),
+			"copilot":       c.CopilotAvailable(),
+			"provider":      "dashscope",
+			"model":         c.Model,
+			"small_model":   c.SmallModel,
+			"medium_model":  c.MediumModel,
+			"daily_cap":     c.DailyCap,
+			"corpus_count":  CorpusChunkCount(),
 		}, "OK")
 	}
 }

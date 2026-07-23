@@ -1,4 +1,6 @@
-import { For, Show } from "solid-js";
+import { A } from "@solidjs/router";
+import { createSignal, For, Show } from "solid-js";
+import { approveCopilotAction, denyCopilotAction } from "./helpApi";
 import { HelpResultCard } from "./HelpResultCard";
 import type { HelpChatMessage } from "./helpTypes";
 
@@ -7,16 +9,86 @@ function AssistantBubble(props: {
   pathname: string;
   onAsk?: (text: string) => void;
 }) {
+  const [acting, setActing] = createSignal(false);
+  const [actionNote, setActionNote] = createSignal("");
+  const reply = () => props.message.reply;
+
+  const onApprove = async () => {
+    const draft = reply().actionDraft;
+    if (!draft || acting()) return;
+    setActing(true);
+    try {
+      const res = await approveCopilotAction(draft, reply().sessionId);
+      setActionNote(res.success ? "Approved — changes applied where allowed." : res.message || "Approve failed.");
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const onDeny = async () => {
+    const draft = reply().actionDraft;
+    if (!draft || acting()) return;
+    setActing(true);
+    try {
+      await denyCopilotAction(draft, reply().sessionId);
+      setActionNote("Denied — nothing was posted.");
+    } finally {
+      setActing(false);
+    }
+  };
+
   return (
     <div class="flex justify-start">
       <div class="max-w-[95%] space-y-2 rounded-2xl rounded-bl-md border border-stroke bg-white px-3 py-2 shadow-sm">
-        <p class="text-sm text-text-primary">{props.message.reply.message}</p>
-        <Show when={props.message.reply.usedAi}>
-          <p class="text-[11px] text-text-secondary">AI summary grounded in the articles below.</p>
+        <p class="text-sm text-text-primary whitespace-pre-wrap">{reply().message}</p>
+        <Show when={reply().usedAi}>
+          <p class="text-[11px] text-text-secondary">
+            {reply().mode === "ops" ? "Live data summary (permission-scoped)." : "AI summary grounded in the articles below."}
+          </p>
         </Show>
-        <Show when={props.message.reply.fallback && props.message.reply.suggestions?.length}>
+        <Show when={reply().deepLinks?.length}>
           <div class="flex flex-wrap gap-2">
-            <For each={props.message.reply.suggestions}>
+            <For each={reply().deepLinks}>
+              {(link) => (
+                <A href={link.href} class="text-xs text-brand-600 hover:underline">
+                  {link.label}
+                </A>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={reply().actionDraft}>
+          <div class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
+            <p class="font-medium">Action draft (not posted yet)</p>
+            <p class="mt-1">{reply().actionDraft!.summary}</p>
+            <Show when={!actionNote()}>
+              <div class="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  class="rounded bg-brand-600 px-2 py-1 text-white disabled:opacity-50"
+                  disabled={acting()}
+                  onClick={() => void onApprove()}
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  class="rounded border border-stroke bg-white px-2 py-1 disabled:opacity-50"
+                  disabled={acting()}
+                  onClick={() => void onDeny()}
+                >
+                  Deny
+                </button>
+              </div>
+            </Show>
+            <Show when={actionNote()}>
+              <p class="mt-2 text-text-secondary">{actionNote()}</p>
+            </Show>
+          </div>
+        </Show>
+        <Show when={reply().fallback && reply().suggestions?.length}>
+          <div class="flex flex-wrap gap-2">
+            <For each={reply().suggestions}>
               {(title) => (
                 <button
                   type="button"
@@ -29,9 +101,9 @@ function AssistantBubble(props: {
             </For>
           </div>
         </Show>
-        <For each={props.message.reply.hits}>
+        <For each={reply().hits}>
           {(hit) => (
-            <HelpResultCard hit={hit} query={props.message.reply.query} pathname={props.pathname} />
+            <HelpResultCard hit={hit} query={reply().query} pathname={props.pathname} />
           )}
         </For>
       </div>
@@ -43,6 +115,7 @@ export function HelpChatThread(props: {
   messages: HelpChatMessage[];
   pathname: string;
   onAsk?: (text: string) => void;
+  streamingText?: string;
 }) {
   return (
     <div class="flex flex-col gap-3">
@@ -59,6 +132,13 @@ export function HelpChatThread(props: {
           )
         }
       </For>
+      <Show when={props.streamingText}>
+        <div class="flex justify-start">
+          <div class="max-w-[95%] rounded-2xl rounded-bl-md border border-dashed border-stroke bg-slate-50 px-3 py-2 text-sm text-text-secondary whitespace-pre-wrap">
+            {props.streamingText}
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }

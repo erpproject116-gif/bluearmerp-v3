@@ -66,10 +66,10 @@ export function HelpAssistantPanel(props: {
       >
         <header class="flex items-center justify-between border-b border-stroke px-4 py-3">
           <div>
-            <h2 class="text-sm font-semibold text-text-primary">Help assistant</h2>
+            <h2 class="text-sm font-semibold text-text-primary">Help / Copilot</h2>
             <p class="text-xs text-text-secondary">
               {props.assistant.aiEnabled()
-                ? "Answers grounded in docs (AI when available)"
+                ? "Guides, live ops answers, and approve-to-act drafts"
                 : "Search guides & knowledge base"}
             </p>
           </div>
@@ -124,6 +124,7 @@ export function HelpAssistantPanel(props: {
               messages={props.assistant.messages()}
               pathname={loc.pathname}
               onAsk={(text) => props.assistant.ask(text)}
+              streamingText={props.assistant.streamingText()}
             />
           </Show>
         </div>

@@ -40,6 +40,16 @@ export type HelpReply = {
   message: string;
   suggestions?: string[];
   usedAi?: boolean;
+  deepLinks?: Array<{ label: string; href: string }>;
+  actionDraft?: {
+    type: string;
+    summary: string;
+    payload: Record<string, unknown>;
+    api?: string;
+    method?: string;
+  } | null;
+  sessionId?: number;
+  mode?: string;
 };
 
 export type HelpChatMessage =

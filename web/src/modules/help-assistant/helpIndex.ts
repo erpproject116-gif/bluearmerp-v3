@@ -92,18 +92,24 @@ function pushSectionChunks(out: HelpChunk[], section: DocSection) {
   const moduleTags = [
     ...new Set([section.id, section.iconId, ...inferTagsFromHref(section.primaryHref)]),
   ];
+  const fromMap = helpArticleAliases[section.id];
+  const questions = fromMap?.questions ?? [];
+  const errorPhrases = fromMap?.errorPhrases ?? [];
   const intro = section.intro?.trim();
-  if (intro) {
+  if (intro || questions.length || errorPhrases.length) {
+    const overviewParts = [intro, ...questions, ...errorPhrases].map((s) => s?.trim()).filter(Boolean) as string[];
     out.push({
       id: `guide:${section.id}#intro`,
       source: "guide",
       articleId: section.id,
       title: section.title,
-      text: intro,
+      text: overviewParts.join(" "),
       href,
       actionHref: section.primaryHref,
       actionLabel: section.primaryLabel,
       moduleTags,
+      questions,
+      errorPhrases,
     });
   }
   section.blocks.forEach((block, idx) => {
@@ -120,6 +126,8 @@ function pushSectionChunks(out: HelpChunk[], section: DocSection) {
       actionHref: section.primaryHref,
       actionLabel: section.primaryLabel,
       moduleTags,
+      questions,
+      errorPhrases,
     });
   });
 }

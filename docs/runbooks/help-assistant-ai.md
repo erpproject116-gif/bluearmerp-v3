@@ -1,77 +1,114 @@
-# Help Assistant — feedback API + optional grounded AI
+# Help Assistant AI + Bluearm Copilot
 
-The in-app Help Assistant retrieves Knowledge Base / guide chunks in the browser (keyword RAG). This runbook covers the **server** pieces: feedback persistence and optional DashScope wording.
+The in-app Help Assistant retrieves Knowledge Base / guide chunks (keyword RAG). Optional DashScope wording runs on the Go API. Copilot adds live read-only tools and approve-to-act drafts.
 
-## Migration
+## Migrations
 
-Apply `159_help_assistant.sql` (creates `help_feedback_events`).
+1. `159_help_assistant.sql` — `help_feedback_events`
+2. `206_financial_health.sql` — dashboard financial health + recurring expenses
+3. `207_copilot_foundation.sql` — `copilot_sessions`, `copilot_messages`, `copilot_usage_daily`, `help_ranking_overrides`, `copilot_action_audits`
 
-## Feedback
+## A. Alibaba Cloud Model Studio (once)
 
-Authenticated users posting Yes/No on a result card:
+1. Sign in to Alibaba Cloud → **Model Studio** (Singapore workspace if that is your region).
+2. Create an **API key**; copy it once.
+3. Confirm the **OpenAI-compatible** base URL (must end with `/compatible-mode/v1`, not `/api/v1`). Wrong URL → 404.
+4. Enable chat models: Flash/Turbo-class (cheap rewrite) + Plus (tool synthesis). VL only if you use Smart RFQ.
+5. Set billing alerts on the Alibaba account.
 
-```http
-POST /api/v1/help/feedback
-{ "query": "...", "pathname": "/app/...", "article_id": "cannot-confirm-document", "vote": "up" }
-```
-
-Events are also kept in browser `localStorage` (`bluearm-help-feedback-v1`) as a local buffer.
-
-## Feedback admin UI
-
-Store users with `user_management.users` read can open:
-
-`/app/user-management/help-feedback`
-
-- **Summary** — down-voted query + article counts (last N days)
-- **Recent** — latest down votes with links to KB articles
-
-```http
-GET /api/v1/help/feedback?vote=down&limit=50
-GET /api/v1/help/feedback/summary?days=30
-```
-
-## Optional AI (grounded compose)
-
-1. Reuse the same DashScope key as RFQ AI (`DASHSCOPE_API_KEY`, `DASHSCOPE_BASE_URL`).
-2. Set on the **Go API** host:
+## B. API server env (never `VITE_*`)
 
 ```env
 DASHSCOPE_API_KEY=sk-...
-DASHSCOPE_BASE_URL=https://{workspace}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_BASE_URL=https://{your-workspace}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
 HELP_AI_ENABLED=true
-HELP_AI_MODEL=qwen-plus
+HELP_AI_MODEL=qwen-flash
+COPILOT_ENABLED=true
+COPILOT_SMALL_MODEL=qwen-flash
+COPILOT_MEDIUM_MODEL=qwen-plus
+COPILOT_DAILY_TOKEN_CAP=500000
 ```
 
-3. Restart the API and check:
+Restart the API after changes.
+
+## Feedback
+
+```http
+POST /api/v1/help/feedback
+{ "query": "...", "pathname": "/app/...", "article_id": "...", "vote": "up"|"down" }
+```
+
+Down/up votes update `help_ranking_overrides` (demote/boost) used by server retrieve.
+
+Admin UI: `/app/user-management/help-feedback`
+
+## Server retrieve (same corpus as Help index)
+
+Export chunks from web (embeds into Go):
+
+```bash
+cd web && npm run export:help-corpus
+```
+
+```http
+POST /api/v1/help/retrieve
+{ "query": "cannot confirm quotation", "pathname": "/app/quotation/quotations", "limit": 3 }
+```
+
+## Optional AI compose (small model)
 
 ```http
 GET /api/v1/help/ai-config
-```
-
-Expect `"enabled": true`, `"provider": "dashscope"`.
-
-4. Compose (browser sends retrieved hits; model must not invent outside them):
-
-```http
 POST /api/v1/help/compose
 {
-  "query": "cannot confirm quotation",
-  "pathname": "/app/quotation/quotations",
-  "hits": [{ "article_id": "...", "title": "...", "scenario": "...", "snippet": "...", "steps": [] }]
+  "query": "...",
+  "pathname": "/app/...",
+  "hits": [{ "article_id": "...", "title": "...", "snippet": "...", "steps": [] }],
+  "personalization": { "role_code": "owner", "branch_id": 1, "locale": "en" },
+  "stream": false
 }
 ```
 
-If AI is off or fails, the UI keeps the deterministic local reply (articles + steps). If the model returns `INSUFFICIENT_CONTEXT`, the UI also keeps the local message.
+Set `"stream": true` for SSE (`event: delta` / `event: done`). Empty hits are rejected (no invent). Daily token cap → `ERR_COPILOT_CAP`.
 
-## Safety model
+## Copilot ask (docs | ops | action)
 
-- Retrieval stays client-side and works offline / without AI.
-- The LLM only sees the top retrieved articles the user already matched.
-- Empty hit lists are rejected by the API (no open-ended generation).
+```http
+GET /api/v1/copilot/config
+POST /api/v1/copilot/ask
+{ "query": "what is overdue?", "pathname": "/app/dashboard" }
+```
+
+- **docs** — server keyword retrieve + small-model compose  
+- **ops** — allowlisted tools (`get_financial_health`, `list_overdue_ar`, `find_stock`, `crm_follow_ups`) + medium-model summary  
+- **action** — returns `action_draft` only; nothing posts until Approve
+
+```http
+POST /api/v1/copilot/actions/approve
+{ "draft": { "type": "create_recurring_expense", "payload": {...} } }
+POST /api/v1/copilot/actions/deny
+{ "draft": { "type": "..." } }
+```
+
+RFQ import draft points users to existing Quotations → Import RFQ (same VL stack).
+
+## Verify
+
+1. Sign in as a store user → Help → ask a known guide question → article cards; AI answer if enabled.
+2. `GET /api/v1/help/ai-config` → `enabled: true`, `small_model` set.
+3. Ops: ask “what is overdue?” with `dashboard.kpis` → numbers align with Financial health panel.
+4. Stock: ask “find stock WIDGET” with inventory read → Find Stock deep link.
+5. Golden CI: `go test ./internal/modules/helpassistant/ -run Golden` (≥90% retrieve).
+
+## Safety
+
+- Retrieval grounded in exported KB/guides only (v1).  
+- Writes never auto-post; Approve required.  
+- Tools check permissions (`dashboard.kpis`, `inventory.stock_movements`, CRM, finance write).  
+- Usage logged to `copilot_usage_daily`.
 
 ## Related
 
-- RFQ vision AI: `docs/runbooks/dashscope-rfq-ai.md`
-- KB scenarios: `web/src/modules/documentation/helpScenarioArticles.ts`
+- Copilot operator day-to-day: `docs/runbooks/copilot.md`
+- RFQ vision: `docs/runbooks/dashscope-rfq-ai.md`
 - Golden queries: `web/src/modules/help-assistant/helpGoldenQueries.ts`
