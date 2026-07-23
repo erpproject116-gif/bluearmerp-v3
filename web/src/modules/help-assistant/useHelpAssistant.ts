@@ -68,32 +68,33 @@ export function useHelpAssistant(getPathname: () => string) {
         let reply: HelpReply = composeHelpReply(q, pathname);
         if (!reply.fallback && reply.hits.length > 0 && cfg?.enabled) {
           try {
-            const streamed = await composeHelpWithAIStream({
+            // Prefer non-stream JSON compose (reliable behind Render/gzip). Streaming is optional.
+            const ai = await composeHelpWithAI({
               query: q,
               pathname,
               hits: reply.hits,
-              onDelta: (delta) => setStreamingText((prev) => prev + delta),
             });
-            if (streamed?.used_ai && streamed.message.trim()) {
+            if (ai?.used_ai && ai.message.trim()) {
               reply = {
                 ...reply,
-                message: streamed.message.trim(),
+                message: ai.message.trim(),
                 usedAi: true,
-                sessionId: streamed.session_id,
+                sessionId: ai.session_id,
               };
               setAiEnabled(true);
             } else {
-              const ai = await composeHelpWithAI({
+              const streamed = await composeHelpWithAIStream({
                 query: q,
                 pathname,
                 hits: reply.hits,
+                onDelta: (delta) => setStreamingText((prev) => prev + delta),
               });
-              if (ai?.used_ai && ai.message.trim()) {
+              if (streamed?.used_ai && streamed.message.trim()) {
                 reply = {
                   ...reply,
-                  message: ai.message.trim(),
+                  message: streamed.message.trim(),
                   usedAi: true,
-                  sessionId: ai.session_id,
+                  sessionId: streamed.session_id,
                 };
                 setAiEnabled(true);
               }

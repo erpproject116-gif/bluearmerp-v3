@@ -194,6 +194,17 @@ export async function composeHelpWithAIStream(input: {
   // Auth / DashScope failures: caller falls back to non-stream compose.
   if (!res.ok || !res.body) return null;
 
+  const ctype = res.headers.get("content-type") || "";
+  // Server may fall back to JSON when Flusher is unavailable.
+  if (ctype.includes("application/json")) {
+    try {
+      const envelope = (await res.json()) as { success?: boolean; data?: HelpComposeAIResult };
+      return envelope.data ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
