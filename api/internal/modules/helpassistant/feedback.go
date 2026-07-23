@@ -67,6 +67,7 @@ func postFeedback(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save feedback.", "ERR_INTERNAL")
 			return
 		}
+		upsertRankingFromVote(r.Context(), pool, tu.TenantID, articleID, query, vote)
 		response.OK(w, map[string]any{"id": id}, "Feedback saved.")
 	}
 }

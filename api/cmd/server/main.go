@@ -28,6 +28,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/fixedassets"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/goodsreceipt"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/helpassistant"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/copilot"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/hr"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/manufacturing"
@@ -181,6 +182,7 @@ func main() {
 			hr.RegisterRoutes(protected, pool)
 			dashboard.RegisterRoutes(protected, pool)
 			helpassistant.RegisterRoutes(protected, pool)
+			copilot.RegisterRoutes(protected, pool)
 		})
 	})
 

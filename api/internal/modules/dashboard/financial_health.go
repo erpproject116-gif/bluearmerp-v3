@@ -104,29 +104,32 @@ type financialHealthResponse struct {
 func financialHealthHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		ctx := r.Context()
-		today := todayDate()
-		out := financialHealthResponse{
-			AsOf:            today.Format("2006-01-02"),
-			OverdueAlerts:   []overdueInvoiceAlert{},
-			ProfitByProduct: []profitRow{},
-			ProfitByProject: []profitRow{},
-			Recurring:       recurringPulse{Items: []recurringRow{}},
-			Cash:            cashPulse{Months: []cashPulseMonth{}},
-		}
-
-		out.Cash = loadCashPulse(ctx, pool, tu.TenantID, today)
-		out.Receivables = loadARBuckets(ctx, pool, tu.TenantID, today)
-		out.Payables = loadAPBuckets(ctx, pool, tu.TenantID, today)
-		out.OverdueAlerts, out.OverdueAlertCount = loadOverdueAlerts(ctx, pool, tu.TenantID, today, 12)
-		out.Pipeline = loadPipelinePulse(ctx, pool, tu.TenantID, today)
-		out.ProfitByProduct = loadProfitByProduct(ctx, pool, tu.TenantID, 90, 8)
-		out.ProfitByProject = loadProfitByProject(ctx, pool, tu.TenantID, 90, 8)
-		out.Recurring = loadRecurringPulse(ctx, pool, tu.TenantID)
-
+		out := LoadFinancialHealth(r.Context(), pool, tu.TenantID)
 		w.Header().Set("Cache-Control", "private, max-age=30")
 		response.OK(w, out, "OK")
 	}
+}
+
+// LoadFinancialHealth builds the dashboard financial-health payload (also used by Copilot tools).
+func LoadFinancialHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64) financialHealthResponse {
+	today := todayDate()
+	out := financialHealthResponse{
+		AsOf:            today.Format("2006-01-02"),
+		OverdueAlerts:   []overdueInvoiceAlert{},
+		ProfitByProduct: []profitRow{},
+		ProfitByProject: []profitRow{},
+		Recurring:       recurringPulse{Items: []recurringRow{}},
+		Cash:            cashPulse{Months: []cashPulseMonth{}},
+	}
+	out.Cash = loadCashPulse(ctx, pool, tenantID, today)
+	out.Receivables = loadARBuckets(ctx, pool, tenantID, today)
+	out.Payables = loadAPBuckets(ctx, pool, tenantID, today)
+	out.OverdueAlerts, out.OverdueAlertCount = loadOverdueAlerts(ctx, pool, tenantID, today, 12)
+	out.Pipeline = loadPipelinePulse(ctx, pool, tenantID, today)
+	out.ProfitByProduct = loadProfitByProduct(ctx, pool, tenantID, 90, 8)
+	out.ProfitByProject = loadProfitByProject(ctx, pool, tenantID, 90, 8)
+	out.Recurring = loadRecurringPulse(ctx, pool, tenantID)
+	return out
 }
 
 func loadCashPulse(ctx context.Context, pool *pgxpool.Pool, tenantID int64, today time.Time) cashPulse {

@@ -14,14 +14,27 @@ func TestBuildGroundedUserPrompt(t *testing.T) {
 			Snippet:   "Check attachments",
 			Steps:     []string{"Upload a file", "Save then Confirm"},
 		},
-	})
+	}, &composePersonalization{RoleCode: "owner", BranchID: 3})
 	if len(ids) != 1 || ids[0] != "cannot-confirm-document" {
 		t.Fatalf("ids=%v", ids)
 	}
-	for _, needle := range []string{"cannot confirm", "/app/quotation", "Cannot confirm a document", "Upload a file"} {
+	for _, needle := range []string{"cannot confirm", "/app/quotation", "Cannot confirm a document", "Upload a file", "owner", "3"} {
 		if !strings.Contains(prompt, needle) {
 			t.Fatalf("prompt missing %q:\n%s", needle, prompt)
 		}
+	}
+}
+
+func TestSearchHelpGoldenSmoke(t *testing.T) {
+	if CorpusChunkCount() == 0 {
+		t.Skip("help corpus not embedded")
+	}
+	hits := SearchHelp("onboarding playbook", "/app/onboarding", 3, minScore, nil)
+	if len(hits) == 0 {
+		t.Fatal("expected hits")
+	}
+	if hits[0].Chunk.ArticleID != "onboarding-playbook" {
+		t.Fatalf("got article %s", hits[0].Chunk.ArticleID)
 	}
 }
 

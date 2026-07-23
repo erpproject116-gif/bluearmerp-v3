@@ -1,6 +1,12 @@
 import { createSignal } from "solid-js";
 import { composeHelpReply } from "./composeHelpReply";
-import { composeHelpWithAI, fetchHelpAIConfig } from "./helpApi";
+import {
+  askCopilot,
+  composeHelpWithAI,
+  composeHelpWithAIStream,
+  fetchHelpAIConfig,
+  shouldUseCopilotAsk,
+} from "./helpApi";
 import type { HelpChatMessage, HelpReply } from "./helpTypes";
 
 let msgSeq = 0;
@@ -14,9 +20,10 @@ export function useHelpAssistant(getPathname: () => string) {
   const [messages, setMessages] = createSignal<HelpChatMessage[]>([]);
   const [busy, setBusy] = createSignal(false);
   const [aiEnabled, setAiEnabled] = createSignal(false);
+  const [streamingText, setStreamingText] = createSignal("");
 
   const refreshAIConfig = () => {
-    void fetchHelpAIConfig().then((cfg) => setAiEnabled(!!cfg?.enabled));
+    void fetchHelpAIConfig().then((cfg) => setAiEnabled(!!(cfg?.enabled || cfg?.copilot)));
   };
 
   const ask = (text: string) => {
@@ -26,20 +33,70 @@ export function useHelpAssistant(getPathname: () => string) {
     const userMsg: HelpChatMessage = { id: nextId(), role: "user", text: q };
     setMessages((prev) => [...prev, userMsg]);
     setBusy(true);
+    setStreamingText("");
 
     void (async () => {
       try {
+        const cfg = await fetchHelpAIConfig();
+        if (cfg?.copilot && shouldUseCopilotAsk(q)) {
+          const copilot = await askCopilot({ query: q, pathname });
+          if (copilot?.message) {
+            const hits =
+              copilot.hits?.map((h) => ({
+                articleId: h.article_id,
+                title: h.title,
+                snippet: h.snippet ?? "",
+                articleHref: h.href ?? "/app/documentation",
+              })) ?? [];
+            const reply: HelpReply = {
+              query: q,
+              hits,
+              fallback: false,
+              message: copilot.message,
+              usedAi: copilot.used_ai,
+              deepLinks: copilot.deep_links,
+              actionDraft: copilot.action_draft ?? null,
+              sessionId: copilot.session_id,
+              mode: copilot.mode,
+            };
+            setAiEnabled(true);
+            setMessages((prev) => [...prev, { id: nextId(), role: "assistant", reply }]);
+            return;
+          }
+        }
+
         let reply: HelpReply = composeHelpReply(q, pathname);
-        if (!reply.fallback && reply.hits.length > 0) {
+        if (!reply.fallback && reply.hits.length > 0 && cfg?.enabled) {
           try {
-            const ai = await composeHelpWithAI({
+            const streamed = await composeHelpWithAIStream({
               query: q,
               pathname,
               hits: reply.hits,
+              onDelta: (delta) => setStreamingText((prev) => prev + delta),
             });
-            if (ai?.used_ai && ai.message.trim()) {
-              reply = { ...reply, message: ai.message.trim(), usedAi: true };
+            if (streamed?.used_ai && streamed.message.trim()) {
+              reply = {
+                ...reply,
+                message: streamed.message.trim(),
+                usedAi: true,
+                sessionId: streamed.session_id,
+              };
               setAiEnabled(true);
+            } else {
+              const ai = await composeHelpWithAI({
+                query: q,
+                pathname,
+                hits: reply.hits,
+              });
+              if (ai?.used_ai && ai.message.trim()) {
+                reply = {
+                  ...reply,
+                  message: ai.message.trim(),
+                  usedAi: true,
+                  sessionId: ai.session_id,
+                };
+                setAiEnabled(true);
+              }
             }
           } catch {
             // Keep deterministic local reply.
@@ -49,6 +106,7 @@ export function useHelpAssistant(getPathname: () => string) {
         setMessages((prev) => [...prev, assistantMsg]);
       } finally {
         setBusy(false);
+        setStreamingText("");
       }
     })();
   };
@@ -61,6 +119,7 @@ export function useHelpAssistant(getPathname: () => string) {
     messages,
     busy,
     aiEnabled,
+    streamingText,
     refreshAIConfig,
     ask,
     clear,
