@@ -20,14 +20,18 @@ import (
 const DefaultBaseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 
 // NormalizeBaseURL fixes common Model Studio console URLs (e.g. .../api/v1 → .../compatible-mode/v1).
+// Invalid values (empty, missing scheme, or accidental env-var names like "DASHSCOPE_BASE_URL") fall back to DefaultBaseURL.
 func NormalizeBaseURL(raw string) string {
 	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	if raw == "" || strings.EqualFold(raw, "DASHSCOPE_BASE_URL") {
 		return DefaultBaseURL
 	}
 	raw = strings.TrimRight(raw, "/")
 	if strings.HasSuffix(raw, "/api/v1") {
 		raw = strings.TrimSuffix(raw, "/api/v1") + "/compatible-mode/v1"
+	}
+	if !strings.HasPrefix(raw, "https://") && !strings.HasPrefix(raw, "http://") {
+		return DefaultBaseURL
 	}
 	return raw
 }

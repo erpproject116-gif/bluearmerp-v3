@@ -21,6 +21,15 @@ func TestNormalizeBaseURL_emptyUsesDefault(t *testing.T) {
 	}
 }
 
+func TestNormalizeBaseURL_rejectsEnvVarNameAndMissingScheme(t *testing.T) {
+	if NormalizeBaseURL("DASHSCOPE_BASE_URL") != DefaultBaseURL {
+		t.Fatal("expected default when value is the env var name")
+	}
+	if NormalizeBaseURL("not-a-url") != DefaultBaseURL {
+		t.Fatal("expected default when scheme is missing")
+	}
+}
+
 func TestClient_Enabled(t *testing.T) {
 	if NewClient("").Enabled() {
 		t.Fatal("expected disabled without API key")
