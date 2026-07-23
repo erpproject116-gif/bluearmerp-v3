@@ -1,4 +1,5 @@
 import { apiFetch } from "../../../shared/api";
+import { formatMoney as formatMoneyShared } from "../../../shared/money";
 
 export type Bir2307PrintPayload = {
   certificate_no: string;
@@ -23,7 +24,7 @@ export function fetchBir2307Print(paymentVoucherId: number) {
 }
 
 export function formatMoney(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatMoneyShared(n);
 }
 
 export function formatPrintDate(iso: string) {

@@ -319,6 +319,7 @@ export function HelpAssistantPanel(props: {
                 pathname={loc.pathname}
                 onAsk={(text) => props.assistant.ask(text)}
                 streamingText={props.assistant.streamingText()}
+                busy={props.assistant.busy()}
               />
             </Show>
           </div>
@@ -443,10 +444,13 @@ export function HelpAssistantPanel(props: {
               />
               <button
                 type="submit"
-                class="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 disabled={props.assistant.busy() || extracting() || (!draft().trim() && !pendingFiles().length)}
               >
-                Send
+                <Show when={props.assistant.busy()}>
+                  <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />
+                </Show>
+                {props.assistant.busy() ? "…" : "Send"}
               </button>
             </form>
           </footer>

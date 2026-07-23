@@ -3,6 +3,7 @@ import {
   useOperationsDashboards,
   useOperationsWidgetData,
 } from "../../shared/useOperations";
+import { formatMoney } from "../../shared/money";
 import { OperationsLayout } from "./OperationsLayout";
 import { OperationsWorkspaceSelector, useOperationsWorkspace } from "./operationsWorkspace";
 import { uiLabel } from "../../shared/branding/uiLabel";
@@ -22,10 +23,6 @@ type SummaryData = {
   done?: number;
   blocked?: number;
 };
-
-function formatMoney(n?: number) {
-  return (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export default function OperationsDashboardPage() {
   const { workspaceId } = useOperationsWorkspace();

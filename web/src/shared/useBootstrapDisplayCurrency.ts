@@ -1,7 +1,7 @@
 import { createEffect } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
-import { PESO_SIGN, setDisplayCurrencySign } from "./money";
+import { currencyDisplaySign, PESO_SIGN, setDisplayCurrencySign } from "./money";
 import { useAuth } from "./auth-context";
 
 type CurrencyRow = {
@@ -28,9 +28,9 @@ export function useBootstrapDisplayCurrency() {
       const rows = res.data ?? [];
       const def = rows.find((r) => r.is_default) ?? rows.find((r) => r.currency_code === "PHP") ?? rows[0];
       const sign = (def?.symbol || "").trim();
-      if (sign) return sign;
+      if (sign) return currencyDisplaySign(sign);
       if (def?.currency_code === "PHP" || def?.currency_code === "DOMESTIC") return PESO_SIGN;
-      return def?.currency_code?.trim() || PESO_SIGN;
+      return currencyDisplaySign(def?.currency_code?.trim() || PESO_SIGN);
     },
     staleTime: 5 * 60_000,
   }));

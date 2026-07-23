@@ -1,3 +1,5 @@
+import { formatMoneyWithCode } from "../../shared/money";
+
 /** Build compose subject: `{item} {DocType} - {tenant}`. */
 export function buildDocumentEmailSubject(
   itemName: string | null | undefined,
@@ -76,9 +78,7 @@ function parseAmount(v: string | number | null | undefined): number {
 }
 
 function formatMoney(amount: number, currencyCode?: string | null): string {
-  const formatted = amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const ccy = (currencyCode ?? "").trim();
-  return ccy ? `${ccy} ${formatted}` : formatted;
+  return formatMoneyWithCode(amount, currencyCode);
 }
 
 function formatQty(v: string | number | null | undefined): string {

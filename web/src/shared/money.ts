@@ -9,11 +9,26 @@ let displayCurrencySign = PESO_SIGN;
 /** Call after loading the tenant default currency (AppShell). Does not affect calculations. */
 export function setDisplayCurrencySign(sign: string | null | undefined): void {
   const s = (sign ?? "").trim();
-  displayCurrencySign = s || PESO_SIGN;
+  displayCurrencySign = s ? currencyDisplaySign(s) : PESO_SIGN;
 }
 
 export function getDisplayCurrencySign(): string {
   return displayCurrencySign || PESO_SIGN;
+}
+
+/**
+ * Map ISO/code/symbol to the glyph we show in the UI.
+ * PHP / DOMESTIC / bare "$" (common mis-format) → ₱. Other ISO codes stay as-is (USD, EUR…).
+ */
+export function currencyDisplaySign(currencyCodeOrSymbol?: string | null): string {
+  const raw = (currencyCodeOrSymbol ?? "").trim();
+  if (!raw) return getDisplayCurrencySign();
+  if (raw === PESO_SIGN || raw === "P") return PESO_SIGN;
+  const upper = raw.toUpperCase();
+  if (upper === "PHP" || upper === "DOMESTIC" || upper === "PHP." || upper === "PH") return PESO_SIGN;
+  // Mis-tagged peso amounts often show as "$" — treat as peso for this product.
+  if (raw === "$" || upper === "PHP$" || upper === "PESO") return PESO_SIGN;
+  return raw;
 }
 
 export type FormatMoneyOpts = {
@@ -32,8 +47,18 @@ export function formatMoney(n: number, opts?: FormatMoneyOpts): string {
     maximumFractionDigits: 2,
   });
   if (opts?.sign === false) return formatted;
-  const sign = typeof opts?.sign === "string" && opts.sign.trim() ? opts.sign.trim() : getDisplayCurrencySign();
+  const sign =
+    typeof opts?.sign === "string" && opts.sign.trim()
+      ? currencyDisplaySign(opts.sign)
+      : getDisplayCurrencySign();
   return `${sign}${formatted}`;
+}
+
+/**
+ * List/print helper: `formatMoneyWithCode(1234.5, "PHP")` → `₱1,234.50` (never `PHP 1,234.50`).
+ */
+export function formatMoneyWithCode(n: number, currencyCode?: string | null): string {
+  return formatMoney(n, { sign: currencyDisplaySign(currencyCode) });
 }
 
 /** @deprecated Prefer formatMoney — kept as alias for existing call sites. */
@@ -54,12 +79,15 @@ export function roundMoney(n: number): number {
 
 /**
  * Strip display formatting (currency signs, thousand commas, spaces) before Number().
- * Safe for pasted "₱1,234.50" without affecting how we store/calculate amounts.
+ * Safe for pasted "₱1,234.50" / "PHP 1,234.50" without affecting how we store/calculate amounts.
  */
 export function stripMoneyFormatting(raw: string): string {
   return String(raw ?? "")
     .trim()
     .replace(/\u20B1/g, "") // ₱
+    .replace(/\$/g, "")
+    .replace(/\bPHP\b/gi, "")
+    .replace(/\bDOMESTIC\b/gi, "")
     .replace(/[$€£¥]/g, "")
     .replace(/,/g, "")
     .replace(/\s+/g, "");
