@@ -9,7 +9,6 @@ import {
   getCopilotSession,
   listCopilotSessions,
   parseEntityMentions,
-  shouldUseCopilotAsk,
   type CopilotSessionSummary,
   type HelpAttachmentPayload,
 } from "./helpApi";
@@ -104,7 +103,10 @@ export function useHelpAssistant(getPathname: () => string) {
         const attPayload = toPayload(attachments);
         const sid = sessionId();
 
-        if (cfg?.copilot && (shouldUseCopilotAsk(displayQ) || attachments.length > 0)) {
+        // When Copilot is enabled, always use /copilot/ask — the API classifies
+        // docs vs live ops vs approve-to-act. A narrow keyword gate was dropping
+        // real finance questions (expenses, revenue, projections) into KB-only mode.
+        if (cfg?.copilot) {
           const copilot = await askCopilot({
             query: displayQ,
             pathname,

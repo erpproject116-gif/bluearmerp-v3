@@ -15,6 +15,8 @@ func TestClassifyIntent(t *testing.T) {
 		{"send email quotation", "action"},
 		{"create follow-up for customer", "action"},
 		{"look up serial SN-1", "ops"},
+		{"How much is my expenses as of today?", "ops"},
+		{"Can you project how will be my revenue by the end of this year?", "ops"},
 	}
 	for _, c := range cases {
 		if got := classifyIntent(c.q); got != c.want {
@@ -33,5 +35,20 @@ func TestParseMentionTokens(t *testing.T) {
 	}
 	if got[1].Type != "quotation" || got[1].ID != 3 {
 		t.Fatalf("quotation parse: %+v", got[1])
+	}
+}
+
+func TestDocsInsufficient(t *testing.T) {
+	if !docsInsufficient(askResult{Mode: "docs", UsedAI: false, Message: "I could not find a matching Bluearm guide for that."}) {
+		t.Fatal("empty corpus should escalate")
+	}
+	if !docsInsufficient(askResult{Mode: "docs", UsedAI: false, Message: "Here are the closest guides:\n- Foo"}) {
+		t.Fatal("ungrounded guide list should escalate")
+	}
+	if docsInsufficient(askResult{Mode: "docs", UsedAI: true, Message: "To confirm a quotation, open …", Hits: []map[string]any{{"score": 1.5}}}) {
+		t.Fatal("successful grounded compose should not escalate")
+	}
+	if docsInsufficient(askResult{Mode: "ops", UsedAI: true, Message: "Cash is …"}) {
+		t.Fatal("ops mode is never 'insufficient docs'")
 	}
 }
