@@ -148,6 +148,12 @@ func evaluateTenantAlerts(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 				return notifCount, taskCount, e
 			}
 			notifCount += n
+		case "overdue_ar":
+			n, e := evalOverdueAR(ctx, pool, tenantID, rule, today)
+			if e != nil {
+				return notifCount, taskCount, e
+			}
+			notifCount += n
 		}
 	}
 	return notifCount, taskCount, nil
@@ -454,6 +460,76 @@ func evalReconciliationGap(ctx context.Context, pool *pgxpool.Pool, tenantID int
 		return 1, nil
 	}
 	return 0, nil
+}
+
+func evalOverdueAR(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rule alertRule, today time.Time) (int, error) {
+	minAge := 1
+	minBalance := 0.01
+	if len(rule.ThresholdJSON) > 0 {
+		var th struct {
+			MinAgeDays  int     `json:"min_age_days"`
+			MinBalance  float64 `json:"min_balance"`
+		}
+		if json.Unmarshal(rule.ThresholdJSON, &th) == nil {
+			if th.MinAgeDays > 0 {
+				minAge = th.MinAgeDays
+			}
+			if th.MinBalance > 0 {
+				minBalance = th.MinBalance
+			}
+		}
+	}
+	if rule.LeadValue > minAge {
+		minAge = rule.LeadValue
+	}
+
+	rows, err := pool.Query(ctx, `
+		select s.id, s.sales_no, p.company_name,
+		  (s.grand_total - coalesce(recv.received, 0))::float8,
+		  ($2::date - coalesce(s.due_date, s.order_date)::date)::int
+		from public.sa_sales s
+		join public.inv_partners p on p.id = s.partner_id
+		left join lateral (
+		  select coalesce(sum(a.applied_amount), 0)::float8 as received
+		  from public.fin_receipt_applications a
+		  join public.fin_official_receipts r on r.id = a.official_receipt_id
+		  where a.sales_id = s.id and r.deleted_at is null
+		) recv on true
+		where s.tenant_id = $1 and s.deleted_at is null
+		  and (s.grand_total - coalesce(recv.received, 0)) >= $3
+		  and ($2::date - coalesce(s.due_date, s.order_date)::date) >= $4
+		order by ($2::date - coalesce(s.due_date, s.order_date)::date) desc
+		limit 50`, tenantID, today, minBalance, minAge)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	created := 0
+	for rows.Next() {
+		var salesID int64
+		var salesNo, customer string
+		var balance float64
+		var ageDays int
+		if err := rows.Scan(&salesID, &salesNo, &customer, &balance, &ageDays); err != nil {
+			return created, err
+		}
+		severity := "warning"
+		if ageDays > 60 {
+			severity = "critical"
+		}
+		key := dedupeKey(rule.RuleType, rule.ID, "sales", salesID, today)
+		title := fmt.Sprintf("Overdue invoice %s", salesNo)
+		body := fmt.Sprintf("%s owes %.2f — %d days past due. Follow up to protect cash flow.", customer, balance, ageDays)
+		ok, err := insertNotification(ctx, pool, tenantID, nil, rule.ID, severity, title, body, "sales", salesID, key)
+		if err != nil {
+			return created, err
+		}
+		if ok {
+			created++
+		}
+	}
+	return created, rows.Err()
 }
 
 func handleCRMOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event) error {

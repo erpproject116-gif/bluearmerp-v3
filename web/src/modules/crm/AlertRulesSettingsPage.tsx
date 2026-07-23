@@ -11,6 +11,8 @@ const RULE_TYPE_LABELS: Record<string, string> = {
   low_stock: "Low stock",
   quote_unconverted: "Unconverted quotes",
   custom_kpi: "Custom KPI",
+  reconciliation_gap: "Reconciliation gap",
+  overdue_ar: "Overdue customer invoices",
 };
 
 export default function AlertRulesSettingsPage() {

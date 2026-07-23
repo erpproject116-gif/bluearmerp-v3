@@ -382,6 +382,7 @@ func redFlagsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			{Code: "gr_without_supplier_invoice", Label: "GR not fully billed"},
 			{Code: "ap_over_application", Label: "AP over-applied payments"},
 			{Code: "budget_overrun", Label: "Budget overrun"},
+			{Code: "overdue_ar", Label: "Overdue customer invoices"},
 		}
 
 		_ = pool.QueryRow(ctx, `
@@ -530,6 +531,19 @@ func redFlagsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		overruns, _ := processpolicy.CountBudgetOverruns(ctx, pool, tu.TenantID)
 		categories[10].Count = overruns
+
+		_ = pool.QueryRow(ctx, `
+			select count(*) from public.sa_sales s
+			left join lateral (
+			  select coalesce(sum(a.applied_amount), 0)::float8 as received
+			  from public.fin_receipt_applications a
+			  join public.fin_official_receipts r on r.id = a.official_receipt_id
+			  where a.sales_id = s.id and r.deleted_at is null
+			) recv on true
+			where s.tenant_id = $1 and s.deleted_at is null
+			  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001
+			  and ($2::date - coalesce(s.due_date, s.order_date)::date) > 0`,
+			tu.TenantID, today).Scan(&categories[11].Count)
 
 		var total int64
 		for _, c := range categories {

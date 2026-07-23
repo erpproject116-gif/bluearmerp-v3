@@ -33,6 +33,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerNoteRoutes(fr, pool)
 		registerLandedCostRoutes(fr, pool)
 		registerContractRoutes(fr, pool)
+		registerRecurringExpenseRoutes(fr, pool)
 	})
 }
 
