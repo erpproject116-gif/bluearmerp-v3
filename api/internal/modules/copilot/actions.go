@@ -3,6 +3,7 @@ package copilot
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,8 +80,86 @@ func executeApprovedDraft(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUse
 			"hint": "Use Import RFQ on quotations. AI enhance reuses the existing RFQ VL pipeline — no second vision stack.",
 			"api":  draft.API,
 		}, "", http.StatusOK
+	case "create_follow_up":
+		if !tu.HasPermission("crm.follow_up_tasks", auth.AccessWrite) {
+			return nil, "Missing crm.follow_up_tasks write permission.", http.StatusForbidden
+		}
+		return createFollowUpFromDraft(r, pool, tu, draft.Payload)
+	case "generate_quotation":
+		next := "/app/quotation/quotations"
+		return map[string]any{
+			"next":    next,
+			"hint":    "Create the quotation in the UI — Copilot only tags the customer/item; it does not auto-post.",
+			"payload": draft.Payload,
+		}, "", http.StatusOK
+	case "send_quotation_email":
+		next := "/app/quotation/quotations"
+		return map[string]any{
+			"next":    next,
+			"hint":    "Open the quotation and use Send email. Copilot will not send mail without the document compose flow.",
+			"payload": draft.Payload,
+			"api":     draft.API,
+		}, "", http.StatusOK
 	default:
 		return nil, "Unsupported action type.", http.StatusBadRequest
+	}
+}
+
+func createFollowUpFromDraft(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUser, payload map[string]any) (any, string, int) {
+	title := strOr(payload["title"], "Follow-up")
+	due := strOr(payload["due_date"], time.Now().UTC().Add(48*time.Hour).Format("2006-01-02"))
+	taskType := strOr(payload["task_type"], "quote_follow_up")
+	stage := strOr(payload["stage"], "scheduled")
+	notes := strOr(payload["notes"], "")
+	var partnerID, quotationID, salesID *int64
+	if id, ok := toInt64(payload["partner_id"]); ok {
+		partnerID = &id
+	}
+	if id, ok := toInt64(payload["quotation_id"]); ok {
+		quotationID = &id
+	}
+	if id, ok := toInt64(payload["sales_id"]); ok {
+		salesID = &id
+	}
+	var id int64
+	err := pool.QueryRow(r.Context(), `
+		insert into public.crm_follow_up_tasks (
+		  tenant_id, task_type, stage, due_date, partner_id, pic_user_id, pic_name,
+		  quotation_id, sales_id, title, notes, created_by_user_id
+		) values ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12)
+		returning id`,
+		tu.TenantID, taskType, stage, due, partnerID, tu.AppUserID, "",
+		quotationID, salesID, title, notes, tu.AppUserID,
+	).Scan(&id)
+	if err != nil {
+		return nil, "Failed to create follow-up task.", http.StatusInternalServerError
+	}
+	return map[string]any{
+		"id":       id,
+		"title":    title,
+		"due_date": due,
+		"next":     "/app/crm/follow-up-tasks",
+	}, "", http.StatusOK
+}
+
+func toInt64(v any) (int64, bool) {
+	switch t := v.(type) {
+	case float64:
+		return int64(t), true
+	case float32:
+		return int64(t), true
+	case int:
+		return int64(t), true
+	case int64:
+		return t, true
+	case json.Number:
+		n, err := t.Int64()
+		return n, err == nil
+	case string:
+		n, err := strconv.ParseInt(strings.TrimSpace(t), 10, 64)
+		return n, err == nil
+	default:
+		return 0, false
 	}
 }
 

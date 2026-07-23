@@ -48,12 +48,55 @@ func runTool(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, name s
 		return toolFindStock(ctx, pool, tu, q)
 	case "crm_follow_ups":
 		return toolCRMFollowUps(ctx, pool, tu)
+	case "lookup_entities":
+		q, _ := args["q"].(string)
+		return toolLookupEntities(ctx, pool, tu, entitiesFromArgs(args), q)
 	case "draft_recurring_expense":
 		return toolDraftRecurring(args)
 	case "import_rfq_pdf":
 		return toolImportRFQ(args)
+	case "draft_follow_up":
+		return toolDraftFollowUp(args)
+	case "draft_generate_quotation":
+		return toolDraftGenerateQuotation(args)
+	case "draft_send_quotation_email":
+		return toolDraftSendQuotationEmail(args)
 	default:
 		return toolResult{Name: name, OK: false, Error: "Unknown tool."}
+	}
+}
+
+func entitiesFromArgs(args map[string]any) []EntityRef {
+	if args == nil {
+		return nil
+	}
+	raw, ok := args["entities"]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []EntityRef:
+		return v
+	case []any:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil
+		}
+		var out []EntityRef
+		if json.Unmarshal(b, &out) != nil {
+			return nil
+		}
+		return out
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil
+		}
+		var out []EntityRef
+		if json.Unmarshal(b, &out) != nil {
+			return nil
+		}
+		return out
 	}
 }
 
@@ -242,6 +285,140 @@ func toolImportRFQ(args map[string]any) toolResult {
 		Data:        raw,
 		ActionDraft: draft,
 		DeepLinks:   []deepLink{{Label: "Quotations / Import RFQ", Href: "/app/quotation/quotations"}},
+	}
+}
+
+func pickEntity(entities []EntityRef, types ...string) *EntityRef {
+	want := map[string]struct{}{}
+	for _, t := range types {
+		want[t] = struct{}{}
+	}
+	for i := range entities {
+		if _, ok := want[entities[i].Type]; ok {
+			e := entities[i]
+			return &e
+		}
+	}
+	return nil
+}
+
+func toolDraftFollowUp(args map[string]any) toolResult {
+	entities := entitiesFromArgs(args)
+	q, _ := args["q"].(string)
+	customer := pickEntity(entities, "customer", "partner", "vendor")
+	quote := pickEntity(entities, "quotation", "quote")
+	sale := pickEntity(entities, "sales", "invoice")
+	title := "Follow-up"
+	if customer != nil {
+		title = "Follow-up: " + customer.Label
+	} else if quote != nil {
+		title = "Follow-up: " + quote.Label
+	} else if sale != nil {
+		title = "Follow-up: " + sale.Label
+	} else if strings.TrimSpace(q) != "" {
+		title = "Follow-up from Copilot"
+	}
+	payload := map[string]any{
+		"task_type": "quote_follow_up",
+		"stage":     "scheduled",
+		"title":     title,
+		"due_date":  time.Now().UTC().Add(48 * time.Hour).Format("2006-01-02"),
+		"notes":     strings.TrimSpace(q),
+	}
+	if customer != nil {
+		payload["partner_id"] = customer.ID
+	}
+	if quote != nil {
+		payload["quotation_id"] = quote.ID
+		payload["task_type"] = "quote_follow_up"
+	}
+	if sale != nil {
+		payload["sales_id"] = sale.ID
+	}
+	draft := &actionDraft{
+		Type:    "create_follow_up",
+		Summary: fmt.Sprintf("Create CRM follow-up %q (due %s)", title, payload["due_date"]),
+		API:     "/api/v1/crm/follow-up-tasks",
+		Method:  "POST",
+		Payload: payload,
+	}
+	raw, _ := json.Marshal(map[string]any{"draft": draft})
+	return toolResult{
+		Name:        "draft_follow_up",
+		OK:          true,
+		Data:        raw,
+		ActionDraft: draft,
+		DeepLinks:   []deepLink{{Label: "Follow-up tasks", Href: "/app/crm/follow-up-tasks"}},
+	}
+}
+
+func toolDraftGenerateQuotation(args map[string]any) toolResult {
+	entities := entitiesFromArgs(args)
+	customer := pickEntity(entities, "customer", "partner")
+	item := pickEntity(entities, "item")
+	href := "/app/quotation/quotations"
+	payload := map[string]any{"ui": href}
+	summary := "Open Quotations to create a new quotation (approve opens the form — nothing is posted automatically)."
+	if customer != nil {
+		payload["partner_id"] = customer.ID
+		payload["partner_name"] = customer.Label
+		summary = fmt.Sprintf("Prepare a quotation for %s — approve to open Quotations with this customer tagged.", customer.Label)
+	}
+	if item != nil {
+		payload["item_id"] = item.ID
+		payload["item_code"] = item.Code
+		payload["item_name"] = item.Label
+	}
+	draft := &actionDraft{
+		Type:    "generate_quotation",
+		Summary: summary,
+		API:     "/api/v1/quotation/quotations",
+		Method:  "POST",
+		Payload: payload,
+	}
+	raw, _ := json.Marshal(map[string]any{"draft": draft})
+	return toolResult{
+		Name:        "draft_generate_quotation",
+		OK:          true,
+		Data:        raw,
+		ActionDraft: draft,
+		DeepLinks:   []deepLink{{Label: "Quotations", Href: href}},
+	}
+}
+
+func toolDraftSendQuotationEmail(args map[string]any) toolResult {
+	entities := entitiesFromArgs(args)
+	quote := pickEntity(entities, "quotation", "quote")
+	customer := pickEntity(entities, "customer", "partner")
+	href := "/app/quotation/quotations"
+	payload := map[string]any{"ui": href}
+	summary := "Open the quotation and use Send email (approve opens the document — email is not sent until you confirm in Quotation)."
+	if quote != nil {
+		payload["quotation_id"] = quote.ID
+		payload["reference_no"] = quote.Code
+		if quote.Code != "" {
+			href = href // list; detail deep-link varies by UI
+		}
+		summary = fmt.Sprintf("Prepare email for quotation %s — approve to open Quotations; send from the document screen.", quote.Label)
+		payload["api"] = fmt.Sprintf("/api/v1/quotation/quotations/%d/send-email", quote.ID)
+	} else if customer != nil {
+		payload["partner_id"] = customer.ID
+		summary = fmt.Sprintf("Find a quotation for %s, then send email from the document screen.", customer.Label)
+	}
+	draft := &actionDraft{
+		Type:    "send_quotation_email",
+		Summary: summary,
+		API:     strOr(payload["api"], "/api/v1/quotation/quotations"),
+		Method:  "POST",
+		Payload: payload,
+	}
+	raw, _ := json.Marshal(map[string]any{"draft": draft})
+	return toolResult{
+		Name:        "draft_send_quotation_email",
+		OK:          true,
+		Data:        raw,
+		ActionDraft: draft,
+		DeepLinks:   []deepLink{{Label: "Quotations", Href: href}},
 	}
 }
 

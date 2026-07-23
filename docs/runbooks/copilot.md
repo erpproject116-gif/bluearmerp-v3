@@ -24,6 +24,12 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 
 4. Keep golden retrieve green: `go test ./internal/modules/helpassistant/ -run Golden`
 
+5. Apply migration `208_copilot_chat_ux.sql` for session titles + attachment metadata.
+
+6. Chat UX: maximize the Copilot panel (▣), use **History** for prior sessions, attach PDF/DOCX/XLSX/CSV/images via **+**.
+
+7. Entity tags: type **@** in the composer to search and tag items, customers, vendors, serials, invoices, quotations, POs, SOs, and load-slip refs (`@[type:id|label]`). Ask e.g. “generate quotation for @…”, “create follow-up for @…”, “send email quotation @…”, then **Approve** (writes never auto-post; quote/email open the UI).
+
 ## Permissions (Phase 2)
 
 | Tool | Permission |
@@ -31,7 +37,9 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 | Financial health / overdue | `dashboard.kpis` read |
 | Find stock | `inventory.stock_movements` read |
 | CRM follow-ups | `crm.follow_up_tasks` read (or KPIs) |
+| Create follow-up (approve) | `crm.follow_up_tasks` write |
 | Create recurring expense (approve) | `finance.contract_write` write |
+| Entity search | authenticated tenant user |
 
 Branch-scoped users still only see datascope-filtered data when the underlying APIs enforce it.
 

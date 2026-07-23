@@ -1,6 +1,6 @@
-import { A } from "@solidjs/router";
 import { createSignal, For, Show } from "solid-js";
 import { approveCopilotAction, denyCopilotAction } from "./helpApi";
+import { HelpDeepLinkChips, HelpMarkdown } from "./HelpMarkdown";
 import { HelpResultCard } from "./HelpResultCard";
 import type { HelpChatMessage } from "./helpTypes";
 
@@ -19,7 +19,19 @@ function AssistantBubble(props: {
     setActing(true);
     try {
       const res = await approveCopilotAction(draft, reply().sessionId);
-      setActionNote(res.success ? "Approved — changes applied where allowed." : res.message || "Approve failed.");
+      if (!res.success) {
+        setActionNote(res.message || "Approve failed.");
+        return;
+      }
+      const result = res.data?.result as { next?: string; hint?: string } | undefined;
+      if (result?.next) {
+        setActionNote(result.hint || "Opening…");
+        window.setTimeout(() => {
+          window.location.assign(result.next!);
+        }, 400);
+        return;
+      }
+      setActionNote("Approved — changes applied where allowed.");
     } finally {
       setActing(false);
     }
@@ -39,23 +51,17 @@ function AssistantBubble(props: {
 
   return (
     <div class="flex justify-start">
-      <div class="max-w-[95%] space-y-2 rounded-2xl rounded-bl-md border border-stroke bg-white px-3 py-2 shadow-sm">
-        <p class="text-sm text-text-primary whitespace-pre-wrap">{reply().message}</p>
+      <div class="max-w-[min(42rem,95%)] space-y-3 rounded-2xl rounded-bl-md border border-stroke bg-white px-4 py-3 shadow-sm">
+        <HelpMarkdown content={reply().message} />
         <Show when={reply().usedAi}>
           <p class="text-[11px] text-text-secondary">
-            {reply().mode === "ops" ? "Live data summary (permission-scoped)." : "AI summary grounded in the articles below."}
+            {reply().mode === "ops"
+              ? "Live data summary (permission-scoped)."
+              : "AI summary grounded in Bluearm guides and any files you attached."}
           </p>
         </Show>
         <Show when={reply().deepLinks?.length}>
-          <div class="flex flex-wrap gap-2">
-            <For each={reply().deepLinks}>
-              {(link) => (
-                <A href={link.href} class="text-xs text-brand-600 hover:underline">
-                  {link.label}
-                </A>
-              )}
-            </For>
-          </div>
+          <HelpDeepLinkChips links={reply().deepLinks!} />
         </Show>
         <Show when={reply().actionDraft}>
           <div class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
@@ -118,13 +124,24 @@ export function HelpChatThread(props: {
   streamingText?: string;
 }) {
   return (
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-4">
       <For each={props.messages}>
         {(msg) =>
           msg.role === "user" ? (
             <div class="flex justify-end">
-              <div class="max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 px-3 py-2 text-sm text-white">
-                {msg.text}
+              <div class="max-w-[min(36rem,85%)] space-y-2 rounded-2xl rounded-br-md bg-brand-600 px-3 py-2 text-sm text-white">
+                <p class="whitespace-pre-wrap m-0">{msg.text}</p>
+                <Show when={msg.attachments?.length}>
+                  <div class="flex flex-wrap gap-1.5">
+                    <For each={msg.attachments}>
+                      {(a) => (
+                        <span class="rounded bg-white/15 px-2 py-0.5 text-[11px]">
+                          {a.name}
+                        </span>
+                      )}
+                    </For>
+                  </div>
+                </Show>
               </div>
             </div>
           ) : (
@@ -134,8 +151,8 @@ export function HelpChatThread(props: {
       </For>
       <Show when={props.streamingText}>
         <div class="flex justify-start">
-          <div class="max-w-[95%] rounded-2xl rounded-bl-md border border-dashed border-stroke bg-slate-50 px-3 py-2 text-sm text-text-secondary whitespace-pre-wrap">
-            {props.streamingText}
+          <div class="max-w-[min(42rem,95%)] rounded-2xl rounded-bl-md border border-dashed border-stroke bg-slate-50 px-4 py-3">
+            <HelpMarkdown content={props.streamingText || ""} class="text-text-secondary" />
           </div>
         </div>
       </Show>

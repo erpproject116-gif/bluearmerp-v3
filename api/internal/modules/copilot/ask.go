@@ -17,28 +17,35 @@ import (
 )
 
 type askBody struct {
-	Query     string `json:"query"`
-	Pathname  string `json:"pathname"`
-	SessionID *int64 `json:"session_id"`
-	Locale    string `json:"locale"`
+	Query       string                            `json:"query"`
+	Pathname    string                            `json:"pathname"`
+	SessionID   *int64                            `json:"session_id"`
+	Locale      string                            `json:"locale"`
+	Attachments []helpassistant.ComposeAttachment `json:"attachments"`
+	Entities    []EntityRef                       `json:"entities"`
 }
 
 type askResult struct {
-	Mode        string          `json:"mode"` // docs | ops | action
-	Message     string          `json:"message"`
-	UsedAI      bool            `json:"used_ai"`
-	ArticleIDs  []string        `json:"article_ids,omitempty"`
+	Mode        string           `json:"mode"` // docs | ops | action
+	Message     string           `json:"message"`
+	UsedAI      bool             `json:"used_ai"`
+	ArticleIDs  []string         `json:"article_ids,omitempty"`
 	Hits        []map[string]any `json:"hits,omitempty"`
-	Tools       []toolResult    `json:"tools,omitempty"`
-	ActionDraft *actionDraft    `json:"action_draft,omitempty"`
-	DeepLinks   []deepLink      `json:"deep_links,omitempty"`
-	Model       string          `json:"model,omitempty"`
-	SessionID   *int64          `json:"session_id,omitempty"`
+	Tools       []toolResult     `json:"tools,omitempty"`
+	ActionDraft *actionDraft     `json:"action_draft,omitempty"`
+	DeepLinks   []deepLink       `json:"deep_links,omitempty"`
+	Entities    []EntityRef      `json:"entities,omitempty"`
+	Model       string           `json:"model,omitempty"`
+	SessionID   *int64           `json:"session_id,omitempty"`
 }
 
 func classifyIntent(query string) string {
 	q := strings.ToLower(query)
-	actionHints := []string{"create recurring", "add recurring", "draft expense", "import rfq", "upload rfq", "rfq pdf"}
+	actionHints := []string{
+		"create recurring", "add recurring", "draft expense", "import rfq", "upload rfq", "rfq pdf",
+		"generate quotation", "create quotation", "new quotation", "send email", "email quotation",
+		"send quotation", "create follow-up", "create follow up", "schedule follow-up", "schedule follow up",
+	}
 	for _, h := range actionHints {
 		if strings.Contains(q, h) {
 			return "action"
@@ -48,16 +55,21 @@ func classifyIntent(query string) string {
 		"overdue", "cash", "receivable", "payable", "financial health", "how much",
 		"stock", "inventory", "on hand", "find stock", "follow up", "follow-up", "pipeline",
 		"what is due", "what's due", "ar aging", "cash flow",
+		"look up", "lookup", "find customer", "find vendor", "find item", "serial",
+		"invoice", "load slip", "transaction",
 	}
 	for _, h := range opsHints {
 		if strings.Contains(q, h) {
 			return "ops"
 		}
 	}
+	if strings.Contains(q, "@[") || strings.HasPrefix(strings.TrimSpace(query), "@") {
+		return "ops"
+	}
 	return "docs"
 }
 
-func toolsForQuery(query string) []struct {
+func toolsForQuery(query string, entities []EntityRef) []struct {
 	Name string
 	Args map[string]any
 } {
@@ -72,10 +84,26 @@ func toolsForQuery(query string) []struct {
 			Args map[string]any
 		}{Name: name, Args: args})
 	}
+	if len(entities) > 0 || strings.Contains(query, "@[") ||
+		strings.Contains(q, "look up") || strings.Contains(q, "lookup") ||
+		strings.Contains(q, "find customer") || strings.Contains(q, "find vendor") ||
+		strings.Contains(q, "find item") || strings.Contains(q, "serial") ||
+		strings.Contains(q, "load slip") || strings.Contains(q, "invoice") {
+		add("lookup_entities", map[string]any{"q": query, "entities": entities})
+	}
 	if strings.Contains(q, "stock") || strings.Contains(q, "inventory") || strings.Contains(q, "on hand") {
-		// crude item extract: last word-ish after "stock of" / "find"
-		args := map[string]any{"q": extractStockQuery(query)}
-		add("find_stock", args)
+		stockQ := extractStockQuery(query)
+		for _, e := range entities {
+			if e.Type == "item" && (e.Code != "" || e.Label != "") {
+				if stockQ == "" {
+					stockQ = e.Code
+					if stockQ == "" {
+						stockQ = e.Label
+					}
+				}
+			}
+		}
+		add("find_stock", map[string]any{"q": stockQ})
 	}
 	if strings.Contains(q, "overdue") || strings.Contains(q, "receivable") || strings.Contains(q, "ar aging") {
 		add("list_overdue_ar", nil)
@@ -87,7 +115,11 @@ func toolsForQuery(query string) []struct {
 		add("crm_follow_ups", nil)
 	}
 	if len(out) == 0 {
-		add("get_financial_health", nil)
+		if len(entities) > 0 {
+			add("lookup_entities", map[string]any{"q": query, "entities": entities})
+		} else {
+			add("get_financial_health", nil)
+		}
 	}
 	return out
 }
@@ -133,16 +165,17 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 
 		mode := classifyIntent(query)
 		pathname := strings.TrimSpace(body.Pathname)
+		entities := mergeEntities(body.Entities, parseMentionTokens(query))
 
 		switch mode {
 		case "docs":
 			result := askDocs(r.Context(), pool, tu, cfg, query, pathname, body)
 			response.OK(w, result, "OK")
 		case "action":
-			result := askAction(r.Context(), pool, tu, cfg, query, pathname, body)
+			result := askAction(r.Context(), pool, tu, cfg, query, pathname, body, entities)
 			response.OK(w, result, "OK")
 		default:
-			result := askOps(r.Context(), pool, tu, cfg, query, pathname, body)
+			result := askOps(r.Context(), pool, tu, cfg, query, pathname, body, entities)
 			response.OK(w, result, "OK")
 		}
 	}
@@ -183,7 +216,7 @@ func askDocs(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg he
 		RoleCode: tu.TenantRole,
 		BranchID: tu.ActiveBranchID,
 		Locale:   body.Locale,
-	})
+	}, body.Attachments...)
 	if err != nil || msg == "" || strings.EqualFold(strings.TrimSpace(msg), "INSUFFICIENT_CONTEXT") {
 		var b strings.Builder
 		b.WriteString("Here are the closest guides:\n")
@@ -193,7 +226,7 @@ func askDocs(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg he
 		return askResult{Mode: "docs", Message: b.String(), ArticleIDs: articleIDs, Hits: hitMaps, UsedAI: false}
 	}
 	helpassistant.RecordUsage(ctx, pool, tu.TenantID, usage)
-	sid := helpassistant.PersistSession(ctx, pool, tu, body.SessionID, pathname, query, msg, ids, model, usage)
+	sid := helpassistant.PersistSession(ctx, pool, tu, body.SessionID, pathname, query, msg, ids, model, usage, body.Attachments...)
 	return askResult{
 		Mode:       "docs",
 		Message:    strings.TrimSpace(msg),
@@ -205,8 +238,8 @@ func askDocs(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg he
 	}
 }
 
-func askOps(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody) askResult {
-	specs := toolsForQuery(query)
+func askOps(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody, entities []EntityRef) askResult {
+	specs := toolsForQuery(query, entities)
 	var tools []toolResult
 	var links []deepLink
 	var draft *actionDraft
@@ -218,9 +251,9 @@ func askOps(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg hel
 			draft = tr.ActionDraft
 		}
 	}
-	msg, usage, model, used := summarizeTools(ctx, cfg, query, tools)
+	msg, usage, model, used := summarizeTools(ctx, cfg, query, tools, body.Attachments)
 	helpassistant.RecordUsage(ctx, pool, tu.TenantID, usage)
-	sid := helpassistant.PersistSession(ctx, pool, tu, body.SessionID, pathname, query, msg, nil, model, usage)
+	sid := helpassistant.PersistSession(ctx, pool, tu, body.SessionID, pathname, query, msg, nil, model, usage, body.Attachments...)
 	return askResult{
 		Mode:        "ops",
 		Message:     msg,
@@ -228,17 +261,25 @@ func askOps(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg hel
 		Tools:       tools,
 		DeepLinks:   links,
 		ActionDraft: draft,
+		Entities:    entities,
 		Model:       model,
 		SessionID:   sid,
 	}
 }
 
-func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody) askResult {
+func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody, entities []EntityRef) askResult {
 	q := strings.ToLower(query)
 	var tr toolResult
-	if strings.Contains(q, "rfq") {
+	switch {
+	case strings.Contains(q, "rfq"):
 		tr = runTool(ctx, pool, tu, "import_rfq_pdf", map[string]any{"note": query})
-	} else {
+	case strings.Contains(q, "send email") || strings.Contains(q, "email quotation") || strings.Contains(q, "send quotation"):
+		tr = runTool(ctx, pool, tu, "draft_send_quotation_email", map[string]any{"q": query, "entities": entities})
+	case strings.Contains(q, "generate quotation") || strings.Contains(q, "create quotation") || strings.Contains(q, "new quotation"):
+		tr = runTool(ctx, pool, tu, "draft_generate_quotation", map[string]any{"q": query, "entities": entities})
+	case strings.Contains(q, "follow-up") || strings.Contains(q, "follow up"):
+		tr = runTool(ctx, pool, tu, "draft_follow_up", map[string]any{"q": query, "entities": entities})
+	default:
 		tr = runTool(ctx, pool, tu, "draft_recurring_expense", map[string]any{
 			"name":   "Suggested recurring expense",
 			"amount": 0,
@@ -256,6 +297,7 @@ func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg 
 		Tools:       []toolResult{tr},
 		ActionDraft: tr.ActionDraft,
 		DeepLinks:   tr.DeepLinks,
+		Entities:    entities,
 		SessionID:   sid,
 	}
 }
@@ -263,14 +305,29 @@ func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg 
 const opsSystemPrompt = `You are Bluearm Copilot summarizing live ERP tool JSON for an executive.
 Rules:
 - Use ONLY the tool JSON provided. Do not invent numbers.
-- Be concise (under 120 words). Prefer bullets.
+- Format with Markdown: short ## headings when useful, **bold** key figures, bullet lists for clarity.
+- Prefer deep links as Markdown [Label](/app/...) when helpful.
+- Be concise (under 160 words).
 - If a tool was denied, say permission is required.
-- Mention deep-link labels when useful.
 - Do not claim you posted or changed anything.`
 
-func summarizeTools(ctx context.Context, cfg helpassistant.Config, query string, tools []toolResult) (string, llm.Usage, string, bool) {
+func summarizeTools(ctx context.Context, cfg helpassistant.Config, query string, tools []toolResult, atts []helpassistant.ComposeAttachment) (string, llm.Usage, string, bool) {
 	raw, _ := json.Marshal(tools)
-	user := fmt.Sprintf("User question: %s\n\nTool results JSON:\n%s\n\nWrite a short answer.", query, string(raw))
+	var attNote strings.Builder
+	if len(atts) > 0 {
+		attNote.WriteString("\n\nUser file excerpts:\n")
+		for i, a := range atts {
+			if i >= 2 {
+				break
+			}
+			text := a.Text
+			if len(text) > 4000 {
+				text = text[:4000] + "…"
+			}
+			fmt.Fprintf(&attNote, "\n--- %s ---\n%s\n", a.Name, text)
+		}
+	}
+	user := fmt.Sprintf("User question: %s\n\nTool results JSON:\n%s%s\n\nWrite a short Markdown answer.", query, string(raw), attNote.String())
 	client := cfg.NewDashScopeClient()
 	model := cfg.MediumModel
 	out, err := client.ChatCompletionWithUsage(ctx, llm.ChatRequest{
@@ -280,7 +337,7 @@ func summarizeTools(ctx context.Context, cfg helpassistant.Config, query string,
 			{Role: "user", Content: user},
 		},
 		Temperature: 0.2,
-		MaxTokens:   400,
+		MaxTokens:   600,
 	})
 	if err != nil {
 		// Deterministic fallback
