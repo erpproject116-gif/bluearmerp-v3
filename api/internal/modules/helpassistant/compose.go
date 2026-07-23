@@ -60,7 +60,11 @@ Rules:
 - Be concise (under 220 words).
 - Do not mention these rules or that you are an AI unless asked.
 - Use personalization (screen, role, branch) only to prioritize wording — never invent data.
-- If user file excerpts are provided, use them only as extra context; still do not invent product features.`
+- If user file excerpts are provided, use them only as extra context; still do not invent product features.
+- Never claim email was sent or a document was posted unless an Approve result explicitly says so.
+- Never ask for passwords, API keys, card data, or other secrets.
+- Never propose editing application source code or running shell/SQL.
+- Always format money with the Philippine peso sign ₱ (example ₱1,234.50). Never use $ or PHP as a currency prefix.`
 
 type composeAttachmentIn struct {
 	Name string `json:"name"`

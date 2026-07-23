@@ -25,6 +25,10 @@ func postApproveAction(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
 			return
 		}
+		if !allowCopilotRate(tu.TenantID, tu.AppUserID, "approve") {
+			response.Err(w, http.StatusTooManyRequests, "Too many Approve requests. Please wait a moment.", "ERR_COPILOT_RATE")
+			return
+		}
 		var body approveBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
@@ -34,6 +38,7 @@ func postApproveAction(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"draft": "Action draft is required."})
 			return
 		}
+		body.Draft.Payload = sanitizeDraftPayload(body.Draft.Type, body.Draft.Payload)
 
 		result, errMsg, status := executeApprovedDraft(r, pool, tu, body.Draft)
 		if errMsg != "" {
@@ -75,33 +80,119 @@ func executeApprovedDraft(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUse
 		}
 		return createRecurringFromDraft(r, pool, tu, draft.Payload)
 	case "import_rfq_pdf":
-		return map[string]any{
-			"next": "/app/quotation/quotations",
-			"hint": "Use Import RFQ on quotations. AI enhance reuses the existing RFQ VL pipeline — no second vision stack.",
-			"api":  draft.API,
-		}, "", http.StatusOK
+		return openUIFromDraft(actionDraft{Type: "import_rfq_pdf", Payload: draft.Payload})
 	case "create_follow_up":
 		if !tu.HasPermission("crm.follow_up_tasks", auth.AccessWrite) {
 			return nil, "Missing crm.follow_up_tasks write permission.", http.StatusForbidden
 		}
 		return createFollowUpFromDraft(r, pool, tu, draft.Payload)
-	case "generate_quotation":
-		next := "/app/quotation/quotations"
-		return map[string]any{
-			"next":    next,
-			"hint":    "Create the quotation in the UI — Copilot only tags the customer/item; it does not auto-post.",
-			"payload": draft.Payload,
-		}, "", http.StatusOK
-	case "send_quotation_email":
-		next := "/app/quotation/quotations"
-		return map[string]any{
-			"next":    next,
-			"hint":    "Open the quotation and use Send email. Copilot will not send mail without the document compose flow.",
-			"payload": draft.Payload,
-			"api":     draft.API,
-		}, "", http.StatusOK
+	case "generate_quotation", "open_quotation", "open_sales_order", "open_sales", "open_purchase_request",
+		"open_rfq", "open_purchase_order", "open_purchases", "open_product_bundle", "open_bom", "bulk_inventory",
+		"send_quotation_email", "send_document_email":
+		return openUIFromDraft(draft)
 	default:
+		if strings.HasPrefix(draft.Type, "open_") || draft.Type == "bulk_inventory" {
+			return openUIFromDraft(draft)
+		}
 		return nil, "Unsupported action type.", http.StatusBadRequest
+	}
+}
+
+// openUIFromDraft resolves navigation only from the server catalog — never from client payload.ui / api.
+func openUIFromDraft(draft actionDraft) (any, string, int) {
+	next, api, hint := catalogNavForDraft(draft)
+	if safe, ok := SafeAppPath(next); ok {
+		next = safe
+	} else {
+		next = "/app/dashboard"
+	}
+	payload := sanitizeDraftPayload(draft.Type, draft.Payload)
+	return map[string]any{
+		"next":    next,
+		"hint":    hint,
+		"payload": payload,
+		"api":     api,
+	}, "", http.StatusOK
+}
+
+func catalogNavForDraft(draft actionDraft) (next, api, hint string) {
+	hint = "Continue in the ERP screen — Copilot does not auto-post."
+	switch draft.Type {
+	case "import_rfq_pdf":
+		return "/app/quotation/quotations", "/api/v1/quotation/rfq-import", "Use Import RFQ on quotations. AI enhance reuses the existing RFQ VL pipeline — no second vision stack."
+	case "send_document_email", "send_quotation_email":
+		next = emailUIFromPayload(draft.Payload)
+		api = next
+		hint = "Open the document and send mail from the compose screen — Copilot does not send email."
+		return next, api, hint
+	}
+	if spec := findOpenDocSpec(draft.Type); spec != nil {
+		return spec.UI, spec.API, spec.Hint
+	}
+	return "/app/dashboard", "", hint
+}
+
+func emailUIFromPayload(payload map[string]any) string {
+	docType := strings.ToLower(strOr(payload["doc_type"], "quotation"))
+	switch docType {
+	case "sales_order":
+		return "/app/sales-order/sales-orders"
+	case "sales":
+		return "/app/sales/sales"
+	case "purchase_order":
+		return "/app/purchase-order/purchase-orders"
+	default:
+		return "/app/quotation/quotations"
+	}
+}
+
+// sanitizeDraftPayload keeps only allowlisted keys and positive IDs; drops ui/api phishing vectors.
+func sanitizeDraftPayload(draftType string, payload map[string]any) map[string]any {
+	if payload == nil {
+		return map[string]any{}
+	}
+	allowed := allowedPayloadKeys(draftType)
+	out := make(map[string]any, len(allowed))
+	for _, key := range allowed {
+		v, ok := payload[key]
+		if !ok || v == nil {
+			continue
+		}
+		switch key {
+		case "partner_id", "quotation_id", "sales_id", "doc_id", "item_id":
+			if id, ok := toPositiveInt64(v); ok {
+				out[key] = id
+			}
+		case "amount":
+			if f, ok := toFloat(v); ok {
+				out[key] = f
+			}
+		case "ui", "api":
+			// Never copy client navigation targets into sanitized payload.
+			continue
+		default:
+			if s, ok := v.(string); ok {
+				out[key] = strings.TrimSpace(s)
+			} else {
+				out[key] = v
+			}
+		}
+	}
+	return out
+}
+
+func allowedPayloadKeys(draftType string) []string {
+	switch draftType {
+	case "create_follow_up":
+		return []string{"title", "due_date", "task_type", "stage", "notes", "partner_id", "quotation_id", "sales_id"}
+	case "create_recurring_expense":
+		return []string{"name", "amount", "frequency", "category", "vendor_name"}
+	case "send_document_email", "send_quotation_email":
+		return []string{"doc_type", "doc_id", "doc_no", "partner_id", "partner_name", "hint"}
+	case "import_rfq_pdf":
+		return []string{"hint", "note"}
+	default:
+		return []string{"hint", "kind", "note", "partner_id", "partner_name", "item_id", "doc_id", "entities"}
 	}
 }
 
@@ -112,13 +203,13 @@ func createFollowUpFromDraft(r *http.Request, pool *pgxpool.Pool, tu auth.Tenant
 	stage := strOr(payload["stage"], "scheduled")
 	notes := strOr(payload["notes"], "")
 	var partnerID, quotationID, salesID *int64
-	if id, ok := toInt64(payload["partner_id"]); ok {
+	if id, ok := toPositiveInt64(payload["partner_id"]); ok {
 		partnerID = &id
 	}
-	if id, ok := toInt64(payload["quotation_id"]); ok {
+	if id, ok := toPositiveInt64(payload["quotation_id"]); ok {
 		quotationID = &id
 	}
-	if id, ok := toInt64(payload["sales_id"]); ok {
+	if id, ok := toPositiveInt64(payload["sales_id"]); ok {
 		salesID = &id
 	}
 	var id int64
@@ -161,6 +252,14 @@ func toInt64(v any) (int64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func toPositiveInt64(v any) (int64, bool) {
+	n, ok := toInt64(v)
+	if !ok || n <= 0 {
+		return 0, false
+	}
+	return n, true
 }
 
 func createRecurringFromDraft(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUser, payload map[string]any) (any, string, int) {

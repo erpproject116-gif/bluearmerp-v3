@@ -3,6 +3,7 @@ import { approveCopilotAction, denyCopilotAction } from "./helpApi";
 import { HelpDeepLinkChips, HelpMarkdown } from "./HelpMarkdown";
 import { HelpResultCard } from "./HelpResultCard";
 import type { HelpChatMessage } from "./helpTypes";
+import { safeAppPath } from "./safeAppPath";
 
 function AssistantBubble(props: {
   message: Extract<HelpChatMessage, { role: "assistant" }>;
@@ -24,14 +25,15 @@ function AssistantBubble(props: {
         return;
       }
       const result = res.data?.result as { next?: string; hint?: string } | undefined;
-      if (result?.next) {
-        setActionNote(result.hint || "Opening…");
+      const next = result?.next ? safeAppPath(result.next) : null;
+      if (next) {
+        setActionNote(result?.hint || "Opening…");
         window.setTimeout(() => {
-          window.location.assign(result.next!);
+          window.location.assign(next);
         }, 400);
         return;
       }
-      setActionNote("Approved — changes applied where allowed.");
+      setActionNote(result?.hint || "Approved — changes applied where allowed.");
     } finally {
       setActing(false);
     }

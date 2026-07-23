@@ -1,5 +1,6 @@
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import { A } from "@solidjs/router";
+import { safeAppPath } from "./safeAppPath";
 
 type Block =
   | { type: "p"; text: string }
@@ -21,9 +22,14 @@ function inlineMarkdown(raw: string): string {
   s = s.replace(/\[([^\]]+)\]\((\/app\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, (_m, label, href) => {
     const h = String(href);
     if (h.startsWith("/app/")) {
-      return `<a href="${h}" data-help-link="1" class="text-brand-600 underline underline-offset-2 hover:text-brand-700">${label}</a>`;
+      const safe = safeAppPath(h);
+      if (!safe) {
+        return label;
+      }
+      return `<a href="${escapeHtml(safe)}" data-help-link="1" class="text-brand-600 underline underline-offset-2 hover:text-brand-700">${label}</a>`;
     }
-    return `<a href="${h}" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline underline-offset-2 hover:text-brand-700">${label}</a>`;
+    // External https? — keep noopener; scheme already constrained by regex (no javascript:/data:)
+    return `<a href="${escapeHtml(h)}" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline underline-offset-2 hover:text-brand-700" title="Opens outside Bluearm">${label}</a><span class="ml-1 text-[10px] text-text-secondary">(opens outside Bluearm)</span>`;
   });
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, "$1<em>$2</em>");
@@ -98,6 +104,12 @@ export function parseHelpMarkdown(md: string): Block[] {
   return blocks;
 }
 
+/** True when markdown contains an external http(s) link (for UI note). */
+export function helpMarkdownHasExternalLink(md: string): boolean {
+  const re = /\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/g;
+  return re.test(md || "");
+}
+
 function BlockView(props: { block: Block }) {
   const b = () => props.block;
   if (b().type === "p") {
@@ -140,14 +152,25 @@ export function HelpMarkdown(props: { content: string; class?: string }) {
   return (
     <div class={`help-md space-y-2.5 text-sm leading-relaxed text-text-primary ${props.class ?? ""}`}>
       <For each={parseHelpMarkdown(props.content || "")}>{(block) => <BlockView block={block} />}</For>
+      <Show when={helpMarkdownHasExternalLink(props.content || "")}>
+        <p class="m-0 text-[11px] text-text-secondary">Links marked “opens outside Bluearm” leave this app.</p>
+      </Show>
     </div>
   );
 }
 
 export function HelpDeepLinkChips(props: { links: Array<{ label: string; href: string }> }) {
+  const safeLinks = () =>
+    (props.links || [])
+      .map((link) => {
+        const href = safeAppPath(link.href);
+        return href ? { label: link.label, href } : null;
+      })
+      .filter((x): x is { label: string; href: string } => x != null);
+
   return (
     <div class="flex flex-wrap gap-2 pt-1">
-      <For each={props.links}>
+      <For each={safeLinks()}>
         {(link) => (
           <A
             href={link.href}

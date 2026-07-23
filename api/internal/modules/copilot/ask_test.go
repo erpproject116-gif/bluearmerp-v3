@@ -15,8 +15,12 @@ func TestClassifyIntent(t *testing.T) {
 		{"send email quotation", "action"},
 		{"create follow-up for customer", "action"},
 		{"look up serial SN-1", "ops"},
-		{"How much is my expenses as of today?", "ops"},
-		{"Can you project how will be my revenue by the end of this year?", "ops"},
+		{"create sales order for Acme", "action"},
+		{"new purchase request", "action"},
+		{"compare pricing WIDGET", "ops"},
+		{"recommend items laptop", "ops"},
+		{"show my notifications", "ops"},
+		{"pc build for gaming", "action"},
 	}
 	for _, c := range cases {
 		if got := classifyIntent(c.q); got != c.want {
