@@ -59,15 +59,15 @@ export default function OperationsDashboardPage() {
                         <div class="grid grid-cols-3 gap-2">
                           <div>
                             <p class="text-xs text-text-secondary">Budget</p>
-                            <p class="font-medium">{formatMoney(data.total_budget)}</p>
+                            <p class="font-medium">{formatMoney(data.total_budget ?? 0)}</p>
                           </div>
                           <div>
                             <p class="text-xs text-text-secondary">Actual</p>
-                            <p class="font-medium">{formatMoney(data.total_actual)}</p>
+                            <p class="font-medium">{formatMoney(data.total_actual ?? 0)}</p>
                           </div>
                           <div>
                             <p class="text-xs text-text-secondary">Variance</p>
-                            <p class="font-medium">{formatMoney(data.variance)}</p>
+                            <p class="font-medium">{formatMoney(data.variance ?? 0)}</p>
                           </div>
                         </div>
                         <table class="mt-2 w-full text-xs">

@@ -131,7 +131,7 @@ export default function QuotationPipelinePage() {
             { key: "pipeline_stage", header: "Stage", render: (r) => PIPELINE_STAGE_LABELS[r.pipeline_stage] },
             { key: "valid_until", header: "Valid until", render: (r) => r.valid_until ?? "—" },
             { key: "progress_status", header: "Progress", render: (r) => humanizeStatus(r.progress_status) },
-            { key: "grand_total", header: "Total", render: (r) => money(r.grand_total) },
+            { key: "grand_total", header: "Total", render: (r) => formatMoney(r.grand_total) },
           ]}
           rows={pagedRows()}
           loading={pipeline.isFetching}
