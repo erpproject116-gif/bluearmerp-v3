@@ -37,8 +37,18 @@ export type CopilotAskResult = {
   tools?: unknown[];
   action_draft?: CopilotActionDraft | null;
   deep_links?: Array<{ label: string; href: string }>;
+  entities?: CopilotEntityRef[];
   model?: string;
   session_id?: number;
+};
+
+export type CopilotEntityRef = {
+  type: string;
+  id: number;
+  code?: string;
+  label: string;
+  extra?: string;
+  href?: string;
 };
 
 export type CopilotActionDraft = {
@@ -114,6 +124,12 @@ export async function summarizeHelpFeedback(opts?: { days?: number }) {
   return apiFetch<HelpFeedbackSummaryRow[]>(`/api/v1/help/feedback/summary${q ? `?${q}` : ""}`);
 }
 
+export type HelpAttachmentPayload = {
+  name: string;
+  kind: string;
+  text: string;
+};
+
 function hitsPayload(hits: HelpReplyHit[]) {
   return hits.map((h) => ({
     article_id: h.articleId,
@@ -129,6 +145,7 @@ export async function composeHelpWithAI(input: {
   pathname: string;
   hits: HelpReplyHit[];
   sessionId?: number;
+  attachments?: HelpAttachmentPayload[];
 }): Promise<HelpComposeAIResult | null> {
   const cfg = await fetchHelpAIConfig();
   if (!cfg?.enabled || !input.hits.length) return null;
@@ -143,6 +160,7 @@ export async function composeHelpWithAI(input: {
         pathname: input.pathname,
         hits: hitsPayload(input.hits),
         session_id: input.sessionId,
+        attachments: input.attachments ?? [],
         personalization: {
           pathname: input.pathname,
           branch_id: branchId || undefined,
@@ -245,6 +263,8 @@ export async function askCopilot(input: {
   query: string;
   pathname: string;
   sessionId?: number;
+  attachments?: HelpAttachmentPayload[];
+  entities?: CopilotEntityRef[];
 }): Promise<CopilotAskResult | null> {
   const cfg = await fetchHelpAIConfig();
   if (!cfg?.copilot) return null;
@@ -256,12 +276,80 @@ export async function askCopilot(input: {
         query: input.query,
         pathname: input.pathname,
         session_id: input.sessionId,
+        attachments: input.attachments ?? [],
+        entities: input.entities ?? [],
       }),
     },
     { silent: true, background: true },
   );
   if (!res.success || !res.data) return null;
   return res.data;
+}
+
+export async function searchCopilotEntities(q: string, type?: string): Promise<CopilotEntityRef[]> {
+  const params = new URLSearchParams({ q: q.trim() });
+  if (type) params.set("type", type);
+  const res = await apiFetch<{ entities: CopilotEntityRef[] }>(
+    `/api/v1/copilot/entities/search?${params.toString()}`,
+    {},
+    { silent: true, background: true },
+  );
+  if (!res.success || !res.data?.entities) return [];
+  return res.data.entities;
+}
+
+export function formatEntityMention(e: CopilotEntityRef): string {
+  const label = (e.code && e.code !== e.label ? `${e.code} ${e.label}` : e.label || e.code || String(e.id)).trim();
+  return `@[${e.type}:${e.id}|${label}]`;
+}
+
+export function parseEntityMentions(text: string): CopilotEntityRef[] {
+  const re = /@\[([a-z_]+):(\d+)\|([^\]]+)\]/g;
+  const out: CopilotEntityRef[] = [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const key = `${m[1]}:${m[2]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ type: m[1], id: Number(m[2]), label: m[3].trim(), code: m[3].trim() });
+  }
+  return out;
+}
+
+export type CopilotSessionSummary = {
+  id: number;
+  title: string;
+  pathname: string;
+  updated_at: string;
+  created_at: string;
+};
+
+export type CopilotSessionDetail = {
+  id: number;
+  title: string;
+  pathname: string;
+  messages: Array<{
+    id: number;
+    role: string;
+    content: string;
+    article_ids?: unknown;
+    attachments?: unknown;
+    model?: string;
+    created_at: string;
+  }>;
+};
+
+export async function listCopilotSessions() {
+  return apiFetch<CopilotSessionSummary[]>("/api/v1/copilot/sessions", {}, { silent: true, background: true });
+}
+
+export async function getCopilotSession(id: number) {
+  return apiFetch<CopilotSessionDetail>(`/api/v1/copilot/sessions/${id}`, {}, { silent: true, background: true });
+}
+
+export async function deleteCopilotSession(id: number) {
+  return apiFetch<{ id: number }>(`/api/v1/copilot/sessions/${id}`, { method: "DELETE" }, { silent: true });
 }
 
 export async function approveCopilotAction(draft: CopilotActionDraft, sessionId?: number) {
@@ -279,9 +367,11 @@ export async function denyCopilotAction(draft: CopilotActionDraft, sessionId?: n
 }
 
 const OPS_HINT =
-  /\b(overdue|cash|stock|inventory|follow[- ]?up|financial health|receivable|payable|pipeline|on hand)\b/i;
-const ACTION_HINT = /\b(create recurring|add recurring|import rfq|upload rfq|rfq pdf)\b/i;
+  /\b(overdue|cash|stock|inventory|follow[- ]?up|financial health|receivable|payable|pipeline|on hand|look\s*up|serial|invoice|load\s*slip|transaction|customer|vendor|item code)\b/i;
+const ACTION_HINT =
+  /\b(create recurring|add recurring|import rfq|upload rfq|rfq pdf|generate quotation|create quotation|new quotation|send email|email quotation|send quotation|create follow[- ]?up|schedule follow[- ]?up)\b/i;
+const MENTION_HINT = /@\[|[^\S\r\n]@\w|^\s*@/;
 
 export function shouldUseCopilotAsk(query: string): boolean {
-  return OPS_HINT.test(query) || ACTION_HINT.test(query);
+  return OPS_HINT.test(query) || ACTION_HINT.test(query) || MENTION_HINT.test(query);
 }

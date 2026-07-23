@@ -13,10 +13,13 @@ import (
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/copilot", func(cr chi.Router) {
 		cr.Get("/config", getConfig())
+		cr.Get("/entities/search", getEntitySearch(pool))
+		cr.Post("/entities/search", postEntitySearch(pool))
 		cr.Post("/ask", postAsk(pool))
 		cr.Post("/tools/run", postRunTool(pool))
 		cr.Post("/actions/approve", postApproveAction(pool))
 		cr.Post("/actions/deny", postDenyAction(pool))
+		registerSessionRoutes(cr, pool)
 	})
 }
 
@@ -34,8 +37,16 @@ func getConfig() http.HandlerFunc {
 				"list_overdue_ar",
 				"find_stock",
 				"crm_follow_ups",
+				"lookup_entities",
 				"draft_recurring_expense",
 				"import_rfq_pdf",
+				"draft_follow_up",
+				"draft_generate_quotation",
+				"draft_send_quotation_email",
+			},
+			"entity_types": []string{
+				"item", "customer", "vendor", "serial", "sales", "quotation",
+				"purchase_order", "sales_order", "load_slip",
 			},
 		}, "OK")
 	}

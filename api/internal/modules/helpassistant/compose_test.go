@@ -14,7 +14,7 @@ func TestBuildGroundedUserPrompt(t *testing.T) {
 			Snippet:   "Check attachments",
 			Steps:     []string{"Upload a file", "Save then Confirm"},
 		},
-	}, &composePersonalization{RoleCode: "owner", BranchID: 3})
+	}, &composePersonalization{RoleCode: "owner", BranchID: 3}, nil)
 	if len(ids) != 1 || ids[0] != "cannot-confirm-document" {
 		t.Fatalf("ids=%v", ids)
 	}

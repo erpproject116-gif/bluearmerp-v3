@@ -53,7 +53,7 @@ export type HelpReply = {
 };
 
 export type HelpChatMessage =
-  | { id: string; role: "user"; text: string }
+  | { id: string; role: "user"; text: string; attachments?: Array<{ name: string; kind: string }> }
   | { id: string; role: "assistant"; reply: HelpReply };
 
 export type HelpFeedbackVote = "up" | "down";
