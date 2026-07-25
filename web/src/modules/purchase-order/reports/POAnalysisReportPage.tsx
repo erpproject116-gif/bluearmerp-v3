@@ -6,6 +6,7 @@ import {
   usePOAnalysisReport,
   type DateRangeFilters,
 } from "../../../shared/reports/useModuleReports";
+import { formatMoney } from "../../../shared/money";
 import { PurchaseRequestLayout } from "../../purchase-request/PurchaseRequestLayout";
 
 export default function POAnalysisReportPage() {
@@ -87,7 +88,7 @@ export default function POAnalysisReportPage() {
                   <td class="px-3 py-2 text-right">{row.confirmed_count}</td>
                   <td class="px-3 py-2 text-right">{row.partial_count}</td>
                   <td class="px-3 py-2 text-right">{row.received_count}</td>
-                  <td class="px-3 py-2 text-right">{row.total_amount.toLocaleString()}</td>
+                  <td class="px-3 py-2 text-right">{formatMoney(row.total_amount)}</td>
                 </tr>
               )}
             </For>

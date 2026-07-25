@@ -2,11 +2,18 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
+import { AlertBanner } from "../../../shared/AlertBanner";
+import { QuickItemModal, type CreatedItem } from "../../../shared/QuickItemModal";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { formatMoney } from "../../../shared/money";
 import { fileImportKey, type RfqDocumentPayload, type RfqOcrPage, type RfqOcrProgress } from "./rfqDocumentOcr";
 import type { RfqStructuredTable, WorkbookSheetInfo } from "./rfqSpreadsheetImport";
 import type { QuotationLineRow } from "./QuotationLineGrid";
 import { emptyQuotationLine } from "./QuotationLineGrid";
-import { rfqParseNeedsAiEnhancement } from "./rfqImportPipeline";
+import { rfqParseNeedsAiEnhancement, type RfqDocumentType } from "./rfqImportPipeline";
+
+const unmatchedChipClass =
+  "inline-flex rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
 
 export type RfqParsedLine = {
   page: number;
@@ -21,6 +28,8 @@ export type RfqParsedLine = {
   line_total?: string;
   confidence: number;
   item_id?: number | null;
+  unit_id?: number | null;
+  unit_code?: string | null;
   sales_price?: number;
   rfq_unit_price?: number;
   match_score?: number;
@@ -109,6 +118,7 @@ type Props = {
 
 export function RfqImportModal(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
   const [busy, setBusy] = createSignal(false);
   const [progress, setProgress] = createSignal<RfqOcrProgress | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -130,7 +140,15 @@ export function RfqImportModal(props: Props) {
   const [aiAvailable, setAiAvailable] = createSignal(false);
   const [aiUsed, setAiUsed] = createSignal(false);
   const [aiModel, setAiModel] = createSignal<string | null>(null);
+  const [documentType, setDocumentType] = createSignal<RfqDocumentType>("unknown");
+  const [blockedReason, setBlockedReason] = createSignal<string | null>(null);
+  const [pagesTruncated, setPagesTruncated] = createSignal(0);
+  const [createLineNo, setCreateLineNo] = createSignal<number | null>(null);
   let fileInputRef: HTMLInputElement | undefined;
+
+  const unmatchedCount = () => lines().filter((l) => l.include && !l.item_id).length;
+  const createLine = () => lines().find((l) => l.line_no === createLineNo()) ?? null;
+  const canCreateItem = () => hasPermission(auth.me, "inventory.items", "write");
 
   createEffect(() => {
     if (!props.open) return;
@@ -166,6 +184,9 @@ export function RfqImportModal(props: Props) {
     setSourceFiles([]);
     setAiUsed(false);
     setAiModel(null);
+    setDocumentType("unknown");
+    setBlockedReason(null);
+    setPagesTruncated(0);
     setProgress(null);
     setError(null);
     if (fileInputRef) fileInputRef.value = "";
@@ -196,10 +217,16 @@ export function RfqImportModal(props: Props) {
     );
     setTableDetected(parsed.table_detected);
     setDetectedColumns(parsed.detected_columns);
+    setDocumentType(parsed.document_type);
+    setBlockedReason(parsed.blocked ? parsed.blocked_reason ?? "This document cannot be imported as an RFQ." : null);
     if (force.filter(Boolean).length >= 2) {
       setForceColumns(force);
     } else if (parsed.force_columns.length) {
       setForceColumns(parsed.force_columns);
+    }
+    if (parsed.blocked) {
+      setLines([]);
+      throw new Error(parsed.blocked_reason ?? "This document cannot be imported as an RFQ.");
     }
     if (!parsed.lines.length) {
       setLines([]);
@@ -260,6 +287,9 @@ export function RfqImportModal(props: Props) {
       setSourceFiles(files);
       setAiUsed(false);
       setAiModel(null);
+      setDocumentType("unknown");
+      setBlockedReason(null);
+      setPagesTruncated(0);
       setSkippedPageCount(payload.skippedPages ?? 0);
       const unitCount = payload.pages.length + payload.tables.length;
       setTableSourceCount(payload.tablePages ?? unitCount);
@@ -374,6 +404,7 @@ export function RfqImportModal(props: Props) {
   };
 
   const needsAiEnhancement = () =>
+    documentType() === "gov_section_spec" ||
     rfqParseNeedsAiEnhancement(
       lines().map((l) => ({ description: l.description, confidence: l.confidence })),
       tableDetected(),
@@ -421,6 +452,8 @@ export function RfqImportModal(props: Props) {
       setDetectedColumns(parsed.detected_columns);
       setAiUsed(true);
       setAiModel(parsed.ai_model ?? cfg.vision_model ?? null);
+      setDocumentType(parsed.document_type);
+      setPagesTruncated(parsed.pages_truncated);
 
       const matched = await matchLines(parsed.lines);
       setLines(matched);
@@ -486,7 +519,33 @@ export function RfqImportModal(props: Props) {
     });
   };
 
+  const clearInventoryMatch = (lineNo: number) => {
+    updateLine(lineNo, {
+      item_id: null,
+      sales_price: undefined,
+      match_score: undefined,
+    });
+  };
+
+  const onItemCreated = (item: CreatedItem) => {
+    const lineNo = createLineNo();
+    if (lineNo == null) return;
+    pickAlternative(lineNo, {
+      item_id: item.id,
+      item_code: item.item_code,
+      item_name: item.item_name,
+      sales_price: item.sales_price,
+      match_score: 1,
+    });
+    setCreateLineNo(null);
+    toast.success(`Bound ${item.item_code} to RFQ line.`);
+  };
+
   const apply = () => {
+    if (blockedReason() || documentType() === "invoice_like") {
+      toast.warning(blockedReason() ?? "This document looks like an invoice, not an RFQ.");
+      return;
+    }
     const selected = lines().filter((l) => l.include);
     if (!selected.length) {
       toast.warning("Select at least one line to import.");
@@ -496,7 +555,11 @@ export function RfqImportModal(props: Props) {
       const description = (ln.description || ln.item_name || ln.item_code || "").trim();
       const price = pickUnitPrice(ln);
       const base = emptyQuotationLine(idx + 1, price);
-      const remarkParts = [ln.remarks?.trim(), ln.unit?.trim() ? `UOM: ${ln.unit.trim()}` : ""].filter(Boolean);
+      const unitId = ln.unit_id ?? null;
+      const unitCode = (ln.unit_code ?? "").trim();
+      // Remark fallback only when the unit text could not be matched to a UoM.
+      const unresolvedUnit = !unitId && !unitCode && ln.unit?.trim() ? `UOM: ${ln.unit.trim()}` : "";
+      const remarkParts = [ln.remarks?.trim(), unresolvedUnit].filter(Boolean);
       return {
         ...base,
         line_no: idx + 1,
@@ -505,6 +568,8 @@ export function RfqImportModal(props: Props) {
         item_name: (ln.item_name || description).trim(),
         description,
         qty: ln.qty || "1",
+        unit_id: unitId,
+        unit_code: unitCode,
         remark: remarkParts.length ? remarkParts.join(" · ") : base.remark,
       };
     });
@@ -529,6 +594,23 @@ export function RfqImportModal(props: Props) {
       .map((c) => c.label || c.field)
       .filter(Boolean)
       .join(" · ");
+
+  const documentTypeLabel = () => {
+    switch (documentType()) {
+      case "gov_section_spec":
+        return "Government RFQ — section-based technical specifications";
+      case "gov_annex_table":
+        return "Government RFQ — Annex table";
+      case "spreadsheet_boq":
+        return "Spreadsheet BOQ / RFQ";
+      case "invoice_like":
+        return "Invoice-like document";
+      case "rfq":
+        return "RFQ document";
+      default:
+        return "";
+    }
+  };
 
   return (
     <Modal
@@ -712,6 +794,29 @@ export function RfqImportModal(props: Props) {
         </div>
       </Show>
 
+      <Show when={documentTypeLabel()}>
+        <div
+          class={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+            documentType() === "invoice_like"
+              ? "border-red-200 bg-red-50 text-red-900"
+              : "border-brand-200 bg-brand-50 text-brand-900"
+          }`}
+        >
+          <p class="font-medium">{documentTypeLabel()}</p>
+          <Show when={blockedReason()}>
+            <p class="mt-1">{blockedReason()}</p>
+          </Show>
+          <Show when={documentType() === "gov_section_spec" && aiAvailable() && !aiUsed()}>
+            <p class="mt-1 text-xs">AI enhancement can validate section headings and fold technical bullets into each item.</p>
+          </Show>
+          <Show when={pagesTruncated() > 0}>
+            <p class="mt-1 text-xs">
+              {pagesTruncated()} page(s) exceeded the AI page cap and were not sent to the model.
+            </p>
+          </Show>
+        </div>
+      </Show>
+
       <div
         role="button"
         tabindex={busy() ? -1 : 0}
@@ -810,6 +915,14 @@ export function RfqImportModal(props: Props) {
       </Show>
 
       <Show when={lines().length > 0}>
+        <Show when={unmatchedCount() > 0}>
+          <AlertBanner kind="warning" title="Some lines are not in inventory" class="mb-3">
+            <p>
+              {unmatchedCount()} selected line(s) have no inventory item bound. Amber rows need a match, a weak-match
+              pick, or a new item before you Apply — or leave them as free-text descriptions.
+            </p>
+          </AlertBanner>
+        </Show>
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 class="text-sm font-semibold text-text-primary">Review line items</h3>
           <button
@@ -828,6 +941,7 @@ export function RfqImportModal(props: Props) {
           <span class="text-sm text-text-secondary">
             {lines().filter((l) => l.include).length} of {lines().length} lines selected
             {skippedPageCount() > 0 ? ` · ${skippedPageCount()} pages skipped` : ""}
+            {unmatchedCount() > 0 ? ` · ${unmatchedCount()} not in inventory` : ""}
           </span>
         </div>
         <div class="max-h-[55vh] overflow-auto rounded-lg border-2 border-brand-100 shadow-sm">
@@ -849,7 +963,7 @@ export function RfqImportModal(props: Props) {
             <tbody>
               <For each={lines()}>
                 {(row) => (
-                  <tr>
+                  <tr classList={{ "bg-amber-50/60": !row.item_id }}>
                     <td class="px-3 py-2">
                       <input
                         type="checkbox"
@@ -860,6 +974,11 @@ export function RfqImportModal(props: Props) {
                     <td class="px-3 py-2 text-text-secondary">{row.page}</td>
                     <td class={`px-3 py-2 text-xs ${confidenceClass(row.confidence)}`}>
                       {Math.round(row.confidence * 100)}%
+                      <Show when={row.match_score && row.match_score > 0}>
+                        <span class="ml-1 text-text-secondary" title="Inventory match score">
+                          · M{Math.round((row.match_score ?? 0) * 100)}%
+                        </span>
+                      </Show>
                     </td>
                     <td class="px-3 py-2">
                       <input
@@ -890,9 +1009,9 @@ export function RfqImportModal(props: Props) {
                         onInput={(e) => updateLine(row.line_no, { unit_price: e.currentTarget.value })}
                       />
                     </td>
-                    <td class="px-3 py-2 text-xs text-text-secondary">
+                    <td class="px-3 py-2 text-xs text-text-secondary tabular-nums">
                       <Show when={row.sales_price && row.sales_price > 0} fallback="—">
-                        {row.sales_price}
+                        {formatMoney(row.sales_price ?? 0)}
                       </Show>
                     </td>
                     <td class="px-3 py-2">
@@ -903,37 +1022,59 @@ export function RfqImportModal(props: Props) {
                       />
                     </td>
                     <td class="px-3 py-2 text-xs">
-                      <Show
-                        when={row.alternatives?.length}
-                        fallback={
-                          row.item_id ? (
-                            <span class="text-text-primary">
-                              {row.item_code} — {row.item_name}
-                            </span>
-                          ) : (
-                            <span class="text-text-secondary">Free text — editable in quotation</span>
-                          )
-                        }
-                      >
-                        <select
-                          class={`${inputClass} max-w-[14rem]`}
-                          value={String(row.item_id ?? "")}
-                          onChange={(e) => {
-                            const id = Number(e.currentTarget.value);
-                            const alt = row.alternatives?.find((a) => a.item_id === id);
-                            if (alt) pickAlternative(row.line_no, alt);
-                          }}
+                      <div class="flex flex-col gap-1.5">
+                        <Show when={!row.item_id && !(row.alternatives?.length)}>
+                          <span class={unmatchedChipClass}>Not in inventory</span>
+                        </Show>
+                        <Show when={!row.item_id && (row.alternatives?.length ?? 0) > 0}>
+                          <span class={unmatchedChipClass}>Weak match — review</span>
+                        </Show>
+                        <Show
+                          when={row.alternatives?.length}
+                          fallback={
+                            row.item_id ? (
+                              <span class="text-text-primary">
+                                {row.item_code} — {row.item_name}
+                              </span>
+                            ) : (
+                              <span class="text-text-secondary">Free text — editable in quotation</span>
+                            )
+                          }
                         >
-                          <option value="">Free text</option>
-                          <For each={row.alternatives}>
-                            {(alt) => (
-                              <option value={String(alt.item_id)}>
-                                {alt.item_code} — {alt.item_name} ({Math.round(alt.match_score * 100)}%)
-                              </option>
-                            )}
-                          </For>
-                        </select>
-                      </Show>
+                          <select
+                            class={`${inputClass} max-w-[14rem]`}
+                            value={String(row.item_id ?? "")}
+                            onChange={(e) => {
+                              const raw = e.currentTarget.value;
+                              if (!raw) {
+                                clearInventoryMatch(row.line_no);
+                                return;
+                              }
+                              const id = Number(raw);
+                              const alt = row.alternatives?.find((a) => a.item_id === id);
+                              if (alt) pickAlternative(row.line_no, alt);
+                            }}
+                          >
+                            <option value="">Free text</option>
+                            <For each={row.alternatives}>
+                              {(alt) => (
+                                <option value={String(alt.item_id)}>
+                                  {alt.item_code} — {alt.item_name} ({Math.round(alt.match_score * 100)}%)
+                                </option>
+                              )}
+                            </For>
+                          </select>
+                        </Show>
+                        <Show when={!row.item_id && canCreateItem()}>
+                          <button
+                            type="button"
+                            class="self-start rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 hover:bg-brand-100"
+                            onClick={() => setCreateLineNo(row.line_no)}
+                          >
+                            Create item
+                          </button>
+                        </Show>
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -942,6 +1083,13 @@ export function RfqImportModal(props: Props) {
           </table>
         </div>
       </Show>
+
+      <QuickItemModal
+        open={createLineNo() != null}
+        initialName={createLine()?.item_name || createLine()?.description || ""}
+        onClose={() => setCreateLineNo(null)}
+        onCreated={onItemCreated}
+      />
 
       <div class="mt-5 flex justify-end gap-2">
         <button
@@ -958,7 +1106,7 @@ export function RfqImportModal(props: Props) {
         <button
           type="button"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          disabled={busy() || lines().length === 0}
+          disabled={busy() || lines().length === 0 || !!blockedReason() || documentType() === "invoice_like"}
           onClick={apply}
         >
           Apply to quotation

@@ -36,6 +36,7 @@ type SalesLine = {
   item_name?: string;
   description?: string | null;
   qty?: number;
+  unit_code?: string | null;
   unit_non_vat?: number;
   non_vat_total?: number;
   tax_amount?: number;
@@ -49,6 +50,7 @@ function mapLine(ln: SalesLine | SupplierInvoiceLine): DocumentLineRow {
     item_name: ln.item_name,
     description: ln.description ?? "",
     qty: ln.qty ?? 0,
+    unit_code: ln.unit_code ?? "",
     unit_non_vat: ln.unit_non_vat ?? 0,
     non_vat_total: ln.non_vat_total ?? 0,
     tax_amount: ln.tax_amount ?? 0,

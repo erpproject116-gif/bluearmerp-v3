@@ -5,6 +5,7 @@ import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { useToast } from "../../shared/toast";
 import { useListState } from "../../shared/useListState";
 import { apiFetch } from "../../shared/api";
+import { formatMoney } from "../../shared/money";
 import { ShippingLayout } from "./ShippingLayout";
 
 type ShippingOrder = {
@@ -127,9 +128,7 @@ export default function ShippingOrdersPage() {
             key: "freight_amount",
             header: "Freight",
             render: (r) =>
-              r.freight_amount != null
-                ? r.freight_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })
-                : "—",
+              r.freight_amount != null ? formatMoney(r.freight_amount) : "—",
           },
           { key: "status", header: "Status" },
           { key: "sales_order_id", header: "Sales order" },

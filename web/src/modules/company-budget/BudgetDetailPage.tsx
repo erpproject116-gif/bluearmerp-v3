@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { formatMoney } from "../../shared/money";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { CompanyBudgetLayout } from "./CompanyBudgetLayout";
@@ -191,7 +192,7 @@ export default function BudgetDetailPage() {
                 <tr class="border-t border-stroke/60">
                   <td class="px-3 py-2">{row.account_id}</td>
                   <td class="px-3 py-2">{row.period_month}</td>
-                  <td class="px-3 py-2 text-right">{row.amount.toLocaleString()}</td>
+                  <td class="px-3 py-2 text-right">{formatMoney(row.amount)}</td>
                 </tr>
               )}
             </For>

@@ -5,7 +5,7 @@ import { AuthImage } from "../../shared/AuthImage";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { useToast } from "../../shared/toast";
 import { useAuth, hasPermission } from "../../shared/auth-context";
-import { sanitizeIntegerInput, bindDecimalInput } from "../../shared/money";
+import { sanitizeIntegerInput, bindDecimalInput, formatMoney } from "../../shared/money";
 import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
 import { uiLabel } from "../../shared/branding/uiLabel";
 import {
@@ -700,7 +700,7 @@ function ModifierGroupCard(props: {
             <li class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-sm">
               <span>{m.name}</span>
               <div class="flex items-center gap-3">
-                <span class="text-xs text-text-secondary">+{m.price_delta.toFixed(2)}</span>
+                <span class="text-xs text-text-secondary">+{formatMoney(m.price_delta)}</span>
                 <button type="button" class="text-xs text-red-500 hover:text-red-600" onClick={() => props.onDeleteOption(m.id)}>
                   Remove
                 </button>

@@ -7,6 +7,8 @@ import {
 } from "../../../shared/reports/useModuleReports";
 import { FinanceLayout } from "../FinanceLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
+import { MoneyCell } from "../../../shared/MoneyCell";
+import { formatMoney } from "../../../shared/money";
 
 export default function ProfitAndLossReportPage() {
   const defaults = defaultReportDateRange();
@@ -86,7 +88,7 @@ export default function ProfitAndLossReportPage() {
                   <td class="px-3 py-2">{row.account_code}</td>
                   <td class="px-3 py-2">{row.account_name}</td>
                   <td class="px-3 py-2">{row.account_type}</td>
-                  <td class="px-3 py-2 text-right">{row.amount}</td>
+                  <MoneyCell value={row.amount} />
                 </tr>
               )}
             </For>
@@ -97,7 +99,7 @@ export default function ProfitAndLossReportPage() {
                 <td class="px-3 py-2" colspan="3">
                   Net total
                 </td>
-                <td class="px-3 py-2 text-right">{report.data?.totalAmount?.toFixed(4)}</td>
+                <td class="px-3 py-2 text-right tabular-nums">{formatMoney(report.data?.totalAmount ?? 0)}</td>
               </tr>
             </tfoot>
           </Show>

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -35,6 +36,8 @@ type SupplierInvoiceLine struct {
 	ItemName            string  `json:"item_name,omitempty"`
 	Description         *string `json:"description,omitempty"`
 	Qty                 float64 `json:"qty"`
+	UnitID              *int64  `json:"unit_id,omitempty"`
+	UnitCode            string  `json:"unit_code,omitempty"`
 	UnitNonVat          float64 `json:"unit_non_vat"`
 	NonVatTotal         float64 `json:"non_vat_total"`
 	TaxAmount           float64 `json:"tax_amount"`
@@ -88,6 +91,8 @@ type supplierInvoiceLineBody struct {
 	ItemName            string  `json:"item_name"`
 	Description         *string `json:"description"`
 	Qty                 float64 `json:"qty"`
+	UnitID              *int64  `json:"unit_id"`
+	UnitCode            string  `json:"unit_code"`
 	UnitPrice           float64 `json:"unit_price"`
 	InputBasis          string  `json:"input_basis"`
 	UnitNonVat          float64 `json:"unit_non_vat"`
@@ -612,7 +617,8 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 	rows, err := pool.Query(ctx, `
 		select sil.id, sil.line_no, sil.goods_receipt_line_id, sil.purchase_order_line_id,
 		  sil.item_id, sil.item_code, sil.item_name, sil.description,
-		  sil.qty::float8, sil.unit_non_vat::float8, sil.non_vat_total::float8,
+		  sil.qty::float8, sil.unit_id, coalesce(sil.unit_code, ''),
+		  sil.unit_non_vat::float8, sil.non_vat_total::float8,
 		  sil.tax_amount::float8, sil.unit_vat_inc::float8, sil.line_total::float8, sil.remark,
 		  coalesce(i.track_serial, false)
 		from public.fin_supplier_invoice_lines sil
@@ -628,7 +634,8 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		if err := rows.Scan(
 			&ln.ID, &ln.LineNo, &ln.GoodsReceiptLineID, &ln.PurchaseOrderLineID,
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
-			&ln.Qty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount, &ln.UnitVatInc, &ln.LineTotal, &ln.Remark,
+			&ln.Qty, &ln.UnitID, &ln.UnitCode,
+			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount, &ln.UnitVatInc, &ln.LineTotal, &ln.Remark,
 			&ln.TrackSerial,
 		); err != nil {
 			return SupplierInvoice{}, err
@@ -920,34 +927,66 @@ func deleteSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 	return documentlifecycle.DeleteHandler(pool, documentlifecycle.SupplierInvoiceConfig())
 }
 
-func resolveSupplierInvoiceLineItem(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody) (itemID *int64, itemCode, itemName string, poLineID *int64, err error) {
+type supplierInvoiceLineRef struct {
+	ItemID   *int64
+	ItemCode string
+	ItemName string
+	UnitID   *int64
+	UnitCode string
+	POLineID *int64
+}
+
+func resolveSupplierInvoiceLineItem(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody) (supplierInvoiceLineRef, error) {
+	ref := supplierInvoiceLineRef{UnitID: ln.UnitID, UnitCode: strings.TrimSpace(ln.UnitCode)}
 	if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
 		_, polID, _, _, grErr := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
 		if grErr != nil {
-			return nil, "", "", nil, grErr
+			return supplierInvoiceLineRef{}, grErr
 		}
-		poLineID = &polID
+		ref.POLineID = &polID
+		var poUnitID *int64
+		var poUnitCode string
 		_ = tx.QueryRow(ctx, `
-			select pol.item_id, pol.item_code, pol.item_name
-			from public.po_purchase_order_lines pol where pol.id = $1`, polID).Scan(&itemID, &itemCode, &itemName)
-		return itemID, itemCode, itemName, poLineID, nil
+			select pol.item_id, pol.item_code, pol.item_name, pol.unit_id, coalesce(pol.unit_code, '')
+			from public.po_purchase_order_lines pol where pol.id = $1`, polID).
+			Scan(&ref.ItemID, &ref.ItemCode, &ref.ItemName, &poUnitID, &poUnitCode)
+		ref.UnitID, ref.UnitCode = preferUnit(ref.UnitID, ref.UnitCode, poUnitID, poUnitCode)
+		return ref, nil
 	}
 	if ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
-		poLineID = ln.PurchaseOrderLineID
+		ref.POLineID = ln.PurchaseOrderLineID
+		var poUnitID *int64
+		var poUnitCode string
 		err := tx.QueryRow(ctx, `
-			select pol.item_id, pol.item_code, pol.item_name
+			select pol.item_id, pol.item_code, pol.item_name, pol.unit_id, coalesce(pol.unit_code, '')
 			from public.po_purchase_order_lines pol
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
-			where pol.id = $1 and po.tenant_id = $2`, *ln.PurchaseOrderLineID, tenantID).Scan(&itemID, &itemCode, &itemName)
+			where pol.id = $1 and po.tenant_id = $2`, *ln.PurchaseOrderLineID, tenantID).
+			Scan(&ref.ItemID, &ref.ItemCode, &ref.ItemName, &poUnitID, &poUnitCode)
 		if err != nil {
-			return nil, "", "", nil, err
+			return supplierInvoiceLineRef{}, err
 		}
-		return itemID, itemCode, itemName, poLineID, nil
+		ref.UnitID, ref.UnitCode = preferUnit(ref.UnitID, ref.UnitCode, poUnitID, poUnitCode)
+		return ref, nil
 	}
-	itemID = ln.ItemID
-	itemCode = strings.TrimSpace(ln.ItemCode)
-	itemName = strings.TrimSpace(ln.ItemName)
-	return itemID, itemCode, itemName, nil, nil
+	ref.ItemID = ln.ItemID
+	ref.ItemCode = strings.TrimSpace(ln.ItemCode)
+	ref.ItemName = strings.TrimSpace(ln.ItemName)
+	return ref, nil
+}
+
+// preferUnit keeps an explicit unit from the request and otherwise inherits the upstream one.
+func preferUnit(id *int64, code string, fallbackID *int64, fallbackCode string) (*int64, string) {
+	if id != nil && *id > 0 {
+		return id, code
+	}
+	if fallbackID != nil && *fallbackID > 0 {
+		return fallbackID, fallbackCode
+	}
+	if code != "" {
+		return nil, code
+	}
+	return nil, fallbackCode
 }
 
 func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoiceID, partnerID int64, invoiceNo, dateNoDisplay string, lines []supplierInvoiceLineBody) error {
@@ -957,19 +996,21 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 		if ln.LineNo > 0 {
 			lineNo = ln.LineNo
 		}
-		itemID, itemCode, itemName, poLineID, err := resolveSupplierInvoiceLineItem(ctx, tx, tenantID, ln)
+		ref, err := resolveSupplierInvoiceLineItem(ctx, tx, tenantID, ln)
 		if err != nil {
 			return fmt.Errorf("line %d: goods receipt line not found", lineNo)
 		}
+		poLineID := ref.POLineID
+		unitID, unitCode := inventory.ResolveLineUnit(ctx, tx, tenantID, ref.ItemID, ref.UnitID, ref.UnitCode)
 
 		_, err = tx.Exec(ctx, `
 			insert into public.fin_supplier_invoice_lines (
 			  supplier_invoice_id, line_no, goods_receipt_line_id, purchase_order_line_id,
-			  item_id, item_code, item_name, description, qty,
+			  item_id, item_code, item_name, description, qty, unit_id, unit_code,
 			  unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
 			invoiceID, lineNo, ln.GoodsReceiptLineID, poLineID,
-			itemID, itemCode, itemName, ln.Description, ln.Qty,
+			ref.ItemID, ref.ItemCode, ref.ItemName, ln.Description, ln.Qty, unitID, unitCode,
 			ln.UnitNonVat, ln.NonVatTotal, ln.TaxAmount, ln.UnitVatInc, ln.LineTotal, ln.Remark)
 		if err != nil {
 			return err

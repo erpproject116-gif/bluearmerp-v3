@@ -424,6 +424,8 @@ func toolComparePricing(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 func matchActionTool(query string) (toolName string, kind string) {
 	q := strings.ToLower(query)
 	switch {
+	case strings.Contains(q, "smart rfq") || strings.Contains(q, "analyze rfq") || strings.Contains(q, "process rfq"):
+		return "run_smart_rfq", ""
 	case strings.Contains(q, "rfq pdf") || strings.Contains(q, "import rfq") || strings.Contains(q, "upload rfq"):
 		return "import_rfq_pdf", ""
 	case strings.Contains(q, "send email") || strings.Contains(q, "email quotation") || strings.Contains(q, "send quotation") ||

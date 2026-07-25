@@ -1,6 +1,9 @@
 package quotation
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseRfqAIJSON_validLines(t *testing.T) {
 	raw := `{"lines":[{"page":2,"item_code":"ABC-1","description":"Network switch 24-port","qty":"10","unit":"pcs","unit_price":"12500","remarks":""}]}`
@@ -39,6 +42,24 @@ func TestParseRfqAIJSON_stripsMarkdownFence(t *testing.T) {
 	}
 	if len(lines) != 1 || lines[0].Description != "Item A" {
 		t.Fatalf("unexpected: %+v", lines)
+	}
+}
+
+func TestParseRfqAIJSON_preservesGovernmentParentItem(t *testing.T) {
+	raw := `{"lines":[{"page":3,"item_name":"LAPTOP","description":"Processor: Core i5\nWarranty: three years","qty":"8","unit":"unit"}]}`
+	lines, err := parseRfqAIJSON(raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(lines) != 1 || lines[0].ItemName != "LAPTOP" || lines[0].Qty != "8" {
+		t.Fatalf("lines=%+v", lines)
+	}
+}
+
+func TestBuildRfqAIUserPromptIncludesDocumentType(t *testing.T) {
+	prompt := buildRfqAIUserPrompt([]rfqAIPageInput{{Page: 1, Text: "I. LAPTOP (8 units)"}}, RfqDocumentGovernmentSpec)
+	if !strings.Contains(prompt, "Document type: gov_section_spec") {
+		t.Fatalf("prompt=%q", prompt)
 	}
 }
 

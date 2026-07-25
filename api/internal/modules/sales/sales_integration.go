@@ -38,6 +38,8 @@ type openSalesOrderLineRow struct {
 	ReleasedQty          float64 `json:"released_qty"`
 	DeliveredQty         float64 `json:"delivered_qty"`
 	BalanceQty           float64 `json:"balance_qty"`
+	UnitID               *int64  `json:"unit_id,omitempty"`
+	UnitCode             *string `json:"unit_code,omitempty"`
 	UnitVatInc           float64 `json:"unit_vat_inc"`
 	Remark               *string `json:"remark,omitempty"`
 	TrackSerial          bool    `json:"track_serial,omitempty"`
@@ -101,6 +103,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(rel.released, 0)::float8,
 			  coalesce(dr.delivered, 0)::float8,
 			  (%s)::float8,
+			  ln.unit_id, ln.unit_code,
 			  ln.unit_vat_inc::float8, ln.remark,
 			  coalesce(i.track_serial, false),
 			  count(*) over()
@@ -149,7 +152,9 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
-				&row.ReleasedQty, &row.DeliveredQty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &row.TrackSerial, &total,
+				&row.ReleasedQty, &row.DeliveredQty, &row.BalanceQty,
+				&row.UnitID, &row.UnitCode,
+				&row.UnitVatInc, &row.Remark, &row.TrackSerial, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
 				return

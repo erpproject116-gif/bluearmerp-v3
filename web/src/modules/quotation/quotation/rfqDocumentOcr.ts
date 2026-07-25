@@ -5,8 +5,6 @@ import tessWorkerUrl from "tesseract.js/dist/worker.min.js?url";
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
-const TESS_CORE_VERSION = "7.0.0";
-
 export type RfqOcrWord = {
   text: string;
   x: number;
@@ -66,11 +64,13 @@ function isImage(file: File) {
 
 async function getOcrWorker(): Promise<Worker> {
   if (!ocrWorkerPromise) {
+    // Prefer self-hosted assets under /tess (see web/public/tess/README.md).
+    // Falls back to bundled worker URL; core/lang must still be served from /tess.
     ocrWorkerPromise = createWorker("eng", OEM.LSTM_ONLY, {
       workerPath: tessWorkerUrl,
       workerBlobURL: false,
-      corePath: `https://cdn.jsdelivr.net/npm/tesseract.js-core@v${TESS_CORE_VERSION}`,
-      langPath: "https://tessdata.projectnaptha.com/4.0.0",
+      corePath: "/tess/tesseract-core",
+      langPath: "/tess/lang",
     });
   }
   return ocrWorkerPromise;
@@ -547,7 +547,9 @@ export async function extractRfqDocumentPayload(
           );
           if (server.emptyTextPages > 0 && server.pages.length === 0) {
             throw new Error(
-              `${file.name}: Server found no readable text (likely scanned pages). Use page range on a text PDF or import as images under ${RFQ_CLIENT_OCR_PAGE_MAX} pages.`,
+              `${file.name}: Server found no readable text (likely scanned pages). ` +
+                `Use a page range of at most ${RFQ_CLIENT_OCR_PAGE_MAX} pages so browser OCR can run, ` +
+                `or export those pages as images and import them.`,
             );
           }
           if (server.emptyTextPages > server.pages.length / 2) {
@@ -555,7 +557,9 @@ export async function extractRfqDocumentPayload(
               phase: "parse",
               page: server.pages.length,
               totalPages: server.pages.length,
-              message: `${server.emptyTextPages} page(s) had no text layer — OCR not run on server.`,
+              message:
+                `${server.emptyTextPages} page(s) had no text layer — server OCR is not available. ` +
+                `Re-import with a page range ≤ ${RFQ_CLIENT_OCR_PAGE_MAX} for browser OCR.`,
             });
           }
           const offsetPages = server.pages.map((p, i) => ({

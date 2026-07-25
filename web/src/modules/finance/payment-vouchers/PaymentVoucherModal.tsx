@@ -4,6 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
+import { formatMoney } from "../../../shared/money";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
@@ -393,7 +394,7 @@ export function PaymentVoucherModal(props: Props) {
                     const row = withholdingLines()[index()];
                     if (!row) return "";
                     const base = Number(row.base_amount) || 0;
-                    return (base * (row.rate_pct / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    return formatMoney(base * (row.rate_pct / 100));
                   })()}
                 />
               </Field>
@@ -402,9 +403,9 @@ export function PaymentVoucherModal(props: Props) {
         </For>
         <Show when={withholdingLines().length > 0}>
           <p class="text-sm text-text-secondary">
-            Applied: {totalApplied().toLocaleString(undefined, { minimumFractionDigits: 2 })} · Withheld:{" "}
-            {totalWithheld().toLocaleString(undefined, { minimumFractionDigits: 2 })} · Net payment:{" "}
-            {(totalApplied() - totalWithheld()).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            Applied: {formatMoney(totalApplied())} · Withheld:{" "}
+            {formatMoney(totalWithheld())} · Net payment:{" "}
+            {formatMoney(totalApplied() - totalWithheld())}
           </p>
         </Show>
       </div>

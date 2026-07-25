@@ -8,6 +8,7 @@ export type DocumentLineRow = {
   item_name?: string | null;
   description?: string | null;
   qty?: number;
+  unit_code?: string | null;
   unit_non_vat?: number;
   non_vat_total?: number;
   tax_amount?: number;
@@ -19,7 +20,8 @@ export const DOCUMENT_LINE_COLUMN_META: PrintLayoutColumn[] = [
   { key: "item_code", label: "Item Code" },
   { key: "description", label: "Description" },
   { key: "qty", label: "Qty" },
-  { key: "unit_non_vat", label: "Unit (Non-VAT)" },
+  { key: "unit_code", label: "UoM" },
+  { key: "unit_non_vat", label: "Unit price (Non-VAT)" },
   { key: "non_vat_total", label: "Non-VAT Total" },
   { key: "tax_amount", label: "Tax" },
   { key: "line_total", label: "Line Total" },
@@ -43,9 +45,10 @@ export function documentLinePrintColumns(
       ),
     },
     { key: "qty", header: "Qty", width: 72, align: "right", render: (ln) => ln.qty ?? 0 },
+    { key: "unit_code", header: "UoM", width: 60, render: (ln) => ln.unit_code || "—" },
     {
       key: "unit_non_vat",
-      header: "Unit (Non-VAT)",
+      header: "Unit price (Non-VAT)",
       width: 110,
       align: "right",
       render: (ln) => formatMoney(ln.unit_non_vat ?? 0),
@@ -86,9 +89,10 @@ type TableProps = {
 
 export function DocumentLinePrintTable(props: TableProps) {
   const allColumns = createMemo(() => documentLinePrintColumns(props.formatMoney));
+  const hasUnitCode = createMemo(() => props.lines().some((ln) => (ln.unit_code ?? "").trim() !== ""));
   const visibleColumns = createMemo(() => {
     const keys = new Set(props.layout.visibleColumns().map((c) => c.key));
-    return allColumns().filter((c) => keys.has(c.key));
+    return allColumns().filter((c) => keys.has(c.key) && (c.key !== "unit_code" || hasUnitCode()));
   });
 
   return (

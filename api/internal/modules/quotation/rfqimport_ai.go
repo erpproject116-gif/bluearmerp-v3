@@ -70,6 +70,7 @@ func aiParseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		inputs := make([]rfqAIPageInput, 0, len(body.Pages))
+		classifierPages := make([]RfqPageInput, 0, len(body.Pages))
 		for _, p := range body.Pages {
 			in := rfqAIPageInput{Page: p.Page, Text: p.Text}
 			if img, ok := imageByPage[p.Page]; ok {
@@ -77,25 +78,33 @@ func aiParseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 				in.ImageMIME = img.Mime
 			}
 			inputs = append(inputs, in)
+			classifierPages = append(classifierPages, RfqPageInput{Page: p.Page, Text: p.Text})
 		}
 
-		result, usage, err := ParseRfqWithAI(r.Context(), cfg, inputs, body.Tables)
+		documentType := ClassifyRfqDocument(classifierPages, body.Tables)
+		if documentType == RfqDocumentInvoiceLike {
+			response.Err(w, http.StatusUnprocessableEntity, "This document looks like an invoice, not an RFQ or BOQ.", "ERR_RFQ_DOCUMENT_TYPE")
+			return
+		}
+		result, usage, err := ParseRfqWithAIForType(r.Context(), cfg, inputs, body.Tables, documentType)
 		if err != nil {
 			response.Err(w, http.StatusBadGateway, err.Error(), "ERR_RFQ_AI")
 			return
 		}
 
 		response.OK(w, map[string]any{
-			"lines":            result.Lines,
-			"line_count":       len(result.Lines),
-			"table_detected":   result.TableDetected,
-			"detected_columns": result.DetectedColumns,
-			"parse_method":     "ai",
-			"ai_used":          true,
+			"lines":              result.Lines,
+			"line_count":         len(result.Lines),
+			"table_detected":     result.TableDetected,
+			"detected_columns":   result.DetectedColumns,
+			"parse_method":       "ai",
+			"ai_used":            true,
 			"ai_model":           usage.Model,
 			"ai_provider":        usage.Provider,
 			"ai_pages_processed": usage.PagesProcessed,
-			"ai_used_vision":   usage.UsedVision,
+			"ai_used_vision":     usage.UsedVision,
+			"pages_truncated":    maxInt(0, len(body.Pages)-usage.PagesProcessed),
+			"document_type":      documentType,
 		}, "RFQ parsed with AI.")
 	}
 }

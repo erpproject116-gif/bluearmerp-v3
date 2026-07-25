@@ -137,6 +137,7 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 
 	rows, err := pool.Query(ctx, fmt.Sprintf(`
 		select ln.id, ln.line_no, ln.item_id, ln.item_code, ln.item_name, ln.description,
+		  ln.unit_id, coalesce(ln.unit_code, ''),
 		  ln.unit_vat_inc::float8, ln.remark,
 		  (%s)::float8
 		from public.so_sales_order_lines ln
@@ -172,9 +173,11 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		var itemID *int64
 		var itemCode, itemName string
 		var description, remark *string
+		var unitID *int64
+		var unitCode string
 		var unitVatInc, balance float64
 		if err := rows.Scan(&soLineID, &lineNo, &itemID, &itemCode, &itemName, &description,
-			&unitVatInc, &remark, &balance); err != nil {
+			&unitID, &unitCode, &unitVatInc, &remark, &balance); err != nil {
 			return 0, err
 		}
 		if balance <= 0.0001 {
@@ -188,6 +191,8 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 			ItemName:               itemName,
 			Description:            description,
 			Qty:                    balance,
+			UnitID:                 unitID,
+			UnitCode:               unitCode,
 			UnitPrice:              unitVatInc,
 			InputBasis:             taxcalc.InputVatIncUnit,
 			Remark:                 remark,
@@ -218,6 +223,7 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 	if errs != nil {
 		return 0, docflowValidation(errs)
 	}
+	resolveComputedLineUnits(ctx, pool, tu.TenantID, computed)
 	if convErrs := validateSalesOrderConversion(ctx, pool, tu.TenantID, computed); convErrs != nil {
 		return 0, docflowValidation(convErrs)
 	}

@@ -64,19 +64,26 @@ type RfqAIUsage struct {
 
 const rfqAISystemPrompt = `You extract procurement RFQ/BOQ line items from document pages.
 Return ONLY valid JSON matching this schema:
-{"lines":[{"page":1,"item_code":"","description":"","qty":"1","unit":"","unit_price":"","line_total":"","remarks":""}]}
+{"lines":[{"page":1,"item_code":"","item_name":"","description":"","qty":"1","unit":"","unit_price":"","line_total":"","remarks":""}]}
 Rules:
 - Include only real item/service rows from tables or numbered lists.
+- A government section heading such as "I. LAPTOP (8 units)" is ONE product row. Use LAPTOP as item_name, 8 as qty, unit as unit, and fold its following specification bullets into description.
+- Never emit individual processor, memory, storage, warranty, connectivity, or similar specification bullets as separate products.
 - Skip headers, footers, totals, subtotals, signatures, terms, and cover pages.
+- Skip PhilGEPS instructions, eligibility requirements, approved-budget narrative, financial-proposal blanks, and "Nothing Follows".
 - Preserve item codes and quantities exactly as shown.
 - Use empty strings for missing fields; qty defaults to "1" when unclear.
 - page must match the page number given in the user message.
-- Do not invent rows not visible in the source.`
+- Do not invent rows, brands, prices, quantities, or specifications not visible in the source.
+Examples:
+- "I. LAPTOP (8 units)" followed by technical bullets => one line with item_name "LAPTOP", qty "8", unit "unit".
+- Annex A row "CSC LANYARD / ID LACE | 500 | set" => one line with item_name "CSC LANYARD / ID LACE", qty "500", unit "set".`
 
 type rfqAIExtractResponse struct {
 	Lines []struct {
 		Page        int    `json:"page"`
 		ItemCode    string `json:"item_code"`
+		ItemName    string `json:"item_name"`
 		Description string `json:"description"`
 		Qty         string `json:"qty"`
 		Unit        string `json:"unit"`
@@ -87,9 +94,16 @@ type rfqAIExtractResponse struct {
 }
 
 func ParseRfqWithAI(ctx context.Context, cfg RfqAIConfig, pages []rfqAIPageInput, tables []RfqStructuredTable) (RfqParseResult, RfqAIUsage, error) {
+	return ParseRfqWithAIForType(ctx, cfg, pages, tables, RfqDocumentUnknown)
+}
+
+func ParseRfqWithAIForType(ctx context.Context, cfg RfqAIConfig, pages []rfqAIPageInput, tables []RfqStructuredTable, documentType RfqDocumentType) (RfqParseResult, RfqAIUsage, error) {
 	var empty RfqParseResult
 	var usage RfqAIUsage
 	usage.Provider = "dashscope"
+	if documentType == RfqDocumentInvoiceLike {
+		return empty, usage, fmt.Errorf("document is invoice-like, not an RFQ or BOQ")
+	}
 	if !cfg.Available() {
 		return empty, usage, fmt.Errorf("RFQ AI is not configured (set DASHSCOPE_API_KEY and RFQ_AI_ENABLED)")
 	}
@@ -137,7 +151,7 @@ func ParseRfqWithAI(ctx context.Context, cfg RfqAIConfig, pages []rfqAIPageInput
 			end = len(aiPages)
 		}
 		batch := aiPages[start:end]
-		batchLines, model, usedVision, err := extractRfqAIBatch(ctx, client, cfg, batch)
+		batchLines, model, usedVision, err := extractRfqAIBatch(ctx, client, cfg, batch, documentType)
 		if err != nil {
 			return empty, usage, err
 		}
@@ -162,14 +176,18 @@ func ParseRfqWithAI(ctx context.Context, cfg RfqAIConfig, pages []rfqAIPageInput
 		return empty, usage, fmt.Errorf("AI extraction returned no line items")
 	}
 
-	return RfqParseResult{
+	result := SanitizeRfqParseResult(RfqParseResult{
 		Lines:           allLines,
 		TableDetected:   true,
 		DetectedColumns: defaultRfqAIColumns(),
-	}, usage, nil
+	}, documentType)
+	if len(result.Lines) == 0 {
+		return empty, usage, fmt.Errorf("AI extraction returned no valid line items after sanitization")
+	}
+	return result, usage, nil
 }
 
-func extractRfqAIBatch(ctx context.Context, client llm.Client, cfg RfqAIConfig, batch []rfqAIPageInput) ([]ParsedRfqLine, string, bool, error) {
+func extractRfqAIBatch(ctx context.Context, client llm.Client, cfg RfqAIConfig, batch []rfqAIPageInput, documentType RfqDocumentType) ([]ParsedRfqLine, string, bool, error) {
 	useVision := false
 	for _, p := range batch {
 		if strings.TrimSpace(p.ImageBase64) != "" {
@@ -185,7 +203,7 @@ func extractRfqAIBatch(ctx context.Context, client llm.Client, cfg RfqAIConfig, 
 	var userParts []llm.ContentPart
 	userParts = append(userParts, llm.ContentPart{
 		Type: "text",
-		Text: buildRfqAIUserPrompt(batch),
+		Text: buildRfqAIUserPrompt(batch, documentType),
 	})
 	for _, p := range batch {
 		b64 := strings.TrimSpace(p.ImageBase64)
@@ -225,9 +243,15 @@ func extractRfqAIBatch(ctx context.Context, client llm.Client, cfg RfqAIConfig, 
 	return lines, model, useVision, err
 }
 
-func buildRfqAIUserPrompt(batch []rfqAIPageInput) string {
+func buildRfqAIUserPrompt(batch []rfqAIPageInput, documentType RfqDocumentType) string {
 	var b strings.Builder
 	b.WriteString("Extract RFQ line items from these document page(s).\n")
+	b.WriteString("Document type: ")
+	b.WriteString(string(documentType))
+	b.WriteString("\n")
+	if documentType == RfqDocumentInvoiceLike {
+		b.WriteString("This is invoice-like. Return {\"lines\":[]}.\n")
+	}
 	for _, p := range batch {
 		b.WriteString(fmt.Sprintf("\n--- Page %d ---\n", p.Page))
 		text := strings.TrimSpace(p.Text)
@@ -275,6 +299,7 @@ func parseRfqAIJSON(raw string) ([]ParsedRfqLine, error) {
 		out = append(out, ParsedRfqLine{
 			Page:        ln.Page,
 			ItemCode:    code,
+			ItemName:    strings.TrimSpace(ln.ItemName),
 			Description: desc,
 			Remarks:     strings.TrimSpace(ln.Remarks),
 			Qty:         qty,
@@ -329,11 +354,11 @@ func parseRfqAIStatus(cfg RfqAIConfig) map[string]any {
 		model = defaultQwenVLModel
 	}
 	return map[string]any{
-		"enabled":       cfg.Available(),
-		"provider":      "dashscope",
-		"model":         model,
-		"text_model":    model,
-		"vision_model":  model,
-		"max_pages":     cfg.MaxTotalPages,
+		"enabled":      cfg.Available(),
+		"provider":     "dashscope",
+		"model":        model,
+		"text_model":   model,
+		"vision_model": model,
+		"max_pages":    cfg.MaxTotalPages,
 	}
 }

@@ -81,6 +81,8 @@ export type PurchaseRequestDetail = {
     spec_name?: string | null;
     description?: string | null;
     qty: number;
+    unit_id?: number | null;
+    unit_code?: string | null;
     unit_non_vat: number;
     non_vat_total: number;
     tax_amount: number;
@@ -145,6 +147,8 @@ function linesFromDetail(lines?: PurchaseRequestDetail["lines"]): PurchaseReques
     spec_name: ln.spec_name ?? "",
     description: ln.description ?? "",
     qty: ln.qty != null ? String(ln.qty) : "1",
+    unit_id: ln.unit_id ?? null,
+    unit_code: ln.unit_code ?? "",
     unit_price: String(ln.unit_vat_inc ?? 0),
     input_basis: "vat_inc_unit" as const,
     unit_non_vat: String(ln.unit_non_vat ?? 0),
@@ -515,6 +519,8 @@ export function PurchaseRequestModal(props: Props) {
         spec_name: ln.spec_name || null,
         description: ln.description || null,
         qty: ln.qty === "" ? 0 : Number(ln.qty),
+        unit_id: ln.unit_id || null,
+        unit_code: ln.unit_code || null,
         unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
         input_basis: ln.input_basis,
         remark: ln.remark || null,

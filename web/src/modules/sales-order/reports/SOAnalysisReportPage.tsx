@@ -6,6 +6,7 @@ import {
   useSOAnalysisReport,
   type DateRangeFilters,
 } from "../../../shared/reports/useModuleReports";
+import { formatMoney } from "../../../shared/money";
 import { SalesOrderLayout } from "../SalesOrderLayout";
 
 export default function SOAnalysisReportPage() {
@@ -87,7 +88,7 @@ export default function SOAnalysisReportPage() {
                   <td class="px-3 py-2 text-right">{row.unconfirmed_count}</td>
                   <td class="px-3 py-2 text-right">{row.in_progress_count}</td>
                   <td class="px-3 py-2 text-right">{row.completed_count}</td>
-                  <td class="px-3 py-2 text-right">{row.total_amount.toLocaleString()}</td>
+                  <td class="px-3 py-2 text-right">{formatMoney(row.total_amount)}</td>
                 </tr>
               )}
             </For>

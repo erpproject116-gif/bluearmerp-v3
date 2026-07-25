@@ -7,6 +7,7 @@ import {
 } from "../../../shared/reports/useModuleReports";
 import { FinanceLayout } from "../FinanceLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
+import { MoneyCell } from "../../../shared/MoneyCell";
 
 export default function BalanceSheetReportPage() {
   const defaults = defaultReportDateRange();
@@ -86,7 +87,7 @@ export default function BalanceSheetReportPage() {
                   <td class="px-3 py-2">{row.account_code}</td>
                   <td class="px-3 py-2">{row.account_name}</td>
                   <td class="px-3 py-2">{row.account_type}</td>
-                  <td class="px-3 py-2 text-right">{row.amount}</td>
+                  <MoneyCell value={row.amount} />
                 </tr>
               )}
             </For>

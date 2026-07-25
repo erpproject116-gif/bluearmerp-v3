@@ -36,6 +36,8 @@ type PurchaseRequestLine struct {
 	SpecName         *string  `json:"spec_name,omitempty"`
 	Description      *string  `json:"description,omitempty"`
 	Qty              float64  `json:"qty"`
+	UnitID           *int64   `json:"unit_id,omitempty"`
+	UnitCode         string   `json:"unit_code,omitempty"`
 	UnitNonVat       float64  `json:"unit_non_vat"`
 	NonVatTotal      float64  `json:"non_vat_total"`
 	TaxAmount        float64  `json:"tax_amount"`
@@ -95,6 +97,8 @@ type purchaseRequestLineBody struct {
 	SpecName    *string `json:"spec_name"`
 	Description *string `json:"description"`
 	Qty         float64 `json:"qty"`
+	UnitID      *int64  `json:"unit_id"`
+	UnitCode    string  `json:"unit_code"`
 	UnitPrice   float64 `json:"unit_price"`
 	InputBasis  string  `json:"input_basis"`
 	Remark      *string `json:"remark"`
@@ -134,6 +138,8 @@ type computedLine struct {
 	SpecName               *string
 	Description            *string
 	Qty                    float64
+	UnitID                 *int64
+	UnitCode               *string
 	InputBasis             string
 	Amounts                taxcalc.LineAmounts
 	Remark                 *string
@@ -504,7 +510,8 @@ func loadPurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, purchaseR
 	rows, err := pool.Query(ctx, `
 		select ln.id, ln.line_no, ln.partner_id, ln.partner_code, ln.partner_name,
 		  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
-		  ln.qty::float8, ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
+		  ln.qty::float8, ln.unit_id, coalesce(ln.unit_code, ''),
+		  ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
 		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark,
 		  coalesce(ln.planned_serial_nos, '{}'),
 		  coalesce(i.track_serial, false),
@@ -523,7 +530,7 @@ func loadPurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, purchaseR
 		var ln PurchaseRequestLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.PartnerID, &ln.PartnerCode, &ln.PartnerName,
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.SpecName, &ln.Description,
-			&ln.Qty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
+			&ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial, &ln.SerialPolicy); err != nil {
 			return nil, err
 		}
@@ -819,13 +826,13 @@ func insertPurchaseRequestLines(ctx context.Context, tx pgx.Tx, purchaseRequestI
 			insert into public.pr_purchase_request_lines (
 			  purchase_request_id, line_no, partner_id, partner_code, partner_name,
 			  item_id, item_code, item_name, spec_name, description,
-			  qty, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
+			  qty, unit_id, unit_code, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
 			  source_sales_order_line_id, planned_serial_nos
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 			returning id`,
 			purchaseRequestID, lineNo, ln.PartnerID, strings.TrimSpace(ln.PartnerCode), strings.TrimSpace(ln.PartnerName),
 			ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.SpecName, ln.Description,
-			ln.Qty, ln.InputBasis, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
+			ln.Qty, ln.UnitID, ln.UnitCode, ln.InputBasis, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
 			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark,
 			ln.SourceSalesOrderLineID, ln.PlannedSerialNos).Scan(&id)
 		if err != nil {
@@ -882,6 +889,7 @@ func computePurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, tenant
 			continue
 		}
 		amounts := taxcalc.ComputeLine(tt, ln.UnitPrice, ln.Qty, inputBasis)
+		unitID, unitCode := inventory.ResolveLineUnit(ctx, pool, tenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
 		out = append(out, computedLine{
 			LineNo:                 ln.LineNo,
 			PartnerID:              ln.PartnerID,
@@ -893,6 +901,8 @@ func computePurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, tenant
 			SpecName:               ln.SpecName,
 			Description:            ln.Description,
 			Qty:                    ln.Qty,
+			UnitID:                 unitID,
+			UnitCode:               unitCode,
 			InputBasis:             inputBasis,
 			Amounts:                amounts,
 			Remark:                 ln.Remark,

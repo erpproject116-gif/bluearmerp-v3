@@ -43,6 +43,8 @@ func getConfig() http.HandlerFunc {
 				"compare_pricing",
 				"draft_recurring_expense",
 				"import_rfq_pdf",
+				"run_smart_rfq",
+				"draft_quotation_from_rfq",
 				"draft_follow_up",
 				"draft_open_document",
 				"draft_send_document_email",
@@ -51,6 +53,7 @@ func getConfig() http.HandlerFunc {
 				"quotation", "sales_order", "sales", "purchase_request", "rfq",
 				"purchase_order", "purchases", "product_bundle", "bom", "bulk_inventory",
 				"send_email", "crm_follow_up",
+				"smart_rfq", "quotation_from_rfq",
 			},
 			"entity_types": []string{
 				"item", "customer", "vendor", "serial", "sales", "quotation",

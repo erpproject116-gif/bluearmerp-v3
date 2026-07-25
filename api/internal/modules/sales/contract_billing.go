@@ -114,6 +114,7 @@ func CreateFromContractMilestone(ctx context.Context, pool *pgxpool.Pool, tenant
 	if errs != nil {
 		return 0, fmt.Errorf("compute lines: %v", errs)
 	}
+	resolveComputedLineUnits(ctx, pool, tenantID, computed)
 	subtotal, taxTotal, grandTotal := sumSaleTotals(computed)
 
 	orderDate := time.Now()

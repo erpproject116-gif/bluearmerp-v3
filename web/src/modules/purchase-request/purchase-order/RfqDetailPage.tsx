@@ -2,6 +2,7 @@ import { A, useParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { formatMoney } from "../../../shared/money";
 import { useToast } from "../../../shared/toast";
 import { SupplierQuotationModal } from "./SupplierQuotationModal";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
@@ -15,6 +16,8 @@ type RfqLine = {
   item_code: string;
   item_name: string;
   qty: number;
+  unit_id?: number | null;
+  unit_code?: string | null;
 };
 
 type RfqDetail = {
@@ -195,6 +198,7 @@ export default function RfqDetailPage() {
                       <th class="px-2 py-2">#</th>
                       <th class="px-2 py-2">Item</th>
                       <th class="px-2 py-2 text-right">Qty</th>
+                      <th class="px-2 py-2">UoM</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -206,6 +210,7 @@ export default function RfqDetailPage() {
                             {ln.item_code} — {ln.item_name}
                           </td>
                           <td class="px-2 py-2 text-right">{ln.qty}</td>
+                          <td class="px-2 py-2">{ln.unit_code || "—"}</td>
                         </tr>
                       )}
                     </For>
@@ -248,7 +253,7 @@ export default function RfqDetailPage() {
                         </td>
                         <td class="px-2 py-2 text-right">{sq.line_count}</td>
                         <td class="px-2 py-2 text-right">
-                          {sq.grand_total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatMoney(sq.grand_total)}
                         </td>
                         <td class="px-2 py-2">
                           <div class="flex justify-end gap-2">

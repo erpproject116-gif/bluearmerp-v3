@@ -3,6 +3,7 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { modalDismissClass } from "../../shared/Modal";
+import { formatMoney } from "../../shared/money";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { ReturnSerialPicker } from "../../shared/ReturnSerialPicker";
 import { useToast } from "../../shared/toast";
@@ -202,7 +203,7 @@ export default function SalesReturnsPage() {
                   <td class="px-3 py-2">{row.return_date}</td>
                   <td class="px-3 py-2">{row.sales_id}</td>
                   <td class="px-3 py-2 capitalize">{row.status}</td>
-                  <td class="px-3 py-2 text-right">{row.grand_total.toFixed(2)}</td>
+                  <td class="px-3 py-2 text-right">{formatMoney(row.grand_total)}</td>
                   <td class="px-3 py-2">
                     <div class="flex flex-wrap items-center gap-2">
                       <ActivityHistoryLink

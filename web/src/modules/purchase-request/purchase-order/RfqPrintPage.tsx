@@ -47,6 +47,7 @@ function RfqPrintView() {
                       <th>#</th>
                       <th>Item</th>
                       <th>Qty</th>
+                      <th>UoM</th>
                       <th>Notes</th>
                     </tr>
                   </thead>
@@ -59,6 +60,7 @@ function RfqPrintView() {
                             {ln.item_code} — {ln.item_name}
                           </td>
                           <td>{ln.qty}</td>
+                          <td>{ln.unit_code ?? ""}</td>
                           <td>{ln.notes ?? ""}</td>
                         </tr>
                       )}

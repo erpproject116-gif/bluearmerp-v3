@@ -31,6 +31,8 @@ type openSupplierQuotationSlipLine struct {
 	ItemName                string  `json:"item_name"`
 	Qty                     float64 `json:"qty"`
 	BalanceQty              float64 `json:"balance_qty"`
+	UnitID                  *int64  `json:"unit_id,omitempty"`
+	UnitCode                *string `json:"unit_code,omitempty"`
 	UnitPrice               float64 `json:"unit_price"`
 }
 
@@ -71,6 +73,7 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  ln.item_id, ln.item_code, ln.item_name,
 			  ln.qty::float8,
 			  (ln.qty - coalesce(ord.ordered, 0))::float8,
+			  ln.unit_id, ln.unit_code,
 			  ln.unit_price::float8,
 			  count(*) over()
 			from public.rfq_supplier_quotation_lines ln
@@ -109,7 +112,7 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.QuoteNo, &quoteDate, &row.PartnerID, &row.PartnerName,
 				&row.TaxTypeID, &row.CurrencyID, &row.LocationID, &row.LocationName, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
-				&row.Qty, &row.BalanceQty, &row.UnitPrice, &total,
+				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitPrice, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read supplier quotation lines.", "ERR_INTERNAL")
 				return

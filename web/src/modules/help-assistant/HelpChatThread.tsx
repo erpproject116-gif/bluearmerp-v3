@@ -12,7 +12,16 @@ function AssistantBubble(props: {
 }) {
   const [acting, setActing] = createSignal(false);
   const [actionNote, setActionNote] = createSignal("");
+  const [detailsOpen, setDetailsOpen] = createSignal(false);
   const reply = () => props.message.reply;
+
+  const deepLinks = () => reply().deepLinks ?? [];
+  const primaryLink = () => (deepLinks().length === 1 ? deepLinks()[0] : null);
+  const extraLinks = () => (deepLinks().length > 1 ? deepLinks() : []);
+  const hasDetails = () =>
+    !!reply().usedAi ||
+    extraLinks().length > 0 ||
+    (reply().hits?.length ?? 0) > 0;
 
   const onApprove = async () => {
     const draft = reply().actionDraft;
@@ -24,16 +33,36 @@ function AssistantBubble(props: {
         setActionNote(res.message || "Approve failed.");
         return;
       }
-      const result = res.data?.result as { next?: string; hint?: string } | undefined;
+      const result = res.data?.result as { next?: string; hint?: string; seed?: unknown } | undefined;
       const next = result?.next ? safeAppPath(result.next) : null;
       if (next) {
+        if (result?.seed && next === "/app/quotation/quotations/new") {
+          try {
+            const raw = JSON.stringify(result.seed);
+            // Soft-cap: stay under typical sessionStorage quotas.
+            if (raw.length > 4_500_000) {
+              const seed = result.seed as { lines?: Array<{ description?: string }> };
+              if (Array.isArray(seed?.lines)) {
+                for (const line of seed.lines) {
+                  if (line.description && line.description.length > 2_000) {
+                    line.description = line.description.slice(0, 2_000) + "\n…[truncated]";
+                  }
+                }
+              }
+            }
+            sessionStorage.setItem("bluearm.rfqQuotationSeed", JSON.stringify(result.seed));
+          } catch {
+            setActionNote("Approved, but the quotation draft could not be staged in this browser.");
+            return;
+          }
+        }
         setActionNote(result?.hint || "Opening…");
         window.setTimeout(() => {
           window.location.assign(next);
         }, 400);
         return;
       }
-      setActionNote(result?.hint || "Approved — changes applied where allowed.");
+      setActionNote(result?.hint || "Approved.");
     } finally {
       setActing(false);
     }
@@ -53,21 +82,14 @@ function AssistantBubble(props: {
 
   return (
     <div class="flex justify-start">
-      <div class="max-w-[min(42rem,95%)] space-y-3 rounded-2xl rounded-bl-md border border-stroke bg-white px-4 py-3 shadow-sm">
-        <HelpMarkdown content={reply().message} />
-        <Show when={reply().usedAi}>
-          <p class="text-[11px] text-text-secondary">
-            {reply().mode === "ops"
-              ? "Live data summary (permission-scoped)."
-              : "AI summary grounded in Bluearm guides and any files you attached."}
-          </p>
-        </Show>
-        <Show when={reply().deepLinks?.length}>
-          <HelpDeepLinkChips links={reply().deepLinks!} />
+      <div class="max-w-[min(42rem,95%)] space-y-2.5 rounded-2xl rounded-bl-md border border-stroke bg-white px-4 py-3 shadow-sm">
+        <HelpMarkdown content={reply().message} hideExternalNote />
+        <Show when={primaryLink()}>
+          {(link) => <HelpDeepLinkChips links={[link()]} />}
         </Show>
         <Show when={reply().actionDraft}>
           <div class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
-            <p class="font-medium">Action draft (not posted yet)</p>
+            <p class="font-medium">Action draft — Approve to continue (nothing posted yet)</p>
             <p class="mt-1">{reply().actionDraft!.summary}</p>
             <Show when={!actionNote()}>
               <div class="mt-2 flex gap-2">
@@ -109,11 +131,41 @@ function AssistantBubble(props: {
             </For>
           </div>
         </Show>
-        <For each={reply().hits}>
-          {(hit) => (
-            <HelpResultCard hit={hit} query={reply().query} pathname={props.pathname} />
-          )}
-        </For>
+        <Show when={hasDetails()}>
+          <button
+            type="button"
+            class="text-[11px] font-medium text-brand-700 hover:underline"
+            onClick={() => setDetailsOpen(!detailsOpen())}
+          >
+            {detailsOpen() ? "Hide details" : "Details"}
+            <Show when={!detailsOpen() && (reply().hits?.length ?? 0) > 0}>
+              <span class="ml-1 text-text-secondary">
+                · {reply().hits!.length} guide{reply().hits!.length === 1 ? "" : "s"}
+              </span>
+            </Show>
+            <Show when={!detailsOpen() && extraLinks().length > 0}>
+              <span class="ml-1 text-text-secondary">· {extraLinks().length} links</span>
+            </Show>
+          </button>
+        </Show>
+        <Show when={detailsOpen()}>
+          <div class="space-y-2 border-t border-stroke/60 pt-2">
+            <Show when={reply().usedAi}>
+              <p class="text-[11px] text-text-secondary">
+                {reply().mode === "ops"
+                  ? "Live data summary (permission-scoped)."
+                  : "AI summary grounded in Bluearm guides and any files you attached."}
+              </p>
+            </Show>
+            <Show when={extraLinks().length > 0}>
+              <HelpDeepLinkChips links={extraLinks()} />
+            </Show>
+            <For each={reply().hits}>
+              {(hit) => <HelpResultCard hit={hit} query={reply().query} pathname={props.pathname} />}
+            </For>
+            <p class="text-[10px] text-text-secondary">Links marked “opens outside Bluearm” leave this app.</p>
+          </div>
+        </Show>
       </div>
     </div>
   );
@@ -138,9 +190,7 @@ export function HelpChatThread(props: {
                   <div class="flex flex-wrap gap-1.5">
                     <For each={msg.attachments}>
                       {(a) => (
-                        <span class="rounded bg-white/15 px-2 py-0.5 text-[11px]">
-                          {a.name}
-                        </span>
+                        <span class="rounded bg-white/15 px-2 py-0.5 text-[11px]">{a.name}</span>
                       )}
                     </For>
                   </div>
@@ -155,7 +205,7 @@ export function HelpChatThread(props: {
       <Show when={props.streamingText}>
         <div class="flex justify-start">
           <div class="max-w-[min(42rem,95%)] rounded-2xl rounded-bl-md border border-dashed border-stroke bg-slate-50 px-4 py-3">
-            <HelpMarkdown content={props.streamingText || ""} class="text-text-secondary" />
+            <HelpMarkdown content={props.streamingText || ""} class="text-text-secondary" hideExternalNote />
           </div>
         </div>
       </Show>

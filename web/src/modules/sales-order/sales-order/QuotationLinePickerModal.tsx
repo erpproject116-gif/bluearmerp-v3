@@ -25,6 +25,8 @@ export type OpenQuotationLineRow = {
   description?: string | null;
   qty: number;
   balance_qty: number;
+  unit_id?: number | null;
+  unit_code?: string | null;
   unit_vat_inc: number;
   remark?: string | null;
 };
@@ -138,7 +140,8 @@ export function QuotationLinePickerModal(props: Props) {
         { key: "customer", header: "Customer", cell: (r) => String(r.customer_name ?? "") },
         { key: "item", header: "Item", cell: (r) => `${r.item_code ?? ""} ${r.item_name ?? ""}` },
         { key: "bal", header: "Balance", class: "text-right", cell: (r) => Number(r.balance_qty ?? 0) },
-        { key: "price", header: "Unit", class: "text-right", cell: (r) => Number(r.unit_vat_inc ?? 0) },
+        { key: "uom", header: "UoM", cell: (r) => String(r.unit_code ?? "") },
+        { key: "price", header: "Unit price", class: "text-right", cell: (r) => Number(r.unit_vat_inc ?? 0) },
       ]}
     />
   );

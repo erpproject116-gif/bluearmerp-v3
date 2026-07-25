@@ -3,6 +3,7 @@ import { DecimalInput } from "./DecimalInput";
 import { inventoryItemSearchErrorMessage, postInventoryItemSearch } from "./inventoryItemSearch";
 import { Field, inputClass } from "./SpreadsheetGrid";
 import { modalDismissClass } from "./Modal";
+import { formatMoney } from "./money";
 import { useToast } from "./toast";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
@@ -24,6 +25,8 @@ export type ItemSearchRow = {
   lot_policy?: string;
   default_location_qty?: number | null;
   total_inv_qty?: number | null;
+  base_unit_id?: number | null;
+  base_unit_code?: string | null;
 };
 
 const ITEM_CATEGORIES = [
@@ -134,7 +137,6 @@ export function ItemSearchModal(props: Props) {
     setTab("filters");
   };
 
-  const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatQty = (n?: number | null) =>
     n == null ? "—" : n.toLocaleString("en-PH", { maximumFractionDigits: 4 });
 
@@ -337,7 +339,7 @@ export function ItemSearchModal(props: Props) {
                           {row.spec_name ? ` [${row.spec_name}]` : ""}
                         </ResizableTd>
                         <ResizableTd width={widthFor("sales_price")} class="py-2 pr-4 text-right">
-                          {money(row.sales_price)}
+                          {formatMoney(row.sales_price)}
                         </ResizableTd>
                         <ResizableTd width={widthFor("default_loc")} class="py-2 pr-4 text-right">
                           {formatQty(row.default_location_qty)}

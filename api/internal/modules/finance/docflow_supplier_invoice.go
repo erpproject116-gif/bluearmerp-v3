@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -183,6 +184,8 @@ func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Po
 		var itemID *int64
 		var itemCode, itemName string
 		var poLineID *int64
+		var unitID *int64
+		var unitCode string
 		if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
 			_, polID, _, _, err := grLineBalance(ctx, tx, tu.TenantID, *ln.GoodsReceiptLineID)
 			if err != nil {
@@ -190,20 +193,22 @@ func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Po
 			}
 			poLineID = &polID
 			_ = tx.QueryRow(ctx, `
-				select pol.item_id, pol.item_code, pol.item_name
-				from public.po_purchase_order_lines pol where pol.id = $1`, polID).Scan(&itemID, &itemCode, &itemName)
+				select pol.item_id, pol.item_code, pol.item_name, pol.unit_id, coalesce(pol.unit_code, '')
+				from public.po_purchase_order_lines pol where pol.id = $1`, polID).
+				Scan(&itemID, &itemCode, &itemName, &unitID, &unitCode)
 		}
+		resolvedUnitID, resolvedUnitCode := inventory.ResolveLineUnit(ctx, tx, tu.TenantID, itemID, unitID, unitCode)
 
 		var lineID int64
 		err = tx.QueryRow(ctx, `
 			insert into public.fin_supplier_invoice_lines (
 			  supplier_invoice_id, line_no, goods_receipt_line_id, purchase_order_line_id,
-			  item_id, item_code, item_name, qty,
+			  item_id, item_code, item_name, qty, unit_id, unit_code,
 			  unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 			returning id`,
 			id, lineNo, ln.GoodsReceiptLineID, poLineID,
-			itemID, itemCode, itemName, ln.Qty,
+			itemID, itemCode, itemName, ln.Qty, resolvedUnitID, resolvedUnitCode,
 			ln.UnitNonVat, ln.NonVatTotal, ln.TaxAmount, ln.UnitVatInc, ln.LineTotal).Scan(&lineID)
 		if err != nil {
 			return 0, err

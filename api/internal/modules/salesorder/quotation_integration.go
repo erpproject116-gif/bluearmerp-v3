@@ -35,6 +35,8 @@ type openQuotationLineRow struct {
 	Description    *string `json:"description,omitempty"`
 	Qty            float64 `json:"qty"`
 	BalanceQty     float64 `json:"balance_qty"`
+	UnitID         *int64  `json:"unit_id,omitempty"`
+	UnitCode       string  `json:"unit_code,omitempty"`
 	UnitVatInc     float64 `json:"unit_vat_inc"`
 	Remark         *string `json:"remark,omitempty"`
 }
@@ -83,6 +85,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  ln.qty::float8,
 			  (ln.qty - coalesce(slip.qty_fulfilled, 0))::float8,
+			  ln.unit_id, coalesce(ln.unit_code, ''),
 			  ln.unit_vat_inc::float8, ln.remark,
 			  count(*) over()
 			from public.quo_quotations q
@@ -117,7 +120,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
-				&row.Qty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &total,
+				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitVatInc, &row.Remark, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read quotation lines.", "ERR_INTERNAL")
 				return

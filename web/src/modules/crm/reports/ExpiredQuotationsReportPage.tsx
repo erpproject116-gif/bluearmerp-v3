@@ -6,6 +6,7 @@ import {
   useExpiredQuotationsReport,
   type ExpiredQuotationsFilters,
 } from "../../../shared/useCrmReports";
+import { formatMoney } from "../../../shared/money";
 import { CrmLayout } from "../CrmLayout";
 
 export default function ExpiredQuotationsReportPage() {
@@ -89,7 +90,7 @@ export default function ExpiredQuotationsReportPage() {
                     {row.item_code} — {row.item_name}
                   </td>
                   <td class="px-3 py-2 text-right">{row.qty}</td>
-                  <td class="px-3 py-2 text-right">{row.line_total}</td>
+                  <td class="px-3 py-2 text-right">{formatMoney(row.line_total)}</td>
                 </tr>
               )}
             </For>

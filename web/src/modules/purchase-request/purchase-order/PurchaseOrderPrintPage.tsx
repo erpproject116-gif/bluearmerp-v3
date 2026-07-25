@@ -54,6 +54,7 @@ function PrintDocument(props: { payload: PurchaseOrderPrintPayload }) {
       item_name: ln.item_name,
       description: ln.description ?? "",
       qty: ln.qty,
+      unit_code: ln.unit_code ?? "",
       unit_non_vat: ln.unit_non_vat,
       non_vat_total: ln.non_vat_total,
       tax_amount: ln.tax_amount,

@@ -28,6 +28,8 @@ export type SupplierInvoiceLine = {
   item_name?: string;
   description?: string | null;
   qty: number;
+  unit_id?: number | null;
+  unit_code?: string | null;
   unit_non_vat: number;
   non_vat_total: number;
   tax_amount: number;

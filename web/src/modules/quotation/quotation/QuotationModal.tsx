@@ -91,6 +91,8 @@ export type QuotationDetail = {
     item_name: string;
     description?: string | null;
     qty: number;
+    unit_id?: number | null;
+    unit_code?: string | null;
     unit_non_vat: number;
     non_vat_total: number;
     tax_amount: number;
@@ -154,6 +156,8 @@ function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
     item_name: ln.item_name ?? "",
     description: ln.description ?? "",
     qty: ln.qty != null ? String(ln.qty) : "1",
+    unit_id: ln.unit_id ?? null,
+    unit_code: ln.unit_code ?? "",
     unit_price: String(ln.unit_vat_inc ?? 0),
     input_basis: "vat_inc_unit" as const,
     unit_non_vat: String(ln.unit_non_vat ?? 0),
@@ -166,6 +170,59 @@ function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
     track_serial: Boolean(ln.track_serial),
     serial_policy: ln.serial_policy ?? "required",
   }));
+}
+
+type RfqQuotationSeed = {
+  partner_id?: number;
+  partner_name?: string;
+  lines?: Array<{
+    item_id?: number;
+    item_code?: string;
+    item_name?: string;
+    description?: string;
+    qty?: number | string;
+    unit?: string;
+    unit_id?: number | null;
+    unit_code?: string | null;
+    unit_price?: number | string;
+    remarks?: string;
+  }>;
+};
+
+function takeRfqQuotationSeed(): RfqQuotationSeed | null {
+  try {
+    const raw = sessionStorage.getItem("bluearm.rfqQuotationSeed");
+    if (!raw) return null;
+    sessionStorage.removeItem("bluearm.rfqQuotationSeed");
+    const parsed = JSON.parse(raw) as RfqQuotationSeed;
+    return parsed && Array.isArray(parsed.lines) ? parsed : null;
+  } catch {
+    sessionStorage.removeItem("bluearm.rfqQuotationSeed");
+    return null;
+  }
+}
+
+function linesFromRfqSeed(seed: RfqQuotationSeed): QuotationLineRow[] {
+  return (seed.lines ?? []).slice(0, 200).map((line, index) => {
+    const price = line.unit_price == null ? "" : String(line.unit_price);
+    const base = emptyQuotationLine(index + 1, price);
+    const unitId = line.unit_id ?? null;
+    const unitCode = (line.unit_code ?? line.unit ?? "").trim();
+    // Only fall back to a remark when the unit could not be captured structurally.
+    const unresolvedUnit = !unitId && !unitCode && line.unit?.trim() ? `UOM: ${line.unit.trim()}` : "";
+    const remarks = [line.remarks?.trim(), unresolvedUnit].filter(Boolean);
+    return {
+      ...base,
+      item_id: line.item_id ?? null,
+      item_code: line.item_code?.trim() ?? "",
+      item_name: line.item_name?.trim() ?? "",
+      description: line.description?.trim() ?? "",
+      qty: line.qty == null ? "1" : String(line.qty),
+      unit_id: unitId,
+      unit_code: unitCode,
+      remark: remarks.join(" · "),
+    };
+  });
 }
 
 export function QuotationModal(props: Props) {
@@ -367,10 +424,12 @@ export function QuotationModal(props: Props) {
   };
 
   let initializedKey: string | null = null;
+  let seededNewLines = false;
 
   createEffect(() => {
     if (!props.open) {
       initializedKey = null;
+      seededNewLines = false;
       setCreatedQuotation(null);
       return;
     }
@@ -403,9 +462,11 @@ export function QuotationModal(props: Props) {
       setLines(linesFromDetail(ed.lines));
       loadCustom(ed.custom_values ?? {});
     } else {
+      const rfqSeed = takeRfqQuotationSeed();
+      const rfqLines = rfqSeed ? linesFromRfqSeed(rfqSeed) : [];
       setOrderDate(todayISO());
-      setPartnerId(null);
-      setCustomerLabel("");
+      setPartnerId(rfqSeed?.partner_id ?? null);
+      setCustomerLabel(rfqSeed?.partner_name ?? "");
       setPicUserId(null);
       setPicName("");
       const branch = getActiveBranchCurrent();
@@ -419,7 +480,21 @@ export function QuotationModal(props: Props) {
       setNoteForPic("");
       setNotes("");
       setProgressStatus("unconfirmed");
-      setLines([emptyQuotationLine(1)]);
+      seededNewLines = rfqLines.length > 0;
+      if (seededNewLines) {
+        const activeTax = taxTypes().find((taxType) => taxType.id === taxTypeId());
+        if (activeTax && taxTypeId()) {
+          const basis = defaultInputBasis(activeTax.tax_mode);
+          const seeded = rfqLines.map((line) => ({ ...line, input_basis: basis }));
+          seededNewLines = false;
+          setLines(seeded);
+          void recalculateQuotationLines(seeded, taxTypeId()!, activeTax).then(setLines);
+        } else {
+          setLines(rfqLines);
+        }
+      } else {
+        setLines([emptyQuotationLine(1)]);
+      }
       loadCustom({});
       void loadPreview(todayISO());
     }
@@ -435,7 +510,13 @@ export function QuotationModal(props: Props) {
       setTaxTypeId(first.id);
       setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
-      setLines([emptyQuotationLine(1, "", basis)]);
+      if (seededNewLines) {
+        const seeded = lines().map((line) => ({ ...line, input_basis: basis }));
+        seededNewLines = false;
+        void recalculateQuotationLines(seeded, first.id, first).then(setLines);
+      } else {
+        setLines([emptyQuotationLine(1, "", basis)]);
+      }
     }
     if (!currencyId()) {
       const def = cc.find((c) => c.is_default) ?? cc[0];
@@ -522,6 +603,8 @@ export function QuotationModal(props: Props) {
         item_name: ln.item_name,
         description: ln.description || null,
         qty: ln.qty === "" ? 0 : Number(ln.qty),
+        unit_id: ln.unit_id || null,
+        unit_code: ln.unit_code || null,
         unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
         input_basis: ln.input_basis,
         remark: ln.remark || null,

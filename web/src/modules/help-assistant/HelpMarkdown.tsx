@@ -148,11 +148,11 @@ function BlockView(props: { block: Block }) {
 }
 
 /** Safe, dependency-free markdown for Copilot replies. */
-export function HelpMarkdown(props: { content: string; class?: string }) {
+export function HelpMarkdown(props: { content: string; class?: string; hideExternalNote?: boolean }) {
   return (
     <div class={`help-md space-y-2.5 text-sm leading-relaxed text-text-primary ${props.class ?? ""}`}>
       <For each={parseHelpMarkdown(props.content || "")}>{(block) => <BlockView block={block} />}</For>
-      <Show when={helpMarkdownHasExternalLink(props.content || "")}>
+      <Show when={!props.hideExternalNote && helpMarkdownHasExternalLink(props.content || "")}>
         <p class="m-0 text-[11px] text-text-secondary">Links marked “opens outside Bluearm” leave this app.</p>
       </Show>
     </div>

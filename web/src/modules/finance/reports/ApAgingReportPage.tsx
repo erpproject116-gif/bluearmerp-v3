@@ -111,7 +111,7 @@ export default function ApAgingReportPage() {
                   </td>
                   <td class="px-3 py-2">{row.vendor_name}</td>
                   <td class="px-3 py-2">{row.due_date}</td>
-                  <td class="px-3 py-2 text-right">{row.balance}</td>
+                  <td class="px-3 py-2 text-right tabular-nums">{formatAmount(row.balance)}</td>
                   <td class="px-3 py-2 text-right">{row.age_days}</td>
                   <td class="px-3 py-2">{row.age_bucket}</td>
                 </tr>

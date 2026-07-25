@@ -30,7 +30,7 @@ func validateSaleLotRequirements(ctx context.Context, q pgx.Tx, tenantID int64, 
 // SO-linked lines rely on prior SO release for qty deduction.
 func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationID, userID int64) error {
 	rows, err := tx.Query(ctx, `
-		select ln.id, ln.item_id, ln.qty::float8, ln.source_sales_order_line_id
+		select ln.id, ln.item_id, ln.qty::float8, ln.unit_id, ln.source_sales_order_line_id
 		from public.sa_sales_lines ln
 		where ln.sales_id = $1
 		order by ln.line_no`, salesID)
@@ -39,29 +39,48 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 	}
 	defer rows.Close()
 
+	type pendingLine struct {
+		lineID  int64
+		itemID  int64
+		unitID  *int64
+		lineQty float64
+	}
+	var pending []pendingLine
 	for rows.Next() {
 		var lineID int64
 		var itemID *int64
 		var qty float64
+		var unitID *int64
 		var soLineID *int64
-		if err := rows.Scan(&lineID, &itemID, &qty, &soLineID); err != nil {
+		if err := rows.Scan(&lineID, &itemID, &qty, &unitID, &soLineID); err != nil {
 			return err
 		}
 		if soLineID != nil || itemID == nil || qty <= 0 {
 			continue
 		}
+		pending = append(pending, pendingLine{lineID: lineID, itemID: *itemID, unitID: unitID, lineQty: qty})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, p := range pending {
+		lineID, itemID := p.lineID, p.itemID
 		var trackInventory bool
-		if err := tx.QueryRow(ctx, `select track_inventory_qty from public.inv_items where id = $1`, *itemID).Scan(&trackInventory); err != nil || !trackInventory {
+		if err := tx.QueryRow(ctx, `select track_inventory_qty from public.inv_items where id = $1`, itemID).Scan(&trackInventory); err != nil || !trackInventory {
 			continue
+		}
+		qty, err := inventory.BaseQtyForLine(ctx, tx, tenantID, itemID, p.unitID, p.lineQty)
+		if err != nil {
+			return fmt.Errorf("line item %d: %w", lineID, err)
 		}
 
 		var qtyOnHand float64
-		err := tx.QueryRow(ctx, `
+		if err := tx.QueryRow(ctx, `
 			select qty_on_hand::float8
 			from public.inv_item_location_balances
 			where tenant_id = $1 and item_id = $2 and location_id = $3
-			for update`, tenantID, *itemID, locationID).Scan(&qtyOnHand)
-		if err != nil {
+			for update`, tenantID, itemID, locationID).Scan(&qtyOnHand); err != nil {
 			return fmt.Errorf("line item %d: insufficient stock at location", lineID)
 		}
 		if qtyOnHand+0.0001 < qty {
@@ -72,7 +91,7 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 			update public.inv_item_location_balances
 			set qty_on_hand = qty_on_hand - $1, updated_at = now()
 			where tenant_id = $2 and item_id = $3 and location_id = $4`,
-			qty, tenantID, *itemID, locationID)
+			qty, tenantID, itemID, locationID)
 		if err != nil || tag.RowsAffected() == 0 {
 			return fmt.Errorf("line item %d: failed to update stock", lineID)
 		}
@@ -81,12 +100,12 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 			insert into public.inv_stock_movements (
 			  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
 			) values ($1, $2, $3, $4, 'sales', 'sa_sales_line', $5, $6)`,
-			tenantID, *itemID, locationID, -qty, lineID, userID)
+			tenantID, itemID, locationID, -qty, lineID, userID)
 		if err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 // validateLotBatchForSaleLine ensures the lot batch matches the line's item and the sale's location.
@@ -110,25 +129,48 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 	}
 
 	rows, err := tx.Query(ctx, `
-		select ln.id, ln.line_no, ln.item_id, ln.lot_batch_id, ln.qty::float8
+		select ln.id, ln.line_no, ln.item_id, ln.unit_id, ln.lot_batch_id, ln.qty::float8
 		from public.sa_sales_lines ln
 		where ln.sales_id = $1 and ln.lot_batch_id is not null
 		order by ln.line_no`, salesID)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
+	type pendingLot struct {
+		lineID, lotBatchID int64
+		lineNo             int
+		lineItemID         *int64
+		unitID             *int64
+		lineQty            float64
+	}
+	var pending []pendingLot
 	for rows.Next() {
-		var lineID, lotBatchID int64
-		var lineNo int
-		var lineItemID *int64
-		var qty float64
-		if err := rows.Scan(&lineID, &lineNo, &lineItemID, &lotBatchID, &qty); err != nil {
+		var p pendingLot
+		if err := rows.Scan(&p.lineID, &p.lineNo, &p.lineItemID, &p.unitID, &p.lotBatchID, &p.lineQty); err != nil {
+			rows.Close()
 			return err
 		}
-		if qty <= 0 {
+		if p.lineQty <= 0 {
 			continue
+		}
+		pending = append(pending, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, p := range pending {
+		lineID, lineNo, lotBatchID, lineItemID := p.lineID, p.lineNo, p.lotBatchID, p.lineItemID
+		_ = lineID
+		qty := p.lineQty
+		if lineItemID != nil {
+			converted, err := inventory.BaseQtyForLine(ctx, tx, tenantID, *lineItemID, p.unitID, p.lineQty)
+			if err != nil {
+				return fmt.Errorf("line %d: %w", lineNo, err)
+			}
+			qty = converted
 		}
 		var lotQty float64
 		var lotItemID, lotLocationID int64
@@ -155,39 +197,67 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 			return fmt.Errorf("line %d: failed to deduct lot qty", lineNo)
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 // reverseSaleLot restores lot batch qty for lines on this sales invoice.
 func reverseSaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
 	rows, err := tx.Query(ctx, `
-		select ln.lot_batch_id, ln.qty::float8
+		select ln.item_id, ln.unit_id, ln.lot_batch_id, ln.qty::float8
 		from public.sa_sales_lines ln
 		where ln.sales_id = $1 and ln.lot_batch_id is not null`, salesID)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	restores, err := collectLotRestores(rows)
+	if err != nil {
+		return err
+	}
+	return applyLotRestores(ctx, tx, tenantID, restores)
+}
 
+type lotRestore struct {
+	itemID     *int64
+	unitID     *int64
+	lotBatchID int64
+	lineQty    float64
+}
+
+func collectLotRestores(rows pgx.Rows) ([]lotRestore, error) {
+	defer rows.Close()
+	var out []lotRestore
 	for rows.Next() {
-		var lotBatchID int64
-		var qty float64
-		if err := rows.Scan(&lotBatchID, &qty); err != nil {
-			return err
+		var r lotRestore
+		if err := rows.Scan(&r.itemID, &r.unitID, &r.lotBatchID, &r.lineQty); err != nil {
+			return nil, err
 		}
-		if qty <= 0 {
+		if r.lineQty <= 0 {
 			continue
 		}
-		_, err = tx.Exec(ctx, `
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func applyLotRestores(ctx context.Context, tx pgx.Tx, tenantID int64, restores []lotRestore) error {
+	for _, r := range restores {
+		qty := r.lineQty
+		if r.itemID != nil {
+			converted, err := inventory.BaseQtyForLine(ctx, tx, tenantID, *r.itemID, r.unitID, r.lineQty)
+			if err != nil {
+				return err
+			}
+			qty = converted
+		}
+		if _, err := tx.Exec(ctx, `
 			update public.inv_lot_batches
 			set qty_on_hand = qty_on_hand + $1, updated_at = now()
 			where id = $2 and tenant_id = $3`,
-			qty, lotBatchID, tenantID)
-		if err != nil {
+			qty, r.lotBatchID, tenantID); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 // reverseSaleStock restores qty for direct-sale stock movements linked to this sales invoice.
@@ -326,33 +396,17 @@ func reverseSaleLotForLines(ctx context.Context, tx pgx.Tx, tenantID int64, line
 		return nil
 	}
 	rows, err := tx.Query(ctx, `
-		select ln.lot_batch_id, ln.qty::float8
+		select ln.item_id, ln.unit_id, ln.lot_batch_id, ln.qty::float8
 		from public.sa_sales_lines ln
 		where ln.id = any($1) and ln.lot_batch_id is not null`, lineIDs)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var lotBatchID int64
-		var qty float64
-		if err := rows.Scan(&lotBatchID, &qty); err != nil {
-			return err
-		}
-		if qty <= 0 {
-			continue
-		}
-		_, err = tx.Exec(ctx, `
-			update public.inv_lot_batches
-			set qty_on_hand = qty_on_hand + $1, updated_at = now()
-			where id = $2 and tenant_id = $3`,
-			qty, lotBatchID, tenantID)
-		if err != nil {
-			return err
-		}
+	restores, err := collectLotRestores(rows)
+	if err != nil {
+		return err
 	}
-	return rows.Err()
+	return applyLotRestores(ctx, tx, tenantID, restores)
 }
 
 // reverseSaleSerialsForLines moves sold serials back to in_stock for selected lines.
@@ -402,12 +456,13 @@ func applySalesReturnStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, lo
 		return nil
 	}
 	var itemID *int64
+	var unitID *int64
 	var lineQty float64
 	var soLineID *int64
 	err := tx.QueryRow(ctx, `
-		select item_id, qty::float8, source_sales_order_line_id
+		select item_id, unit_id, qty::float8, source_sales_order_line_id
 		from public.sa_sales_lines where id = $1 and sales_id = $2`,
-		salesLineID, salesID).Scan(&itemID, &lineQty, &soLineID)
+		salesLineID, salesID).Scan(&itemID, &unitID, &lineQty, &soLineID)
 	if err != nil {
 		return fmt.Errorf("sales line not found")
 	}
@@ -419,7 +474,11 @@ func applySalesReturnStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, lo
 		return nil
 	}
 
-	restoreQty := returnQty
+	baseReturnQty, err := inventory.BaseQtyForLine(ctx, tx, tenantID, *itemID, unitID, returnQty)
+	if err != nil {
+		return err
+	}
+	restoreQty := baseReturnQty
 	if soLineID == nil {
 		// Direct sale: prefer reversing proportional stock from original movement.
 		var movQty float64
@@ -456,7 +515,7 @@ func applySalesReturnStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, lo
 	if lotBatchID != nil {
 		lotRestore := lineQty
 		if lineQty > 0.0001 {
-			lotRestore = returnQty
+			lotRestore = baseReturnQty
 		}
 		_, err = tx.Exec(ctx, `
 			update public.inv_lot_batches
