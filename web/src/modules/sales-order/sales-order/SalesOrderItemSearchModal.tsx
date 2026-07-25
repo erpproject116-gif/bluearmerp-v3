@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
+import { formatMoney } from "../../../shared/money";
 import { inventoryItemSearchErrorMessage, postInventoryItemSearch } from "../../../shared/inventoryItemSearch";
 import { useToast } from "../../../shared/toast";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
@@ -124,8 +125,6 @@ export function SalesOrderItemSearchModal(props: Props) {
     props.onClose();
   };
 
-  const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   return (
     <Show when={props.open}>
       <div class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
@@ -210,7 +209,7 @@ export function SalesOrderItemSearchModal(props: Props) {
                         </td>
                         <td class="py-2 pr-4 font-medium text-brand-600">{row.item_code}</td>
                         <td class="py-2 pr-4">{row.item_name}</td>
-                        <td class="py-2 text-right">{money(row.sales_price)}</td>
+                        <td class="py-2 text-right">{formatMoney(row.sales_price)}</td>
                       </tr>
                     )}
                   </For>

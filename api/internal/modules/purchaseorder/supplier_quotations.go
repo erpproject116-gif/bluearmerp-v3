@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -38,6 +39,8 @@ type SupplierQuotationLine struct {
 	ItemCode         string  `json:"item_code"`
 	ItemName         string  `json:"item_name"`
 	Qty              float64 `json:"qty"`
+	UnitID           *int64  `json:"unit_id,omitempty"`
+	UnitCode         string  `json:"unit_code,omitempty"`
 	UnitPrice        float64 `json:"unit_price"`
 	LineTotal        float64 `json:"line_total"`
 }
@@ -55,6 +58,8 @@ type supplierQuotationBody struct {
 		ItemCode         string  `json:"item_code"`
 		ItemName         string  `json:"item_name"`
 		Qty              float64 `json:"qty"`
+		UnitID           *int64  `json:"unit_id"`
+		UnitCode         string  `json:"unit_code"`
 		UnitPrice        float64 `json:"unit_price"`
 	} `json:"lines"`
 }
@@ -64,6 +69,8 @@ type rfqLineRef struct {
 	ItemCode string
 	ItemName string
 	Qty      float64
+	UnitID   *int64
+	UnitCode string
 }
 
 func registerSupplierQuotationRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -166,7 +173,8 @@ func loadSupplierQuotation(ctx context.Context, pool *pgxpool.Pool, tenantID, id
 	}
 
 	rows, err := pool.Query(ctx, `
-		select id, line_no, rfq_request_line_id, item_id, qty::float8, unit_price::float8, line_total::float8
+		select id, line_no, rfq_request_line_id, item_id, qty::float8,
+		  unit_id, coalesce(unit_code, ''), unit_price::float8, line_total::float8
 		from public.rfq_supplier_quotation_lines
 		where supplier_quotation_id = $1
 		order by line_no`, id)
@@ -177,7 +185,8 @@ func loadSupplierQuotation(ctx context.Context, pool *pgxpool.Pool, tenantID, id
 
 	for rows.Next() {
 		var ln SupplierQuotationLine
-		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.RFQRequestLineID, &ln.ItemID, &ln.Qty, &ln.UnitPrice, &ln.LineTotal); err != nil {
+		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.RFQRequestLineID, &ln.ItemID, &ln.Qty,
+			&ln.UnitID, &ln.UnitCode, &ln.UnitPrice, &ln.LineTotal); err != nil {
 			return SupplierQuotation{}, err
 		}
 		if ln.RFQRequestLineID != nil {
@@ -252,11 +261,12 @@ func createSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		for i, ln := range lineItems {
+			unitID, unitCode := inventory.ResolveLineUnit(r.Context(), tx, tu.TenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
 			_, err = tx.Exec(r.Context(), `
 				insert into public.rfq_supplier_quotation_lines
-				  (supplier_quotation_id, rfq_request_line_id, line_no, item_id, qty, unit_price, line_total)
-				values ($1, $2, $3, $4, $5, $6, $7)`,
-				id, ln.RFQRequestLineID, i+1, ln.ItemID, ln.Qty, ln.UnitPrice, ln.LineTotal)
+				  (supplier_quotation_id, rfq_request_line_id, line_no, item_id, qty, unit_id, unit_code, unit_price, line_total)
+				values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+				id, ln.RFQRequestLineID, i+1, ln.ItemID, ln.Qty, unitID, unitCode, ln.UnitPrice, ln.LineTotal)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to save supplier quotation lines.", "ERR_INTERNAL")
 				return
@@ -345,11 +355,12 @@ func updateSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		for i, ln := range lineItems {
+			unitID, unitCode := inventory.ResolveLineUnit(r.Context(), tx, tu.TenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
 			if _, err := tx.Exec(r.Context(), `
 				insert into public.rfq_supplier_quotation_lines
-				  (supplier_quotation_id, rfq_request_line_id, line_no, item_id, qty, unit_price, line_total)
-				values ($1, $2, $3, $4, $5, $6, $7)`,
-				id, ln.RFQRequestLineID, i+1, ln.ItemID, ln.Qty, ln.UnitPrice, ln.LineTotal); err != nil {
+				  (supplier_quotation_id, rfq_request_line_id, line_no, item_id, qty, unit_id, unit_code, unit_price, line_total)
+				values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+				id, ln.RFQRequestLineID, i+1, ln.ItemID, ln.Qty, unitID, unitCode, ln.UnitPrice, ln.LineTotal); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to update supplier quotation lines.", "ERR_INTERNAL")
 				return
 			}
@@ -505,7 +516,7 @@ func assertRFQOwned(ctx context.Context, tx pgx.Tx, tenantID, rfqID int64) error
 
 func loadRFQLineRefs(ctx context.Context, tx pgx.Tx, rfqID int64) (map[int64]rfqLineRef, error) {
 	rows, err := tx.Query(ctx, `
-		select id, item_id, item_code, item_name, qty::float8
+		select id, item_id, item_code, item_name, qty::float8, unit_id, coalesce(unit_code, '')
 		from public.rfq_request_lines
 		where rfq_id = $1`, rfqID)
 	if err != nil {
@@ -517,7 +528,7 @@ func loadRFQLineRefs(ctx context.Context, tx pgx.Tx, rfqID int64) (map[int64]rfq
 	for rows.Next() {
 		var id int64
 		var x rfqLineRef
-		if err := rows.Scan(&id, &x.ItemID, &x.ItemCode, &x.ItemName, &x.Qty); err != nil {
+		if err := rows.Scan(&id, &x.ItemID, &x.ItemCode, &x.ItemName, &x.Qty, &x.UnitID, &x.UnitCode); err != nil {
 			return nil, err
 		}
 		out[id] = x
@@ -532,6 +543,8 @@ func normalizeSupplierQuotationLines(lines []struct {
 	ItemCode         string  `json:"item_code"`
 	ItemName         string  `json:"item_name"`
 	Qty              float64 `json:"qty"`
+	UnitID           *int64  `json:"unit_id"`
+	UnitCode         string  `json:"unit_code"`
 	UnitPrice        float64 `json:"unit_price"`
 }, refs map[int64]rfqLineRef, grandTotal *float64) ([]SupplierQuotationLine, map[string]string) {
 	errs := map[string]string{}
@@ -544,6 +557,8 @@ func normalizeSupplierQuotationLines(lines []struct {
 			ItemCode:         strings.TrimSpace(raw.ItemCode),
 			ItemName:         strings.TrimSpace(raw.ItemName),
 			Qty:              raw.Qty,
+			UnitID:           raw.UnitID,
+			UnitCode:         strings.TrimSpace(raw.UnitCode),
 			UnitPrice:        raw.UnitPrice,
 		}
 		if raw.LineNo > 0 {
@@ -564,6 +579,12 @@ func normalizeSupplierQuotationLines(lines []struct {
 			}
 			if ln.Qty <= 0 {
 				ln.Qty = ref.Qty
+			}
+			if ln.UnitID == nil {
+				ln.UnitID = ref.UnitID
+			}
+			if ln.UnitCode == "" {
+				ln.UnitCode = ref.UnitCode
 			}
 		}
 		if ln.Qty <= 0 {

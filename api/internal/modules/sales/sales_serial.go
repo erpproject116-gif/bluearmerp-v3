@@ -3,6 +3,7 @@ package sales
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -47,7 +48,11 @@ func validateSaleSerialRequirements(ctx context.Context, q pgx.Tx, tenantID int6
 			}
 			continue
 		}
-		if err := inventory.ValidateSerialUnitCapture(ln.LineNo, settings.SerialPolicy, len(ln.SerialUnitIDs), ln.Qty); err != nil {
+		baseQty, err := serialBaseQty(ctx, q, tenantID, ln.LineNo, *ln.ItemID, ln.UnitID, ln.Qty)
+		if err != nil {
+			return err
+		}
+		if err := inventory.ValidateSerialUnitCapture(ln.LineNo, settings.SerialPolicy, len(ln.SerialUnitIDs), baseQty); err != nil {
 			return err
 		}
 		if ln.SerialLotNo != nil && strings.TrimSpace(*ln.SerialLotNo) != "" && len(ln.SerialUnitIDs) == 0 {
@@ -55,6 +60,19 @@ func validateSaleSerialRequirements(ctx context.Context, q pgx.Tx, tenantID int6
 		}
 	}
 	return nil
+}
+
+// serialBaseQty converts a line qty to the item base unit and rejects fractional
+// results, since serial units cannot be split.
+func serialBaseQty(ctx context.Context, q inventory.UnitQuerier, tenantID int64, lineNo int, itemID int64, unitID *int64, qty float64) (float64, error) {
+	baseQty, err := inventory.BaseQtyForLine(ctx, q, tenantID, itemID, unitID, qty)
+	if err != nil {
+		return 0, fmt.Errorf("line %d: %w", lineNo, err)
+	}
+	if math.Abs(baseQty-math.Round(baseQty)) > 1e-6 {
+		return 0, fmt.Errorf("line %d: quantity converts to %.4f base units; serial-tracked items need a whole number", lineNo, baseQty)
+	}
+	return math.Round(baseQty), nil
 }
 
 // loadReservedSerialUnitIDsForSOLine returns serial units reserved on SO release for a line.
@@ -104,7 +122,7 @@ func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, par
 	}
 
 	rows, err := tx.Query(ctx, `
-		select ln.id, ln.line_no, ln.item_id, ln.qty::float8
+		select ln.id, ln.line_no, ln.item_id, ln.unit_id, ln.qty::float8
 		from public.sa_sales_lines ln
 		where ln.sales_id = $1
 		order by ln.line_no`, salesID)
@@ -117,12 +135,13 @@ func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, par
 		id     int64
 		lineNo int
 		itemID *int64
+		unitID *int64
 		qty    float64
 	}
 	var dbLines []dbLine
 	for rows.Next() {
 		var ln dbLine
-		if err := rows.Scan(&ln.id, &ln.lineNo, &ln.itemID, &ln.qty); err != nil {
+		if err := rows.Scan(&ln.id, &ln.lineNo, &ln.itemID, &ln.unitID, &ln.qty); err != nil {
 			return err
 		}
 		dbLines = append(dbLines, ln)
@@ -159,7 +178,11 @@ func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, par
 			}
 			continue
 		}
-		if err := inventory.ValidateSerialUnitCapture(dbLn.lineNo, settings.SerialPolicy, len(body.SerialUnitIDs), dbLn.qty); err != nil {
+		baseQty, err := serialBaseQty(ctx, tx, tenantID, dbLn.lineNo, *dbLn.itemID, dbLn.unitID, dbLn.qty)
+		if err != nil {
+			return err
+		}
+		if err := inventory.ValidateSerialUnitCapture(dbLn.lineNo, settings.SerialPolicy, len(body.SerialUnitIDs), baseQty); err != nil {
 			return err
 		}
 		serials := make([]string, 0, len(body.SerialUnitIDs))

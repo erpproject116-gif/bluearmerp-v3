@@ -7,6 +7,7 @@ import {
   type DateRangeFilters,
 } from "../../../shared/reports/useModuleReports";
 import { FinanceLayout } from "../FinanceLayout";
+import { MoneyCell } from "../../../shared/MoneyCell";
 
 export default function TrialBalanceReportPage() {
   const defaults = defaultReportDateRange();
@@ -90,9 +91,9 @@ export default function TrialBalanceReportPage() {
                   <td class="px-3 py-2">{row.account_code}</td>
                   <td class="px-3 py-2">{row.account_name}</td>
                   <td class="px-3 py-2">{row.account_type}</td>
-                  <td class="px-3 py-2 text-right">{row.total_debit}</td>
-                  <td class="px-3 py-2 text-right">{row.total_credit}</td>
-                  <td class="px-3 py-2 text-right">{row.balance}</td>
+                  <MoneyCell value={row.total_debit} sign={false} />
+                  <MoneyCell value={row.total_credit} sign={false} />
+                  <MoneyCell value={row.balance} sign={false} />
                 </tr>
               )}
             </For>

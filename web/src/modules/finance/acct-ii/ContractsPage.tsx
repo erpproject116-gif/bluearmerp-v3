@@ -6,6 +6,7 @@ import { KanbanCard, type KanbanDetailRow } from "../../../shared/KanbanCard";
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../../shared/ViewModeToggle";
 import { useToast } from "../../../shared/toast";
 import { apiFetch } from "../../../shared/api";
+import { formatMoney } from "../../../shared/money";
 import { AcctIILayout } from "./AcctIILayout";
 
 const BOARD_STORAGE_KEY = "finance-contracts-view";
@@ -71,7 +72,7 @@ function milestoneCardDetails(m: ContractMilestone): KanbanDetailRow[] {
     { label: "Contract", value: `${m.contract_no} — ${m.contract_title}` },
     { label: "Customer", value: m.partner_name },
     { label: "Due", value: m.due_date ?? "—" },
-    { label: "Amount", value: m.amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+    { label: "Amount", value: formatMoney(m.amount) },
   ];
   if (m.sales_no) rows.push({ label: "Sales invoice", value: m.sales_no });
   if (m.inv_project_id) rows.push({ label: "Inv. project", value: `#${m.inv_project_id}` });
@@ -284,7 +285,7 @@ export default function ContractsPage() {
           {
             key: "total_amount",
             header: "Total",
-            render: (r) => r.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+            render: (r) => formatMoney(r.total_amount),
           },
           {
             key: "status",

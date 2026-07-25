@@ -231,9 +231,7 @@ export function HelpAssistantPanel(props: {
             <div>
               <h2 class="text-sm font-semibold text-text-primary">Bluearm Copilot</h2>
               <p class="text-xs text-text-secondary">
-                {props.assistant.aiEnabled()
-                  ? "Guides, live data, @tags, files, and approve-to-act drafts"
-                  : "In-app help"}
+                {props.assistant.aiEnabled() ? "Ask, look up, or draft an action" : "In-app help"}
               </p>
             </div>
             <div class="flex items-center gap-1">
@@ -279,9 +277,8 @@ export function HelpAssistantPanel(props: {
               fallback={
                 <div class="space-y-3 text-sm text-text-secondary">
                   <p>
-                    Ask how Bluearm works, check live cash/overdue/stock, type{" "}
-                    <span class="font-medium text-text-primary">@</span> to tag items/customers/serials/docs, or
-                    attach a file for context.
+                    Ask a question, type <span class="font-medium text-text-primary">@</span> to tag
+                    records, or attach a file.
                   </p>
                   <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">Try asking</p>
                   <div class="flex flex-wrap gap-2">

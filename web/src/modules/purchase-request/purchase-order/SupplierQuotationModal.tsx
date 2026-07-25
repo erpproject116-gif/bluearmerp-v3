@@ -4,6 +4,7 @@ import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
+import { formatMoney } from "../../../shared/money";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
@@ -15,6 +16,8 @@ type RfqLine = {
   item_code: string;
   item_name: string;
   qty: number;
+  unit_id?: number | null;
+  unit_code?: string | null;
 };
 
 type SupplierQuotationDetail = {
@@ -34,6 +37,8 @@ type SupplierQuotationDetail = {
     item_code: string;
     item_name: string;
     qty: number;
+    unit_id?: number | null;
+    unit_code?: string | null;
     unit_price: number;
     line_total: number;
   }>;
@@ -54,6 +59,8 @@ type LineDraft = {
   item_code: string;
   item_name: string;
   qty: number;
+  unit_id?: number | null;
+  unit_code?: string | null;
   unit_price: string;
 };
 
@@ -98,6 +105,8 @@ export function SupplierQuotationModal(props: Props) {
         item_code: ln.item_code,
         item_name: ln.item_name,
         qty: ln.qty,
+        unit_id: ln.unit_id ?? null,
+        unit_code: ln.unit_code ?? "",
         unit_price: "0",
       })),
     );
@@ -125,6 +134,8 @@ export function SupplierQuotationModal(props: Props) {
         item_code: ln.item_code,
         item_name: ln.item_name,
         qty: ln.qty,
+        unit_id: ln.unit_id ?? null,
+        unit_code: ln.unit_code ?? "",
         unit_price: String(ln.unit_price ?? 0),
       })),
     );
@@ -161,6 +172,8 @@ export function SupplierQuotationModal(props: Props) {
         item_code: ln.item_code,
         item_name: ln.item_name,
         qty: ln.qty,
+        unit_id: ln.unit_id ?? undefined,
+        unit_code: ln.unit_code || undefined,
         unit_price: Number(ln.unit_price || "0"),
       })),
     };
@@ -271,6 +284,7 @@ export function SupplierQuotationModal(props: Props) {
                     <th class="px-2 py-2">#</th>
                     <th class="px-2 py-2">Item</th>
                     <th class="px-2 py-2 text-right">Qty</th>
+                    <th class="px-2 py-2">UoM</th>
                     <th class="px-2 py-2 text-right">Unit price</th>
                     <th class="px-2 py-2 text-right">Line total</th>
                   </tr>
@@ -284,6 +298,7 @@ export function SupplierQuotationModal(props: Props) {
                           {ln.item_code} — {ln.item_name}
                         </td>
                         <td class="px-2 py-2 text-right">{ln.qty}</td>
+                        <td class="px-2 py-2">{ln.unit_code || "—"}</td>
                         <td class="px-2 py-2 text-right">
                           <input
                             type="number"
@@ -302,10 +317,7 @@ export function SupplierQuotationModal(props: Props) {
                           />
                         </td>
                         <td class="px-2 py-2 text-right">
-                          {(ln.qty * (Number(ln.unit_price || "0") || 0)).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                          {formatMoney(ln.qty * (Number(ln.unit_price || "0") || 0))}
                         </td>
                       </tr>
                     )}
@@ -315,11 +327,7 @@ export function SupplierQuotationModal(props: Props) {
             </div>
 
             <p class="mt-3 text-right text-sm font-medium">
-              Grand total:{" "}
-              {grandTotal().toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              Grand total: {formatMoney(grandTotal())}
             </p>
 
             <div class="mt-6 flex justify-end gap-2">

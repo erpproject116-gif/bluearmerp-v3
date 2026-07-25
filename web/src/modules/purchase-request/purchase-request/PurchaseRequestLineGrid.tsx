@@ -12,6 +12,7 @@ import { filterTaxLineColumns } from "../../../shared/taxLineGrid";
 import { applyColumnLabels, lineViewKey, useColumnLabelSettings } from "../../../shared/useColumnLabelSettings";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
+import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { PartnerSearchModal, type PartnerSearchRow } from "./PartnerSearchModal";
 import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
 import { DocumentSerialScanBar } from "../../../shared/DocumentSerialScanBar";
@@ -30,6 +31,8 @@ export type PurchaseRequestLineRow = {
   spec_name: string;
   description: string;
   qty: string;
+  unit_id?: number | null;
+  unit_code?: string;
   unit_price: string;
   input_basis: "vat_inc_unit" | "non_vat_unit";
   unit_non_vat: string;
@@ -65,6 +68,8 @@ export function emptyPurchaseRequestLine(
     spec_name: "",
     description: "",
     qty: "1",
+    unit_id: null,
+    unit_code: "",
     unit_price: salesPrice,
     input_basis: inputBasis,
     unit_non_vat: "",
@@ -85,6 +90,7 @@ const LINE_COLUMNS = [
   { key: "spec_name", header: "Spec Name", width: 110 },
   { key: "description", header: "Description", width: 120 },
   { key: "qty", header: "Qty", width: 72 },
+  { key: "unit", header: "UoM", width: 80 },
   { key: "basis", header: "Basis", width: 100 },
   { key: "unit_price", header: "Unit Price", width: 100 },
   { key: "unit_non_vat", header: "Unit (Non-VAT)", width: 110 },
@@ -235,6 +241,8 @@ export function PurchaseRequestLineGrid(props: Props) {
             item_code: item.item_code,
             item_name: item.item_name,
             spec_name: item.spec_name ?? "",
+            unit_id: item.base_unit_id ?? null,
+            unit_code: item.base_unit_code ?? "",
             unit_price: String(item.sales_price ?? 0),
             input_basis: basis,
             track_serial: Boolean(item.track_serial),
@@ -440,7 +448,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                   width={widthFor(c.key)}
                   onResizeStart={onResizeStart}
                   resizable={c.key !== "actions"}
-                  class={`px-2 py-2${c.key.includes("unit") || c.key === "qty" || c.key === "tax" || c.key === "line_total" || c.key === "non_vat_total" ? " text-right" : ""}`}
+                  class={`px-2 py-2${c.key !== "unit" && (c.key.includes("unit") || c.key === "qty" || c.key === "tax" || c.key === "line_total" || c.key === "non_vat_total") ? " text-right" : ""}`}
                 >
                   {c.header}
                 </ResizableTh>
@@ -492,6 +500,13 @@ export function PurchaseRequestLineGrid(props: Props) {
                   </ResizableTd>
                   <ResizableTd width={widthFor("qty")} class="px-2 py-1">
                     <DecimalInput mode="qty" class={`${inputClass} w-full text-right`} value={line().qty} onValue={(v) => void updateLine(idx, { qty: v })} />
+                  </ResizableTd>
+                  <ResizableTd width={widthFor("unit")} class="px-2 py-1">
+                    <LineUnitSelect
+                      unitId={line().unit_id}
+                      unitCode={line().unit_code}
+                      onChange={(u) => void updateLine(idx, { unit_id: u.unit_id, unit_code: u.unit_code })}
+                    />
                   </ResizableTd>
                   <Show when={hasCol("basis")}>
                     <ResizableTd width={widthFor("basis")} class="px-2 py-1">
@@ -568,6 +583,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                 Totals
               </td>
               <td class="px-2 py-2 text-right">{totals().qty.toLocaleString("en-PH", { maximumFractionDigits: 4 })}</td>
+              <td />
               <Show when={hasCol("basis")}>
                 <td />
               </Show>

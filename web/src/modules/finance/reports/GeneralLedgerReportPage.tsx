@@ -7,6 +7,7 @@ import {
   type DateRangeFilters,
 } from "../../../shared/reports/useModuleReports";
 import { FinanceLayout } from "../FinanceLayout";
+import { MoneyCell } from "../../../shared/MoneyCell";
 
 export default function GeneralLedgerReportPage() {
   const defaults = defaultReportDateRange();
@@ -93,8 +94,8 @@ export default function GeneralLedgerReportPage() {
                   <td class="px-3 py-2">
                     {row.account_code} — {row.account_name}
                   </td>
-                  <td class="px-3 py-2 text-right">{row.debit}</td>
-                  <td class="px-3 py-2 text-right">{row.credit}</td>
+                  <MoneyCell value={row.debit} sign={false} />
+                  <MoneyCell value={row.credit} sign={false} />
                   <td class="px-3 py-2">{row.party_name ?? ""}</td>
                   <td class="px-3 py-2">{row.remarks ?? ""}</td>
                 </tr>

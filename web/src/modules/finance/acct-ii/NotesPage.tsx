@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { apiFetch } from "../../../shared/api";
+import { formatMoney } from "../../../shared/money";
 import { AcctIILayout } from "./AcctIILayout";
 
 type Note = {
@@ -148,7 +149,7 @@ export default function NotesPage() {
           {
             key: "amount",
             header: "Amount",
-            render: (r) => r.amount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+            render: (r) => formatMoney(r.amount),
           },
           {
             key: "status",

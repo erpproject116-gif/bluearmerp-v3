@@ -81,6 +81,11 @@ func executeApprovedDraft(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUse
 		return createRecurringFromDraft(r, pool, tu, draft.Payload)
 	case "import_rfq_pdf":
 		return openUIFromDraft(actionDraft{Type: "import_rfq_pdf", Payload: draft.Payload})
+	case "create_quotation_from_rfq":
+		if !tu.HasPermission("quotation.quotations", auth.AccessWrite) {
+			return nil, "Missing quotation write permission.", http.StatusForbidden
+		}
+		return openUIFromDraft(draft)
 	case "create_follow_up":
 		if !tu.HasPermission("crm.follow_up_tasks", auth.AccessWrite) {
 			return nil, "Missing crm.follow_up_tasks write permission.", http.StatusForbidden
@@ -107,23 +112,29 @@ func openUIFromDraft(draft actionDraft) (any, string, int) {
 		next = "/app/dashboard"
 	}
 	payload := sanitizeDraftPayload(draft.Type, draft.Payload)
-	return map[string]any{
+	result := map[string]any{
 		"next":    next,
 		"hint":    hint,
 		"payload": payload,
 		"api":     api,
-	}, "", http.StatusOK
+	}
+	if draft.Type == "create_quotation_from_rfq" {
+		result["seed"] = payload
+	}
+	return result, "", http.StatusOK
 }
 
 func catalogNavForDraft(draft actionDraft) (next, api, hint string) {
-	hint = "Continue in the ERP screen — Copilot does not auto-post."
+	hint = "Continue in the ERP screen."
 	switch draft.Type {
 	case "import_rfq_pdf":
-		return "/app/quotation/quotations", "/api/v1/quotation/rfq-import", "Use Import RFQ on quotations. AI enhance reuses the existing RFQ VL pipeline — no second vision stack."
+		return "/app/quotation/quotations", "/api/v1/quotation/rfq-import", "Open Import RFQ on quotations."
+	case "create_quotation_from_rfq":
+		return "/app/quotation/quotations/new", "/api/v1/quotation/quotations", "Review the prefilled quotation, then save."
 	case "send_document_email", "send_quotation_email":
 		next = emailUIFromPayload(draft.Payload)
 		api = next
-		hint = "Open the document and send mail from the compose screen — Copilot does not send email."
+		hint = "Open the document and send mail from the compose screen."
 		return next, api, hint
 	}
 	if spec := findOpenDocSpec(draft.Type); spec != nil {
@@ -150,6 +161,9 @@ func emailUIFromPayload(payload map[string]any) string {
 func sanitizeDraftPayload(draftType string, payload map[string]any) map[string]any {
 	if payload == nil {
 		return map[string]any{}
+	}
+	if draftType == "create_quotation_from_rfq" {
+		return sanitizeRfqQuotationSeedPayload(payload)
 	}
 	allowed := allowedPayloadKeys(draftType)
 	out := make(map[string]any, len(allowed))
@@ -191,9 +205,89 @@ func allowedPayloadKeys(draftType string) []string {
 		return []string{"doc_type", "doc_id", "doc_no", "partner_id", "partner_name", "hint"}
 	case "import_rfq_pdf":
 		return []string{"hint", "note"}
+	case "create_quotation_from_rfq":
+		return []string{"partner_id", "partner_name", "document_type", "source_name", "lines"}
 	default:
 		return []string{"hint", "kind", "note", "partner_id", "partner_name", "item_id", "doc_id", "entities"}
 	}
+}
+
+func sanitizeRfqQuotationSeedPayload(payload map[string]any) map[string]any {
+	out := map[string]any{}
+	if id, ok := toPositiveInt64(payload["partner_id"]); ok {
+		out["partner_id"] = id
+	}
+	for _, key := range []string{"partner_name", "document_type", "source_name"} {
+		if value := boundedString(payload[key], 240); value != "" {
+			out[key] = value
+		}
+	}
+
+	rawLines, ok := payload["lines"]
+	if !ok {
+		return out
+	}
+	encoded, err := json.Marshal(rawLines)
+	if err != nil {
+		return out
+	}
+	var lines []map[string]any
+	if json.Unmarshal(encoded, &lines) != nil {
+		return out
+	}
+	if len(lines) > 200 {
+		lines = lines[:200]
+	}
+	clean := make([]any, 0, len(lines))
+	for _, line := range lines {
+		itemName := boundedString(line["item_name"], 240)
+		itemCode := boundedString(line["item_code"], 100)
+		description := boundedString(line["description"], 12_000)
+		if itemName == "" && itemCode == "" && description == "" {
+			continue
+		}
+		qty, ok := toFloat(line["qty"])
+		if !ok || qty <= 0 {
+			qty = 1
+		}
+		unitPrice, ok := toFloat(line["unit_price"])
+		if !ok || unitPrice < 0 {
+			unitPrice = 0
+		}
+		row := map[string]any{
+			"item_code":   itemCode,
+			"item_name":   itemName,
+			"description": description,
+			"qty":         qty,
+			"unit":        boundedString(line["unit"], 40),
+			"unit_price":  unitPrice,
+			"remarks":     boundedString(line["remarks"], 2_000),
+		}
+		if id, ok := toPositiveInt64(line["item_id"]); ok {
+			row["item_id"] = id
+		}
+		if id, ok := toPositiveInt64(line["unit_id"]); ok {
+			row["unit_id"] = id
+		}
+		if code := boundedString(line["unit_code"], 30); code != "" {
+			row["unit_code"] = code
+		}
+		clean = append(clean, row)
+	}
+	out["lines"] = clean
+	return out
+}
+
+func boundedString(value any, maxLen int) string {
+	s, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	s = strings.TrimSpace(s)
+	if len(s) > maxLen {
+		s = s[:maxLen]
+	}
+	return s
 }
 
 func createFollowUpFromDraft(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUser, payload map[string]any) (any, string, int) {

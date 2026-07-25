@@ -5,6 +5,7 @@ import { apiFetch } from "../../../shared/api";
 import { createQuery } from "@tanstack/solid-query";
 import { FinanceLayout } from "../FinanceLayout";
 import type { DateRangeFilters } from "../../../shared/reports/useModuleReports";
+import { MoneyCell } from "../../../shared/MoneyCell";
 
 type CashBookRow = {
   entry_date: string;
@@ -114,9 +115,9 @@ export default function CashBookReportPage(props: Props) {
                   <td class="px-3 py-2">{row.entry_no}</td>
                   <td class="px-3 py-2">{row.account_code} — {row.account_name}</td>
                   <td class="px-3 py-2">{row.description}</td>
-                  <td class="px-3 py-2 text-right">{row.debit.toFixed(4)}</td>
-                  <td class="px-3 py-2 text-right">{row.credit.toFixed(4)}</td>
-                  <td class="px-3 py-2 text-right">{row.balance.toFixed(4)}</td>
+                  <MoneyCell value={row.debit} sign={false} />
+                  <MoneyCell value={row.credit} sign={false} />
+                  <MoneyCell value={row.balance} sign={false} />
                 </tr>
               )}
             </For>

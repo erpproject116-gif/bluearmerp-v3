@@ -11,6 +11,7 @@ import {
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ReportEmptyMessage } from "../../../shared/reports/ReportTableStates";
 import { apiFetch } from "../../../shared/api";
+import { formatMoney } from "../../../shared/money";
 
 type CategoryOpt = { id: number; name: string };
 type LocationOpt = { id: number; location_name: string };
@@ -75,10 +76,6 @@ function filtersFromSearchParams(params: Record<string, string | string[] | unde
 
 function fmtQty(n: number) {
   return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "—";
-}
-
-function fmtMoney(n: number) {
-  return Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
 }
 
 export default function InventoryStatusReportPage() {
@@ -255,7 +252,7 @@ export default function InventoryStatusReportPage() {
                           <div class="text-[11px] text-amber-700">Other branches</div>
                         </Show>
                       </td>
-                      <td class="px-3 py-2 text-right tabular-nums">{fmtMoney(r.sales_price)}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">{formatMoney(r.sales_price)}</td>
                       <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.company_available_qty)}</td>
                       <td class="px-3 py-2">{statusLabel(r.stock_status)}</td>
                       <td class="px-3 py-2">

@@ -35,6 +35,8 @@ type SaleLine struct {
 	Description            *string          `json:"description,omitempty"`
 	Qty                    float64          `json:"qty"`
 	ReturnedQty            float64          `json:"returned_qty"`
+	UnitID                 *int64           `json:"unit_id,omitempty"`
+	UnitCode               string           `json:"unit_code,omitempty"`
 	UnitNonVat             float64          `json:"unit_non_vat"`
 	NonVatTotal            float64          `json:"non_vat_total"`
 	TaxAmount              float64          `json:"tax_amount"`
@@ -106,6 +108,8 @@ type saleLineBody struct {
 	ItemName               string  `json:"item_name"`
 	Description            *string `json:"description"`
 	Qty                    float64 `json:"qty"`
+	UnitID                 *int64  `json:"unit_id"`
+	UnitCode               string  `json:"unit_code"`
 	UnitPrice              float64 `json:"unit_price"`
 	InputBasis             string  `json:"input_basis"`
 	DiscountAmount         float64 `json:"discount_amount"`
@@ -146,6 +150,8 @@ type computedLine struct {
 	ItemName               string
 	Description            *string
 	Qty                    float64
+	UnitID                 *int64
+	UnitCode               *string
 	Amounts                taxcalc.LineAmounts
 	DiscountAmount         float64
 	DiscountedUnitNonVat   float64
@@ -435,6 +441,7 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 	rows, err := pool.Query(ctx, `
 		select sl.id, sl.line_no, sl.item_id, sl.item_code, sl.item_name, sl.description,
 		  sl.qty::float8, coalesce(sl.returned_qty, 0)::float8,
+		  sl.unit_id, coalesce(sl.unit_code, ''),
 		  sl.unit_non_vat::float8, sl.non_vat_total::float8, sl.tax_amount::float8,
 		  sl.unit_vat_inc::float8, sl.line_total::float8,
 		  sl.discount_amount::float8, sl.discounted_unit_non_vat::float8, sl.discounted_unit_vat_inc::float8,
@@ -469,7 +476,8 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 		var ln SaleLine
 		var serialUnitsJSON []byte
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
-			&ln.Qty, &ln.ReturnedQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
+			&ln.Qty, &ln.ReturnedQty, &ln.UnitID, &ln.UnitCode,
+			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal,
 			&ln.DiscountAmount, &ln.DiscountedUnitNonVat, &ln.DiscountedUnitVatInc,
 			&ln.Remark, &ln.SerialLotNo, &ln.LotBatchID, &ln.SourceSalesOrderLineID,
@@ -528,6 +536,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, errs)
 			return
 		}
+		resolveComputedLineUnits(r.Context(), pool, tu.TenantID, computed)
 		if len(computed) == 0 {
 			response.Validation(w, map[string]string{"lines": "At least one line with quantity is required."})
 			return
@@ -728,6 +737,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, errs)
 			return
 		}
+		resolveComputedLineUnits(r.Context(), pool, tu.TenantID, computed)
 		subtotal, taxTotal, grandTotal := sumSaleTotals(computed)
 
 		if convErrs := validateSalesOrderConversion(r.Context(), pool, tu.TenantID, computed); convErrs != nil {
@@ -897,12 +907,12 @@ func insertSaleLines(ctx context.Context, tx pgx.Tx, salesID int64, lines []comp
 		_, err := tx.Exec(ctx, `
 			insert into public.sa_sales_lines (
 			  sales_id, line_no, item_id, item_code, item_name, description,
-			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total,
+			  qty, unit_id, unit_code, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total,
 			  discount_amount, discounted_unit_non_vat, discounted_unit_vat_inc,
 			  remark, serial_lot_no, lot_batch_id, source_sales_order_line_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
 			salesID, lineNo, ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.Description,
-			ln.Qty, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
+			ln.Qty, ln.UnitID, ln.UnitCode, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
 			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal,
 			ln.DiscountAmount, ln.DiscountedUnitNonVat, ln.DiscountedUnitVatInc,
 			ln.Remark, ln.SerialLotNo, ln.LotBatchID, ln.SourceSalesOrderLineID)
@@ -952,6 +962,10 @@ func computeSaleLines(tt taxcalc.TaxType, templateCode string, lines []saleLineB
 			amounts = discounted
 		}
 
+		var unitCode *string
+		if c := strings.TrimSpace(ln.UnitCode); c != "" {
+			unitCode = &c
+		}
 		out = append(out, computedLine{
 			LineNo:                 ln.LineNo,
 			ItemID:                 ln.ItemID,
@@ -959,6 +973,8 @@ func computeSaleLines(tt taxcalc.TaxType, templateCode string, lines []saleLineB
 			ItemName:               ln.ItemName,
 			Description:            ln.Description,
 			Qty:                    ln.Qty,
+			UnitID:                 ln.UnitID,
+			UnitCode:               unitCode,
 			Amounts:                amounts,
 			DiscountAmount:         discountAmount,
 			DiscountedUnitNonVat:   discountedUnitNonVat,
@@ -973,6 +989,20 @@ func computeSaleLines(tt taxcalc.TaxType, templateCode string, lines []saleLineB
 		return nil, errs
 	}
 	return out, nil
+}
+
+// resolveComputedLineUnits fills unit_id/unit_code from the item base unit when the
+// caller did not pick a unit explicitly.
+func resolveComputedLineUnits(ctx context.Context, q inventory.UnitQuerier, tenantID int64, lines []computedLine) {
+	for i := range lines {
+		code := ""
+		if lines[i].UnitCode != nil {
+			code = *lines[i].UnitCode
+		}
+		unitID, unitCode := inventory.ResolveLineUnit(ctx, q, tenantID, lines[i].ItemID, lines[i].UnitID, code)
+		lines[i].UnitID = unitID
+		lines[i].UnitCode = unitCode
+	}
 }
 
 func applyPartnerRatesToSaleLines(ctx context.Context, pool *pgxpool.Pool, tenantID, partnerID int64, lines []saleLineBody) []saleLineBody {

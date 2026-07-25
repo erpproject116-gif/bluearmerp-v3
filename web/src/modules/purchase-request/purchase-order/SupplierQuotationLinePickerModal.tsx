@@ -2,6 +2,7 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
+import { formatMoney } from "../../../shared/money";
 import { LoadingText } from "../../../shared/LoadingText";
 
 export type OpenSupplierQuotationLineRow = {
@@ -23,6 +24,8 @@ export type OpenSupplierQuotationLineRow = {
   item_name: string;
   qty: number;
   balance_qty: number;
+  unit_id?: number | null;
+  unit_code?: string | null;
   unit_price: number;
 };
 
@@ -155,7 +158,7 @@ export function SupplierQuotationLinePickerModal(props: Props) {
                               {row.item_code} — {row.item_name}
                             </td>
                             <td class="py-2 text-right">{row.balance_qty}</td>
-                            <td class="py-2 text-right">{row.unit_price}</td>
+                            <td class="py-2 text-right">{formatMoney(row.unit_price)}</td>
                           </tr>
                         )}
                       </For>

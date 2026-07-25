@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { apiFetch } from "../../../shared/api";
+import { formatMoney } from "../../../shared/money";
 import { useGoodsReceiptList } from "../../../shared/useGoodsReceiptList";
 import { AcctIILayout } from "./AcctIILayout";
 
@@ -112,7 +113,7 @@ export default function LandedCostPage() {
           {
             key: "total_amount",
             header: "Total",
-            render: (r) => r.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+            render: (r) => formatMoney(r.total_amount),
           },
           {
             key: "status",

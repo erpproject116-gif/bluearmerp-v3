@@ -26,7 +26,18 @@ type ParseBatchResult = {
   lines: ParseApiLine[];
   table_detected: boolean;
   detected_columns: RfqDetectedColumn[];
+  document_type: RfqDocumentType;
+  blocked: boolean;
+  blocked_reason?: string;
 };
+
+export type RfqDocumentType =
+  | "unknown"
+  | "rfq"
+  | "gov_section_spec"
+  | "gov_annex_table"
+  | "spreadsheet_boq"
+  | "invoice_like";
 
 export type RfqImportProgress = {
   phase: "parse" | "match";
@@ -53,6 +64,9 @@ async function parseBatch(
     lines: ParseApiLine[];
     table_detected?: boolean;
     detected_columns?: RfqDetectedColumn[];
+    document_type?: RfqDocumentType;
+    blocked?: boolean;
+    blocked_reason?: string;
   }>("/api/v1/quotation/rfq-import/parse", {
     method: "POST",
     body: JSON.stringify({
@@ -68,6 +82,9 @@ async function parseBatch(
     lines: res.data.lines,
     table_detected: !!res.data.table_detected,
     detected_columns: res.data.detected_columns ?? [],
+    document_type: res.data.document_type ?? "unknown",
+    blocked: !!res.data.blocked,
+    blocked_reason: res.data.blocked_reason,
   };
 }
 
@@ -75,7 +92,15 @@ export async function parsePayloadInBatches(
   payload: RfqDocumentPayload,
   force: string[],
   onProgress?: (p: RfqImportProgress) => void,
-): Promise<{ lines: ParseApiLine[]; table_detected: boolean; detected_columns: RfqDetectedColumn[]; force_columns: string[] }> {
+): Promise<{
+  lines: ParseApiLine[];
+  table_detected: boolean;
+  detected_columns: RfqDetectedColumn[];
+  force_columns: string[];
+  document_type: RfqDocumentType;
+  blocked: boolean;
+  blocked_reason?: string;
+}> {
   const pageChunks = payload.pages.length ? chunk(payload.pages, RFQ_PARSE_PAGE_CHUNK) : [];
   const tableChunks = payload.tables.length ? chunk(payload.tables, RFQ_PARSE_PAGE_CHUNK) : [];
   const totalBatches = Math.max(pageChunks.length, tableChunks.length, 1);
@@ -84,6 +109,17 @@ export async function parsePayloadInBatches(
   let tableDetected = false;
   let detectedColumns: RfqDetectedColumn[] = [];
   let activeForce = force.filter(Boolean).length >= 2 ? [...force] : [];
+  let documentType: RfqDocumentType = "unknown";
+  let blocked = false;
+  let blockedReason: string | undefined;
+  const typePriority: Record<RfqDocumentType, number> = {
+    unknown: 0,
+    rfq: 1,
+    spreadsheet_boq: 2,
+    gov_annex_table: 3,
+    gov_section_spec: 4,
+    invoice_like: 5,
+  };
 
   for (let i = 0; i < totalBatches; i++) {
     onProgress?.({
@@ -99,6 +135,13 @@ export async function parsePayloadInBatches(
     );
     mergedLines = mergedLines.concat(batch.lines);
     if (batch.table_detected) tableDetected = true;
+    if (typePriority[batch.document_type] > typePriority[documentType]) {
+      documentType = batch.document_type;
+    }
+    if (batch.blocked) {
+      blocked = true;
+      blockedReason = batch.blocked_reason;
+    }
     if (!detectedColumns.length && batch.detected_columns.length) {
       detectedColumns = batch.detected_columns;
       if (activeForce.length < 2) {
@@ -121,6 +164,9 @@ export async function parsePayloadInBatches(
     table_detected: tableDetected,
     detected_columns: detectedColumns,
     force_columns: activeForce,
+    document_type: documentType,
+    blocked,
+    blocked_reason: blockedReason,
   };
 }
 
@@ -196,7 +242,14 @@ export async function aiParsePayload(
   payload: RfqDocumentPayload,
   pageImages: Array<{ page: number; image_base64: string; mime: string }>,
   onProgress?: (p: RfqImportProgress) => void,
-): Promise<{ lines: ParseApiLine[]; table_detected: boolean; detected_columns: RfqDetectedColumn[]; ai_model?: string }> {
+): Promise<{
+  lines: ParseApiLine[];
+  table_detected: boolean;
+  detected_columns: RfqDetectedColumn[];
+  ai_model?: string;
+  pages_truncated: number;
+  document_type: RfqDocumentType;
+}> {
   onProgress?.({
     phase: "parse",
     batch: 1,
@@ -209,6 +262,8 @@ export async function aiParsePayload(
     table_detected?: boolean;
     detected_columns?: RfqDetectedColumn[];
     ai_model?: string;
+    pages_truncated?: number;
+    document_type?: RfqDocumentType;
   }>("/api/v1/quotation/rfq-import/ai-parse", {
     method: "POST",
     body: JSON.stringify({
@@ -235,5 +290,7 @@ export async function aiParsePayload(
     table_detected: !!res.data.table_detected,
     detected_columns: res.data.detected_columns ?? [],
     ai_model: res.data.ai_model,
+    pages_truncated: res.data.pages_truncated ?? 0,
+    document_type: res.data.document_type ?? "unknown",
   };
 }

@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { apiFetch } from "../../shared/api";
+import { formatMoney } from "../../shared/money";
 import { ShippingLayout } from "./ShippingLayout";
 
 type ShippingRule = {
@@ -88,9 +89,7 @@ export default function ShippingRulesPage() {
               key: "flat_amount",
               header: "Flat freight",
               render: (r) =>
-                r.flat_amount != null
-                  ? r.flat_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })
-                  : "—",
+                r.flat_amount != null ? formatMoney(r.flat_amount) : "—",
             },
             { key: "active", header: "Active", render: (r) => (r.active ? "Yes" : "No") },
           ]}

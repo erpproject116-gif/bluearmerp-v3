@@ -346,6 +346,72 @@ func ConvertQty(ctx context.Context, q UnitQuerier, tenantID, fromUnitID, toUnit
 	return qty / factor, nil
 }
 
+// ResolveLineUnit normalizes the unit captured on a document line.
+// An explicit unit wins (its code is refreshed from the units master); otherwise
+// the item base unit is used. Lines without an item keep whatever free text was sent.
+func ResolveLineUnit(ctx context.Context, q UnitQuerier, tenantID int64, itemID *int64, unitID *int64, unitCode string) (*int64, *string) {
+	code := strings.TrimSpace(unitCode)
+	if unitID != nil && *unitID > 0 {
+		var resolved string
+		if err := q.QueryRow(ctx, `
+			select code from public.inv_units where id=$1 and tenant_id=$2`,
+			*unitID, tenantID).Scan(&resolved); err == nil {
+			id := *unitID
+			return &id, &resolved
+		}
+	}
+	if itemID != nil && *itemID > 0 {
+		baseID, baseCode, err := ItemBaseUnit(ctx, q, tenantID, *itemID)
+		if err == nil && baseID > 0 {
+			return &baseID, &baseCode
+		}
+	}
+	if code == "" {
+		return nil, nil
+	}
+	return nil, &code
+}
+
+// LookupUnitByCode resolves free-text unit text (imports, parsed documents) to a
+// unit master row. Returns false when there is no active match.
+func LookupUnitByCode(ctx context.Context, q UnitQuerier, tenantID int64, code string) (int64, string, bool) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return 0, "", false
+	}
+	var id int64
+	var resolved string
+	err := q.QueryRow(ctx, `
+		select id, code from public.inv_units
+		where tenant_id=$1 and is_active and lower(code)=lower($2)
+		limit 1`, tenantID, code).Scan(&id, &resolved)
+	if err != nil || id <= 0 {
+		return 0, "", false
+	}
+	return id, resolved, true
+}
+
+// BaseQtyForLine converts a document line quantity into the item base unit so
+// ledger writes stay in one unit. It fails closed: when the line carries a unit
+// that cannot be reconciled with the item base unit, the caller gets an error
+// instead of an unconverted quantity.
+func BaseQtyForLine(ctx context.Context, q UnitQuerier, tenantID, itemID int64, lineUnitID *int64, qty float64) (float64, error) {
+	if lineUnitID == nil || *lineUnitID <= 0 {
+		return qty, nil
+	}
+	baseUnitID, _, err := ItemBaseUnit(ctx, q, tenantID, itemID)
+	if err != nil {
+		return 0, fmt.Errorf("item %d: base unit lookup failed", itemID)
+	}
+	if baseUnitID <= 0 {
+		return 0, fmt.Errorf("item %d: set a base unit under Inventory → Items before posting stock", itemID)
+	}
+	if *lineUnitID == baseUnitID {
+		return qty, nil
+	}
+	return ConvertQty(ctx, q, tenantID, *lineUnitID, baseUnitID, qty)
+}
+
 // ItemBaseUnit returns base_unit_id and code for an item.
 func ItemBaseUnit(ctx context.Context, q UnitQuerier, tenantID, itemID int64) (unitID int64, code string, err error) {
 	err = q.QueryRow(ctx, `

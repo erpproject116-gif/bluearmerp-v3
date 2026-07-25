@@ -10,17 +10,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/dashboard"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quotation"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 )
 
 type toolResult struct {
-	Name         string          `json:"name"`
-	OK           bool            `json:"ok"`
-	Denied       bool            `json:"denied,omitempty"`
-	Error        string          `json:"error,omitempty"`
-	Data         json.RawMessage `json:"data,omitempty"`
-	DeepLinks    []deepLink      `json:"deep_links,omitempty"`
-	ActionDraft  *actionDraft    `json:"action_draft,omitempty"`
+	Name        string          `json:"name"`
+	OK          bool            `json:"ok"`
+	Denied      bool            `json:"denied,omitempty"`
+	Error       string          `json:"error,omitempty"`
+	Data        json.RawMessage `json:"data,omitempty"`
+	DeepLinks   []deepLink      `json:"deep_links,omitempty"`
+	ActionDraft *actionDraft    `json:"action_draft,omitempty"`
 }
 
 type deepLink struct {
@@ -67,6 +68,10 @@ func runTool(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, name s
 		tr = toolDraftRecurring(args)
 	case "import_rfq_pdf":
 		tr = toolImportRFQ(args)
+	case "run_smart_rfq":
+		tr = toolRunSmartRFQ(ctx, pool, tu, args)
+	case "draft_quotation_from_rfq":
+		tr = toolDraftQuotationFromRFQ(args)
 	case "draft_follow_up":
 		tr = toolDraftFollowUp(args)
 	case "draft_generate_quotation":
@@ -273,11 +278,11 @@ func toolDraftRecurring(args map[string]any) toolResult {
 		API:     "/api/v1/finance/recurring-expenses",
 		Method:  "POST",
 		Payload: map[string]any{
-			"name":       name,
-			"amount":     amount,
-			"frequency":  freq,
-			"category":   strOr(args["category"], "general"),
-			"is_active":  true,
+			"name":      name,
+			"amount":    amount,
+			"frequency": freq,
+			"category":  strOr(args["category"], "general"),
+			"is_active": true,
 		},
 	}
 	raw, _ := json.Marshal(map[string]any{"draft": draft})
@@ -309,6 +314,108 @@ func toolImportRFQ(args map[string]any) toolResult {
 		Data:        raw,
 		ActionDraft: draft,
 		DeepLinks:   []deepLink{{Label: "Quotations / Import RFQ", Href: "/app/quotation/quotations"}},
+	}
+}
+
+func toolRunSmartRFQ(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, args map[string]any) toolResult {
+	if !tu.HasPermission("quotation.quotations", auth.AccessRead) {
+		return toolResult{Name: "run_smart_rfq", Denied: true, Error: "Missing quotation read permission."}
+	}
+	rawInput, err := json.Marshal(args)
+	if err != nil {
+		return toolResult{Name: "run_smart_rfq", OK: false, Error: "Invalid Smart RFQ input."}
+	}
+	var input quotation.RfqRunInput
+	if err := json.Unmarshal(rawInput, &input); err != nil {
+		return toolResult{Name: "run_smart_rfq", OK: false, Error: "Invalid Smart RFQ pages or tables."}
+	}
+	if len(input.Pages) == 0 && len(input.Tables) == 0 {
+		return toolImportRFQ(map[string]any{
+			"note": "Attach an RFQ with extracted text/table data, or use Import RFQ from Quotations.",
+		})
+	}
+	if len(input.Pages) > 100 || len(input.Tables) > 100 {
+		return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ input is too large; use a page range (max 100 pages/tables in Copilot)."}
+	}
+	imageBytes := 0
+	for _, image := range input.PageImages {
+		imageBytes += len(image.ImageBase64)
+		if imageBytes > 12_000_000 {
+			return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ page images exceed the Copilot limit; use Import RFQ with a page range."}
+		}
+	}
+	totalText := 0
+	for i := range input.Pages {
+		if len(input.Pages[i].Text) > 20_000 {
+			input.Pages[i].Text = input.Pages[i].Text[:20_000] + "…[truncated]"
+		}
+		totalText += len(input.Pages[i].Text)
+		if totalText > 250_000 {
+			return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ extracted text exceeds the Copilot limit; use Import RFQ with a page range."}
+		}
+	}
+
+	result, err := quotation.RunRfqImportPipeline(ctx, pool, tu, input)
+	if err != nil {
+		return toolResult{Name: "run_smart_rfq", OK: false, Error: err.Error()}
+	}
+	data, _ := json.Marshal(result)
+	tr := toolResult{
+		Name:      "run_smart_rfq",
+		OK:        true,
+		Data:      data,
+		DeepLinks: []deepLink{{Label: "Quotations", Href: "/app/quotation/quotations"}},
+	}
+	if result.Blocked || len(result.Matched) == 0 {
+		return tr
+	}
+	seedLines := make([]any, 0, len(result.Matched))
+	for _, line := range result.Matched {
+		seedLines = append(seedLines, map[string]any{
+			"item_id":     line.ItemID,
+			"item_code":   line.ItemCode,
+			"item_name":   line.ItemName,
+			"description": line.Description,
+			"qty":         line.Qty,
+			"unit":        line.Unit,
+			"unit_id":     line.UnitID,
+			"unit_code":   line.UnitCode,
+			"unit_price":  line.SalesPrice,
+			"remarks":     line.Remarks,
+		})
+	}
+	draftArgs := map[string]any{
+		"document_type": result.DocumentType,
+		"lines":         seedLines,
+	}
+	if input.PartnerID != nil && *input.PartnerID > 0 {
+		draftArgs["partner_id"] = *input.PartnerID
+	}
+	draftResult := toolDraftQuotationFromRFQ(draftArgs)
+	tr.ActionDraft = draftResult.ActionDraft
+	return tr
+}
+
+func toolDraftQuotationFromRFQ(args map[string]any) toolResult {
+	payload := sanitizeRfqQuotationSeedPayload(args)
+	lines, _ := payload["lines"].([]any)
+	if len(lines) == 0 {
+		return toolResult{Name: "draft_quotation_from_rfq", OK: false, Error: "No valid RFQ lines are available for a quotation draft."}
+	}
+	draft := &actionDraft{
+		Type:    "create_quotation_from_rfq",
+		Summary: fmt.Sprintf("Prepare a quotation draft from %d Smart RFQ line(s). Approve opens a prefilled form; it does not save or post.", len(lines)),
+		API:     "/api/v1/quotation/quotations",
+		Method:  "POST",
+		Payload: payload,
+	}
+	raw, _ := json.Marshal(map[string]any{"draft": draft, "line_count": len(lines)})
+	return toolResult{
+		Name:        "draft_quotation_from_rfq",
+		OK:          true,
+		Data:        raw,
+		ActionDraft: draft,
+		DeepLinks:   []deepLink{{Label: "New quotation", Href: "/app/quotation/quotations/new"}},
 	}
 }
 

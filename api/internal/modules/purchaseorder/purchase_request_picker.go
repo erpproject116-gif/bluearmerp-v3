@@ -40,6 +40,8 @@ type openPurchaseRequestSlipLine struct {
 	Description           *string `json:"description,omitempty"`
 	Qty                   float64 `json:"qty"`
 	BalanceQty            float64 `json:"balance_qty"`
+	UnitID                *int64  `json:"unit_id,omitempty"`
+	UnitCode              *string `json:"unit_code,omitempty"`
 	InputBasis            string  `json:"input_basis"`
 	UnitPrice             float64 `json:"unit_price"`
 	UnitNonVat            float64 `json:"unit_non_vat"`
@@ -90,6 +92,7 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
 			  ln.qty::float8,
 			  (ln.qty - coalesce(sl.slipped, 0))::float8,
+			  ln.unit_id, ln.unit_code,
 			  coalesce(nullif(ln.input_basis, ''), 'vat_inc_unit'),
 			  ln.unit_non_vat::float8, ln.unit_vat_inc::float8, ln.remark,
 			  coalesce(i.track_serial, false),
@@ -127,7 +130,7 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.LocationID, &row.LocationName, &row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.PartnerID, &row.PartnerCode, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Description,
-				&row.Qty, &row.BalanceQty, &row.InputBasis,
+				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.InputBasis,
 				&row.UnitNonVat, &row.UnitVatInc, &row.Remark, &row.TrackSerial, &row.PlannedSerialNos, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read purchase request lines.", "ERR_INTERNAL")

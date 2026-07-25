@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { A, useSearchParams } from "@solidjs/router";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { formatMoney } from "../../shared/money";
 import { useToast } from "../../shared/toast";
 import { apiFetch } from "../../shared/api";
 
@@ -63,10 +64,6 @@ async function fetchAccounts(type: "expense" | "liability", q: string): Promise<
     label: `${a.account_code} ${a.account_name}`,
     sublabel: a.account_type,
   }));
-}
-
-function money(n: number) {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function CommissionRulesPage() {
@@ -407,13 +404,13 @@ export default function CommissionRulesPage() {
             {
               key: "base_amount",
               header: "Base",
-              render: (r) => money(r.base_amount),
+              render: (r) => formatMoney(r.base_amount),
               exportValue: (r) => r.base_amount,
             },
             {
               key: "commission_amount",
               header: "Commission",
-              render: (r) => money(r.commission_amount),
+              render: (r) => formatMoney(r.commission_amount),
               exportValue: (r) => r.commission_amount,
             },
             {

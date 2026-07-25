@@ -29,10 +29,10 @@ type rfqPageText struct {
 }
 
 type rfqParseRequest struct {
-	Pages           []rfqPageText          `json:"pages"`
-	Tables          []RfqStructuredTable   `json:"tables,omitempty"`
-	ForceColumns    []string               `json:"force_columns,omitempty"`
-	HeaderOverrides map[string]string      `json:"header_overrides,omitempty"`
+	Pages           []rfqPageText        `json:"pages"`
+	Tables          []RfqStructuredTable `json:"tables,omitempty"`
+	ForceColumns    []string             `json:"force_columns,omitempty"`
+	HeaderOverrides map[string]string    `json:"header_overrides,omitempty"`
 }
 
 type rfqMatchRequest struct {
@@ -40,7 +40,7 @@ type rfqMatchRequest struct {
 	PartnerID *int64          `json:"partner_id,omitempty"`
 }
 
-type rfqItemAlternative struct {
+type RfqItemAlternative struct {
 	ItemID     int64   `json:"item_id"`
 	ItemCode   string  `json:"item_code"`
 	ItemName   string  `json:"item_name"`
@@ -48,23 +48,27 @@ type rfqItemAlternative struct {
 	MatchScore float64 `json:"match_score"`
 }
 
-type rfqMatchedLine struct {
+type RfqMatchedLine struct {
 	ParsedRfqLine
 	ItemID       *int64               `json:"item_id"`
 	ItemCode     string               `json:"item_code"`
 	ItemName     string               `json:"item_name"`
 	SalesPrice   float64              `json:"sales_price"`
+	UnitID       *int64               `json:"unit_id,omitempty"`
+	UnitCode     string               `json:"unit_code,omitempty"`
 	RfqUnitPrice float64              `json:"rfq_unit_price,omitempty"`
 	MatchScore   float64              `json:"match_score"`
-	Alternatives []rfqItemAlternative `json:"alternatives,omitempty"`
+	Alternatives []RfqItemAlternative `json:"alternatives,omitempty"`
 }
 
 func registerRfqImportRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.Post("/rfq-import/extract-pdf", extractRfqPDF(pool))
-	r.Post("/rfq-import/parse", parseRfqImport(pool))
-	r.Post("/rfq-import/ai-parse", aiParseRfqImport(pool))
-	r.Get("/rfq-import/ai-config", rfqAIConfigHandler())
-	r.Post("/rfq-import/match-items", matchRfqImportItems(pool))
+	requireQuotation := auth.RequirePermission("quotation.quotations", auth.AccessRead)
+	r.With(requireQuotation).Post("/rfq-import/extract-pdf", extractRfqPDF(pool))
+	r.With(requireQuotation).Post("/rfq-import/parse", parseRfqImport(pool))
+	r.With(requireQuotation).Post("/rfq-import/ai-parse", aiParseRfqImport(pool))
+	r.With(requireQuotation).Post("/rfq-import/run", runRfqImport(pool))
+	r.With(requireQuotation).Get("/rfq-import/ai-config", rfqAIConfigHandler())
+	r.With(requireQuotation).Post("/rfq-import/match-items", matchRfqImportItems(pool))
 }
 
 func extractRfqPDF(_ *pgxpool.Pool) http.HandlerFunc {
@@ -123,13 +127,13 @@ func extractRfqPDF(_ *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		response.OK(w, map[string]any{
-			"pages":           pagesOut,
-			"total_pages":     result.TotalPages,
-			"skipped_pages":   result.Skipped,
-			"extracted_pages": len(pagesOut),
+			"pages":            pagesOut,
+			"total_pages":      result.TotalPages,
+			"skipped_pages":    result.Skipped,
+			"extracted_pages":  len(pagesOut),
 			"empty_text_pages": emptyText,
-			"text_only":       result.TextOnly,
-			"server_extract":  result.ServerParse,
+			"text_only":        result.TextOnly,
+			"server_extract":   result.ServerParse,
 		}, "PDF extracted.")
 	}
 }
@@ -165,14 +169,7 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			ForceColumns:    body.ForceColumns,
 			HeaderOverrides: body.HeaderOverrides,
 		}
-		structured := ParseRfqStructuredTables(body.Tables, opts)
-		var docResult RfqParseResult
-		if len(structured.Lines) > 0 && len(body.Tables) > 0 {
-			docResult = parseRfqDocumentLayoutOnly(pages, opts)
-		} else {
-			docResult = ParseRfqDocumentWithOptions(pages, opts)
-		}
-		result := mergeRfqParseResults(structured, docResult)
+		result, documentType := ParseRfqDeterministic(pages, body.Tables, opts)
 		response.OK(w, map[string]any{
 			"lines":            result.Lines,
 			"page_count":       len(body.Pages),
@@ -180,6 +177,14 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			"line_count":       len(result.Lines),
 			"table_detected":   result.TableDetected,
 			"detected_columns": result.DetectedColumns,
+			"document_type":    documentType,
+			"blocked":          documentType == RfqDocumentInvoiceLike,
+			"blocked_reason": func() string {
+				if documentType == RfqDocumentInvoiceLike {
+					return "This document looks like an invoice, not an RFQ or BOQ."
+				}
+				return ""
+			}(),
 		}, "RFQ parsed.")
 	}
 }
@@ -200,40 +205,69 @@ func matchRfqImportItems(pool *pgxpool.Pool) http.HandlerFunc {
 		if body.PartnerID != nil {
 			partnerID = *body.PartnerID
 		}
-		out := make([]rfqMatchedLine, 0, len(body.Lines))
-		for _, ln := range body.Lines {
-			matched := rfqMatchedLine{ParsedRfqLine: ln}
-			if v := parseMoneyFloat(ln.UnitPrice); v > 0 {
-				matched.RfqUnitPrice = v
-			}
-			candidates := lookupRfqItemCandidates(r.Context(), pool, tu.TenantID, ln, 5)
-			if len(candidates) > 0 {
-				best := candidates[0]
+		out := MatchRfqLines(r.Context(), pool, tu.TenantID, partnerID, body.Lines)
+		response.OK(w, map[string]any{"lines": out}, "Items matched.")
+	}
+}
+
+func MatchRfqLines(ctx context.Context, pool *pgxpool.Pool, tenantID, partnerID int64, lines []ParsedRfqLine) []RfqMatchedLine {
+	out := make([]RfqMatchedLine, 0, len(lines))
+	for _, original := range lines {
+		queryLine := original
+		queryLine.Description = rfqMatchQuery(original)
+		matched := RfqMatchedLine{ParsedRfqLine: original}
+		if v := parseMoneyFloat(original.UnitPrice); v > 0 {
+			matched.RfqUnitPrice = v
+		}
+		candidates := lookupRfqItemCandidates(ctx, pool, tenantID, queryLine, 5)
+		if len(candidates) > 0 {
+			best := candidates[0]
+			if best.Score >= 0.7 {
 				matched.ItemID = &best.ID
 				matched.ItemCode = best.Code
 				matched.ItemName = best.Name
-				matched.SalesPrice = resolveRfqSalesPrice(r.Context(), pool, tu.TenantID, best.ID, partnerID, best.SalesPrice)
+				matched.SalesPrice = resolveRfqSalesPrice(ctx, pool, tenantID, best.ID, partnerID, best.SalesPrice)
 				matched.MatchScore = best.Score
-				for _, alt := range candidates {
-					price := resolveRfqSalesPrice(r.Context(), pool, tu.TenantID, alt.ID, partnerID, alt.SalesPrice)
-					matched.Alternatives = append(matched.Alternatives, rfqItemAlternative{
-						ItemID: alt.ID, ItemCode: alt.Code, ItemName: alt.Name,
-						SalesPrice: price, MatchScore: alt.Score,
-					})
-				}
-			} else if strings.TrimSpace(ln.ItemCode) != "" {
-				matched.ItemCode = ln.ItemCode
 			}
-			if matched.ItemName == "" && strings.TrimSpace(ln.Description) != "" {
-				matched.ItemName = ln.Description
+			for _, alt := range candidates {
+				price := resolveRfqSalesPrice(ctx, pool, tenantID, alt.ID, partnerID, alt.SalesPrice)
+				matched.Alternatives = append(matched.Alternatives, RfqItemAlternative{
+					ItemID: alt.ID, ItemCode: alt.Code, ItemName: alt.Name,
+					SalesPrice: price, MatchScore: alt.Score,
+				})
 			}
-			if matched.SalesPrice == 0 && matched.RfqUnitPrice > 0 {
-				matched.SalesPrice = matched.RfqUnitPrice
-			}
-			out = append(out, matched)
 		}
-		response.OK(w, map[string]any{"lines": out}, "Items matched.")
+		if matched.ItemCode == "" && strings.TrimSpace(original.ItemCode) != "" {
+			matched.ItemCode = original.ItemCode
+		}
+		if matched.ItemName == "" {
+			matched.ItemName = original.ItemName
+		}
+		if matched.ItemName == "" && strings.TrimSpace(original.Description) != "" {
+			matched.ItemName = shortRfqItemTitle(original.Description)
+		}
+		if matched.SalesPrice == 0 && matched.RfqUnitPrice > 0 {
+			matched.SalesPrice = matched.RfqUnitPrice
+		}
+		matched.UnitID, matched.UnitCode = resolveRfqLineUnit(ctx, pool, tenantID, matched.ItemID, original.Unit)
+		out = append(out, matched)
 	}
+	return out
+}
+
+// resolveRfqLineUnit turns the unit text scraped from the RFQ into a structured
+// unit where possible, so the quotation draft carries a real UoM instead of a
+// remark. Unrecognized text is returned as a code-only hint.
+func resolveRfqLineUnit(ctx context.Context, pool *pgxpool.Pool, tenantID int64, itemID *int64, rawUnit string) (*int64, string) {
+	if id, code, ok := inventory.LookupUnitByCode(ctx, pool, tenantID, rawUnit); ok {
+		return &id, code
+	}
+	if itemID != nil && *itemID > 0 {
+		if baseID, baseCode, err := inventory.ItemBaseUnit(ctx, pool, tenantID, *itemID); err == nil && baseID > 0 {
+			return &baseID, baseCode
+		}
+	}
+	return nil, ""
 }
 
 func resolveRfqSalesPrice(ctx context.Context, pool *pgxpool.Pool, tenantID, itemID, partnerID int64, current float64) float64 {
@@ -321,9 +355,16 @@ func lookupRfqItem(ctx context.Context, pool *pgxpool.Pool, tenantID int64, ln P
 }
 
 func firstSignificantToken(s string) string {
+	stop := map[string]struct{}{
+		"with": {}, "from": {}, "minimum": {}, "technical": {}, "specifications": {},
+		"item": {}, "unit": {}, "supply": {}, "including": {},
+	}
 	for _, part := range strings.Fields(s) {
-		p := strings.Trim(part, ".,;:-")
-		if len(p) >= 3 {
+		p := strings.Trim(part, ".,;:-()[]")
+		if len(p) >= 4 {
+			if _, generic := stop[strings.ToLower(p)]; generic {
+				continue
+			}
 			return p
 		}
 	}

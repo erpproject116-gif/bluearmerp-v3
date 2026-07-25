@@ -1,0 +1,157 @@
+[
+  {
+    "name": "doj_nps_equipment",
+    "pages": [
+      {
+        "page": 1,
+        "text": "REQUEST FOR QUOTATION\nApproved Budget for the Contract (ABC)\nSmall Value Procurement\nPhilGEPS Registration Number\nMIMINUM TECHNICAL SPECIFICATIONS / TERMS OF REFERENCE / SCOPE OF WORK\nI. LAPTOP (8 units)\nProcessor: Intel Core i5, 12th Generation or higher*\nMemory: 16 GB RAM*\nStorage: at least 1TB*\nWarranty: Minimum one year manufacturer warranty\nII. PRINTER (5 units)\nA. General*\nDevice Type: Multifunction Color Printer (Print, Scan, Copy)\nPrint Speed: Black and White minimum 12 ppm\nJ. Warranty\nMinimum Warranty: One year on parts and service\nFINANCIAL PROPOSAL\nAPPROVED BUDGET FOR THE CONTRACT (ABC):"
+      }
+    ],
+    "expected": {
+      "document_type": "gov_section_spec",
+      "lines": [
+        {"item_name": "LAPTOP", "qty": "8", "unit": "unit"},
+        {"item_name": "PRINTER", "qty": "5", "unit": "unit"}
+      ]
+    }
+  },
+  {
+    "name": "doj_pads_equipment",
+    "pages": [
+      {
+        "page": 1,
+        "text": "REQUEST FOR QUOTATION\nApproved Budget for the Contract (ABC)\nSmall Value Procurement\nPhilGEPS Registration Number\nMIMINUM TECHNICAL SPECIFICATIONS / TERMS OF REFERENCE / SCOPE OF WORK\nI. LAPTOP (8 units)\nProcessor: Intel Core i5, 12th Generation or higher*\nMemory: 16 GB RAM*\nStorage: at least 1TB*\nWarranty: Minimum one year manufacturer warranty\nII. PRINTER (3 units)\nA. General*\nDevice Type: Multifunction Color Printer (Print, Scan, Copy)\nPrint Speed: Black and White minimum 12 ppm\nJ. Warranty\nMinimum Warranty: One year on parts and service\nFINANCIAL PROPOSAL"
+      }
+    ],
+    "expected": {
+      "document_type": "gov_section_spec",
+      "lines": [
+        {"item_name": "LAPTOP", "qty": "8", "unit": "unit"},
+        {"item_name": "PRINTER", "qty": "3", "unit": "unit"}
+      ]
+    }
+  },
+  {
+    "name": "csc_annex_a",
+    "pages": [
+      {
+        "page": 1,
+        "text": "Civil Service Commission\nREQUEST FOR QUOTATION\nPhilGEPS Reg. No.\nTERMS AND CONDITIONS"
+      },
+      {
+        "page": 2,
+        "text": "REQUEST FOR QUOTATION\nAnnex A\nITEM & DESCRIPTION\nQTY UNIT\nITEM NO.\n1 CSC LANYARD / ID LACE\n500 set\n3/4-1 inch digital sublimation single-side face print\nApproved Budget for the Contract: PhP30,000.00.\nxxxxxxxxxx-Nothing Follows-xxxxxxxxxx"
+      }
+    ],
+    "tables": [
+      {
+        "page": 2,
+        "headers": ["Item & Description", "QTY", "UNIT", "Remarks"],
+        "rows": [
+          ["CSC LANYARD / ID LACE - 3/4-1 inch digital sublimation single-side face print", "500", "set", ""]
+        ]
+      }
+    ],
+    "expected": {
+      "document_type": "gov_annex_table",
+      "lines": [
+        {"item_name": "CSC LANYARD / ID LACE - 3/4-1 inch digital sublimation single-side face print", "qty": "500", "unit": "set"}
+      ]
+    }
+  },
+  {
+    "name": "mid_range_laptop_desktop",
+    "tables": [
+      {
+        "page": 1,
+        "sheet": "Laptop",
+        "headers": ["Item", "Quantity", "Technical Specifications", "Cost Per Unit", "Total Cost", "Remarks"],
+        "rows": [
+          ["Mid-Range Laptop", "85", "Processor: Intel Core Ultra 5; Memory: 16GB DDR5; Storage: 512GB NVMe; Warranty: 3 Years", "45000", "3825000", ""]
+        ]
+      },
+      {
+        "page": 2,
+        "sheet": "Desktop",
+        "headers": ["Item", "Quantity", "Technical Specifications", "Cost Per Unit", "Total Cost", "Remarks"],
+        "rows": [
+          ["Mid-Range Desktops", "64", "Processor: Intel Core i5-14400; Memory: 16GB DDR5; Storage: 512GB NVMe + 1TB HDD; Warranty: 3 Years", "49000", "3136000", ""]
+        ]
+      }
+    ],
+    "expected": {
+      "document_type": "spreadsheet_boq",
+      "lines": [
+        {"item_name": "Mid-Range Laptop", "qty": "85", "unit": "", "unit_price": "45000"},
+        {"item_name": "Mid-Range Desktops", "qty": "64", "unit": "", "unit_price": "49000"}
+      ]
+    }
+  },
+  {
+    "name": "scrubbed_service_invoice_negative",
+    "pages": [
+      {
+        "page": 1,
+        "text": "INVOICE\nBILL TO\nDATE 07/01/2026\nINVOICE NO. INV-SCRUBBED\nSERVICE DESCRIPTION HOURS RATE TOTAL\nDashboard Development Dataset normalization 2:22:00 7.00 16.57\nTOTAL 99.98"
+      }
+    ],
+    "expected": {
+      "document_type": "invoice_like",
+      "lines": []
+    }
+  },
+  {
+    "name": "numbered_section_variant",
+    "pages": [
+      {
+        "page": 1,
+        "text": "REQUEST FOR QUOTATION\nPhilGEPS Registration Number\n1. Laptop – 8 units\nProcessor: Intel Core i5\n2. Printer - 5 pcs\nDevice Type: Multifunction\nFINANCIAL PROPOSAL"
+      }
+    ],
+    "expected": {
+      "document_type": "gov_section_spec",
+      "lines": [
+        {"item_name": "Laptop", "qty": "8", "unit": "unit"},
+        {"item_name": "Printer", "qty": "5", "unit": "pcs"}
+      ]
+    }
+  },
+  {
+    "name": "item_qty_paren_variant",
+    "pages": [
+      {
+        "page": 1,
+        "text": "REQUEST FOR QUOTATION\nApproved Budget for the Contract\nItem 1: Desktop (qty 64)\nMemory: 16GB\nItem 2: Monitor (qty 64)\nSize: 24 inch\nFINANCIAL PROPOSAL"
+      }
+    ],
+    "expected": {
+      "document_type": "gov_section_spec",
+      "lines": [
+        {"item_name": "Desktop", "qty": "64", "unit": "unit"},
+        {"item_name": "Monitor", "qty": "64", "unit": "unit"}
+      ]
+    }
+  },
+  {
+    "name": "boq_with_amount_due_stays_rfq",
+    "pages": [
+      {
+        "page": 1,
+        "text": "REQUEST FOR QUOTATION\nBill of Quantities\nAmount Due is subject to VAT\nITEM DESCRIPTION QTY\nWidget 10"
+      }
+    ],
+    "tables": [
+      {
+        "page": 1,
+        "headers": ["Item", "Technical Specifications", "Qty"],
+        "rows": [["Widget", "Steel grade A", "10"]]
+      }
+    ],
+    "expected": {
+      "document_type": "spreadsheet_boq",
+      "lines": [
+        {"item_name": "Widget", "qty": "10", "unit": ""}
+      ]
+    }
+  }
+]

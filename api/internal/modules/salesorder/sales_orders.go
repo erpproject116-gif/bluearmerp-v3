@@ -35,6 +35,8 @@ type SalesOrderLine struct {
 	Qty                   float64  `json:"qty"`
 	DeliveredQty          float64  `json:"delivered_qty"`
 	BilledQty             float64  `json:"billed_qty"`
+	UnitID                *int64   `json:"unit_id,omitempty"`
+	UnitCode              string   `json:"unit_code,omitempty"`
 	UnitNonVat            float64  `json:"unit_non_vat"`
 	NonVatTotal           float64  `json:"non_vat_total"`
 	TaxAmount             float64  `json:"tax_amount"`
@@ -95,6 +97,8 @@ type salesOrderLineBody struct {
 	ItemName              string   `json:"item_name"`
 	Description           *string  `json:"description"`
 	Qty                   float64  `json:"qty"`
+	UnitID                *int64   `json:"unit_id"`
+	UnitCode              string   `json:"unit_code"`
 	UnitPrice             float64  `json:"unit_price"`
 	InputBasis            string   `json:"input_basis"`
 	Remark                *string  `json:"remark"`
@@ -132,6 +136,8 @@ type computedLine struct {
 	ItemName              string
 	Description           *string
 	Qty                   float64
+	UnitID                *int64
+	UnitCode              *string
 	Amounts               taxcalc.LineAmounts
 	Remark                *string
 	SourceQuotationLineID *int64
@@ -430,6 +436,7 @@ func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID i
 	rows, err := pool.Query(ctx, `
 		select ln.id, ln.line_no, ln.item_id, ln.item_code, ln.item_name, ln.description,
 		  ln.qty::float8, coalesce(ln.delivered_qty, 0)::float8, coalesce(ln.billed_qty, 0)::float8,
+		  ln.unit_id, coalesce(ln.unit_code, ''),
 		  ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
 		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark, ln.source_quotation_line_id,
 		  coalesce(ln.planned_serial_nos, '{}'),
@@ -448,7 +455,8 @@ func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID i
 	for rows.Next() {
 		var ln SalesOrderLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
-			&ln.Qty, &ln.DeliveredQty, &ln.BilledQty, &ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
+			&ln.Qty, &ln.DeliveredQty, &ln.BilledQty, &ln.UnitID, &ln.UnitCode,
+			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.SourceQuotationLineID, &ln.PlannedSerialNos, &ln.TrackSerial, &ln.SerialPolicy); err != nil {
 			return nil, err
 		}
@@ -786,12 +794,12 @@ func insertSalesOrderLines(ctx context.Context, tx pgx.Tx, salesOrderID int64, l
 		err := tx.QueryRow(ctx, `
 			insert into public.so_sales_order_lines (
 			  sales_order_id, line_no, item_id, item_code, item_name, description,
-			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
+			  qty, unit_id, unit_code, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
 			  source_quotation_line_id, planned_serial_nos
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 			returning id`,
 			salesOrderID, lineNo, ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.Description,
-			ln.Qty, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
+			ln.Qty, ln.UnitID, ln.UnitCode, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
 			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark, ln.SourceQuotationLineID, ln.PlannedSerialNos).Scan(&id)
 		if err != nil {
 			return nil, err
@@ -830,6 +838,7 @@ func computeSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID in
 			continue
 		}
 		amounts := taxcalc.ComputeLine(tt, ln.UnitPrice, ln.Qty, inputBasis)
+		unitID, unitCode := inventory.ResolveLineUnit(ctx, pool, tenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
 		out = append(out, computedLine{
 			LineNo:                ln.LineNo,
 			ItemID:                ln.ItemID,
@@ -837,6 +846,8 @@ func computeSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID in
 			ItemName:              ln.ItemName,
 			Description:           ln.Description,
 			Qty:                   ln.Qty,
+			UnitID:                unitID,
+			UnitCode:              unitCode,
 			Amounts:               amounts,
 			Remark:                ln.Remark,
 			SourceQuotationLineID: ln.SourceQuotationLineID,

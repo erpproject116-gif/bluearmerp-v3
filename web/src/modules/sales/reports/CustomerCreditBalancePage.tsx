@@ -2,6 +2,7 @@ import { createQuery } from "@tanstack/solid-query";
 import { For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { uiLabel } from "../../../shared/branding/uiLabel";
+import { formatMoney } from "../../../shared/money";
 
 type CreditBalanceRow = {
   partner_id: number;
@@ -24,8 +25,7 @@ export default function CustomerCreditBalancePage() {
     },
   }));
 
-  const fmt = (n: number | null | undefined) =>
-    n == null ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n: number | null | undefined) => (n == null ? "—" : formatMoney(n));
 
   return (
     <div class="space-y-4">

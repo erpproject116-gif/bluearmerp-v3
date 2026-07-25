@@ -105,7 +105,8 @@ func CreateFromPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tu auth.
 	rows, err := pool.Query(ctx, `
 		select ln.id, ln.line_no, ln.partner_id, ln.partner_code, ln.partner_name,
 		  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
-		  ln.qty::float8, ln.input_basis, ln.unit_non_vat::float8, ln.unit_vat_inc::float8,
+		  ln.qty::float8, ln.unit_id, coalesce(ln.unit_code, ''),
+		  ln.input_basis, ln.unit_non_vat::float8, ln.unit_vat_inc::float8,
 		  ln.remark, coalesce(sl.slipped, 0)::float8,
 		  coalesce(ln.planned_serial_nos, '{}')
 		from public.pr_purchase_request_lines ln
@@ -131,10 +132,12 @@ func CreateFromPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tu auth.
 		var specName, description, remark *string
 		var qty, unitNonVat, unitVatInc, slipped float64
 		var inputBasis string
+		var unitID *int64
+		var unitCode string
 		var planned []string
 		if err := rows.Scan(&prLineID, &lnLineNo, &partnerID, &partnerCode, &partnerName,
 			&itemID, &itemCode, &itemName, &specName, &description,
-			&qty, &inputBasis, &unitNonVat, &unitVatInc, &remark, &slipped, &planned); err != nil {
+			&qty, &unitID, &unitCode, &inputBasis, &unitNonVat, &unitVatInc, &remark, &slipped, &planned); err != nil {
 			return 0, err
 		}
 		openQty := qty - slipped
@@ -151,6 +154,7 @@ func CreateFromPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tu auth.
 		lineNo++
 		amounts := taxcalc.ComputeLine(tt, unitPrice, openQty, inputBasis)
 		prLineIDCopy := prLineID
+		resolvedUnitID, resolvedUnitCode := inventory.ResolveLineUnit(ctx, pool, tu.TenantID, itemID, unitID, unitCode)
 		computed = append(computed, computedLine{
 			LineNo:                lineNo,
 			PurchaseRequestLineID: &prLineIDCopy,
@@ -163,6 +167,8 @@ func CreateFromPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tu auth.
 			SpecName:              specName,
 			Description:           description,
 			Qty:                   openQty,
+			UnitID:                resolvedUnitID,
+			UnitCode:              resolvedUnitCode,
 			InputBasis:            inputBasis,
 			Amounts:               amounts,
 			Remark:                remark,

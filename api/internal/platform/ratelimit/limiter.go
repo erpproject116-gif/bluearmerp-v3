@@ -110,6 +110,7 @@ func TierForPath(method, path string) Tier {
 		strings.Contains(p, "/goods-receipts/") && strings.Contains(p, "/scan") ||
 		strings.HasSuffix(p, "/export") ||
 		strings.Contains(p, "/rfq-import/ai-parse") ||
+		strings.Contains(p, "/rfq-import/run") ||
 		strings.Contains(p, "/copilot/ask") ||
 		strings.Contains(p, "/copilot/actions/approve") ||
 		strings.Contains(p, "/copilot/tools/run") {

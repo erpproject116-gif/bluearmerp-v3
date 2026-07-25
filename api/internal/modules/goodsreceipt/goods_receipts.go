@@ -951,7 +951,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		lineRows, err := tx.Query(r.Context(), `
 			select grl.id, grl.purchase_order_line_id, grl.received_qty::float8,
 			  pol.qty::float8, pol.received_qty::float8,
-			  pol.item_id, pol.partner_id, pol.item_code, pol.item_name,
+			  pol.item_id, pol.partner_id, pol.item_code, pol.item_name, pol.unit_id,
 			  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
 			  coalesce(i.serial_policy, 'required'), coalesce(i.lot_policy, 'required'),
 			  coalesce(i.track_inventory_qty, false),
@@ -977,6 +977,8 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			PartnerID           *int64
 			ItemCode            string
 			ItemName            string
+			UnitID              *int64
+			BaseQty             float64
 			TrackSerial         bool
 			TrackLot            bool
 			SerialPolicy        string
@@ -991,7 +993,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			if err := lineRows.Scan(
 				&ln.ID, &ln.PurchaseOrderLineID, &ln.ReceivedQty,
 				&ln.POQty, &ln.POReceivedQty,
-				&ln.ItemID, &ln.PartnerID, &ln.ItemCode, &ln.ItemName,
+				&ln.ItemID, &ln.PartnerID, &ln.ItemCode, &ln.ItemName, &ln.UnitID,
 				&ln.TrackSerial, &ln.TrackLot, &ln.SerialPolicy, &ln.LotPolicy, &ln.TrackInventory, &ln.WarrantyMonths,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
@@ -1008,7 +1010,37 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				})
 				return
 			}
+			lines = append(lines, ln)
+		}
+		if err := lineRows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
+			return
+		}
+		lineRows.Close()
+		if !hasReceiptQty {
+			response.Validation(w, map[string]string{"lines": "At least one line must have a received quantity."})
+			return
+		}
+
+		// Ledger writes happen in the item base unit, so convert once per line here.
+		for i := range lines {
+			ln := &lines[i]
+			ln.BaseQty = ln.ReceivedQty
+			if ln.ItemID != nil {
+				baseQty, err := inventory.BaseQtyForLine(r.Context(), tx, tu.TenantID, *ln.ItemID, ln.UnitID, ln.ReceivedQty)
+				if err != nil {
+					response.Validation(w, map[string]string{"unit_id": fmt.Sprintf("Line %d: %v", ln.ID, err)})
+					return
+				}
+				ln.BaseQty = baseQty
+			}
 			if ln.TrackSerial {
+				if ln.BaseQty != float64(int64(ln.BaseQty)) {
+					response.Validation(w, map[string]string{
+						"serials": fmt.Sprintf("Line %d converts to %.4f base units; serial-tracked items need a whole number.", ln.ID, ln.BaseQty),
+					})
+					return
+				}
 				var serialCount int
 				if err := tx.QueryRow(r.Context(), `
 					select count(*) from public.gr_goods_receipt_serials
@@ -1016,7 +1048,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Err(w, http.StatusInternalServerError, "Failed to count serials.", "ERR_INTERNAL")
 					return
 				}
-				if err := inventory.ValidateGRSerialCapture(ln.ID, ln.SerialPolicy, serialCount, ln.ReceivedQty); err != nil {
+				if err := inventory.ValidateGRSerialCapture(ln.ID, ln.SerialPolicy, serialCount, ln.BaseQty); err != nil {
 					response.Validation(w, map[string]string{"serials": err.Error()})
 					return
 				}
@@ -1035,11 +1067,6 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 			}
-			lines = append(lines, ln)
-		}
-		if !hasReceiptQty {
-			response.Validation(w, map[string]string{"lines": "At least one line must have a received quantity."})
-			return
 		}
 
 		for _, ln := range lines {
@@ -1133,13 +1160,32 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Err(w, http.StatusInternalServerError, "Failed to load lots.", "ERR_INTERNAL")
 					return
 				}
+				type grLot struct {
+					lotNo  string
+					qty    float64
+					expiry *time.Time
+				}
+				var lots []grLot
 				for lotRows.Next() {
-					var lotNo string
-					var lotQty float64
-					var expiry *time.Time
-					if err := lotRows.Scan(&lotNo, &lotQty, &expiry); err != nil {
+					var l grLot
+					if err := lotRows.Scan(&l.lotNo, &l.qty, &l.expiry); err != nil {
 						lotRows.Close()
 						response.Err(w, http.StatusInternalServerError, "Failed to read lot.", "ERR_INTERNAL")
+						return
+					}
+					lots = append(lots, l)
+				}
+				if err := lotRows.Err(); err != nil {
+					lotRows.Close()
+					response.Err(w, http.StatusInternalServerError, "Failed to process lots.", "ERR_INTERNAL")
+					return
+				}
+				lotRows.Close()
+				for _, l := range lots {
+					lotNo, expiry := l.lotNo, l.expiry
+					lotQty, err := inventory.BaseQtyForLine(r.Context(), tx, tu.TenantID, *ln.ItemID, ln.UnitID, l.qty)
+					if err != nil {
+						response.Validation(w, map[string]string{"lots": fmt.Sprintf("Line %d: %v", ln.ID, err)})
 						return
 					}
 					_, err = tx.Exec(r.Context(), `
@@ -1156,17 +1202,10 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 						tu.TenantID, *ln.ItemID, lotNo, locationID, lotQty, expiry,
 						ln.PurchaseOrderLineID, ln.ID)
 					if err != nil {
-						lotRows.Close()
 						response.Err(w, http.StatusInternalServerError, "Failed to upsert lot batch.", "ERR_INTERNAL")
 						return
 					}
 				}
-				if err := lotRows.Err(); err != nil {
-					lotRows.Close()
-					response.Err(w, http.StatusInternalServerError, "Failed to process lots.", "ERR_INTERNAL")
-					return
-				}
-				lotRows.Close()
 			}
 
 			if ln.TrackInventory && ln.ItemID != nil && ln.ReceivedQty > 0 {
@@ -1175,7 +1214,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					values ($1, $2, $3, $4)
 					on conflict (tenant_id, item_id, location_id)
 					do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
-					tu.TenantID, *ln.ItemID, locationID, ln.ReceivedQty)
+					tu.TenantID, *ln.ItemID, locationID, ln.BaseQty)
 				if err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to update stock balance.", "ERR_INTERNAL")
 					return
@@ -1184,7 +1223,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					insert into public.inv_stock_movements (
 					  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
 					) values ($1, $2, $3, $4, 'goods_receipt', 'goods_receipt', $5, $6)`,
-					tu.TenantID, *ln.ItemID, locationID, ln.ReceivedQty, grID, tu.AppUserID)
+					tu.TenantID, *ln.ItemID, locationID, ln.BaseQty, grID, tu.AppUserID)
 				if err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
 					return

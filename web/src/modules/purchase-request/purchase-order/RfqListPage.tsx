@@ -2,6 +2,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
+import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
@@ -15,7 +16,23 @@ type RfqRow = {
   line_count: number;
 };
 
-type RfqLineDraft = { item_id: number | null; item_code: string; item_name: string; qty: string };
+type RfqLineDraft = {
+  item_id: number | null;
+  item_code: string;
+  item_name: string;
+  qty: string;
+  unit_id: number | null;
+  unit_code: string;
+};
+
+const emptyRfqLine = (): RfqLineDraft => ({
+  item_id: null,
+  item_code: "",
+  item_name: "",
+  qty: "1",
+  unit_id: null,
+  unit_code: "",
+});
 
 async function fetchItems(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
@@ -31,7 +48,7 @@ export default function RfqListPage() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const [createOpen, setCreateOpen] = createSignal(false);
-  const [lines, setLines] = createSignal<RfqLineDraft[]>([{ item_id: null, item_code: "", item_name: "", qty: "1" }]);
+  const [lines, setLines] = createSignal<RfqLineDraft[]>([emptyRfqLine()]);
   const [creating, setCreating] = createSignal(false);
 
   const list = createQuery(() => ({
@@ -45,7 +62,7 @@ export default function RfqListPage() {
 
   const invalidate = () => void client.invalidateQueries({ queryKey: ["rfq-list"] });
 
-  const addLine = () => setLines((prev) => [...prev, { item_id: null, item_code: "", item_name: "", qty: "1" }]);
+  const addLine = () => setLines((prev) => [...prev, emptyRfqLine()]);
 
   const createRfq = async () => {
     const payload = lines()
@@ -54,6 +71,8 @@ export default function RfqListPage() {
         item_code: ln.item_code,
         item_name: ln.item_name,
         qty: Number(ln.qty),
+        unit_id: ln.unit_id ?? undefined,
+        unit_code: ln.unit_code || undefined,
       }))
       .filter((ln) => ln.qty > 0 && (ln.item_id || ln.item_name));
     if (!payload.length) {
@@ -71,7 +90,7 @@ export default function RfqListPage() {
       return;
     }
     toast.success(`RFQ ${res.data?.rfq_no ?? "created"}.`);
-    setLines([{ item_id: null, item_code: "", item_name: "", qty: "1" }]);
+    setLines([emptyRfqLine()]);
     setCreateOpen(false);
     invalidate();
   };
@@ -128,7 +147,7 @@ export default function RfqListPage() {
             </div>
             <For each={lines()}>
               {(ln, idx) => (
-                <div class="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_100px]">
+                <div class="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_100px_110px]">
                   <LookupCombo
                     label={`Item ${idx() + 1}`}
                     value={() => {
@@ -153,7 +172,7 @@ export default function RfqListPage() {
                     onClear={() => {
                       setLines((prev) => {
                         const next = [...prev];
-                        next[idx()] = { item_id: null, item_code: "", item_name: "", qty: next[idx()].qty };
+                        next[idx()] = { ...emptyRfqLine(), qty: next[idx()].qty };
                         return next;
                       });
                     }}
@@ -175,6 +194,22 @@ export default function RfqListPage() {
                         });
                       }}
                     />
+                  </label>
+                  <label class="block text-sm">
+                    <span class="text-text-secondary">UoM</span>
+                    <div class="mt-1">
+                      <LineUnitSelect
+                        unitId={ln.unit_id}
+                        unitCode={ln.unit_code}
+                        onChange={(u) =>
+                          setLines((prev) => {
+                            const next = [...prev];
+                            next[idx()] = { ...next[idx()], unit_id: u.unit_id, unit_code: u.unit_code };
+                            return next;
+                          })
+                        }
+                      />
+                    </div>
                   </label>
                 </div>
               )}

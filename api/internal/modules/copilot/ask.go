@@ -43,6 +43,7 @@ func classifyIntent(query string) string {
 	q := strings.ToLower(query)
 	actionHints := []string{
 		"create recurring", "add recurring", "draft expense", "import rfq", "upload rfq", "rfq pdf",
+		"smart rfq", "analyze rfq", "process rfq",
 		"generate quotation", "create quotation", "new quotation", "send email", "email quotation",
 		"send quotation", "create follow-up", "create follow up", "schedule follow-up", "schedule follow up",
 		"crm task", "create sales order", "new sales order", "create so", "new so",
@@ -413,10 +414,26 @@ func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg 
 		args["name"] = "Suggested recurring expense"
 		args["amount"] = 0
 	}
+	if (toolName == "run_smart_rfq" || toolName == "import_rfq_pdf") && len(body.Attachments) > 0 {
+		pages := make([]map[string]any, 0, len(body.Attachments))
+		complete := true
+		for i, attachment := range body.Attachments {
+			text := strings.TrimSpace(attachment.Text)
+			if text == "" || strings.Contains(text, "…[truncated]") {
+				complete = false
+				break
+			}
+			pages = append(pages, map[string]any{"page": i + 1, "text": text})
+		}
+		if complete && len(pages) > 0 {
+			toolName = "run_smart_rfq"
+			args["pages"] = pages
+		}
+	}
 	tr := runTool(ctx, pool, tu, toolName, args)
-	msg := "I prepared an action draft. Review it and Approve — nothing is posted until you confirm."
+	msg := "I prepared an action draft. Review the card below and Approve when ready."
 	if tr.ActionDraft != nil {
-		msg = tr.ActionDraft.Summary + "\n\nNothing is posted until you Approve."
+		msg = tr.ActionDraft.Summary
 	}
 	sid := helpassistant.PersistSession(ctx, pool, tu, body.SessionID, pathname, query, msg, nil, "", llm.Usage{})
 	return askResult{
@@ -521,6 +538,7 @@ func postRunTool(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
 			return
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, 16<<20)
 		var body struct {
 			Name string         `json:"name"`
 			Args map[string]any `json:"args"`

@@ -86,6 +86,8 @@ export type SalesOrderDetail = {
     item_name: string;
     description?: string | null;
     qty: number;
+    unit_id?: number | null;
+    unit_code?: string | null;
     unit_non_vat: number;
     non_vat_total: number;
     tax_amount: number;
@@ -150,6 +152,8 @@ function linesFromDetail(lines?: SalesOrderDetail["lines"]): SalesOrderLineRow[]
     item_name: ln.item_name ?? "",
     description: ln.description ?? "",
     qty: ln.qty != null ? String(ln.qty) : "1",
+    unit_id: ln.unit_id ?? null,
+    unit_code: ln.unit_code ?? "",
     unit_price: String(ln.unit_vat_inc ?? 0),
     input_basis: "vat_inc_unit" as const,
     unit_non_vat: String(ln.unit_non_vat ?? 0),
@@ -421,6 +425,8 @@ export function SalesOrderModal(props: Props) {
       item_name: row.item_name,
       description: row.description ?? "",
       qty: String(row.balance_qty),
+      unit_id: row.unit_id ?? null,
+      unit_code: row.unit_code ?? "",
       unit_price: String(row.unit_vat_inc),
       remark: row.remark ?? "",
       source_quotation_line_id: row.source_quotation_line_id,
@@ -550,6 +556,8 @@ export function SalesOrderModal(props: Props) {
         item_name: ln.item_name,
         description: ln.description || null,
         qty: ln.qty === "" ? 0 : Number(ln.qty),
+        unit_id: ln.unit_id || null,
+        unit_code: ln.unit_code || null,
         unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
         input_basis: ln.input_basis,
         remark: ln.remark || null,

@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { formatMoney } from "../../shared/money";
 import { inputClass } from "../../shared/SpreadsheetGrid";
 import { GridExportButtons } from "../../shared/gridExport";
 import { useToast } from "../../shared/toast";
@@ -219,7 +220,7 @@ export default function BankReconciliationPage() {
                       </td>
                       <td class="px-3 py-2">{row.statement_date}</td>
                       <td class="px-3 py-2">{row.reference_no || row.description || "—"}</td>
-                      <td class="px-3 py-2 text-right">{row.amount.toFixed(2)}</td>
+                      <td class="px-3 py-2 text-right">{formatMoney(row.amount)}</td>
                     </tr>
                   )}
                 </For>
@@ -256,7 +257,7 @@ export default function BankReconciliationPage() {
                       <td class="px-3 py-2">{row.payment_date}</td>
                       <td class="px-3 py-2">{row.document_no}</td>
                       <td class="px-3 py-2">{row.partner_name || "—"}</td>
-                      <td class="px-3 py-2 text-right">{row.amount.toFixed(2)}</td>
+                      <td class="px-3 py-2 text-right">{formatMoney(row.amount)}</td>
                       <td class="px-3 py-2 text-right">
                         <button
                           type="button"
@@ -283,10 +284,10 @@ export default function BankReconciliationPage() {
           <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-5 shadow-lg">
             <h3 class="text-lg font-semibold text-text-primary">Confirm match</h3>
             <div class="mt-3 space-y-2 text-sm text-text-secondary">
-              <p>Statement: {selectedStatementLine()!.reference_no || selectedStatementLine()!.description || "—"} — {selectedStatementLine()!.amount.toFixed(2)}</p>
-              <p>Payment: {pendingMatch()!.document_no} — {pendingMatch()!.amount.toFixed(2)}</p>
+              <p>Statement: {selectedStatementLine()!.reference_no || selectedStatementLine()!.description || "—"} — {formatMoney(selectedStatementLine()!.amount)}</p>
+              <p>Payment: {pendingMatch()!.document_no} — {formatMoney(pendingMatch()!.amount)}</p>
               <Show when={(amountDelta() ?? 0) > 0.01}>
-                <p class="font-medium text-amber-700">Amount difference: {amountDelta()!.toFixed(2)}</p>
+                <p class="font-medium text-amber-700">Amount difference: {formatMoney(amountDelta()!)}</p>
               </Show>
             </div>
             <div class="mt-4 flex justify-end gap-2">

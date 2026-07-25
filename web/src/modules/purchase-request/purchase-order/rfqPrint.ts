@@ -6,6 +6,7 @@ export type RfqLine = {
   item_code: string;
   item_name: string;
   qty: number;
+  unit_code?: string | null;
   notes?: string | null;
 };
 

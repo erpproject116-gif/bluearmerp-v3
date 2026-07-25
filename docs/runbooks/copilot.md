@@ -47,6 +47,10 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 
 9. **Action catalog (approve-to-act):** quotation, sales order, sales invoice, purchase request, RFQ, purchase order, purchases, email send, bulk inventory (import/stock UI), product bundle / PC build, manufacturing BOM, CRM follow-up (full create). Document actions open the ERP form with tagged @entities — they do **not** auto-post. Ops tools: recommend items, compare pricing, smart notifications.
 
+10. **Agentic Smart RFQ:** `run_smart_rfq` uses the quotation module's single `RunRfqImportPipeline` contract (classify → parse → conditional Qwen VL → sanitize → inventory match). It never uses a second Copilot extraction prompt/stack. If chat does not contain complete extracted page/table payload, Copilot opens the existing Import RFQ UI instead of pretending it parsed the binary.
+
+11. **RFQ approve boundary:** `draft_quotation_from_rfq` / `create_quotation_from_rfq` allows at most 200 sanitized lines. Approve stages the seed in the browser and opens `/app/quotation/quotations/new`; it does not insert, save, confirm, post, or email a quotation. The user reviews and saves in the standard form. Invoice-like documents are blocked and cannot produce an Approve draft.
+
 ## Permissions (Phase 2)
 
 | Tool | Permission |

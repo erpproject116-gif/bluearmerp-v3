@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -35,6 +36,8 @@ type RFQLine struct {
 	ItemCode string  `json:"item_code"`
 	ItemName string  `json:"item_name"`
 	Qty      float64 `json:"qty"`
+	UnitID   *int64  `json:"unit_id,omitempty"`
+	UnitCode string  `json:"unit_code,omitempty"`
 	Notes    *string `json:"notes,omitempty"`
 }
 
@@ -106,7 +109,7 @@ func loadRFQ(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (RFQ, 
 	hdr.RfqDate = d.Format("2006-01-02")
 
 	rows, err := pool.Query(ctx, `
-		select id, line_no, item_id, item_code, item_name, qty::float8, notes
+		select id, line_no, item_id, item_code, item_name, qty::float8, unit_id, coalesce(unit_code, ''), notes
 		from public.rfq_request_lines where rfq_id = $1 order by line_no`, id)
 	if err != nil {
 		return RFQ{}, err
@@ -114,7 +117,7 @@ func loadRFQ(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (RFQ, 
 	defer rows.Close()
 	for rows.Next() {
 		var ln RFQLine
-		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.Notes); err != nil {
+		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.Notes); err != nil {
 			return RFQ{}, err
 		}
 		hdr.Lines = append(hdr.Lines, ln)
@@ -137,6 +140,8 @@ func createRFQ(pool *pgxpool.Pool) http.HandlerFunc {
 				ItemCode string  `json:"item_code"`
 				ItemName string  `json:"item_name"`
 				Qty      float64 `json:"qty"`
+				UnitID   *int64  `json:"unit_id"`
+				UnitCode string  `json:"unit_code"`
 				Notes    *string `json:"notes"`
 			} `json:"lines"`
 		}
@@ -186,10 +191,11 @@ func createRFQ(pool *pgxpool.Pool) http.HandlerFunc {
 					where id = $1 and tenant_id = $2 and deleted_at is null`,
 					*ln.ItemID, tu.TenantID).Scan(&itemCode, &itemName)
 			}
+			unitID, unitCode := inventory.ResolveLineUnit(r.Context(), tx, tu.TenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
 			_, err = tx.Exec(r.Context(), `
-				insert into public.rfq_request_lines (rfq_id, line_no, item_id, item_code, item_name, qty, notes)
-				values ($1, $2, $3, $4, $5, $6, $7)`,
-				rfqID, i+1, ln.ItemID, itemCode, itemName, ln.Qty, ln.Notes)
+				insert into public.rfq_request_lines (rfq_id, line_no, item_id, item_code, item_name, qty, unit_id, unit_code, notes)
+				values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+				rfqID, i+1, ln.ItemID, itemCode, itemName, ln.Qty, unitID, unitCode, ln.Notes)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to insert line.", "ERR_INTERNAL")
 				return
@@ -239,7 +245,7 @@ func createRFQFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		rows, err := pool.Query(r.Context(), `
 			select ln.item_id, ln.item_code, ln.item_name,
 			  greatest(ln.qty - coalesce(sl.slipped, 0), 0)::float8 as open_qty,
-			  ln.remark
+			  ln.unit_id, coalesce(ln.unit_code, ''), ln.remark
 			from public.pr_purchase_request_lines ln
 			left join (
 			  select purchase_request_line_id, sum(qty) as slipped
@@ -257,7 +263,7 @@ func createRFQFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		lines := make([]RFQLine, 0, 8)
 		for rows.Next() {
 			var ln RFQLine
-			if err := rows.Scan(&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.Notes); err != nil {
+			if err := rows.Scan(&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.Notes); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read purchase request lines.", "ERR_INTERNAL")
 				return
 			}
@@ -300,9 +306,9 @@ func createRFQFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 
 		for i, ln := range lines {
 			_, err = tx.Exec(r.Context(), `
-				insert into public.rfq_request_lines (rfq_id, line_no, item_id, item_code, item_name, qty, notes)
-				values ($1, $2, $3, $4, $5, $6, $7)`,
-				rfqID, i+1, ln.ItemID, ln.ItemCode, ln.ItemName, ln.Qty, ln.Notes)
+				insert into public.rfq_request_lines (rfq_id, line_no, item_id, item_code, item_name, qty, unit_id, unit_code, notes)
+				values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+				rfqID, i+1, ln.ItemID, ln.ItemCode, ln.ItemName, ln.Qty, ln.UnitID, nullIfEmpty(ln.UnitCode), ln.Notes)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to insert RFQ line.", "ERR_INTERNAL")
 				return

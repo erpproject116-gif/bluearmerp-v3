@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { modalDismissClass } from "../../../shared/Modal";
+import { formatMoney } from "../../../shared/money";
 
 export type ReturnSaleLine = {
   id: number;
@@ -97,7 +98,7 @@ export function ReturnSaleLinesModal(props: Props) {
                         {ln.item_code} — {ln.item_name}
                       </td>
                       <td class="px-2 py-2 text-right">{ln.qty}</td>
-                      <td class="px-2 py-2 text-right">{ln.line_total.toFixed(2)}</td>
+                      <td class="px-2 py-2 text-right">{formatMoney(ln.line_total)}</td>
                     </tr>
                   )}
                 </For>

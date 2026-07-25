@@ -116,6 +116,8 @@ export type PurchaseOrderDetail = {
     description?: string | null;
     qty: number;
     received_qty?: number;
+    unit_id?: number | null;
+    unit_code?: string | null;
     unit_non_vat: number;
     non_vat_total: number;
     tax_amount: number;
@@ -188,6 +190,8 @@ function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestL
     spec_name: ln.spec_name ?? "",
     description: ln.description ?? "",
     qty: ln.qty != null ? String(ln.qty) : "1",
+    unit_id: ln.unit_id ?? null,
+    unit_code: ln.unit_code ?? "",
     unit_price: String(ln.unit_vat_inc ?? 0),
     input_basis: "vat_inc_unit" as const,
     unit_non_vat: String(ln.unit_non_vat ?? 0),
@@ -445,6 +449,8 @@ export function PurchaseOrderModal(props: Props) {
       spec_name: row.spec_name ?? "",
       description: row.description ?? "",
       qty: String(row.balance_qty),
+      unit_id: row.unit_id ?? null,
+      unit_code: row.unit_code ?? "",
       unit_price: String(row.unit_price),
       remark: row.remark ?? "",
       purchase_request_line_id: row.source_purchase_request_line_id,
@@ -482,6 +488,8 @@ export function PurchaseOrderModal(props: Props) {
       item_code: row.item_code,
       item_name: row.item_name,
       qty: String(row.balance_qty),
+      unit_id: row.unit_id ?? null,
+      unit_code: row.unit_code ?? "",
       unit_price: String(row.unit_price),
       supplier_quotation_line_id: row.source_supplier_quotation_line_id,
       rfq_request_line_id: row.rfq_request_line_id ?? null,
@@ -602,6 +610,8 @@ export function PurchaseOrderModal(props: Props) {
         spec_name: ln.spec_name || null,
         description: ln.description || null,
         qty: ln.qty === "" ? 0 : Number(ln.qty),
+        unit_id: ln.unit_id || null,
+        unit_code: ln.unit_code || null,
         unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
         input_basis: ln.input_basis,
         remark: ln.remark || null,
