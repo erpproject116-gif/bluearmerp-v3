@@ -1,6 +1,6 @@
 import { A } from "@solidjs/router";
 import { For, Show, createSignal } from "solid-js";
-import { useOkrDashboard, useOkrKeyResults, useOkrMutations, useOkrObjectives } from "../../shared/useOkr";
+import { useOkrKeyResults, useOkrMutations, useOkrObjectives } from "../../shared/useOkr";
 
 export default function OkrListPage() {
   const [page] = createSignal(1);

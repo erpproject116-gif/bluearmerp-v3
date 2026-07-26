@@ -1,6 +1,6 @@
 import { A } from "@solidjs/router";
 import { For, Show, createSignal } from "solid-js";
-import { useSopDashboard, useSopDocuments, useSopMutations } from "../../shared/useSop";
+import { useSopDocuments, useSopMutations } from "../../shared/useSop";
 
 export default function SopLibraryPage() {
   const [page, setPage] = createSignal(1);
