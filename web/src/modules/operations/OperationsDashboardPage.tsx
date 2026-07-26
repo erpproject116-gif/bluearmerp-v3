@@ -24,6 +24,18 @@ type SummaryData = {
   blocked?: number;
 };
 
+type RiskData = {
+  overdue?: number;
+  blocked?: number;
+  due_7d?: number;
+};
+
+type CompletionData = {
+  percent_complete?: number;
+  done?: number;
+  total?: number;
+};
+
 export default function OperationsDashboardPage() {
   const { workspaceId } = useOperationsWorkspace();
   const dashboards = useOperationsDashboards(workspaceId);
@@ -103,6 +115,33 @@ export default function OperationsDashboardPage() {
                         <div><span class="text-text-secondary">In progress</span><p class="text-xl font-semibold">{data.in_progress ?? 0}</p></div>
                         <div><span class="text-text-secondary">Done</span><p class="text-xl font-semibold">{data.done ?? 0}</p></div>
                         <div><span class="text-text-secondary">Blocked</span><p class="text-xl font-semibold">{data.blocked ?? 0}</p></div>
+                      </div>
+                    );
+                  })()}
+                </Show>
+                <Show when={widget.widget_type === "work_item_risk"}>
+                  {(() => {
+                    const data = widget.data as RiskData;
+                    return (
+                      <div class="grid grid-cols-3 gap-3 text-sm">
+                        <div><span class="text-text-secondary">Overdue</span><p class="text-xl font-semibold text-red-700">{data.overdue ?? 0}</p></div>
+                        <div><span class="text-text-secondary">Blocked</span><p class="text-xl font-semibold">{data.blocked ?? 0}</p></div>
+                        <div><span class="text-text-secondary">Due 7d</span><p class="text-xl font-semibold">{data.due_7d ?? 0}</p></div>
+                      </div>
+                    );
+                  })()}
+                </Show>
+                <Show when={widget.widget_type === "work_item_completion"}>
+                  {(() => {
+                    const data = widget.data as CompletionData;
+                    const pct = Math.round(data.percent_complete ?? 0);
+                    return (
+                      <div class="text-sm">
+                        <p class="text-3xl font-semibold">{pct}%</p>
+                        <p class="mt-1 text-text-secondary">{data.done ?? 0} of {data.total ?? 0} done</p>
+                        <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div class="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+                        </div>
                       </div>
                     );
                   })()}

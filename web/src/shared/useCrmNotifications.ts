@@ -48,12 +48,19 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
   });
 }
 
-export function useCrmUnreadCount(enabled = true) {
+/** Page size of the shell feed shared by the bell dropdown and the toast poller. */
+const SHELL_FEED_PAGE_SIZE = 10;
+
+/**
+ * The one notification query the app shell polls. Both the bell (badge +
+ * dropdown) and the toast poller call this with identical params so TanStack
+ * dedupes them into a single 60s request instead of two.
+ */
+export function useCrmNotificationFeed(enabled: () => boolean) {
   return useCrmNotifications(() => ({
     page: 1,
-    pageSize: 1,
-    unreadOnly: true,
-    enabled,
+    pageSize: SHELL_FEED_PAGE_SIZE,
+    enabled: enabled(),
   }));
 }
 

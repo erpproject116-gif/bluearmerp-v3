@@ -44,6 +44,9 @@ type TenantUser struct {
 	canManageSalesTeamRole    bool
 	canViewCrmAnalyticsRole   bool
 	AutoEnableAllModules      bool
+	// ApplyUserScopes mirrors tenant_roles.apply_user_scopes so branch resolution
+	// and every datascope-filtered list read it from context instead of re-querying.
+	ApplyUserScopes           bool
 	AuthRevision              int64
 	ActiveBranchID            int64
 	permissions               map[string]string
@@ -151,7 +154,6 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 				}
 			}
 
-			attachPlatformIdentity(r.Context(), pool, &user)
 			if !user.PlatformOnly {
 				user.ActiveBranchID = resolveActiveBranchID(r.Context(), pool, user, parseActiveBranchHeader(r))
 			}
@@ -185,19 +187,23 @@ func parseActiveTenantHeader(r *http.Request) int64 {
 	return id
 }
 
+// resolveTenantUser serves the whole authorization identity (tenant profile,
+// effective permissions, platform staff identity) from one cache entry.
+//
+// A live hit is trusted for the remainder of AUTH_CACHE_TTL_SECONDS: permission
+// mutations already call InvalidateUser* in the same request, so re-reading
+// auth_revision on every hit only bought cross-process freshness, which this
+// process-local cache cannot provide anyway. Staleness is bounded by the TTL.
 func resolveTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, tenantID int64) (TenantUser, error) {
 	key := cacheKey(authUserID, tenantID)
-	if cached, rev, ok := cacheGet(key); ok {
-		current, err := currentAuthRevision(ctx, pool, authUserID, cached.TenantID)
-		if err == nil && current == rev {
-			return cached, nil
-		}
-		InvalidateUser(authUserID)
+	if cached, _, ok := cacheGet(key); ok {
+		return cached, nil
 	}
 	user, err := loadTenantUser(ctx, pool, authUserID, tenantID)
 	if err != nil {
 		return TenantUser{}, err
 	}
+	attachPlatformIdentity(ctx, pool, &user)
 	cacheSet(key, user, user.AuthRevision)
 	return user, nil
 }
@@ -233,6 +239,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		  coalesce(tr.can_view_all_crm, false),
 		  coalesce(tr.can_manage_sales_team, false),
 		  coalesce(tr.can_view_crm_analytics, false),
+		  coalesce(tr.apply_user_scopes, false),
 		  t.auto_enable_all_modules,
 		  u.auth_revision
 		from public.users u
@@ -252,7 +259,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 	var tu TenantUser
 	tu.AuthUserID = authUserID
 	var canFormSettings, canManageUsers, canViewActivityLogs, canViewCrm, canManageCrmRules bool
-	var canViewAllCrm, canManageSalesTeam, canViewCrmAnalytics bool
+	var canViewAllCrm, canManageSalesTeam, canViewCrmAnalytics, applyUserScopes bool
 	err := pool.QueryRow(ctx, q, authUserID, tenantID).Scan(
 		&tu.AppUserID,
 		&tu.TenantID,
@@ -269,6 +276,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		&canViewAllCrm,
 		&canManageSalesTeam,
 		&canViewCrmAnalytics,
+		&applyUserScopes,
 		&tu.AutoEnableAllModules,
 		&tu.AuthRevision,
 	)
@@ -286,6 +294,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 	tu.canViewAllCrmRole = canViewAllCrm
 	tu.canManageSalesTeamRole = canManageSalesTeam
 	tu.canViewCrmAnalyticsRole = canViewCrmAnalytics
+	tu.ApplyUserScopes = applyUserScopes
 	tu.IsStoreAdmin = tu.CanManageFormSettings()
 	// Legacy bootstrap: allowlisted emails with an active platform_users row keep superadmin.
 	// Non-allowlisted platform roles still get Command Center access via PlatformPermissions.

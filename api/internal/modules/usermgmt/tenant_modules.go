@@ -14,6 +14,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/tenantmodules"
 )
 
 type tenantModuleRow struct {
@@ -308,6 +309,9 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
 		}
+
+		// The module gate caches answers per tenant; a toggle must bite immediately.
+		tenantmodules.InvalidateTenant(tu.TenantID)
 
 		after, _ := listTenantModuleRows(r.Context(), pool, tu)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.tenant_modules.update", "tenant_modules", &tu.TenantID, before, after)

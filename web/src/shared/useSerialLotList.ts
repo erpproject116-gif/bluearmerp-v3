@@ -149,7 +149,6 @@ export function useSerialUnitList(params: () => SerialUnitListParams) {
           total: res.meta?.total ?? 0,
         };
       },
-      staleTime: 0,
       placeholderData: (prev: { rows: SerialUnitRow[]; total: number } | undefined) => prev,
     };
   });
@@ -176,7 +175,6 @@ export function useSerialEventList(params: () => SerialEventListParams) {
           total: res.meta?.total ?? 0,
         };
       },
-      staleTime: 0,
       placeholderData: (prev: { rows: SerialEventRow[]; total: number } | undefined) => prev,
     };
   });
@@ -202,7 +200,6 @@ export function useLotBatchList(params: () => LotBatchListParams) {
           total: res.meta?.total ?? 0,
         };
       },
-      staleTime: 0,
       placeholderData: (prev: { rows: LotBatchRow[]; total: number } | undefined) => prev,
     };
   });

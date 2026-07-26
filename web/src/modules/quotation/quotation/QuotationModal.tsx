@@ -45,7 +45,7 @@ import {
   type QuotationLineRow,
 } from "./QuotationLineGrid";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
-import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
+import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import {
   QuotationLinePickerModal,
   type PickedQuotationLine,
@@ -117,22 +117,6 @@ type Props = {
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
-}
-
-async function fetchPartners(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; company_name: string; partner_kind: string }[]>(`/api/v1/inventory/partners?${qs}`);
-  return (res.data ?? [])
-    .filter((p) => p.partner_kind === "customer" || p.partner_kind === "both")
-    .map((p) => ({ id: p.id, label: p.company_name }));
-}
-
-async function fetchLocations(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
-  return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
 }
 
 async function fetchProjects(q: string): Promise<LookupOption[]> {
@@ -747,7 +731,7 @@ export function QuotationModal(props: Props) {
           setPartnerId(null);
           setCustomerLabel("");
         }}
-        fetchOptions={fetchPartners}
+        fetchOptions={(q) => fetchPartnerOptions(q, "customer")}
         createLabel="Add customer"
         onCreate={(q) => {
           setNewCustomerName(q);
@@ -787,7 +771,7 @@ export function QuotationModal(props: Props) {
           setLocationId(null);
           setLocationLabel("");
         }}
-        fetchOptions={fetchLocations}
+        fetchOptions={fetchLocationOptions}
         createLabel="Add location"
         onCreate={
           hasPermission(auth.me, "inventory.locations", "write")

@@ -19,7 +19,7 @@ import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
-import { useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
+import { fetchLocationOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
@@ -113,13 +113,6 @@ function formatDateNoDisplay(iso: string, seq: number) {
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return String(seq);
   return `${m}/${d}/${y}-${seq}`;
-}
-
-async function fetchLocations(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
-  return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
 }
 
 async function fetchProjects(q: string): Promise<LookupOption[]> {
@@ -686,7 +679,7 @@ export function PurchaseRequestModal(props: Props) {
           setLocationId(null);
           setLocationLabel("");
         }}
-        fetchOptions={fetchLocations}
+        fetchOptions={fetchLocationOptions}
         createLabel="Add location"
         onCreate={
           hasPermission(auth.me, "inventory.locations", "write")

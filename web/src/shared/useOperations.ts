@@ -311,6 +311,45 @@ export function useOperationsWidgetData(dashboardId: () => number | null) {
   });
 }
 
+export type TasksDashboardSummary = {
+  my_open: number;
+  my_overdue: number;
+  workspace_overdue: number;
+  due_this_week: number;
+  by_status: { key: string; count: number }[];
+  by_priority: { key: string; count: number }[];
+  overdue_or_soon: {
+    id: number;
+    title: string;
+    status: string;
+    priority: string;
+    end_date?: string | null;
+    assignee_user_id?: number | null;
+    assignee_name?: string;
+    overdue: boolean;
+  }[];
+  crm_follow_ups_open: number;
+  crm_follow_ups_deep_link: string;
+};
+
+export function useOperationsTasksDashboard(workspaceId: () => number | null) {
+  return createQuery(() => {
+    const id = workspaceId();
+    return {
+      queryKey: ["operations-tasks-summary", id],
+      enabled: id != null && id > 0,
+      queryFn: async () => {
+        const res = await apiFetch<TasksDashboardSummary>(
+          `/api/v1/operations/dashboards/tasks-summary?workspace_id=${id}`,
+        );
+        if (!res.success) throw new Error(res.message ?? "Failed to load tasks dashboard");
+        return res.data!;
+      },
+      staleTime: OPS_STALE_MS,
+    };
+  });
+}
+
 export function useIndustryPacks() {
   return createQuery(() => ({
     queryKey: ["operations-industry-packs"],

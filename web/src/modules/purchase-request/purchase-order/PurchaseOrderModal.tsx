@@ -16,6 +16,8 @@ import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../
 import {
   ACTIVE_CURRENCIES_KEY,
   ACTIVE_TAX_TYPES_KEY,
+  fetchLocationOptions,
+  fetchPartnerOptions,
   loadActiveCurrencies,
   loadActiveTaxTypes,
   useActiveCurrencies,
@@ -143,13 +145,6 @@ type Props = {
   onSaved: () => void;
 };
 
-async function fetchLocations(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
-  return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
-}
-
 async function fetchProjects(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
   if (q) qs.set("q", q);
@@ -161,21 +156,6 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
   const qs = q ? `?q=${encodeURIComponent(q)}` : "";
   const res = await apiFetch<{ id: number; full_name: string; email: string }[]>(`/api/v1/inventory/after-sales/users${qs}`);
   return (res.data ?? []).map((u) => ({ id: u.id, label: u.full_name, sublabel: u.email }));
-}
-
-async function fetchPartners(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; company_name: string; partner_code: string; partner_kind: string }[]>(
-    `/api/v1/inventory/partners?${qs}`,
-  );
-  return (res.data ?? [])
-    .filter((p) => p.partner_kind === "vendor" || p.partner_kind === "both")
-    .map((p) => ({
-      id: p.id,
-      label: p.company_name,
-      sublabel: p.partner_code,
-    }));
 }
 
 function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestLineRow[] {
@@ -826,7 +806,7 @@ export function PurchaseOrderModal(props: Props) {
                     setPartnerLabel("");
                     setPartnerCode("");
                   }}
-                  fetchOptions={fetchPartners}
+                  fetchOptions={(q) => fetchPartnerOptions(q, "vendor", { withCode: true })}
                   createLabel="Add vendor"
                   onCreate={(q) => {
                     setNewVendorName(q);
@@ -858,7 +838,7 @@ export function PurchaseOrderModal(props: Props) {
                     setLocationId(null);
                     setLocationLabel("");
                   }}
-                  fetchOptions={fetchLocations}
+                  fetchOptions={fetchLocationOptions}
                   createLabel="Add location"
                   onCreate={
                     hasPermission(auth.me, "inventory.locations", "write")

@@ -39,16 +39,9 @@ func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 		frag, argIdx := applyExplicitLocationSQL(f, argIdx, args)
 		return frag, argIdx, nil
 	}
-	var apply bool
-	err := pool.QueryRow(ctx, `
-		select coalesce(tr.apply_user_scopes, false)
-		from public.tenant_roles tr
-		where tr.tenant_id = $1 and tr.role_code = $2`,
-		tu.TenantID, tu.TenantRole).Scan(&apply)
-	if err != nil {
-		return "", argIdx, err
-	}
-	if !apply {
+	// apply_user_scopes rides on TenantUser (loaded with the session), so a handler
+	// that filters several queries no longer repeats the tenant_roles lookup.
+	if !tu.ApplyUserScopes {
 		frag, argIdx := applyExplicitLocationSQL(f, argIdx, args)
 		return frag, argIdx, nil
 	}

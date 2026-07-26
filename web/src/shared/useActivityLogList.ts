@@ -82,7 +82,6 @@ export function useActivityLogList(params: () => ActivityLogFilters & { enabled?
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 0,
       gcTime: 300_000,
     };
   });

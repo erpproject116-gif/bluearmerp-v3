@@ -19,11 +19,13 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		cr.Group(func(g chi.Router) {
 			g.Use(auth.RequireViewCRM)
 			registerDashboardRoutes(g, pool)
+			registerLeadsDashboardRoutes(g, pool)
 			registerSalesTeamRoutes(g, pool)
 			registerWarrantyAssetRoutes(g, pool)
 			registerFollowUpTaskRoutes(g, pool)
 			registerPipelineRoutes(g, pool)
 			registerLeadRoutes(g, pool)
+			registerClientsRoutes(g, pool)
 
 			g.Route("/reports", func(rr chi.Router) {
 				rr.Use(auth.RequireCrmAnalytics)

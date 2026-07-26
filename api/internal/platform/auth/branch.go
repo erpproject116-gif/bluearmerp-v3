@@ -46,13 +46,7 @@ func resolveActiveBranchID(ctx context.Context, pool *pgxpool.Pool, tu TenantUse
 		return branchID
 	}
 
-	var applyScopes bool
-	err = pool.QueryRow(ctx, `
-		select coalesce(tr.apply_user_scopes, false)
-		from public.tenant_roles tr
-		where tr.tenant_id = $1 and tr.role_code = $2`,
-		tu.TenantID, tu.TenantRole).Scan(&applyScopes)
-	if err != nil || !applyScopes {
+	if !tu.ApplyUserScopes {
 		return branchID
 	}
 

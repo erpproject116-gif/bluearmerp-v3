@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/ttlcache"
 )
 
 // One active account per core type (asset, liability, income, expense).
@@ -77,6 +79,24 @@ var foundationAckKeys = map[string]string{
 	"process_policies":  "process_policies_ack",
 	"chart_of_accounts": "chart_of_accounts_ack",
 }
+
+// SETUP_READY_CACHE_TTL_SECONDS=0 disables the cache and restores full detection per request.
+var readyCache = ttlcache.New[bool]("SETUP_READY_CACHE_TTL_SECONDS", 15, 10000)
+
+// InvalidateTenant forces the next readiness check to re-detect.
+func InvalidateTenant(tenantID int64) {
+	readyCache.Invalidate(strconv.FormatInt(tenantID, 10))
+}
+
+// cachedReady reports whether detection can be skipped. Only a cached "ready"
+// counts; a cached "not ready" never short-circuits.
+func cachedReady(tenantID int64) bool {
+	ready, ok := readyCache.Get(strconv.FormatInt(tenantID, 10))
+	return ok && ready
+}
+
+// ResetCache clears every cached tenant (tests).
+func ResetCache() { readyCache.Reset() }
 
 func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Payload, error) {
 	store := loadProgress(ctx, pool, tenantID)
@@ -148,10 +168,20 @@ func LoadForUser(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) (P
 	return p, nil
 }
 
+// IsReady is the gate consulted before every blocked mutation. Load() fans out
+// across a dozen foundation tables, so the answer is cached briefly per tenant.
+// Only "ready" is cached: an incomplete workspace keeps re-detecting so finishing
+// setup unblocks the very next request instead of after the TTL.
 func IsReady(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (bool, error) {
+	if cachedReady(tenantID) {
+		return true, nil
+	}
 	p, err := Load(ctx, pool, tenantID)
 	if err != nil {
 		return false, err
+	}
+	if p.RequiredComplete {
+		readyCache.Set(strconv.FormatInt(tenantID, 10), true)
 	}
 	return p.RequiredComplete, nil
 }
@@ -250,7 +280,11 @@ func AckFoundationStep(ctx context.Context, pool *pgxpool.Pool, tenantID int64, 
 	if !ok {
 		return fmt.Errorf("unknown foundation step: %s", stepID)
 	}
-	return mergeOnboardingProgress(ctx, pool, tenantID, map[string]any{key: true})
+	err := mergeOnboardingProgress(ctx, pool, tenantID, map[string]any{key: true})
+	if err == nil {
+		InvalidateTenant(tenantID)
+	}
+	return err
 }
 
 func blockingMessage(stepID string) string {

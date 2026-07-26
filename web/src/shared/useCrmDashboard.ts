@@ -42,3 +42,42 @@ export function useInvalidateCrmDashboard() {
   const client = useQueryClient();
   return () => void client.invalidateQueries({ queryKey: ["crm-dashboard"] });
 }
+
+export type LeadStatusCount = { status: string; count: number };
+export type OppStageValue = { stage: string; count: number; expected_value: number };
+export type AgingBucket = { bucket: string; count: number };
+
+export type CrmLeadsDashboardSummary = {
+  scoped_view?: boolean;
+  by_status: LeadStatusCount[];
+  open_lead_count: number;
+  follow_ups_overdue: number;
+  follow_ups_due_soon: number;
+  opportunities_by_stage: OppStageValue[];
+  aging: AgingBucket[];
+};
+
+export function useCrmLeadsDashboard(enabled = true) {
+  return createQuery(() => ({
+    queryKey: ["crm-dashboard", "leads-summary"],
+    enabled,
+    queryFn: async () => {
+      const res = await apiFetch<CrmLeadsDashboardSummary>("/api/v1/crm/dashboard/leads-summary");
+      if (!res.success) throw new Error(res.message ?? "Failed to load leads dashboard");
+      return (
+        res.data ??
+        ({
+          by_status: [],
+          open_lead_count: 0,
+          follow_ups_overdue: 0,
+          follow_ups_due_soon: 0,
+          opportunities_by_stage: [],
+          aging: [],
+        } as CrmLeadsDashboardSummary)
+      );
+    },
+    staleTime: 60_000,
+    refetchInterval: enabled ? 60_000 : false,
+  }));
+}
+

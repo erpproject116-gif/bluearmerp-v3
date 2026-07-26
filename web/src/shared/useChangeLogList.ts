@@ -70,7 +70,6 @@ export function useChangeLogList(params: () => ChangeLogFilters & { enabled?: bo
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 0,
       gcTime: 300_000,
     };
   });

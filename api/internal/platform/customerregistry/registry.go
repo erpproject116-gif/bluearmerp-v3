@@ -143,6 +143,9 @@ func LinkTenant(ctx context.Context, pool *pgxpool.Pool, customerID, tenantID in
 		    auth_user_id = coalesce(auth_user_id, nullif($3,'')::uuid),
 		    updated_at = now()
 		where id = $1`, customerID, tenantID, strings.TrimSpace(authUserID))
+	if err == nil {
+		NotifyTenantBillingChanged(tenantID)
+	}
 	return err
 }
 
@@ -189,6 +192,9 @@ func CreateSubscription(ctx context.Context, pool *pgxpool.Pool, customerID, ten
 		returning id`,
 		customerID, tenantID, planKind, planID, startsAt, endsAt, lockInMonths, monthly, total, notes,
 	).Scan(&subID)
+	if err == nil {
+		NotifyTenantBillingChanged(tenantID)
+	}
 	return subID, err
 }
 

@@ -7,13 +7,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func currentAuthRevision(ctx context.Context, pool *pgxpool.Pool, authUserID string, tenantID int64) (int64, error) {
-	var rev int64
-	err := pool.QueryRow(ctx, `
-		select auth_revision from public.users
-		where auth_user_id = $1::uuid and tenant_id = $2 and status = 'active'`, authUserID, tenantID).Scan(&rev)
-	return rev, err
-}
+// users.auth_revision is bumped whenever permissions change. It is read on the
+// auth cache-miss path (loadTenantUser) and stamped onto the cache entry; live
+// requests no longer re-read it, because the same writers call InvalidateUser*.
 
 func bumpUserRevisionTx(ctx context.Context, tx pgx.Tx, userID int64) error {
 	_, err := tx.Exec(ctx, `

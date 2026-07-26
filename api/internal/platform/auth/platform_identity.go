@@ -4,12 +4,22 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrNoPlatformProfile = errors.New("no platform profile")
+
+// platformSignInWriteInterval bounds how often last_signed_in_at is re-stamped.
+// It is presence bookkeeping, not an audit trail, so one write per window is enough.
+const platformSignInWriteInterval = 15 * time.Minute
+
+// shouldStampPlatformSignIn reports whether last_signed_in_at is stale enough to rewrite.
+func shouldStampPlatformSignIn(last *time.Time, now time.Time) bool {
+	return last == nil || now.Sub(*last) >= platformSignInWriteInterval
+}
 
 // Platform identity fields attached to TenantUser for Command Center.
 // PlatformUserID == 0 means the caller has no platform membership.
@@ -42,11 +52,12 @@ func loadPlatformIdentity(ctx context.Context, pool *pgxpool.Pool, authUserID, e
 	var id int64
 	var role string
 	var active bool
+	var lastSignedIn *time.Time
 	err := pool.QueryRow(ctx, `
-		select id, role, is_active
+		select id, role, is_active, last_signed_in_at
 		from public.platform_users
 		where auth_user_id = $1::uuid
-		limit 1`, authUserID).Scan(&id, &role, &active)
+		limit 1`, authUserID).Scan(&id, &role, &active, &lastSignedIn)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Accept pending invite on first Google sign-in.
@@ -66,7 +77,9 @@ func loadPlatformIdentity(ctx context.Context, pool *pgxpool.Pool, authUserID, e
 	if err != nil {
 		return PlatformIdentity{}, err
 	}
-	_, _ = pool.Exec(ctx, `update public.platform_users set last_signed_in_at = now() where id = $1`, id)
+	if shouldStampPlatformSignIn(lastSignedIn, time.Now()) {
+		_, _ = pool.Exec(ctx, `update public.platform_users set last_signed_in_at = now() where id = $1`, id)
+	}
 	return PlatformIdentity{
 		PlatformUserID: id,
 		Role:           role,

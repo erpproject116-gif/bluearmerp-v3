@@ -53,7 +53,6 @@ export function useGoodsReceiptList(params: () => GoodsReceiptListParams) {
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 0,
       placeholderData: (prev) => prev,
     };
   });

@@ -150,6 +150,9 @@ import {
   ActivityLogListPage,
   ChangeLogListPage,
   CrmDashboardPage,
+  CrmLeadsDashboardPage,
+  CrmClientsPage,
+  CrmClientDetailPage,
   CrmNotificationsPage,
   FollowUpTasksPage,
   QuotationPipelinePage,
@@ -192,7 +195,13 @@ import {
   OperationsCalendarPage,
   OperationsTimelinePage,
   OperationsDashboardPage,
+  OperationsTasksDashboardPage,
   OperationsAutomationPage,
+  SopLibraryPage,
+  SopDashboardPage,
+  SopDocumentPage,
+  OkrListPage,
+  OkrDashboardPage,
   PosPage,
   PosSettingsPage,
   HrEmployeesPage,
@@ -290,6 +299,7 @@ import { CrmRoute } from "./shared/CrmRoute";
 import { SupportRoute } from "./shared/SupportRoute";
 import { CommsRoute } from "./shared/CommsRoute";
 import { OperationsRoute } from "./shared/OperationsRoute";
+import { SopRoute, OkrRoute } from "./shared/SopOkrRoute";
 import { PosRoute } from "./shared/PosRoute";
 import { HrRoute } from "./shared/HrRoute";
 import { BookingRoute } from "./shared/BookingRoute";
@@ -619,6 +629,9 @@ export default function App() {
           <Route path="/crm/dashboard" component={() => (
             <CrmRoute><CrmDashboardPage /></CrmRoute>
           )} />
+          <Route path="/crm/leads/dashboard" component={() => (
+            <CrmRoute><CrmLeadsDashboardPage /></CrmRoute>
+          )} />
           <Route path="/crm/notifications" component={() => (
             <CrmRoute><CrmNotificationsPage /></CrmRoute>
           )} />
@@ -627,6 +640,12 @@ export default function App() {
           )} />
           <Route path="/crm/leads" component={() => (
             <CrmRoute><LeadsPage /></CrmRoute>
+          )} />
+          <Route path="/crm/clients/:id" component={() => (
+            <CrmRoute><CrmClientDetailPage /></CrmRoute>
+          )} />
+          <Route path="/crm/clients" component={() => (
+            <CrmRoute><CrmClientsPage /></CrmRoute>
           )} />
           <Route path="/crm/opportunities" component={() => (
             <CrmRoute><OpportunitiesPage /></CrmRoute>
@@ -700,6 +719,9 @@ export default function App() {
           <Route path="/operations/dashboard" component={() => (
             <OperationsRoute><OperationsDashboardPage /></OperationsRoute>
           )} />
+          <Route path="/operations/tasks" component={() => (
+            <OperationsRoute><OperationsTasksDashboardPage /></OperationsRoute>
+          )} />
           <Route path="/operations/automation" component={() => (
             <OperationsRoute><OperationsAutomationPage /></OperationsRoute>
           )} />
@@ -710,6 +732,21 @@ export default function App() {
           )} />
           <Route path="/operations" component={() => (
             <OperationsRoute><OperationsHubPage /></OperationsRoute>
+          )} />
+          <Route path="/sop/dashboard" component={() => (
+            <SopRoute><SopDashboardPage /></SopRoute>
+          )} />
+          <Route path="/sop/documents/:id" component={() => (
+            <SopRoute><SopDocumentPage /></SopRoute>
+          )} />
+          <Route path="/sop" component={() => (
+            <SopRoute><SopLibraryPage /></SopRoute>
+          )} />
+          <Route path="/okr/dashboard" component={() => (
+            <OkrRoute><OkrDashboardPage /></OkrRoute>
+          )} />
+          <Route path="/okr" component={() => (
+            <OkrRoute><OkrListPage /></OkrRoute>
           )} />
           <Route path="/hr/employees/settings" component={() => (
             <HrRoute><HrEmployeesSettingsPage /></HrRoute>

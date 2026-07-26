@@ -85,9 +85,13 @@ Fill values from the Supabase Dashboard.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `AUTH_CACHE_ENABLED` | `true` | In-process session cache for auth + permissions |
-| `AUTH_CACHE_TTL_SECONDS` | `30` | Max cache entry age; `0` disables cache |
+| `AUTH_CACHE_ENABLED` | `true` | In-process session cache for auth + permissions + platform identity |
+| `AUTH_CACHE_TTL_SECONDS` | `30` | Max cache entry age, and the staleness bound for permissions; `0` disables cache |
 | `AUTH_CACHE_MAX_ENTRIES` | `10000` | LRU cap |
+| `SESSION_ACTIVITY_WRITE_SECONDS` | `30` | Minimum age of `last_activity_at` before an interactive request re-stamps it; `0` writes on every request |
+| `ENTITLEMENT_CACHE_TTL_SECONDS` | `30` | Subscription/urgency lookup cache for the write gate; `0` disables |
+| `MODULE_CACHE_TTL_SECONDS` | `30` | Module & feature enablement cache; `0` disables |
+| `SETUP_READY_CACHE_TTL_SECONDS` | `15` | Workspace-setup readiness cache; `0` disables |
 | `DB_MAX_CONNS` | `10` | pgxpool max connections (keep below Supabase tier limit) |
 | `DB_MIN_CONNS` | `2` | Warm pool connections |
 | `DB_MAX_CONN_LIFETIME_MIN` | `30` | Recycle connections |
@@ -96,6 +100,12 @@ Fill values from the Supabase Dashboard.
 | `AUDIT_BATCH_SIZE` | `100` | Audit flush batch size |
 | `AUDIT_FLUSH_INTERVAL_MS` | `75` | Audit flush interval |
 | `GZIP_ENABLED` | `false` | Compress responses ≥ 8KB |
+
+Every cache above is **process-local** — there is no Redis or shared tier. With more
+than one API instance, a change made on one instance can be up to that instance's TTL
+stale on the others, except where an explicit invalidation hook runs in the same
+process as the write. Setting a TTL variable to `0` restores the original
+query-per-request behavior and is the first thing to try when debugging stale data.
 
 See [ADR 0004](../adr/0004-performance-patterns.md) and [baseline-and-targets.md](../performance/baseline-and-targets.md).
 

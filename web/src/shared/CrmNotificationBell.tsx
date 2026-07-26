@@ -4,7 +4,7 @@ import { crmNotificationHref } from "./crmNotificationRoutes";
 import {
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
-  useCrmNotifications,
+  useCrmNotificationFeed,
   useInvalidateCrmNotifications,
   type CrmNotification,
 } from "./useCrmNotifications";
@@ -32,11 +32,7 @@ export function CrmNotificationBell(props: Props) {
   const navigate = useNavigate();
   const invalidate = useInvalidateCrmNotifications();
 
-  const preview = useCrmNotifications(() => ({
-    page: 1,
-    pageSize: 10,
-    enabled: props.enabled,
-  }));
+  const preview = useCrmNotificationFeed(() => props.enabled);
 
   const unread = () => preview.data?.unreadTotal ?? 0;
 
