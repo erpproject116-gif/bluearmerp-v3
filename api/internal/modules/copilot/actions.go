@@ -86,13 +86,33 @@ func executeApprovedDraft(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUse
 			return nil, "Missing quotation write permission.", http.StatusForbidden
 		}
 		return openUIFromDraft(draft)
+	case "map_import_dataset":
+		if !tu.HasPermission("migration.center", auth.AccessWrite) {
+			return nil, "Missing migration.center write permission.", http.StatusForbidden
+		}
+		return openUIFromDraft(draft)
+	case "propose_serial_lot_import":
+		// Staging only — actual serial capture still requires goods-receipt write in the UI.
+		if !tu.HasPermission("inventory.serial_receive", auth.AccessRead) {
+			return nil, "Missing inventory.serial_receive permission.", http.StatusForbidden
+		}
+		return openUIFromDraft(draft)
 	case "create_follow_up":
 		if !tu.HasPermission("crm.follow_up_tasks", auth.AccessWrite) {
 			return nil, "Missing crm.follow_up_tasks write permission.", http.StatusForbidden
 		}
 		return createFollowUpFromDraft(r, pool, tu, draft.Payload)
-	case "generate_quotation", "open_quotation", "open_sales_order", "open_sales", "open_purchase_request",
-		"open_rfq", "open_purchase_order", "open_purchases", "open_product_bundle", "open_bom", "bulk_inventory",
+	case "open_quotation", "open_sales_order", "open_sales", "open_purchase_request",
+		"open_rfq", "open_purchase_order", "open_purchases":
+		// Seeding a create form requires write on the target module; plain
+		// navigation (no partner, no lines) stays open to everyone.
+		if spec, ok := docSeedSpecs[draft.Type]; ok && docSeedHasContent(draft.Payload) {
+			if !tu.HasPermission(spec.WritePermission, auth.AccessWrite) {
+				return nil, "Missing " + spec.WritePermission + " write permission.", http.StatusForbidden
+			}
+		}
+		return openUIFromDraft(draft)
+	case "generate_quotation", "open_product_bundle", "open_bom", "bulk_inventory",
 		"send_quotation_email", "send_document_email":
 		return openUIFromDraft(draft)
 	default:
@@ -118,7 +138,9 @@ func openUIFromDraft(draft actionDraft) (any, string, int) {
 		"payload": payload,
 		"api":     api,
 	}
-	if draft.Type == "create_quotation_from_rfq" {
+	if draft.Type == "create_quotation_from_rfq" || draft.Type == "map_import_dataset" || draft.Type == "propose_serial_lot_import" {
+		result["seed"] = payload
+	} else if _, ok := docSeedSpecs[draft.Type]; ok && docSeedHasContent(payload) {
 		result["seed"] = payload
 	}
 	return result, "", http.StatusOK
@@ -131,6 +153,10 @@ func catalogNavForDraft(draft actionDraft) (next, api, hint string) {
 		return "/app/quotation/quotations", "/api/v1/quotation/rfq-import", "Open Import RFQ on quotations."
 	case "create_quotation_from_rfq":
 		return "/app/quotation/quotations/new", "/api/v1/quotation/quotations", "Review the prefilled quotation, then save."
+	case "map_import_dataset":
+		return migrationCenterPath, "/api/v1/migration", "Review the column mapping in Migration Center, then confirm the import there."
+	case "propose_serial_lot_import":
+		return serialReceivePath, "/api/v1/goods-receipt", "Review the staged serial list in Receive / Scan, pick the goods-receipt line, then import — nothing is registered until you confirm."
 	case "send_document_email", "send_quotation_email":
 		next = emailUIFromPayload(draft.Payload)
 		api = next
@@ -164,6 +190,15 @@ func sanitizeDraftPayload(draftType string, payload map[string]any) map[string]a
 	}
 	if draftType == "create_quotation_from_rfq" {
 		return sanitizeRfqQuotationSeedPayload(payload)
+	}
+	if draftType == "map_import_dataset" {
+		return sanitizeMapImportPayload(payload)
+	}
+	if draftType == "propose_serial_lot_import" {
+		return sanitizeSerialLotPayload(payload)
+	}
+	if _, ok := docSeedSpecs[draftType]; ok {
+		return sanitizeDocSeedPayload(payload)
 	}
 	allowed := allowedPayloadKeys(draftType)
 	out := make(map[string]any, len(allowed))
@@ -222,59 +257,14 @@ func sanitizeRfqQuotationSeedPayload(payload map[string]any) map[string]any {
 			out[key] = value
 		}
 	}
-
-	rawLines, ok := payload["lines"]
-	if !ok {
+	if _, ok := payload["lines"]; !ok {
 		return out
 	}
-	encoded, err := json.Marshal(rawLines)
-	if err != nil {
+	lines := sanitizeSeedLines(payload["lines"])
+	if lines == nil {
 		return out
 	}
-	var lines []map[string]any
-	if json.Unmarshal(encoded, &lines) != nil {
-		return out
-	}
-	if len(lines) > 200 {
-		lines = lines[:200]
-	}
-	clean := make([]any, 0, len(lines))
-	for _, line := range lines {
-		itemName := boundedString(line["item_name"], 240)
-		itemCode := boundedString(line["item_code"], 100)
-		description := boundedString(line["description"], 12_000)
-		if itemName == "" && itemCode == "" && description == "" {
-			continue
-		}
-		qty, ok := toFloat(line["qty"])
-		if !ok || qty <= 0 {
-			qty = 1
-		}
-		unitPrice, ok := toFloat(line["unit_price"])
-		if !ok || unitPrice < 0 {
-			unitPrice = 0
-		}
-		row := map[string]any{
-			"item_code":   itemCode,
-			"item_name":   itemName,
-			"description": description,
-			"qty":         qty,
-			"unit":        boundedString(line["unit"], 40),
-			"unit_price":  unitPrice,
-			"remarks":     boundedString(line["remarks"], 2_000),
-		}
-		if id, ok := toPositiveInt64(line["item_id"]); ok {
-			row["item_id"] = id
-		}
-		if id, ok := toPositiveInt64(line["unit_id"]); ok {
-			row["unit_id"] = id
-		}
-		if code := boundedString(line["unit_code"], 30); code != "" {
-			row["unit_code"] = code
-		}
-		clean = append(clean, row)
-	}
-	out["lines"] = clean
+	out["lines"] = lines
 	return out
 }
 

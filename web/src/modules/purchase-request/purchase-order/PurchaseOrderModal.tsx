@@ -42,6 +42,7 @@ import {
   recalculatePurchaseRequestLines,
   type PurchaseRequestLineRow,
 } from "../purchase-request/PurchaseRequestLineGrid";
+import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
 import { PurchaseRequestLinePickerModal, type PickedPurchaseRequestLine } from "./PurchaseRequestLinePickerModal";
 import {
   SupplierQuotationLinePickerModal,
@@ -369,6 +370,11 @@ export function PurchaseOrderModal(props: Props) {
       queryClient.ensureQueryData({ queryKey: ACTIVE_TAX_TYPES_KEY, queryFn: loadActiveTaxTypes }),
       queryClient.ensureQueryData({ queryKey: ACTIVE_CURRENCIES_KEY, queryFn: loadActiveCurrencies }),
     ]);
+    const seed = takeDocSeed("purchase_order");
+    const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
+      ...emptyPurchaseRequestLine(index + 1),
+      ...docSeedLinePatch(line),
+    }));
     setOrderDate(todayISO());
     setPicUserId(null);
     setPicName("");
@@ -380,18 +386,27 @@ export function PurchaseOrderModal(props: Props) {
     setProjectName("");
     setReference("");
     setNotes("");
-    setPartnerId(null);
-    setPartnerLabel("");
-    setPartnerCode("");
+    setPartnerId(seed?.partner_id ?? null);
+    setPartnerLabel(seed?.partner_name ?? "");
+    setPartnerCode(seed?.partner_code ?? "");
     if (tt.length) {
       const first = tt[0];
       setTaxTypeId(first.id);
       setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
-      setLines([emptyPurchaseRequestLine(1, "", defaultInputBasis(first.tax_mode))]);
+      const basis = defaultInputBasis(first.tax_mode);
+      if (seedLines.length > 0) {
+        const seeded = seedLines.map((line) => ({ ...line, input_basis: basis }));
+        setLines(await recalculatePurchaseRequestLines(seeded, first.id, first));
+      } else {
+        setLines([emptyPurchaseRequestLine(1, "", basis)]);
+      }
     } else {
       setTaxTypeId(null);
       setTaxTypeLabel("");
-      setLines([emptyPurchaseRequestLine(1)]);
+      setLines(seedLines.length > 0 ? seedLines : [emptyPurchaseRequestLine(1)]);
+    }
+    if (seedLines.length > 0 && seed?.needs_qty_review) {
+      toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
     }
     const def = cc.find((c) => c.is_default) ?? cc[0];
     setCurrencyId(def?.id ?? null);

@@ -1,5 +1,6 @@
 import { A, useNavigate } from "@solidjs/router";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onMount, Show } from "solid-js";
+import { hasDocSeed } from "../../../shared/docSeed";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
@@ -288,6 +289,15 @@ export default function PurchaseOrderListPage() {
   const [poModalOpen, setPoModalOpen] = createSignal(false);
   const [editingPoId, setEditingPoId] = createSignal<number | null>(null);
   const [viewingDeleted, setViewingDeleted] = createSignal(false);
+
+  // Copilot approve-to-seed handoff: a staged PO seed auto-opens the create modal.
+  onMount(() => {
+    if (hasDocSeed("purchase_order")) {
+      setEditingPoId(null);
+      setViewingDeleted(false);
+      setPoModalOpen(true);
+    }
+  });
 
   const lifecycle = useDocumentLifecycle({
     apiBase: "/api/v1/purchase-order/purchase-orders",

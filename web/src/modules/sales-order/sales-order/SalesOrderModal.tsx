@@ -45,6 +45,7 @@ import {
   recalculateSalesOrderLines,
   type SalesOrderLineRow,
 } from "./SalesOrderLineGrid";
+import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
 
 export type SalesOrderDetail = {
   id: number;
@@ -319,6 +320,8 @@ export function SalesOrderModal(props: Props) {
     }
   };
 
+  let seededNewLines = false;
+
   createEffect(() => {
     if (!props.open) {
       setCreatedSalesOrder(null);
@@ -354,9 +357,14 @@ export function SalesOrderModal(props: Props) {
       setSourceQuotationId(ed.source_quotation_id ?? null);
       setLines(linesFromDetail(ed.lines));
     } else {
+      const seed = takeDocSeed("sales_order");
+      const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
+        ...emptySalesOrderLine(index + 1),
+        ...docSeedLinePatch(line),
+      }));
       setOrderDate(todayISO());
-      setPartnerId(null);
-      setCustomerLabel("");
+      setPartnerId(seed?.partner_id ?? null);
+      setCustomerLabel(seed?.partner_name ?? "");
       setPicUserId(null);
       setPicName("");
       setSalesPersonId(null);
@@ -376,7 +384,15 @@ export function SalesOrderModal(props: Props) {
       setNotes("");
       setProgressStatus("unconfirmed");
       setSourceQuotationId(null);
-      setLines([emptySalesOrderLine(1)]);
+      seededNewLines = seedLines.length > 0;
+      if (seededNewLines) {
+        setLines(seedLines);
+        if (seed?.needs_qty_review) {
+          toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
+        }
+      } else {
+        setLines([emptySalesOrderLine(1)]);
+      }
       void loadPreview(todayISO());
     }
   });
@@ -391,7 +407,13 @@ export function SalesOrderModal(props: Props) {
       setTaxTypeId(first.id);
       setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
-      setLines([emptySalesOrderLine(1, "", basis)]);
+      if (seededNewLines) {
+        const seeded = lines().map((line) => ({ ...line, input_basis: basis }));
+        seededNewLines = false;
+        void recalculateSalesOrderLines(seeded, first.id, first).then(setLines);
+      } else {
+        setLines([emptySalesOrderLine(1, "", basis)]);
+      }
     }
     if (!currencyId()) {
       const def = cc.find((c) => c.is_default) ?? cc[0];

@@ -170,6 +170,7 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			HeaderOverrides: body.HeaderOverrides,
 		}
 		result, documentType := ParseRfqDeterministic(pages, body.Tables, opts)
+		blocked, blockedReason := rfqBlockedReason(documentType)
 		response.OK(w, map[string]any{
 			"lines":            result.Lines,
 			"page_count":       len(body.Pages),
@@ -178,14 +179,22 @@ func parseRfqImport(_ *pgxpool.Pool) http.HandlerFunc {
 			"table_detected":   result.TableDetected,
 			"detected_columns": result.DetectedColumns,
 			"document_type":    documentType,
-			"blocked":          documentType == RfqDocumentInvoiceLike,
-			"blocked_reason": func() string {
-				if documentType == RfqDocumentInvoiceLike {
-					return "This document looks like an invoice, not an RFQ or BOQ."
-				}
-				return ""
-			}(),
+			"blocked":          blocked,
+			"blocked_reason":   blockedReason,
 		}, "RFQ parsed.")
+	}
+}
+
+// rfqBlockedReason centralizes document types that must never produce quotation lines.
+func rfqBlockedReason(documentType RfqDocumentType) (bool, string) {
+	switch documentType {
+	case RfqDocumentInvoiceLike:
+		return true, "This document looks like an invoice, not an RFQ or BOQ."
+	case RfqDocumentSpecSheet:
+		return true, "This looks like a technical specification sheet with no order quantities. " +
+			"Import the RFQ or BOQ pages instead — spec sheets are reference attachments, not line items."
+	default:
+		return false, ""
 	}
 }
 
@@ -255,12 +264,25 @@ func MatchRfqLines(ctx context.Context, pool *pgxpool.Pool, tenantID, partnerID 
 	return out
 }
 
+// rfqUnitLookupFallbacks maps normalized RFQ unit codes to tenant unit codes that
+// mean the same thing (inv_units seeds "pc"; RFQ normalization emits "pcs").
+var rfqUnitLookupFallbacks = map[string][]string{
+	"pcs": {"pc", "piece"},
+	"pc":  {"pcs"},
+	"ea":  {"each"},
+}
+
 // resolveRfqLineUnit turns the unit text scraped from the RFQ into a structured
 // unit where possible, so the quotation draft carries a real UoM instead of a
 // remark. Unrecognized text is returned as a code-only hint.
 func resolveRfqLineUnit(ctx context.Context, pool *pgxpool.Pool, tenantID int64, itemID *int64, rawUnit string) (*int64, string) {
 	if id, code, ok := inventory.LookupUnitByCode(ctx, pool, tenantID, rawUnit); ok {
 		return &id, code
+	}
+	for _, alias := range rfqUnitLookupFallbacks[strings.ToLower(strings.TrimSpace(rawUnit))] {
+		if id, code, ok := inventory.LookupUnitByCode(ctx, pool, tenantID, alias); ok {
+			return &id, code
+		}
 	}
 	if itemID != nil && *itemID > 0 {
 		if baseID, baseCode, err := inventory.ItemBaseUnit(ctx, pool, tenantID, *itemID); err == nil && baseID > 0 {

@@ -13,6 +13,7 @@ const (
 	RfqDocumentGovernmentAnnex RfqDocumentType = "gov_annex_table"
 	RfqDocumentSpreadsheetBOQ  RfqDocumentType = "spreadsheet_boq"
 	RfqDocumentInvoiceLike     RfqDocumentType = "invoice_like"
+	RfqDocumentSpecSheet       RfqDocumentType = "spec_sheet"
 	RfqDocumentRFQ             RfqDocumentType = "rfq"
 )
 
@@ -23,6 +24,13 @@ var (
 	rfqNumberedSection = regexp.MustCompile(`(?im)^\s*(?:item\s+)?\d+[.):]\s+.+?(?:[–—\-:(]|\bqty\b)\s*\d+(?:\.\d+)?\s*(?:units?|pcs?|pieces?|sets?|lots?|qty)?\s*\)?\s*$`)
 	rfqGovernmentSignals = regexp.MustCompile(`(?i)\b(?:philgeps|approved budget for the contract|republic act no\.?\s*\d+|small value procurement)\b`)
 	rfqInvoiceSignals    = regexp.MustCompile(`(?i)\b(?:invoice\s+no\.?|bill\s+to|amount\s+due|hours\s+rate\s+total)\b`)
+	// Standard-specification attachments (PhilHealth ITR sheets etc.): compliance
+	// matrix with minimum requirements and no order quantities.
+	rfqSpecSheetSignals = regexp.MustCompile(`(?i)\b(?:standard specifications?|minimum requirements?|technical specifications?)\b`)
+	rfqSpecSheetMatrix  = regexp.MustCompile(`(?i)\bcompliance\b|\bnothing follows\b|\(\s*y\s*/\s*n\s*\)`)
+	// Annex header with OCR tolerance: "Item & Description", "Articles / Descriptions",
+	// garbled "Arlicles / Descriplions" (t↔l misreads on scanned forms).
+	rfqAnnexHeaderFuzzy = regexp.MustCompile(`(?i)\b(?:items?|ar[tl]icles?)\b\s*(?:[&/]|and)?\s*descri[a-z]*`)
 )
 
 func ClassifyRfqDocument(pages []RfqPageInput, tables []RfqStructuredTable) RfqDocumentType {
@@ -43,6 +51,12 @@ func ClassifyRfqDocument(pages []RfqPageInput, tables []RfqStructuredTable) RfqD
 	if rfqInvoiceSignals.MatchString(text) && !hasRFQ {
 		return RfqDocumentInvoiceLike
 	}
+	// Spec-sheet guard: standard-specification / compliance-matrix attachments carry
+	// no order quantities and must not be parsed into product lines.
+	if !hasRFQ && rfqSpecSheetSignals.MatchString(text) && rfqSpecSheetMatrix.MatchString(text) &&
+		!rfqGovernmentSection.MatchString(b.String()) && !structuredTablesLookLikeBOQ(tables) {
+		return RfqDocumentSpecSheet
+	}
 	if rfqGovernmentSection.MatchString(b.String()) || (rfqGovernmentSignals.MatchString(text) && rfqNumberedSection.MatchString(b.String())) {
 		return RfqDocumentGovernmentSpec
 	}
@@ -50,7 +64,8 @@ func ClassifyRfqDocument(pages []RfqPageInput, tables []RfqStructuredTable) RfqD
 		return RfqDocumentGovernmentSpec
 	}
 	if (strings.Contains(text, "annex a") || strings.Contains(text, "annex \"a\"")) &&
-		(strings.Contains(text, "item & description") || strings.Contains(text, "item and description")) {
+		(strings.Contains(text, "item & description") || strings.Contains(text, "item and description") ||
+			rfqAnnexHeaderFuzzy.MatchString(text)) {
 		return RfqDocumentGovernmentAnnex
 	}
 	if structuredTablesLookLikeBOQ(tables) {

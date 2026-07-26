@@ -6,6 +6,7 @@ import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useInvalidateSerialLotLists } from "../../../shared/useSerialLotList";
+import { takeSerialLotSeed } from "../../../shared/docSeed";
 import {
   patchGoodsReceiptLines,
   removeSerialFromLine,
@@ -425,6 +426,26 @@ export default function SerialReceivePage() {
   onMount(() => {
     const gr = goodsReceipt();
     if (gr) scanQueue.initFromStorage(gr.id);
+    // Copilot approve-to-seed handoff: stage proposed serials into the paste
+    // buffer only — nothing is registered until the user clicks Import.
+    const seed = takeSerialLotSeed();
+    if (seed?.rows?.length) {
+      const serials = seed.rows
+        .map((row) => row.serial?.trim())
+        .filter((s): s is string => !!s);
+      if (serials.length > 0) {
+        setPasteText(serials.join("\n"));
+        setPasteOpen(true);
+        toast.success(
+          `Copilot staged ${serials.length} serial(s) from ${seed.file_name || "your attachment"}. ` +
+            "Create or select a goods receipt, pick the scan line, then Import to confirm.",
+        );
+      }
+      const lotCount = seed.rows.filter((row) => row.lot?.trim()).length;
+      if (lotCount > 0) {
+        toast.warning(`${lotCount} lot value(s) in the file are not staged automatically — enter lots via the lot fields.`);
+      }
+    }
   });
 
   return (

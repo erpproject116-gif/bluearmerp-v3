@@ -1,7 +1,7 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { MigrationMappedImportModal } from "./MigrationMappedImportModal";
-import type { MigKind } from "../../shared/migrationCsvImport";
+import { takeMigImportSeed, type MigImportSeed, type MigKind } from "../../shared/migrationCsvImport";
 
 const ENTITIES: { kind: MigKind; title: string; blurb: string; href: string }[] = [
   {
@@ -26,6 +26,15 @@ const ENTITIES: { kind: MigKind; title: string; blurb: string; href: string }[] 
 
 export default function MigrationCenterPage() {
   const [kind, setKind] = createSignal<MigKind | null>(null);
+  const [seed, setSeed] = createSignal<MigImportSeed | null>(null);
+
+  onMount(() => {
+    const staged = takeMigImportSeed();
+    if (staged) {
+      setSeed(staged);
+      setKind(staged.kind);
+    }
+  });
 
   return (
     <div class="space-y-6">
@@ -69,8 +78,15 @@ export default function MigrationCenterPage() {
             open
             kind={k()}
             title={`Import ${ENTITIES.find((e) => e.kind === k())?.title ?? k()}`}
-            onClose={() => setKind(null)}
-            onImported={() => setKind(null)}
+            seed={seed()}
+            onClose={() => {
+              setKind(null);
+              setSeed(null);
+            }}
+            onImported={() => {
+              setKind(null);
+              setSeed(null);
+            }}
           />
         )}
       </Show>

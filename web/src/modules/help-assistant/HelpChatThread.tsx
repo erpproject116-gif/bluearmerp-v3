@@ -5,6 +5,39 @@ import { HelpResultCard } from "./HelpResultCard";
 import type { HelpChatMessage } from "./helpTypes";
 import { safeAppPath } from "./safeAppPath";
 
+/** Approve-to-seed handoffs: draft type → sessionStorage key the target screen consumes once. */
+const SEED_STORAGE_KEYS: Record<string, string> = {
+  create_quotation_from_rfq: "bluearm.rfqQuotationSeed",
+  map_import_dataset: "bluearm.migImportSeed",
+  open_quotation: "bluearm.docSeed.quotation",
+  open_sales_order: "bluearm.docSeed.sales_order",
+  open_sales: "bluearm.docSeed.sales",
+  open_purchase_request: "bluearm.docSeed.purchase_request",
+  open_rfq: "bluearm.docSeed.rfq",
+  open_purchase_order: "bluearm.docSeed.purchase_order",
+  open_purchases: "bluearm.docSeed.purchases",
+  propose_serial_lot_import: "bluearm.serialLotSeed",
+};
+
+/** Soft-cap oversized seeds so we stay under typical sessionStorage quotas. */
+function capSeedForStorage(seed: unknown): unknown {
+  try {
+    const raw = JSON.stringify(seed);
+    if (raw.length <= 4_500_000) return seed;
+    const s = seed as { lines?: Array<{ description?: string }> };
+    if (Array.isArray(s?.lines)) {
+      for (const line of s.lines) {
+        if (line.description && line.description.length > 2_000) {
+          line.description = line.description.slice(0, 2_000) + "\n…[truncated]";
+        }
+      }
+    }
+    return s;
+  } catch {
+    return seed;
+  }
+}
+
 function AssistantBubble(props: {
   message: Extract<HelpChatMessage, { role: "assistant" }>;
   pathname: string;
@@ -36,23 +69,12 @@ function AssistantBubble(props: {
       const result = res.data?.result as { next?: string; hint?: string; seed?: unknown } | undefined;
       const next = result?.next ? safeAppPath(result.next) : null;
       if (next) {
-        if (result?.seed && next === "/app/quotation/quotations/new") {
+        const seedKey = SEED_STORAGE_KEYS[draft.type];
+        if (result?.seed && seedKey) {
           try {
-            const raw = JSON.stringify(result.seed);
-            // Soft-cap: stay under typical sessionStorage quotas.
-            if (raw.length > 4_500_000) {
-              const seed = result.seed as { lines?: Array<{ description?: string }> };
-              if (Array.isArray(seed?.lines)) {
-                for (const line of seed.lines) {
-                  if (line.description && line.description.length > 2_000) {
-                    line.description = line.description.slice(0, 2_000) + "\n…[truncated]";
-                  }
-                }
-              }
-            }
-            sessionStorage.setItem("bluearm.rfqQuotationSeed", JSON.stringify(result.seed));
+            sessionStorage.setItem(seedKey, JSON.stringify(capSeedForStorage(result.seed)));
           } catch {
-            setActionNote("Approved, but the quotation draft could not be staged in this browser.");
+            setActionNote("Approved, but the draft could not be staged in this browser.");
             return;
           }
         }

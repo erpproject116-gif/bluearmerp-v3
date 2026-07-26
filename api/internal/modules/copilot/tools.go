@@ -70,6 +70,10 @@ func runTool(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, name s
 		tr = toolImportRFQ(args)
 	case "run_smart_rfq":
 		tr = toolRunSmartRFQ(ctx, pool, tu, args)
+	case "map_import_dataset":
+		tr = toolMapImportDataset(tu, args)
+	case "propose_serial_lot_import":
+		tr = toolProposeSerialLotImport(tu, args)
 	case "draft_quotation_from_rfq":
 		tr = toolDraftQuotationFromRFQ(args)
 	case "draft_follow_up":
@@ -527,9 +531,7 @@ func toolDraftSendQuotationEmail(args map[string]any) toolResult {
 	if quote != nil {
 		payload["quotation_id"] = quote.ID
 		payload["reference_no"] = quote.Code
-		if quote.Code != "" {
-			href = href // list; detail deep-link varies by UI
-		}
+		// href stays on the list view; detail deep-link varies by UI.
 		summary = fmt.Sprintf("Prepare email for quotation %s — approve to open Quotations; send from the document screen.", quote.Label)
 		payload["api"] = fmt.Sprintf("/api/v1/quotation/quotations/%d/send-email", quote.ID)
 	} else if customer != nil {

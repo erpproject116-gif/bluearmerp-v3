@@ -107,6 +107,10 @@ func ParseRfqDeterministic(pages []RfqPageInput, tables []RfqStructuredTable, op
 	if documentType == RfqDocumentInvoiceLike {
 		return RfqParseResult{}, documentType
 	}
+	// Spec sheets carry compliance matrices, not order lines — never emit products.
+	if documentType == RfqDocumentSpecSheet {
+		return RfqParseResult{}, documentType
+	}
 	if documentType == RfqDocumentGovernmentSpec {
 		sections := ParseRfqSectionSpecifications(pages)
 		if len(sections.Lines) > 0 {
@@ -135,7 +139,17 @@ func SanitizeRfqParseResult(result RfqParseResult, documentType RfqDocumentType)
 		line.ItemName = normalizeRfqItemTitle(line.ItemName)
 		line.Description = strings.TrimSpace(line.Description)
 		line.Remarks = strings.TrimSpace(line.Remarks)
+		rawQty := strings.TrimSpace(line.Qty)
 		line.Qty = normalizeQty(line.Qty)
+		if line.Qty == "" && rawQty != "" {
+			// Fused "600 PCS" qty values arriving from AI or fallback paths.
+			if q, u, ok := splitQtyUnitCell(rawQty); ok {
+				line.Qty = q
+				if strings.TrimSpace(line.Unit) == "" {
+					line.Unit = u
+				}
+			}
+		}
 		line.Unit = normalizeRfqUnit(line.Unit)
 
 		joined := strings.TrimSpace(strings.Join([]string{line.ItemName, line.Description}, " "))
@@ -184,19 +198,14 @@ func normalizeRfqItemTitle(value string) string {
 }
 
 func normalizeRfqUnit(value string) string {
-	v := strings.ToLower(strings.TrimSpace(value))
-	switch v {
-	case "unit", "units":
-		return "unit"
-	case "pc", "pcs", "piece", "pieces":
-		return "pcs"
-	case "set", "sets":
-		return "set"
-	case "lot", "lots":
-		return "lot"
-	default:
-		return v
+	v := strings.ToLower(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(value), ".")))
+	if v == "" {
+		return ""
 	}
+	if canonical, ok := rfqUnitWordCanonical[v]; ok {
+		return canonical
+	}
+	return v
 }
 
 func shortRfqItemTitle(description string) string {

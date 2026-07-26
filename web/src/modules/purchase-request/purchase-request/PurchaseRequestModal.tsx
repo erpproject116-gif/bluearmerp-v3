@@ -38,6 +38,7 @@ import {
   recalculatePurchaseRequestLines,
   type PurchaseRequestLineRow,
 } from "./PurchaseRequestLineGrid";
+import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
 
 export type PurchaseRequestDetail = {
   id: number;
@@ -382,6 +383,8 @@ export function PurchaseRequestModal(props: Props) {
     }
   };
 
+  let seededNewLines = false;
+
   createEffect(() => {
     if (!props.open) return;
     const ed = props.editing;
@@ -410,6 +413,11 @@ export function PurchaseRequestModal(props: Props) {
       setApprovedByName(ed.approved_by_name ?? "");
       setLines(linesFromDetail(ed.lines));
     } else {
+      const seed = takeDocSeed("purchase_request");
+      const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
+        ...emptyPurchaseRequestLine(index + 1),
+        ...docSeedLinePatch(line),
+      }));
       setRequestDate(todayISO());
       setPicUserId(null);
       setPicName("");
@@ -425,7 +433,15 @@ export function PurchaseRequestModal(props: Props) {
       setReference("");
       setNotes("");
       setProgressStatus("unconfirmed");
-      setLines([emptyPurchaseRequestLine(1)]);
+      seededNewLines = seedLines.length > 0;
+      if (seededNewLines) {
+        setLines(seedLines);
+        if (seed?.needs_qty_review) {
+          toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
+        }
+      } else {
+        setLines([emptyPurchaseRequestLine(1)]);
+      }
       void loadPreview(todayISO());
     }
   });
@@ -440,7 +456,13 @@ export function PurchaseRequestModal(props: Props) {
       setTaxTypeId(first.id);
       setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
-      setLines([emptyPurchaseRequestLine(1, "", basis)]);
+      if (seededNewLines) {
+        const seeded = lines().map((line) => ({ ...line, input_basis: basis }));
+        seededNewLines = false;
+        void recalculatePurchaseRequestLines(seeded, first.id, first).then(setLines);
+      } else {
+        setLines([emptyPurchaseRequestLine(1, "", basis)]);
+      }
     }
     if (!currencyId()) {
       const def = cc.find((c) => c.is_default) ?? cc[0];

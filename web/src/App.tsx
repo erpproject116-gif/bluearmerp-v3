@@ -561,10 +561,8 @@ export default function App() {
           <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
           <Route path="/finance/acct-i/reports/cash-flow-statement" component={CashFlowStatementPage} />
           <Route path="/finance/acct-i/reports/cash-book" component={() => <CashBookReportPage />} />
-          <Route
-            path="/finance/acct-i/reports/fund-statement"
-            component={() => <CashBookReportPage title="Fund Statement" apiPath="/api/v1/finance/reports/fund-statement" exportName="fund-statement.csv" />}
-          />
+          {/* Keep <Route path=...> on one line — extract-app-routes.mjs parses line by line. */}
+          <Route path="/finance/acct-i/reports/fund-statement" component={() => <CashBookReportPage title="Fund Statement" apiPath="/api/v1/finance/reports/fund-statement" exportName="fund-statement.csv" />} />
           <Route path="/finance/acct-i/reports/general-ledger" component={GeneralLedgerReportPage} />
           <Route path="/finance/acct-i/reports/trial-balance" component={TrialBalanceReportPage} />
           <Route path="/finance/acct-i/payment-entries" component={PaymentEntriesPage} />

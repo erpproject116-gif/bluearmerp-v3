@@ -47,6 +47,32 @@ export const MIG_REQUIRED: Record<MigKind, string[]> = {
 
 const migBase = `${apiBase}/api/v1/migration`;
 
+/** Copilot "map_import_dataset" Approve stages this seed; Migration Center consumes it once. */
+export type MigImportSeed = {
+  kind: MigKind;
+  file_name?: string;
+  headers?: string[];
+  column_map?: Record<string, string>;
+  csv_text?: string;
+  truncated?: boolean;
+};
+
+export const MIG_IMPORT_SEED_KEY = "bluearm.migImportSeed";
+
+export function takeMigImportSeed(): MigImportSeed | null {
+  try {
+    const raw = sessionStorage.getItem(MIG_IMPORT_SEED_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(MIG_IMPORT_SEED_KEY);
+    const parsed = JSON.parse(raw) as MigImportSeed;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (!["items", "partners", "accounts"].includes(parsed.kind)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export function listMigImportProfiles(kind: MigKind) {
   return apiFetch<MigImportProfile[]>(`/api/v1/migration/import-profiles?kind=${encodeURIComponent(kind)}`);
 }

@@ -49,7 +49,24 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 
 10. **Agentic Smart RFQ:** `run_smart_rfq` uses the quotation module's single `RunRfqImportPipeline` contract (classify → parse → conditional Qwen VL → sanitize → inventory match). It never uses a second Copilot extraction prompt/stack. If chat does not contain complete extracted page/table payload, Copilot opens the existing Import RFQ UI instead of pretending it parsed the binary.
 
-11. **RFQ approve boundary:** `draft_quotation_from_rfq` / `create_quotation_from_rfq` allows at most 200 sanitized lines. Approve stages the seed in the browser and opens `/app/quotation/quotations/new`; it does not insert, save, confirm, post, or email a quotation. The user reviews and saves in the standard form. Invoice-like documents are blocked and cannot produce an Approve draft.
+11. **RFQ approve boundary:** `draft_quotation_from_rfq` / `create_quotation_from_rfq` allows at most 200 sanitized lines. Approve stages the seed in the browser and opens `/app/quotation/quotations/new`; it does not insert, save, confirm, post, or email a quotation. The user reviews and saves in the standard form. Invoice-like documents and spec sheets are blocked and cannot produce an Approve draft.
+
+12. **Attach → map → import (`map_import_dataset`):** a sheet attachment (CSV/XLSX) plus an import-style ask produces a draft that auto-detects the Migration Center entity (items / partners / accounts) and auto-maps columns (same aliases as the modal). Approve stages `bluearm.migImportSeed` in `sessionStorage` and opens `/app/user-management/migration-center`, where the existing mapped-import modal opens prefilled — nothing imports until the user confirms there (`migration.center` write enforced by the import API). If the sheet reads like an RFQ (e.g. "REQUEST FOR QUOTATION", PhilGEPS), Copilot hands off to Import RFQ instead.
+
+13. **Generalized document seeds:** `open_quotation|open_sales_order|open_sales|open_purchase_request|open_rfq|open_purchase_order|open_purchases` drafts that carry a partner and/or tagged `@item` lines return a sanitized seed on Approve (allowlisted fields, ≤ 200 lines, server-side `sanitizeDocSeedPayload`, write permission on the target module required when the payload seeds content). The client stores it under `bluearm.docSeed.<kind>` and the create form consumes it once; lines seeded from bare `@item` tags get qty 1 plus an amber "review quantities" warning. Copy always says "Review and save" — never "created".
+
+14. **Serial & lot propose (`propose_serial_lot_import`):** a serial/lot CSV attachment (headers like `serial`/`lot`/`item_code`/`qty`, or one serial per line) produces a propose-only draft (≤ 500 rows). Approve stages `bluearm.serialLotSeed` and opens Serial & Lot → Receive with the list in the paste buffer. No serial, lot, or stock row is written until the user runs the existing capture actions.
+
+### Seed sessionStorage keys (all one-shot, consumed on first read)
+
+| Key | Consumer |
+|-----|----------|
+| `bluearm.rfqQuotationSeed` | Quotation create (legacy RFQ path; falls back to `bluearm.docSeed.quotation`) |
+| `bluearm.docSeed.quotation` / `.sales_order` / `.sales` / `.purchase_request` / `.rfq` / `.purchase_order` / `.purchases` | Respective create modals / pages |
+| `bluearm.migImportSeed` | Migration Center mapped-import modal |
+| `bluearm.serialLotSeed` | Serial & Lot → Receive paste buffer |
+
+Regression proofs: `go test ./internal/modules/copilot/` (sanitizer allowlists), `web/src/shared/docSeed.test.ts` (one-shot consume + validation), `web/e2e/copilot-seeds.spec.ts` (staged seed prefills the target screen; asserts staging only, never Save/Import).
 
 ## Permissions (Phase 2)
 
@@ -75,4 +92,4 @@ See `docs/runbooks/help-assistant-ai.md` section B. Minimum:
 
 ## Out of scope (intentional)
 
-Fine-tuned private model; DashVector until keyword+tools prove insufficient; autopost JE/stock; Zapier-style external agents.
+Fine-tuned private model (including DashScope weight fine-tuning on RFQ samples); DashVector until keyword+tools prove insufficient; autopost JE/stock; silent create/post of commercial documents, serials, or lots (all seed flows stop at a prefilled form); rebuilding the Migration mapping UI inside the chat bubble; Zapier-style external agents.

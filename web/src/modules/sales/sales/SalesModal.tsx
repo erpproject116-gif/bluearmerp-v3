@@ -60,6 +60,7 @@ import {
   type SalesLineRow,
   type SalesTemplateCode,
 } from "./SalesLineGrid";
+import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
 import { CashInFromCustomerModal } from "./CashInFromCustomerModal";
 import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
 import { SalesHoldListModal, type SalesHoldPayload } from "./SalesHoldListModal";
@@ -527,6 +528,8 @@ export function SalesModal(props: Props) {
     }
   };
 
+  let seededNewLines = false;
+
   createEffect(() => {
     if (!props.open) {
       setCreatedSale(null);
@@ -538,9 +541,14 @@ export function SalesModal(props: Props) {
     if (ed) {
       hydrateFromDetail(ed);
     } else {
+      const seed = takeDocSeed("sales");
+      const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
+        ...emptySalesLine(index + 1),
+        ...docSeedLinePatch(line),
+      }));
       setOrderDate(todayISO());
-      setPartnerId(null);
-      setCustomerLabel("");
+      setPartnerId(seed?.partner_id ?? null);
+      setCustomerLabel(seed?.partner_name ?? "");
       setPicUserId(null);
       setPicName("");
       const branch = getActiveBranchCurrent();
@@ -557,7 +565,15 @@ export function SalesModal(props: Props) {
       setProgressStatus("unconfirmed");
       setSalesCategory("");
       setSourceSalesOrderId(null);
-      setLines([emptySalesLine(1)]);
+      seededNewLines = seedLines.length > 0;
+      if (seededNewLines) {
+        setLines(seedLines);
+        if (seed?.needs_qty_review) {
+          toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
+        }
+      } else {
+        setLines([emptySalesLine(1)]);
+      }
       setCommissions([]);
       void loadPreview(todayISO());
     }
@@ -573,7 +589,13 @@ export function SalesModal(props: Props) {
       setTaxTypeId(first.id);
       setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
-      setLines([emptySalesLine(1, "", basis)]);
+      if (seededNewLines) {
+        const seeded = lines().map((line) => ({ ...line, input_basis: basis }));
+        seededNewLines = false;
+        void recalculateSalesLines(seeded, first.id, first, templateCode()).then(setLines);
+      } else {
+        setLines([emptySalesLine(1, "", basis)]);
+      }
     }
     if (!currencyId()) {
       const def = cc.find((c) => c.is_default) ?? cc[0];

@@ -1,0 +1,86 @@
+{
+  "note": "Ground truth for captured real-document payloads (*.rfq-payload.json). Files marked held_out are regression sentinels: CI asserts them, but do NOT tune regex/parser changes against their contents.",
+  "cases": {
+    "BATELEC I - RFQ Form (Office Supplies - 38936)": {
+      "document_type": "rfq",
+      "lines": [
+        { "item_name": "BALLPEN (100 BLUE; 50 RED)", "qty": "600", "unit": "pcs" },
+        { "item_name": "BATTERY AA (DOUBLE AA)", "qty": "24", "unit": "pcs" },
+        { "item_name": "CARBON PAPER LONG", "qty": "5", "unit": "box" },
+        { "item_name": "CARBON PAPER SHORT", "qty": "5", "unit": "box" },
+        { "item_name": "CON. FORMS 11X14 7/8 1 PLY", "qty": "30", "unit": "box" },
+        { "item_name": "CON. FORMS 11X9 1/2 4 PLY", "qty": "30", "unit": "box" },
+        { "item_name": "CORRECTION TAPE", "qty": "60", "unit": "pcs" },
+        { "item_name": "DOUBLE SIDED TAPE", "qty": "10", "unit": "roll" },
+        { "item_name": "ENVELOPE BUSINESS LONG", "qty": "300", "unit": "pcs" },
+        { "item_name": "ENVELOPE PAY", "qty": "300", "unit": "pcs" }
+      ]
+    },
+    "BATELEC I - RFQ Form (Office Supplies - 38937)": {
+      "held_out": true,
+      "document_type": "rfq",
+      "lines": [
+        { "item_name": "FASTENER (STEEL)", "qty": "30", "unit": "box" },
+        { "item_name": "FINGERTIP MOISTENER", "qty": "120", "unit": "box" },
+        { "item_name": "FOLDER ACCOUNTING LONG", "qty": "200", "unit": "pcs" },
+        { "item_name": "FOLDER ACCOUNTING SHORT", "qty": "200", "unit": "pcs" },
+        { "item_name": "FOLDER SHORT", "qty": "150", "unit": "pcs" },
+        { "item_name": "INK PENTEL PEN (5 BLACK, 5 BLUE)", "qty": "10", "unit": "bottle" },
+        { "item_name": "INK STAMP PAD", "qty": "5", "unit": "bottle" },
+        { "item_name": "MASKING TAPE", "qty": "240", "unit": "roll" },
+        { "item_name": "PAPER CLIP JUMBO/BIG", "qty": "20", "unit": "box" },
+        { "item_name": "PAPER CLIP SMALL", "qty": "30", "unit": "box" }
+      ]
+    },
+    "BATELEC I - RFQ Form (Office Supplies - 38938)": {
+      "held_out": true,
+      "document_type": "rfq",
+      "lines": [
+        { "item_name": "PAPERCLIP DOUBLE CLAMP 2\" (X12)", "qty": "5", "unit": "box" },
+        { "item_name": "PAPER CLIP DOUBLE CLAMP MEDIUM", "qty": "5", "unit": "box" },
+        { "item_name": "PAPER CLIP DOUBLE CLAMP 1\"", "qty": "5", "unit": "box" },
+        { "item_name": "PENTEL PEN (24 BLUE)", "qty": "120", "unit": "pcs" },
+        { "item_name": "RECORD BOOK 500PP", "qty": "20", "unit": "pcs" },
+        { "item_name": "RIBBON ADDING MACHINE (BLACK & RED)", "qty": "10", "unit": "pcs" },
+        { "item_name": "RUBBERBAND SMALL", "qty": "30", "unit": "box" },
+        { "item_name": "SIGN PEN (96 BLACK; 24 BLUE)", "qty": "120", "unit": "pcs" },
+        { "item_name": "STAPLER #35", "qty": "10", "unit": "pcs" },
+        { "item_name": "TAPE PACKAGING", "qty": "12", "unit": "roll" }
+      ]
+    },
+    "2026 RFQ DOJ-NPS equipment (1)": {
+      "document_type": "gov_section_spec",
+      "lines": [
+        { "item_name": "LAPTOP", "qty": "8", "unit": "unit" },
+        { "item_name": "PRINTER", "qty": "5", "unit": "unit" }
+      ]
+    },
+    "2026 RFQ DOJ-PADS equipment (1)": {
+      "document_type": "gov_section_spec",
+      "lines": [
+        { "item_name": "LAPTOP", "qty": "8", "unit": "unit" },
+        { "item_name": "PRINTER", "qty": "3", "unit": "unit" }
+      ]
+    },
+    "RFQ NO. DSWD7-2026-0754": {
+      "document_type": "gov_annex_table",
+      "line_count": 0,
+      "note": "Heavily garbled scan OCR baked into the PDF text layer. Deterministic parse must stay empty (no junk spec-bullet lines); the AI vision pass extracts the real line (Document Scanner, qty 2)."
+    },
+    "UPS": {
+      "document_type": "spec_sheet",
+      "line_count": 0,
+      "note": "PhilHealth ITR standard-specification compliance sheet — not an RFQ; import is blocked with an explanation."
+    },
+    "Desktop PC Mid-Range Specs": {
+      "document_type": "unknown",
+      "line_count": 0,
+      "note": "Scanned PDF with no text layer; words are empty here because browser OCR runs client-side only."
+    },
+    "RFQ": {
+      "document_type": "spreadsheet_boq",
+      "line_count": 0,
+      "note": "Blank PhilHealth RFQ .xls template — headers present, item rows empty. Footer rows (Delivery Period / Warranty / C.O.D) must not become lines."
+    }
+  }
+}

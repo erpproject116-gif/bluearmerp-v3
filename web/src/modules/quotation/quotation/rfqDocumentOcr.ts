@@ -71,6 +71,8 @@ async function getOcrWorker(): Promise<Worker> {
       workerBlobURL: false,
       corePath: "/tess/tesseract-core",
       langPath: "/tess/lang",
+      // /tess/lang serves the raw eng.traineddata (see README) — no .gz suffix.
+      gzip: false,
     });
   }
   return ocrWorkerPromise;

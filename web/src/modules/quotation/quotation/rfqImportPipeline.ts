@@ -37,6 +37,7 @@ export type RfqDocumentType =
   | "gov_section_spec"
   | "gov_annex_table"
   | "spreadsheet_boq"
+  | "spec_sheet"
   | "invoice_like";
 
 export type RfqImportProgress = {
@@ -118,7 +119,8 @@ export async function parsePayloadInBatches(
     spreadsheet_boq: 2,
     gov_annex_table: 3,
     gov_section_spec: 4,
-    invoice_like: 5,
+    spec_sheet: 5,
+    invoice_like: 6,
   };
 
   for (let i = 0; i < totalBatches; i++) {

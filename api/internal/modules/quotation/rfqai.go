@@ -75,9 +75,12 @@ Rules:
 - Use empty strings for missing fields; qty defaults to "1" when unclear.
 - page must match the page number given in the user message.
 - Do not invent rows, brands, prices, quantities, or specifications not visible in the source.
+- A "standard specification" / compliance-matrix sheet (columns like DETAILS, MINIMUM REQUIREMENTS, COMPLIANCE Y/N) is NOT an RFQ: return {"lines":[]}.
 Examples:
 - "I. LAPTOP (8 units)" followed by technical bullets => one line with item_name "LAPTOP", qty "8", unit "unit".
-- Annex A row "CSC LANYARD / ID LACE | 500 | set" => one line with item_name "CSC LANYARD / ID LACE", qty "500", unit "set".`
+- Annex A row "CSC LANYARD / ID LACE | 500 | set" => one line with item_name "CSC LANYARD / ID LACE", qty "500", unit "set".
+- Garbled scanned annex where OCR split the row, e.g. "2 nrt Supply and Delivery of Document" then "1 u Scanner" then spec bullets: the item number and qty live in separate narrow columns ("1" = item no., "2" = qty, "u"/"nrt" = OCR misreads of "unit"). Emit ONE line: item_name "Supply and Delivery of Document Scanner", qty "2", unit "unit", specs folded into description — never emit the spec bullets (interface, resolution, sensor…) as products.
+- Qty cell fused with its unit, e.g. row "600 PCS | BALLPEN (100 BLUE; 50 RED)" => qty "600", unit "pcs", item_name "BALLPEN (100 BLUE; 50 RED)". Never leave qty at "1" when a number+unit pair like "600 PCS" or "5 BOXES" appears at the start of the row.`
 
 type rfqAIExtractResponse struct {
 	Lines []struct {
