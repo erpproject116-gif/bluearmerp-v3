@@ -1,5 +1,5 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { LineUnitSelect } from "../../../shared/LineUnitSelect";
@@ -7,6 +7,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
+import { takeDocSeed } from "../../../shared/docSeed";
 
 type RfqRow = {
   id: number;
@@ -50,6 +51,26 @@ export default function RfqListPage() {
   const [createOpen, setCreateOpen] = createSignal(false);
   const [lines, setLines] = createSignal<RfqLineDraft[]>([emptyRfqLine()]);
   const [creating, setCreating] = createSignal(false);
+
+  // Copilot approve-to-seed handoff: staged RFQ lines open the create panel prefilled.
+  onMount(() => {
+    const seed = takeDocSeed("rfq");
+    if (!seed?.lines?.length) return;
+    const seeded = seed.lines.slice(0, 200).map((line) => ({
+      item_id: line.item_id ?? null,
+      item_code: line.item_code?.trim() ?? "",
+      item_name: line.item_name?.trim() ?? "",
+      qty: line.qty == null ? "1" : String(line.qty),
+      unit_id: line.unit_id ?? null,
+      unit_code: (line.unit_code ?? line.unit ?? "").trim(),
+    }));
+    if (!seeded.length) return;
+    setLines(seeded);
+    setCreateOpen(true);
+    if (seed.needs_qty_review) {
+      toast.warning("Copilot prefilled RFQ lines with qty 1 — review quantities before creating.");
+    }
+  });
 
   const list = createQuery(() => ({
     queryKey: ["rfq-list"],

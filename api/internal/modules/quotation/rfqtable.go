@@ -56,6 +56,85 @@ var rfqColumnSynonyms = map[rfqColumnField][]string{
 
 var rfqTableFooter = regexp.MustCompile(`(?i)^(grand\s+total|sub\s*total|subtotal|total\s+amount|total\s*:?|amount\s+due|approved\s+by|prepared\s+by|signature|vat|tax\s+total|net\s+total)`)
 
+// Document reference rows that leak into table bodies: "PR38936", "PO-1234", "RFQ No. 5567".
+var rfqDocRefRow = regexp.MustCompile(`(?i)^(?:pr|po|rfq|ref)[-.\s]?(?:no\.?\s*)?\d{3,}$`)
+
+// rfqUnitWordCanonical maps unit-of-measure words seen in RFQ qty cells to canonical codes.
+// Used to split fused "600 PCS" qty cells and "10 BOTTLES <desc>" description prefixes.
+var rfqUnitWordCanonical = map[string]string{
+	"pc": "pcs", "pcs": "pcs", "piece": "pcs", "pieces": "pcs",
+	"unit": "unit", "units": "unit",
+	"set": "set", "sets": "set",
+	"lot": "lot", "lots": "lot",
+	"box": "box", "boxes": "box", "bx": "box",
+	"roll": "roll", "rolls": "roll",
+	"bottle": "bottle", "bottles": "bottle", "btl": "bottle", "btls": "bottle",
+	"pack": "pack", "packs": "pack", "pck": "pack",
+	"ream": "ream", "reams": "ream", "rm": "ream",
+	"sheet": "sheet", "sheets": "sheet",
+	"pad": "pad", "pads": "pad",
+	"pair": "pair", "pairs": "pair",
+	"dozen": "dozen", "dozens": "dozen", "doz": "dozen",
+	"kit": "kit", "kits": "kit",
+	"can": "can", "cans": "can",
+	"tube": "tube", "tubes": "tube",
+	"gal": "gal", "gallon": "gal", "gallons": "gal",
+	"carton": "carton", "cartons": "carton", "ctn": "carton",
+	"bundle": "bundle", "bundles": "bundle",
+	"ea": "ea", "each": "ea",
+	"kg": "kg", "g": "g", "l": "L", "liter": "L", "liters": "L", "litre": "L", "litres": "L",
+	"m": "m", "meter": "m", "meters": "m", "metre": "m", "metres": "m",
+	// OCR misreads of "unit" on scanned government forms.
+	"unrt": "unit", "nrt": "unit", "unlt": "unit",
+}
+
+var (
+	rfqQtyUnitCell = regexp.MustCompile(`(?i)^(\d{1,7}(?:[.,]\d+)?)\s*([a-z]{1,12})\.?$`)
+	// "600 PCS BALLPEN …" — qty + known unit word + description on one line/cell.
+	rfqQtyUnitPrefixSpaced = regexp.MustCompile(`(?i)^(\d{1,7}(?:\.\d+)?)\s+([a-z]{1,12})\.?\s+(\S.*)$`)
+	// OCR-fused qty+unit+description with no space after the unit ("10 BOTTLESINK PENTEL PEN").
+	// Restricted to plural unit tokens so words like CANDLE never split as CAN+DLE.
+	rfqQtyUnitPrefixFused = regexp.MustCompile(`(?i)^(\d{1,7})\s+(pcs|pieces|boxes|bottles|rolls|packs|reams|sheets|sets|units|lots)(\S.+)$`)
+)
+
+// splitQtyUnitCell splits a fused qty cell like "600 PCS" / "5 BOXES" into qty + canonical unit.
+func splitQtyUnitCell(s string) (qty, unit string, ok bool) {
+	m := rfqQtyUnitCell.FindStringSubmatch(strings.TrimSpace(s))
+	if len(m) != 3 {
+		return "", "", false
+	}
+	canonical, known := rfqUnitWordCanonical[strings.ToLower(m[2])]
+	if !known {
+		return "", "", false
+	}
+	q := normalizeQty(strings.ReplaceAll(m[1], ",", ""))
+	if q == "" {
+		return "", "", false
+	}
+	return q, canonical, true
+}
+
+// extractQtyUnitPrefix pulls a leading "qty unit" pair off a description, when the
+// qty column was merged into the description text by extraction ("600 PCS BALLPEN…").
+func extractQtyUnitPrefix(desc string) (qty, unit, rest string, ok bool) {
+	trimmed := strings.TrimSpace(desc)
+	if m := rfqQtyUnitPrefixSpaced.FindStringSubmatch(trimmed); len(m) == 4 {
+		if canonical, known := rfqUnitWordCanonical[strings.ToLower(m[2])]; known {
+			if q := normalizeQty(m[1]); q != "" {
+				return q, canonical, strings.TrimSpace(m[3]), true
+			}
+		}
+	}
+	if m := rfqQtyUnitPrefixFused.FindStringSubmatch(trimmed); len(m) == 4 {
+		if canonical, known := rfqUnitWordCanonical[strings.ToLower(m[2])]; known {
+			if q := normalizeQty(m[1]); q != "" {
+				return q, canonical, strings.TrimSpace(m[3]), true
+			}
+		}
+	}
+	return "", "", "", false
+}
+
 type rfqTextRow struct {
 	y     float64
 	cells []string
@@ -582,13 +661,25 @@ func rowToLine(row rfqTextRow, schema []rfqColumnSlot) rowParseResult {
 		return strings.TrimSpace(strings.Join(vals[f], " "))
 	}
 
+	qtyRaw := join(colQty)
+	qty := normalizeQty(qtyRaw)
+	unit := strings.ToLower(join(colUnit))
+	if qty == "" && strings.TrimSpace(qtyRaw) != "" {
+		// Fused "600 PCS" qty cell: recover both qty and unit.
+		if q, u, ok := splitQtyUnitCell(qtyRaw); ok {
+			qty = q
+			if unit == "" {
+				unit = u
+			}
+		}
+	}
 	line := ParsedRfqLine{
 		ItemCode:    join(colItemCode),
 		ItemName:    join(colItemName),
 		Description: join(colDescription),
 		Remarks:     join(colRemarks),
-		Qty:         normalizeQty(join(colQty)),
-		Unit:        strings.ToLower(join(colUnit)),
+		Qty:         qty,
+		Unit:        unit,
 		UnitPrice:   normalizeMoney(join(colUnitPrice)),
 		LineTotal:   normalizeMoney(join(colLineTotal)),
 		Confidence:  0.88,
@@ -597,6 +688,20 @@ func rowToLine(row rfqTextRow, schema []rfqColumnSlot) rowParseResult {
 }
 
 func finishRowParseFromLine(line ParsedRfqLine, row rfqTextRow) rowParseResult {
+	// Qty column merged into the description text ("600 PCS BALLPEN…"): rescue it
+	// before name/description mirroring so both fields end up clean.
+	if line.Qty == "" {
+		if q, u, rest, ok := extractQtyUnitPrefix(line.Description); ok && rest != "" {
+			if strings.EqualFold(strings.TrimSpace(line.ItemName), strings.TrimSpace(line.Description)) {
+				line.ItemName = rest
+			}
+			line.Qty = q
+			line.Description = rest
+			if line.Unit == "" {
+				line.Unit = u
+			}
+		}
+	}
 	if line.ItemName != "" && line.Description == "" {
 		line.Description = line.ItemName
 	}
@@ -670,6 +775,10 @@ func isTableFooterRow(line string) bool {
 func isLikelyNonTableRow(row rfqTextRow, schema []rfqColumnSlot) bool {
 	line := strings.Join(row.cells, " ")
 	if isRfqNoiseLine(normalizeRfqLine(line)) {
+		return true
+	}
+	// Document reference footers inside the table body ("PR38936").
+	if len(row.cells) == 1 && rfqDocRefRow.MatchString(strings.TrimSpace(line)) {
 		return true
 	}
 	if len(row.cells) == 1 && len(line) > 80 {

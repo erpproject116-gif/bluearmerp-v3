@@ -149,6 +149,29 @@ export function RfqImportModal(props: Props) {
   const unmatchedCount = () => lines().filter((l) => l.include && !l.item_id).length;
   const createLine = () => lines().find((l) => l.line_no === createLineNo()) ?? null;
   const canCreateItem = () => hasPermission(auth.me, "inventory.items", "write");
+  const canExportPayload = () =>
+    import.meta.env.DEV || hasPermission(auth.me, "quotation.quotations", "write");
+
+  /** Download the exact payload sent to /rfq-import/* so it can become a golden corpus fixture. */
+  const exportParsePayload = () => {
+    const pages = sourcePages();
+    const tables = sourceTables();
+    if (!pages.length && !tables.length) return;
+    const fixture = {
+      captured_at: new Date().toISOString(),
+      files: sourceFiles().map((f) => f.name),
+      pages,
+      tables,
+    };
+    const blob = new Blob([JSON.stringify(fixture, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const base = sourceFiles()[0]?.name.replace(/\.[^.]+$/, "") || "rfq-payload";
+    a.href = url;
+    a.download = `${base}.rfq-payload.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   createEffect(() => {
     if (!props.open) return;
@@ -603,6 +626,8 @@ export function RfqImportModal(props: Props) {
         return "Government RFQ — Annex table";
       case "spreadsheet_boq":
         return "Spreadsheet BOQ / RFQ";
+      case "spec_sheet":
+        return "Technical specification sheet — no order quantities";
       case "invoice_like":
         return "Invoice-like document";
       case "rfq":
@@ -866,7 +891,41 @@ export function RfqImportModal(props: Props) {
       </Show>
 
       <Show when={error()}>
-        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error()}</div>
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error()}
+          <Show
+            when={
+              aiAvailable() &&
+              !aiUsed() &&
+              !blockedReason() &&
+              lines().length === 0 &&
+              sourcePages().length > 0
+            }
+          >
+            <div class="mt-2">
+              <button
+                type="button"
+                class="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                disabled={busy()}
+                onClick={() => void enhanceWithAI()}
+              >
+                Try AI extraction
+              </button>
+              <span class="ml-2 text-xs text-red-700/80">
+                Scanned or garbled documents often need the AI vision pass.
+              </span>
+            </div>
+          </Show>
+          <Show when={canExportPayload() && (sourcePages().length > 0 || sourceTables().length > 0)}>
+            <button
+              type="button"
+              class="ml-2 text-xs font-medium text-red-700 underline"
+              onClick={exportParsePayload}
+            >
+              Export parse payload
+            </button>
+          </Show>
+        </div>
       </Show>
 
       <Show when={showColumnMap()}>
@@ -925,17 +984,30 @@ export function RfqImportModal(props: Props) {
         </Show>
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 class="text-sm font-semibold text-text-primary">Review line items</h3>
-          <button
-            type="button"
-            class="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
-            disabled={busy()}
-            onClick={() => {
-              reset();
-              fileInputRef?.click();
-            }}
-          >
-            Import another file
-          </button>
+          <div class="flex items-center gap-3">
+            <Show when={canExportPayload()}>
+              <button
+                type="button"
+                class="text-xs font-medium text-text-secondary hover:underline disabled:opacity-50"
+                title="Download the extracted pages/tables JSON for parser fixtures"
+                disabled={busy() || (!sourcePages().length && !sourceTables().length)}
+                onClick={exportParsePayload}
+              >
+                Export parse payload
+              </button>
+            </Show>
+            <button
+              type="button"
+              class="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+              disabled={busy()}
+              onClick={() => {
+                reset();
+                fileInputRef?.click();
+              }}
+            >
+              Import another file
+            </button>
+          </div>
         </div>
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm text-text-secondary">

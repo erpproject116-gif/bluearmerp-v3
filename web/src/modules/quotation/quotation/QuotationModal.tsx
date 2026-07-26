@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, Show, Suspense, lazy } from "solid-js"
 import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
+import { takeDocSeed } from "../../../shared/docSeed";
 import type { LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { ModalField } from "../../../shared/ModalField";
@@ -175,6 +176,7 @@ function linesFromDetail(lines?: QuotationDetail["lines"]): QuotationLineRow[] {
 type RfqQuotationSeed = {
   partner_id?: number;
   partner_name?: string;
+  needs_qty_review?: boolean;
   lines?: Array<{
     item_id?: number;
     item_code?: string;
@@ -192,7 +194,10 @@ type RfqQuotationSeed = {
 function takeRfqQuotationSeed(): RfqQuotationSeed | null {
   try {
     const raw = sessionStorage.getItem("bluearm.rfqQuotationSeed");
-    if (!raw) return null;
+    if (!raw) {
+      // Copilot "open_quotation" drafts stage the generalized doc seed instead.
+      return (takeDocSeed("quotation") as RfqQuotationSeed | null) ?? null;
+    }
     sessionStorage.removeItem("bluearm.rfqQuotationSeed");
     const parsed = JSON.parse(raw) as RfqQuotationSeed;
     return parsed && Array.isArray(parsed.lines) ? parsed : null;
@@ -491,6 +496,9 @@ export function QuotationModal(props: Props) {
           void recalculateQuotationLines(seeded, taxTypeId()!, activeTax).then(setLines);
         } else {
           setLines(rfqLines);
+        }
+        if (rfqSeed?.needs_qty_review) {
+          toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
         }
       } else {
         setLines([emptyQuotationLine(1)]);

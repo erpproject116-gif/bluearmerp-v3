@@ -52,6 +52,10 @@ func classifyIntent(query string) string {
 		"create rfq", "new rfq", "request for quotation",
 		"new purchase", "supplier invoice", "create purchase",
 		"bulk inventory", "import items", "csv import", "stock entry",
+		"import this", "import the", "import my", "import data", "import excel", "import spreadsheet",
+		"import partners", "import customers", "import vendors", "import suppliers", "import accounts",
+		"map columns", "map the columns", "map this", "column mapping", "map and import",
+		"import serial", "serial import", "import lot", "lot import", "register serial", "upload serial",
 		"pc build", "product bundle", "item build", "bill of materials", "create bom", "new bom",
 		"compose email", "email sales", "email the",
 	}
@@ -174,6 +178,34 @@ func extractRecommendQuery(query string) string {
 	return extractStockQuery(query)
 }
 
+// pickSheetAttachment returns the first spreadsheet/CSV attachment, if any.
+func pickSheetAttachment(atts []helpassistant.ComposeAttachment) *helpassistant.ComposeAttachment {
+	for i := range atts {
+		if strings.EqualFold(atts[i].Kind, "sheet") {
+			return &atts[i]
+		}
+	}
+	return nil
+}
+
+// wantsDatasetImport reports whether an action query with a sheet attached should
+// stage a Migration Center mapped import instead of a generic open-document draft.
+func wantsDatasetImport(query, toolName, kind string) bool {
+	if toolName == "draft_open_document" && kind == "bulk_inventory" {
+		return true
+	}
+	q := strings.ToLower(query)
+	for _, h := range []string{
+		"import", "mapping", "map column", "map the column", "map this", "map these",
+		"map and", "map my", "map file", "map data", "upload",
+	} {
+		if strings.Contains(q, h) {
+			return true
+		}
+	}
+	return false
+}
+
 func extractStockQuery(query string) string {
 	lower := strings.ToLower(query)
 	for _, prefix := range []string{"find stock ", "stock of ", "inventory of ", "stock for ", "find "} {
@@ -218,6 +250,9 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"attachments": "Too many attachments (max 4)."})
 			return
 		}
+		// Keep the full extracted text for deterministic tool args (Smart RFQ pages,
+		// dataset import seeds); the packed copy below is only for LLM prompts.
+		rawAttachments := body.Attachments
 		body.Attachments = PackAttachments(body.Attachments, defaultPackAttPerFile, defaultPackAttTotal)
 		if err := helpassistant.CheckDailyCap(r.Context(), pool, tu.TenantID, cfg.DailyCap); err != nil {
 			if errors.Is(err, helpassistant.ErrDailyTokenCap) {
@@ -240,7 +275,7 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			response.OK(w, finalizeAskResult(result), "OK")
 		case "action":
-			result := askAction(r.Context(), pool, tu, cfg, query, pathname, body, entities)
+			result := askAction(r.Context(), pool, tu, cfg, query, pathname, body, entities, rawAttachments)
 			response.OK(w, finalizeAskResult(result), "OK")
 		default:
 			result := askOps(r.Context(), pool, tu, cfg, query, pathname, body, entities)
@@ -404,7 +439,7 @@ func askOps(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg hel
 	}
 }
 
-func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody, entities []EntityRef) askResult {
+func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody, entities []EntityRef, rawAtts []helpassistant.ComposeAttachment) askResult {
 	toolName, kind := matchActionTool(query)
 	args := map[string]any{"q": query, "entities": entities, "note": query}
 	if kind != "" {
@@ -414,10 +449,36 @@ func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg 
 		args["name"] = "Suggested recurring expense"
 		args["amount"] = 0
 	}
-	if (toolName == "run_smart_rfq" || toolName == "import_rfq_pdf") && len(body.Attachments) > 0 {
-		pages := make([]map[string]any, 0, len(body.Attachments))
+	if len(rawAtts) == 0 {
+		rawAtts = body.Attachments
+	}
+	// Serial/lot proposals consume the first sheet or text attachment as CSV.
+	if toolName == "propose_serial_lot_import" {
+		if att := pickSheetAttachment(rawAtts); att != nil {
+			args["file_name"] = att.Name
+			args["csv_text"] = att.Text
+		} else if len(rawAtts) > 0 {
+			args["file_name"] = rawAtts[0].Name
+			args["csv_text"] = rawAtts[0].Text
+		}
+	}
+	// Sheet attachment + import/map intent → dataset mapping draft (or RFQ handoff
+	// when the sheet reads like an RFQ). Explicit RFQ/serial tool choices are respected.
+	if toolName != "run_smart_rfq" && toolName != "import_rfq_pdf" && toolName != "propose_serial_lot_import" {
+		if att := pickSheetAttachment(rawAtts); att != nil && wantsDatasetImport(query, toolName, kind) {
+			if looksLikeRfqSheetText(att.Text) {
+				toolName = "import_rfq_pdf"
+			} else {
+				toolName = "map_import_dataset"
+				args["file_name"] = att.Name
+				args["csv_text"] = att.Text
+			}
+		}
+	}
+	if (toolName == "run_smart_rfq" || toolName == "import_rfq_pdf") && len(rawAtts) > 0 {
+		pages := make([]map[string]any, 0, len(rawAtts))
 		complete := true
-		for i, attachment := range body.Attachments {
+		for i, attachment := range rawAtts {
 			text := strings.TrimSpace(attachment.Text)
 			if text == "" || strings.Contains(text, "…[truncated]") {
 				complete = false

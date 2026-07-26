@@ -157,6 +157,21 @@ func toolDraftOpenDocument(kind string, args map[string]any) toolResult {
 			}
 		}
 		summary += " Items: " + strings.Join(codes, ", ") + "."
+		// Line-document drafts stage tagged items as seed lines (qty 1) so
+		// Approve prefills the create form; the user reviews and saves.
+		if _, seedable := docSeedSpecs[spec.DraftType]; seedable {
+			lines := make([]any, 0, len(items))
+			for _, it := range items {
+				line := map[string]any{"item_code": it.Code, "item_name": it.Label, "qty": 1}
+				if it.ID > 0 {
+					line["item_id"] = it.ID
+				}
+				lines = append(lines, line)
+			}
+			payload["lines"] = lines
+			payload["needs_qty_review"] = true
+			summary += " Quantities default to 1 — review them in the form before saving."
+		}
 	}
 
 	draft := &actionDraft{
@@ -435,6 +450,9 @@ func matchActionTool(query string) (toolName string, kind string) {
 		return "draft_follow_up", ""
 	case strings.Contains(q, "recurring"):
 		return "draft_recurring_expense", ""
+	case (strings.Contains(q, "serial") || strings.Contains(q, "lot number") || strings.Contains(q, "lot no")) &&
+		(strings.Contains(q, "import") || strings.Contains(q, "upload") || strings.Contains(q, "register") || strings.Contains(q, "capture")):
+		return "propose_serial_lot_import", ""
 	case strings.Contains(q, "bulk inventory") || strings.Contains(q, "import items") || strings.Contains(q, "csv import") || strings.Contains(q, "stock entry"):
 		return "draft_open_document", "bulk_inventory"
 	case strings.Contains(q, "pc build") || strings.Contains(q, "product bundle") || (strings.Contains(q, "item build") && !strings.Contains(q, "bom")):

@@ -153,13 +153,24 @@ func finishRowParse(vals map[rfqColumnField][]string, row rfqTextRow) rowParseRe
 		return strings.TrimSpace(strings.Join(vals[f], " "))
 	}
 
+	qtyRaw := join(colQty)
+	qty := normalizeQty(qtyRaw)
+	unit := strings.ToLower(join(colUnit))
+	if qty == "" && strings.TrimSpace(qtyRaw) != "" {
+		if q, u, ok := splitQtyUnitCell(qtyRaw); ok {
+			qty = q
+			if unit == "" {
+				unit = u
+			}
+		}
+	}
 	line := ParsedRfqLine{
 		ItemCode:    join(colItemCode),
 		ItemName:    join(colItemName),
 		Description: join(colDescription),
 		Remarks:     join(colRemarks),
-		Qty:         normalizeQty(join(colQty)),
-		Unit:        strings.ToLower(join(colUnit)),
+		Qty:         qty,
+		Unit:        unit,
 		UnitPrice:   normalizeMoney(join(colUnitPrice)),
 		LineTotal:   normalizeMoney(join(colLineTotal)),
 		Confidence:  0.95,

@@ -53,6 +53,7 @@ import {
   recalculatePurchaseRequestLines,
   type PurchaseRequestLineRow,
 } from "../../purchase-request/purchase-request/PurchaseRequestLineGrid";
+import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
 import { SupplierInvoiceApprovalPanel } from "./SupplierInvoiceApprovalPanel";
 import { SupplierInvoicePostSaveDialog } from "./SupplierInvoicePostSaveDialog";
 import { CashPaymentToVendorModal } from "./CashPaymentToVendorModal";
@@ -260,6 +261,8 @@ export function SupplierInvoiceModal(props: Props) {
     }
   };
 
+  let seededNewLines = false;
+
   createEffect(() => {
     if (!props.open) {
       setCreatedInvoice(null);
@@ -292,9 +295,14 @@ export function SupplierInvoiceModal(props: Props) {
       setLines(linesFromDetail(ed.lines));
       setActiveTab("details");
     } else {
+      const seed = takeDocSeed("purchases");
+      const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
+        ...emptyPurchaseRequestLine(index + 1),
+        ...docSeedLinePatch(line),
+      }));
       setInvoiceDate(todayISO());
-      setPartnerId(null);
-      setVendorLabel("");
+      setPartnerId(seed?.partner_id ?? null);
+      setVendorLabel(seed?.partner_name ?? "");
       setPicUserId(null);
       setPicName("");
       const branch = getActiveBranchCurrent();
@@ -310,7 +318,15 @@ export function SupplierInvoiceModal(props: Props) {
       setReference("");
       setNotes("");
       setProgressStatus("unconfirmed");
-      setLines([emptyPurchaseRequestLine(1)]);
+      seededNewLines = seedLines.length > 0;
+      if (seededNewLines) {
+        setLines(seedLines);
+        if (seed?.needs_qty_review) {
+          toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
+        }
+      } else {
+        setLines([emptyPurchaseRequestLine(1)]);
+      }
       setActiveTab("details");
       void loadPreview(todayISO());
     }
@@ -326,7 +342,13 @@ export function SupplierInvoiceModal(props: Props) {
       setTaxTypeId(first.id);
       setTaxTypeLabel(formatTaxTypeLabel(first.name, first.tax_mode, first.rate_percent));
       const basis = defaultInputBasis(first.tax_mode);
-      setLines([emptyPurchaseRequestLine(1, "", basis)]);
+      if (seededNewLines) {
+        const seeded = lines().map((line) => ({ ...line, input_basis: basis }));
+        seededNewLines = false;
+        void recalculatePurchaseRequestLines(seeded, first.id, first).then(setLines);
+      } else {
+        setLines([emptyPurchaseRequestLine(1, "", basis)]);
+      }
     }
     if (!currencyId()) {
       const def = cc.find((c) => c.is_default) ?? cc[0];

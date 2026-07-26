@@ -89,9 +89,9 @@ func RunRfqImportPipeline(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		LineCount:     len(deterministic.Lines),
 		TableDetected: deterministic.TableDetected,
 	}
-	if documentType == RfqDocumentInvoiceLike {
+	if blocked, reason := rfqBlockedReason(documentType); blocked {
 		out.Blocked = true
-		out.BlockedReason = "This document looks like an invoice, not an RFQ or BOQ."
+		out.BlockedReason = reason
 		out.Lines = []ParsedRfqLine{}
 		out.Matched = []RfqMatchedLine{}
 		out.LineCount = 0
