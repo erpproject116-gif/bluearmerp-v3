@@ -84,7 +84,6 @@ export function usePurchaseRequestList(params: () => PurchaseRequestListParams) 
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 0,
       placeholderData: (prev) => prev,
     };
   });

@@ -9,6 +9,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/tenantmodules"
 )
 
 type moduleRouteRule struct {
@@ -41,6 +42,10 @@ var moduleMutationRules = []moduleRouteRule{
 		message: "Purchases (supplier invoices) are turned off for this workspace.", nextHint: "/app/user-management/tenant-modules"},
 	{prefix: "/api/v1/pos", moduleCode: "pos",
 		message: "POS is turned off for this workspace.", nextHint: "/app/user-management/tenant-modules"},
+	{prefix: "/api/v1/sop", moduleCode: "sop",
+		message: "SOP is turned off for this workspace.", nextHint: "/app/user-management/tenant-modules"},
+	{prefix: "/api/v1/okr", moduleCode: "okr",
+		message: "OKR is turned off for this workspace.", nextHint: "/app/user-management/tenant-modules"},
 }
 
 // ModuleEnablement blocks mutating API calls when the mapped module/feature is disabled.
@@ -135,12 +140,5 @@ func matchModuleRule(path string) (moduleRouteRule, bool) {
 }
 
 func tenantModuleEnabled(ctx context.Context, pool *pgxpool.Pool, tenantID int64, code string) (bool, error) {
-	var enabled bool
-	err := pool.QueryRow(ctx, `
-		select coalesce(
-		  (select tm.is_enabled from public.tenant_modules tm
-		   where tm.tenant_id = $1 and tm.module_code = $2),
-		  false
-		)`, tenantID, code).Scan(&enabled)
-	return enabled, err
+	return tenantmodules.Enabled(ctx, pool, tenantID, code)
 }

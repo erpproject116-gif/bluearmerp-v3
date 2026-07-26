@@ -23,20 +23,13 @@ func ResolveLocationFilter(tu auth.TenantUser, explicit *int64) *int64 {
 
 // RoleAppliesUserScopes reports whether the tenant role enforces user_data_scopes.
 // Owners and platform superadmins never apply scopes.
-func RoleAppliesUserScopes(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) (bool, error) {
+// The flag comes from the cached TenantUser; ctx/pool are kept so callers stay
+// unchanged and a future scope source can go back to the database.
+func RoleAppliesUserScopes(_ context.Context, _ *pgxpool.Pool, tu auth.TenantUser) (bool, error) {
 	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
 		return false, nil
 	}
-	var apply bool
-	err := pool.QueryRow(ctx, `
-		select coalesce(tr.apply_user_scopes, false)
-		from public.tenant_roles tr
-		where tr.tenant_id = $1 and tr.role_code = $2`,
-		tu.TenantID, tu.TenantRole).Scan(&apply)
-	if err != nil {
-		return false, err
-	}
-	return apply, nil
+	return tu.ApplyUserScopes, nil
 }
 
 // ResolveReportLocationFilter applies explicit ?location_id= for everyone.

@@ -101,6 +101,8 @@ export const navGroups: NavGroup[] = [
       { kind: "module", moduleId: "booking" },
       { kind: "module", moduleId: "comms" },
       { kind: "module", moduleId: "operations" },
+      { kind: "module", moduleId: "sop" },
+      { kind: "module", moduleId: "okr" },
       { kind: "module", moduleId: "quality" },
       { kind: "module", moduleId: "reports" },
       { kind: "module", moduleId: "support" },

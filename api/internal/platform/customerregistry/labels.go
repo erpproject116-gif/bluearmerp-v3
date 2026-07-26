@@ -3,6 +3,7 @@ package customerregistry
 import (
 	"context"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -100,6 +101,38 @@ func daysUntil(endsAt *time.Time, now time.Time) int {
 	return int(math.Ceil(hours / 24))
 }
 
+// Billing state is cached per tenant by the entitlement gate. That package
+// already imports this one, so it registers a hook here instead of the other way
+// around, and every writer that recomputes urgency evicts the cache for free.
+var (
+	changeHooksMu sync.RWMutex
+	changeHooks   []func(tenantID int64)
+)
+
+// OnTenantBillingChanged registers a callback fired whenever a customer's
+// subscription or urgency state changes.
+func OnTenantBillingChanged(fn func(tenantID int64)) {
+	if fn == nil {
+		return
+	}
+	changeHooksMu.Lock()
+	changeHooks = append(changeHooks, fn)
+	changeHooksMu.Unlock()
+}
+
+// NotifyTenantBillingChanged fires the registered hooks. Safe to call with 0.
+func NotifyTenantBillingChanged(tenantID int64) {
+	if tenantID <= 0 {
+		return
+	}
+	changeHooksMu.RLock()
+	hooks := changeHooks
+	changeHooksMu.RUnlock()
+	for _, fn := range hooks {
+		fn(tenantID)
+	}
+}
+
 // UpdateCustomerUrgency recomputes and persists urgency for one customer.
 func UpdateCustomerUrgency(ctx context.Context, pool *pgxpool.Pool, customerID int64, now time.Time) (string, error) {
 	var tenantID *int64
@@ -144,5 +177,8 @@ func UpdateCustomerUrgency(ctx context.Context, pool *pgxpool.Pool, customerID i
 		update public.platform_customers
 		set urgency_label = $2, urgency_updated_at = $3, updated_at = now()
 		where id = $1`, customerID, label, now)
+	if err == nil && hasTenant {
+		NotifyTenantBillingChanged(*tenantID)
+	}
 	return label, err
 }

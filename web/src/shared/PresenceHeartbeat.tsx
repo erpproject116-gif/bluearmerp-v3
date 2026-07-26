@@ -40,18 +40,38 @@ export function PresenceHeartbeat() {
     });
   };
 
+  // A hidden tab is not "present", so the heartbeat stops instead of writing
+  // presence rows for a window nobody is looking at. Becoming visible pulses once
+  // and restarts the cadence.
+  const startTimer = () => {
+    if (timer) return;
+    timer = setInterval(() => void pulse(), HEARTBEAT_MS);
+  };
+  const stopTimer = () => {
+    if (!timer) return;
+    clearInterval(timer);
+    timer = undefined;
+  };
+
   onMount(async () => {
     setAvatarUrl(await resolveAvatarUrl(auth.me?.user.avatar_url));
-    void pulse();
-    timer = setInterval(() => void pulse(), HEARTBEAT_MS);
+    if (!document.hidden) {
+      void pulse();
+      startTimer();
+    }
 
     const onVis = () => {
-      if (document.visibilityState === "visible") void pulse();
+      if (document.visibilityState === "visible") {
+        void pulse();
+        startTimer();
+      } else {
+        stopTimer();
+      }
     };
     document.addEventListener("visibilitychange", onVis);
     onCleanup(() => {
       document.removeEventListener("visibilitychange", onVis);
-      if (timer) clearInterval(timer);
+      stopTimer();
       if (routeTimer) clearTimeout(routeTimer);
       void clearPresence();
     });

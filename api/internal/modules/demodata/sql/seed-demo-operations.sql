@@ -144,7 +144,9 @@ begin
       dashboard_id, widget_type, title, config, grid_x, grid_y, grid_w, grid_h, sort_order
     ) values
       (v_dashboard_id, 'job_cost_bva', 'Budget vs Actual', '{}'::jsonb, 0, 0, 6, 3, 0),
-      (v_dashboard_id, 'work_item_summary', 'Work Items by Status', '{}'::jsonb, 6, 0, 6, 3, 10);
+      (v_dashboard_id, 'work_item_summary', 'Work Items by Status', '{}'::jsonb, 6, 0, 6, 3, 10),
+      (v_dashboard_id, 'work_item_risk', 'Milestone risk', '{}'::jsonb, 0, 3, 6, 3, 20),
+      (v_dashboard_id, 'work_item_completion', '% complete', '{}'::jsonb, 6, 3, 6, 3, 30);
 
     raise notice 'seed-demo-operations: created demo-riverside-reno for %', v_code;
   end loop;

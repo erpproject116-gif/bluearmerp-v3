@@ -41,7 +41,6 @@ export function usePaymentVoucherList(params: () => { page: number; pageSize: nu
         if (!res.success) throw new Error(res.message ?? "Failed to load");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 0,
       placeholderData: (prev) => prev,
     };
   });

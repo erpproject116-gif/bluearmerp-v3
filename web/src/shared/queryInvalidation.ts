@@ -103,8 +103,11 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
     "crm-sales-team",
     "crm-notifications",
     "crm-dashboard",
+    "crm-leads-dashboard",
     "crm-follow-up-tasks",
     "crm-leads",
+    "crm-clients-health",
+    "crm-client-health",
   ],
   operations: [
     "operations-workspaces",
@@ -113,8 +116,11 @@ const DOMAIN_KEYS: Record<string, readonly string[]> = {
     "operations-automation",
     "operations-dashboards",
     "operations-widget-data",
+    "operations-tasks-summary",
     "operations-industry-packs",
   ],
+  sop: ["sop-documents", "sop-document", "sop-dashboard"],
+  okr: ["okr-objectives", "okr-key-results", "okr-dashboard"],
   booking: ["bookings", "booking-calendar"],
   support: ["support-tickets"],
   selling: ["selling-workspace"],
@@ -146,6 +152,8 @@ const MUTATION_RULES: MutationRule[] = [
   { test: (p) => p.startsWith("/api/v1/manufacturing"), domains: ["manufacturing", "inventory"] },
   { test: (p) => p.startsWith("/api/v1/crm"), domains: ["crm"] },
   { test: (p) => p.startsWith("/api/v1/operations"), domains: ["operations"] },
+  { test: (p) => p.startsWith("/api/v1/sop"), domains: ["sop"] },
+  { test: (p) => p.startsWith("/api/v1/okr"), domains: ["okr"] },
   { test: (p) => p.startsWith("/api/v1/hr"), domains: ["hr"] },
   { test: (p) => p.startsWith("/api/v1/platform/onboarding"), domains: ["platform"] },
   { test: (p) => p.startsWith("/api/v1/platform/setup"), domains: ["platform"] },
@@ -270,11 +278,14 @@ export function invalidateQueryPrefixes(client: QueryClient, prefixes: Iterable<
   void client.invalidateQueries({ predicate });
 }
 
-/** Invalidate and refetch active queries so lists update without a hard refresh. */
+/**
+ * Invalidate and refetch active queries so lists update without a hard refresh.
+ * `refetchType: "active"` already refetches every mounted query that matches, so
+ * a follow-up refetchQueries would only fire the same requests a second time.
+ */
 export async function refetchQueryPrefixes(client: QueryClient, prefixes: Iterable<string>): Promise<void> {
   const predicate = predicateForPrefixes(prefixes);
   await client.invalidateQueries({ predicate, refetchType: "active" });
-  await client.refetchQueries({ predicate, type: "active" });
 }
 
 export async function invalidateAfterMutation(path: string, method?: string): Promise<void> {

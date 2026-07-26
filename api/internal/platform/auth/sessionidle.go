@@ -27,6 +27,30 @@ func sessionIdleTimeout() time.Duration {
 	return 20 * time.Minute
 }
 
+// activityWriteInterval is the minimum age of last_activity_at before an
+// interactive request re-stamps it. Without it every foreground call issues an
+// UPDATE. Derived from the row we already SELECT, so it stays correct across
+// API instances. 0 disables the throttle (write on every bump).
+func activityWriteInterval() time.Duration {
+	secs := 30
+	if v := strings.TrimSpace(os.Getenv("SESSION_ACTIVITY_WRITE_SECONDS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			secs = n
+		}
+	}
+	return time.Duration(secs) * time.Second
+}
+
+// shouldStampActivity reports whether an interactive request should re-write
+// last_activity_at given how recently it was stamped.
+func shouldStampActivity(lastActivity, now time.Time) bool {
+	interval := activityWriteInterval()
+	if interval <= 0 {
+		return true
+	}
+	return now.Sub(lastActivity) >= interval
+}
+
 func isSessionIdleExemptPath(path string) bool {
 	if path == "/api/v1/auth/session-ended" {
 		return true
@@ -90,6 +114,11 @@ func enforceSessionActivity(ctx context.Context, pool *pgxpool.Pool, authUserID 
 	}
 
 	if bump {
+		// Already stamped recently — the session is provably not idle, so skip the write.
+		// Worst-case drift is one interval, far below the idle timeout.
+		if !shouldStampActivity(lastActivity, time.Now()) {
+			return nil
+		}
 		_, err = pool.Exec(ctx, `
 			update public.auth_session_activity
 			set last_activity_at = now()

@@ -1,5 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { createSignal, For, Show, createMemo } from "solid-js";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import {
   convertLeadToQuotation,
@@ -18,8 +18,13 @@ import { CrmLayout } from "./CrmLayout";
 
 const STATUS_OPTIONS: LeadStatus[] = ["new", "contacted", "qualified", "lost", "converted"];
 
+function isLeadStatus(v: string | undefined): v is LeadStatus {
+  return !!v && (STATUS_OPTIONS as string[]).includes(v);
+}
+
 export default function LeadsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("updated_at");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -34,7 +39,18 @@ export default function LeadsPage() {
   const toast = useToast();
   const invalidate = useInvalidateLeads();
 
-  const list = useLeads(() => ({ page: page(), pageSize, q: q() || undefined }));
+  const filterStatus = createMemo(() => {
+    const raw = searchParams.status;
+    const v = Array.isArray(raw) ? raw[0] : raw;
+    return isLeadStatus(v) ? v : undefined;
+  });
+
+  const list = useLeads(() => ({
+    page: page(),
+    pageSize,
+    q: q() || undefined,
+    status: filterStatus(),
+  }));
 
   const openNew = () => {
     setSelected(null);
@@ -122,6 +138,26 @@ export default function LeadsPage() {
 
   return (
     <CrmLayout>
+      <div class="mb-3 flex flex-wrap items-center gap-3">
+        <label class="flex items-center gap-2 text-sm text-text-secondary">
+          Status
+          <select
+            class={inputClass + " w-auto"}
+            value={filterStatus() ?? ""}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setPage(1);
+              setSearchParams({ status: v || undefined });
+            }}
+          >
+            <option value="">All</option>
+            <For each={STATUS_OPTIONS}>{(s) => <option value={s}>{s}</option>}</For>
+          </select>
+        </label>
+        <A href="/app/crm/leads/dashboard" class="text-sm font-medium text-brand-600 hover:underline">
+          Leads dashboard
+        </A>
+      </div>
       <SpreadsheetGrid
         columns={[
           { key: "lead_name", header: "Lead", clickable: true },

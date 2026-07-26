@@ -104,16 +104,7 @@ func branchesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		scoped := false
-		if !tu.IsPlatformSuperadmin && !tu.IsTenantOwner {
-			if err := pool.QueryRow(r.Context(), `
-				select coalesce(tr.apply_user_scopes, false)
-				from public.tenant_roles tr
-				where tr.tenant_id = $1 and tr.role_code = $2`,
-				tu.TenantID, tu.TenantRole).Scan(&scoped); err != nil {
-				scoped = false
-			}
-		}
+		scoped := tu.ApplyUserScopes && !tu.IsPlatformSuperadmin && !tu.IsTenantOwner
 
 		var (
 			rows pgx.Rows

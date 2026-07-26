@@ -149,6 +149,9 @@ export const HelpFeedbackPage = lazy(() => import("../modules/user-management/he
 export const ActivityLogListPage = lazy(() => import("../modules/activity-logs/ActivityLogListPage"));
 export const ChangeLogListPage = lazy(() => import("../modules/activity-logs/ChangeLogListPage"));
 export const CrmDashboardPage = lazy(() => import("../modules/crm/CrmDashboardPage"));
+export const CrmLeadsDashboardPage = lazy(() => import("../modules/crm/CrmLeadsDashboardPage"));
+export const CrmClientsPage = lazy(() => import("../modules/crm/CrmClientsPage"));
+export const CrmClientDetailPage = lazy(() => import("../modules/crm/CrmClientDetailPage"));
 export const CrmNotificationsPage = lazy(() => import("../modules/crm/CrmNotificationsPage"));
 export const FollowUpTasksPage = lazy(() => import("../modules/crm/FollowUpTasksPage"));
 export const QuotationPipelinePage = lazy(() => import("../modules/crm/QuotationPipelinePage"));
@@ -189,7 +192,13 @@ export const OperationsWorkItemSettingsPage = lazy(() => import("../modules/oper
 export const OperationsCalendarPage = lazy(() => import("../modules/operations/OperationsCalendarPage"));
 export const OperationsTimelinePage = lazy(() => import("../modules/operations/OperationsTimelinePage"));
 export const OperationsDashboardPage = lazy(() => import("../modules/operations/OperationsDashboardPage"));
+export const OperationsTasksDashboardPage = lazy(() => import("../modules/operations/OperationsTasksDashboardPage"));
 export const OperationsAutomationPage = lazy(() => import("../modules/operations/OperationsAutomationPage"));
+export const SopLibraryPage = lazy(() => import("../modules/sop/SopLibraryPage"));
+export const SopDashboardPage = lazy(() => import("../modules/sop/SopDashboardPage"));
+export const SopDocumentPage = lazy(() => import("../modules/sop/SopDocumentPage"));
+export const OkrListPage = lazy(() => import("../modules/okr/OkrListPage"));
+export const OkrDashboardPage = lazy(() => import("../modules/okr/OkrDashboardPage"));
 export const CommsInboxPage = lazy(() => import("../modules/comms/InboxPage"));
 export const CommsSettingsPage = lazy(() => import("../modules/comms/CommsSettingsPage"));
 export const PosPage = lazy(() => import("../modules/pos/PosPage"));

@@ -80,7 +80,6 @@ export function useOfficialReceiptList(params: () => OfficialReceiptListParams) 
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 0,
       placeholderData: (prev) => prev,
     };
   });

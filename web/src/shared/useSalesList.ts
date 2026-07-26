@@ -64,7 +64,6 @@ export function useSalesList(params: () => SalesListParams) {
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 0,
       placeholderData: (prev) => prev,
     };
   });

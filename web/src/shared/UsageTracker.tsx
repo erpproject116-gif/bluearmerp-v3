@@ -121,9 +121,15 @@ function tickTimers() {
   }
 }
 
-async function sendHeartbeat() {
+/**
+ * `force` bypasses the hidden-tab skip; used by pagehide so a closing tab still
+ * flushes. The local timers keep ticking while hidden (idle seconds must stay
+ * accurate) — only the network POST is suppressed.
+ */
+async function sendHeartbeat(force = false) {
   if (!clientSessionId || !sessionStarted || ending) return;
   tickTimers();
+  if (!force && typeof document !== "undefined" && document.hidden) return;
 
   // Include open visit checkpoint without closing it.
   const pages = [...pendingPages];
@@ -297,7 +303,7 @@ export function UsageTracker() {
     };
     const onHide = () => {
       tickTimers();
-      void sendHeartbeat();
+      void sendHeartbeat(true);
     };
     const onStorage = (e: StorageEvent) => {
       if (e.key === LAST_ACTIVITY_STORAGE_KEY) {

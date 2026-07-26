@@ -336,9 +336,11 @@ export const appModules: AppModule[] = [
     basePath: "/app/crm",
     features: [
       { label: "My pipeline", href: "/app/crm/dashboard", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Leads dashboard", href: "/app/crm/leads/dashboard", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Notifications", href: "/app/crm/notifications", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Follow-up Tasks", href: "/app/crm/follow-up-tasks", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Leads", href: "/app/crm/leads", settingsHref: "/app/crm/settings/alert-rules" },
+      { label: "Clients", href: "/app/crm/clients", settingsHref: "/app/crm/settings/alert-rules" },
       { label: "Opportunities", href: "/app/crm/opportunities", settingsHref: "/app/crm/settings/alert-rules" },
       {
         label: "Quote board",
@@ -403,8 +405,29 @@ export const appModules: AppModule[] = [
       { label: "Calendar", href: "/app/operations/calendar", settingsHref: "/app/operations/calendar" },
       { label: "Timeline", href: "/app/operations/timeline", settingsHref: "/app/operations/timeline" },
       { label: "Project dashboard", href: "/app/operations/dashboard", settingsHref: "/app/operations/dashboard" },
+      { label: "Tasks dashboard", href: "/app/operations/tasks", settingsHref: "/app/operations/dashboard" },
       { label: "Job costing", href: "/app/operations/job-costing", settingsHref: "/app/operations/job-costing" },
       { label: "Automation", href: "/app/operations/automation", settingsHref: "/app/operations/automation" },
+    ],
+  },
+  {
+    id: "sop",
+    label: "SOP",
+    href: "/app/sop",
+    basePath: "/app/sop",
+    features: [
+      { label: "Library", href: "/app/sop", settingsHref: "/app/sop" },
+      { label: "Dashboard", href: "/app/sop/dashboard", settingsHref: "/app/sop/dashboard" },
+    ],
+  },
+  {
+    id: "okr",
+    label: "OKRs",
+    href: "/app/okr",
+    basePath: "/app/okr",
+    features: [
+      { label: "Objectives", href: "/app/okr", settingsHref: "/app/okr" },
+      { label: "Dashboard", href: "/app/okr/dashboard", settingsHref: "/app/okr/dashboard" },
     ],
   },
   {

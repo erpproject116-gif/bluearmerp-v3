@@ -245,6 +245,10 @@ func patchRole(pool *pgxpool.Pool) http.HandlerFunc {
 			select count(*) from public.users u
 			where u.tenant_id = $1 and u.tenant_role = $2`, tu.TenantID, row.RoleCode).Scan(&row.UserCount)
 
+		// Role flags (apply_user_scopes, can_manage_*) are cached on TenantUser, so
+		// members must be evicted or they keep the pre-edit capabilities until TTL.
+		_ = auth.InvalidateUsersByTenantRole(r.Context(), pool, tu.TenantID, row.RoleCode)
+
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "role.update", "tenant_role", &id, nil, map[string]any{
 			"role_code": row.RoleCode,
 		})

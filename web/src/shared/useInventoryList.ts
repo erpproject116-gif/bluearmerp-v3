@@ -57,7 +57,6 @@ export function useInventoryList<T>(entity: string, params: () => InventoryListP
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 0,
       gcTime: 300_000,
       placeholderData: (prev: InventoryListResult<T> | undefined) => prev,
     };

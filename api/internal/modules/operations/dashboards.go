@@ -67,9 +67,22 @@ type WorkItemSummaryData struct {
 	Blocked    int `json:"blocked"`
 }
 
+type WorkItemRiskData struct {
+	Overdue int `json:"overdue"`
+	Blocked int `json:"blocked"`
+	Due7d   int `json:"due_7d"`
+}
+
+type WorkItemCompletionData struct {
+	PercentComplete float64 `json:"percent_complete"`
+	Done            int     `json:"done"`
+	Total           int     `json:"total"`
+}
+
 func registerDashboardRoutes(r chi.Router, pool *pgxpool.Pool) {
 	dr := r.With(auth.RequirePermission("operations.dashboard", auth.AccessRead))
 	dr.Get("/dashboards", listDashboards(pool))
+	dr.Get("/dashboards/tasks-summary", tasksDashboardSummaryHandler(pool))
 	dr.Get("/dashboards/{id}", getDashboard(pool))
 	dr.Get("/dashboards/{id}/widgets", listDashboardWidgets(pool))
 	dr.Get("/dashboards/{id}/widget-data", dashboardWidgetData(pool))
@@ -184,11 +197,24 @@ func dashboardWidgetData(pool *pgxpool.Pool) http.HandlerFunc {
 			jobCostProjectID = jcID
 		}
 
+		if dash.WorkspaceID != nil {
+			_ = ensureDefaultDashboardWidgets(r.Context(), pool, dash.ID)
+			widgets, err = loadDashboardWidgets(r.Context(), pool, dashboardID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load widgets.", "ERR_INTERNAL")
+				return
+			}
+		}
+
 		var out []WidgetData
 		var bvaCache any
 		var bvaLoaded bool
 		var summaryCache any
 		var summaryLoaded bool
+		var riskCache any
+		var riskLoaded bool
+		var completionCache any
+		var completionLoaded bool
 		for _, widget := range widgets {
 			var data any
 			var err error
@@ -219,6 +245,32 @@ func dashboardWidgetData(pool *pgxpool.Pool) http.HandlerFunc {
 					}
 				}
 				data = summaryCache
+			case "work_item_risk":
+				if !riskLoaded {
+					riskLoaded = true
+					if dash.WorkspaceID == nil {
+						riskCache = WorkItemRiskData{}
+					} else {
+						riskCache, err = loadWorkItemRisk(r.Context(), pool, tu.TenantID, *dash.WorkspaceID)
+						if err != nil {
+							continue
+						}
+					}
+				}
+				data = riskCache
+			case "work_item_completion":
+				if !completionLoaded {
+					completionLoaded = true
+					if dash.WorkspaceID == nil {
+						completionCache = WorkItemCompletionData{}
+					} else {
+						completionCache, err = loadWorkItemCompletion(r.Context(), pool, tu.TenantID, *dash.WorkspaceID)
+						if err != nil {
+							continue
+						}
+					}
+				}
+				data = completionCache
 			default:
 				data = map[string]any{}
 			}
@@ -245,6 +297,16 @@ func resolveWidgetData(ctx context.Context, pool *pgxpool.Pool, tenantID int64, 
 			return WorkItemSummaryData{}, nil
 		}
 		return loadWorkItemSummary(ctx, pool, tenantID, *workspaceID)
+	case "work_item_risk":
+		if workspaceID == nil {
+			return WorkItemRiskData{}, nil
+		}
+		return loadWorkItemRisk(ctx, pool, tenantID, *workspaceID)
+	case "work_item_completion":
+		if workspaceID == nil {
+			return WorkItemCompletionData{}, nil
+		}
+		return loadWorkItemCompletion(ctx, pool, tenantID, *workspaceID)
 	default:
 		return map[string]any{}, nil
 	}
@@ -328,6 +390,84 @@ func loadWorkItemSummary(ctx context.Context, pool *pgxpool.Pool, tenantID, work
 		}
 	}
 	return out, nil
+}
+
+func loadWorkItemRisk(ctx context.Context, pool *pgxpool.Pool, tenantID, workspaceID int64) (WorkItemRiskData, error) {
+	var out WorkItemRiskData
+	err := pool.QueryRow(ctx, `
+		select
+		  count(*) filter (
+		    where status <> 'done' and end_date is not null and end_date < current_date
+		  )::int as overdue,
+		  count(*) filter (where status = 'blocked')::int as blocked,
+		  count(*) filter (
+		    where status <> 'done'
+		      and end_date is not null
+		      and end_date >= current_date
+		      and end_date < (current_date + interval '7 days')::date
+		  )::int as due_7d
+		from public.wm_work_items
+		where tenant_id = $1 and workspace_id = $2`, tenantID, workspaceID).Scan(
+		&out.Overdue, &out.Blocked, &out.Due7d,
+	)
+	return out, err
+}
+
+func loadWorkItemCompletion(ctx context.Context, pool *pgxpool.Pool, tenantID, workspaceID int64) (WorkItemCompletionData, error) {
+	var out WorkItemCompletionData
+	err := pool.QueryRow(ctx, `
+		select
+		  count(*) filter (where status = 'done')::int,
+		  count(*) filter (
+		    where status in ('open', 'in_progress', 'done', 'blocked')
+		  )::int
+		from public.wm_work_items
+		where tenant_id = $1 and workspace_id = $2`, tenantID, workspaceID).Scan(&out.Done, &out.Total)
+	if err != nil {
+		return out, err
+	}
+	if out.Total > 0 {
+		out.PercentComplete = float64(out.Done) * 100.0 / float64(out.Total)
+	}
+	return out, nil
+}
+
+// ensureDefaultDashboardWidgets inserts risk + completion widgets when missing on a default dashboard.
+func ensureDefaultDashboardWidgets(ctx context.Context, pool *pgxpool.Pool, dashboardID int64) error {
+	defaults := []struct {
+		widgetType string
+		title      string
+		sortOrder  int
+		gridX      int
+		gridY      int
+	}{
+		{"job_cost_bva", "Budget vs Actual", 0, 0, 0},
+		{"work_item_summary", "Work Items by Status", 10, 6, 0},
+		{"work_item_risk", "Milestone risk", 20, 0, 3},
+		{"work_item_completion", "% complete", 30, 6, 3},
+	}
+	for _, d := range defaults {
+		var exists bool
+		if err := pool.QueryRow(ctx, `
+			select exists(
+			  select 1 from public.wm_dashboard_widgets
+			  where dashboard_id = $1 and widget_type = $2
+			)`, dashboardID, d.widgetType).Scan(&exists); err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+		if _, err := pool.Exec(ctx, `
+			insert into public.wm_dashboard_widgets (
+			  dashboard_id, widget_type, title, config, grid_x, grid_y, grid_w, grid_h, sort_order
+			) values ($1, $2, $3, '{}'::jsonb, $4, $5, 6, 3, $6)`,
+			dashboardID, d.widgetType, d.title, d.gridX, d.gridY, d.sortOrder,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func loadDashboard(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Dashboard, error) {

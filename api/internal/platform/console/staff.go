@@ -164,11 +164,17 @@ func (s *service) patchStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	args = append(args, id)
-	_, err := s.pool.Exec(r.Context(),
-		`update public.platform_users set `+strings.Join(sets, ", ")+` where id = $`+strconv.Itoa(n), args...)
+	var authUserID string
+	err := s.pool.QueryRow(r.Context(),
+		`update public.platform_users set `+strings.Join(sets, ", ")+
+			` where id = $`+strconv.Itoa(n)+
+			` returning coalesce(auth_user_id::text, '')`, args...).Scan(&authUserID)
 	if err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to update staff.", "ERR_INTERNAL")
 		return
 	}
+	// Platform role and is_active now ride on the cached session, so deactivating or
+	// demoting staff must evict them instead of waiting out the auth cache TTL.
+	auth.InvalidateUser(authUserID)
 	response.OK(w, map[string]any{"id": id}, "Updated.")
 }

@@ -1,6 +1,6 @@
 import { createEffect, onMount } from "solid-js";
 import { crmNotificationHref, crmSeverityToastType } from "./crmNotificationRoutes";
-import { markCrmNotificationRead, useCrmNotifications, useInvalidateCrmNotifications } from "./useCrmNotifications";
+import { markCrmNotificationRead, useCrmNotificationFeed, useInvalidateCrmNotifications } from "./useCrmNotifications";
 import { useToast } from "./toast";
 
 type Props = {
@@ -10,17 +10,16 @@ type Props = {
 const seenUnreadIds = new Set<number>();
 let bootstrapped = false;
 
-/** Polls for new CRM notifications and shows clickable toasts. */
+/**
+ * Shows clickable toasts for new CRM notifications. It reads the same shell feed
+ * as the bell rather than polling its own unread-only query, and filters the
+ * unread rows client-side.
+ */
 export function CrmNotificationPoller(props: Props) {
   const toast = useToast();
   const invalidate = useInvalidateCrmNotifications();
 
-  const unread = useCrmNotifications(() => ({
-    page: 1,
-    pageSize: 10,
-    unreadOnly: true,
-    enabled: props.enabled,
-  }));
+  const feed = useCrmNotificationFeed(() => props.enabled);
 
   onMount(() => {
     if (!props.enabled) return;
@@ -32,7 +31,7 @@ export function CrmNotificationPoller(props: Props) {
 
   createEffect(() => {
     if (!props.enabled) return;
-    const rows = unread.data?.rows ?? [];
+    const rows = (feed.data?.rows ?? []).filter((n) => !n.read_at);
     for (const n of rows) {
       if (seenUnreadIds.has(n.id)) continue;
       seenUnreadIds.add(n.id);
