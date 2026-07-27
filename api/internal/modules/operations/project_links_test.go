@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+func TestDocHrefCoversSellingBuyingTypes(t *testing.T) {
+	types := []string{
+		"quo_quotation", "so_sales_order", "sa_sales",
+		"pr_purchase_request", "rfq_request", "rfq_supplier_quotation",
+		"po_purchase_order", "gr_goods_receipt", "fin_supplier_invoice",
+		"fin_official_receipt", "job_cost_project",
+	}
+	for _, dt := range types {
+		if !supportedDocTypes[dt] {
+			t.Fatalf("missing supportedDocTypes entry: %s", dt)
+		}
+		if href := docHref(dt, 42); href == "" {
+			t.Fatalf("empty href for %s", dt)
+		}
+	}
+}
+
 func TestInventoryProjectErrorMessage(t *testing.T) {
 	msg := inventoryProjectErrorMessage(nil)
 	if msg != "Failed to create inventory project." {

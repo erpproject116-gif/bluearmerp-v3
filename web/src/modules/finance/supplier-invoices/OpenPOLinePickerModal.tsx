@@ -3,7 +3,6 @@ import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
   buildOpenLineQuery,
-  defaultMonitorDates,
   type OpenMonitorFilters,
 } from "../../../shared/OpenTransactionMonitor";
 import type { OpenPOLine } from "../../../shared/useSupplierInvoiceList";
@@ -21,11 +20,10 @@ type Props = {
 const pageSize = 50;
 
 export function OpenPOLinePickerModal(props: Props) {
-  const dates = defaultMonitorDates(30);
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
     q: "",
-    dateFrom: dates.dateFrom,
-    dateTo: dates.dateTo,
+    dateFrom: "",
+    dateTo: "",
     docNo: "",
     partnerId: null,
     partnerLocked: false,
@@ -38,11 +36,11 @@ export function OpenPOLinePickerModal(props: Props) {
     if (!props.open) return;
     setSelected(new Set<number>());
     setPage(1);
-    const d = defaultMonitorDates(30);
     setFilters({
       q: "",
-      dateFrom: d.dateFrom,
-      dateTo: d.dateTo,
+      // Default to all open PO lines (not last-30-days only).
+      dateFrom: "",
+      dateTo: "",
       docNo: "",
       partnerId: props.partnerId ?? null,
       partnerLocked: Boolean(props.partnerId),
@@ -141,7 +139,7 @@ export function OpenPOLinePickerModal(props: Props) {
       ]}
       onApply={apply}
       applyLabel={props.mapOnly ? "Map selected lines" : undefined}
-      emptyHint="No open PO lines for these filters. Clear dates or show all partners."
+      emptyHint="No confirmed Purchase Order lines with open billed qty. Confirm the PO first, clear date/vendor filters, or use Load Slip → Goods Receipt for serial/lot items and when GR-before-invoice policy is on."
     />
   );
 }

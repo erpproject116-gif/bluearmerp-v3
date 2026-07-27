@@ -5,7 +5,7 @@ import { useAuth } from "../auth-context";
 import { applyBrandingTheme } from "./applyTheme";
 import { DEFAULT_BRANDING } from "./defaults";
 import { setBrandingSnapshot } from "./brandingStore";
-import type { BrandingPayload, BrandingSettings } from "./types";
+import type { BrandingPayload, BrandingReceipt, BrandingSettings } from "./types";
 
 function mergeSettings(raw: Partial<BrandingSettings> | undefined): BrandingSettings {
   return {
@@ -21,6 +21,7 @@ type BrandingContextValue = {
   settings: () => BrandingSettings;
   canManage: () => boolean;
   logoPreviewUrl: () => string | undefined;
+  logoMissing: () => boolean;
   loading: () => boolean;
   refresh: () => Promise<void>;
   /** Re-run theme CSS vars after light/dark preference changes. */
@@ -37,6 +38,7 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
   const [settings, setSettings] = createSignal<BrandingSettings>(mergeSettings(undefined));
   const [canManage, setCanManage] = createSignal(false);
   const [logoPreviewUrl, setLogoPreviewUrl] = createSignal<string | undefined>();
+  const [logoMissing, setLogoMissing] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
 
   const loadLogoPreview = async (settings: BrandingSettings) => {
@@ -70,6 +72,7 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
       if (res.success && res.data) {
         apply(mergeSettings(res.data.settings));
         setCanManage(Boolean(res.data.can_manage));
+        setLogoMissing(Boolean(res.data.logo_missing));
       }
     } finally {
       setLoading(false);
@@ -85,9 +88,23 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
   });
 
   const save = async (patch: Partial<BrandingSettings>) => {
+    // Never send null logo_asset_id from a color/label save — that used to wipe the logo.
+    const liveLogoId = settings().receipt.logo_asset_id;
+    const receipt = patch.receipt
+      ? {
+          ...patch.receipt,
+          logo_asset_id:
+            patch.receipt.logo_asset_id ?? liveLogoId ?? null,
+        }
+      : undefined;
+    const body: Partial<BrandingSettings> = receipt ? { ...patch, receipt } : { ...patch };
+    if (body.receipt && (body.receipt.logo_asset_id == null || body.receipt.logo_asset_id === 0)) {
+      const { logo_asset_id: _omit, ...restReceipt } = body.receipt;
+      body.receipt = restReceipt as BrandingReceipt;
+    }
     const res = await apiFetch<{ settings: BrandingSettings }>("/api/v1/branding", {
       method: "PUT",
-      body: JSON.stringify(patch),
+      body: JSON.stringify(body),
     });
     if (res.success && res.data?.settings) {
       apply(mergeSettings(res.data.settings));
@@ -118,6 +135,7 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
     }
     getGlobalToast()?.success(body.message ?? "Logo uploaded.");
     await refresh();
+    setLogoMissing(false);
     return true;
   };
 
@@ -141,6 +159,7 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
     settings,
     canManage,
     logoPreviewUrl,
+    logoMissing,
     loading,
     refresh,
     reapplyTheme: () => applyBrandingTheme(settings()),

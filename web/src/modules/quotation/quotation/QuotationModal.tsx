@@ -882,6 +882,9 @@ export function QuotationModal(props: Props) {
           }}
         />
       </div>
+      <p class="col-span-full mb-2 text-xs text-text-secondary">
+        You can type product names that are not yet in Inventory. Product registration is required from Sales Order, Sales, Purchase Order, and Purchases onward.
+      </p>
       <QuotationLineGrid
         lines={lines}
         onChange={setLines}

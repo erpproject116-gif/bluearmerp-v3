@@ -793,6 +793,9 @@ export function PurchaseRequestModal(props: Props) {
           }}
         />
       </div>
+      <p class="col-span-full mb-2 text-xs text-text-secondary">
+        Free-text products are allowed on Purchase Requests. Register items in Inventory before converting to a Purchase Order.
+      </p>
       <PurchaseRequestLineGrid
         lines={lines}
         onChange={setLines}

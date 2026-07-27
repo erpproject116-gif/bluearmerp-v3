@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
@@ -63,13 +64,19 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		})
 		offset := httputil.Offset(p)
 
-		where := `so.tenant_id = $1 and so.deleted_at is null`
+		where := `so.tenant_id = $1 and so.deleted_at is null
+			and so.progress_status in ('in_progress', 'completed')`
 		if useDelivery {
 			where += ` and coalesce(dr.delivered, 0) > 0.0001
 				and (coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)) > 0.0001`
 		} else {
-			where += ` and coalesce(rel.released, 0) > 0.0001
-				and (coalesce(rel.released, 0) - coalesce(slip.sold, 0)) > 0.0001`
+			// Legacy combined mode: invoiceable = ordered − sold for normal items.
+			// Serial-tracked items still require Pick List release first.
+			where += ` and (
+				(coalesce(i.track_serial, false) = false and (ln.qty - coalesce(slip.sold, 0)) > 0.0001)
+				or (coalesce(i.track_serial, false) = true
+					and coalesce(rel.released, 0) - coalesce(slip.sold, 0) > 0.0001)
+			)`
 		}
 		args := []any{tu.TenantID}
 		argN := 2
@@ -173,14 +180,17 @@ func balanceExpr(useDelivery bool) string {
 	if useDelivery {
 		return "coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)"
 	}
-	return "coalesce(rel.released, 0) - coalesce(slip.sold, 0)"
+	// Legacy: ordered residual for normal items; released residual for serial-tracked lines.
+	return `case when coalesce(i.track_serial, false)
+		then coalesce(rel.released, 0) - coalesce(slip.sold, 0)
+		else ln.qty - coalesce(slip.sold, 0) end`
 }
 
 func zeroBalanceMessage(useDelivery bool) string {
 	if useDelivery {
 		return "No delivered balance available."
 	}
-	return "No released balance available."
+	return "No open sales order quantity available. Confirm the SO first; serial-tracked items also need Pick List release."
 }
 
 func salesOrderLineQtyError(balance, qty float64) string {
@@ -227,6 +237,7 @@ func salesOrderLineBalance(ctx context.Context, tx pgx.Tx, tenantID, salesOrderL
 		select (%s)::float8
 		from public.so_sales_order_lines ln
 		join public.so_sales_orders so on so.id = ln.sales_order_id
+		left join public.inv_items i on i.id = ln.item_id
 		left join (
 		  select sales_order_line_id, sum(release_qty) as released
 		  from public.so_sales_order_release_lines
@@ -265,6 +276,7 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 			select (%s)::float8
 			from public.so_sales_order_lines ln
 			join public.so_sales_orders so on so.id = ln.sales_order_id
+			left join public.inv_items i on i.id = ln.item_id
 			left join (
 			  select sales_order_line_id, sum(release_qty) as released
 			  from public.so_sales_order_release_lines
@@ -315,18 +327,23 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 	return nil
 }
 
-func writeSalesOrderSlipsForSales(ctx context.Context, tx pgx.Tx, tenantID, salesID int64, salesNo, dateNoDisplay string, lines []computedLine, useDelivery bool) error {
+func writeSalesOrderSlipsForSales(ctx context.Context, tx pgx.Tx, tenantID, salesID, userID int64, salesNo, dateNoDisplay string, lines []computedLine, useDelivery bool) error {
 	salesOrderIDs := map[int64]struct{}{}
 	for i, ln := range lines {
 		if ln.SourceSalesOrderLineID == nil {
 			continue
+		}
+		if !useDelivery {
+			if err := ensureLegacyReleaseForInvoice(ctx, tx, tenantID, userID, *ln.SourceSalesOrderLineID, ln.Qty); err != nil {
+				return fmt.Errorf("Line %d: %w", i+1, err)
+			}
 		}
 		balance, err := salesOrderLineBalance(ctx, tx, tenantID, *ln.SourceSalesOrderLineID, useDelivery)
 		if err != nil {
 			return errors.New("Sales order line not found for conversion.")
 		}
 		if ln.Qty > balance+0.0001 {
-			return fmt.Errorf("Line %d exceeds release balance.", i+1)
+			return fmt.Errorf("Line %d exceeds available balance.", i+1)
 		}
 		slipRef := salesNo
 		_, err = tx.Exec(ctx, `
@@ -353,6 +370,81 @@ func writeSalesOrderSlipsForSales(ctx context.Context, tx pgx.Tx, tenantID, sale
 	for soid := range salesOrderIDs {
 		if err := recomputeSalesOrderFulfillmentStatus(ctx, tx, tenantID, soid); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// ensureLegacyReleaseForInvoice creates Pick List release rows (and stock deduction) when
+// invoicing ordered SO qty that was never released — skip-friendly legacy combined mode.
+func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, userID, salesOrderLineID int64, invoiceQty float64) error {
+	var locationID int64
+	var itemID *int64
+	var released, sold float64
+	var trackInventory, trackSerial bool
+	err := tx.QueryRow(ctx, `
+		select so.location_id, ln.item_id,
+		  coalesce(rel.released, 0)::float8,
+		  coalesce(slip.sold, 0)::float8,
+		  coalesce(i.track_inventory_qty, false),
+		  coalesce(i.track_serial, false)
+		from public.so_sales_order_lines ln
+		join public.so_sales_orders so on so.id = ln.sales_order_id
+		left join public.inv_items i on i.id = ln.item_id
+		left join (
+		  select sales_order_line_id, sum(release_qty) as released
+		  from public.so_sales_order_release_lines
+		  group by sales_order_line_id
+		) rel on rel.sales_order_line_id = ln.id
+		left join (
+		  select sales_order_line_id, sum(qty) as sold
+		  from public.so_sales_order_slip_lines
+		  where slip_type = 'sales'
+		  group by sales_order_line_id
+		) slip on slip.sales_order_line_id = ln.id
+		where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null
+		  and so.progress_status in ('in_progress', 'completed')`,
+		salesOrderLineID, tenantID,
+	).Scan(&locationID, &itemID, &released, &sold, &trackInventory, &trackSerial)
+	if err != nil {
+		return errors.New("sales order line not found or not confirmed")
+	}
+
+	availableReleased := released - sold
+	if availableReleased+0.0001 >= invoiceQty {
+		return nil
+	}
+	shortfall := invoiceQty - availableReleased
+	if shortfall <= 0.0001 {
+		return nil
+	}
+	if trackSerial {
+		return errors.New("serial-tracked items require Sales Order → Pick List release before invoicing")
+	}
+
+	var releaseLineID int64
+	err = tx.QueryRow(ctx, `
+		insert into public.so_sales_order_release_lines
+		  (sales_order_line_id, location_id, release_date, release_qty, created_by_user_id)
+		values ($1, $2, current_date, $3, $4)
+		returning id`,
+		salesOrderLineID, locationID, shortfall, userID,
+	).Scan(&releaseLineID)
+	if err != nil {
+		return errors.New("failed to auto-release sales order quantity")
+	}
+
+	if trackInventory && itemID != nil {
+		if err := inventory.DeductOnHandStock(ctx, tx, tenantID, *itemID, locationID, shortfall); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `
+			insert into public.inv_stock_movements
+			  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
+			values ($1, $2, $3, $4, 'so_release', 'so_release_line', $5, $6)`,
+			tenantID, *itemID, locationID, -shortfall, releaseLineID, userID)
+		if err != nil {
+			return errors.New("failed to record stock movement for auto-release")
 		}
 	}
 	return nil

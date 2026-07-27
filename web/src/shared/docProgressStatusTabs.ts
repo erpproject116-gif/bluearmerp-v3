@@ -1,6 +1,6 @@
 import { progressStatusLabel } from "./branding/progressStatus";
 
-/** ECount list status pills: All / e-Approval / Unconfirmed / Confirm */
+/** List status pills: All / e-Approval / Unconfirmed / Confirm */
 export const DOC_PROGRESS_STATUS_TABS = [
   { value: "", label: "All" },
   { value: "e_approval", label: progressStatusLabel("e_approval") },

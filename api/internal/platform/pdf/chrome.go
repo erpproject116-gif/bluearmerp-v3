@@ -67,9 +67,14 @@ func (d *DocLayout) RenderBrandedHeader(title, subtitle, fallbackCompany string,
 	if meta := strings.TrimSpace(chrome.HeaderText); meta != "" {
 		d.pdf.SetFont("Arial", "", 9)
 		d.pdf.SetTextColor(80, 80, 80)
+		companyLower := strings.ToLower(strings.TrimSpace(company))
 		for _, line := range strings.Split(meta, "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" {
+				continue
+			}
+			// Defense in depth: skip lines that still duplicate the company title.
+			if companyLower != "" && strings.EqualFold(line, company) {
 				continue
 			}
 			d.pdf.SetXY(pageMargin, d.y)

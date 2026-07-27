@@ -183,7 +183,7 @@ export function ItemMasterModal(props: Props) {
             <For each={props.categories}>{(c) => <option value={c.id}>{c.name}</option>}</For>
           </select>
         </Field>
-        <Field label="Item category (ECount)">
+        <Field label="Item category">
           <select
             class={inputClass}
             value={props.form().item_category}

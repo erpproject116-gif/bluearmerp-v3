@@ -166,17 +166,32 @@ export default function RfqListPage() {
                 Close
               </button>
             </div>
+            <p class="mb-3 text-xs text-text-secondary">
+              Free-text products are allowed on RFQ. Register items in Inventory before converting to a Purchase Order.
+            </p>
             <For each={lines()}>
               {(ln, idx) => (
-                <div class="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_100px_110px]">
+                <div class="mb-3 space-y-2 rounded-lg border border-stroke p-3">
                   <LookupCombo
-                    label={`Item ${idx() + 1}`}
+                    label={`Item ${idx() + 1} (search inventory or type a free-text name)`}
                     value={() => {
                       const l = lines()[idx()];
-                      return l.item_code ? `${l.item_code} — ${l.item_name}` : "";
+                      if (l.item_id && l.item_code) return `${l.item_code} — ${l.item_name}`;
+                      return l.item_name || l.item_code || "";
                     }}
                     selectedId={() => ln.item_id}
-                    onInput={() => {}}
+                    onInput={(text) => {
+                      setLines((prev) => {
+                        const next = [...prev];
+                        next[idx()] = {
+                          ...next[idx()],
+                          item_id: null,
+                          item_code: "",
+                          item_name: text,
+                        };
+                        return next;
+                      });
+                    }}
                     onSelect={(o) => {
                       const parts = o.label.split(" — ");
                       setLines((prev) => {
@@ -198,40 +213,59 @@ export default function RfqListPage() {
                       });
                     }}
                     fetchOptions={fetchItems}
+                    placeholder="Type product name or search inventory…"
                   />
-                  <label class="block text-sm">
-                    <span class="text-text-secondary">Qty</span>
-                    <input
-                      type="number"
-                      class="mt-1 w-full rounded border border-stroke px-2 py-1"
-                      min="0"
-                      value={ln.qty}
-                      onInput={(e) => {
-                        const v = e.currentTarget.value;
-                        setLines((prev) => {
-                          const next = [...prev];
-                          next[idx()] = { ...next[idx()], qty: v };
-                          return next;
-                        });
-                      }}
-                    />
-                  </label>
-                  <label class="block text-sm">
-                    <span class="text-text-secondary">UoM</span>
-                    <div class="mt-1">
-                      <LineUnitSelect
-                        unitId={ln.unit_id}
-                        unitCode={ln.unit_code}
-                        onChange={(u) =>
+                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_100px_110px]">
+                    <label class="block text-sm">
+                      <span class="text-text-secondary">Item code (optional)</span>
+                      <input
+                        class="mt-1 w-full rounded border border-stroke px-2 py-1"
+                        value={ln.item_code}
+                        placeholder="Free-text code"
+                        onInput={(e) => {
+                          const v = e.currentTarget.value;
                           setLines((prev) => {
                             const next = [...prev];
-                            next[idx()] = { ...next[idx()], unit_id: u.unit_id, unit_code: u.unit_code };
+                            next[idx()] = { ...next[idx()], item_code: v, item_id: null };
                             return next;
-                          })
-                        }
+                          });
+                        }}
                       />
-                    </div>
-                  </label>
+                    </label>
+                    <label class="block text-sm">
+                      <span class="text-text-secondary">Qty</span>
+                      <input
+                        type="number"
+                        class="mt-1 w-full rounded border border-stroke px-2 py-1"
+                        min="0"
+                        value={ln.qty}
+                        onInput={(e) => {
+                          const v = e.currentTarget.value;
+                          setLines((prev) => {
+                            const next = [...prev];
+                            next[idx()] = { ...next[idx()], qty: v };
+                            return next;
+                          });
+                        }}
+                      />
+                    </label>
+                    <label class="block text-sm">
+                      <span class="text-text-secondary">UoM</span>
+                      <div class="mt-1">
+                        <LineUnitSelect
+                          unitId={ln.unit_id}
+                          unitCode={ln.unit_code}
+                          onChange={(u) =>
+                            setLines((prev) => {
+                              const next = [...prev];
+                              next[idx()] = { ...next[idx()], unit_id: u.unit_id, unit_code: u.unit_code };
+                              return next;
+                            })
+                          }
+                        />
+                      </div>
+                    </label>
+                  </div>
                 </div>
               )}
             </For>

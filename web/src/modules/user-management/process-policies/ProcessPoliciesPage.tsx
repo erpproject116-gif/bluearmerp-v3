@@ -74,7 +74,7 @@ const BOOLEAN_FIELDS: PolicyField[] = [
   {
     key: "purchase_require_gr_before_supplier_invoice",
     label: "Require goods receipt before supplier invoice",
-    help: "When on, supplier invoices must link to posted goods receipt lines.",
+    help: "Off by default (flexible). When on, supplier invoices must link to posted goods receipt lines. When off, Load Slip → Purchase Order can bill confirmed PO residual and auto-receive stock on save (like Sales Invoice → SO).",
   },
   {
     key: "legacy_combined_so_release",

@@ -22,6 +22,19 @@ export const helpArticleAliases: Record<string, HelpArticleAlias> = {
       "foundation incomplete",
     ],
   },
+  "quotation-rfq-unregistered-products": {
+    questions: [
+      "product unavailable quotation",
+      "save quotation without inventory item",
+      "print quote before item master",
+      "rfq product not registered",
+    ],
+    errorPhrases: [
+      "register the product in inventory before saving",
+      "register free-text rfq products",
+      "inventory registration is optional",
+    ],
+  },
   "process-policy-gates-explained": {
     questions: [
       "what are process policies",

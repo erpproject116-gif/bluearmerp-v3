@@ -664,7 +664,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := writeSalesOrderSlipsForSales(r.Context(), tx, tu.TenantID, id, salesNo, dateNoDisplay, computed, !policy.LegacyCombinedSORelease); err != nil {
+		if err := writeSalesOrderSlipsForSales(r.Context(), tx, tu.TenantID, id, tu.AppUserID, salesNo, dateNoDisplay, computed, !policy.LegacyCombinedSORelease); err != nil {
 			response.Validation(w, map[string]string{"conversion": err.Error()})
 			return
 		}
@@ -935,6 +935,10 @@ func computeSaleLines(tt taxcalc.TaxType, templateCode string, lines []saleLineB
 	var out []computedLine
 	for i, ln := range lines {
 		if ln.Qty <= 0 {
+			continue
+		}
+		if ln.ItemID == nil || *ln.ItemID <= 0 {
+			errs[fmt.Sprintf("lines[%d].item_id", i)] = "Register the product in Inventory before saving a sales invoice."
 			continue
 		}
 		inputBasis := ln.InputBasis

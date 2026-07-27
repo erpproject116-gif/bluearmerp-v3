@@ -364,23 +364,31 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 
 		for _, ln := range entry.Lines {
+			reason := ""
+			if entry.Notes != nil {
+				reason = strings.TrimSpace(*entry.Notes)
+			}
 			switch entry.EntryType {
 			case "receipt":
-				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.ToLocationID, ln.Qty, tu.AppUserID, "stock_entry", id, "receipt"); err != nil {
+				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.ToLocationID, ln.Qty, tu.AppUserID, "stock_entry", id, "receipt", reason); err != nil {
 					response.Validation(w, map[string]string{"lines": err.Error()})
 					return
 				}
 			case "issue":
-				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.FromLocationID, -ln.Qty, tu.AppUserID, "stock_entry", id, "issue"); err != nil {
+				moveType := "issue"
+				if reason == "internal_use" || reason == "product_defect" {
+					moveType = reason
+				}
+				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.FromLocationID, -ln.Qty, tu.AppUserID, "stock_entry", id, moveType, reason); err != nil {
 					response.Validation(w, map[string]string{"lines": err.Error()})
 					return
 				}
 			case "transfer":
-				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.FromLocationID, -ln.Qty, tu.AppUserID, "stock_entry", id, "transfer_out"); err != nil {
+				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.FromLocationID, -ln.Qty, tu.AppUserID, "stock_entry", id, "transfer_out", reason); err != nil {
 					response.Validation(w, map[string]string{"lines": err.Error()})
 					return
 				}
-				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.ToLocationID, ln.Qty, tu.AppUserID, "stock_entry", id, "transfer_in"); err != nil {
+				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.ToLocationID, ln.Qty, tu.AppUserID, "stock_entry", id, "transfer_in", reason); err != nil {
 					response.Validation(w, map[string]string{"lines": err.Error()})
 					return
 				}
@@ -426,7 +434,8 @@ func replaceStockEntryLines(ctx context.Context, tx pgx.Tx, tenantID, entryID in
 }
 
 // ApplyStockDelta updates location balances and records a stock movement (used by stock entries and manufacturing backflush).
-func ApplyStockDelta(ctx context.Context, tx pgx.Tx, tenantID, itemID, locationID int64, delta float64, userID int64, refType string, refID int64, movementType string) error {
+// Optional reason is stored on inv_stock_movements.reason when provided.
+func ApplyStockDelta(ctx context.Context, tx pgx.Tx, tenantID, itemID, locationID int64, delta float64, userID int64, refType string, refID int64, movementType string, reason ...string) error {
 	var qtyOnHand float64
 	err := tx.QueryRow(ctx, `
 		select qty_on_hand::float8 from public.inv_item_location_balances
@@ -455,10 +464,18 @@ func ApplyStockDelta(ctx context.Context, tx pgx.Tx, tenantID, itemID, locationI
 	if err != nil {
 		return err
 	}
+	rsn := ""
+	if len(reason) > 0 {
+		rsn = strings.TrimSpace(reason[0])
+	}
+	var rsnArg any
+	if rsn != "" {
+		rsnArg = rsn
+	}
 	_, err = tx.Exec(ctx, `
 		insert into public.inv_stock_movements
-		  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
-		values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		tenantID, itemID, locationID, delta, movementType, refType, refID, userID)
+		  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, reason, created_by_user_id)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		tenantID, itemID, locationID, delta, movementType, refType, refID, rsnArg, userID)
 	return err
 }

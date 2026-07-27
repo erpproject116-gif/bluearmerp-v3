@@ -38,8 +38,8 @@ const RECEIPT_FIELDS: { key: keyof BrandingReceipt; label: string; multiline?: b
   { key: "phone", label: "Phone" },
   { key: "email", label: "Email" },
   { key: "tax_id", label: "Tax ID (TIN) — used on BIR 2307 payor" },
-  { key: "header_text", label: "Extra header text", multiline: true },
-  { key: "footer_text", label: "Receipt footer", multiline: true },
+  { key: "header_text", label: "Extra header text (do not repeat company name — it prints as the title)", multiline: true },
+  { key: "footer_text", label: "Receipt / printable footer (defaults to company name if empty)", multiline: true },
 ];
 
 const MAX_LOGO_MB = 2;
@@ -93,7 +93,15 @@ export default function BrandingSettingsPage() {
   const save = async () => {
     setSaving(true);
     try {
-      const ok = await branding.save(draft());
+      const liveLogoId = branding.settings().receipt.logo_asset_id;
+      const d = draft();
+      const ok = await branding.save({
+        ...d,
+        receipt: {
+          ...d.receipt,
+          logo_asset_id: liveLogoId ?? d.receipt.logo_asset_id,
+        },
+      });
       if (ok) setDirty(false);
     } finally {
       setSaving(false);
@@ -204,23 +212,36 @@ export default function BrandingSettingsPage() {
       <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
         <h2 class="text-lg font-medium text-text-primary">Company logo &amp; print header</h2>
         <p class="mt-1 text-sm text-text-secondary">
+          Upload a company logo for sidebar and all printables (invoices, quotations, receipts, ledgers). If no logo is uploaded, printables show a lettermark from the company name. Company name prints once as the title — put only address/contact in Extra header text.
+        </p>
+        <p class="mt-1 text-sm text-text-secondary">
           Logo and company details appear in the app sidebar and on printed reports. Report templates can override these per report.
         </p>
         <div class="mt-4 flex flex-wrap items-start gap-4">
           <BrandingLogoImage />
-          <label class="cursor-pointer rounded-lg border border-stroke px-3 py-2 text-sm hover:erp-panel">
-            Upload logo (max {MAX_LOGO_MB} MB)
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              class="hidden"
-              onChange={(e) => {
-                const f = e.currentTarget.files?.[0];
-                if (f) void onLogoFile(f);
-                e.currentTarget.value = "";
-              }}
-            />
-          </label>
+          <div class="space-y-2">
+            <label class="cursor-pointer rounded-lg border border-stroke px-3 py-2 text-sm hover:erp-panel">
+              Upload logo (max {MAX_LOGO_MB} MB)
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                class="hidden"
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  if (f) void onLogoFile(f);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+            <Show when={branding.settings().receipt.logo_asset_id && !branding.logoMissing()}>
+              <p class="text-xs font-medium text-emerald-700">Logo saved for this company.</p>
+            </Show>
+            <Show when={branding.logoMissing()}>
+              <p class="text-xs font-medium text-amber-700">
+                Logo file is missing on the server — please re-upload. Saving colors will not remove your logo setting.
+              </p>
+            </Show>
+          </div>
         </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
           <For each={RECEIPT_FIELDS}>

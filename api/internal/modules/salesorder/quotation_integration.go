@@ -53,6 +53,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 		offset := httputil.Offset(p)
 
 		where := `q.tenant_id = $1 and q.deleted_at is null
+			and ln.item_id is not null
 			and (ln.qty - coalesce(slip.qty_fulfilled, 0)) > 0.0001`
 		args := []any{tu.TenantID}
 		argN := 2

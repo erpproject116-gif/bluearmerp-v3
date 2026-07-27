@@ -341,20 +341,21 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Load Slip: supplier invoice from purchase order",
     scenario: "You want to bill open PO lines without posting a goods receipt first.",
     intro:
-      "When process policy allows, open PO lines with residual quantity can be pulled directly onto a supplier invoice for the same vendor.",
+      "When process policy allows (GR-before-invoice off — default), confirmed PO lines with open billed qty can be pulled onto a supplier invoice. Saving auto-receives unreceived stock for normal items (same idea as Sales Invoice auto-release from SO).",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Buying → New Purchase (or Accounts → Supplier Invoices → New).",
-          "Select the vendor — Load Slip lists open PO lines for that partner.",
+          "Confirm the Purchase Order (status Confirmed — drafts never appear).",
+          "Open Buying → New Purchase and optionally select the vendor.",
           "Choose Load Slip → Purchase Order, tick lines, and apply residual qty.",
-          "Save the supplier invoice; billed qty updates on the PO line.",
+          "Save the supplier invoice — billed qty updates; unreceived qty is auto-received and stock increases for inventory items.",
+          "Serial/lot items: post Goods Receipt first, then Load Slip → Goods Receipt.",
         ],
       },
       {
         type: "tip",
-        text: "If your policy requires GR before supplier invoice, use Load Slip (from Goods Receipt) instead.",
+        text: "If your policy requires GR before supplier invoice, use Load Slip → Goods Receipt instead, or turn the gate off under Process policies.",
       },
     ],
     primaryHref: "/app/purchases/purchases/new",
@@ -501,7 +502,7 @@ export const moduleKbArticles: KbArticle[] = [
   {
     id: "sales-hold-list",
     title: "Sales Hold list (park draft invoices)",
-    scenario: "You need to pause a new sales invoice and resume it later — like Ecount's Hold list.",
+    scenario: "You need to pause a new sales invoice and resume it later — like BluearmERP's Hold list.",
     intro:
       "Hold list stores up to five draft sale payloads per user. Use it only on **new** sales (not when editing an existing invoice).",
     blocks: [
@@ -614,20 +615,22 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Load Slip: sales invoice from sales order",
     scenario: "You released or delivered a sales order and need to bill the customer.",
     intro:
-      "This is the standard path when process policy requires a sales order before invoicing. Load Slip → Sales Order lists open SO lines with invoiceable balance for the selected customer.",
+      "This is the standard path when process policy requires a sales order before invoicing. Load Slip → Sales Order lists confirmed SO lines with open ordered quantity for the selected customer (legacy release mode auto-releases stock when you save the invoice).",
     blocks: [
       {
         type: "steps",
         items: [
-          "Release stock on Sales Order → Pick List (and post a delivery note if your store uses split release).",
-          "Open Sales → New Sale and select the customer.",
+          "Confirm the Sales Order (progress Confirmed or Complete).",
+          "For serial-tracked items, release stock on Sales Order → Pick List first.",
+          "If your store uses split release, post a delivery note before invoicing.",
+          "Open Sales → New Sale and optionally select the customer.",
           "Click Load Slip → Sales Order, tick the lines to bill, and confirm.",
           "Review quantities and prices, save as Unconfirmed, upload attachments if required, then Confirm.",
         ],
       },
       {
         type: "tip",
-        text: "If Load Slip shows no lines, check that the SO is confirmed and enough quantity was released or delivered. See Sales → Pre-Invoicing Status for a backlog view.",
+        text: "If Load Slip shows no lines, confirm the SO and clear date/partner filters. See Sales → Pre-Invoicing Status for a backlog view.",
       },
     ],
     primaryHref: "/app/sales/sales/new",
@@ -756,7 +759,7 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Receivable and Payable Status (as-of reports)",
     scenario: "You need open AR or AP balances at a specific date, not just aging buckets.",
     intro:
-      "Receivable Status and Payable Status mirror ECount E040721/E040722 — customer or vendor balances as-of a date.",
+      "Receivable Status and Payable Status show customer or vendor balances as-of a date in BluearmERP.",
     blocks: [
       {
         type: "steps",

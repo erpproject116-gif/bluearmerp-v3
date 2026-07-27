@@ -64,6 +64,7 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		offset := httputil.Offset(p)
 
 		where := `pr.tenant_id = $1 and pr.deleted_at is null
+			and ln.item_id is not null
 			and (ln.qty - coalesce(sl.slipped, 0)) > 0.0001`
 		args := []any{tu.TenantID}
 		argN := 2

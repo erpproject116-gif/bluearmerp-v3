@@ -39,6 +39,46 @@ export const helpScenarioArticles: KbArticle[] = [
     ],
   },
   {
+    id: "quotation-rfq-unregistered-products",
+    title: "Quotation / RFQ with products not yet in inventory",
+    scenario:
+      "You need to save or print a quotation or RFQ before the product is registered in Inventory — BluearmERP fast track.",
+    intro:
+      "Quotations, RFQs, and purchase requests allow free-text product code/name without an inventory item. Registration becomes required when you create a sales order, sales invoice, purchase order, or purchase (supplier invoice).",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "On New Quotation or New RFQ, type the product name (and optional code) directly in the line — double-click Item Code only if you want to pick from inventory.",
+          "Save and print as usual; PDF uses the typed name/code.",
+          "Before Sales Order, Sales, Purchase Order, or Purchases: open Inventory → Items, create the product, then edit the quotation/RFQ/PR line (or re-pick) so item_id is set.",
+          "Load Slip into SO/PO only lists lines that already have a registered inventory item — free-text lines stay on the source document until linked.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Error “Register the product in Inventory before saving…” means you reached an inventory-gated document. Create the item first, then retry.",
+      },
+    ],
+    primaryHref: "/app/inventory/items",
+    primaryLabel: "Inventory items",
+    relatedGuideIds: ["inventory-master-data", "load-slip-overview", "sales-load-slip-so"],
+    questions: [
+      "product not in inventory quotation",
+      "create quotation without product",
+      "rfq free text item",
+      "unregistered product quote",
+      "quotation without item",
+    ],
+    errorPhrases: [
+      "register the product in inventory before saving",
+      "inventory registration is optional on quotations",
+      "inventory registration is optional on rfq",
+      "inventory registration is optional on purchase requests",
+      "register free-text rfq products",
+    ],
+  },
+  {
     id: "process-policy-gates-explained",
     title: "Process policy gates (quotation, SO, GR before supplier invoice)",
     scenario:
@@ -916,7 +956,7 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Resume a sales invoice from Hold list",
     scenario: "You parked a draft sales invoice on Hold and need to finish it later.",
     intro:
-      "Sales Hold list stores draft invoices so you can resume without losing lines — similar to Ecount Hold.",
+      "Sales Hold list stores draft invoices so you can resume without losing lines — BluearmERP Hold.",
     blocks: [
       {
         type: "steps",
@@ -1099,26 +1139,27 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Load Slip shows no lines",
     scenario: "You open Load Slip on a sale, PO, GR, or invoice and the picker is empty or shows no eligible lines.",
     intro:
-      "Load Slip only lists open, confirmable source lines that match process policy and remaining quantity. An empty list usually means the source is not confirmed, already fully consumed, or filtered out by branch/partner.",
+      "Load Slip only lists open, confirmable source lines that match process policy and remaining quantity. For Sales Order → Sales Invoice, the SO must be Confirmed/Complete with open ordered qty (legacy mode). Serial-tracked items and split-release tenants still need Pick List / delivery first.",
     blocks: [
       {
         type: "steps",
         items: [
           "Confirm the source document (quotation, SO, PR, RFQ, PO, or GR) is Confirmed / Complete — drafts never appear.",
-          "Check remaining qty: fully Load Slipped or invoiced lines drop out of the picker.",
+          "For Sales Order → invoice: open Load Slip → Sales Order on New Sale; clear date filters if needed.",
+          "Serial-tracked SO lines: release on Sales Order → Pick List before Load Slip.",
+          "Split-release stores: post a delivery receipt before Load Slip → Sales Order.",
+          "Check remaining qty: fully invoiced lines drop out of the picker.",
           "Match partner and active branch/location to the source document header.",
-          "If policy requires a prior step (for example SO before sale), complete that document first.",
-          "Retry Load Slip after Save on the target form so filters refresh.",
         ],
       },
       {
         type: "tip",
-        text: "Wrong document type in the Load Slip menu (Quotation vs Sales Order vs GR) is a common cause — pick the same source you actually created.",
+        text: "Wrong document type in the Load Slip menu (Quotation vs Sales Order vs GR) is a common cause — pick the same source you actually created. Combined invoices “+ New row” opens New Sale; use “Batch eligible sales” only to group existing invoices.",
       },
     ],
-    primaryHref: "/app/sales",
-    primaryLabel: "Sales",
-    relatedGuideIds: ["load-slip-overview", "mapping-center-when-to-use", "cannot-confirm-document"],
+    primaryHref: "/app/sales/sales/new",
+    primaryLabel: "New sales invoice",
+    relatedGuideIds: ["load-slip-overview", "sales-load-slip-so", "sales-order-release"],
   },
   {
     id: "insufficient-stock-on-release",

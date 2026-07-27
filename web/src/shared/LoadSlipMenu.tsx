@@ -150,7 +150,7 @@ export const BUYING_LOAD_SLIP_SOURCES: LoadSlipOption[] = [
 
 /** New Sale / sales invoice — Selling fulfill + Buying map. */
 export const SALES_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "so", label: "Sales Order", group: "Selling", hint: "Open SO lines for invoicing" },
+  { id: "so", label: "Sales Order", group: "Selling", hint: "Confirmed SO lines still open to invoice" },
   { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines (populate invoice)" },
   { id: "shipping", label: "Shipping Order", group: "Selling", hint: "SO lines linked to a shipping order" },
   { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
@@ -190,7 +190,7 @@ export const PURCHASE_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
 
 /** New Purchases / supplier invoice — Buying fulfill + Selling map. */
 export const PURCHASE_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines with residual qty" },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: "Confirmed PO lines with open billed qty (auto-receives stock when GR policy is off)" },
   { id: "gr", label: "Goods Receipt (Receiving)", group: "Buying", hint: "Posted GR lines not yet invoiced" },
   { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "PO lines sourced from accepted vendor quotes" },
   { id: "so", label: "Sales Order", group: "Selling", hint: MAP_HINT },

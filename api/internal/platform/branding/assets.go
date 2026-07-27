@@ -289,7 +289,43 @@ func mergeSettingsPatch(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 		return nil, err
 	}
 	curBytes, _ := json.Marshal(current)
-	return deepMergeJSON(curBytes, patch), nil
+	mergedBytes := deepMergeJSON(curBytes, patch)
+
+	// Saving colors/labels must not clear logo_asset_id when the client sends null.
+	// Explicit logo removal goes through DELETE /branding/assets/{id}.
+	var mergedMap map[string]any
+	_ = json.Unmarshal(mergedBytes, &mergedMap)
+	preserveLogoAssetID(current, mergedMap, patch)
+	out, _ := json.Marshal(mergedMap)
+	return out, nil
+}
+
+func preserveLogoAssetID(current, merged map[string]any, patch json.RawMessage) {
+	curReceipt, _ := current["receipt"].(map[string]any)
+	merReceipt, _ := merged["receipt"].(map[string]any)
+	if merReceipt == nil {
+		return
+	}
+	curID := logoAssetIDFromMap(nil)
+	if curReceipt != nil {
+		curID = logoAssetIDFromMap(curReceipt["logo_asset_id"])
+	}
+	merID := logoAssetIDFromMap(merReceipt["logo_asset_id"])
+	if curID > 0 && merID <= 0 {
+		var patchMap map[string]any
+		_ = json.Unmarshal(patch, &patchMap)
+		patchReceipt, _ := patchMap["receipt"].(map[string]any)
+		if patchReceipt == nil {
+			merReceipt["logo_asset_id"] = curID
+			return
+		}
+		if _, explicit := patchReceipt["logo_asset_id"]; !explicit {
+			merReceipt["logo_asset_id"] = curID
+			return
+		}
+		// Explicit null/0 in patch — still preserve; delete asset endpoint clears logo.
+		merReceipt["logo_asset_id"] = curID
+	}
 }
 
 func enrichReceiptFromTenant(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settings map[string]any) {
@@ -308,9 +344,9 @@ func enrichReceiptFromTenant(ctx context.Context, pool *pgxpool.Pool, tenantID i
 	setIfEmpty(receipt, "address", address)
 }
 
-// stripStaleLogoAsset removes logo_asset_id from settings when the DB row or file is missing
-// (common on Render after redeploy when the ephemeral upload volume was wiped).
-func stripStaleLogoAsset(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settings map[string]any) bool {
+// logoAssetFileMissing reports whether receipt.logo_asset_id points at a missing
+// DB row or disk file (common after ephemeral upload volume wipe). Does not mutate settings.
+func logoAssetFileMissing(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settings map[string]any) bool {
 	receipt, _ := settings["receipt"].(map[string]any)
 	if receipt == nil {
 		return false
@@ -325,19 +361,30 @@ func stripStaleLogoAsset(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 		from public.tenant_branding_assets
 		where id = $1 and tenant_id = $2`, assetID, tenantID).Scan(&storagePath)
 	if err != nil {
-		delete(receipt, "logo_asset_id")
 		return true
 	}
 	abs, err := filedownload.ResolveSafePath(uploadDir(), storagePath)
 	if err != nil {
-		delete(receipt, "logo_asset_id")
 		return true
 	}
 	if _, err := os.Stat(abs); err != nil {
-		delete(receipt, "logo_asset_id")
 		return true
 	}
 	return false
+}
+
+// stripStaleLogoAsset clears logo_asset_id from the in-memory settings map when the
+// asset file is gone. Prefer logoAssetFileMissing for GET responses (do not persist wipe).
+func stripStaleLogoAsset(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settings map[string]any) bool {
+	if !logoAssetFileMissing(ctx, pool, tenantID, settings) {
+		return false
+	}
+	receipt, _ := settings["receipt"].(map[string]any)
+	if receipt == nil {
+		return false
+	}
+	delete(receipt, "logo_asset_id")
+	return true
 }
 
 func logoAssetIDFromMap(v any) int64 {

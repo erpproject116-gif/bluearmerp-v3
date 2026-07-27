@@ -7,8 +7,8 @@ import (
 
 func TestBalanceExpr_releaseMode(t *testing.T) {
 	got := balanceExpr(false)
-	if !strings.Contains(got, "rel.released") || !strings.Contains(got, "slip.sold") {
-		t.Fatalf("unexpected release balance expr: %q", got)
+	if !strings.Contains(got, "ln.qty") || !strings.Contains(got, "slip.sold") || !strings.Contains(got, "track_serial") {
+		t.Fatalf("unexpected legacy balance expr: %q", got)
 	}
 }
 
@@ -20,8 +20,8 @@ func TestBalanceExpr_deliveryMode(t *testing.T) {
 }
 
 func TestZeroBalanceMessage(t *testing.T) {
-	if zeroBalanceMessage(false) != "No released balance available." {
-		t.Fatal("release message mismatch")
+	if !strings.Contains(zeroBalanceMessage(false), "open sales order quantity") {
+		t.Fatal("legacy message mismatch")
 	}
 	if zeroBalanceMessage(true) != "No delivered balance available." {
 		t.Fatal("delivery message mismatch")

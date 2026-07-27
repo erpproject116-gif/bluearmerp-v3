@@ -300,7 +300,7 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		return 0, err
 	}
 
-	if err := writeSalesOrderSlipsForSales(ctx, tx, tu.TenantID, id, salesNo, dateNoDisplay, computed, useDelivery); err != nil {
+	if err := writeSalesOrderSlipsForSales(ctx, tx, tu.TenantID, id, tu.AppUserID, salesNo, dateNoDisplay, computed, useDelivery); err != nil {
 		return 0, docflowValidation(map[string]string{"conversion": err.Error()})
 	}
 

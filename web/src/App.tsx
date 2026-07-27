@@ -264,6 +264,9 @@ import {
   PurchasePreInvoicingPage,
   PayableStatusReportPage,
   ReceivableStatusReportPage,
+  CollectionsHubPage,
+  DisbursementsHubPage,
+  ExpensesPage,
   SellingWorkspacePage,
   SellingReportsPage,
   BuyingReportsHubPage,
@@ -475,6 +478,12 @@ export default function App() {
           <Route path="/manufacturing/boms" component={() => (
             <Navigate href="/app/inventory/serial-lot/manufacturing/boms" />
           )} />
+          <Route path="/inventory/work-orders" component={() => (
+            <Navigate href="/app/inventory/serial-lot/manufacturing/work-orders" />
+          )} />
+          <Route path="/inventory/boms" component={() => (
+            <Navigate href="/app/inventory/serial-lot/manufacturing/boms" />
+          )} />
           <Route path="/after-sales/repair-orders/new" component={RepairOrderNewPage} />
           <Route path="/after-sales/repair-orders/status" component={RepairOrderStatusPage} />
           <Route path="/after-sales/repair-orders/settings" component={RepairOrderSettingsPage} />
@@ -567,6 +576,10 @@ export default function App() {
           <Route path="/finance/acct-ii/withholding-codes" component={WithholdingCodesPage} />
           <Route path="/finance/acct-ii/checks" component={CheckRegisterPage} />
           <Route path="/finance/acct-ii/setup" component={ModuleSetupHubPage} />
+          <Route path="/finance/collections" component={CollectionsHubPage} />
+          <Route path="/finance/disbursements" component={DisbursementsHubPage} />
+          <Route path="/purchases/expenses" component={ExpensesPage} />
+          <Route path="/buying/expenses" component={ExpensesPage} />
           <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
           <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
           <Route path="/finance/acct-i/reports/cash-flow-statement" component={CashFlowStatementPage} />

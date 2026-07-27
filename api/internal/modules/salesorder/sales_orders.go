@@ -824,6 +824,10 @@ func computeSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID in
 		if ln.Qty <= 0 {
 			continue
 		}
+		if ln.ItemID == nil || *ln.ItemID <= 0 {
+			errs[fmt.Sprintf("lines[%d].item_id", i)] = "Register the product in Inventory before saving a sales order (quotations may use free-text items)."
+			continue
+		}
 		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
 		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.LineNo, ln.ItemID, ln.Qty, planned); err != nil {
 			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()

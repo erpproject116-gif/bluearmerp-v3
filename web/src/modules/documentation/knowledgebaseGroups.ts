@@ -23,6 +23,7 @@ export const knowledgebaseGroups: KbGroup[] = [
       "process-policy-gates-explained",
       "foundation-setup-blocked-api",
       "cannot-confirm-document",
+      "quotation-rfq-unregistered-products",
       "attachment-requirements",
       "document-attachments-workflow",
       "skip-setup-remind-later",
@@ -59,6 +60,7 @@ export const knowledgebaseGroups: KbGroup[] = [
     articleIds: [
       "quotation-to-sales-flow",
       "quotation-progress-status",
+      "quotation-rfq-unregistered-products",
       "quotation-rfq-ai-import",
       "sales-order-release",
       "insufficient-stock-on-release",

@@ -109,4 +109,13 @@ describe("composeHelpReply", () => {
     expect(reply.fallback).toBe(false);
     expect(reply.hits.some((h) => h.articleId === "quotation-progress-status")).toBe(true);
   });
+
+  it("matches unregistered product quotation / RFQ ticket", () => {
+    const reply = composeHelpReply(
+      "Register the product in Inventory before saving a sales order",
+      "/app/sales-order/sales-orders",
+    );
+    expect(reply.fallback).toBe(false);
+    expect(reply.hits.some((h) => h.articleId === "quotation-rfq-unregistered-products")).toBe(true);
+  });
 });

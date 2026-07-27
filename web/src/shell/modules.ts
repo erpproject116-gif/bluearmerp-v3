@@ -88,6 +88,8 @@ export const appModules: AppModule[] = [
       { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing", settingsHref: "/app/inventory/stock-movements" },
       { label: "Price List", href: "/app/inventory/price-lists", settingsHref: "/app/inventory/price-lists", featureCode: "inventory.price_lists" },
       { label: "Product Bundles", href: "/app/inventory/product-bundles", settingsHref: "/app/inventory/product-bundles" },
+      { label: "BOMs", href: "/app/inventory/serial-lot/manufacturing/boms", settingsHref: "/app/inventory/serial-lot/manufacturing/boms", featureCode: "manufacturing.boms", headerPriority: "primary" },
+      { label: "Work Orders", href: "/app/inventory/serial-lot/manufacturing/work-orders", settingsHref: "/app/inventory/serial-lot/manufacturing/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
     ],
     subBranches: [
       {
@@ -113,6 +115,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/buying",
     features: [
       { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying", headerPriority: "primary" },
+      { label: "Expenses", href: "/app/purchases/expenses", settingsHref: "/app/purchases/expenses", featureCode: "finance.expenses", headerPriority: "primary" },
       { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/buying", headerPriority: "primary" },
       { label: "Purchase Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Pre-Invoicing (Purchases)", href: "/app/purchases/purchases/pre-invoicing", settingsHref: "/app/purchases/purchases/settings" },
@@ -309,6 +312,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/purchases",
     features: [
       { label: "Purchase Invoice List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
+      { label: "Expenses", href: "/app/purchases/expenses", settingsHref: "/app/purchases/expenses", featureCode: "finance.expenses", headerPriority: "primary" },
       { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
       { label: "Purchase Invoice Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       {

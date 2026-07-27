@@ -3,7 +3,7 @@ export type SerialSlipType = {
   label: string;
 };
 
-/** ECount C000690 — 21 slip types for manual serial registration. */
+/** Slip types for manual serial registration. */
 export const SERIAL_SLIP_TYPES: SerialSlipType[] = [
   { value: "quotation", label: "Quotation" },
   { value: "sales_order", label: "Sales Order" },

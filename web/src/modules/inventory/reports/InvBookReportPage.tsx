@@ -29,6 +29,7 @@ export default function InvBookReportPage() {
       }
     };
     window.addEventListener("keydown", onKey);
+    search();
     return () => window.removeEventListener("keydown", onKey);
   });
 
@@ -118,7 +119,18 @@ export default function InvBookReportPage() {
         </tbody>
       </table>
       <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
-        <p class="px-5 py-8 text-center text-sm text-text-secondary">No inv. book rows for this period.</p>
+        <p class="px-5 py-8 text-center text-sm text-text-secondary">
+          No inventory book rows for this period. Try a wider date range, or post stock movements via{" "}
+          <a class="text-brand-600 hover:underline" href="/app/inventory/stock-entries">
+            Stock Entries
+          </a>
+          .
+        </p>
+      </Show>
+      <Show when={report.isError}>
+        <p class="px-5 py-4 text-center text-sm text-red-600">
+          {(report.error as Error)?.message ?? "Failed to load inv. book."}
+        </p>
       </Show>
     </ReportPageLayout>
   );
