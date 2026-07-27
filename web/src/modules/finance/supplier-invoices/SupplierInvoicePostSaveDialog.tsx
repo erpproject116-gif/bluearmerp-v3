@@ -14,12 +14,20 @@ export function SupplierInvoicePostSaveDialog(props: Props) {
   return (
     <Modal open={props.open} title="Purchase saved" onClose={props.onDone} stacked>
       <p class="text-sm text-text-secondary">
-        <strong>{props.invoiceNo}</strong> saved — {formatPeso(props.amount)}. Record a vendor payment now, open the Invoice tab for A/P accounts, or finish and pay later from Unpaid / Payment Vouchers.
+        <strong>{props.invoiceNo}</strong> saved — {formatPeso(props.amount)}. Next step on the MyPage Flow Chart is{" "}
+        <strong>Pay</strong> (Cash Out to vendor) — same as Ecount after Purchases.
       </p>
       <div class="mt-6 flex flex-wrap justify-end gap-2">
         <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={props.onDone}>
           Done
         </button>
+        <a
+          href="/app/dashboard"
+          class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary"
+          onClick={props.onDone}
+        >
+          MyPage Flow Chart
+        </a>
         <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-brand-600" onClick={props.onAccounting}>
           Link accounting voucher
         </button>

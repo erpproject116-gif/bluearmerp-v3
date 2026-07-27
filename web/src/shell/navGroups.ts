@@ -38,19 +38,19 @@ export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
 export const navGroups: NavGroup[] = [
   {
     id: "stocks_management",
-    label: "Stock",
+    label: "Inv. I — Stock",
     iconId: "inventory",
     defaultExpanded: false,
     entries: [
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "Warehouse" },
+      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "Warehouse (Inv. II)" },
       { kind: "module", moduleId: "inventory" },
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Batch & serial tracking" },
+      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Serial / Lot (Inv. II)" },
       { kind: "module", moduleId: "after_sales" },
     ],
   },
   {
     id: "sales_process",
-    label: "Sales",
+    label: "Inv. I — Sales",
     iconId: "selling",
     defaultExpanded: false,
     entries: [
@@ -68,7 +68,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "procurement_process",
-    label: "Purchasing",
+    label: "Inv. I — Purchases",
     iconId: "buying",
     defaultExpanded: false,
     entries: [
@@ -80,13 +80,13 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "accounting_dept",
-    label: "Accounting",
+    label: "Acct. I / II",
     iconId: "finance",
     defaultExpanded: false,
     entries: [
       { kind: "module", moduleId: "finance" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "General ledger" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Receivables & payables" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "Acct. I — General ledger" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Acct. II — Receivables & payables" },
       { kind: "subBranch", moduleId: "finance", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
       { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "Review supplier payments" },
     ],

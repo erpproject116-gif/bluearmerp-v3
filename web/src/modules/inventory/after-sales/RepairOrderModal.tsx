@@ -59,6 +59,12 @@ export type RepairOrderDetail = {
   scheduled_completion_date?: string | null;
   latest_update?: string | null;
   repair_details?: string | null;
+  sales_id?: number | null;
+  sales_line_id?: number | null;
+  serial_unit_id?: number | null;
+  release_location_id?: number | null;
+  sales_no?: string | null;
+  serial_no?: string | null;
   lines?: Array<{
     line_no: number;
     item_id?: number | null;
@@ -160,6 +166,14 @@ export function RepairOrderModal(props: Props) {
   const [projectName, setProjectName] = createSignal("");
   const [technicianName, setTechnicianName] = createSignal("");
   const [progressStatus, setProgressStatus] = createSignal("received");
+  const [salesId, setSalesId] = createSignal<number | null>(null);
+  const [salesNo, setSalesNo] = createSignal("");
+  const [salesLineId, setSalesLineId] = createSignal<number | null>(null);
+  const [serialUnitId, setSerialUnitId] = createSignal<number | null>(null);
+  const [serialNo, setSerialNo] = createSignal("");
+  const [releaseLocationId, setReleaseLocationId] = createSignal<number | null>(null);
+  const [releaseLocationLabel, setReleaseLocationLabel] = createSignal("");
+  const [receiveToRma, setReceiveToRma] = createSignal(true);
   const [scheduledDate, setScheduledDate] = createSignal("");
   const [latestUpdate, setLatestUpdate] = createSignal("");
   const [repairDetails, setRepairDetails] = createSignal("");
@@ -211,6 +225,14 @@ export function RepairOrderModal(props: Props) {
       setScheduledDate(ed.scheduled_completion_date ?? "");
       setLatestUpdate(ed.latest_update ?? "");
       setRepairDetails(ed.repair_details ?? "");
+      setSalesId(ed.sales_id ?? null);
+      setSalesNo(ed.sales_no ?? "");
+      setSalesLineId(ed.sales_line_id ?? null);
+      setSerialUnitId(ed.serial_unit_id ?? null);
+      setSerialNo(ed.serial_no ?? "");
+      setReleaseLocationId(ed.release_location_id ?? null);
+      setReleaseLocationLabel("");
+      setReceiveToRma(true);
       setLines(linesFromDetail(ed.lines));
       loadCustom(ed.custom_values ?? {});
       void loadAttachments(ed.id);
@@ -230,6 +252,14 @@ export function RepairOrderModal(props: Props) {
       setScheduledDate("");
       setLatestUpdate("");
       setRepairDetails("");
+      setSalesId(null);
+      setSalesNo("");
+      setSalesLineId(null);
+      setSerialUnitId(null);
+      setSerialNo("");
+      setReleaseLocationId(null);
+      setReleaseLocationLabel("");
+      setReceiveToRma(true);
       setLines([emptyLine(1)]);
       setAttachments([]);
       loadCustom({});
@@ -397,6 +427,11 @@ export function RepairOrderModal(props: Props) {
       scheduled_completion_date: scheduledDate() || null,
       latest_update: latestUpdate() || null,
       repair_details: repairDetails() || null,
+      sales_id: salesId(),
+      sales_line_id: salesLineId(),
+      serial_unit_id: serialUnitId(),
+      release_location_id: releaseLocationId(),
+      receive_to_rma: receiveToRma() && Boolean(serialUnitId()),
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
         item_id: ln.item_id || null,
@@ -553,11 +588,83 @@ export function RepairOrderModal(props: Props) {
               disabled={m.disabled}
               onChange={(e) => setProgressStatus(e.currentTarget.value)}
             >
-              <option value="received">Received</option>
-              <option value="finished">Finished</option>
+              <option value="received">Received (RMA in)</option>
+              <option value="diagnosing">Diagnosing</option>
+              <option value="repairing">Repairing</option>
+              <option value="awaiting_parts">Awaiting parts</option>
+              <option value="finished">Finished (repaired)</option>
+              <option value="released">Released to active stock</option>
             </select>
           )}
         </ModalField>
+        <Field label="Original sales invoice no.">
+          <input
+            class={inputClass}
+            value={salesNo()}
+            placeholder="SI no. for traceability"
+            onInput={(e) => setSalesNo(e.currentTarget.value)}
+            onBlur={async () => {
+              const q = salesNo().trim();
+              if (!q) {
+                setSalesId(null);
+                return;
+              }
+              const res = await apiFetch<{ id: number; sales_no: string }[]>(
+                `/api/v1/sales/sales?page=1&pageSize=5&q=${encodeURIComponent(q)}`,
+              );
+              const hit = (res.data ?? []).find((s) => s.sales_no === q) ?? res.data?.[0];
+              if (hit) {
+                setSalesId(hit.id);
+                setSalesNo(hit.sales_no);
+              }
+            }}
+          />
+        </Field>
+        <Field label="Defective serial no.">
+          <input
+            class={inputClass}
+            value={serialNo()}
+            placeholder="Sold serial to receive into RMA"
+            onInput={(e) => setSerialNo(e.currentTarget.value)}
+            onBlur={async () => {
+              const q = serialNo().trim();
+              if (!q) {
+                setSerialUnitId(null);
+                return;
+              }
+              const res = await apiFetch<{ id: number; serial_no: string; status: string; sales_line_id?: number | null }[]>(
+                `/api/v1/inventory/serial-units?page=1&pageSize=5&serial_no=${encodeURIComponent(q)}`,
+              );
+              const hit = (res.data ?? []).find((s) => s.serial_no.toLowerCase() === q.toLowerCase()) ?? res.data?.[0];
+              if (hit) {
+                setSerialUnitId(hit.id);
+                setSerialNo(hit.serial_no);
+                if (hit.sales_line_id) setSalesLineId(hit.sales_line_id);
+              }
+            }}
+          />
+        </Field>
+        <label class="col-span-full flex items-center gap-2 text-sm text-text-primary">
+          <input type="checkbox" checked={receiveToRma()} onChange={(e) => setReceiveToRma(e.currentTarget.checked)} />
+          Receive into RMA warehouse (location must have RMA flag; removes from customer / not sellable)
+        </label>
+        <ModalLookupField
+          settings={byKey}
+          fieldKey="release_location_id"
+          fallbackLabel="Release to active location"
+          value={releaseLocationLabel}
+          selectedId={releaseLocationId}
+          onInput={setReleaseLocationLabel}
+          onSelect={(o) => {
+            setReleaseLocationId(o.id);
+            setReleaseLocationLabel(o.label);
+          }}
+          onClear={() => {
+            setReleaseLocationId(null);
+            setReleaseLocationLabel("");
+          }}
+          fetchOptions={fetchLocations}
+        />
         <ModalField settings={byKey} fieldKey="scheduled_completion_date" fallbackLabel="Scheduled completion date">
           {(m) => (
             <DateInput value={scheduledDate()} disabled={m.disabled} onInput={(e) => setScheduledDate(e.currentTarget.value)} />

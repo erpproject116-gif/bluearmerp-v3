@@ -22,6 +22,7 @@ type Location = {
   location_type: string;
   production_process: string;
   status: string;
+  is_rma?: boolean;
   custom_values?: Record<string, unknown>;
 };
 
@@ -32,7 +33,13 @@ export default function LocationsPage() {
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Location | null>(null);
   const [nextCode, setNextCode] = createSignal("");
-  const [form, setForm] = createSignal({ location_name: "", location_type: "location", production_process: "bundle", status: "active" });
+  const [form, setForm] = createSignal({
+    location_name: "",
+    location_type: "location",
+    production_process: "bundle",
+    status: "active",
+    is_rma: false,
+  });
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
@@ -59,7 +66,7 @@ export default function LocationsPage() {
     const res = await apiFetch<{ next_code: string }>("/api/v1/inventory/locations/next-code");
     setNextCode(res.data?.next_code ?? "-----");
     setEditing(null);
-    setForm({ location_name: "", location_type: "location", production_process: "bundle", status: "active" });
+    setForm({ location_name: "", location_type: "location", production_process: "bundle", status: "active", is_rma: false });
     loadCustom({});
     setModalOpen(true);
   };
@@ -67,7 +74,13 @@ export default function LocationsPage() {
   const openEdit = (row: Location) => {
     setEditing(row);
     setNextCode(row.location_code);
-    setForm({ location_name: row.location_name, location_type: row.location_type, production_process: row.production_process, status: row.status });
+    setForm({
+      location_name: row.location_name,
+      location_type: row.location_type,
+      production_process: row.production_process,
+      status: row.status,
+      is_rma: Boolean(row.is_rma),
+    });
     loadCustom(row.custom_values ?? {});
     setModalOpen(true);
   };
@@ -105,6 +118,7 @@ export default function LocationsPage() {
           { key: "location_code", header: "Code", clickable: true },
           { key: "location_name", header: "Name", clickable: true },
           { key: "location_type", header: "Type" },
+          { key: "is_rma", header: "RMA", render: (r) => (r.is_rma ? "Yes" : "—") },
           { key: "production_process", header: "Production" },
           { key: "status", header: "Status" },
           {
@@ -188,6 +202,16 @@ export default function LocationsPage() {
             </select>
           )}
         </ModalField>
+        <Field label="RMA warehouse">
+          <label class="flex items-center gap-2 text-sm text-text-primary">
+            <input
+              type="checkbox"
+              checked={form().is_rma}
+              onChange={(e) => setForm((f) => ({ ...f, is_rma: e.currentTarget.checked }))}
+            />
+            Quarantine / repair stock (not sellable)
+          </label>
+        </Field>
         <ModalField settings={byKey} fieldKey="production_process" fallbackLabel="Production process" fallbackRequired>
           {(m) => (
             <select

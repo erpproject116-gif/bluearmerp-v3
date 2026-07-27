@@ -1,0 +1,170 @@
+bluearm_route,kind,prgIds,notes
+/app/activity-logs,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/activity-logs/changes,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/after-sales,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/after-sales/register-repair,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/after-sales/register-repair/consumption,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/after-sales/register-repair/status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/after-sales/repair-orders,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/after-sales/repair-orders/status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/booking,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/booking/bookings,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/booking/calendar,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/booking/resources,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/booking/services,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/buying,mapped,E040305;E040306;E040307;E040309;E040310;E040313;E040318;E040319;E040714;E040722;E040724;E041015,
+/app/buying/reports,mapped,E040305;E040306;E040307;E040309;E040310;E040313;E040318;E040319;E040714;E040722;E040724;E041015,
+/app/comms,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/comms/inbox,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/comms/sent-documents,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/comms/settings,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/clients,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/dashboard,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/follow-up-tasks,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/leads,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/leads/dashboard,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/notifications,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/opportunities,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/pipelines/quotations,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/settings/alert-rules,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/crm/warranty-assets,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/dashboard,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/dashboard/approvals,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/data-center,mapped,C001401,
+/app/data-center/inbox,mapped,C001401,
+/app/data-center/ingestion-rules,mapped,C001401,
+/app/documentation,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/finance,mapped,C000001;C000010;C000125;C000126;E010201;E010208;E010209;E010210;E010211;E010212;E010213;E010403,
+/app/finance/acct-i/journal-entries,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/finance/acct-ii/checks,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/finance/budgets,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/finance/official-receipts,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/finance/payment-vouchers,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/finance/reports,mapped,C000001;E010702;E010712;E010730;E010801;E010802;E010803;E010804;E010805;E010807;E010808;E010809,
+/app/fixed-assets,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/absenteeism,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/attendance,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/discipline,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/employees,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/ess,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/evaluations,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/hire-onboarding,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/learning,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/leave,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/pay-items,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/payroll-runs,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/remittances,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/hr/special-runs,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory,mapped,C000029;C000033;C000092;C000690;C000691;C000904;C001130;E040103;E040619;E040620;E040634;E040639,
+/app/inventory/departments,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/find-stock,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/items,mapped,C000029;C001130;E040103,
+/app/inventory/locations,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/partners,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/price-lists,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/product-bundles,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/projects,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/reports/inv-book,mapped,E040701;E040702;E040708;E040711;E040719;E040720;E040726;E040727;E040728;E040819,
+/app/inventory/reports/inventory-status,mapped,E040701;E040702;E040708;E040711;E040719;E040720;E040726;E040727;E040728;E040819,
+/app/inventory/reports/on-hand,mapped,E040701;E040702;E040708;E040711;E040719;E040720;E040726;E040727;E040728;E040819,
+/app/inventory/reports/stock-ageing,mapped,E040701;E040702;E040708;E040711;E040719;E040720;E040726;E040727;E040728;E040819,
+/app/inventory/reports/stock-balance,mapped,E040701;E040702;E040708;E040711;E040719;E040720;E040726;E040727;E040728;E040819,
+/app/inventory/reports/stock-ledger,mapped,E040701;E040702;E040708;E040711;E040719;E040720;E040726;E040727;E040728;E040819,
+/app/inventory/serial-lot/manufacturing/boms,mapped,C000092;C000690;C000691;E040619;E040620;E040634;E040639;E041018,
+/app/inventory/serial-lot/manufacturing/work-orders,mapped,C000092;C000690;C000691;E040619;E040620;E040634;E040639;E041018,
+/app/inventory/serial-lot/registry,mapped,C000092;C000690;C000691;E040619;E040620;E040634;E040639;E041018,
+/app/inventory/stock-entries,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/stock-movements,mapped,C000033,
+/app/inventory/stock-reconciliation,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/units,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/inventory/wms/scheduled-receipts,mapped,C000904,
+/app/okr,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/okr/dashboard,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/operations,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/operations/automation,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/operations/calendar,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/operations/dashboard,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/operations/job-costing,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/operations/packs,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/operations/tasks,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/operations/timeline,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/pos,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/pos/manage,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-order,mapped,E040301,
+/app/purchase-order/goods-receipt,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-order/purchase-orders,mapped,E040301,
+/app/purchase-order/purchase-orders/outstanding,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-order/purchase-orders/status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-order/purchase-returns,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-order/reports/items-to-receive,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-order/reports/po-analysis,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-order/rfq,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-request,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-request/purchase-requests,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchase-request/purchase-requests/status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchases,mapped,C000031;E040303,
+/app/purchases/expenses,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/purchases/purchases,mapped,C000031;E040303,
+/app/purchases/purchases/ap-by-vendor,mapped,C000031,
+/app/purchases/purchases/payment-status,mapped,C000031,
+/app/purchases/purchases/pre-invoicing,mapped,C000031,
+/app/purchases/purchases/status,mapped,C000031,
+/app/quality,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/quality/capa,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/quality/ncrs,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/quality/qc-requests,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/quotation,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/quotation/quotations,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/quotation/quotations/outstanding,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/quotation/quotations/status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/quotation/tax-mngt/tax-types,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/reports,mapped,C000035;E010851;E010858;E040627;E040633;E040703;E040704;E040709;E040710;E040716;E040725;E040730,
+/app/reports/saved-views,mapped,C000035;E040627;E040633;E040703;E040704;E040709;E040710;E040716;E040725;E040806;E040807,
+/app/sales,mapped,C000030;E040205,
+/app/sales-order,mapped,E040203,
+/app/sales-order/delivery-receipts,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/reports,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/reports/pending-shipment,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/reports/shipment-status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/reports/shipping-order-status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/reports/so-analysis,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/sales-orders,mapped,E040203,
+/app/sales-order/sales-orders/outstanding,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/sales-orders/release,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/sales-orders/status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/shipping/orders,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/shipping/rules,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales-order/shipping/trips,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/collective-invoicing/list,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/commission-rules,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/reports/ar-by-customer,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/reports/customer-credit-balance,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/reports/discount-status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/reports/print-slips,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/reports/si-receipt-status,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/sales,mapped,C000030;E040205,
+/app/sales/sales-returns,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sales/sales/pre-invoicing,mapped,C000030,
+/app/sales/sales/price-batch,mapped,C000030,
+/app/sales/sales/status,mapped,C000030,
+/app/selling,mapped,C000004;E040207;E040208;E040209;E040211;E040212;E040214;E040216;E040217;E040222;E040227;E040228,
+/app/selling/commissions,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/selling/reports,mapped,E040207;E040208;E040209;E040211;E040212;E040214;E040216;E040217;E040222;E040227;E040228;E040609,
+/app/selling/reports/receivable-status,mapped,E040207;E040208;E040209;E040211;E040212;E040214;E040216;E040217;E040222;E040227;E040228;E040609,
+/app/sop,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/sop/dashboard,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/support,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/support/tickets,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/demo-data,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/groups,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/help-feedback,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/mapping-center,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/migration-center,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/process-policies,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/roles,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/tenant-modules,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/user-permissions,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/user-management/users,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map

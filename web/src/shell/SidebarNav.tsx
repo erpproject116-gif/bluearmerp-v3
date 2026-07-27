@@ -18,11 +18,13 @@ import {
   ungroupedModuleIds,
   isFinanceUnderSalesReportPath,
   type NavGroupEntry,
+  type NavGroup,
 } from "./navGroups";
 import { isAnySubBranchPath, isSubBranchPath } from "./sub-branch-nav";
 import { isReviewPurchasesPath } from "./review-purchases-nav";
 import { isTaxMngtPath } from "./tax-mngt-nav";
 import { useAuth } from "../shared/auth-context";
+import { ecountTopById, resolveEcountTopFromPath, type EcountTopId } from "./ecount-top-nav";
 
 function brandedLabel(labels: Record<string, string>, key: string, fallback: string): string {
   const v = labels[key];
@@ -326,12 +328,61 @@ function initialOpenGroupId(): string | null {
   return null;
 }
 
+function filterEntriesForTop(top: EcountTopId, groupId: string, entries: NavGroupEntry[]): NavGroupEntry[] {
+  if (top === "inv2" && groupId === "stocks_management") {
+    return entries.filter(
+      (e) =>
+        e.kind === "subBranch" &&
+        (e.featureCode === "inventory.serial_lot" || e.featureCode === "inventory.wms"),
+    );
+  }
+  if (top === "inv1" && groupId === "stocks_management") {
+    return entries.filter(
+      (e) =>
+        !(
+          e.kind === "subBranch" &&
+          (e.featureCode === "inventory.serial_lot" || e.featureCode === "inventory.wms")
+        ),
+    );
+  }
+  if (top === "acct1" && groupId === "accounting_dept") {
+    return entries.filter(
+      (e) =>
+        e.kind === "module" ||
+        (e.kind === "subBranch" &&
+          (e.featureCode === "finance.acct_i" || e.featureCode === "quotation.tax_mngt")),
+    );
+  }
+  if (top === "acct2" && groupId === "accounting_dept") {
+    return entries.filter(
+      (e) =>
+        e.kind === "module" ||
+        (e.kind === "subBranch" &&
+          (e.featureCode === "finance.acct_ii" || e.featureCode === "finance.payment_vouchers")),
+    );
+  }
+  return entries;
+}
+
+function visibleNavGroups(top: EcountTopId): NavGroup[] {
+  const cfg = ecountTopById(top);
+  if (top === "mypage") return [];
+  return navGroups
+    .filter((g) => cfg.navGroupIds.includes(g.id))
+    .map((g) => ({
+      ...g,
+      entries: filterEntriesForTop(top, g.id, g.entries),
+    }))
+    .filter((g) => g.entries.length > 0);
+}
+
 export function SidebarNav() {
   const auth = useAuth();
   const loc = useLocation();
   let navEl: HTMLElement | undefined;
   let savedScrollTop = 0;
   const [openGroupId, setOpenGroupId] = createSignal<string | null>(initialOpenGroupId());
+  const top = () => resolveEcountTopFromPath(loc.pathname);
 
   const openGroup = (groupId: string) => {
     const prev = openGroupId();
@@ -356,15 +407,22 @@ export function SidebarNav() {
     ),
   );
 
-  const ungrouped = () =>
-    ungroupedModuleIds
+  const ungrouped = () => {
+    const cfg = ecountTopById(top());
+    const ids = cfg.ungroupedModuleIds ?? (top() === "mypage" ? ungroupedModuleIds : []);
+    // Always show Home when on mypage; when elsewhere still allow Home via strip
+    const list = top() === "mypage" ? ungroupedModuleIds : ids;
+    return list
       .map((id) => appModules.find((m) => m.id === id))
       .filter((m): m is AppModule => !!m && isTenantModuleEnabled(auth.me, m.id));
+  };
 
   const belowGroup = () =>
     belowGroupModuleIds
       .map((id) => appModules.find((m) => m.id === id))
       .filter((m): m is AppModule => !!m && isTenantModuleEnabled(auth.me, m.id));
+
+  const groups = () => visibleNavGroups(top());
 
   return (
     <nav
@@ -376,7 +434,17 @@ export function SidebarNav() {
     >
       <For each={ungrouped()}>{(module) => <NavModuleLink module={module} />}</For>
 
-      <For each={navGroups}>
+      <Show when={top() === "mypage"}>
+        <p class="px-2 text-xs text-text-secondary">
+          Use the top strip (Inv. I / Acct. I …) or{" "}
+          <A href="/app/dashboard/site-map" class="font-medium text-brand-600 hover:underline">
+            Site Map
+          </A>{" "}
+          to open modules.
+        </p>
+      </Show>
+
+      <For each={groups()}>
         {(group) => (
           <NavGroupBlock
             groupId={group.id}

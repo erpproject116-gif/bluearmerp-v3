@@ -159,12 +159,13 @@ export const MODAL_FORM_GUIDES: Record<string, ModalFormGuideDef> = {
   },
   repair_order: {
     id: "repair_order",
-    title: "Creating a repair order",
-    summary: "A repair order tracks after-sales service work on a customer’s item.",
+    title: "Repair Order = RMA service job",
+    summary:
+      "Use Repair Order for defective returns: link the original sales invoice, receive the serial into an RMA warehouse (not sellable), repair, then release to active stock.",
     steps: [
-      "Select the customer and item being repaired.",
-      "Add parts or labor lines as needed.",
-      "Save, then update status as work progresses.",
+      "Create/mark a Location with “RMA warehouse” and select it as Location.",
+      "Enter original Sales Invoice no. and the sold Serial no., keep “Receive into RMA” checked.",
+      "Diagnose/repair (progress statuses), then set Released + choose an active (non-RMA) release location.",
     ],
   },
   stock_adjustment: {

@@ -8,6 +8,7 @@ import {
 } from "../../../shared/useSerialLotList";
 import { SerialLotLayout } from "./SerialLotLayout";
 import { SerialRegisterModal } from "./SerialRegisterModal";
+import { SerialGenerateModal } from "./SerialGenerateModal";
 import {
   defaultSerialRegistryFilters,
   serialStatusLabel,
@@ -25,6 +26,7 @@ export default function SerialRegistryListPage() {
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [registerOpen, setRegisterOpen] = createSignal(false);
+  const [generateOpen, setGenerateOpen] = createSignal(false);
   const pageSize = 25;
 
   const list = useSerialUnitList(() => {
@@ -70,6 +72,15 @@ export default function SerialRegistryListPage() {
 
   return (
     <SerialLotLayout>
+      <div class="mb-3 flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-lg border border-stroke bg-white px-3 py-1.5 text-sm font-medium text-brand-700 shadow-sm hover:bg-brand-50"
+          onClick={() => setGenerateOpen(true)}
+        >
+          Generate serials / print labels
+        </button>
+      </div>
       <SerialRegistryListFilter
         value={draftFilters}
         onChange={setDraftFilters}
@@ -123,6 +134,11 @@ export default function SerialRegistryListPage() {
         open={registerOpen()}
         onClose={() => setRegisterOpen(false)}
         onSaved={invalidate}
+      />
+      <SerialGenerateModal
+        open={generateOpen()}
+        onClose={() => setGenerateOpen(false)}
+        onGenerated={() => invalidate()}
       />
     </SerialLotLayout>
   );

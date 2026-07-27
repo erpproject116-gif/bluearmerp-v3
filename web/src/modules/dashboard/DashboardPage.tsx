@@ -1,4 +1,4 @@
-import { A } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
 import { createMemo, For, Show } from "solid-js";
 import { DashboardLayout } from "./DashboardLayout";
@@ -7,6 +7,8 @@ import { OnboardingChecklist } from "../../shared/OnboardingChecklist";
 import { DayJobsPanel } from "../../shared/DayJobsPanel";
 import { HomeFinanceOverview } from "./HomeFinanceOverview";
 import { FinancialHealthPanel } from "./FinancialHealthPanel";
+import { MyPageLearnPanel } from "./MyPageLearnPanel";
+import { MyPageFlowChart } from "./MyPageFlowChart";
 import {
   useDashboardInventoryTrend,
   useDashboardRedFlags,
@@ -18,8 +20,6 @@ import {
   type DashboardRedFlagCategory,
   type DashboardTrendPoint,
 } from "../../shared/useDashboard";
-
-
 
 function int(n: number) {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -78,13 +78,11 @@ function CssBarChart(props: { title: string; points: DashboardTrendPoint[]; valu
                     {pt.value > 0 ? format(pt.value) : ""}
                   </span>
                   <div
-                    class="w-full rounded-t bg-brand-500 transition-all"
-                    style={{ height: `${pct()}%`, "min-height": pt.value > 0 ? "4px" : "0" }}
-                    title={`${pt.period}: ${format(pt.value)}`}
+                    class="w-full rounded-t bg-brand-500/80"
+                    style={{ height: `${pct()}%` }}
+                    title={`${pt.label}: ${format(pt.value)}`}
                   />
-                  <span class="truncate text-[10px] text-text-secondary" title={pt.period}>
-                    {pt.period.slice(5)}
-                  </span>
+                  <span class="truncate text-[10px] text-text-secondary">{pt.label}</span>
                 </div>
               );
             }}
@@ -95,21 +93,17 @@ function CssBarChart(props: { title: string; points: DashboardTrendPoint[]; valu
   );
 }
 
-function RankedList<T extends { label: string; value: string }>(props: {
-  title: string;
-  items: T[];
-  emptyText?: string;
-}) {
+function RankedList(props: { title: string; items: { label: string; value: string }[]; emptyText: string }) {
   return (
     <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
       <h3 class="mb-3 text-sm font-semibold text-text-primary">{props.title}</h3>
-      <Show when={props.items.length > 0} fallback={<p class="text-sm text-text-secondary">{props.emptyText ?? "No data."}</p>}>
+      <Show when={props.items.length > 0} fallback={<p class="text-sm text-text-secondary">{props.emptyText}</p>}>
         <ul class="space-y-2">
           <For each={props.items}>
             {(item) => (
               <li class="flex items-center justify-between gap-2 text-sm">
-                <span class="truncate text-text-primary">{item.label}</span>
-                <span class="shrink-0 text-text-secondary">{item.value}</span>
+                <span class="min-w-0 truncate text-text-primary">{item.label}</span>
+                <span class="shrink-0 font-medium text-text-secondary">{item.value}</span>
               </li>
             )}
           </For>
@@ -122,61 +116,42 @@ function RankedList<T extends { label: string; value: string }>(props: {
 function RedFlagsTable(props: { categories: DashboardRedFlagCategory[]; total: number }) {
   return (
     <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
-      <div class="mb-3 flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-text-primary">Red flags</h3>
-        <span class="text-xs text-text-secondary">{int(props.total)} total</span>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead class="bg-slate-50 text-left text-xs uppercase text-text-secondary">
-            <tr>
-              <th class="px-3 py-2">Category</th>
-              <th class="px-3 py-2 text-right">Count</th>
-              <th class="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            <For each={props.categories}>
-              {(cat) => {
-                const href = redFlagLinks[cat.code];
-                const accent = cat.count > 0 ? "text-red-600 font-semibold" : "text-text-primary";
-                return (
-                  <tr class="border-t border-stroke/60">
-                    <td class={`px-3 py-2 ${accent}`}>{cat.label}</td>
-                    <td class={`px-3 py-2 text-right ${accent}`}>{int(cat.count)}</td>
-                    <td class="px-3 py-2 text-right">
-                      <Show when={href && cat.count > 0}>
-                        <A href={href!} class="text-xs font-medium text-brand-600 hover:underline">
-                          View
-                        </A>
-                      </Show>
-                    </td>
-                  </tr>
-                );
-              }}
-            </For>
-          </tbody>
-        </table>
-      </div>
+      <h3 class="mb-3 text-sm font-semibold text-text-primary">
+        Red flags <span class="font-normal text-text-secondary">({props.total})</span>
+      </h3>
+      <Show when={props.categories.length > 0} fallback={<p class="text-sm text-text-secondary">No red flags.</p>}>
+        <ul class="divide-y divide-stroke">
+          <For each={props.categories}>
+            {(cat) => {
+              const href = redFlagLinks[cat.key];
+              const row = (
+                <div class="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span class="text-text-primary">{cat.label}</span>
+                  <span class="font-semibold text-amber-700">{cat.count}</span>
+                </div>
+              );
+              return href ? <li><A href={href}>{row}</A></li> : <li>{row}</li>;
+            }}
+          </For>
+        </ul>
+      </Show>
     </section>
   );
 }
 
 export default function DashboardPage() {
+  const [params, setParams] = useSearchParams();
+  const tab = () => (params.tab === "overview" ? "overview" : "mypage");
+
   const summary = useDashboardSummary();
-  const salesTrend = useDashboardSalesTrend(12);
-  const inventoryTrend = useDashboardInventoryTrend(12);
+  const salesTrend = useDashboardSalesTrend();
+  const inventoryTrend = useDashboardInventoryTrend();
   const redFlags = useDashboardRedFlags();
-  const topCustomers = useDashboardTopCustomers(90, 10);
-  const topVendors = useDashboardTopVendors(90, 10);
-  const topItems = useDashboardTopItems(90, 10);
+  const topCustomers = useDashboardTopCustomers();
+  const topVendors = useDashboardTopVendors();
+  const topItems = useDashboardTopItems();
 
-  const loading = () =>
-    summary.isFetching &&
-    !summary.data &&
-    salesTrend.isFetching &&
-    !salesTrend.data;
-
+  const loading = () => summary.isLoading;
   const summaryData = () => summary.data;
 
   const customerItems = createMemo(() =>
@@ -203,67 +178,106 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-text-secondary">
-          Home — financial health, unpaid invoices, cash flow, then sales and stock snapshots.
-        </p>
-        <A
-          href="/app/dashboard/approvals"
-          class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-brand-600 shadow-sm transition hover:shadow-md"
-        >
-          Approvals queue
-        </A>
+        <div>
+          <h2 class="text-lg font-semibold text-text-primary">MyPage</h2>
+          <p class="text-sm text-text-secondary">
+            Guided home — learn links and process flow first; business KPIs on Overview.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="inline-flex rounded-lg border border-stroke bg-white p-0.5 text-sm shadow-sm">
+            <button
+              type="button"
+              class="rounded-md px-3 py-1.5 font-medium transition"
+              classList={{
+                "bg-brand-600 text-white": tab() === "mypage",
+                "text-text-secondary hover:text-text-primary": tab() !== "mypage",
+              }}
+              onClick={() => setParams({ tab: undefined })}
+            >
+              MyPage
+            </button>
+            <button
+              type="button"
+              class="rounded-md px-3 py-1.5 font-medium transition"
+              classList={{
+                "bg-brand-600 text-white": tab() === "overview",
+                "text-text-secondary hover:text-text-primary": tab() !== "overview",
+              }}
+              onClick={() => setParams({ tab: "overview" })}
+            >
+              Business overview
+            </button>
+          </div>
+          <A
+            href="/app/dashboard/approvals"
+            class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-brand-600 shadow-sm transition hover:shadow-md"
+          >
+            Approvals queue
+          </A>
+          <A
+            href="/app/dashboard/site-map"
+            class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-text-secondary shadow-sm transition hover:shadow-md"
+          >
+            Site Map
+          </A>
+        </div>
       </div>
 
-      <ReconciliationBanner compact />
-
-      <div class="mb-6">
-        <OnboardingChecklist compact />
-      </div>
-
-      <DayJobsPanel />
-
-      <FinancialHealthPanel />
-
-      <HomeFinanceOverview />
-
-      <Show when={loading()}>
-        <p class="text-sm text-text-secondary">Loading dashboard…</p>
+      <Show when={tab() === "mypage"}>
+        <div class="mb-6 grid gap-4 lg:grid-cols-2">
+          <MyPageLearnPanel />
+          <MyPageFlowChart />
+        </div>
+        <ReconciliationBanner compact />
+        <div class="mt-4">
+          <OnboardingChecklist compact />
+        </div>
+        <div class="mt-4">
+          <DayJobsPanel />
+        </div>
       </Show>
 
-      <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Operations snapshot</p>
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <For each={kpiTiles}>
-          {(tile) => {
-            const raw = () => tile.value(summaryData());
-            const display = () => (tile.format === "money" ? formatPeso(Number(raw())) : int(Number(raw())));
-            const inner = (
-              <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm transition hover:shadow-md">
-                <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">{tile.label}</p>
-                <p class={`mt-2 text-2xl font-bold ${tile.accent ?? "text-text-primary"}`}>{display()}</p>
-              </div>
-            );
-            return tile.href ? <A href={tile.href}>{inner}</A> : inner;
-          }}
-        </For>
-      </div>
+      <Show when={tab() === "overview"}>
+        <FinancialHealthPanel />
+        <HomeFinanceOverview />
 
-      <div class="mt-6 grid gap-4 lg:grid-cols-2">
-        <CssBarChart title="Sales trend (12 months)" points={salesTrend.data?.points ?? []} valueFormat="money" />
-        <CssBarChart title="Inventory receipts (12 months)" points={inventoryTrend.data?.points ?? []} valueFormat="int" />
-      </div>
+        <Show when={loading()}>
+          <p class="text-sm text-text-secondary">Loading dashboard…</p>
+        </Show>
 
-      <div class="mt-6">
-        <RedFlagsTable
-          categories={redFlags.data?.categories ?? []}
-          total={redFlags.data?.total_count ?? 0}
-        />
-      </div>
+        <p class="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-text-secondary">Operations snapshot</p>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <For each={kpiTiles}>
+            {(tile) => {
+              const raw = () => tile.value(summaryData());
+              const display = () => (tile.format === "money" ? formatPeso(Number(raw())) : int(Number(raw())));
+              const inner = (
+                <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm transition hover:shadow-md">
+                  <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">{tile.label}</p>
+                  <p class={`mt-2 text-2xl font-bold ${tile.accent ?? "text-text-primary"}`}>{display()}</p>
+                </div>
+              );
+              return tile.href ? <A href={tile.href}>{inner}</A> : inner;
+            }}
+          </For>
+        </div>
 
-      <div class="mt-6 grid gap-4 lg:grid-cols-3">
-        <RankedList title="Top customers (90d)" items={customerItems()} emptyText="No sales in the last 90 days." />
-        <RankedList title="Top vendors (90d)" items={vendorItems()} emptyText="No purchase orders in the last 90 days." />
-        <RankedList title="Top selling items (90d)" items={itemItems()} emptyText="No sales lines in the last 90 days." />
-      </div>
+        <div class="mt-6 grid gap-4 lg:grid-cols-2">
+          <CssBarChart title="Sales trend (12 months)" points={salesTrend.data?.points ?? []} valueFormat="money" />
+          <CssBarChart title="Inventory receipts (12 months)" points={inventoryTrend.data?.points ?? []} valueFormat="int" />
+        </div>
+
+        <div class="mt-6">
+          <RedFlagsTable categories={redFlags.data?.categories ?? []} total={redFlags.data?.total_count ?? 0} />
+        </div>
+
+        <div class="mt-6 grid gap-4 lg:grid-cols-3">
+          <RankedList title="Top customers (90d)" items={customerItems()} emptyText="No sales in the last 90 days." />
+          <RankedList title="Top vendors (90d)" items={vendorItems()} emptyText="No purchase orders in the last 90 days." />
+          <RankedList title="Top selling items (90d)" items={itemItems()} emptyText="No sales lines in the last 90 days." />
+        </div>
+      </Show>
     </DashboardLayout>
   );
 }

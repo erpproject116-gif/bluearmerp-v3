@@ -358,25 +358,57 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var body struct {
-			ProgressStatus string `json:"progress_status"`
+			ProgressStatus    string `json:"progress_status"`
+			ReleaseLocationID *int64 `json:"release_location_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
 		status := defaultProgress(body.ProgressStatus)
-		if body.ProgressStatus != "" && body.ProgressStatus != "received" && body.ProgressStatus != "finished" {
-			response.Validation(w, map[string]string{"progress_status": "Must be received or finished."})
+		if body.ProgressStatus != "" && !isValidRepairProgress(body.ProgressStatus) {
+			response.Validation(w, map[string]string{"progress_status": "Invalid progress status."})
 			return
 		}
 
-		tag, err := pool.Exec(r.Context(), `
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		tag, err := tx.Exec(r.Context(), `
 			update public.inv_repair_orders
 			set progress_status = $1, updated_at = now()
 			where id = $2 and tenant_id = $3 and deleted_at is null`,
 			status, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Repair order not found.", "ERR_NOT_FOUND")
+			return
+		}
+
+		if status == "released" {
+			var serialID *int64
+			var releaseLoc *int64
+			_ = tx.QueryRow(r.Context(), `
+				select serial_unit_id, release_location_id from public.inv_repair_orders where id = $1`, id).
+				Scan(&serialID, &releaseLoc)
+			if body.ReleaseLocationID != nil {
+				releaseLoc = body.ReleaseLocationID
+			}
+			rel := int64(0)
+			if releaseLoc != nil {
+				rel = *releaseLoc
+			}
+			if err := applyRepairRMARelease(r.Context(), tx, tu.TenantID, id, rel, serialID); err != nil {
+				response.Validation(w, map[string]string{"release_location_id": err.Error()})
+				return
+			}
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
 		}
 

@@ -40,6 +40,7 @@ import { navFeatureLabelKey, navModuleLabelKey } from "../shared/branding/navLab
 import { UserAccountMenu } from "./UserAccountMenu";
 import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
 import { SidebarNav } from "./SidebarNav";
+import { EcountModuleStrip } from "./EcountModuleStrip";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { DemoTenantBanner } from "../shared/DemoTenantBanner";
 import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBar";
@@ -272,9 +273,10 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
         <div class="shrink-0">
           <Show when={!shell.collapsed()}>
-            <p class="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            <p class="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">
               {brandingLabel("app.modules_heading", "Modules")}
             </p>
+            <EcountModuleStrip />
           </Show>
         </div>
 

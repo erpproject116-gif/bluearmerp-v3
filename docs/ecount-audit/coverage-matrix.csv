@@ -1,273 +1,672 @@
-prgId,menu_path_l1,menu_path_l2,menu_path_l3,screen_name,screen_type,tab_count,tabs_audited,status,controls_logged,coverage_pct,bluearm_route,gap_priority,notes
-E010408,Acct. I,Fast Entry,Payment Journal,Payment Journal,form,1,1,in-progress,60,40,/app/finance/cash/payments,P2,Live Jul 2026; Hold/Bank/Card toolbar; see E010408-payment-journal.md
-E010403,Acct. I,Fast Entry,Receipt Journal,Receipt Journal,form,1,1,in-progress,60,40,/app/finance/cash/receipts,P2,Live Jul 2026; Payment Agency Details; see E010403-receipt-journal.md
-C000029,Inv. I,Setup,Item,Item List,list,24,22,in-progress,195,92,/app/inventory/items,P1,Pass 7 Jul 2026; item 00002 edit 7 tabs + Inv. Count I Adjust; see C000029-item-list.md
-C001130,Inv. I,Setup,Item Relation,Register Item Relation,form,2,2,in-progress,38,75,/app/inventory/items,P2,Pass 7 Jul 2026; Option=Default Setting; see C000029-item-list.md
-C000030,Inv. I,Sales,Sales List,Sales List,list,5,4,in-progress,55,45,/app/selling/sales,P1,Live Jul 2026; tenant alias C000004; New Sales = E040205
-C000004,Inv. I,Sales,Sales List,Sales List,list,5,4,in-progress,55,45,/app/selling/sales,P1,Alias prgId for Sales List in BLUEARM tenant; same as C000030
-C000031,Inv. I,Purchases,Purchase List,Purchase List,list,11,6,in-progress,65,50,/app/finance/supplier-invoices,P1,Pass 3 Jul 2026; status pills + list tabs 1-6; F2 inline form; see C000031-purchase-list.md
-C000032,Inv. I,Production,Goods Receipt List,Goods Receipt List,list,10,5,cataloged,55,40,/app/job-costing,P2,Extra GR I/II/III + source + delete pills
-C000033,Inv. I,Inv. Mov.,Location Tran. List,Location Tran. List,list,7,4,cataloged,50,35,/app/inventory/stock-movements,P2,Source + delete pills; Internal Use/Defect/Adj menus cataloged
-C000035,Inv. I,Reports,Reports hub,Reports,hub,0,0,cataloged,80,15,/app/reports,P2,Menu tree only; per-report Option pills TBD
-C000654,Inv. I,Online Store Mgmt,Register Online Store,Register Online Store,list,2,1,in-progress,35,25,—,P3,Pass 1 Jul 2026; Order Mgmt subtree; see C000654-online-store-orders.md
-E040205,Inv. I,Sales,New Sales,New Sales,form,4,4,in-progress,110,80,/app/selling/sales/new,P1,Pass 4 Jul 2026; Modify Sales + Cash In prefill + Link modal; see E040205-new-sales.md
-E040303,Inv. I,Purchases,New Purchases,New Purchases,form,5,4,in-progress,85,70,/app/finance/supplier-invoices/new,P1,Pass 8 Jul 2026; Load Slip + PO line picker; see E040303-new-purchases.md
-C000140,Inv. II,Costing,Monthly Profit,New Costing,list,0,0,cataloged,15,10,/app/job-costing,P3,Inv II default on module open; costing subtree only
-C000904,Inv. II,WMS,Select WMS Account,Select WMS Account,list,0,0,cataloged,20,15,/app/inventory/wms,P3,Pass 1 Jul 2026; menu tree; no WMS license in tenant; see inv2-wms-export-order-plan.md
-C000652,Inv. II,Export,Invoice / Packing List,Invoice / Packing List,list,3,3,in-progress,55,55,—,P3,Pass 3 Jul 2026; F2 opens Input Invoice/Packing List modal ESD028M; see inv2-wms-export-order-plan.md
-E040901,Inv. II,Order Mgmt,Reg. Order Mgmt Process,Reg. Order Mgmt Process,list,0,0,in-progress,50,45,/app/selling/order-management,P3,Pass 3 Jul 2026; 10-step workflow grid; RMA templates; see inv2-wms-export-order-plan.md
-E040624,Inv. II,Plan Mgmt,Sales Forecast Input Screen,Sales Forecast Input Screen,form,0,0,in-progress,30,40,—,P3,Pass 3 Jul 2026; date + item/amount lines; see inv2-wms-export-order-plan.md
-E040907,Inv. II,Export,Invoice/Packing List Status,Invoice/Packing List Status,report,5,5,in-progress,40,45,—,P3,Pass 4 Jul 2026; Default/Type/Details/Summary/by Line; see inv2-wms-export-order-plan.md
-E040905,Inv. II,Export,Invoice / Packing List,Invoice / Packing List,list,3,3,in-progress,55,55,—,P3,Site Map leaf prgId; hub C000652; see inv2-wms-export-order-plan.md
-E061308,Acct. II,Withholding,New Withholding Tax on Sales,New Withholding Tax on Sales,form,0,0,in-progress,35,40,—,P3,Pass 3 Acct II; quarterly WH lines; see acct2-breadth.md
-E061101,Acct. II,e-Contract,Contract Progress,Contract Progress,list,0,0,in-progress,25,30,—,P3,Pass 3 Acct II; see acct2-breadth.md
-E061201,Acct. II,Billing Note,Billing Note List,Billing Note List,list,3,3,in-progress,40,45,—,P3,Site Map leaf; hub C001256; F2 Billing Note Enter; see acct2-breadth.md
-C000127,Acct. II,Check Management,Checks Received List,Checks Received List,list,1,1,in-progress,35,30,—,P3,Pass 2 Acct II; received+issued subtrees; see acct2-breadth.md
-C000666,Acct. II,Contract,Contract Field List,Contract Field List,list,0,0,in-progress,25,25,—,P3,Pass 2 Acct II; contract subtree cataloged; see acct2-breadth.md
-C001258,Acct. II,Withholding,Withholding Tax on Sales List,Withholding Tax on Sales List,list,1,1,in-progress,30,30,—,P3,Pass 2 Acct II; purchase+sales WH subtrees; see acct2-breadth.md
-C000094,Inv. II,Plan Mgmt,Sales Forecast List,Sales Forecast List,list,2,2,in-progress,25,30,—,P3,Pass 2 Jul 2026; All/History pills; see inv2-wms-export-order-plan.md
-C000125,Acct. II,Receivable Management,New Receivable Payment,New Receivable Payment,list,0,0,in-progress,45,30,/app/finance/receivables,P2,Pass 1 Jul 2026; AR list columns; see acct2-breadth.md
-C000126,Acct. II,Payable Management,New Payable Payment,New Payable Payment,list,0,0,in-progress,45,30,/app/finance/payables,P2,Pass 1 Jul 2026; AP list columns; see acct2-breadth.md
-C000021,Acct. II,Budget,Budget Status,Budget Status,report,2,2,in-progress,30,25,—,P3,Pass 1 Jul 2026; Default/All pills; see acct2-breadth.md
-C000005,Acct. II,Expenses,Trade Voucher List,Trade Voucher List,list,4,4,in-progress,25,20,—,P3,Pass 1 Jul 2026; import expenses subtree; see acct2-breadth.md
-C000131,Mgmt,Payroll,Payroll Book,Payroll Book,list,0,0,cataloged,20,10,—,P3,Pass 1 Jul 2026; see mgmt-gw-datacenter-breadth.md
-C000007,GW,e-Approval,e-Approval,e-Approval,hub,0,0,cataloged,10,5,—,P3,Pass 1 Jul 2026; GW not licensed in tenant; see mgmt-gw-datacenter-breadth.md
-C001401,Data Center,Collect Data,Register Collected Data,Register Collected Data,list,0,0,in-progress,25,30,/app/data-center,P2,Pass 1 Jul 2026; 3 collectors registered; see mgmt-gw-datacenter-breadth.md
-C000092,Inv. II,Serial/Lot No.,Serial/Lot No. Slip List,Serial/Lot No. Slip List,list,12,12,depth-complete,85,70,/app/inventory/serial-lot,P1,Pass 17 Jul 2026; All + pills 1-10; Option Default; live rows; see C000092-serial-lot-slip-list.md
-C000690,Inv. II,Serial/Lot No.,Reg. Serial/Lot No.,Reg. Serial/Lot No.,list,13,13,depth-complete,55,65,/app/inventory/serial-lot,P1,Pass 18 Jul 2026; shared C000092 list + New F2 form; 21 slip types; see inv2-serial-lot.md
-C000691,Inv. II,Serial/Lot No.,Inventory Adj. by Serial/Lot No.,Inventory Adj. by Serial/Lot No.,workspace,2,2,in-progress,45,50,/app/inventory/serial-lot,P1,Pass 18 Jul 2026; adj workspace not list; menuSeq MENUTREE_001892; see inv2-serial-lot.md
-E040634,Inv. II,Serial/Lot No.,Inventory Adj. by Serial/Lot No.,Inventory Adj. by Serial/Lot No.,workspace,2,2,in-progress,45,50,/app/inventory/serial-lot,P1,Pass 18 Jul 2026; duplicate menu alias same UI as C000691; menuSeq MENUTREE_001338
-E040639,Inv. II,Serial/Lot No.,Serial/Lot No. Status,Serial/Lot No. Status,report,3,3,in-progress,70,55,/app/inventory/serial-lot,P1,Pass 17; Details/Summary by Line; Terms of Validity; Print/Excel/Email; see inv2-serial-lot.md
-E040620,Inv. II,Serial/Lot No.,Serial/Lot No. Inv. Book,Serial/Lot No. Inv. Book,report,4,4,in-progress,65,55,/app/inventory/serial-lot,P1,Pass 18 Jul 2026; Default/All + General/Summary; custom field filters; see inv2-serial-lot.md
-E040619,Inv. II,Serial/Lot No.,Serial/Lot No. Inv. Balance,Serial/Lot No. Inv. Balance,report,2,2,in-progress,55,50,/app/inventory/serial-lot,P1,Pass 18 Jul 2026; Serial/Lot vs By Location type; see inv2-serial-lot.md
-C000001,Acct. I,Reports,Reports hub,Reports,hub,0,0,cataloged,90,15,/app/finance/reports,P2,Acct I default landing; GL/FS report tree; see screens/C000001-acct-reports-hub.md
-C000093,Inv. II,Quality Control,Quality Insp. Request List,Quality Insp. Request List,list,6,5,in-progress,50,40,/app/qms,P2,Live Jul 2026; 5 status pills; menu alias E040629; see screens/C000093-qc-request-list.md
-E040622,Inv. II,Quality Control,Quality Inspection List,Quality Inspection List,list,5,4,in-progress,55,45,/app/qms,P2,Live Jul 2026; 4 status pills; Pass/Fail filters; see E040622-qc-inspection-list.md
-E010201,Acct. I,Fast Entry,General Journal,General Journal,form,1,1,in-progress,55,35,/app/finance/journal,P2,Live Jul 2026; Dr/Cr grid; see screens/E010201-general-journal.md
-E010505,Acct. I,Fast Entry,S/A Journal,S/A Journal,form,1,1,in-progress,50,40,/app/finance/journal/sa,P2,Live Jul 2026; Employee sub-ledger; Hold only; see E010505-sa-journal.md
-E010213,Acct. I,Fast Entry,Auto Generate Voucher List,Auto Generate Voucher List,list,1,1,in-progress,25,30,/app/finance/auto-vouchers,P2,Live Jul 2026; single All pill; see E010213-auto-generate-voucher-list.md
-E010208,Acct. I,Fast Entry,Bank Reconciliation,Bank Reconciliation,list,4,4,in-progress,45,50,/app/finance/acct-i/bank-reconciliation,P2,Pass 1 Jul 2026; match pills All/Unchecked/Check/Exclude; see E010208-bank-reconciliation.md
-E010209,Acct. I,Fast Entry,New Balance Adjustment,New Balance Adjustment,form,9,9,in-progress,85,75,/app/finance/period-close,P2,Pass 3 Jul 2026; Bal. Count By Customer/Vendor on 1024 GCASH; see acct1-balance-adjustment.md
-E010211,Acct. I,Fast Entry,Bal. Count List,Bal. Count List,list,3,3,in-progress,50,45,/app/finance/period-close,P2,Pass 2 Jul 2026; F2 opens nested E010209; see acct1-balance-adjustment.md
-E010210,Acct. I,Fast Entry,Balance Adjustment List,Balance Adjustment List,list,1,1,in-progress,35,50,/app/finance/period-close,P2,Pass 3 Jul 2026; F2 opens nested E010209; see acct1-balance-adjustment.md
-E010212,Acct. I,Fast Entry,Bal. Adjustment Status,Bal. Adjustment Status,report,9,9,in-progress,50,40,/app/finance/period-close,P2,Pass 1 Jul 2026; Compare with Actual Balance; see acct1-balance-adjustment.md
-E040103,Inv. I,Setup,Item,Item List,list,24,22,in-progress,195,92,/app/inventory/items,P1,Tenant alias C000029; pass 7 edit panel + Inv. Count I; see C000029-item-list.md
-C000010,Acct. I,Fast Entry,Fast Entry,Fast Entry,hub,0,1,in-progress,35,20,/app/finance/journal,P2,Hub prgId; defaults to E010201; see screens/acct1-fast-entry.md pass 3
-E010207,Acct. I,Fast Entry,PG Sales List,PG Sales List,list,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_002566
-E010301,Acct. I,Fast Entry,Sales Invoice I,Sales Invoice I,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000076
-E010303,Acct. I,Fast Entry,Purchase Invoice I,Purchase Invoice I,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000078
-E010401,Acct. I,Fast Entry,From Employee,From Employee,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000323
-E010402,Acct. I,Fast Entry,Receipt,Receipt,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000329
-E010404,Acct. I,Fast Entry,Cash In - From Customer,Cash In - From Customer,form,0,0,in-progress,25,35,/app/finance/cash/receipts,P2,Pass 1 Jul 2026; see E010404-cash-in-from-customer.md
-E010405,Acct. I,Fast Entry,From Merchant Account,From Merchant Account,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000325
-E010406,Acct. I,Fast Entry,Bank Loan,Bank Loan,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000326
-E010407,Acct. I,Fast Entry,From Others,From Others,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000327
-E010409,Acct. I,Cash,Cash Out - To Vendor,Cash Out - To Vendor,form,0,0,in-progress,20,30,/app/finance/cash/payments,P2,Pass 1 Jul 2026; see E010409-cash-out-to-vendor.md
-E010410,Acct. I,Fast Entry,To Employee,To Employee,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000331
-E010411,Acct. I,Fast Entry,Bank Transfer,Bank Transfer,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000332
-E010412,Acct. I,Fast Entry,To Credit Card,To Credit Card,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000333
-E010413,Acct. I,Fast Entry,Loan Repayment/Interest,Loan Repayment/Interest,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000334
-E010414,Acct. I,Fast Entry,To Others,To Others,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000335
-E010501,Acct. I,Fast Entry,Receipt,Receipt,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000336
-E010503,Acct. I,Fast Entry,Others,Others,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000084
-E010504,Acct. I,Fast Entry,Credit Card Receipt,Credit Card Receipt,form,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000337
-E010801,Acct. I,Reports,Cash Book,Cash Book,report,1,1,in-progress,25,25,/app/finance/reports,P2,Pass 5 Jul 2026; dept/project/Include Deposit; tenant empty grid; see acct1-reports-book.md
-N000121,Acct. I,Reports,Management Resource,Sales Summary,report,1,1,in-progress,45,35,/app/finance/reports,P2,Pass 15 Jul 2026; N-prefix requires MENUTREE_000001; see acct1-reports-management-resource.md
-N000122,Acct. I,Reports,Sales/Purchase Book,Sales/Purchase Book,report,0,0,blocked,0,5,—,P2,Pass 5 Jul 2026; empty render in tenant; see acct1-reports-book.md
-N000128,Acct. I,Reports,Management Resource,Purchase Summary,report,1,1,in-progress,45,35,/app/finance/reports,P2,Pass 15 Jul 2026; mirror N000121 purchase side; see acct1-reports-management-resource.md
-E010802,Acct. I,Reports,Journal,Journal,report,1,1,in-progress,35,25,/app/finance/reports,P2,Pass 1 Jul 2026; GL journal inquiry; see acct1-reports-book.md
-E010803,Acct. I,Reports,Daily Trial Balance,Daily Trial Balance,report,3,3,in-progress,30,25,/app/finance/reports,P2,Pass 1 Jul 2026; Daily/Monthly type pills; see acct1-reports-book.md
-E010804,Acct. I,Reports,Fund Statement,Fund Statement,report,2,2,in-progress,35,30,/app/finance/reports,P2,Pass 15 Jul 2026; customer relation radios; see acct1-reports-management-resource.md
-E010805,Acct. I,Reports,Cash Flow (Deposit and Withdrawal Details),Cash Flow (Deposit and Withdrawal Details),report,2,2,in-progress,40,30,/app/finance/reports,P2,Pass 15 Jul 2026; Same Period Prev. Day comparison; see acct1-reports-management-resource.md
-E010807,Acct. I,Reports,LedgerⅠ,LedgerⅠ,report,4,1,in-progress,40,30,/app/finance/reports,P2,Pass 2 Jul 2026; Type radios by Line/Daily/Monthly; see acct1-reports-book.md
-E010808,Acct. I,Reports,LedgerⅡ,LedgerⅡ,report,4,1,in-progress,45,30,/app/finance/reports,P2,Pass 3 Jul 2026; Summary by Customer/Vendor; see acct1-reports-book.md
-E010809,Acct. I,Reports,LedgerⅢ,LedgerⅢ,report,4,1,in-progress,40,30,/app/finance/reports,P2,Pass 3 Jul 2026; account+customer hybrid; see acct1-reports-book.md
-E010811,Acct. I,Reports,Compound Trial Balance,Compound Trial Balance,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000370
-E010812,Acct. I,Reports,Income Statement,Income Statement,report,1,1,in-progress,45,35,/app/finance/reports,P2,Pass 2 Jul 2026; FS date range + comparison; see acct1-reports-book.md
-E010813,Acct. I,Reports,Balance Sheet,Balance Sheet,report,1,1,in-progress,40,35,/app/finance/reports,P2,Pass 2 Jul 2026; dept/project display types; see acct1-reports-book.md
-E010815,Acct. I,Reports,Fund In./De. Details,Fund In./De. Details,report,2,2,in-progress,30,25,/app/finance/reports,P2,Pass 15 Jul 2026; reload if stale title; see acct1-reports-management-resource.md
-E010816,Acct. I,Reports,Schedule of Cost,Schedule of Cost,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000369
-E010817,Acct. I,Reports,Retained Earnings Statement,Retained Earnings Statement,report,1,0,in-progress,15,25,/app/finance/reports,P2,Pass 3 Jul 2026; period list + New F2; see acct1-reports-book.md
-E010819,Acct. I,Reports,Monthly Income Statement,Monthly Income Statement,report,2,2,in-progress,35,30,/app/finance/reports,P2,Pass 15 Jul 2026; Beginning/Increase/Ending columns; see acct1-reports-management-resource.md
-E010821,Acct. I,Reports,Management Report,Management Report,report,2,2,in-progress,25,25,/app/finance/reports,P2,Pass 15 Jul 2026; Acct. I chart templates; distinct from E040704; see acct1-reports-management-resource.md
-E010822,Acct. I,Reports,AR/AP Aging,AR/AP Aging,report,2,2,in-progress,40,30,/app/finance/reports,P1,Pass 15 Jul 2026; as-of aging summary; see acct1-reports-management-resource.md
-E010823,Acct. I,Reports,AR/AP Aging Details,AR/AP Aging Details,report,2,2,in-progress,45,35,/app/finance/reports,P1,Pass 15 Jul 2026; Receivable/Payables + Summary by PIC; see acct1-reports-management-resource.md
-E010824,Acct. I,Reports,Monthly Cost,Monthly Cost,report,2,2,in-progress,35,30,/app/finance/reports,P2,Pass 15 Jul 2026; Manufacturing/Service/Etc. type; see acct1-reports-management-resource.md
-E010829,Acct. I,Reports,Search Customer/Vendor Transactions,Search Customer/Vendor Transactions,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001355
-E010830,Acct. I,Reports,Cash Report,Cash Report,report,2,2,in-progress,35,30,/app/finance/reports,P2,Pass 15 Jul 2026; dept/project + Status preset; see acct1-reports-management-resource.md
-E010831,Acct. I,Reports,Currency Ledger,Currency Ledger,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000380
-E010832,Acct. I,Reports,Statement of Operation,Statement of Operation,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001359
-E010833,Acct. I,Reports,Customer/Vendor Book I,Customer/Vendor Book I,report,1,1,in-progress,45,35,/app/finance/reports,P1,Pass 13 Jul 2026; generic AR/AP toggle; Inv. I hash works; see inv1-reports-others.md
-E010835,Acct. I,Reports,Payments Journal Sum.,Payments Journal Sum.,report,1,1,in-progress,50,40,/app/finance/reports,P2,Pass 15 Jul 2026; by Bank Account and Account type; see acct1-reports-management-resource.md
-E010836,Acct. I,Reports,Receipts Journal Sum.,Receipts Journal Sum.,report,1,1,in-progress,50,40,/app/finance/reports,P2,Pass 15 Jul 2026; Deposit Account filter; see acct1-reports-management-resource.md
-E010840,Acct. I,Reports,S/A Journal Sum.,S/A Journal Sum.,report,1,1,in-progress,50,40,/app/finance/reports,P2,Pass 15 Jul 2026; by Employee and Account type; see acct1-reports-management-resource.md
-E010842,Acct. I,Reports,Customer/Vendor Book II,Customer/Vendor Book II,report,2,2,in-progress,40,30,/app/finance/reports,P1,Pass 13 Jul 2026; summary book + foreign currency; see inv1-reports-others.md
-E010843,Acct. I,Reports,Accounting Summary,Accounting Summary,report,2,2,in-progress,45,35,/app/finance/reports,P2,Pass 15 Jul 2026; Summary Condition 1-3 + Target; see acct1-reports-management-resource.md
-E010844,Acct. I,Reports,Chart of Accounts Status,Chart of Accounts Status,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001357
-E010847,Acct. I,Reports,Others,Accounting Transaction Status,report,1,1,in-progress,55,40,/app/finance/reports,P2,Pass 16 Jul 2026; live title Voucher Status; see acct1-reports-others.md
-E010702,Acct. I,Reports,Others,Print Voucher,report,2,2,in-progress,45,35,/app/finance/reports,P2,Pass 16 Jul 2026; Sort by Modified Date; see acct1-reports-others.md
-E010705,Acct. I,Reports,Others,Update Balance for Accounting,action,0,0,in-progress,10,20,/app/finance/period-close,P1,Pass 16 Jul 2026; month range + F8 rebuild; see acct1-reports-others.md
-E010712,Acct. I,Reports,Others,View Transaction History,report,2,2,in-progress,45,35,/app/finance/reports,P2,Pass 16 Jul 2026; title Change History (Acct.); distinct from E040716; see acct1-reports-others.md
-E010730,Acct. I,Reports,Others,Accounting vs. Inventory,report,2,2,in-progress,50,40,/app/finance/reports,P1,Pass 16 Jul 2026; GL vs Inv reconciliation; see acct1-reports-others.md
-E010850,Acct. I,Reports,Custom Report,Custom Report,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001360
-E010851,Inv. I,Reports,Communication Center,Message Log,list,5,5,in-progress,35,30,/app/reports/communication,P2,Pass 14 Jul 2026; opens Msg. inbox; see inv1-reports-communication-proof.md
-E010856,Acct. I,Reports,Ledger IV,Ledger IV,report,0,0,in-progress,0,30,/app/finance/reports,P2,Pass 3 Jul 2026; tenant empty render; see acct1-reports-book.md
-E010857,Acct. I,Reports,Account In./De. Details,Account In./De. Details,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001710
-E010858,Inv. I,Reports,Communication Center,Sent Doc. History,report,1,1,in-progress,55,45,/app/reports/communication,P2,Pass 14 Jul 2026; email/SMS send log + Resend; see inv1-reports-communication-proof.md
-E040730,Inv. I,Reports,Proof Center,Proof Center,list,1,1,in-progress,40,35,/app/reports/proof,P2,Pass 14 Jul 2026; Attach Receipts + e-Sign; see inv1-reports-communication-proof.md
-E010861,Acct. I,Reports,Statement of Cash Flows,Statement of Cash Flows,report,1,1,in-progress,35,30,/app/finance/reports,P2,Pass 4 Jul 2026; Enter modal + Apply Formula grid; see acct1-reports-book.md
-E040201,Inv. I,Sales,New Quotation,New Quotation,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000486
-E040202,Inv. I,Sales,Quotation List,Quotation List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000487
-E040203,Inv. I,Sales,New Sales Order,New Sales Order,form,0,0,in-progress,55,50,/app/selling/sales-orders/new,P1,Pass 1 Jul 2026; Quotation pull; see E040203-new-sales-order.md
-E040204,Inv. I,Sales,Sales Order List,Sales Order List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000489
-E040206,Inv. I,Sales,Sales List,Sales List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000492
-E040207,Inv. I,Reports,Sales,Sales Status,report,2,2,in-progress,40,35,/app/selling/reports,P1,Pass 5 Jul 2026; Details/Summary/by Line; see inv1-sales-reports.md
-E040208,Inv. I,Reports,Sales,Quotation Status,report,2,2,in-progress,35,30,/app/selling/reports,P1,Pass 6 Jul 2026; Status/Summary + Reference No.; see inv1-sales-reports.md
-E040209,Inv. I,Reports,Sales,Sales Order Status,report,2,2,in-progress,35,30,/app/selling/reports,P1,Pass 6 Jul 2026; Status/Summary + Delivery Date; see inv1-sales-reports.md
-E040210,Inv. I,Sales,Print Sales Slips,Print Sales Slips,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000497
-E040211,Inv. I,Reports,Sales,Outstanding Quote Status,report,2,2,in-progress,35,30,/app/selling/reports,P1,Pass 7 Jul 2026; as-of + Outstanding Quote Qty; see inv1-sales-reports.md
-E040212,Inv. I,Reports,Sales,Outstanding S/O Status,report,2,2,in-progress,35,30,/app/selling/reports,P1,Pass 7 Jul 2026; mirror outstanding quote; see inv1-sales-reports.md
-E040214,Inv. I,Reports,Sales,A/R by Customer,report,2,2,in-progress,45,35,/app/selling/reports,P1,Pass 5 Jul 2026; By Customer/Vendor vs by PIC; see inv1-sales-reports.md
-E040215,Inv. I,Sales,Collective Invoicing (Sales),Collective Invoicing (Sales),list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000187
-E040216,Inv. I,Reports,Sales,Sales Discount Status,report,1,1,in-progress,30,30,/app/selling/reports,P1,Pass 9 Jul 2026; mirror Receipt Status; Discount Amount filter; tenant empty Jul MTD; see inv1-sales-reports.md
-E040217,Inv. I,Reports,Sales,Receipt Status,report,1,1,in-progress,30,30,/app/selling/reports,P1,Pass 5 Jul 2026; cash receipt inquiry; tenant empty Jul MTD; see inv1-sales-reports.md
-E040721,Inv. I,Reports,Sales,Receivable Status,report,1,1,in-progress,35,30,/app/selling/reports,P1,Pass 6 Jul 2026; as-of date (not range); tenant empty Jul; distinct from Acct II E060404; see inv1-sales-reports.md
-E040722,Inv. I,Reports,Purchases,Payable Status,report,1,1,in-progress,35,30,/app/buying/reports,P1,Pass 8 Jul 2026; mirror Receivable E040721; tenant empty Jul; see inv1-purchase-reports.md
-E040220,Inv. I,Sales,New Shipping Order,New Shipping Order,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000659
-E040221,Inv. I,Sales,Shipping Order List,Shipping Order List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000660
-E040222,Inv. I,Reports,Sales,Shipping Order Status,report,2,2,in-progress,35,30,/app/selling/reports,P1,Pass 8 Jul 2026; Status/Summary + Details/by Line; tenant empty Jul MTD; see inv1-sales-reports.md
-E040224,Inv. I,Sales,Change Sales Price-Batch,Change Sales Price-Batch,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000725
-E040225,Inv. I,Sales,New Shipment,New Shipment,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000775
-E040226,Inv. I,Sales,Shipment List,Shipment List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000776
-E040227,Inv. I,Reports,Sales,Shipment Status,report,2,2,in-progress,35,30,/app/selling/reports,P1,Pass 7 Jul 2026; Status/Summary + Details/by Line; tenant empty Jul MTD; see inv1-sales-reports.md
-E040228,Inv. I,Reports,Sales,Pending Shipment Status,report,2,2,in-progress,35,30,/app/selling/reports,P1,Pass 8 Jul 2026; as-of + Pending Shipment Qty; tenant empty as-of; see inv1-sales-reports.md
-E040609,Inv. I,Reports,Sales,Pre-Invoicing Status (Sales),report,1,1,in-progress,30,30,/app/selling/reports,P1,Pass 9 Jul 2026; Base Date as-of + Amount filter; see inv1-sales-reports.md
-E040723,Inv. I,Reports,Sales,Customer/Vendor Book I (AR),report,2,2,in-progress,40,35,/app/selling/reports,P1,Pass 9 Jul 2026; Summary Type By Slip+Details + Email; see inv1-sales-reports.md
-N000119,Inv. I,Reports,Sales,Sales Invoice Status (Inv.),report,1,1,in-progress,40,30,/app/selling/reports,P1,Pass 10 Jul 2026; N-prefix tax slip inquiry + Status Confirm pills; tenant empty Jul MTD; see inv1-sales-reports.md
-E040713,Inv. I,Reports,Sales,Monthly Receivable Change Details,report,1,1,in-progress,35,30,/app/selling/reports,P1,Pass 10 Jul 2026; month-range AR fluctuation; mirror E040714; see inv1-sales-reports.md
-E040230,Inv. I,Sales,Release Sales Order,Release Sales Order,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001647
-E040301,Inv. I,Purchases,New Purchase Order,New Purchase Order,form,0,0,in-progress,60,50,/app/buying/purchase-orders/new,P1,Pass 1 Jul 2026; Load Slip/RFQ/PO Plan; see E040301-new-purchase-order.md
-E040302,Inv. I,Purchases,Purchase Order List,Purchase Order List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000509
-E040304,Inv. I,Purchases,Purchase List,Purchase List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000511
-E040305,Inv. I,Reports,Purchases,Purchase Status,report,2,2,in-progress,40,35,/app/buying/reports,P1,Pass 6 Jul 2026; mirror Sales Status; see inv1-purchase-reports.md
-E040306,Inv. I,Reports,Purchases,Purchase Order Status,report,2,2,in-progress,35,30,/app/buying/reports,P1,Pass 7 Jul 2026; mirror SO Status; see inv1-purchase-reports.md
-E040307,Inv. I,Reports,Purchases,Outstanding P/O Status,report,2,2,in-progress,35,30,/app/buying/reports,P1,Pass 7 Jul 2026; mirror outstanding S/O; see inv1-purchase-reports.md
-E040309,Inv. I,Reports,Purchases,A/P by Vendor,report,2,2,in-progress,45,35,/app/buying/reports,P1,Pass 6 Jul 2026; mirror A/R by Customer; see inv1-purchase-reports.md
-E040310,Inv. I,Reports,Purchases,Payment Status,report,1,1,in-progress,30,30,/app/buying/reports,P1,Pass 7 Jul 2026; mirror Receipt Status; tenant empty Jul MTD; see inv1-purchase-reports.md
-E040311,Inv. I,Purchases,Change Purchases Price-Batch,Change Purchases Price-Batch,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001662
-E040312,Inv. I,Purchases,Collective Invoicing (Purchase),Collective Invoicing (Purchase),list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000193
-E040313,Inv. I,Reports,Purchases,Purchase Discount Status,report,1,1,in-progress,30,30,/app/buying/reports,P1,Pass 9 Jul 2026; mirror Sales Discount; tenant empty Jul MTD; see inv1-purchase-reports.md
-E040314,Inv. I,Purchases,New Purchase Request,New Purchase Request,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000504
-E040315,Inv. I,Purchases,Purchase Request List,Purchase Request List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000505
-E040316,Inv. I,Purchases,New Purchase Plan,New Purchase Plan,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000506
-E040317,Inv. I,Purchases,Purchase Plan List,Purchase Plan List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000507
-E040318,Inv. I,Reports,Purchases,Purchase Request Status,report,2,2,in-progress,35,30,/app/buying/reports,P1,Pass 9 Jul 2026; Details/by Line + PR No. + Delivery Date; see inv1-purchase-reports.md
-E040319,Inv. I,Reports,Purchases,Pre-Invoicing Status (Purchases),report,1,1,in-progress,30,30,/app/buying/reports,P1,Pass 9 Jul 2026; Base Date as-of mirror E040609; see inv1-purchase-reports.md
-E040724,Inv. I,Reports,Purchases,Customer/Vendor Book I (AP),report,2,2,in-progress,40,35,/app/buying/reports,P1,Pass 9 Jul 2026; mirror E040723 for AP; see inv1-purchase-reports.md
-N000127,Inv. I,Reports,Purchases,Purchase Invoice Status (Inv.),report,1,1,in-progress,40,30,/app/buying/reports,P1,Pass 10 Jul 2026; mirror N000119; hash quirk left menu; tenant empty Jul MTD; see inv1-purchase-reports.md
-E040714,Inv. I,Reports,Purchases,Monthly Payable Fluctuation,report,1,1,in-progress,35,30,/app/buying/reports,P1,Pass 10 Jul 2026; mirror E040713; see inv1-purchase-reports.md
-E040321,Inv. I,Purchases,New RFQ,New RFQ,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001325
-E040322,Inv. I,Purchases,RFQ List,RFQ List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001326
-E040323,Inv. I,Purchases,RFQ Progress Status,RFQ Progress Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001912
-E040325,Inv. I,Purchases,RFQ Status,RFQ Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001913
-E040401,Inv. I,Production,BOM Design,BOM Design,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000520
-E040402,Inv. I,Production,BOM Design Status,BOM Design Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001952
-E040403,Inv. I,Production,Estimated BOM,Estimated BOM,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000521
-E040404,Inv. I,Production,New Goods Issued,New Goods Issued,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000524
-E040405,Inv. I,Production,Goods Issued List,Goods Issued List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000525
-E040406,Inv. I,Production,Goods Receipt I,Goods Receipt I,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000526
-E040407,Inv. I,Production,Goods Receipt II,Goods Receipt II,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000527
-E040408,Inv. I,Production,Goods Receipt List,Goods Receipt List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000529
-E040409,Inv. I,Production,Goods Issued Status,Goods Issued Status,report,1,1,in-progress,45,35,/app/job-costing/reports,P1,Pass 12 Jul 2026; Details/Summary/by Line; see inv1-reports-production.md
-E040410,Inv. I,Production,Goods Receipt Status,Goods Receipt Status,report,1,1,in-progress,50,35,/app/job-costing/reports,P1,Pass 12 Jul 2026; + Payable No. + GR I/II/III; see inv1-reports-production.md
-E040411,Inv. I,Production,New Job Order,New Job Order,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000522
-E040412,Inv. I,Production,Job Order List,Job Order List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000523
-E040413,Inv. I,Production,Job Order Status,Job Order Status,report,1,1,in-progress,50,40,/app/job-costing/reports,P1,Pass 12 Jul 2026; J/O + delivery date filters; see inv1-reports-production.md
-E040414,Inv. I,Production,Progress Status by J/O,Progress Status by J/O,report,1,1,in-progress,45,35,/app/job-costing/reports,P1,Pass 12 Jul 2026; four progress type radios; see inv1-reports-production.md
-E040415,Inv. I,Production,Goods Receipt/Consumed Status I,Goods Receipt/Consumed Status I,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000535
-E040416,Inv. I,Production,Goods Receipt III,Goods Receipt III,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000528
-E040418,Inv. I,Production,Collective Invoicing (O/E),Collective Invoicing (O/E),list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000530
-E040419,Inv. I,Production,Discount on O/E Status,Discount on O/E Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000664
-E040425,Inv. I,Production,Reg. Process,Reg. Process,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002704
-E040426,Inv. I,Production,Reg. Resource,Reg. Resource,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002705
-E040427,Inv. I,Production,BOR (Required Time),BOR (Required Time),list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002706
-E040428,Inv. I,Production,Calculate Required Time,Calculate Required Time,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002707
-E040429,Inv. I,Production,Apply J/O to Job,Apply J/O to Job,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002709
-E040430,Inv. I,Production,New Job Record,New Job Record,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002710
-E040431,Inv. I,Production,Job Record List,Job Record List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002711
-E040432,Inv. I,Production,Job Record Status,Job Record Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002712
-E040435,Inv. I,Production,New Production Plan/MRP,New Production Plan/MRP,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002762
-E040436,Inv. I,Production,Job Order Efficiency Status,Job Order Efficiency Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002884
-E040501,Inv. I,Inv. Mov.,New Location Tran.,New Location Tran.,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000539
-E040502,Inv. I,Inv. Mov.,Location Tran. List,Location Tran. List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000540
-E040503,Inv. I,Inv. Mov.,New Internal Use,New Internal Use,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000541
-E040504,Inv. I,Inv. Mov.,Internal Use List,Internal Use List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000542
-E040505,Inv. I,Inv. Mov.,Location Tran. Status,Location Tran. Status,report,0,0,cataloged,0,5,—,P1,Pass 12 Jul 2026; No Authorization in tenant; see inv1-reports-inv-movement.md
-E040506,Inv. I,Inv. Mov.,Internal Use Status,Internal Use Status,report,0,0,cataloged,0,5,—,P1,Pass 12 Jul 2026; No Authorization in tenant; see inv1-reports-inv-movement.md
-E040507,Inv. I,Inv. Mov.,New Product Defect,New Product Defect,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000543
-E040508,Inv. I,Inv. Mov.,Product Defect List,Product Defect List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000544
-E040509,Inv. I,Inv. Mov.,Product Defect Status,Product Defect Status,report,0,0,cataloged,0,5,—,P1,Pass 12 Jul 2026; No Authorization in tenant; see inv1-reports-inv-movement.md
-E040608,Inv. I,Inv. Mov.,Inv. Adjustment Status,Inv. Adjustment Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog; auth blocked pass 12; see inv1-reports-inv-movement.md
-E040615,Inv. I,Inv. Mov.,Inv. Count Status,Inv. Count Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog; auth blocked pass 12; see inv1-reports-inv-movement.md
-E040510,Inv. I,Inv. Mov.,Disassemble Status,Disassemble Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000552
-E040511,Inv. I,Inv. Mov.,Disposal Status,Disposal Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000553
-E040512,Inv. I,Inv. Mov.,Defect Rate Status,Defect Rate Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000554
-E041003,Inv. I,Online Store Mgmt,Setup,Register Online Store,list,4,4,in-progress,25,20,—,P3,Pass 2 Jul 2026; F2 store form; see C000654-online-store.md
-E041004,Inv. I,Online Store Mgmt,Setup,Link to Online Store Item Code,list,0,0,in-progress,0,15,—,P3,Pass 2 Jul 2026; empty until store registered; see C000654-online-store.md
-E041005,Inv. I,Online Store Mgmt,Order Mgmt,Order Mgmt Status,list,11,13,in-progress,55,35,—,P3,Pass 3 Jul 2026; Option filters + Collect Orders modal; see C000654-online-store-orders.md
-E041006,Inv. I,Online Store Mgmt,Order Mgmt,Order Confirmation,list,1,1,in-progress,40,30,—,P3,Pass 1 Jul 2026; Collect Orders; see C000654-online-store-orders.md
-E041007,Inv. I,Online Store Mgmt,Order Mgmt,Delivery,list,1,1,in-progress,45,30,—,P3,Pass 1 Jul 2026; Ready to Release; see C000654-online-store-orders.md
-E041008,Inv. I,Online Store Mgmt,Order Mgmt,Cancel,list,1,1,in-progress,40,30,—,P3,Pass 2 Jul 2026; Cancellation Complete; see C000654-online-store-orders.md
-E041009,Inv. I,Online Store Mgmt,Order Mgmt,Return,list,1,1,in-progress,40,30,—,P3,Pass 2 Jul 2026; Returned toolbar; see C000654-online-store-orders.md
-E041010,Inv. I,Online Store Mgmt,Order Mgmt,Exchange,list,1,1,in-progress,45,30,—,P3,Pass 2 Jul 2026; Returned Exchange; see C000654-online-store-orders.md
-E041011,Inv. I,Online Store Mgmt,Order Mgmt,ERP Transmission,list,1,1,in-progress,40,30,—,P3,Pass 2 Jul 2026; SO/Sale ERP status; see C000654-online-store-orders.md
-E041015,Inv. I,Reports,Purchases,Purchase Plan Status,report,2,2,in-progress,35,30,/app/buying/reports,P1,Pass 9 Jul 2026; prgId E041015; Details/by Line; see inv1-purchase-reports.md
-E040703,Inv. I,Reports,Others,AR/AP Status,report,1,1,in-progress,35,30,/app/reports,P1,Pass 10 Jul 2026; Type Receivable/Payables/Combined as-of; see inv1-reports-others.md
-E040806,Inv. I,Reports,Others,Daily Profit Status,report,2,2,in-progress,50,40,/app/reports,P1,Pass 10 Jul 2026; Default/All pills + FIFO vs monthly cost; see inv1-reports-others.md
-E040807,Inv. I,Reports,Others,Daily Costing Status,report,2,2,in-progress,40,35,/app/reports,P1,Pass 11 Jul 2026; mirror Daily Profit cost-only; see inv1-reports-others.md
-E040725,Inv. I,Reports,Others,Sales/Purchases Summary,report,1,1,in-progress,50,40,/app/reports,P1,Pass 13 Jul 2026; Summary Condition 1/2/Target; see inv1-reports-others.md
-E040710,Inv. I,Reports,Others,Summary,report,1,1,in-progress,55,45,/app/reports,P1,Pass 13 Jul 2026; six Menu Type radios; see inv1-reports-others.md
-E040819,Inv. I,Reports,Others,Price Change History,report,2,2,in-progress,45,35,/app/inventory/reports,P1,Pass 13 Jul 2026; by Slip + price type checkboxes; see inv1-reports-others.md
-E040704,Inv. I,Reports,Others,Management Report,report,2,2,in-progress,25,20,/app/reports,P1,Pass 13 Jul 2026; date-only template report; see inv1-reports-others.md
-E040709,Inv. I,Reports,Others,Status Grand Total,report,2,2,in-progress,45,35,/app/reports,P1,Pass 13 Jul 2026; Vertical/Horizontal matrix; see inv1-reports-others.md
-E040716,Inv. I,Reports,Others,View Transaction History,report,1,1,in-progress,40,30,/app/reports,P2,Pass 13 Jul 2026; title Change History; Slip/Basic Code; see inv1-reports-others.md
-E040627,Inv. I,Reports,Others,All-In-One I,workspace,0,0,in-progress,30,25,/app/reports,P2,Pass 13+16 Jul 2026; customer workspace; Acct. I menuSeq MENUTREE_001352; see inv1-reports-others.md acct1-reports-others.md
-E040633,Inv. I,Reports,Others,All-in-One II,workspace,0,0,in-progress,25,20,/app/reports,P2,Pass 13 Jul 2026; item workspace dashboard; see inv1-reports-others.md
-E040701,Inv. I,Reports,Inventory Balance,Inventory Balance,report,1,1,in-progress,45,40,/app/inventory/reports,P1,Pass 11 Jul 2026; use menuSeq MENUTREE_001888; see inv1-reports-inventory-balance.md
-E040711,Inv. I,Reports,Inventory Balance,Inv. Balance by Location,report,2,2,in-progress,45,40,/app/inventory/reports,P1,Pass 11 Jul 2026; Horizontal/Vertical location matrix; see inv1-reports-inventory-balance.md
-E040728,Inv. I,Reports,Inventory Balance,Inv. Balance by Item Relation,report,1,1,in-progress,35,30,/app/inventory/reports,P1,Pass 11 Jul 2026; item relation rollup; see inv1-reports-inventory-balance.md
-E040702,Inv. I,Reports,Inventory Balance,Inv. Book,report,2,2,in-progress,50,45,/app/inventory/reports,P1,Pass 11 Jul 2026; stock ledger + price display; see inv1-reports-inventory-balance.md
-E040719,Inv. I,Reports,Inventory Balance,Inventory Change History,report,2,2,in-progress,45,40,/app/inventory/reports,P1,Pass 11 Jul 2026; Summary/Daily/Monthly pivot; see inv1-reports-inventory-balance.md
-E040727,Inv. I,Reports,Inventory Balance,Inventory Aging Details,report,1,1,in-progress,35,30,/app/inventory/reports,P1,Pass 11 Jul 2026; aging buckets as-of; see inv1-reports-inventory-balance.md
-E040708,Inv. I,Reports,Inventory Balance,Daily Report,report,2,2,in-progress,45,35,/app/inventory/reports,P1,Pass 12 Jul 2026; cross-module daily inquiry; see inv1-reports-inventory-balance.md
-E040720,Inv. I,Reports,Inventory Balance,Inv. Balance by Multi Spec.,report,2,2,in-progress,45,40,/app/inventory/reports,P1,Pass 12 Jul 2026; Spec. Group/Code 1-3; see inv1-reports-inventory-balance.md
-E040726,Inv. I,Reports,Inventory Balance,Inv. balance converted by BOM,report,1,1,in-progress,30,25,/app/inventory/reports,P1,Pass 12 Jul 2026; BOM parent Item Code; see inv1-reports-inventory-balance.md
-N000118,Acct. I,Reports,Others,Sales Invoice Status,report,1,1,in-progress,40,30,/app/finance/reports,P1,Pass 11 Jul 2026; menuType MENUTREE_000001; mirror N000119; see inv1-sales-reports.md
-N000126,Acct. I,Reports,Others,Purchase Invoice Status,report,1,1,in-progress,40,30,/app/finance/reports,P1,Pass 11 Jul 2026; menuType MENUTREE_000001; mirror N000127; see inv1-purchase-reports.md
-E041018,Inv. II,Serial/Lot No.,Item vs. Serial/Lot No. Balance,Item vs. Serial/Lot No. Balance,report,2,2,in-progress,45,45,/app/inventory/serial-lot,P1,Pass 18 Jul 2026; Compare by Serial/Lot No vs Item; menuSeq MENUTREE_002766; see inv2-serial-lot.md
-E060402,Acct. II,Receivable Management,New Receivable Payment,New Receivable Payment,list,0,0,in-progress,50,40,/app/finance/receivables,P2,Pass 4 Jul 2026; Decrease Amount + Receipts Journal modal; see acct2-breadth.md
-E060403,Acct. II,Receivable Management,Receivable List,Receivable List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000687
-E060404,Acct. II,Receivable Management,Receivable Status,Receivable Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000688
-E060405,Acct. II,Receivable Management,Receivable Transaction Details,Receivable Transaction Details,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000716
-E060406,Acct. II,Receivable Management,Registered Receivable Status,Registered Receivable Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000717
-E060407,Acct. II,Receivable Management,Receivable Payment Status,Receivable Payment Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000718
-E060408,Acct. II,Receivable Management,AR Aging Details,AR Aging Details,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001314
-E060502,Acct. II,Payable Management,New Payable Payment,New Payable Payment,list,0,0,in-progress,50,40,/app/finance/payables,P2,Pass 4 Jul 2026; Decrease Amount + Payments Journal modal; see acct2-breadth.md
-E060503,Acct. II,Payable Management,Payable List,Payable List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000692
-E060504,Acct. II,Payable Management,Payable Status,Payable Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000693
-E060505,Acct. II,Payable Management,Payable Transaction Details,Payable Transaction Details,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000719
-E060506,Acct. II,Payable Management,Registered Payable Status,Registered Payable Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000720
-E060507,Acct. II,Payable Management,Payable Payment Status,Payable Payment Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000721
-E060508,Acct. II,Payable Management,AP Aging Details,AP Aging Details,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001315
-E060602,Inv. I,Sales,New RCVD. Check Payment,New RCVD. Check Payment,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000696
-E060603,Inv. I,Sales,Checks Received List,Checks Received List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000697
-E060604,Inv. I,Sales,Checks Received Status,Checks Received Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000698
-E060606,Inv. I,Sales,New Issued Check Clearance,New Issued Check Clearance,form,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000700
-E060607,Inv. I,Sales,Checks Issued List,Checks Issued List,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000701
-E060608,Inv. I,Sales,Checks Issued Status,Checks Issued Status,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000702
-E060609,Acct. I,Reports,Checks Received Status Report,Checks Received Status Report,report,0,0,cataloged,0,5,—,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001750
-E060610,Inv. I,Sales,Decrease of Received Checks Balance,Decrease of Received Checks Balance,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001751
-E060611,Inv. I,Sales,Increase of Issued Checks Balance,Increase of Issued Checks Balance,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001752
-E060612,Inv. I,Sales,Decrease of Issued Checks Balance,Decrease of Issued Checks Balance,report,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001753
-E060613,Inv. I,Sales,Received Check Transactions,Received Check Transactions,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001941
-E060614,Inv. I,Sales,Issued Check Transactions,Issued Check Transactions,list,0,0,cataloged,0,5,—,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001942
+prgId,menu_path_l1,menu_path_l2,menu_path_l3,screen_name,screen_type,tab_count,tabs_audited,status,controls_logged,coverage_pct,bluearm_route,bluearm_parity,deferred_reason,gap_priority,notes
+E010408,Acct. I,Fast Entry,Payment Journal,Payment Journal,form,1,1,in-progress,60,40,/app/finance/cash/payments,partial,,P2,Live Jul 2026; Hold/Bank/Card toolbar; see E010408-payment-journal.md
+E010403,Acct. I,Fast Entry,Receipt Journal,Receipt Journal,form,1,1,in-progress,60,40,/app/finance/cash/receipts,partial,,P2,Live Jul 2026; Payment Agency Details; see E010403-receipt-journal.md
+C000029,Inv. I,Setup,Item,Item List,list,24,22,in-progress,195,92,/app/inventory/items,partial,,P1,Pass 7 Jul 2026; item 00002 edit 7 tabs + Inv. Count I Adjust; see C000029-item-list.md; known-parity: Item list+modal tabs/F3 — gaps P1 Done; residual reports
+C001130,Inv. I,Setup,Item Relation,Register Item Relation,form,2,2,in-progress,38,75,/app/inventory/items,partial,,P2,Pass 7 Jul 2026; Option=Default Setting; see C000029-item-list.md
+C000030,Inv. I,Sales,Sales List,Sales List,list,5,4,in-progress,55,45,/app/sales/sales,partial,,P1,Live Jul 2026; tenant alias C000004; New Sales = E040205; known-parity: Sales list pills + Load Slip + Cash In — gaps P1 Done
+C000004,Inv. I,Sales,Sales List,Sales List,list,5,4,in-progress,55,45,/app/selling/sales,partial,,P1,Alias prgId for Sales List in BLUEARM tenant; same as C000030
+C000031,Inv. I,Purchases,Purchase List,Purchase List,list,11,6,in-progress,65,50,/app/purchases/purchases,partial,,P1,Pass 3 Jul 2026; status pills + list tabs 1-6; F2 inline form; see C000031-purchase-list.md; known-parity: Purchase list + Load Slip + Cash Out — gaps P1 Done
+C000032,Inv. I,Production,Goods Receipt List,Goods Receipt List,list,10,5,cataloged,55,40,/app/job-costing,missing,,P2,Extra GR I/II/III + source + delete pills
+C000033,Inv. I,Inv. Mov.,Location Tran. List,Location Tran. List,list,7,4,cataloged,50,35,/app/inventory/stock-movements,missing,,P2,Source + delete pills; Internal Use/Defect/Adj menus cataloged
+C000035,Inv. I,Reports,Reports hub,Reports,hub,0,0,cataloged,80,15,/app/reports,missing,,P2,Menu tree only; per-report Option pills TBD
+C000654,Inv. I,Online Store Mgmt,Register Online Store,Register Online Store,list,2,1,in-progress,35,25,—,missing,,P3,Pass 1 Jul 2026; Order Mgmt subtree; see C000654-online-store-orders.md
+E040205,Inv. I,Sales,New Sales,New Sales,form,4,4,in-progress,110,80,/app/sales/sales/new,partial,,P1,Pass 4 Jul 2026; Modify Sales + Cash In prefill + Link modal; see E040205-new-sales.md; known-parity: New Sales form parity partial — gaps P1 Done core
+E040303,Inv. I,Purchases,New Purchases,New Purchases,form,5,4,in-progress,85,70,/app/purchases/purchases/new,partial,,P1,Pass 8 Jul 2026; Load Slip + PO line picker; see E040303-new-purchases.md; known-parity: New Purchases form — gaps P1 Done core
+C000140,Inv. II,Costing,Monthly Profit,New Costing,list,0,0,cataloged,15,10,/app/job-costing,missing,,P3,Inv II default on module open; costing subtree only
+C000904,Inv. II,WMS,Select WMS Account,Select WMS Account,list,0,0,cataloged,20,15,/app/inventory/wms,missing,,P3,Pass 1 Jul 2026; menu tree; no WMS license in tenant; see inv2-wms-export-order-plan.md
+C000652,Inv. II,Export,Invoice / Packing List,Invoice / Packing List,list,3,3,in-progress,55,55,—,missing,,P3,Pass 3 Jul 2026; F2 opens Input Invoice/Packing List modal ESD028M; see inv2-wms-export-order-plan.md
+E040901,Inv. II,Order Mgmt,Reg. Order Mgmt Process,Reg. Order Mgmt Process,list,0,0,in-progress,50,45,/app/selling/order-management,partial,,P3,Pass 3 Jul 2026; 10-step workflow grid; RMA templates; see inv2-wms-export-order-plan.md
+E040624,Inv. II,Plan Mgmt,Sales Forecast Input Screen,Sales Forecast Input Screen,form,0,0,in-progress,30,40,—,missing,,P3,Pass 3 Jul 2026; date + item/amount lines; see inv2-wms-export-order-plan.md
+E040907,Inv. II,Export,Invoice/Packing List Status,Invoice/Packing List Status,report,5,5,in-progress,40,45,—,missing,,P3,Pass 4 Jul 2026; Default/Type/Details/Summary/by Line; see inv2-wms-export-order-plan.md
+E040905,Inv. II,Export,Invoice / Packing List,Invoice / Packing List,list,3,3,in-progress,55,55,—,missing,,P3,Site Map leaf prgId; hub C000652; see inv2-wms-export-order-plan.md
+E061308,Acct. II,Withholding,New Withholding Tax on Sales,New Withholding Tax on Sales,form,0,0,in-progress,35,40,—,missing,,P3,Pass 3 Acct II; quarterly WH lines; see acct2-breadth.md
+E061101,Acct. II,e-Contract,Contract Progress,Contract Progress,list,0,0,in-progress,25,30,—,missing,,P3,Pass 3 Acct II; see acct2-breadth.md
+E061201,Acct. II,Billing Note,Billing Note List,Billing Note List,list,3,3,in-progress,40,45,—,missing,,P3,Site Map leaf; hub C001256; F2 Billing Note Enter; see acct2-breadth.md
+C000127,Acct. II,Check Management,Checks Received List,Checks Received List,list,1,1,in-progress,35,30,—,missing,,P3,Pass 2 Acct II; received+issued subtrees; see acct2-breadth.md
+C000666,Acct. II,Contract,Contract Field List,Contract Field List,list,0,0,in-progress,25,25,—,missing,,P3,Pass 2 Acct II; contract subtree cataloged; see acct2-breadth.md
+C001258,Acct. II,Withholding,Withholding Tax on Sales List,Withholding Tax on Sales List,list,1,1,in-progress,30,30,—,missing,,P3,Pass 2 Acct II; purchase+sales WH subtrees; see acct2-breadth.md
+C000094,Inv. II,Plan Mgmt,Sales Forecast List,Sales Forecast List,list,2,2,in-progress,25,30,—,missing,,P3,Pass 2 Jul 2026; All/History pills; see inv2-wms-export-order-plan.md
+C000125,Acct. II,Receivable Management,New Receivable Payment,New Receivable Payment,list,0,0,in-progress,45,30,/app/finance/receivables,partial,,P2,Pass 1 Jul 2026; AR list columns; see acct2-breadth.md
+C000126,Acct. II,Payable Management,New Payable Payment,New Payable Payment,list,0,0,in-progress,45,30,/app/finance/payables,partial,,P2,Pass 1 Jul 2026; AP list columns; see acct2-breadth.md
+C000021,Acct. II,Budget,Budget Status,Budget Status,report,2,2,in-progress,30,25,—,missing,,P3,Pass 1 Jul 2026; Default/All pills; see acct2-breadth.md
+C000005,Acct. II,Expenses,Trade Voucher List,Trade Voucher List,list,4,4,in-progress,25,20,—,missing,,P3,Pass 1 Jul 2026; import expenses subtree; see acct2-breadth.md
+C000131,Mgmt,Payroll,Payroll Book,Payroll Book,list,0,0,cataloged,20,10,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,Pass 1 Jul 2026; see mgmt-gw-datacenter-breadth.md
+C000007,GW,e-Approval,e-Approval,e-Approval,hub,0,0,cataloged,10,5,—,deferred,Deferred — Groupware not in Bluearm Computer Store scope; see deferred-register.md,P3,Pass 1 Jul 2026; GW not licensed in tenant; see mgmt-gw-datacenter-breadth.md
+C001401,Data Center,Collect Data,Register Collected Data,Register Collected Data,list,0,0,in-progress,25,30,/app/data-center,deferred,Deferred — import/integration hub; use Bluearm CSV/import tools; see deferred-register.md,P2,Pass 1 Jul 2026; 3 collectors registered; see mgmt-gw-datacenter-breadth.md
+C000092,Inv. II,Serial/Lot No.,Serial/Lot No. Slip List,Serial/Lot No. Slip List,list,12,12,depth-complete,85,70,/app/inventory/serial-lot,partial,,P1,Pass 17 Jul 2026; All + pills 1-10; Option Default; live rows; see C000092-serial-lot-slip-list.md; known-parity: Serial/Lot hub — Inv.II pass Done features
+C000690,Inv. II,Serial/Lot No.,Reg. Serial/Lot No.,Reg. Serial/Lot No.,list,13,13,depth-complete,55,65,/app/inventory/serial-lot,parity,,P1,Pass 18 Jul 2026; shared C000092 list + New F2 form; 21 slip types; see inv2-serial-lot.md; known-parity: Reg Serial/Lot F2 — gaps Done
+C000691,Inv. II,Serial/Lot No.,Inventory Adj. by Serial/Lot No.,Inventory Adj. by Serial/Lot No.,workspace,2,2,in-progress,45,50,/app/inventory/serial-lot,parity,,P1,Pass 18 Jul 2026; adj workspace not list; menuSeq MENUTREE_001892; see inv2-serial-lot.md; known-parity: Serial/Lot adj — gaps Done
+E040634,Inv. II,Serial/Lot No.,Inventory Adj. by Serial/Lot No.,Inventory Adj. by Serial/Lot No.,workspace,2,2,in-progress,45,50,/app/inventory/serial-lot,parity,,P1,Pass 18 Jul 2026; duplicate menu alias same UI as C000691; menuSeq MENUTREE_001338; known-parity: Serial/Lot adj workspace — gaps Done
+E040639,Inv. II,Serial/Lot No.,Serial/Lot No. Status,Serial/Lot No. Status,report,3,3,in-progress,70,55,/app/inventory/serial-lot,parity,,P1,Pass 17; Details/Summary by Line; Terms of Validity; Print/Excel/Email; see inv2-serial-lot.md; known-parity: Serial/Lot Status — gaps Done
+E040620,Inv. II,Serial/Lot No.,Serial/Lot No. Inv. Book,Serial/Lot No. Inv. Book,report,4,4,in-progress,65,55,/app/inventory/serial-lot,parity,,P1,Pass 18 Jul 2026; Default/All + General/Summary; custom field filters; see inv2-serial-lot.md; known-parity: Serial Inv Book — gaps Done
+E040619,Inv. II,Serial/Lot No.,Serial/Lot No. Inv. Balance,Serial/Lot No. Inv. Balance,report,2,2,in-progress,55,50,/app/inventory/serial-lot,parity,,P1,Pass 18 Jul 2026; Serial/Lot vs By Location type; see inv2-serial-lot.md; known-parity: Serial Inv Balance — gaps Done
+C000001,Acct. I,Reports,Reports hub,Reports,hub,0,0,cataloged,90,15,/app/finance/reports,missing,,P2,Acct I default landing; GL/FS report tree; see screens/C000001-acct-reports-hub.md
+C000093,Inv. II,Quality Control,Quality Insp. Request List,Quality Insp. Request List,list,6,5,in-progress,50,40,/app/qms,partial,,P2,Live Jul 2026; 5 status pills; menu alias E040629; see screens/C000093-qc-request-list.md
+E040622,Inv. II,Quality Control,Quality Inspection List,Quality Inspection List,list,5,4,in-progress,55,45,/app/qms,partial,,P2,Live Jul 2026; 4 status pills; Pass/Fail filters; see E040622-qc-inspection-list.md
+E010201,Acct. I,Fast Entry,General Journal,General Journal,form,1,1,in-progress,55,35,/app/finance/journal,partial,,P2,Live Jul 2026; Dr/Cr grid; see screens/E010201-general-journal.md
+E010505,Acct. I,Fast Entry,S/A Journal,S/A Journal,form,1,1,in-progress,50,40,/app/finance/journal/sa,partial,,P2,Live Jul 2026; Employee sub-ledger; Hold only; see E010505-sa-journal.md
+E010213,Acct. I,Fast Entry,Auto Generate Voucher List,Auto Generate Voucher List,list,1,1,in-progress,25,30,/app/finance/auto-vouchers,partial,,P2,Live Jul 2026; single All pill; see E010213-auto-generate-voucher-list.md
+E010208,Acct. I,Fast Entry,Bank Reconciliation,Bank Reconciliation,list,4,4,in-progress,45,50,/app/finance/acct-i/bank-reconciliation,parity,,P2,Pass 1 Jul 2026; match pills All/Unchecked/Check/Exclude; see E010208-bank-reconciliation.md; known-parity: Bank reconciliation Done in gaps
+E010209,Acct. I,Fast Entry,New Balance Adjustment,New Balance Adjustment,form,9,9,in-progress,85,75,/app/finance/period-close,partial,,P2,Pass 3 Jul 2026; Bal. Count By Customer/Vendor on 1024 GCASH; see acct1-balance-adjustment.md
+E010211,Acct. I,Fast Entry,Bal. Count List,Bal. Count List,list,3,3,in-progress,50,45,/app/finance/period-close,partial,,P2,Pass 2 Jul 2026; F2 opens nested E010209; see acct1-balance-adjustment.md
+E010210,Acct. I,Fast Entry,Balance Adjustment List,Balance Adjustment List,list,1,1,in-progress,35,50,/app/finance/period-close,partial,,P2,Pass 3 Jul 2026; F2 opens nested E010209; see acct1-balance-adjustment.md
+E010212,Acct. I,Fast Entry,Bal. Adjustment Status,Bal. Adjustment Status,report,9,9,in-progress,50,40,/app/finance/period-close,partial,,P2,Pass 1 Jul 2026; Compare with Actual Balance; see acct1-balance-adjustment.md
+E040103,Inv. I,Setup,Item,Item List,list,24,22,in-progress,195,92,/app/inventory/items,partial,,P1,Tenant alias C000029; pass 7 edit panel + Inv. Count I; see C000029-item-list.md
+C000010,Acct. I,Fast Entry,Fast Entry,Fast Entry,hub,0,1,in-progress,35,20,/app/finance/journal,partial,,P2,Hub prgId; defaults to E010201; see screens/acct1-fast-entry.md pass 3
+E010207,Acct. I,Fast Entry,PG Sales List,PG Sales List,list,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_002566
+E010301,Acct. I,Fast Entry,Sales Invoice I,Sales Invoice I,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000076
+E010303,Acct. I,Fast Entry,Purchase Invoice I,Purchase Invoice I,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000078
+E010401,Acct. I,Fast Entry,From Employee,From Employee,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000323
+E010402,Acct. I,Fast Entry,Receipt,Receipt,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000329
+E010404,Acct. I,Fast Entry,Cash In - From Customer,Cash In - From Customer,form,0,0,in-progress,25,35,/app/finance/official-receipts,partial,,P2,Pass 1 Jul 2026; see E010404-cash-in-from-customer.md; known-parity: Cash In - From Customer — modal + list; known-parity: Cash In - From Customer — OR list + modal
+E010405,Acct. I,Fast Entry,From Merchant Account,From Merchant Account,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000325
+E010406,Acct. I,Fast Entry,Bank Loan,Bank Loan,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000326
+E010407,Acct. I,Fast Entry,From Others,From Others,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000327
+E010409,Acct. I,Cash,Cash Out - To Vendor,Cash Out - To Vendor,form,0,0,in-progress,20,30,/app/finance/payment-vouchers,partial,,P2,Pass 1 Jul 2026; see E010409-cash-out-to-vendor.md; known-parity: Cash Out - To Vendor — modal + list; known-parity: Cash Out - To Vendor — PV list + modal
+E010410,Acct. I,Fast Entry,To Employee,To Employee,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000331
+E010411,Acct. I,Fast Entry,Bank Transfer,Bank Transfer,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000332
+E010412,Acct. I,Fast Entry,To Credit Card,To Credit Card,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000333
+E010413,Acct. I,Fast Entry,Loan Repayment/Interest,Loan Repayment/Interest,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000334
+E010414,Acct. I,Fast Entry,To Others,To Others,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000335
+E010501,Acct. I,Fast Entry,Receipt,Receipt,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000336
+E010503,Acct. I,Fast Entry,Others,Others,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000084
+E010504,Acct. I,Fast Entry,Credit Card Receipt,Credit Card Receipt,form,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000337
+E010801,Acct. I,Reports,Cash Book,Cash Book,report,1,1,in-progress,25,25,/app/finance/reports,partial,,P2,Pass 5 Jul 2026; dept/project/Include Deposit; tenant empty grid; see acct1-reports-book.md
+N000121,Acct. I,Reports,Management Resource,Sales Summary,report,1,1,in-progress,45,35,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; N-prefix requires MENUTREE_000001; see acct1-reports-management-resource.md
+N000122,Acct. I,Reports,Sales/Purchase Book,Sales/Purchase Book,report,0,0,blocked,0,5,—,missing,,P2,Pass 5 Jul 2026; empty render in tenant; see acct1-reports-book.md
+N000128,Acct. I,Reports,Management Resource,Purchase Summary,report,1,1,in-progress,45,35,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; mirror N000121 purchase side; see acct1-reports-management-resource.md
+E010802,Acct. I,Reports,Journal,Journal,report,1,1,in-progress,35,25,/app/finance/reports,partial,,P2,Pass 1 Jul 2026; GL journal inquiry; see acct1-reports-book.md
+E010803,Acct. I,Reports,Daily Trial Balance,Daily Trial Balance,report,3,3,in-progress,30,25,/app/finance/reports,partial,,P2,Pass 1 Jul 2026; Daily/Monthly type pills; see acct1-reports-book.md
+E010804,Acct. I,Reports,Fund Statement,Fund Statement,report,2,2,in-progress,35,30,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; customer relation radios; see acct1-reports-management-resource.md
+E010805,Acct. I,Reports,Cash Flow (Deposit and Withdrawal Details),Cash Flow (Deposit and Withdrawal Details),report,2,2,in-progress,40,30,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; Same Period Prev. Day comparison; see acct1-reports-management-resource.md
+E010807,Acct. I,Reports,LedgerⅠ,LedgerⅠ,report,4,1,in-progress,40,30,/app/finance/reports,partial,,P2,Pass 2 Jul 2026; Type radios by Line/Daily/Monthly; see acct1-reports-book.md
+E010808,Acct. I,Reports,LedgerⅡ,LedgerⅡ,report,4,1,in-progress,45,30,/app/finance/reports,partial,,P2,Pass 3 Jul 2026; Summary by Customer/Vendor; see acct1-reports-book.md
+E010809,Acct. I,Reports,LedgerⅢ,LedgerⅢ,report,4,1,in-progress,40,30,/app/finance/reports,partial,,P2,Pass 3 Jul 2026; account+customer hybrid; see acct1-reports-book.md
+E010811,Acct. I,Reports,Compound Trial Balance,Compound Trial Balance,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000370
+E010812,Acct. I,Reports,Income Statement,Income Statement,report,1,1,in-progress,45,35,/app/finance/reports,partial,,P2,Pass 2 Jul 2026; FS date range + comparison; see acct1-reports-book.md
+E010813,Acct. I,Reports,Balance Sheet,Balance Sheet,report,1,1,in-progress,40,35,/app/finance/reports,partial,,P2,Pass 2 Jul 2026; dept/project display types; see acct1-reports-book.md
+E010815,Acct. I,Reports,Fund In./De. Details,Fund In./De. Details,report,2,2,in-progress,30,25,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; reload if stale title; see acct1-reports-management-resource.md
+E010816,Acct. I,Reports,Schedule of Cost,Schedule of Cost,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000369
+E010817,Acct. I,Reports,Retained Earnings Statement,Retained Earnings Statement,report,1,0,in-progress,15,25,/app/finance/reports,partial,,P2,Pass 3 Jul 2026; period list + New F2; see acct1-reports-book.md
+E010819,Acct. I,Reports,Monthly Income Statement,Monthly Income Statement,report,2,2,in-progress,35,30,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; Beginning/Increase/Ending columns; see acct1-reports-management-resource.md
+E010821,Acct. I,Reports,Management Report,Management Report,report,2,2,in-progress,25,25,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; Acct. I chart templates; distinct from E040704; see acct1-reports-management-resource.md
+E010822,Acct. I,Reports,AR/AP Aging,AR/AP Aging,report,2,2,in-progress,40,30,/app/finance/reports,partial,,P1,Pass 15 Jul 2026; as-of aging summary; see acct1-reports-management-resource.md
+E010823,Acct. I,Reports,AR/AP Aging Details,AR/AP Aging Details,report,2,2,in-progress,45,35,/app/finance/reports,partial,,P1,Pass 15 Jul 2026; Receivable/Payables + Summary by PIC; see acct1-reports-management-resource.md
+E010824,Acct. I,Reports,Monthly Cost,Monthly Cost,report,2,2,in-progress,35,30,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; Manufacturing/Service/Etc. type; see acct1-reports-management-resource.md
+E010829,Acct. I,Reports,Search Customer/Vendor Transactions,Search Customer/Vendor Transactions,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001355
+E010830,Acct. I,Reports,Cash Report,Cash Report,report,2,2,in-progress,35,30,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; dept/project + Status preset; see acct1-reports-management-resource.md
+E010831,Acct. I,Reports,Currency Ledger,Currency Ledger,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_000380
+E010832,Acct. I,Reports,Statement of Operation,Statement of Operation,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001359
+E010833,Acct. I,Reports,Customer/Vendor Book I,Customer/Vendor Book I,report,1,1,in-progress,45,35,/app/finance/reports,partial,,P1,Pass 13 Jul 2026; generic AR/AP toggle; Inv. I hash works; see inv1-reports-others.md
+E010835,Acct. I,Reports,Payments Journal Sum.,Payments Journal Sum.,report,1,1,in-progress,50,40,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; by Bank Account and Account type; see acct1-reports-management-resource.md
+E010836,Acct. I,Reports,Receipts Journal Sum.,Receipts Journal Sum.,report,1,1,in-progress,50,40,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; Deposit Account filter; see acct1-reports-management-resource.md
+E010840,Acct. I,Reports,S/A Journal Sum.,S/A Journal Sum.,report,1,1,in-progress,50,40,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; by Employee and Account type; see acct1-reports-management-resource.md
+E010842,Acct. I,Reports,Customer/Vendor Book II,Customer/Vendor Book II,report,2,2,in-progress,40,30,/app/finance/reports,partial,,P1,Pass 13 Jul 2026; summary book + foreign currency; see inv1-reports-others.md
+E010843,Acct. I,Reports,Accounting Summary,Accounting Summary,report,2,2,in-progress,45,35,/app/finance/reports,partial,,P2,Pass 15 Jul 2026; Summary Condition 1-3 + Target; see acct1-reports-management-resource.md
+E010844,Acct. I,Reports,Chart of Accounts Status,Chart of Accounts Status,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001357
+E010847,Acct. I,Reports,Others,Accounting Transaction Status,report,1,1,in-progress,55,40,/app/finance/reports,partial,,P2,Pass 16 Jul 2026; live title Voucher Status; see acct1-reports-others.md
+E010702,Acct. I,Reports,Others,Print Voucher,report,2,2,in-progress,45,35,/app/finance/reports,partial,,P2,Pass 16 Jul 2026; Sort by Modified Date; see acct1-reports-others.md
+E010705,Acct. I,Reports,Others,Update Balance for Accounting,action,0,0,in-progress,10,20,/app/finance/period-close,partial,,P1,Pass 16 Jul 2026; month range + F8 rebuild; see acct1-reports-others.md
+E010712,Acct. I,Reports,Others,View Transaction History,report,2,2,in-progress,45,35,/app/finance/reports,partial,,P2,Pass 16 Jul 2026; title Change History (Acct.); distinct from E040716; see acct1-reports-others.md
+E010730,Acct. I,Reports,Others,Accounting vs. Inventory,report,2,2,in-progress,50,40,/app/finance/reports,parity,,P1,Pass 16 Jul 2026; GL vs Inv reconciliation; see acct1-reports-others.md; known-parity: Acct vs Inv recon — gaps Done
+E010850,Acct. I,Reports,Custom Report,Custom Report,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001360
+E010851,Inv. I,Reports,Communication Center,Message Log,list,5,5,in-progress,35,30,/app/reports/communication,partial,,P2,Pass 14 Jul 2026; opens Msg. inbox; see inv1-reports-communication-proof.md
+E010856,Acct. I,Reports,Ledger IV,Ledger IV,report,0,0,in-progress,0,30,/app/finance/reports,partial,,P2,Pass 3 Jul 2026; tenant empty render; see acct1-reports-book.md
+E010857,Acct. I,Reports,Account In./De. Details,Account In./De. Details,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001710
+E010858,Inv. I,Reports,Communication Center,Sent Doc. History,report,1,1,in-progress,55,45,/app/reports/communication,partial,,P2,Pass 14 Jul 2026; email/SMS send log + Resend; see inv1-reports-communication-proof.md
+E040730,Inv. I,Reports,Proof Center,Proof Center,list,1,1,in-progress,40,35,/app/reports/proof,partial,,P2,Pass 14 Jul 2026; Attach Receipts + e-Sign; see inv1-reports-communication-proof.md
+E010861,Acct. I,Reports,Statement of Cash Flows,Statement of Cash Flows,report,1,1,in-progress,35,30,/app/finance/reports,partial,,P2,Pass 4 Jul 2026; Enter modal + Apply Formula grid; see acct1-reports-book.md
+E040201,Inv. I,Sales,New Quotation,New Quotation,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000486
+E040202,Inv. I,Sales,Quotation List,Quotation List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000487
+E040203,Inv. I,Sales,New Sales Order,New Sales Order,form,0,0,in-progress,55,50,/app/sales-order/sales-orders/new,partial,,P1,Pass 1 Jul 2026; Quotation pull; see E040203-new-sales-order.md; known-parity: New SO — crawled + wired
+E040204,Inv. I,Sales,Sales Order List,Sales Order List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000489
+E040206,Inv. I,Sales,Sales List,Sales List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000492
+E040207,Inv. I,Reports,Sales,Sales Status,report,2,2,in-progress,40,35,/app/selling/reports,partial,,P1,Pass 5 Jul 2026; Details/Summary/by Line; see inv1-sales-reports.md
+E040208,Inv. I,Reports,Sales,Quotation Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 6 Jul 2026; Status/Summary + Reference No.; see inv1-sales-reports.md
+E040209,Inv. I,Reports,Sales,Sales Order Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 6 Jul 2026; Status/Summary + Delivery Date; see inv1-sales-reports.md
+E040210,Inv. I,Sales,Print Sales Slips,Print Sales Slips,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000497
+E040211,Inv. I,Reports,Sales,Outstanding Quote Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 7 Jul 2026; as-of + Outstanding Quote Qty; see inv1-sales-reports.md
+E040212,Inv. I,Reports,Sales,Outstanding S/O Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 7 Jul 2026; mirror outstanding quote; see inv1-sales-reports.md
+E040214,Inv. I,Reports,Sales,A/R by Customer,report,2,2,in-progress,45,35,/app/selling/reports,partial,,P1,Pass 5 Jul 2026; By Customer/Vendor vs by PIC; see inv1-sales-reports.md
+E040215,Inv. I,Sales,Collective Invoicing (Sales),Collective Invoicing (Sales),list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000187
+E040216,Inv. I,Reports,Sales,Sales Discount Status,report,1,1,in-progress,30,30,/app/selling/reports,partial,,P1,Pass 9 Jul 2026; mirror Receipt Status; Discount Amount filter; tenant empty Jul MTD; see inv1-sales-reports.md
+E040217,Inv. I,Reports,Sales,Receipt Status,report,1,1,in-progress,30,30,/app/selling/reports,partial,,P1,Pass 5 Jul 2026; cash receipt inquiry; tenant empty Jul MTD; see inv1-sales-reports.md
+E040721,Inv. I,Reports,Sales,Receivable Status,report,1,1,in-progress,35,30,/app/selling/reports,parity,,P1,Pass 6 Jul 2026; as-of date (not range); tenant empty Jul; distinct from Acct II E060404; see inv1-sales-reports.md; known-parity: Receivable Status — gaps Done
+E040722,Inv. I,Reports,Purchases,Payable Status,report,1,1,in-progress,35,30,/app/buying/reports,parity,,P1,Pass 8 Jul 2026; mirror Receivable E040721; tenant empty Jul; see inv1-purchase-reports.md; known-parity: Payable Status — gaps Done
+E040220,Inv. I,Sales,New Shipping Order,New Shipping Order,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000659
+E040221,Inv. I,Sales,Shipping Order List,Shipping Order List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000660
+E040222,Inv. I,Reports,Sales,Shipping Order Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 8 Jul 2026; Status/Summary + Details/by Line; tenant empty Jul MTD; see inv1-sales-reports.md
+E040224,Inv. I,Sales,Change Sales Price-Batch,Change Sales Price-Batch,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000725
+E040225,Inv. I,Sales,New Shipment,New Shipment,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000775
+E040226,Inv. I,Sales,Shipment List,Shipment List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000776
+E040227,Inv. I,Reports,Sales,Shipment Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 7 Jul 2026; Status/Summary + Details/by Line; tenant empty Jul MTD; see inv1-sales-reports.md
+E040228,Inv. I,Reports,Sales,Pending Shipment Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 8 Jul 2026; as-of + Pending Shipment Qty; tenant empty as-of; see inv1-sales-reports.md
+E040609,Inv. I,Reports,Sales,Pre-Invoicing Status (Sales),report,1,1,in-progress,30,30,/app/selling/reports,partial,,P1,Pass 9 Jul 2026; Base Date as-of + Amount filter; see inv1-sales-reports.md
+E040723,Inv. I,Reports,Sales,Customer/Vendor Book I (AR),report,2,2,in-progress,40,35,/app/selling/reports,partial,,P1,Pass 9 Jul 2026; Summary Type By Slip+Details + Email; see inv1-sales-reports.md
+N000119,Inv. I,Reports,Sales,Sales Invoice Status (Inv.),report,1,1,in-progress,40,30,/app/selling/reports,partial,,P1,Pass 10 Jul 2026; N-prefix tax slip inquiry + Status Confirm pills; tenant empty Jul MTD; see inv1-sales-reports.md
+E040713,Inv. I,Reports,Sales,Monthly Receivable Change Details,report,1,1,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 10 Jul 2026; month-range AR fluctuation; mirror E040714; see inv1-sales-reports.md
+E040230,Inv. I,Sales,Release Sales Order,Release Sales Order,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001647
+E040301,Inv. I,Purchases,New Purchase Order,New Purchase Order,form,0,0,in-progress,60,50,/app/purchase-order/purchase-orders/new,partial,,P1,Pass 1 Jul 2026; Load Slip/RFQ/PO Plan; see E040301-new-purchase-order.md; known-parity: New PO — crawled + wired
+E040302,Inv. I,Purchases,Purchase Order List,Purchase Order List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000509
+E040304,Inv. I,Purchases,Purchase List,Purchase List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000511
+E040305,Inv. I,Reports,Purchases,Purchase Status,report,2,2,in-progress,40,35,/app/buying/reports,partial,,P1,Pass 6 Jul 2026; mirror Sales Status; see inv1-purchase-reports.md
+E040306,Inv. I,Reports,Purchases,Purchase Order Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 7 Jul 2026; mirror SO Status; see inv1-purchase-reports.md
+E040307,Inv. I,Reports,Purchases,Outstanding P/O Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 7 Jul 2026; mirror outstanding S/O; see inv1-purchase-reports.md
+E040309,Inv. I,Reports,Purchases,A/P by Vendor,report,2,2,in-progress,45,35,/app/buying/reports,partial,,P1,Pass 6 Jul 2026; mirror A/R by Customer; see inv1-purchase-reports.md
+E040310,Inv. I,Reports,Purchases,Payment Status,report,1,1,in-progress,30,30,/app/buying/reports,partial,,P1,Pass 7 Jul 2026; mirror Receipt Status; tenant empty Jul MTD; see inv1-purchase-reports.md
+E040311,Inv. I,Purchases,Change Purchases Price-Batch,Change Purchases Price-Batch,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001662
+E040312,Inv. I,Purchases,Collective Invoicing (Purchase),Collective Invoicing (Purchase),list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000193
+E040313,Inv. I,Reports,Purchases,Purchase Discount Status,report,1,1,in-progress,30,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; mirror Sales Discount; tenant empty Jul MTD; see inv1-purchase-reports.md
+E040314,Inv. I,Purchases,New Purchase Request,New Purchase Request,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000504
+E040315,Inv. I,Purchases,Purchase Request List,Purchase Request List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000505
+E040316,Inv. I,Purchases,New Purchase Plan,New Purchase Plan,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000506
+E040317,Inv. I,Purchases,Purchase Plan List,Purchase Plan List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000507
+E040318,Inv. I,Reports,Purchases,Purchase Request Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; Details/by Line + PR No. + Delivery Date; see inv1-purchase-reports.md
+E040319,Inv. I,Reports,Purchases,Pre-Invoicing Status (Purchases),report,1,1,in-progress,30,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; Base Date as-of mirror E040609; see inv1-purchase-reports.md
+E040724,Inv. I,Reports,Purchases,Customer/Vendor Book I (AP),report,2,2,in-progress,40,35,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; mirror E040723 for AP; see inv1-purchase-reports.md
+N000127,Inv. I,Reports,Purchases,Purchase Invoice Status (Inv.),report,1,1,in-progress,40,30,/app/buying/reports,partial,,P1,Pass 10 Jul 2026; mirror N000119; hash quirk left menu; tenant empty Jul MTD; see inv1-purchase-reports.md
+E040714,Inv. I,Reports,Purchases,Monthly Payable Fluctuation,report,1,1,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 10 Jul 2026; mirror E040713; see inv1-purchase-reports.md
+E040321,Inv. I,Purchases,New RFQ,New RFQ,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001325
+E040322,Inv. I,Purchases,RFQ List,RFQ List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001326
+E040323,Inv. I,Purchases,RFQ Progress Status,RFQ Progress Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001912
+E040325,Inv. I,Purchases,RFQ Status,RFQ Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001913
+E040401,Inv. I,Production,BOM Design,BOM Design,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000520
+E040402,Inv. I,Production,BOM Design Status,BOM Design Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001952
+E040403,Inv. I,Production,Estimated BOM,Estimated BOM,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000521
+E040404,Inv. I,Production,New Goods Issued,New Goods Issued,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000524
+E040405,Inv. I,Production,Goods Issued List,Goods Issued List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000525
+E040406,Inv. I,Production,Goods Receipt I,Goods Receipt I,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000526
+E040407,Inv. I,Production,Goods Receipt II,Goods Receipt II,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000527
+E040408,Inv. I,Production,Goods Receipt List,Goods Receipt List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000529
+E040409,Inv. I,Production,Goods Issued Status,Goods Issued Status,report,1,1,in-progress,45,35,/app/job-costing/reports,partial,,P1,Pass 12 Jul 2026; Details/Summary/by Line; see inv1-reports-production.md
+E040410,Inv. I,Production,Goods Receipt Status,Goods Receipt Status,report,1,1,in-progress,50,35,/app/job-costing/reports,partial,,P1,Pass 12 Jul 2026; + Payable No. + GR I/II/III; see inv1-reports-production.md
+E040411,Inv. I,Production,New Job Order,New Job Order,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000522
+E040412,Inv. I,Production,Job Order List,Job Order List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000523
+E040413,Inv. I,Production,Job Order Status,Job Order Status,report,1,1,in-progress,50,40,/app/job-costing/reports,partial,,P1,Pass 12 Jul 2026; J/O + delivery date filters; see inv1-reports-production.md
+E040414,Inv. I,Production,Progress Status by J/O,Progress Status by J/O,report,1,1,in-progress,45,35,/app/job-costing/reports,partial,,P1,Pass 12 Jul 2026; four progress type radios; see inv1-reports-production.md
+E040415,Inv. I,Production,Goods Receipt/Consumed Status I,Goods Receipt/Consumed Status I,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000535
+E040416,Inv. I,Production,Goods Receipt III,Goods Receipt III,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000528
+E040418,Inv. I,Production,Collective Invoicing (O/E),Collective Invoicing (O/E),list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000530
+E040419,Inv. I,Production,Discount on O/E Status,Discount on O/E Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000664
+E040425,Inv. I,Production,Reg. Process,Reg. Process,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002704
+E040426,Inv. I,Production,Reg. Resource,Reg. Resource,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002705
+E040427,Inv. I,Production,BOR (Required Time),BOR (Required Time),list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002706
+E040428,Inv. I,Production,Calculate Required Time,Calculate Required Time,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002707
+E040429,Inv. I,Production,Apply J/O to Job,Apply J/O to Job,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002709
+E040430,Inv. I,Production,New Job Record,New Job Record,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002710
+E040431,Inv. I,Production,Job Record List,Job Record List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002711
+E040432,Inv. I,Production,Job Record Status,Job Record Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002712
+E040435,Inv. I,Production,New Production Plan/MRP,New Production Plan/MRP,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002762
+E040436,Inv. I,Production,Job Order Efficiency Status,Job Order Efficiency Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_002884
+E040501,Inv. I,Inv. Mov.,New Location Tran.,New Location Tran.,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000539
+E040502,Inv. I,Inv. Mov.,Location Tran. List,Location Tran. List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000540
+E040503,Inv. I,Inv. Mov.,New Internal Use,New Internal Use,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000541
+E040504,Inv. I,Inv. Mov.,Internal Use List,Internal Use List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000542
+E040505,Inv. I,Inv. Mov.,Location Tran. Status,Location Tran. Status,report,0,0,cataloged,0,5,—,missing,,P1,Pass 12 Jul 2026; No Authorization in tenant; see inv1-reports-inv-movement.md
+E040506,Inv. I,Inv. Mov.,Internal Use Status,Internal Use Status,report,0,0,cataloged,0,5,—,missing,,P1,Pass 12 Jul 2026; No Authorization in tenant; see inv1-reports-inv-movement.md
+E040507,Inv. I,Inv. Mov.,New Product Defect,New Product Defect,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000543
+E040508,Inv. I,Inv. Mov.,Product Defect List,Product Defect List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000544
+E040509,Inv. I,Inv. Mov.,Product Defect Status,Product Defect Status,report,0,0,cataloged,0,5,—,missing,,P1,Pass 12 Jul 2026; No Authorization in tenant; see inv1-reports-inv-movement.md
+E040608,Inv. I,Inv. Mov.,Inv. Adjustment Status,Inv. Adjustment Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog; auth blocked pass 12; see inv1-reports-inv-movement.md
+E040615,Inv. I,Inv. Mov.,Inv. Count Status,Inv. Count Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog; auth blocked pass 12; see inv1-reports-inv-movement.md
+E040510,Inv. I,Inv. Mov.,Disassemble Status,Disassemble Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000552
+E040511,Inv. I,Inv. Mov.,Disposal Status,Disposal Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000553
+E040512,Inv. I,Inv. Mov.,Defect Rate Status,Defect Rate Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000554
+E041003,Inv. I,Online Store Mgmt,Setup,Register Online Store,list,4,4,in-progress,25,20,—,missing,,P3,Pass 2 Jul 2026; F2 store form; see C000654-online-store.md
+E041004,Inv. I,Online Store Mgmt,Setup,Link to Online Store Item Code,list,0,0,in-progress,0,15,—,missing,,P3,Pass 2 Jul 2026; empty until store registered; see C000654-online-store.md
+E041005,Inv. I,Online Store Mgmt,Order Mgmt,Order Mgmt Status,list,11,13,in-progress,55,35,—,missing,,P3,Pass 3 Jul 2026; Option filters + Collect Orders modal; see C000654-online-store-orders.md
+E041006,Inv. I,Online Store Mgmt,Order Mgmt,Order Confirmation,list,1,1,in-progress,40,30,—,missing,,P3,Pass 1 Jul 2026; Collect Orders; see C000654-online-store-orders.md
+E041007,Inv. I,Online Store Mgmt,Order Mgmt,Delivery,list,1,1,in-progress,45,30,—,missing,,P3,Pass 1 Jul 2026; Ready to Release; see C000654-online-store-orders.md
+E041008,Inv. I,Online Store Mgmt,Order Mgmt,Cancel,list,1,1,in-progress,40,30,—,missing,,P3,Pass 2 Jul 2026; Cancellation Complete; see C000654-online-store-orders.md
+E041009,Inv. I,Online Store Mgmt,Order Mgmt,Return,list,1,1,in-progress,40,30,—,missing,,P3,Pass 2 Jul 2026; Returned toolbar; see C000654-online-store-orders.md
+E041010,Inv. I,Online Store Mgmt,Order Mgmt,Exchange,list,1,1,in-progress,45,30,—,missing,,P3,Pass 2 Jul 2026; Returned Exchange; see C000654-online-store-orders.md
+E041011,Inv. I,Online Store Mgmt,Order Mgmt,ERP Transmission,list,1,1,in-progress,40,30,—,missing,,P3,Pass 2 Jul 2026; SO/Sale ERP status; see C000654-online-store-orders.md
+E041015,Inv. I,Reports,Purchases,Purchase Plan Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; prgId E041015; Details/by Line; see inv1-purchase-reports.md
+E040703,Inv. I,Reports,Others,AR/AP Status,report,1,1,in-progress,35,30,/app/reports,partial,,P1,Pass 10 Jul 2026; Type Receivable/Payables/Combined as-of; see inv1-reports-others.md
+E040806,Inv. I,Reports,Others,Daily Profit Status,report,2,2,in-progress,50,40,/app/reports,partial,,P1,Pass 10 Jul 2026; Default/All pills + FIFO vs monthly cost; see inv1-reports-others.md
+E040807,Inv. I,Reports,Others,Daily Costing Status,report,2,2,in-progress,40,35,/app/reports,partial,,P1,Pass 11 Jul 2026; mirror Daily Profit cost-only; see inv1-reports-others.md
+E040725,Inv. I,Reports,Others,Sales/Purchases Summary,report,1,1,in-progress,50,40,/app/reports,partial,,P1,Pass 13 Jul 2026; Summary Condition 1/2/Target; see inv1-reports-others.md
+E040710,Inv. I,Reports,Others,Summary,report,1,1,in-progress,55,45,/app/reports,partial,,P1,Pass 13 Jul 2026; six Menu Type radios; see inv1-reports-others.md
+E040819,Inv. I,Reports,Others,Price Change History,report,2,2,in-progress,45,35,/app/inventory/reports,partial,,P1,Pass 13 Jul 2026; by Slip + price type checkboxes; see inv1-reports-others.md
+E040704,Inv. I,Reports,Others,Management Report,report,2,2,in-progress,25,20,/app/reports,partial,,P1,Pass 13 Jul 2026; date-only template report; see inv1-reports-others.md
+E040709,Inv. I,Reports,Others,Status Grand Total,report,2,2,in-progress,45,35,/app/reports,partial,,P1,Pass 13 Jul 2026; Vertical/Horizontal matrix; see inv1-reports-others.md
+E040716,Inv. I,Reports,Others,View Transaction History,report,1,1,in-progress,40,30,/app/reports,partial,,P2,Pass 13 Jul 2026; title Change History; Slip/Basic Code; see inv1-reports-others.md
+E040627,Inv. I,Reports,Others,All-In-One I,workspace,0,0,in-progress,30,25,/app/reports,partial,,P2,Pass 13+16 Jul 2026; customer workspace; Acct. I menuSeq MENUTREE_001352; see inv1-reports-others.md acct1-reports-others.md
+E040633,Inv. I,Reports,Others,All-in-One II,workspace,0,0,in-progress,25,20,/app/reports,partial,,P2,Pass 13 Jul 2026; item workspace dashboard; see inv1-reports-others.md
+E040701,Inv. I,Reports,Inventory Balance,Inventory Balance,report,1,1,in-progress,45,40,/app/inventory/reports,partial,,P1,Pass 11 Jul 2026; use menuSeq MENUTREE_001888; see inv1-reports-inventory-balance.md
+E040711,Inv. I,Reports,Inventory Balance,Inv. Balance by Location,report,2,2,in-progress,45,40,/app/inventory/reports,partial,,P1,Pass 11 Jul 2026; Horizontal/Vertical location matrix; see inv1-reports-inventory-balance.md
+E040728,Inv. I,Reports,Inventory Balance,Inv. Balance by Item Relation,report,1,1,in-progress,35,30,/app/inventory/reports,partial,,P1,Pass 11 Jul 2026; item relation rollup; see inv1-reports-inventory-balance.md
+E040702,Inv. I,Reports,Inventory Balance,Inv. Book,report,2,2,in-progress,50,45,/app/inventory/reports,partial,,P1,Pass 11 Jul 2026; stock ledger + price display; see inv1-reports-inventory-balance.md
+E040719,Inv. I,Reports,Inventory Balance,Inventory Change History,report,2,2,in-progress,45,40,/app/inventory/reports,partial,,P1,Pass 11 Jul 2026; Summary/Daily/Monthly pivot; see inv1-reports-inventory-balance.md
+E040727,Inv. I,Reports,Inventory Balance,Inventory Aging Details,report,1,1,in-progress,35,30,/app/inventory/reports,partial,,P1,Pass 11 Jul 2026; aging buckets as-of; see inv1-reports-inventory-balance.md
+E040708,Inv. I,Reports,Inventory Balance,Daily Report,report,2,2,in-progress,45,35,/app/inventory/reports,partial,,P1,Pass 12 Jul 2026; cross-module daily inquiry; see inv1-reports-inventory-balance.md
+E040720,Inv. I,Reports,Inventory Balance,Inv. Balance by Multi Spec.,report,2,2,in-progress,45,40,/app/inventory/reports,partial,,P1,Pass 12 Jul 2026; Spec. Group/Code 1-3; see inv1-reports-inventory-balance.md
+E040726,Inv. I,Reports,Inventory Balance,Inv. balance converted by BOM,report,1,1,in-progress,30,25,/app/inventory/reports,partial,,P1,Pass 12 Jul 2026; BOM parent Item Code; see inv1-reports-inventory-balance.md
+N000118,Acct. I,Reports,Others,Sales Invoice Status,report,1,1,in-progress,40,30,/app/finance/reports,partial,,P1,Pass 11 Jul 2026; menuType MENUTREE_000001; mirror N000119; see inv1-sales-reports.md
+N000126,Acct. I,Reports,Others,Purchase Invoice Status,report,1,1,in-progress,40,30,/app/finance/reports,partial,,P1,Pass 11 Jul 2026; menuType MENUTREE_000001; mirror N000127; see inv1-purchase-reports.md
+E041018,Inv. II,Serial/Lot No.,Item vs. Serial/Lot No. Balance,Item vs. Serial/Lot No. Balance,report,2,2,in-progress,45,45,/app/inventory/serial-lot,parity,,P1,Pass 18 Jul 2026; Compare by Serial/Lot No vs Item; menuSeq MENUTREE_002766; see inv2-serial-lot.md; known-parity: Item vs Serial balance — gaps Done
+E060402,Acct. II,Receivable Management,New Receivable Payment,New Receivable Payment,list,0,0,in-progress,50,40,/app/finance/receivables,partial,,P2,Pass 4 Jul 2026; Decrease Amount + Receipts Journal modal; see acct2-breadth.md
+E060403,Acct. II,Receivable Management,Receivable List,Receivable List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000687
+E060404,Acct. II,Receivable Management,Receivable Status,Receivable Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000688
+E060405,Acct. II,Receivable Management,Receivable Transaction Details,Receivable Transaction Details,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000716
+E060406,Acct. II,Receivable Management,Registered Receivable Status,Registered Receivable Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000717
+E060407,Acct. II,Receivable Management,Receivable Payment Status,Receivable Payment Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000718
+E060408,Acct. II,Receivable Management,AR Aging Details,AR Aging Details,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001314
+E060502,Acct. II,Payable Management,New Payable Payment,New Payable Payment,list,0,0,in-progress,50,40,/app/finance/payables,partial,,P2,Pass 4 Jul 2026; Decrease Amount + Payments Journal modal; see acct2-breadth.md
+E060503,Acct. II,Payable Management,Payable List,Payable List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000692
+E060504,Acct. II,Payable Management,Payable Status,Payable Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000693
+E060505,Acct. II,Payable Management,Payable Transaction Details,Payable Transaction Details,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000719
+E060506,Acct. II,Payable Management,Registered Payable Status,Registered Payable Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000720
+E060507,Acct. II,Payable Management,Payable Payment Status,Payable Payment Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000721
+E060508,Acct. II,Payable Management,AP Aging Details,AP Aging Details,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001315
+E060602,Inv. I,Sales,New RCVD. Check Payment,New RCVD. Check Payment,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000696
+E060603,Inv. I,Sales,Checks Received List,Checks Received List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000697
+E060604,Inv. I,Sales,Checks Received Status,Checks Received Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000698
+E060606,Inv. I,Sales,New Issued Check Clearance,New Issued Check Clearance,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000700
+E060607,Inv. I,Sales,Checks Issued List,Checks Issued List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000701
+E060608,Inv. I,Sales,Checks Issued Status,Checks Issued Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000702
+E060609,Acct. I,Reports,Checks Received Status Report,Checks Received Status Report,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001750
+E060610,Inv. I,Sales,Decrease of Received Checks Balance,Decrease of Received Checks Balance,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001751
+E060611,Inv. I,Sales,Increase of Issued Checks Balance,Increase of Issued Checks Balance,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001752
+E060612,Inv. I,Sales,Decrease of Issued Checks Balance,Decrease of Issued Checks Balance,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001753
+E060613,Inv. I,Sales,Received Check Transactions,Received Check Transactions,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001941
+E060614,Inv. I,Sales,Issued Check Transactions,Issued Check Transactions,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001942
+831J3K25VPD4SA3,MyPage,MyPage,,MyPage,other,0,0,cataloged,0,0,—,missing,,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=831J3K25VPD4SA3
+831J3K25W474SA4,MyPage,Default Group,,Default Group,other,0,0,cataloged,0,0,—,missing,,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=831J3K25W474SA4
+C000008,User Customization,User Customization,,User Customization,other,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000008
+C000009,Inv. I,Setup,,Setup,hub,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000009
+C000011,Inv. I,Invoice,,Invoice,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000011
+C000012,Inv. I,Cash,,Cash,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000012
+C000013,Inv. I,Non-Cash Transaction,,Non-Cash Transaction,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000013
+C000014,Inv. I,Notes,,Notes,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000014
+C000015,Inv. I,Fixed Assets,,Fixed Assets,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000015
+C000016,Inv. I,Accounting Transaction Mgmt,,Accounting Transaction Mgmt,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000016
+C000017,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000017
+C000036,Inv. I,Costing,,Costing,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000036
+C000037,Inv. I,Exps.,,Exps.,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000037
+C000038,Inv. I,Share,,Share,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000038
+C000039,Inv. I,e-Approval,,e-Approval,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000039
+C000040,Inv. I,Work,,Work,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000040
+C000042,Inv. I,CRM,,CRM,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000042
+C000044,Inv. I,Project,,Project,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000044
+C000046,Inv. I,Cash In,,Cash In,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000080
+C000047,Inv. I,Cash Out,,Cash Out,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000081
+C000048,Inv. I,Other Transaction,,Other Transaction,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000082
+C000049,Inv. I,Fixed Asset Reports,,Fixed Asset Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000094
+C000050,Inv. I,Management Resource,,Management Resource,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000115
+C000051,Inv. I,Book,,Book,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000116
+C000052,Inv. I,Others,,Others,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000117
+C000053,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000118
+C000062,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000137
+C000071,Inv. I,Quotation,,Quotation,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000184
+C000072,Inv. I,Sales Order,,Sales Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000185
+C000073,Inv. I,Sales,,Sales,hub,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000186
+C000075,Inv. I,Purchase Request,,Purchase Request,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000189
+C000076,Inv. I,Purchase Plan,,Purchase Plan,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000190
+C000077,Inv. I,Purchase Order,,Purchase Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000191
+C000078,Inv. I,Purchases,,Purchases,hub,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000192
+C000080,Inv. I,BOM,,BOM,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000195
+C000081,Inv. I,Job Order,,Job Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000196
+C000082,Inv. I,Goods Issued,,Goods Issued,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000197
+C000083,Inv. I,Goods Receipt,,Goods Receipt,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000198
+C000084,Inv. I,INVOICING (O/E),,INVOICING (O/E),other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000199
+C000086,Inv. I,Location Tran.,,Location Tran.,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000201
+C000087,Inv. I,Internal Use,,Internal Use,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000202
+C000088,Inv. I,Product Defect,,Product Defect,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000203
+C000089,Inv. I,Inv. Adj.,,Inv. Adj.,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000204
+C000091,Inv. I,After-Sales Service,,After-Sales Service,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000206
+C000095,Inv. I,Sales,,Sales,hub,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000219
+C000096,Inv. I,Purchases,,Purchases,hub,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000220
+C000097,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000225
+C000098,Inv. I,Monthly Profit,,Monthly Profit,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000226
+C000099,Inv. I,Daily Profit,,Daily Profit,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000227
+C000100,Inv. I,Register Expenses,,Register Expenses,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000229
+C000101,Inv. I,Register Payments,,Register Payments,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000230
+C000102,User Customization,Customs Clearance,,Customs Clearance,other,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000231
+C000103,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000233
+C000106,Inv. I,Basic Information,,Basic Information,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000253
+C000107,Inv. I,Clock In/Out,,Clock In/Out,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000260
+C000111,Inv. I,Company Info Modification,,Company Info Modification,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000272
+C000113,Inv. I,Function Setup,,Function Setup,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000274
+C000114,Inv. I,User Setup,,User Setup,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000275
+C000115,Inv. I,Others,,Others,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000276
+C000120,Inv. I,Shipping Order,,Shipping Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000658
+C000128,Inv. I,Received Check,,Received Check,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000734
+C000129,Inv. I,Issued Check,,Issued Check,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000735
+C000132,Mgmt,Payroll,,Payroll,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000749
+C000133,Inv. I,Time Mgmt,,Time Mgmt,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000750
+C000134,Inv. I,Setup,,Setup,hub,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000751
+C000136,Mgmt,Manage Payroll,,Manage Payroll,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000753
+C000137,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000758
+C000138,Inv. I,Shipping,,Shipping,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000774
+C000646,Inv. I,RFQ,,RFQ,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001324
+C000647,Inv. I,Financial Statements,,Financial Statements,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001353
+C000648,Inv. I,Production/Outsourcing,,Production/Outsourcing,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001365
+C000649,Inv. I,Inv. Movement,,Inv. Movement,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001366
+C000650,Inv. I,Others,,Others,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001367
+C000651,Inv. I,Order Mgmt,,Order Mgmt,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001390
+C000653,Inv. I,Project Plan,,Project Plan,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001426
+C000655,Inv. I,Expenses,,Expenses,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001500
+C000656,Inv. I,Setup,,Setup,hub,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001510
+C000657,Inv. I,Cost List,,Cost List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001520
+C000658,Inv. I,Cost Status,,Cost Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001530
+C000659,Inv. I,Information,,Information,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001600
+C000660,Inv. I,Configuration,,Configuration,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001601
+C000661,Inv. I,Download,,Download,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001602
+C000662,Inv. I,Communication Center,,Communication Center,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001606
+C000663,Inv. I,Communication Center,,Communication Center,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001612
+C000664,Inv. I,Setup,,Setup,hub,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002572
+C000665,Inv. I,Order Mgmt,,Order Mgmt,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002573
+C000667,Inv. I,Invoicing,,Invoicing,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001666
+C000668,Inv. I,Contract,,Contract,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001673
+C000669,Inv. I,Estimated Invoice,,Estimated Invoice,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001677
+C000685,User Customization,Customer Portal,,Customer Portal,other,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001878
+C000686,Inv. I,Webmail Settings,,Webmail Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001881
+C000687,Inv. I,Inventory Balance,,Inventory Balance,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001888
+C000688,Inv. I,Repair Order,,Repair Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001889
+C000689,Inv. I,Register Repair,,Register Repair,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001890
+C000692,Inv. I,Create Quality Insp. Request,,Create Quality Insp. Request,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001893
+C000693,Inv. I,Quality Inspection,,Quality Inspection,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001894
+C000694,Inv. I,Sales Forecast,,Sales Forecast,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001895
+C000698,Inv. I,Internal Management,,Internal Management,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001899
+C000699,Inv. I,Accounting Transaction List,,Accounting Transaction List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001905
+C000700,Inv. I,Print Voucher,,Print Voucher,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001909
+C000701,Inv. I,Setup,,Setup,hub,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001910
+C000702,Inv. I,Time Mgmt,,Time Mgmt,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001911
+C000703,Inv. I,Note Receivable,,Note Receivable,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001918
+C000704,Inv. I,Notes Payable,,Notes Payable,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001925
+C000900,Inv. I,Security,,Security,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002952
+C000905,Inv. I,Receipt Mgmt,,Receipt Mgmt,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001967
+C000906,Inv. I,Release Mgmt,,Release Mgmt,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002464
+C000910,Inv. I,Public Mail,,Public Mail,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001980
+C001001,Mgmt,HR,,HR,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002476
+C001002,Inv. I,Assignment,,Assignment,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002477
+C001003,Mgmt,HR Status,,HR Status,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002483
+C001101,Mgmt,Day Laborer Payroll,,Day Laborer Payroll,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002489
+C001102,Inv. I,Day Labor Setup,,Day Labor Setup,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002490
+C001103,Inv. I,Day Labor Work Log,,Day Labor Work Log,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002495
+C001105,Mgmt,Manage Day Labor Payroll,,Manage Day Labor Payroll,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002500
+C001122,Inv. I,Mapping Center,,Mapping Center,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002540
+C001123,Inv. I,Survey,,Survey,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002543
+C001124,Inv. I,Default Setting,,Default Setting,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002549
+C001137,Inv. I,Bank Acct./Card,,Bank Acct./Card,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002562
+C001138,Inv. I,Security Setup,,Security Setup,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002558
+C001251,Inv. I,Process,,Process,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002703
+C001252,Inv. I,Job,,Job,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002708
+C001254,Inv. I,UserPay Settings,,UserPay Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002769
+C001256,Inv. I,Billing Note,,Billing Note,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002912
+C001260,Inv. I,Tax Withholding Type,,Tax Withholding Type,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002934
+C001261,Inv. I,Withholding Tax on Purchase,,Withholding Tax on Purchase,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002935
+C001262,Inv. I,Withholding Tax on Sales,,Withholding Tax on Sales,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002936
+C001402,Inv. I,Collect Data,,Collect Data,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002777
+C061101,Inv. I,e-Contract,,e-Contract,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002588
+C061103,Inv. I,e-Employment Contract,,e-Employment Contract,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002591
+E000106,Inv. I,Company Information,,Company Information,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000636
+E000107,Inv. I,Reg. User,,Reg. User,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000640
+E000109,Inv. I,Default Settings,,Default Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000647
+E000113,Inv. I,Mgmt Report Email,,Mgmt Report Email,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000638
+E000114,Inv. I,Logo/Stamp,,Logo/Stamp,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000639
+E000115,Inv. I,Authorization Group Settings,,Authorization Group Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000641
+E000117,Inv. I,User Login History,,User Login History,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000644
+E000125,Inv. I,API Authentication Key Issuance,,API Authentication Key Issuance,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001534
+E000126,Inv. I,C-Portal Group Settings,,C-Portal Group Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001603
+E000127,Inv. I,Add/Set up User ID,,Add/Set up User ID,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001604
+E000129,Inv. I,Ecount Excel Uploader,,Ecount Excel Uploader,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000279
+E000131,Inv. I,Awaiting for Permission Approval,,Awaiting for Permission Approval,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001768
+E000132,Inv. I,Login History Monitoring,,Login History Monitoring,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001800
+E000137,Inv. I,Webmail Settings,,Webmail Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001882
+E000138,Inv. I,Webmail ID Settings,,Webmail ID Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001883
+E000139,Inv. I,Convenience Function,,Convenience Function,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001947
+E000140,Inv. I,File History,,File History,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002759
+E000142,Inv. I,Security History Status,,Security History Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002949
+E000143,Inv. I,Administrator Settings,,Administrator Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002950
+E000160,Inv. I,UserPay Group Settings,,UserPay Group Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002770
+E000161,Inv. I,UserPay Settings,,UserPay Settings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002906
+E010101,Acct. I,Customer/Vendor,,Customer/Vendor,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000170
+E010103,Acct. I,Reg. Card,,Reg. Card,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000054
+E010104,Acct. I,Reg. Bank Account,,Reg. Bank Account,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000055
+E010105,Acct. I,Department,,Department,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002773
+E010106,Acct. I,Approval Line for Print (Acct.),,Approval Line for Print (Acct.),other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000058
+E010107,Acct. I,Chart of Accounts,,Chart of Accounts,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000062
+E010109,Acct. I,Merchant Account,,Merchant Account,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000059
+E010110,Acct. I,PIC/Employee,,PIC/Employee,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000177
+E010111,Acct. I,Change Code,,Change Code,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000063
+E010112,Acct. I,Project,,Project,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000173
+E010114,Acct. I,Payment Agency,,Payment Agency,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000060
+E010118,Acct. I,Reg. Add. Field Type,,Reg. Add. Field Type,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000733
+E010601,Acct. I,Increase of Note Receivable,,Increase of Note Receivable,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000085
+E010602,Acct. I,Decrease of Note Receivable,,Decrease of Note Receivable,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000086
+E010603,Acct. I,Notes Endorsement,,Notes Endorsement,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000087
+E010604,Acct. I,Increase of Notes Payable,,Increase of Notes Payable,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000088
+E010605,Acct. I,Decrease of Notes Payable,,Decrease of Notes Payable,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000089
+E010609,Acct. I,Asset Type,,Asset Type,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001625
+E010610,Acct. I,Asset List,,Asset List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000091
+E010611,Acct. I,Asset Increase,,Asset Increase,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000092
+E010612,Acct. I,Asset Decrease,,Asset Decrease,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000093
+E010613,Acct. I,Asset Book,,Asset Book,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000339
+E010614,Acct. I,Increase Asset List,,Increase Asset List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000340
+E010615,Acct. I,Decrease Asset List,,Decrease Asset List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000341
+E010616,Acct. I,Depreciation,,Depreciation,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000344
+E010617,Acct. I,Asset Balance,,Asset Balance,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000342
+E010618,Acct. I,Asset Variance Log,,Asset Variance Log,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000343
+E010619,Acct. I,Asset Voucher List,,Asset Voucher List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001626
+E010621,Acct. I,Decrease of Note Receivable - Batch,,Decrease of Note Receivable - Batch,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001919
+E010622,Acct. I,Note Receivable List,,Note Receivable List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001920
+E010623,Acct. I,Note Receivable Transactions,,Note Receivable Transactions,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001921
+E010624,Acct. I,Increase of Note Receivable Balance,,Increase of Note Receivable Balance,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001922
+E010625,Acct. I,Decrease of Note Receivable Balance,,Decrease of Note Receivable Balance,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001923
+E010626,Acct. I,Outstanding Notes Status,,Outstanding Notes Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001924
+E010629,Acct. I,Decrease of Notes Payable - Batch,,Decrease of Notes Payable - Batch,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001926
+E010630,Acct. I,Note Payable List,,Note Payable List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001927
+E010631,Acct. I,Note Payable Transactions,,Note Payable Transactions,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001928
+E010632,Acct. I,Increase of Note Payable Balance,,Increase of Note Payable Balance,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001929
+E010633,Acct. I,Decrease of Note Payable Balance,,Decrease of Note Payable Balance,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001930
+E010634,Acct. I,Notes Payable Status,,Notes Payable Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001931
+E010701,Acct. I,Accounting Transaction List,,Accounting Transaction List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000098
+E010710,Acct. I,Print Payment Journal,,Print Payment Journal,form,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000104
+E010711,Acct. I,Print Receipt Journal,,Print Receipt Journal,form,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000105
+E010714,Acct. I,Print Suspense Account Journal,,Print Suspense Account Journal,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000106
+E020105,Inv. I,Day Labor Employee,,Day Labor Employee,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002491
+E020133,Mgmt,Day Labor Payroll Transfer Status,,Day Labor Payroll Transfer Status,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002504
+E020135,Mgmt,Day Labor Search Payroll by Employee,,Day Labor Search Payroll by Employee,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002503
+E020136,Inv. I,Day Labor Earnings,,Day Labor Earnings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002492
+E020137,Inv. I,Day Labor Deduction,,Day Labor Deduction,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002493
+E020138,Inv. I,New Day Labor Work,,New Day Labor Work,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002499
+E020139,Mgmt,Day Labor Payroll Book,,Day Labor Payroll Book,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002498
+E020201,Inv. I,Monthly Budget List,,Monthly Budget List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000136
+E020202,Inv. I,Budget Status,,Budget Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000430
+E020203,Inv. I,Budget vs. Actual,,Budget vs. Actual,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000431
+E020204,Inv. I,Budget Control Book,,Budget Control Book,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000432
+E020205,Inv. I,Budget-Actual Book,,Budget-Actual Book,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001760
+E020206,Inv. I,Controlled Budget vs. Actual,,Controlled Budget vs. Actual,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001795
+E020602,Inv. I,Assignment List,,Assignment List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002479
+E020603,Inv. I,Employee Profile,,Employee Profile,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002478
+E020606,Inv. I,General Certificate,,General Certificate,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002485
+E020609,Inv. I,Employee Status,,Employee Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002487
+E020701,Inv. I,Register Record Time,,Register Record Time,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000754
+E020702,Inv. I,Register Paid Leave,,Register Paid Leave,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000755
+E020703,Inv. I,Search Paid Leave by Employee,,Search Paid Leave by Employee,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001790
+E020710,Inv. I,Record Time,,Record Time,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000756
+E020711,Inv. I,Time List,,Time List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000757
+E020715,Inv. I,Time Attendance Status,,Time Attendance Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001397
+E020716,Inv. I,Remaining Paid Leave Days Status,,Remaining Paid Leave Days Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001398
+E020719,Inv. I,Paid Leave Use Status,,Paid Leave Use Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001783
+E020720,Inv. I,Assignment Status,,Assignment Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002516
+E020721,Inv. I,New Assignment,,New Assignment,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002519
+E020722,Inv. I,Clock In/Out Status(Employee),,Clock In/Out Status(Employee),report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002457
+E020723,Inv. I,Tardiness(Employee),,Tardiness(Employee),other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002458
+E020724,Inv. I,Clock In/Out (Employee),,Clock In/Out (Employee),other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002459
+E020725,Inv. I,Clock In/Out Application Criteria,,Clock In/Out Application Criteria,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002455
+E020726,Inv. I,Clock In/Out Record(Employee),,Clock In/Out Record(Employee),other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002456
+E020728,Inv. I,Clock In/Out/Time Attendance Status (Employee),,Clock In/Out/Time Attendance Status (Employee),report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002561
+E020751,Inv. I,Day Labor Work List,,Day Labor Work List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002532
+E020752,Inv. I,Day Labor Work Status,,Day Labor Work Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002533
+E020753,Mgmt,Day Labor Payroll Status,,Day Labor Payroll Status,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002534
+E020754,Inv. I,Day Labor Confirm Work Status,,Day Labor Confirm Work Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002547
+E040102,Inv. I,Location,,Location,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000172
+E040104,Inv. I,Mgmt. Field,,Mgmt. Field,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000175
+E040111,Inv. I,Approval Line for Print (Inv.),,Approval Line for Print (Inv.),other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000178
+E040113,Inv. I,Change Code,,Change Code,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000183
+E040114,Inv. I,Foreign Currency,,Foreign Currency,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000182
+E040120,User Customization,Price Level Group by Customer/Vendor,,Price Level Group by Customer/Vendor,other,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000485
+E040122,Inv. I,Price by Item,,Price by Item,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001404
+E040124,Inv. I,Price Level Registration,,Price Level Registration,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001620
+E040125,Inv. I,Price Apply Order Settings,,Price Apply Order Settings,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002548
+E040126,Inv. I,Price Mgmt,,Price Mgmt,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000176
+E040601,Inv. II,New Repair Order,,New Repair Order,form,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000557
+E040602,Inv. II,Repair Order List,,Repair Order List,list,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000558
+E040605,Inv. II,New Repair,,New Repair,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000559
+E040606,Inv. II,Repair List,,Repair List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000560
+E040607,Inv. II,Update Balance for Inventory,,Update Balance for Inventory,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000222
+E040610,Inv. II,Repair Order Status,,Repair Order Status,report,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000561
+E040611,Inv. II,Repair Status,,Repair Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000562
+E040613,Inv. II,Inv. Count List,,Inv. Count List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000546
+E040614,Inv. II,Inventory Adj. List,,Inventory Adj. List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000548
+E040617,Inv. II,Reg. Serial/Lot No.,,Reg. Serial/Lot No.,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000563
+E040618,Inv. II,Serial/Lot No. Slip List,,Serial/Lot No. Slip List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000564
+E040621,Inv. II,New Quality Inspection,,New Quality Inspection,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000738
+E040623,Inv. II,Quality Inspection Status,,Quality Inspection Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000741
+E040625,Inv. II,Sales Forecast List,,Sales Forecast List,list,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000571
+E040626,Inv. II,Sales vs. Sales Forecast,,Sales vs. Sales Forecast,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000572
+E040628,Inv. II,New Quality Insp. Request,,New Quality Insp. Request,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000736
+E040629,Inv. II,Quality Insp. Request List,,Quality Insp. Request List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000737
+E040630,Inv. II,Quality Insp. Request Status,,Quality Insp. Request Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000740
+E040631,Inv. II,Uninspected Status,,Uninspected Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000742
+E040632,Inv. II,New QC Insp. Type,,New QC Insp. Type,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000744
+E040636,Inv. II,Project Plan List,,Project Plan List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001429
+E040637,Inv. II,Plan vs. Actual Project Status,,Plan vs. Actual Project Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001430
+E040640,Inv. II,Sales Forecast Status,,Sales Forecast Status,report,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002460
+E040641,Inv. II,A/S Consumption Status,,A/S Consumption Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002520
+E040650,Inv. II,Inv. Adj. Process Status,,Inv. Adj. Process Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001437
+E040802,Inv. I,New Costing,,New Costing,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000590
+E040804,Inv. I,Actual Cost Status,,Actual Cost Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000591
+E040805,Inv. I,Monthly Profit Status,,Monthly Profit Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000592
+E040808,Inv. I,Standard Cost Status,,Standard Cost Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000665
+E040809,Inv. I,Variance Analysis,,Variance Analysis,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000666
+E040904,Inv. II,Order Mgmt Status,,Order Mgmt Status,report,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001393
+E060201,Acct. II,Import Tracking No.,,Import Tracking No.,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000228
+E060202,Acct. II,Import Expenses,,Import Expenses,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000595
+E060203,Acct. II,Log Misc. Expenses,,Log Misc. Expenses,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000596
+E060204,Acct. II,Purchase Invoice,,Purchase Invoice,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000597
+E060205,Acct. II,To Vendor,,To Vendor,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000598
+E060206,Acct. II,To Customs Broker,,To Customs Broker,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000599
+E060207,Acct. II,Update Account,,Update Account,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000600
+E060208,Acct. II,Trade Voucher List,,Trade Voucher List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000232
+E060209,Acct. II,Import Status,,Import Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000601
+E060210,Acct. II,Expenses Type,,Expenses Type,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002449
+E060808,Acct. II,Reg. Control Type,,Reg. Control Type,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001513
+E060809,Acct. II,Reg. Cost,,Reg. Cost,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001514
+E060810,Acct. II,Reg. Cost Group,,Reg. Cost Group,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001515
+E060811,Acct. II,Reg. Cost-Batch,,Reg. Cost-Batch,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001797
+E060812,Acct. II,Cost Details,,Cost Details,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001798
+E060813,Acct. II,Search Cost Details,,Search Cost Details,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001799
+E060814,Acct. II,Invoicing by Slip (Expense),,Invoicing by Slip (Expense),other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001885
+E060815,Acct. II,Cost Details Status,,Cost Details Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001884
+E060901,Acct. II,Contract Item,,Contract Item,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001671
+E060902,Acct. II,New Contract,,New Contract,form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001674
+E060903,Acct. II,Contract List,,Contract List,list,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001675
+E060904,Acct. II,Change Contract Price/Qty-Batch,,Change Contract Price/Qty-Batch,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001676
+E060905,Acct. II,Create Estimated Invoice,,Create Estimated Invoice,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001678
+E060906,Acct. II,Collective apply to Acct./Sales,,Collective apply to Acct./Sales,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001679
+E060907,Acct. II,Print Estimated Invoice,,Print Estimated Invoice,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001668
+E060908,Acct. II,Pre-Invoicing Status(Contracts),,Pre-Invoicing Status(Contracts),report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001667
+E060909,Acct. II,Outstanding Estimated Invoice Status,,Outstanding Estimated Invoice Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001670
+E060912,Acct. II,Contract Status,,Contract Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001725
+E061102,Inv. I,Contract Status,,Contract Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002590
+E061103,Inv. I,Employment Contract Progress,,Employment Contract Progress,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002592
+E061104,Inv. I,Employment Contract Status,,Employment Contract Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002593
+E061203,Inv. I,Billing Note Status,,Billing Note Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002914
+E061301,Inv. I,Reg. Withholding Tax Type,,Reg. Withholding Tax Type,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002930
+E061302,Inv. I,Withholding Tax on Purchase List,,Withholding Tax on Purchase List,list,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002931
+E061303,Inv. I,New Withholding Tax on Purchase,,New Withholding Tax on Purchase,form,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002932
+E061304,Inv. I,Withholding Tax on Purchase Status,,Withholding Tax on Purchase Status,report,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002933
+E061309,Inv. I,Withholding Tax on Sales List,,Withholding Tax on Sales List,list,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002938
+E061310,Inv. I,Withholding Tax on Sales Status,,Withholding Tax on Sales Status,report,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002939
+E070103,Mgmt,Compose Draft,,Compose Draft,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000246
+E070105,Mgmt,Track Request,,Track Request,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000247
+E070107,Mgmt,Create Template,,Create Template,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000627
+E070108,Mgmt,All Submissions,,All Submissions,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000248
+E070109,Mgmt,Approval Settings,,Approval Settings,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000249
+E070201,Mgmt,Schedule,,Schedule,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000238
+E070202,Mgmt,Contacts,,Contacts,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000240
+E070203,Mgmt,Search by Condition,,Search by Condition,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000242
+E070204,Mgmt,Office Equipment,,Office Equipment,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000239
+E070205,Mgmt,Recent Posts,,Recent Posts,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000245
+E070252,Mgmt,Anonymous Board,,Anonymous Board,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001327
+E070254,Mgmt,Outside Duty List,,Outside Duty List,list,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001765
+E070255,Mgmt,Outside Duty Status,,Outside Duty Status,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001767
+E070256,Mgmt,New Survey,,New Survey,form,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002544
+E070257,Mgmt,Survey List,,Survey List,list,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002545
+E070258,Mgmt,Survey Status,,Survey Status,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002546
+E070302,Mgmt,Business Contact,,Business Contact,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000256
+E070304,Mgmt,Worksheet,,Worksheet,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000258
+E070305,Mgmt,Clock In/Out Record (ID),,Clock In/Out Record (ID),other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000259
+E070306,Mgmt,Clock In/Out Status (ID),,Clock In/Out Status (ID),report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000632
+E070307,Mgmt,Tardiness (ID),,Tardiness (ID),other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000633
+E070309,Mgmt,Daily Time Sheet (ID),,Daily Time Sheet (ID),other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000635
+E070315,Mgmt,Clock In-Out/Time Mgmt/Schedule (ID),,Clock In-Out/Time Mgmt/Schedule (ID),other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001956
+E071501,Mgmt,업무관리게시판,,업무관리게시판,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002188
+E072501,Mgmt,게시판,,게시판,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002087
+E074500,Mgmt,Projects,,Projects,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002649
+E075501,Mgmt,고객관리게시판,,고객관리게시판,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002289
+E077000,Mgmt,All Folders,,All Folders,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001973
+E077001,Mgmt,Inbox,,Inbox,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001974
+E077002,Mgmt,Sent Mail,,Sent Mail,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001975
+E077003,Mgmt,Read Receipt Status,,Read Receipt Status,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001976
+E077004,Mgmt,Temporary Storage Box (SB),,Temporary Storage Box (SB),other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001977
+E077005,Mgmt,Spam Folder,,Spam Folder,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001978
+E077006,Mgmt,Deleted Folder,,Deleted Folder,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001979
+E077007,Mgmt,Compose,,Compose,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001981
+E077008,Mgmt,Default Folders,,Default Folders,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001982
+E077100,Mgmt,ECDrive,,ECDrive,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002714
+E090101,Inv. I,Register Employee,,Register Employee,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000760
+E090102,Inv. I,Approval Line for Print (Manage),,Approval Line for Print (Manage),other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000765
+E090103,Inv. I,Earnings,,Earnings,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000763
+E090104,Inv. I,Earnings/Deductions Groups,,Earnings/Deductions Groups,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000764
+E090106,Mgmt,Payroll Book,,Payroll Book,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000767
+E090110,Mgmt,Search Payroll by Employee,,Search Payroll by Employee,other,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000771
+E090114,Inv. I,Deductions,,Deductions,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001949
+E090115,Mgmt,Payroll Status,,Payroll Status,report,0,0,cataloged,0,0,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001950
+E090116,Inv. I,Confirm Work Status,,Confirm Work Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001951
+E090174,Inv. I,WMS Inventory Adjustment,,WMS Inventory Adjustment,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002468
+E090178,Inv. I,Inventory History Mgmt,,Inventory History Mgmt,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002470
+E090180,Inv. I,Scheduled Receipt,,Scheduled Receipt,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001968
+E090181,Inv. I,Process Receipt,,Process Receipt,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001969
+E090182,Inv. I,Scheduled Release,,Scheduled Release,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002465
+E090184,Inv. I,Process Release,,Process Release,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002466
+E090195,Inv. I,WMS Inventory Balance,,WMS Inventory Balance,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002469
+E090196,Inv. I,New (Decrease),,New (Decrease),form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002467
+E090199,Inv. I,New (Increase),,New (Increase),form,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001970
+E090215,Inv. I,Select WMS Account,,Select WMS Account,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001966
+E090216,Inv. I,Warehouse Mgmt,,Warehouse Mgmt,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_001958
+E090220,Inv. I,Org. Chart Status,,Org. Chart Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002717
+E090222,Inv. I,Reg. Org. Chart,,Reg. Org. Chart,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002761
+E090230,Inv. I,Scheduled Release Status,,Scheduled Release Status,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002763
+E090231,Inv. I,Scheduled Receipt Status,,Scheduled Receipt Status,report,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002768
+E100000,Inv. I,Register Collected Data,,Register Collected Data,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002778
+E101001,Inv. I,Collect Sales Slip,,Collect Sales Slip,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002779
+E101049,Inv. I,Collect Quotation,,Collect Quotation,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002827
+E101050,Inv. I,Collect Purchase Order,,Collect Purchase Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002828
+E101501,Inv. I,Collected Data,,Collected Data,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002829
+E200062,Inv. I,Notice,,Notice,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002036
+E200064,Inv. I,Task Management,,Task Management,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002037
+E200162,Inv. I,Work,,Work,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002136
+E200319,Inv. I,Sales Activity Management,,Sales Activity Management,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002238
+E200321,Inv. I,Consultation History Management,,Consultation History Management,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002239
+E200419,Inv. I,Site Schedule,,Site Schedule,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002599
+E200421,Inv. I,SW Development Schedule Management,,SW Development Schedule Management,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002600
+N000007,User Customization,Customer/Vendor AR Book,,Customer/Vendor AR Book,report,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003166
+N000008,User Customization,Customer/Vendor AR Book Print,,Customer/Vendor AR Book Print,report,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003167
+N000012,User Customization,Customer/Vendor AP Book,,Customer/Vendor AP Book,report,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003168
+N000013,User Customization,Print Customer/Vendor AP Summary Book,,Print Customer/Vendor AP Summary Book,report,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003169
+N000045,User Customization,Customer/Vendor AR Summary Book,,Customer/Vendor AR Summary Book,report,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003170
+N000046,User Customization,Customer/Vendor AP Summary Book,,Customer/Vendor AP Summary Book,report,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003171
+N000116,Inv. I,Sales Invoice List,,Sales Invoice List,list,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003214
+N000117,Inv. I,Sales Invoice List (Inv.),,Sales Invoice List (Inv.),list,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003215
+N000120,Inv. I,Sales Invoice Status (Contract),,Sales Invoice Status (Contract),report,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003221
+N000124,Inv. I,Purchase Invoice List,,Purchase Invoice List,list,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003225
+N000125,Inv. I,Purchase Invoice List,,Purchase Invoice List,list,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_003226
+P000053,Inv. I,Data Management,,Data Management,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002527
+P000054,Inv. I,Backup and Delete,,Backup and Delete,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002528
+P000055,Inv. I,Reset Data,,Reset Data,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002559
+P000063,Inv. I,Set Org. Chart,,Set Org. Chart,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_002760

@@ -278,6 +278,7 @@ export const ReportsIndexPage = lazy(() => import("../modules/reports/ReportsInd
 export const SavedViewsPage = lazy(() => import("../modules/reports/SavedViewsPage"));
 export const DashboardPage = lazy(() => import("../modules/dashboard/DashboardPage"));
 export const ApprovalsQueuePage = lazy(() => import("../modules/dashboard/ApprovalsQueuePage"));
+export const SiteMapPage = lazy(() => import("../modules/dashboard/SiteMapPage"));
 export const DocumentationPage = lazy(() => import("../modules/documentation/DocumentationPage"));
 export const BudgetListPage = lazy(() => import("../modules/company-budget/BudgetListPage"));
 export const BudgetDetailPage = lazy(() => import("../modules/company-budget/BudgetDetailPage"));

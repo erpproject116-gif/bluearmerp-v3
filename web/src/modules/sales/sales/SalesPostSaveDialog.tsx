@@ -14,12 +14,20 @@ export function SalesPostSaveDialog(props: Props) {
   return (
     <Modal open={props.open} title="Sale saved" onClose={props.onDone} stacked>
       <p class="text-sm text-text-secondary">
-        <strong>{props.salesNo}</strong> saved — {formatPeso(props.amount)}. Record payment or set up the accounting invoice now?
+        <strong>{props.salesNo}</strong> saved — {formatPeso(props.amount)}. Next step on the MyPage Flow Chart is{" "}
+        <strong>Receipt</strong> (Cash In) — same as Ecount after Sales.
       </p>
       <div class="mt-6 flex flex-wrap justify-end gap-2">
         <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={props.onDone}>
           Done
         </button>
+        <a
+          href="/app/dashboard"
+          class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary"
+          onClick={props.onDone}
+        >
+          MyPage Flow Chart
+        </a>
         <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-brand-600" onClick={props.onAccounting}>
           Link accounting voucher
         </button>

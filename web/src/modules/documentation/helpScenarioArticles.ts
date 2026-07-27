@@ -5,6 +5,33 @@ import type { KbArticle } from "./documentationTypes";
  * Problem-oriented articles: blockers, paraphrases, and deeper module Q&A.
  */
 export const helpScenarioArticles: KbArticle[] = [
+  // ─── MyPage / Ecount navigation ─────────────────────────────────────────
+  {
+    id: "mypage-flow-chart",
+    title: "Where do I start? MyPage Flow Chart",
+    scenario:
+      "You do not know which screen to open for sales, purchases, cash in/out, or stock — or you opened the wrong menu and filed a ticket.",
+    intro:
+      "Open Home → MyPage. Use Learn to use BluearmERP for common lists and vouchers, or the Flow Chart to walk Quotation→Sales→Receipt and PR→PO→GR→Purchase→Pay. Use the top strip (Inv. I / Inv. II / Acct. I / Acct. II) like Ecount modules.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Go to /app/dashboard (Home / MyPage).",
+          "Click the Flow Chart node for the step you need — do not invent a parallel screen.",
+          "After Sales save, choose Cash In; after Purchase save, choose Cash Payment — same as Ecount prompts.",
+          "Use Site Map (/app/dashboard/site-map) to search menu names.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Wrong-screen tickets usually mean skipping MyPage. Bookmark Home and follow the chain left to right.",
+      },
+    ],
+    primaryHref: "/app/dashboard",
+    primaryLabel: "Open MyPage",
+    relatedGuideIds: ["load-slip-overview", "official-receipt-after-si", "payment-voucher-after-purchase"],
+  },
   // ─── P0: Blockers & confusion ───────────────────────────────────────────
   {
     id: "cannot-confirm-document",

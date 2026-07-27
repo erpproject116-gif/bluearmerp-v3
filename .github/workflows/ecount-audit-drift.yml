@@ -1,0 +1,28 @@
+name: Ecount audit drift (G0/G7)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+  push:
+    paths:
+      - "docs/ecount-audit/site-map-prgids.csv"
+      - "docs/ecount-audit/coverage-matrix.csv"
+      - "docs/ecount-audit/scripts/reconcile-sitemap-coverage.py"
+      - "docs/ecount-audit/scripts/bluearm-orphan-map.py"
+
+jobs:
+  gate-g0:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/ecount-audit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: G0 — Site Map vs coverage (no missing prgIds)
+        run: python scripts/reconcile-sitemap-coverage.py --check
+      - name: G6 — regenerate Bluearm orphan report
+        run: python scripts/bluearm-orphan-map.py --check
