@@ -7,6 +7,7 @@ import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
+import { StockEntryModal, type StockEntryReasonPreset, type StockEntryType } from "./StockEntryModal";
 
 export type StockMovementRow = {
   id: number;
@@ -37,6 +38,9 @@ export default function StockMovementsPage() {
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("created_at", 25, { defaultOrder: "desc" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
+  const [entryOpen, setEntryOpen] = createSignal(false);
+  const [entryType, setEntryType] = createSignal<StockEntryType>("transfer");
+  const [entryReason, setEntryReason] = createSignal<StockEntryReasonPreset>("");
   const [movementType, setMovementType] = createSignal("");
   const [dateFrom, setDateFrom] = createSignal("");
   const [dateTo, setDateTo] = createSignal("");
@@ -65,7 +69,16 @@ export default function StockMovementsPage() {
     },
   }));
 
-  const invalidate = () => void qc.invalidateQueries({ queryKey: ["stock-movements"] });
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ["stock-movements"] });
+    void qc.invalidateQueries({ queryKey: ["stock-entries"] });
+  };
+
+  const openEntry = (type: StockEntryType, reason: StockEntryReasonPreset = "") => {
+    setEntryType(type);
+    setEntryReason(reason);
+    setEntryOpen(true);
+  };
 
   return (
     <>
@@ -84,14 +97,31 @@ export default function StockMovementsPage() {
             <option value="">All</option>
             <option value="adjustment">Adjustment</option>
             <option value="so_release">SO Release</option>
+            <option value="transfer_in">Transfer in</option>
+            <option value="transfer_out">Transfer out</option>
+            <option value="issue">Issue</option>
+            <option value="receipt">Receipt</option>
+            <option value="internal_use">Internal use</option>
+            <option value="product_defect">Product defect</option>
           </select>
         </label>
         <button type="button" class="rounded-lg bg-brand px-4 py-2 text-sm text-white" onClick={invalidate}>
           Apply filters
         </button>
-        <button type="button" class="ml-auto rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50" onClick={() => setAdjustOpen(true)}>
-          Stock adjustment
-        </button>
+        <div class="ml-auto flex flex-wrap gap-2">
+          <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => openEntry("transfer")}>
+            Stock transfer
+          </button>
+          <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => openEntry("issue", "internal_use")}>
+            Internal use
+          </button>
+          <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => openEntry("issue", "product_defect")}>
+            Product defect
+          </button>
+          <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => setAdjustOpen(true)}>
+            Stock adjustment
+          </button>
+        </div>
       </div>
 
       <SpreadsheetGrid
@@ -132,6 +162,15 @@ export default function StockMovementsPage() {
       />
 
       <StockAdjustmentModal open={adjustOpen()} onClose={() => setAdjustOpen(false)} onSaved={invalidate} />
+      <StockEntryModal
+        open={entryOpen()}
+        onClose={() => setEntryOpen(false)}
+        onCreated={invalidate}
+        initialType={entryType()}
+        initialReason={entryReason()}
+        lockType
+        autoPost
+      />
     </>
   );
 }

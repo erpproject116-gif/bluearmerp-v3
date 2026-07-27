@@ -5,7 +5,7 @@ export default function PayableStatusReportPage() {
     <ArApAsOfReportView
       mode="payable"
       title="Payable Status"
-      subtitle="Open vendor payable balances as-of a single date (E040722)."
+      subtitle="Open vendor payable balances as-of a single date."
     />
   );
 }

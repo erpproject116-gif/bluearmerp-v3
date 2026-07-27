@@ -113,7 +113,7 @@ export function SalesHoldListModal(props: Props) {
   return (
     <Modal open={props.open} title="Hold list (sales invoice)" onClose={props.onClose}>
       <p class="mb-4 text-sm text-text-secondary">
-        Park up to 5 draft sales invoices (Ecount-style). Save the current form to a slot, or load a held slip back into the grid.
+        Park up to 5 draft sales invoices. Save the current form to a slot, or load a held slip back into the grid.
       </p>
       <Show when={!loading()} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
         <table class="min-w-full text-sm">

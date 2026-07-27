@@ -8,6 +8,11 @@ import {
 } from "./helpApi";
 import { HelpChatThread } from "./HelpChatThread";
 import { suggestedPrompts } from "./helpRouteContext";
+import {
+  filterMentionCatalog,
+  type MentionCatalogItem,
+  type MentionPickerRow,
+} from "./mentionCatalog";
 import type { useHelpAssistant } from "./useHelpAssistant";
 
 type Assistant = ReturnType<typeof useHelpAssistant>;
@@ -23,6 +28,14 @@ function activeMention(text: string, caret: number): { start: number; query: str
   return { start: at, query: frag };
 }
 
+function catalogRows(query: string): MentionPickerRow[] {
+  return filterMentionCatalog(query).map((item) => ({ source: "catalog" as const, item }));
+}
+
+function entityRows(entities: CopilotEntityRef[]): MentionPickerRow[] {
+  return entities.map((item) => ({ source: "entity" as const, item }));
+}
+
 export function HelpAssistantPanel(props: {
   open: boolean;
   onClose: () => void;
@@ -34,7 +47,7 @@ export function HelpAssistantPanel(props: {
   const [extracting, setExtracting] = createSignal(false);
   const [extractError, setExtractError] = createSignal("");
   const [mentionOpen, setMentionOpen] = createSignal(false);
-  const [mentionItems, setMentionItems] = createSignal<CopilotEntityRef[]>([]);
+  const [mentionItems, setMentionItems] = createSignal<MentionPickerRow[]>([]);
   const [mentionIndex, setMentionIndex] = createSignal(0);
   const [mentionStart, setMentionStart] = createSignal(0);
   let scrollEl: HTMLDivElement | undefined;
@@ -91,40 +104,78 @@ export function HelpAssistantPanel(props: {
     const active = activeMention(text, caret);
     if (!active) {
       setMentionOpen(false);
+      setMentionItems([]);
       return;
     }
     setMentionStart(active.start);
-    if (active.query.trim().length < 1) {
-      setMentionItems([]);
-      setMentionOpen(false);
+    const q = active.query;
+
+    // Bare "@" or short local filter: show catalog immediately (no API wait).
+    const local = catalogRows(q);
+    if (q.trim().length < 1) {
+      setMentionItems(local);
+      setMentionIndex(0);
+      setMentionOpen(local.length > 0);
       return;
     }
+
+    // Show catalog matches right away while entity search runs.
+    if (local.length > 0) {
+      setMentionItems(local);
+      setMentionIndex(0);
+      setMentionOpen(true);
+    }
+
     if (mentionTimer) window.clearTimeout(mentionTimer);
     mentionTimer = window.setTimeout(() => {
       void (async () => {
-        const items = await searchCopilotEntities(active.query);
-        setMentionItems(items);
+        const typeMatch = /^([a-z_]+):(.*)$/i.exec(q.trim());
+        const type = typeMatch?.[1];
+        const searchQ = (typeMatch?.[2] ?? q).trim() || (type ? type : q);
+        const entities = await searchCopilotEntities(searchQ, type || undefined);
+        const merged = [...catalogRows(q), ...entityRows(entities)];
+        setMentionItems(merged);
         setMentionIndex(0);
-        setMentionOpen(items.length > 0);
+        setMentionOpen(merged.length > 0);
       })();
     }, 180);
   };
 
-  const insertMention = (entity: CopilotEntityRef) => {
+  const replaceMentionFragment = (replacement: string, caretAfter?: number) => {
     const el = inputEl;
     const text = draft();
     const caret = el?.selectionStart ?? text.length;
     const active = activeMention(text, caret) ?? { start: mentionStart(), query: "" };
-    const token = formatEntityMention(entity);
-    const next = text.slice(0, active.start) + token + " " + text.slice(caret);
+    const next = text.slice(0, active.start) + replacement + text.slice(caret);
     setDraft(next);
     setMentionOpen(false);
     queueMicrotask(() => {
       if (!inputEl) return;
-      const pos = active.start + token.length + 1;
+      const pos = caretAfter ?? active.start + replacement.length;
       inputEl.focus();
       inputEl.setSelectionRange(pos, pos);
+      // If we left an @type: prefix, keep the picker open for the next search.
+      scheduleMentionSearch(next, pos);
     });
+  };
+
+  const insertCatalogItem = (item: MentionCatalogItem) => {
+    if (item.keepAtPrefix) {
+      const token = `@${item.insert}`;
+      replaceMentionFragment(token);
+      return;
+    }
+    replaceMentionFragment(item.insert);
+  };
+
+  const insertMention = (entity: CopilotEntityRef) => {
+    const token = formatEntityMention(entity) + " ";
+    replaceMentionFragment(token);
+  };
+
+  const pickMentionRow = (row: MentionPickerRow) => {
+    if (row.source === "catalog") insertCatalogItem(row.item);
+    else insertMention(row.item);
   };
 
   const onFiles = async (list: FileList | null) => {
@@ -170,6 +221,15 @@ export function HelpAssistantPanel(props: {
       height: "auto",
     };
   };
+
+  const rowBadge = (row: MentionPickerRow) =>
+    row.source === "catalog" ? row.item.badge : row.item.type;
+  const rowLabel = (row: MentionPickerRow) =>
+    row.source === "catalog" ? row.item.label : row.item.label;
+  const rowHint = (row: MentionPickerRow) =>
+    row.source === "catalog"
+      ? row.item.hint
+      : [row.item.code, row.item.extra].filter(Boolean).join(" · ");
 
   return (
     <Show when={props.open}>
@@ -277,8 +337,8 @@ export function HelpAssistantPanel(props: {
               fallback={
                 <div class="space-y-3 text-sm text-text-secondary">
                   <p>
-                    Ask a question, type <span class="font-medium text-text-primary">@</span> to tag
-                    records, or attach a file.
+                    Ask a question, type <span class="font-medium text-text-primary">@</span> for
+                    commands, tools, topics, or records, or attach a file.
                   </p>
                   <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">Try asking</p>
                   <div class="flex flex-wrap gap-2">
@@ -297,15 +357,16 @@ export function HelpAssistantPanel(props: {
                       type="button"
                       class="rounded-full border border-stroke bg-white px-3 py-1 text-xs text-text-primary hover:border-brand-300 hover:bg-brand-50"
                       onClick={() => {
-                        const v = "generate quotation for @";
+                        const v = "@";
                         setDraft(v);
                         queueMicrotask(() => {
                           inputEl?.focus();
                           inputEl?.setSelectionRange(v.length, v.length);
+                          scheduleMentionSearch(v, v.length);
                         });
                       }}
                     >
-                      Generate quotation for @
+                      Browse @ menu
                     </button>
                   </div>
                 </div>
@@ -323,9 +384,12 @@ export function HelpAssistantPanel(props: {
 
           <footer class="relative border-t border-stroke p-3">
             <Show when={mentionOpen()}>
-              <div class="absolute bottom-full left-3 right-3 z-10 mb-1 max-h-48 overflow-y-auto rounded-lg border border-stroke bg-white shadow-lg">
+              <div class="absolute bottom-full left-3 right-3 z-10 mb-1 max-h-56 overflow-y-auto rounded-lg border border-stroke bg-white shadow-lg">
+                <p class="sticky top-0 border-b border-stroke bg-slate-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                  Commands · tools · topics · records
+                </p>
                 <For each={mentionItems()}>
-                  {(item, idx) => (
+                  {(row, idx) => (
                     <button
                       type="button"
                       class={`flex w-full items-start gap-2 px-3 py-2 text-left text-xs hover:bg-brand-50 ${
@@ -333,18 +397,16 @@ export function HelpAssistantPanel(props: {
                       }`}
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        insertMention(item);
+                        pickMentionRow(row);
                       }}
                     >
                       <span class="rounded bg-slate-100 px-1.5 py-0.5 font-medium uppercase text-text-secondary">
-                        {item.type}
+                        {rowBadge(row)}
                       </span>
                       <span class="min-w-0 flex-1">
-                        <span class="block truncate font-medium text-text-primary">{item.label}</span>
-                        <Show when={item.code || item.extra}>
-                          <span class="block truncate text-text-secondary">
-                            {[item.code, item.extra].filter(Boolean).join(" · ")}
-                          </span>
+                        <span class="block truncate font-medium text-text-primary">{rowLabel(row)}</span>
+                        <Show when={rowHint(row)}>
+                          <span class="block truncate text-text-secondary">{rowHint(row)}</span>
                         </Show>
                       </span>
                     </button>
@@ -404,7 +466,7 @@ export function HelpAssistantPanel(props: {
                 ref={inputEl}
                 rows={props.assistant.maximized() ? 3 : 2}
                 class="min-w-0 flex-1 resize-none rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-                placeholder="Message Copilot… type @ to tag · Enter to send"
+                placeholder="Message Copilot… type @ for menu · Enter to send"
                 value={draft()}
                 disabled={props.assistant.busy()}
                 onInput={(e) => {
@@ -428,7 +490,7 @@ export function HelpAssistantPanel(props: {
                       const item = mentionItems()[mentionIndex()];
                       if (item) {
                         e.preventDefault();
-                        insertMention(item);
+                        pickMentionRow(item);
                         return;
                       }
                     }

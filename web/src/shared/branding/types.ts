@@ -37,4 +37,6 @@ export type BrandingPayload = {
   settings: BrandingSettings;
   can_manage: boolean;
   logo_url?: string;
+  /** True when logo_asset_id is set but the file is missing on disk — re-upload required. */
+  logo_missing?: boolean;
 };

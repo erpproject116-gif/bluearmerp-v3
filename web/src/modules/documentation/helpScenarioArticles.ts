@@ -42,7 +42,7 @@ export const helpScenarioArticles: KbArticle[] = [
     id: "quotation-rfq-unregistered-products",
     title: "Quotation / RFQ with products not yet in inventory",
     scenario:
-      "You need to save or print a quotation or RFQ before the product is registered in Inventory — Ecount-style fast track.",
+      "You need to save or print a quotation or RFQ before the product is registered in Inventory — BluearmERP fast track.",
     intro:
       "Quotations, RFQs, and purchase requests allow free-text product code/name without an inventory item. Registration becomes required when you create a sales order, sales invoice, purchase order, or purchase (supplier invoice).",
     blocks: [
@@ -68,7 +68,7 @@ export const helpScenarioArticles: KbArticle[] = [
       "create quotation without product",
       "rfq free text item",
       "unregistered product quote",
-      "ecount quotation without item",
+      "quotation without item",
     ],
     errorPhrases: [
       "register the product in inventory before saving",
@@ -956,7 +956,7 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Resume a sales invoice from Hold list",
     scenario: "You parked a draft sales invoice on Hold and need to finish it later.",
     intro:
-      "Sales Hold list stores draft invoices so you can resume without losing lines — similar to Ecount Hold.",
+      "Sales Hold list stores draft invoices so you can resume without losing lines — BluearmERP Hold.",
     blocks: [
       {
         type: "steps",

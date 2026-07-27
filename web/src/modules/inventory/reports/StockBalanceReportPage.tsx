@@ -26,6 +26,8 @@ export default function StockBalanceReportPage() {
       }
     };
     window.addEventListener("keydown", onKey);
+    // Auto-run so the report is not empty until users discover F8/Search.
+    search();
     return () => window.removeEventListener("keydown", onKey);
   });
 
@@ -82,7 +84,17 @@ export default function StockBalanceReportPage() {
         </tbody>
       </table>
       <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
-        <p class="px-5 py-8 text-center text-sm text-text-secondary">No stock balances found.</p>
+        <p class="px-5 py-8 text-center text-sm text-text-secondary">
+          No stock balances found. Post a goods receipt or stock entry first, then refresh.{" "}
+          <a class="text-brand-600 hover:underline" href="/app/inventory/stock-entries">
+            Open stock entries
+          </a>
+        </p>
+      </Show>
+      <Show when={report.isError}>
+        <p class="px-5 py-4 text-center text-sm text-red-600">
+          {(report.error as Error)?.message ?? "Failed to load stock balance."}
+        </p>
       </Show>
     </ReportPageLayout>
   );

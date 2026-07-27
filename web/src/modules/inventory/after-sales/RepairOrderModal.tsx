@@ -500,9 +500,14 @@ export function RepairOrderModal(props: Props) {
           settings={byKey}
           fieldKey="pic_name"
           fallbackLabel="PIC"
+          fallbackPlaceholder="Type a name or pick a user"
           value={picName}
           selectedId={picUserId}
-          onInput={setPicName}
+          onInput={(text) => {
+            setPicName(text);
+            // Free-text PIC name: clear linked user when typing diverges from a pick.
+            setPicUserId(null);
+          }}
           onSelect={(o) => {
             setPicUserId(o.id);
             setPicName(o.label);

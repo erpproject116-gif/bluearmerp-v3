@@ -44,6 +44,7 @@ export default function UsersPage() {
   const [inviteRole, setInviteRole] = createSignal("member");
   const [editRole, setEditRole] = createSignal("member");
   const [editStatus, setEditStatus] = createSignal("active");
+  const [editName, setEditName] = createSignal("");
   const [editGroupIds, setEditGroupIds] = createSignal<number[]>([]);
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
@@ -72,6 +73,7 @@ export default function UsersPage() {
 
   const openEdit = async (row: TenantUserRow) => {
     setEditing(row);
+    setEditName(row.full_name ?? "");
     setEditRole(row.tenant_role);
     setEditStatus(row.status);
     setEditGroupIds([]);
@@ -149,12 +151,21 @@ export default function UsersPage() {
   const saveEdit = async () => {
     const row = editing();
     if (!row) return;
+    const fullName = editName().trim();
+    if (!fullName) {
+      toast.warning("Full name is required.");
+      return;
+    }
     setSaving(true);
     const ok = await submitEntity(
       () =>
         apiFetch(`/api/v1/user-management/users/${row.id}`, {
           method: "PATCH",
-          body: JSON.stringify({ tenant_role: editRole(), status: editStatus() }),
+          body: JSON.stringify({
+            full_name: fullName,
+            tenant_role: editRole(),
+            status: editStatus(),
+          }),
         }, { silent: true }),
       toast,
       "User updated.",
@@ -345,6 +356,13 @@ export default function UsersPage() {
             <>
               <Field label="Email">
                 <input class={inputClass} value={row().email} readOnly />
+              </Field>
+              <Field label="Full name *">
+                <input
+                  class={inputClass}
+                  value={editName()}
+                  onInput={(e) => setEditName(e.currentTarget.value)}
+                />
               </Field>
               <Field label="Role *">
                 <select

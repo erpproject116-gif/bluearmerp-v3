@@ -72,7 +72,7 @@ type Props = {
   emptyHint?: string;
 };
 
-/** Ecount-style open-transaction Load Slip monitor: search, date range, doc no, multi-select. */
+/** Open-transaction Load Slip monitor: search, date range, doc no, multi-select. */
 export function OpenTransactionMonitor(props: Props) {
   const totalPages = () => Math.max(1, Math.ceil(props.total / props.pageSize));
   const patch = (partial: Partial<OpenMonitorFilters>) =>

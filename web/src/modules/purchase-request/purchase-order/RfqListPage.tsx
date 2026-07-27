@@ -166,6 +166,9 @@ export default function RfqListPage() {
                 Close
               </button>
             </div>
+            <p class="mb-3 text-xs text-text-secondary">
+              Free-text products are allowed on RFQ. Register items in Inventory before converting to a Purchase Order.
+            </p>
             <For each={lines()}>
               {(ln, idx) => (
                 <div class="mb-3 space-y-2 rounded-lg border border-stroke p-3">

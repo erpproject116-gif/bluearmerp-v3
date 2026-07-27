@@ -50,19 +50,19 @@ func getBranding(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load branding.", "ERR_INTERNAL")
 			return
 		}
-		staleCleared := stripStaleLogoAsset(r.Context(), pool, tu.TenantID, settings)
-		if staleCleared {
-			_, _ = pool.Exec(r.Context(), `
-				update public.tenant_branding
-				set settings = settings #- '{receipt,logo_asset_id}',
-				    updated_at = now()
-				where tenant_id = $1 and (settings->'receipt'->>'logo_asset_id') is not null`, tu.TenantID)
+		// Do not wipe logo_asset_id when the file is missing (ephemeral disks).
+		// Keep the ID so a re-upload or durable restore can recover; warn the client.
+		logoMissing := logoAssetFileMissing(r.Context(), pool, tu.TenantID, settings)
+		msg := "OK"
+		if logoMissing {
+			msg = "Logo file is missing on the server — please re-upload your company logo."
 		}
 		response.OK(w, map[string]any{
-			"settings":   settings,
-			"can_manage": tu.CanManageBranding(),
-			"logo_url":   logoURLFromSettings(settings),
-		}, "OK")
+			"settings":     settings,
+			"can_manage":   tu.CanManageBranding(),
+			"logo_url":     logoURLFromSettings(settings),
+			"logo_missing": logoMissing,
+		}, msg)
 	}
 }
 

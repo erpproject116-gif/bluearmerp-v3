@@ -33,6 +33,7 @@ export default function OnHandReportPage() {
       }
     };
     window.addEventListener("keydown", onKey);
+    search();
     return () => window.removeEventListener("keydown", onKey);
   });
 
@@ -122,7 +123,12 @@ export default function OnHandReportPage() {
           </tbody>
         </table>
         <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
-          <ReportEmptyMessage />
+          <ReportEmptyMessage message="No on-hand balances found. Post a goods receipt or stock entry, then refresh. Open Stock Entries from Inventory if needed." />
+        </Show>
+        <Show when={report.isError}>
+          <p class="px-5 py-4 text-center text-sm text-red-600">
+            {(report.error as Error)?.message ?? "Failed to load on-hand report."}
+          </p>
         </Show>
       </ReportPageLayout>
     </>

@@ -7,7 +7,7 @@ export default function ReceivableStatusReportPage() {
       <ArApAsOfReportView
         mode="receivable"
         title="Receivable Status"
-        subtitle="Open customer receivable balances as-of a single date (E040721)."
+        subtitle="Open customer receivable balances as-of a single date."
       />
     </SalesLayout>
   );

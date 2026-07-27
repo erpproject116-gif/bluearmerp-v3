@@ -41,11 +41,17 @@ type linkBody struct {
 }
 
 var supportedDocTypes = map[string]bool{
-	"quo_quotation":      true,
-	"po_purchase_order":  true,
-	"sa_sales":           true,
-	"fin_official_receipt": true,
-	"job_cost_project":   true,
+	"quo_quotation":           true,
+	"so_sales_order":          true,
+	"sa_sales":                true,
+	"pr_purchase_request":     true,
+	"rfq_request":             true,
+	"rfq_supplier_quotation":  true,
+	"po_purchase_order":       true,
+	"gr_goods_receipt":        true,
+	"fin_supplier_invoice":    true,
+	"fin_official_receipt":    true,
+	"job_cost_project":        true,
 }
 
 func registerLinkRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -254,14 +260,45 @@ func resolveDoc(ctx context.Context, pool *pgxpool.Pool, tenantID int64, docType
 			select reference_no from public.quo_quotations
 			where id = $1 and tenant_id = $2 and deleted_at is null`, docID, tenantID).Scan(&label)
 		return label, href, err == nil
-	case "po_purchase_order":
+	case "so_sales_order":
 		err := pool.QueryRow(ctx, `
-			select purchase_order_no from public.po_purchase_orders
+			select sales_order_no from public.so_sales_orders
 			where id = $1 and tenant_id = $2 and deleted_at is null`, docID, tenantID).Scan(&label)
 		return label, href, err == nil
 	case "sa_sales":
 		err := pool.QueryRow(ctx, `
 			select sales_no from public.sa_sales
+			where id = $1 and tenant_id = $2 and deleted_at is null`, docID, tenantID).Scan(&label)
+		return label, href, err == nil
+	case "pr_purchase_request":
+		err := pool.QueryRow(ctx, `
+			select purchase_request_no from public.pr_purchase_requests
+			where id = $1 and tenant_id = $2 and deleted_at is null`, docID, tenantID).Scan(&label)
+		return label, href, err == nil
+	case "rfq_request":
+		err := pool.QueryRow(ctx, `
+			select rfq_no from public.rfq_requests
+			where id = $1 and tenant_id = $2`, docID, tenantID).Scan(&label)
+		return label, href, err == nil
+	case "rfq_supplier_quotation":
+		err := pool.QueryRow(ctx, `
+			select quote_no from public.rfq_supplier_quotations
+			where id = $1 and tenant_id = $2`, docID, tenantID).Scan(&label)
+		return label, href, err == nil
+	case "po_purchase_order":
+		err := pool.QueryRow(ctx, `
+			select purchase_order_no from public.po_purchase_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null`, docID, tenantID).Scan(&label)
+		return label, href, err == nil
+	case "gr_goods_receipt":
+		err := pool.QueryRow(ctx, `
+			select coalesce(nullif(trim(gr.reference), ''), 'GR-' || gr.id::text)
+			from public.gr_goods_receipts gr
+			where gr.id = $1 and gr.tenant_id = $2`, docID, tenantID).Scan(&label)
+		return label, href, err == nil
+	case "fin_supplier_invoice":
+		err := pool.QueryRow(ctx, `
+			select invoice_no from public.fin_supplier_invoices
 			where id = $1 and tenant_id = $2 and deleted_at is null`, docID, tenantID).Scan(&label)
 		return label, href, err == nil
 	case "fin_official_receipt":
@@ -289,11 +326,11 @@ func searchDocs(ctx context.Context, pool *pgxpool.Pool, tenantID int64, docType
 			where tenant_id = $1 and deleted_at is null
 			  and ($2 = '' or reference_no ilike $3)
 			order by order_date desc, id desc limit $4`
-	case "po_purchase_order":
+	case "so_sales_order":
 		sql = `
-			select id, purchase_order_no from public.po_purchase_orders
+			select id, sales_order_no from public.so_sales_orders
 			where tenant_id = $1 and deleted_at is null
-			  and ($2 = '' or purchase_order_no ilike $3 or coalesce(reference,'') ilike $3)
+			  and ($2 = '' or sales_order_no ilike $3)
 			order by order_date desc, id desc limit $4`
 	case "sa_sales":
 		sql = `
@@ -301,6 +338,44 @@ func searchDocs(ctx context.Context, pool *pgxpool.Pool, tenantID int64, docType
 			where tenant_id = $1 and deleted_at is null
 			  and ($2 = '' or sales_no ilike $3 or coalesce(si_dr_no,'') ilike $3)
 			order by order_date desc, id desc limit $4`
+	case "pr_purchase_request":
+		sql = `
+			select id, purchase_request_no from public.pr_purchase_requests
+			where tenant_id = $1 and deleted_at is null
+			  and ($2 = '' or purchase_request_no ilike $3)
+			order by request_date desc, id desc limit $4`
+	case "rfq_request":
+		sql = `
+			select id, rfq_no from public.rfq_requests
+			where tenant_id = $1
+			  and ($2 = '' or rfq_no ilike $3)
+			order by rfq_date desc, id desc limit $4`
+	case "rfq_supplier_quotation":
+		sql = `
+			select id, quote_no from public.rfq_supplier_quotations
+			where tenant_id = $1
+			  and ($2 = '' or quote_no ilike $3)
+			order by quote_date desc, id desc limit $4`
+	case "po_purchase_order":
+		sql = `
+			select id, purchase_order_no from public.po_purchase_orders
+			where tenant_id = $1 and deleted_at is null
+			  and ($2 = '' or purchase_order_no ilike $3 or coalesce(reference,'') ilike $3)
+			order by order_date desc, id desc limit $4`
+	case "gr_goods_receipt":
+		sql = `
+			select gr.id,
+			  coalesce(nullif(trim(gr.reference), ''), 'GR-' || gr.id::text)
+			from public.gr_goods_receipts gr
+			where gr.tenant_id = $1
+			  and ($2 = '' or coalesce(gr.reference,'') ilike $3 or ('GR-' || gr.id::text) ilike $3)
+			order by gr.receipt_date desc, gr.id desc limit $4`
+	case "fin_supplier_invoice":
+		sql = `
+			select id, invoice_no from public.fin_supplier_invoices
+			where tenant_id = $1 and deleted_at is null
+			  and ($2 = '' or invoice_no ilike $3)
+			order by invoice_date desc, id desc limit $4`
 	case "fin_official_receipt":
 		sql = `
 			select id, receipt_no from public.fin_official_receipts
@@ -339,10 +414,22 @@ func docHref(docType string, docID int64) string {
 	switch docType {
 	case "quo_quotation":
 		return "/app/quotation/quotations/" + id
-	case "po_purchase_order":
-		return "/app/purchase-order/purchase-orders"
+	case "so_sales_order":
+		return "/app/sales-order/sales-orders"
 	case "sa_sales":
 		return "/app/sales/sales"
+	case "pr_purchase_request":
+		return "/app/purchase-request/purchase-requests"
+	case "rfq_request":
+		return "/app/purchase-order/rfq/" + id
+	case "rfq_supplier_quotation":
+		return "/app/purchase-order/rfq"
+	case "po_purchase_order":
+		return "/app/purchase-order/purchase-orders"
+	case "gr_goods_receipt":
+		return "/app/purchase-order/goods-receipt"
+	case "fin_supplier_invoice":
+		return "/app/purchases/purchases"
 	case "fin_official_receipt":
 		return "/app/finance/official-receipts"
 	case "job_cost_project":

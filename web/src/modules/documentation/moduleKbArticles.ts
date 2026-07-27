@@ -502,7 +502,7 @@ export const moduleKbArticles: KbArticle[] = [
   {
     id: "sales-hold-list",
     title: "Sales Hold list (park draft invoices)",
-    scenario: "You need to pause a new sales invoice and resume it later — like Ecount's Hold list.",
+    scenario: "You need to pause a new sales invoice and resume it later — like BluearmERP's Hold list.",
     intro:
       "Hold list stores up to five draft sale payloads per user. Use it only on **new** sales (not when editing an existing invoice).",
     blocks: [
@@ -759,7 +759,7 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Receivable and Payable Status (as-of reports)",
     scenario: "You need open AR or AP balances at a specific date, not just aging buckets.",
     intro:
-      "Receivable Status and Payable Status mirror ECount E040721/E040722 — customer or vendor balances as-of a date.",
+      "Receivable Status and Payable Status show customer or vendor balances as-of a date in BluearmERP.",
     blocks: [
       {
         type: "steps",

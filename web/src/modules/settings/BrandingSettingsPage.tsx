@@ -93,7 +93,15 @@ export default function BrandingSettingsPage() {
   const save = async () => {
     setSaving(true);
     try {
-      const ok = await branding.save(draft());
+      const liveLogoId = branding.settings().receipt.logo_asset_id;
+      const d = draft();
+      const ok = await branding.save({
+        ...d,
+        receipt: {
+          ...d.receipt,
+          logo_asset_id: liveLogoId ?? d.receipt.logo_asset_id,
+        },
+      });
       if (ok) setDirty(false);
     } finally {
       setSaving(false);
@@ -211,19 +219,29 @@ export default function BrandingSettingsPage() {
         </p>
         <div class="mt-4 flex flex-wrap items-start gap-4">
           <BrandingLogoImage />
-          <label class="cursor-pointer rounded-lg border border-stroke px-3 py-2 text-sm hover:erp-panel">
-            Upload logo (max {MAX_LOGO_MB} MB)
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              class="hidden"
-              onChange={(e) => {
-                const f = e.currentTarget.files?.[0];
-                if (f) void onLogoFile(f);
-                e.currentTarget.value = "";
-              }}
-            />
-          </label>
+          <div class="space-y-2">
+            <label class="cursor-pointer rounded-lg border border-stroke px-3 py-2 text-sm hover:erp-panel">
+              Upload logo (max {MAX_LOGO_MB} MB)
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                class="hidden"
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  if (f) void onLogoFile(f);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+            <Show when={branding.settings().receipt.logo_asset_id && !branding.logoMissing()}>
+              <p class="text-xs font-medium text-emerald-700">Logo saved for this company.</p>
+            </Show>
+            <Show when={branding.logoMissing()}>
+              <p class="text-xs font-medium text-amber-700">
+                Logo file is missing on the server — please re-upload. Saving colors will not remove your logo setting.
+              </p>
+            </Show>
+          </div>
         </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
           <For each={RECEIPT_FIELDS}>

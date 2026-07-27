@@ -13,8 +13,14 @@ import {
 
 const DOC_TYPES = [
   { value: "quo_quotation", label: "Quotation" },
-  { value: "po_purchase_order", label: "Purchase order" },
+  { value: "so_sales_order", label: "Sales order" },
   { value: "sa_sales", label: "Sales invoice" },
+  { value: "pr_purchase_request", label: "Purchase request" },
+  { value: "rfq_request", label: "RFQ" },
+  { value: "rfq_supplier_quotation", label: "Supplier quotation" },
+  { value: "po_purchase_order", label: "Purchase order" },
+  { value: "gr_goods_receipt", label: "Goods receipt" },
+  { value: "fin_supplier_invoice", label: "Purchase / supplier invoice" },
   { value: "fin_official_receipt", label: "Official receipt" },
   { value: "job_cost_project", label: "Job cost project" },
 ] as const;
