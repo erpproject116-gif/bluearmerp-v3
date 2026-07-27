@@ -43,19 +43,21 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			"quote_date":   "sq.quote_date",
 			"quote_no":     "sq.quote_no",
 			"partner_name": "p.company_name",
-			"item_code":    "ln.item_code",
+			"item_code":    "coalesce(rl.item_code, '')",
 		})
 		offset := httputil.Offset(p)
 
+		// Item code/name live on rfq_request_lines (supplier quotation lines only store item_id).
 		where := `sq.tenant_id = $1 and sq.status in ('accepted', 'received')
-			and (ln.qty - coalesce(ord.ordered, 0)) > 0.0001`
+			and (ln.qty - coalesce(ord.ordered, 0)) > 0.0001
+			and coalesce(ln.item_id, rl.item_id) is not null`
 		args := []any{tu.TenantID}
 		argN := 2
 
 		if p.Q != "" {
 			where += fmt.Sprintf(` and (
 				sq.quote_no ilike $%d or p.company_name ilike $%d or
-				ln.item_code ilike $%d or ln.item_name ilike $%d)`, argN, argN, argN, argN)
+				coalesce(rl.item_code, '') ilike $%d or coalesce(rl.item_name, '') ilike $%d)`, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
@@ -70,16 +72,18 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  sq.quote_no, sq.quote_date, sq.partner_id, p.company_name,
 			  pr.tax_type_id, pr.currency_id, pr.location_id, coalesce(l.location_name, ''),
 			  coalesce(pr.pic_name, ''),
-			  ln.item_id, ln.item_code, ln.item_name,
+			  coalesce(ln.item_id, rl.item_id),
+			  coalesce(rl.item_code, ''), coalesce(rl.item_name, ''),
 			  ln.qty::float8,
 			  (ln.qty - coalesce(ord.ordered, 0))::float8,
-			  ln.unit_id, ln.unit_code,
+			  coalesce(ln.unit_id, rl.unit_id), coalesce(ln.unit_code, rl.unit_code),
 			  ln.unit_price::float8,
 			  count(*) over()
 			from public.rfq_supplier_quotation_lines ln
 			join public.rfq_supplier_quotations sq on sq.id = ln.supplier_quotation_id
 			join public.inv_partners p on p.id = sq.partner_id
 			join public.rfq_requests rf on rf.id = sq.rfq_id
+			left join public.rfq_request_lines rl on rl.id = ln.rfq_request_line_id
 			left join public.pr_purchase_requests pr on pr.id = rf.purchase_request_id and pr.deleted_at is null
 			left join public.inv_locations l on l.id = pr.location_id
 			left join (

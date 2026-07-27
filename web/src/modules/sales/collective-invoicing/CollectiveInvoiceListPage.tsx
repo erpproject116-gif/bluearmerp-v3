@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { formatPeso } from "../../../shared/money";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { SALES_SETTINGS_HREF } from "../../../shared/entityTypes";
@@ -29,6 +30,7 @@ function openInvoicePrint(id: number, mode: "voucher" | "ar_statement" = "vouche
 }
 
 export default function CollectiveInvoiceListPage() {
+  const navigate = useNavigate();
   const toast = useToast();
   const invalidate = useInvalidateCollectiveInvoices();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("invoice_date", 25, {
@@ -175,7 +177,7 @@ export default function CollectiveInvoiceListPage() {
         selectedId={selectedId()}
         onSelect={setSelectedId}
         onEdit={() => {}}
-        onNew={() => void onAutoBatch()}
+        onNew={() => navigate("/app/sales/sales/new")}
         codeKey="date_no_display"
         nameKey="customer_name"
         sortKey={sort()}

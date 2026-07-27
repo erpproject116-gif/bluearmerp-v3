@@ -851,6 +851,12 @@ func createFromSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			if qty <= 0 {
 				continue
 			}
+			if itemID == nil || *itemID <= 0 {
+				response.Validation(w, map[string]string{
+					"lines": "Register free-text RFQ products in Inventory before converting to a purchase order.",
+				})
+				return
+			}
 			lineNo++
 			inputBasis := taxcalc.InputVatIncUnit
 			amounts := taxcalc.ComputeLine(tt, unitPrice, qty, inputBasis)
@@ -1320,6 +1326,10 @@ func computePurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID
 	var out []computedLine
 	for i, ln := range lines {
 		if ln.Qty <= 0 {
+			continue
+		}
+		if ln.ItemID == nil || *ln.ItemID <= 0 {
+			errs[fmt.Sprintf("lines[%d].item_id", i)] = "Register the product in Inventory before saving a purchase order (RFQ may use free-text items)."
 			continue
 		}
 		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)

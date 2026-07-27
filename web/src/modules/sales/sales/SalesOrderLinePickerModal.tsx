@@ -3,7 +3,6 @@ import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
   buildOpenLineQuery,
-  defaultMonitorDates,
   type OpenMonitorFilters,
 } from "../../../shared/OpenTransactionMonitor";
 
@@ -47,11 +46,10 @@ type Props = {
 const pageSize = 50;
 
 export function SalesOrderLinePickerModal(props: Props) {
-  const dates = defaultMonitorDates(30);
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
     q: "",
-    dateFrom: dates.dateFrom,
-    dateTo: dates.dateTo,
+    dateFrom: "",
+    dateTo: "",
     docNo: "",
     partnerId: null,
     partnerLocked: false,
@@ -64,11 +62,11 @@ export function SalesOrderLinePickerModal(props: Props) {
     if (!props.open) return;
     setSelected(new Set<number>());
     setPage(1);
-    const d = defaultMonitorDates(30);
     setFilters({
       q: "",
-      dateFrom: d.dateFrom,
-      dateTo: d.dateTo,
+      // Default to all open SO lines (not last-30-days only) so confirmed orders are visible.
+      dateFrom: "",
+      dateTo: "",
       docNo: "",
       partnerId: props.partnerId ?? null,
       partnerLocked: Boolean(props.partnerId),
@@ -133,6 +131,7 @@ export function SalesOrderLinePickerModal(props: Props) {
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
       onApply={confirm}
+      emptyHint="No confirmed Sales Order lines with open qty. Confirm the SO (progress Confirmed/Complete), clear the customer lock if needed, or use Sales Order → Pick List for serial-tracked items. Split-release stores also need a delivery receipt first."
       columns={[
         { key: "date_no", header: "Date-No.", cell: (r) => String(r.date_no_display ?? "") },
         { key: "so", header: "SO No.", cell: (r) => String(r.sales_order_no ?? "") },

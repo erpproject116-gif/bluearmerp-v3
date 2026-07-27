@@ -678,6 +678,11 @@ func computeQuotationLines(ctx context.Context, pool *pgxpool.Pool, tenantID int
 			errs[fmt.Sprintf("lines[%d].qty", i)] = "Quantity must be greater than zero."
 			continue
 		}
+		if strings.TrimSpace(ln.ItemName) == "" && strings.TrimSpace(ln.ItemCode) == "" &&
+			(ln.Description == nil || strings.TrimSpace(*ln.Description) == "") {
+			errs[fmt.Sprintf("lines[%d].item_name", i)] = "Enter a product name, code, or description (inventory registration is optional on quotations)."
+			continue
+		}
 		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
 		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.LineNo, ln.ItemID, ln.Qty, planned); err != nil {
 			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()

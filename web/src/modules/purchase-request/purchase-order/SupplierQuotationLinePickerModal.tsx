@@ -121,6 +121,11 @@ export function SupplierQuotationLinePickerModal(props: Props) {
             <Show when={data()}>
               {(payload) => (
                 <>
+                  <Show when={payload().rows.length === 0}>
+                    <p class="mb-3 text-sm text-amber-800">
+                      No open RFQ / supplier quotation lines with registered inventory items. Register free-text RFQ products in Inventory, accept the supplier quote, then retry Load Slip.
+                    </p>
+                  </Show>
                   <table class="erp-grid min-w-full text-sm">
                     <thead>
                       <tr class="border-b border-stroke text-left text-xs uppercase text-text-secondary">

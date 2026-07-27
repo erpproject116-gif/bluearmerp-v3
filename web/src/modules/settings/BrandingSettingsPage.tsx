@@ -38,8 +38,8 @@ const RECEIPT_FIELDS: { key: keyof BrandingReceipt; label: string; multiline?: b
   { key: "phone", label: "Phone" },
   { key: "email", label: "Email" },
   { key: "tax_id", label: "Tax ID (TIN) — used on BIR 2307 payor" },
-  { key: "header_text", label: "Extra header text", multiline: true },
-  { key: "footer_text", label: "Receipt footer", multiline: true },
+  { key: "header_text", label: "Extra header text (do not repeat company name — it prints as the title)", multiline: true },
+  { key: "footer_text", label: "Receipt / printable footer (defaults to company name if empty)", multiline: true },
 ];
 
 const MAX_LOGO_MB = 2;
@@ -203,6 +203,9 @@ export default function BrandingSettingsPage() {
 
       <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
         <h2 class="text-lg font-medium text-text-primary">Company logo &amp; print header</h2>
+        <p class="mt-1 text-sm text-text-secondary">
+          Upload a company logo for sidebar and all printables (invoices, quotations, receipts, ledgers). If no logo is uploaded, printables show a lettermark from the company name. Company name prints once as the title — put only address/contact in Extra header text.
+        </p>
         <p class="mt-1 text-sm text-text-secondary">
           Logo and company details appear in the app sidebar and on printed reports. Report templates can override these per report.
         </p>

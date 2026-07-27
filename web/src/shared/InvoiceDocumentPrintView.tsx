@@ -91,7 +91,11 @@ function InvoiceDocumentArticle(props: { data: InvoiceDocumentPrintData }) {
   return (
     <>
     <article class="quotation-print__page">
-      <PrintBrandingHeader docTitle={d().title} docSubtitle={d().docNo} />
+      <PrintBrandingHeader
+        docTitle={d().title}
+        docSubtitle={d().docNo}
+        tenantFallbackName={d().tenantCompanyName}
+      />
       <section class="quotation-print__grid">
         <div>
           <h3 class="quotation-print__section">{d().partyLabel}</h3>

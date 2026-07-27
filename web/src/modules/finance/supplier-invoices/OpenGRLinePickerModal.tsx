@@ -3,7 +3,6 @@ import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
   buildOpenLineQuery,
-  defaultMonitorDates,
   type OpenMonitorFilters,
 } from "../../../shared/OpenTransactionMonitor";
 import type { OpenGRLine } from "../../../shared/useSupplierInvoiceList";
@@ -20,11 +19,10 @@ type Props = {
 const pageSize = 50;
 
 export function OpenGRLinePickerModal(props: Props) {
-  const dates = defaultMonitorDates(30);
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
     q: "",
-    dateFrom: dates.dateFrom,
-    dateTo: dates.dateTo,
+    dateFrom: "",
+    dateTo: "",
     docNo: "",
     partnerId: null,
     partnerLocked: false,
@@ -37,11 +35,11 @@ export function OpenGRLinePickerModal(props: Props) {
     if (!props.open) return;
     setSelected(new Set<number>());
     setPage(1);
-    const d = defaultMonitorDates(30);
     setFilters({
       q: "",
-      dateFrom: d.dateFrom,
-      dateTo: d.dateTo,
+      // Default to all open GR lines (not last-30-days only).
+      dateFrom: "",
+      dateTo: "",
       docNo: "",
       partnerId: props.partnerId ?? null,
       partnerLocked: Boolean(props.partnerId),
@@ -134,7 +132,7 @@ export function OpenGRLinePickerModal(props: Props) {
       ]}
       onApply={apply}
       applyLabel={props.mapOnly ? "Map selected lines" : undefined}
-      emptyHint="No open GR lines for these filters. Clear dates or show all partners."
+      emptyHint="No open GR lines with remaining qty. Clear date/vendor filters, or confirm goods were received and not already fully purchased."
     />
   );
 }

@@ -871,7 +871,12 @@ export function SupplierInvoiceModal(props: Props) {
               }}
             />
             <p class="text-xs text-text-secondary">
-              Buying and Selling sources. PO/GR/RFQ apply residual qty; SO/Quotation map item lines without adopting the customer as vendor. Browse all partners in the monitor.
+              <Show
+                when={processPolicy.data?.purchase_require_gr_before_supplier_invoice}
+                fallback="Load Slip → Purchase Order bills confirmed PO residual and auto-receives stock when needed (like Sales Invoice → SO). Serial/lot items still need Goods Receipt first."
+              >
+                Process policy requires Goods Receipt before purchase invoice — use Load Slip → Goods Receipt (Receiving). Turn the gate off under Process policies for PO→invoice flexibility.
+              </Show>
             </p>
           </div>
           <PurchaseRequestLineGrid

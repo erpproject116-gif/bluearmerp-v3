@@ -3,7 +3,6 @@ import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
   buildOpenLineQuery,
-  defaultMonitorDates,
   type OpenMonitorFilters,
 } from "../../../shared/OpenTransactionMonitor";
 
@@ -46,11 +45,10 @@ type Props = {
 const pageSize = 50;
 
 export function QuotationLinePickerModal(props: Props) {
-  const dates = defaultMonitorDates(30);
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
     q: "",
-    dateFrom: dates.dateFrom,
-    dateTo: dates.dateTo,
+    dateFrom: "",
+    dateTo: "",
     docNo: "",
     partnerId: null,
     partnerLocked: false,
@@ -63,11 +61,11 @@ export function QuotationLinePickerModal(props: Props) {
     if (!props.open) return;
     setSelected(new Set<number>());
     setPage(1);
-    const d = defaultMonitorDates(30);
     setFilters({
       q: "",
-      dateFrom: d.dateFrom,
-      dateTo: d.dateTo,
+      // Default to all open quotation lines (not last-30-days only).
+      dateFrom: "",
+      dateTo: "",
       docNo: "",
       partnerId: props.partnerId ?? null,
       partnerLocked: Boolean(props.partnerId),
@@ -134,6 +132,7 @@ export function QuotationLinePickerModal(props: Props) {
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
       onApply={confirm}
+      emptyHint="No open quotation lines with registered inventory items. Free-text quotation lines must be linked to Inventory items before Load Slip → Sales Order. Clear date/customer filters if needed."
       columns={[
         { key: "date_no", header: "Date-No.", cell: (r) => String(r.date_no_display ?? "") },
         { key: "ref", header: "Quotation", cell: (r) => String(r.reference_no ?? "") },

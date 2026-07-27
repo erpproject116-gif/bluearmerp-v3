@@ -138,11 +138,18 @@
   margin-bottom: 1.25rem;
 }
 
+.print-brand-logo,
+.print-brand-mark {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
 .quotation-print__company {
-  font-size: 1.25rem;
+  margin: 0;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #1e3a8a;
-  margin: 0;
+  line-height: 1.25;
 }
 
 .quotation-print__doc-title h2 {
@@ -315,5 +322,17 @@
     border: none;
     border-radius: 0;
     max-width: none;
+  }
+
+  .print-brand-logo,
+  .print-brand-mark {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Avoid on-screen horizontal scrollbars bleeding into the print preview. */
+  .quotation-print .overflow-x-auto,
+  .quotation-print [class*="overflow"] {
+    overflow: visible !important;
   }
 }

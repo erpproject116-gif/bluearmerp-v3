@@ -3,6 +3,7 @@ package finance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -907,7 +908,7 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		dateNoDisplay := formatDateNoDisplay(invoiceDate, dateSeq)
-		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, invoiceNo, dateNoDisplay, body.Lines); err != nil {
+		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, invoiceNo, dateNoDisplay, body.Lines); err != nil {
 			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
 		}
@@ -989,14 +990,32 @@ func preferUnit(id *int64, code string, fallbackID *int64, fallbackCode string) 
 	return nil, fallbackCode
 }
 
-func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoiceID, partnerID int64, invoiceNo, dateNoDisplay string, lines []supplierInvoiceLineBody) error {
+func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoiceID, partnerID, locationID, userID int64, invoiceNo, dateNoDisplay string, lines []supplierInvoiceLineBody) error {
 	poLinesToSync := map[int64]bool{}
 	for i, ln := range lines {
 		lineNo := i + 1
 		if ln.LineNo > 0 {
 			lineNo = ln.LineNo
 		}
-		ref, err := resolveSupplierInvoiceLineItem(ctx, tx, tenantID, ln)
+		grLineID := ln.GoodsReceiptLineID
+		if (grLineID == nil || *grLineID <= 0) && ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
+			autoGR, err := ensureLegacyReceiveForInvoice(ctx, tx, tenantID, userID, locationID, *ln.PurchaseOrderLineID, ln.Qty)
+			if err != nil {
+				return fmt.Errorf("line %d: %w", lineNo, err)
+			}
+			if autoGR != nil {
+				grLineID = autoGR
+			}
+		}
+		ref, err := resolveSupplierInvoiceLineItem(ctx, tx, tenantID, supplierInvoiceLineBody{
+			GoodsReceiptLineID:  grLineID,
+			PurchaseOrderLineID: ln.PurchaseOrderLineID,
+			ItemID:              ln.ItemID,
+			ItemCode:            ln.ItemCode,
+			ItemName:            ln.ItemName,
+			UnitID:              ln.UnitID,
+			UnitCode:            ln.UnitCode,
+		})
 		if err != nil {
 			return fmt.Errorf("line %d: goods receipt line not found", lineNo)
 		}
@@ -1009,19 +1028,19 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 			  item_id, item_code, item_name, description, qty, unit_id, unit_code,
 			  unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark
 			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
-			invoiceID, lineNo, ln.GoodsReceiptLineID, poLineID,
+			invoiceID, lineNo, grLineID, poLineID,
 			ref.ItemID, ref.ItemCode, ref.ItemName, ln.Description, ln.Qty, unitID, unitCode,
 			ln.UnitNonVat, ln.NonVatTotal, ln.TaxAmount, ln.UnitVatInc, ln.LineTotal, ln.Remark)
 		if err != nil {
 			return err
 		}
 
-		if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
+		if grLineID != nil && *grLineID > 0 {
 			_, err = tx.Exec(ctx, `
 				insert into public.gr_goods_receipt_slip_lines (
 				  goods_receipt_line_id, slip_type, slip_ref, slip_date_no, qty, supplier_invoice_id
 				) values ($1, 'supplier_invoice', $2, $3, $4, $5)`,
-				*ln.GoodsReceiptLineID, invoiceNo, dateNoDisplay, ln.Qty, invoiceID)
+				*grLineID, invoiceNo, dateNoDisplay, ln.Qty, invoiceID)
 			if err != nil {
 				return err
 			}
@@ -1036,6 +1055,138 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 		}
 	}
 	return nil
+}
+
+// ensureLegacyReceiveForInvoice posts a Goods Receipt for unreceived PO qty when invoicing
+// from Load Slip → Purchase Order without a prior GR (flexible mode; GR-before-SI policy off).
+// Serial/lot items still require an explicit Goods Receipt. Returns nil when the PO line is
+// already fully received (bill-only path).
+func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, userID, locationID, purchaseOrderLineID int64, invoiceQty float64) (*int64, error) {
+	var poID int64
+	var ordered, received float64
+	var itemID *int64
+	var unitID *int64
+	var trackInventory, trackSerial, trackLot bool
+	err := tx.QueryRow(ctx, `
+		select po.id, pol.qty::float8, coalesce(pol.received_qty, 0)::float8,
+		  pol.item_id, pol.unit_id,
+		  coalesce(i.track_inventory_qty, false),
+		  coalesce(i.track_serial, false),
+		  coalesce(i.track_lot, false)
+		from public.po_purchase_order_lines pol
+		join public.po_purchase_orders po on po.id = pol.purchase_order_id
+		left join public.inv_items i on i.id = pol.item_id
+		where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null
+		  and po.status in ('confirmed', 'partially_received', 'received')`,
+		purchaseOrderLineID, tenantID,
+	).Scan(&poID, &ordered, &received, &itemID, &unitID, &trackInventory, &trackSerial, &trackLot)
+	if err != nil {
+		return nil, errors.New("purchase order line not found or not confirmed")
+	}
+
+	openReceive := ordered - received
+	if openReceive <= 0.0001 {
+		// Already received — allow PO-only billing without inventing another GR.
+		return nil, nil
+	}
+	if trackSerial || trackLot {
+		return nil, errors.New("serial/lot-tracked items require Goods Receipt (Receiving) before purchase invoice")
+	}
+	if invoiceQty > openReceive+0.0001 {
+		return nil, fmt.Errorf("exceeds unreceived PO quantity (%.4f available). Use Load Slip → Goods Receipt for already received qty, or lower invoice qty", openReceive)
+	}
+
+	var locTenant int64
+	if err := tx.QueryRow(ctx, `
+		select tenant_id from public.inv_locations where id = $1 and deleted_at is null`, locationID).
+		Scan(&locTenant); err != nil || locTenant != tenantID {
+		return nil, errors.New("invalid location for auto-receive")
+	}
+
+	var grID int64
+	err = tx.QueryRow(ctx, `
+		insert into public.gr_goods_receipts (
+		  tenant_id, purchase_order_id, receipt_date, location_id, status,
+		  reference, notes, created_by_user_id
+		) values ($1, $2, current_date, $3, 'posted', $4, $5, $6)
+		returning id`,
+		tenantID, poID, locationID,
+		"Auto-receive on purchase invoice", "Created automatically when invoicing open PO qty without a prior GR.",
+		userID,
+	).Scan(&grID)
+	if err != nil {
+		return nil, errors.New("failed to auto-create goods receipt")
+	}
+
+	var grLineID int64
+	err = tx.QueryRow(ctx, `
+		insert into public.gr_goods_receipt_lines (
+		  goods_receipt_id, purchase_order_line_id, line_no, expected_qty, received_qty
+		) values ($1, $2, 1, $3, $3)
+		returning id`,
+		grID, purchaseOrderLineID, invoiceQty,
+	).Scan(&grLineID)
+	if err != nil {
+		return nil, errors.New("failed to auto-create goods receipt line")
+	}
+
+	baseQty := invoiceQty
+	if itemID != nil && *itemID > 0 {
+		bq, err := inventory.BaseQtyForLine(ctx, tx, tenantID, *itemID, unitID, invoiceQty)
+		if err != nil {
+			return nil, err
+		}
+		baseQty = bq
+	}
+
+	if trackInventory && itemID != nil && *itemID > 0 && baseQty > 0 {
+		_, err = tx.Exec(ctx, `
+			insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
+			values ($1, $2, $3, $4)
+			on conflict (tenant_id, item_id, location_id)
+			do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
+			tenantID, *itemID, locationID, baseQty)
+		if err != nil {
+			return nil, errors.New("failed to update stock on auto-receive")
+		}
+		_, err = tx.Exec(ctx, `
+			insert into public.inv_stock_movements (
+			  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
+			) values ($1, $2, $3, $4, 'goods_receipt', 'goods_receipt', $5, $6)`,
+			tenantID, *itemID, locationID, baseQty, grID, userID)
+		if err != nil {
+			return nil, errors.New("failed to record stock movement for auto-receive")
+		}
+	}
+
+	tag, err := tx.Exec(ctx, `
+		update public.po_purchase_order_lines
+		set received_qty = received_qty + $1
+		where id = $2 and (qty - received_qty) >= $1 - 0.0001`,
+		invoiceQty, purchaseOrderLineID)
+	if err != nil || tag.RowsAffected() == 0 {
+		return nil, errors.New("failed to update purchase order received quantity")
+	}
+
+	var openLines int
+	if err := tx.QueryRow(ctx, `
+		select count(*) from public.po_purchase_order_lines
+		where purchase_order_id = $1 and (qty - received_qty) > 0.0001`, poID).Scan(&openLines); err != nil {
+		return nil, err
+	}
+	newPOStatus := "received"
+	if openLines > 0 {
+		newPOStatus = "partially_received"
+	}
+	_, err = tx.Exec(ctx, `
+		update public.po_purchase_orders
+		set status = $1, updated_at = now()
+		where id = $2`, newPOStatus, poID)
+	if err != nil {
+		return nil, errors.New("failed to update purchase order status")
+	}
+
+	return &grLineID, nil
 }
 
 func clearSupplierInvoiceSlipLines(ctx context.Context, tx pgx.Tx, invoiceID int64) error {
@@ -1164,7 +1315,7 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 
 		parsedDate, _ := parseDate(body.InvoiceDate)
 		dateNoDisplay := formatDateNoDisplay(parsedDate, before.DateSeq)
-		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, before.InvoiceNo, dateNoDisplay, body.Lines); err != nil {
+		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, before.InvoiceNo, dateNoDisplay, body.Lines); err != nil {
 			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
 		}

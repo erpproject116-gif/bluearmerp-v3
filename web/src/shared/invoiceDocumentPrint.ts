@@ -28,6 +28,7 @@ export type InvoiceDocumentPrintData = {
   lines: DocumentLineRow[];
   voucher: SalesInvoice | PurchaseInvoice;
   attachments: Attachment[];
+  tenantCompanyName?: string;
 };
 
 type SalesLine = {
@@ -101,6 +102,7 @@ async function loadSalesInvoiceDocument(id: number, opts?: InvoiceDocumentPrintO
     lines: ((sale.lines ?? []) as SalesLine[]).map(mapLine),
     voucher,
     attachments: attRes.success && attRes.data ? attRes.data : [],
+    tenantCompanyName: payload.tenant.company_name,
   };
 }
 
@@ -140,6 +142,7 @@ async function loadPurchaseInvoiceDocument(id: number, opts?: InvoiceDocumentPri
     lines: (inv.lines ?? []).map(mapLine),
     voucher,
     attachments: attRes.success && attRes.data ? attRes.data : [],
+    tenantCompanyName: payload.tenant.company_name,
   };
 }
 

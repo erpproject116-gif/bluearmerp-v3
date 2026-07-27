@@ -250,8 +250,13 @@ export function QuotationLineGrid(props: Props) {
 
   return (
     <div class="col-span-full">
-      <div class="mb-2 flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-text-primary">{uiLabel("lines.heading")}</h3>
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 class="text-sm font-semibold text-text-primary">{uiLabel("lines.heading")}</h3>
+          <p class="text-xs text-text-secondary">
+            Unregistered products are allowed on quotations — type a name/code, or double-click Item Code to pick from inventory.
+          </p>
+        </div>
         <button type="button" class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50" onClick={addLine}>
           {uiLabel("lines.add_button")}
         </button>
@@ -283,15 +288,35 @@ export function QuotationLineGrid(props: Props) {
                   <ResizableTd width={widthFor("line_no")} class="px-2 py-1">{line().line_no}</ResizableTd>
                   <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
-                      class={`${inputClass} w-full cursor-pointer`}
+                      class={`${inputClass} w-full`}
                       value={line().item_code}
-                      readOnly
+                      placeholder="Code or dbl-click to search"
+                      title="Type freely for unregistered products, or double-click to pick from inventory"
                       onDblClick={() => openSearch(idx)}
-                      title={uiLabel("lines.item_search_hint")}
+                      onInput={(e) =>
+                        void updateLine(idx, {
+                          item_code: e.currentTarget.value,
+                          item_id: null,
+                          track_serial: false,
+                          planned_serial_nos: [],
+                        })
+                      }
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">
-                    <input class={`${inputClass} w-full`} value={line().item_name} onInput={(e) => void updateLine(idx, { item_name: e.currentTarget.value })} />
+                    <input
+                      class={`${inputClass} w-full`}
+                      value={line().item_name}
+                      placeholder="Product name (required if not in inventory)"
+                      onInput={(e) =>
+                        void updateLine(idx, {
+                          item_name: e.currentTarget.value,
+                          item_id: null,
+                          track_serial: false,
+                          planned_serial_nos: [],
+                        })
+                      }
+                    />
                   </ResizableTd>
                   <ResizableTd width={widthFor("description")} class="px-2 py-1">
                     <input class={`${inputClass} w-full`} value={line().description} onInput={(e) => void updateLine(idx, { description: e.currentTarget.value })} />

@@ -875,6 +875,12 @@ func computePurchaseRequestLines(ctx context.Context, pool *pgxpool.Pool, tenant
 		if ln.Qty <= 0 {
 			continue
 		}
+		if (ln.ItemID == nil || *ln.ItemID <= 0) &&
+			strings.TrimSpace(ln.ItemName) == "" && strings.TrimSpace(ln.ItemCode) == "" &&
+			(ln.Description == nil || strings.TrimSpace(*ln.Description) == "") {
+			errs[fmt.Sprintf("lines[%d].item_name", i)] = "Enter a product name, code, or description (inventory registration is optional on purchase requests)."
+			continue
+		}
 		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
 		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.LineNo, ln.ItemID, ln.Qty, planned); err != nil {
 			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
@@ -1089,6 +1095,7 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		offset := httputil.Offset(p)
 
 		where := `so.tenant_id = $1 and so.deleted_at is null
+			and so.progress_status in ('in_progress', 'completed')
 			and (ln.qty - coalesce(req.requested, 0)) > 0.0001`
 		args := []any{tu.TenantID}
 		argN := 2

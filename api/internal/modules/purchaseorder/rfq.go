@@ -183,13 +183,18 @@ func createRFQ(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): "Quantity must be positive."})
 				return
 			}
-			itemCode := ln.ItemCode
-			itemName := ln.ItemName
+			itemCode := strings.TrimSpace(ln.ItemCode)
+			itemName := strings.TrimSpace(ln.ItemName)
 			if ln.ItemID != nil && *ln.ItemID > 0 {
 				_ = tx.QueryRow(r.Context(), `
 					select item_code, item_name from public.inv_items
 					where id = $1 and tenant_id = $2 and deleted_at is null`,
 					*ln.ItemID, tu.TenantID).Scan(&itemCode, &itemName)
+			} else if itemName == "" && itemCode == "" {
+				response.Validation(w, map[string]string{
+					fmt.Sprintf("lines[%d].item_name", i): "Enter a product name or code (inventory registration is optional on RFQ).",
+				})
+				return
 			}
 			unitID, unitCode := inventory.ResolveLineUnit(r.Context(), tx, tu.TenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
 			_, err = tx.Exec(r.Context(), `

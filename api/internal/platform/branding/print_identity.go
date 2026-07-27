@@ -63,7 +63,7 @@ func LoadPrintIdentity(ctx context.Context, pool *pgxpool.Pool, tenantID int64) 
 			headerParts = append(headerParts, line)
 		}
 	}
-	id.HeaderText = strings.Join(headerParts, "\n")
+	id.HeaderText = normalizePrintHeaderLines(id.CompanyName, strings.Join(headerParts, "\n"))
 
 	if id.CompanyName == "" {
 		id.CompanyName = "Company"
@@ -113,6 +113,41 @@ func formatReceiptContactLines(id PrintIdentity) []string {
 		lines = append(lines, "Tax ID: "+id.TaxID)
 	}
 	return lines
+}
+
+// normalizePrintHeaderLines strips company-name duplicates so PDF letterheads
+// do not repeat the company title (mirrors web receiptBranding.ts).
+func normalizePrintHeaderLines(companyName, headerText string) string {
+	company := strings.TrimSpace(companyName)
+	companyLower := strings.ToLower(company)
+	raw := strings.Split(strings.ReplaceAll(headerText, "\r\n", "\n"), "\n")
+	var out []string
+	seen := map[string]bool{}
+	for _, line := range raw {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if companyLower != "" && lower == companyLower {
+			continue
+		}
+		if companyLower != "" && strings.HasPrefix(lower, companyLower) {
+			rest := strings.TrimSpace(line[len(company):])
+			rest = strings.TrimLeft(rest, " \t,·-:")
+			if rest == "" {
+				continue
+			}
+			line = rest
+			lower = strings.ToLower(line)
+		}
+		if seen[lower] {
+			continue
+		}
+		seen[lower] = true
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
 }
 
 func strFromMap(m map[string]any, key string) string {
