@@ -9,7 +9,6 @@ export function printCode128Labels(opts: {
   if (!w) return false;
   const labels = rows
     .map((r, i) => {
-      const safe = r.code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
       const cap = (r.caption ?? r.code).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
       return `<div class="label"><svg id="bc${i}"></svg><div class="code">${cap}</div></div>`;
     })
