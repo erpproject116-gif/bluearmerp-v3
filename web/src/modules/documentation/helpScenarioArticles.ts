@@ -164,7 +164,7 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Sales return with serial numbers",
     scenario: "A customer returns a serial-tracked unit and you need stock and serial status restored correctly.",
     intro:
-      "Sales returns reverse invoiced quantity. For Track serial items, you must scan or select the same serial units that left stock so the registry returns them to available.",
+      "Sales returns reverse invoiced quantity and restore units as sellable stock at the return location. For Track serial items, you must scan or select the same serial units that left stock so the registry returns them to available. Do not use Sales Return for warranty repair / RMA hold — use After-Sales → Repair Order instead (see Help: Sales Return vs Repair Order).",
     blocks: [
       {
         type: "steps",
@@ -178,12 +178,42 @@ export const helpScenarioArticles: KbArticle[] = [
       },
       {
         type: "tip",
+        text: "If the customer needs repair (not a sellable restock), use Repair Order with an RMA-flagged location — Sales Return would put the unit back into sellable inventory.",
+      },
+      {
+        type: "tip",
         text: "If scan is rejected, the serial may still be in stock, belong to another invoice, or not exist. Trace the serial first under Inventory → Serial & Lot.",
       },
     ],
     primaryHref: "/app/sales/sales-returns",
     primaryLabel: "Sales returns",
-    relatedGuideIds: ["serial-barcode-scanning", "serial-lot-registry"],
+    relatedGuideIds: ["serial-barcode-scanning", "serial-lot-registry", "sales-return-vs-repair-rma"],
+  },
+  {
+    id: "sales-return-vs-repair-rma",
+    title: "Sales Return vs Repair Order (RMA)",
+    scenario: "A customer brings back a serial-tracked unit and staff must choose the correct document path.",
+    intro:
+      "Wrong path breaks stock: Sales Return restores sellable qty; Repair Order with RMA holds the unit as not sellable until released after service.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Use Sales → Sales Returns when the customer is returning goods to restock (credit / reverse invoice) and the unit should be sellable again.",
+          "Use After-Sales → Repair Orders when the unit is defective for repair/warranty: pick the sold serial from the Sales Invoice, set an RMA-flagged location, and enable Receive into RMA.",
+          "On Locations, enable “RMA warehouse” for the service intake location — otherwise RMA receive fails.",
+          "After repair, set progress to Released and choose a non-RMA active location to put the serial back into sellable stock.",
+          "Never post both a Sales Return and an RMA receive for the same serial without a clear inventory reason.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Quick test: if the unit must not appear in Inventory Status as sellable while in the workshop, it is Repair Order + RMA — not Sales Return.",
+      },
+    ],
+    primaryHref: "/app/after-sales/repair-orders",
+    primaryLabel: "Repair orders",
+    relatedGuideIds: ["sales-return-serial", "after-sales-repair", "serial-lot-registry"],
   },
   {
     id: "serial-count-mismatch",

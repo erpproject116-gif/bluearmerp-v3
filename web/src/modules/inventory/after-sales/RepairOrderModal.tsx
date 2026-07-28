@@ -40,6 +40,10 @@ import {
   type PickedQuotationLine,
 } from "../../sales-order/sales-order/QuotationLinePickerModal";
 import { PurchaseRequestLinePickerModal, type PickedPurchaseRequestLine } from "../../purchase-request/purchase-order/PurchaseRequestLinePickerModal";
+import {
+  RepairOrderRmaSiPickerModal,
+  type RmaCandidate,
+} from "./RepairOrderRmaSiPickerModal";
 
 export type RepairOrderDetail = {
   id: number;
@@ -104,8 +108,23 @@ async function fetchPartners(q: string): Promise<LookupOption[]> {
 async function fetchLocations(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
   if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
-  return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
+  const res = await apiFetch<{ id: number; location_name: string; is_rma?: boolean }[]>(
+    `/api/v1/inventory/locations?${qs}`,
+  );
+  return (res.data ?? []).map((l) => ({
+    id: l.id,
+    label: l.is_rma ? `${l.location_name} (RMA)` : l.location_name,
+    meta: { is_rma: Boolean(l.is_rma) },
+  }));
+}
+
+async function resolveLocationIsRma(id: number | null): Promise<boolean> {
+  if (!id) return false;
+  const res = await apiFetch<{ id: number; is_rma?: boolean }[]>(
+    `/api/v1/inventory/locations?page=1&pageSize=50&status=active`,
+  );
+  const hit = (res.data ?? []).find((l) => l.id === id);
+  return Boolean(hit?.is_rma);
 }
 
 async function fetchProjects(q: string): Promise<LookupOption[]> {
@@ -161,6 +180,7 @@ export function RepairOrderModal(props: Props) {
   const [picName, setPicName] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
+  const [locationIsRma, setLocationIsRma] = createSignal(false);
   const [projectId, setProjectId] = createSignal<number | null>(null);
   const [projectLabel, setProjectLabel] = createSignal("");
   const [projectName, setProjectName] = createSignal("");
@@ -181,6 +201,7 @@ export function RepairOrderModal(props: Props) {
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
   const [prPickerOpen, setPrPickerOpen] = createSignal(false);
+  const [rmaSiPickerOpen, setRmaSiPickerOpen] = createSignal(false);
   const [attachments, setAttachments] = createSignal<RepairOrderAttachment[]>([]);
   const [uploading, setUploading] = createSignal(false);
 
@@ -217,6 +238,8 @@ export function RepairOrderModal(props: Props) {
       setPicName(ed.pic_name);
       setLocationId(ed.location_id);
       setLocationLabel(ed.location_name ?? "");
+      setLocationIsRma(false);
+      void resolveLocationIsRma(ed.location_id).then(setLocationIsRma);
       setProjectId(ed.project_id ?? null);
       setProjectLabel(ed.project_name ?? "");
       setProjectName(ed.project_name ?? "");
@@ -244,6 +267,7 @@ export function RepairOrderModal(props: Props) {
       setPicName("");
       setLocationId(null);
       setLocationLabel("");
+      setLocationIsRma(false);
       setProjectId(null);
       setProjectLabel("");
       setProjectName("");
@@ -308,6 +332,7 @@ export function RepairOrderModal(props: Props) {
       setPicName(payload.pic_name);
       setLocationId(payload.location_id);
       setLocationLabel(payload.location_label);
+      void resolveLocationIsRma(payload.location_id).then(setLocationIsRma);
       setProjectId(payload.project_id);
       setProjectLabel(payload.project_label);
       setProjectName(payload.project_name);
@@ -564,10 +589,12 @@ export function RepairOrderModal(props: Props) {
           onSelect={(o) => {
             setLocationId(o.id);
             setLocationLabel(o.label);
+            setLocationIsRma(Boolean(o.meta?.is_rma));
           }}
           onClear={() => {
             setLocationId(null);
             setLocationLabel("");
+            setLocationIsRma(false);
           }}
           fetchOptions={fetchLocations}
           createLabel="Add location"
@@ -580,6 +607,17 @@ export function RepairOrderModal(props: Props) {
               : undefined
           }
         />
+        <Show when={receiveToRma() && locationId() && !locationIsRma()}>
+          <div class="col-span-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Selected location is not RMA-flagged. Open Inventory → Locations, edit the location, and enable{" "}
+            <strong>RMA warehouse</strong> — or pick a location labeled (RMA). Receive into RMA will fail until then.
+          </div>
+        </Show>
+        <Show when={receiveToRma() && !locationId()}>
+          <div class="col-span-full rounded-lg border border-dashed border-stroke bg-slate-50 px-3 py-2 text-sm text-text-secondary">
+            Choose an RMA-flagged location (lookup shows “(RMA)”) before receiving a defective serial into the warehouse.
+          </div>
+        </Show>
         <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
           {(m) => (
             <select
@@ -597,11 +635,45 @@ export function RepairOrderModal(props: Props) {
             </select>
           )}
         </ModalField>
-        <Field label="Original sales invoice no.">
+        <div class="col-span-full flex flex-wrap items-end gap-2">
+          <Field label="Original sales invoice / serial (RMA)">
+            <div class="flex flex-wrap gap-2">
+              <input
+                class={inputClass + " min-w-[10rem] flex-1"}
+                value={salesNo() ? `${salesNo()}${serialNo() ? ` · ${serialNo()}` : ""}` : ""}
+                placeholder="Use Pick from SI, or type SI / serial below"
+                readOnly
+              />
+              <button
+                type="button"
+                class="rounded-lg border border-brand-600 bg-white px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                onClick={() => setRmaSiPickerOpen(true)}
+              >
+                Pick from SI
+              </button>
+              <Show when={salesId() || serialUnitId()}>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
+                  onClick={() => {
+                    setSalesId(null);
+                    setSalesNo("");
+                    setSalesLineId(null);
+                    setSerialUnitId(null);
+                    setSerialNo("");
+                  }}
+                >
+                  Clear
+                </button>
+              </Show>
+            </div>
+          </Field>
+        </div>
+        <Field label="SI no. (manual)">
           <input
             class={inputClass}
             value={salesNo()}
-            placeholder="SI no. for traceability"
+            placeholder="Optional override"
             onInput={(e) => setSalesNo(e.currentTarget.value)}
             onBlur={async () => {
               const q = salesNo().trim();
@@ -620,7 +692,7 @@ export function RepairOrderModal(props: Props) {
             }}
           />
         </Field>
-        <Field label="Defective serial no.">
+        <Field label="Serial no. (manual / scan)">
           <input
             class={inputClass}
             value={serialNo()}
@@ -648,6 +720,11 @@ export function RepairOrderModal(props: Props) {
           <input type="checkbox" checked={receiveToRma()} onChange={(e) => setReceiveToRma(e.currentTarget.checked)} />
           Receive into RMA warehouse (location must have RMA flag; removes from customer / not sellable)
         </label>
+        <Show when={receiveToRma() && serialUnitId() && locationIsRma()}>
+          <p class="col-span-full text-xs text-emerald-800">
+            Ready: serial linked and location is RMA-flagged. On save, unit moves to RMA (not sellable) until released.
+          </p>
+        </Show>
         <ModalLookupField
           settings={byKey}
           fieldKey="release_location_id"
@@ -837,6 +914,38 @@ export function RepairOrderModal(props: Props) {
       }
     />
 
+    <RepairOrderRmaSiPickerModal
+      open={rmaSiPickerOpen()}
+      partnerId={partnerId()}
+      onClose={() => setRmaSiPickerOpen(false)}
+      onPick={(row: RmaCandidate) => {
+        setSalesId(row.sales_id);
+        setSalesNo(row.sales_no);
+        setSalesLineId(row.sales_line_id);
+        setSerialUnitId(row.serial_unit_id);
+        setSerialNo(row.serial_no);
+        if (!partnerId()) {
+          setPartnerId(row.partner_id);
+          setCustomerLabel(row.customer_name);
+        }
+        const linesNow = lines();
+        const first = linesNow[0];
+        if (first && !first.item_id && row.item_id) {
+          setLines([
+            {
+              ...first,
+              item_id: row.item_id,
+              item_code: row.item_code,
+              item_name: row.item_name,
+              serial_lot_no: row.serial_no,
+              qty: first.qty || "1",
+            },
+            ...linesNow.slice(1),
+          ]);
+        }
+      }}
+    />
+
     <QuickCustomerModal
       open={showNewCustomer()}
       initialName={newCustomerName()}
@@ -854,6 +963,7 @@ export function RepairOrderModal(props: Props) {
       onCreated={(l) => {
         setLocationId(l.id);
         setLocationLabel(l.location_name);
+        setLocationIsRma(false);
       }}
     />
     </>

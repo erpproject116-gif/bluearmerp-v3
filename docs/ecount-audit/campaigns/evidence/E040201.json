@@ -1,0 +1,24 @@
+{
+  "prgId": "E040201",
+  "screen_name": "New Quotation",
+  "pills": [
+    {"label": "New Quotation", "audited": true, "notes": "form template tab"},
+    {"label": "Quotation", "audited": true, "notes": "header/type label area"}
+  ],
+  "toolbar": [
+    "Option", "Find(F3)", "Sort", "View Trans. (Quotation)", "My Item", "Discount",
+    "View Inv. Qty", "Created Slip", "Barcode", "Verification", "Calculate Profit",
+    "Load Slip", "Reset", "List", "VAT Inc.", "Domestic"
+  ],
+  "toolbar_audited": [
+    "Option", "Find(F3)", "Sort", "View Trans. (Quotation)", "My Item", "Discount",
+    "View Inv. Qty", "Created Slip", "Barcode", "Verification", "Calculate Profit",
+    "Load Slip", "Reset", "List", "VAT Inc.", "Domestic"
+  ],
+  "controls_logged": 60,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/quotation/quotations/new",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 depth-complete; Save/Confirm not submitted; residuals: Calculate Profit, Verification, tenant template tabs",
+  "mark_depth_complete": true
+}

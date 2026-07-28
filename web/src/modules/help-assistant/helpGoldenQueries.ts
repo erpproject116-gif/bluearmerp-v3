@@ -9,6 +9,8 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
   // Existing baselines
   { query: "rfq workflow", path: "/app/purchase-order/rfq", expectArticleId: "rfq-workflow" },
   { query: "return serial", path: "/app/sales/sales-returns", expectArticleId: "sales-return-serial" },
+  { query: "sales return vs repair order rma", path: "/app/after-sales/repair-orders", expectArticleId: "sales-return-vs-repair-rma" },
+  { query: "defective unit rma not sales return", path: "/app/after-sales/repair-orders", expectArticleId: "sales-return-vs-repair-rma" },
   { query: "switch between businesses", path: "/app/dashboard", expectArticleId: "switch-between-businesses" },
   { query: "where do I start mypage flow chart", path: "/app/dashboard", expectArticleId: "mypage-flow-chart" },
   { query: "which screen for sales cash in", path: "/app/dashboard", expectArticleId: "mypage-flow-chart" },

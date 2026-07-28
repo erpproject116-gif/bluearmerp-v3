@@ -8,10 +8,20 @@ import {
 } from "../../shared/useSupportTickets";
 import { useListState } from "../../shared/useListState";
 import { canManageAllSupportTickets, hasPermission, useAuth } from "../../shared/auth-context";
+import { downloadReportCsv } from "../../shared/reports/downloadReportCsv";
 import { SupportLayout } from "./SupportLayout";
 import { NewSupportTicketModal } from "./NewSupportTicketModal";
 
 const STATUS_OPTIONS: TicketStatus[] = ["open", "in_progress", "waiting", "resolved", "closed"];
+
+function ticketsExportUrl(params: Record<string, string | undefined>, format: "csv" | "md") {
+  const qs = new URLSearchParams();
+  qs.set("format", format);
+  for (const [k, v] of Object.entries(params)) {
+    if (v) qs.set(k, v);
+  }
+  return `/api/v1/support/tickets/export?${qs}`;
+}
 
 export default function TicketsPage() {
   const navigate = useNavigate();
@@ -36,6 +46,19 @@ export default function TicketsPage() {
 
   const openDetail = (row: Ticket) => {
     navigate(`/app/support/tickets/${row.id}`);
+  };
+
+  const exportFilter = () => ({
+    q: q() || undefined,
+    status: statusFilter() || undefined,
+  });
+
+  const exportCsv = () => {
+    void downloadReportCsv(ticketsExportUrl(exportFilter(), "csv"), "support-tickets.csv");
+  };
+
+  const exportMarkdown = () => {
+    void downloadReportCsv(ticketsExportUrl(exportFilter(), "md"), "support-tickets.md");
   };
 
   return (
@@ -87,6 +110,26 @@ export default function TicketsPage() {
         search={q()}
         onSearchChange={setQ}
         searchPlaceholder="Search tickets…"
+        toolbarExtra={
+          <>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
+              onClick={exportCsv}
+              title="Export ticket titles and full body text as CSV"
+            >
+              Export CSV
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
+              onClick={exportMarkdown}
+              title="Export all tickets with title and full body for documentation"
+            >
+              Export docs (MD)
+            </button>
+          </>
+        }
       />
 
       <NewSupportTicketModal open={modalOpen()} onClose={() => setModalOpen(false)} />

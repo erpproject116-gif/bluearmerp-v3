@@ -16,7 +16,7 @@ filter-management,C000029,Item List Option panel,L2,Management,no,"Serial/lot, a
 form-default,C000029,Inline New/Edit form,L2,Default,yes,"Code, name, group1, spec modes, unit, category, inv qty mgmt, process, prices+tax",,,,,/app/inventory/items,yes,
 form-item-info,C000029,Inline New/Edit form,L2,Item Information,no,"Edit panel: tax rates, barcode, keyword, sharing, image, QC, item groups 1-3, remark",,,,,/app/inventory/items,yes,Pass 7 edit 00002 — richer than Default tab
 form-qty,C000029,Inline New/Edit form,L2,Qty,no,"Aux qty conversion ratio, Safety stock qty, Safety stock control per doc type (SO/Sales/GI/GR/Loc/Internal/Defect), Set by location, C-Portal min SO check/unit, Inventory qty enter, Lead time, Min purchase qty, Vendor",,,,,/app/inventory/items,yes,Pass 2 clicked
-form-price,C000029,Inline New/Edit form,L2,Price,no,"Purchase/Sale/VIP + tax included (may duplicate Default)",,,,,/app/inventory/items,yes,
+form-price,C000029,Inline New/Edit form,L2,Price,no,Purchase/Sale/VIP + tax included (may duplicate Default),,,,,/app/inventory/items,yes,
 form-cost,C000029,Inline New/Edit form,L2,Cost,no,"O/E price, Std labor time, OH allocation weight, Std material/labor/expense/OE costs",,,,,/app/inventory/items,yes,Pass 2 clicked
 form-additional,C000029,Inline New/Edit form,L2,Additional Information,no,"Text add fields 1-6, Number add fields 1-10",,,,,/app/inventory/items/settings,yes,Pass 2 clicked
 form-management,C000029,Inline New/Edit form,L2,Management,no,"Serial/Lot mode (Default/Required/Optional/Do Not Use), Auto-create mfg slip (sales/loc trans), Auto-create QC (purchases/GR), Mgmt field, QC method",,,,,/app/inventory/serial-lot,yes,Pass 2 clicked
@@ -60,7 +60,7 @@ form-purchase-inv-i,E040303,New Purchases form,L2,Purchase Invoice I,yes,"Date, 
 form-purchase-new-dropdown,E040303,New Purchases form,L2,New Purchase,no,Template dropdown (only Invoice I seen),,,,,/app/finance/supplier-invoices/new,yes,
 form-purchase-acct-voucher,E040303,New Purchases accounting,L3,Voucher Date,no,Accounting voucher date block,,,,,/app/finance/supplier-invoices,yes,
 form-purchase-acct-tax,E040303,New Purchases accounting,L3,Tax Type,no,BIR/tax invoice fields,,,,,/app/finance/supplier-invoices,yes,
-form-purchase-acct-accounts,E040303,New Purchases accounting,L3,Accounts,no,Purchase acct, withdrawal, payable, due date, fees,,,,,/app/finance/supplier-invoices,yes,
+form-purchase-acct-accounts,E040303,New Purchases accounting,L3,Accounts,no,Purchase acct, withdrawal, payable, due date, fees,,,
 form-sales-inv-i,E040205,New Sales form,L2,Sales Invoice I,yes,"Date, due date, customer, PIC, location-out, VAT, currency, notes, SI/DR, SO#, terms, project",,,,,/app/selling/sales/new,yes,Pass 1 Jul 2026
 form-sales-new-dropdown,E040205,New Sales form,L2,New Sales,no,Template dropdown (only Invoice I seen),,,,,/app/selling/sales/new,yes,
 form-sales-notification,E040205,New Sales form,L3,Notification,no,Target + Email/Messenger/Msg/Push,,,,,/app/selling/sales,yes,
@@ -85,7 +85,7 @@ serial-slip-type-7,C000092,Serial/Lot Slip List type pills,L2,7,yes,Slip type fi
 serial-slip-type-8,C000092,Serial/Lot Slip List type pills,L2,8,yes,Slip type filter 8,,,,,/app/inventory/serial-lot,yes,
 serial-slip-type-9,C000092,Serial/Lot Slip List type pills,L2,9,yes,Slip type filter 9,,,,,/app/inventory/serial-lot,yes,
 serial-slip-type-10,C000092,Serial/Lot Slip List type pills,L2,10,yes,Slip type filter 10,,,,,/app/inventory/serial-lot,yes,
-serial-slip-option-default,C000092,Serial/Lot Slip List Option,L2,Default,yes,"Date Recent 30 Days (+1 Month); Terms of Validity; Item categories; Linked Slip/Set Manually; Sort Modified Date; Template",,,,,/app/inventory/serial-lot,yes,Pass 17
+serial-slip-option-default,C000092,Serial/Lot Slip List Option,L2,Default,yes,Date Recent 30 Days (+1 Month); Terms of Validity; Item categories; Linked Slip/Set Manually; Sort Modified Date; Template,,,,,/app/inventory/serial-lot,yes,Pass 17
 serial-status-default,E040639,Serial/Lot No. Status Option,L2,Default,yes,Saved filter template,,,,,/app/inventory/serial-lot,yes,Pass 17
 serial-status-details,E040639,Serial/Lot No. Status type,L2,Details,yes,Detail report layout,,,,,/app/inventory/serial-lot,yes,Pass 17 default active
 serial-status-summary,E040639,Serial/Lot No. Status type,L2,Summary,no,Summary + by Line layout,,,,,/app/inventory/serial-lot,yes,Pass 17
@@ -129,12 +129,12 @@ form-auto-voucher-all,E010213,Auto Generate Voucher List,L2,All,yes,Single statu
 item-list-alias,E040103,Item List (tenant alias),L0,Setup,yes,Same as C000029 — Item List in BLUEARM tenant,,,,,/app/inventory/items,yes,prgId alias Jul 2026 live crawl
 item-toolbar-barcode,C000029,Item List Barcode modal,L3,Barcode (Item),yes,"Qty, Item Code/Name/Spec, Barcode; Print Barcode",,,,,/app/inventory/items,yes,Requires checkbox row select
 item-toolbar-inv-adj,C000029,Item List Inv. Adj. modal,L3,Inv. Count I,yes,"Date, Location, Adjust → per-location qty grid, Save F8",,,,,/app/inventory/stock-entries,yes,Pass 7 — 8 location columns on 00002
-item-toolbar-relation,C000029,Item List Relation modal,L3,Item Relation List,yes,"Main/linked item grid + qty conversion columns",,,,,/app/inventory/items,yes,New F2 / Excel / Uploader on modal
+item-toolbar-relation,C000029,Item List Relation modal,L3,Item Relation List,yes,Main/linked item grid + qty conversion columns,,,,,/app/inventory/items,yes,New F2 / Excel / Uploader on modal
 online-order-status-all,E041005,Online Store Order Mgmt Status,L2,All,yes,11 status pills with counts,,,,,—,yes,Pass 1 Jul 2026
 online-order-confirm-all,E041006,Order Confirmation,L2,All,yes,,,,,,—,yes,Pass 1 Jul 2026
 online-delivery-all,E041007,Delivery,L2,All,yes,,,,,,—,yes,Pass 1 Jul 2026
-item-relation-register,C001130,Register Item Relation,L4,Quantity Control Basis,yes,"Main Item / Individual Item radios",,,,,/app/inventory/items,yes,Child of Item Relation List New F2; formType SI903; Save F8
-item-relation-register-grid,C001130,Register Item Relation,L4,Linked lines grid,yes,"Linked Item Code/Name/Spec/Qty + Bom Sync",,,,,/app/inventory/items,yes,Find F3; default 3 blank rows
+item-relation-register,C001130,Register Item Relation,L4,Quantity Control Basis,yes,Main Item / Individual Item radios,,,,,/app/inventory/items,yes,Child of Item Relation List New F2; formType SI903; Save F8
+item-relation-register-grid,C001130,Register Item Relation,L4,Linked lines grid,yes,Linked Item Code/Name/Spec/Qty + Bom Sync,,,,,/app/inventory/items,yes,Find F3; default 3 blank rows
 item-relation-option,C001130,Register Item Relation,L4,Default Setting,yes,Option dropdown — form layout only,,,,,/app/inventory/items,yes,Pass 7 standalone; no filter pills
 export-status-all,C000652,Export Invoice/Packing List,L2,All,yes,Default status filter,,,,,—,yes,Pass 2 Jul 2026
 export-status-unconfirmed,C000652,Export Invoice/Packing List,L2,Unconfirmed,no,,,,,,—,yes,
@@ -159,9 +159,9 @@ ledger1-type-monthly,E010807,LedgerⅠ Type,L2,Monthly,no,,,,,,/app/finance/repo
 ledger1-type-recalc,E010807,LedgerⅠ Type,L2,Recalculate by Account,no,,,,,,/app/finance/reports,yes,
 bs-default,E010813,Balance Sheet,L2,Default,yes,"Dept/Project display type, comparison period",,,,,/app/finance/reports,yes,Pass 2 Jul 2026
 is-default,E010812,Income Statement,L2,Default,yes,"Date range, comparison, Beginning/Increase/Ending",,,,,/app/finance/reports,yes,Pass 2 Jul 2026
-ledger2-default,E010808,LedgerⅡ,L2,Default,yes,"Customer-centric; Summary by Customer/Vendor type",,,,,/app/finance/reports,yes,Pass 3 Jul 2026
+ledger2-default,E010808,LedgerⅡ,L2,Default,yes,Customer-centric; Summary by Customer/Vendor type,,,,,/app/finance/reports,yes,Pass 3 Jul 2026
 ledger2-type-summary,E010808,LedgerⅡ Type,L2,Summary by Customer/Vendor,no,,,,,,/app/finance/reports,yes,
-ledger3-default,E010809,LedgerⅢ,L2,Default,yes,"Account+customer hybrid",,,,,/app/finance/reports,yes,Pass 3 Jul 2026
+ledger3-default,E010809,LedgerⅢ,L2,Default,yes,Account+customer hybrid,,,,,/app/finance/reports,yes,Pass 3 Jul 2026
 scf-period-default,E010861,Statement of Cash Flows,L2,Default,yes,Accounting Period list,,,,,/app/finance/reports,yes,Pass 3 Jul 2026
 online-order-option-default,E041005,Order Mgmt Status Option,L2,Default,yes,"Date ranges, store, mapping status",,,,,—,yes,Pass 3 Jul 2026
 online-order-option-all,E041005,Order Mgmt Status Option,L2,All,no,,,,,,—,yes,Pass 3 Jul 2026
@@ -169,7 +169,7 @@ sales-status-default,E040207,Sales Status,L2,Default,yes,"Details type; date, cu
 sales-status-type-details,E040207,Sales Status Type,L2,Details,yes,Line-level grid,,,,,/app/selling/reports,yes,
 sales-status-type-summary,E040207,Sales Status Type,L2,Summary,no,,,,,,/app/selling/reports,yes,
 sales-status-type-byline,E040207,Sales Status Type,L2,by Line,no,,,,,,/app/selling/reports,yes,
-ar-customer-default,E040214,A/R by Customer,L2,Default,yes,"By Customer/Vendor type",,,,,/app/selling/reports,yes,Pass 5 Jul 2026
+ar-customer-default,E040214,A/R by Customer,L2,Default,yes,By Customer/Vendor type,,,,,/app/selling/reports,yes,Pass 5 Jul 2026
 ar-customer-type-cust,E040214,A/R by Customer Type,L2,By Customer/Vendor,yes,,,,,,/app/selling/reports,yes,
 ar-customer-type-pic,E040214,A/R by Customer Type,L2,by PIC,no,,,,,,/app/selling/reports,yes,
 receipt-status-default,E040217,Receipt Status,L2,Default,yes,"Customer, dept, PIC filters",,,,,/app/selling/reports,yes,Pass 5 Jul 2026
@@ -198,7 +198,7 @@ po-status-type-details,E040306,Purchase Order Status Type,L2,Details,yes,,,,,,/a
 outstanding-po-default,E040307,Outstanding P/O Status,L2,Default,yes,Outstanding P/O Qty range,,,,,/app/buying/reports,yes,Pass 7 Jul 2026
 payment-status-default,E040310,Payment Status,L2,Default,yes,"Vendor, dept, PIC filters",,,,,/app/buying/reports,yes,Pass 7 Jul 2026
 cash-book-default,E010801,Cash Book,L2,Default,yes,"Dept, project, Include Deposit",,,,,/app/finance/reports,yes,Pass 5 Jul 2026
-form-purchase-load-slip,E040303,Load Slip modal,L2,Slip type picker,yes,"PO/GR/SO/quotation/etc. source types",,,,,/app/finance/supplier-invoices/new,yes,Pass 5 Jul 2026
+form-purchase-load-slip,E040303,Load Slip modal,L2,Slip type picker,yes,PO/GR/SO/quotation/etc. source types,,,,,/app/finance/supplier-invoices/new,yes,Pass 5 Jul 2026
 form-purchase-po-picker,E040303,Purchase Order picker modal,L2,Default,yes,"PO No., vendor, item filters; Apply Residual Qty",,,,,/app/finance/supplier-invoices/new,yes,Pass 8 Jul 2026
 pending-shipment-default,E040228,Pending Shipment Status,L2,Default,yes,As-of + Pending Shipment Qty,,,,,/app/selling/reports,yes,Pass 8 Jul 2026
 pending-shipment-type-line,E040228,Pending Shipment Type,L2,by Line,yes,,,,,,/app/selling/reports,yes,
@@ -284,7 +284,7 @@ fund-inde-default,E010815,Fund In./De. Details,L2,Default,yes,Date + dept/projec
 fund-inde-all,E010815,Fund In./De. Details,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
 monthly-is-default,E010819,Monthly Income Statement,L2,Default,yes,Month range + Beginning/Increase/Ending,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
 monthly-is-all,E010819,Monthly Income Statement,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
-monthly-cost-default,E010824,Monthly Cost,L2,Default,yes,Type Manufacturing/Service/Etc.,,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
+monthly-cost-default,E010824,Monthly Cost,L2,Default,yes,Type Manufacturing/Service/Etc.,,,,,,/app/finance/reports,yes
 monthly-cost-type-mfg,E010824,Monthly Cost Type,L2,Manufacturing,yes,Service + Etc. toggles,,,,,/app/finance/reports,yes,
 arap-aging-default,E010822,AR/AP Aging,L2,Default,yes,As-of + customer/account/dept/PIC,,,,,/app/finance/reports,yes,Pass 15 Jul 2026
 arap-aging-all,E010822,AR/AP Aging,L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
@@ -312,6 +312,150 @@ acct-txn-history-default,E010712,Change History (Acct.),L2,Default,yes,Voucher S
 acct-txn-history-all,E010712,Change History (Acct.),L2,All,no,Extended template drawer,,,,,/app/finance/reports,yes,
 acct-all-in-one-customer,E040627,All-In-One I (Acct. I),L0,Customer workspace,yes,Quick links AR/AP/Sales/Purchase/Slip Entry,,,,,/app/reports,yes,Pass 16; menuSeq MENUTREE_001352
 update-balance-acct,E010705,Update Balance for Accounting,action,—,yes,Start/End month + F8 rebuild,,,,,/app/finance/period-close,yes,Pass 16 Jul 2026
-bluearm-header-finance-reports,,,Bluearm shell,L0,Finance reports (hidden),no,AR/AP aging budget reports etc,,,,,finance workspace + /app/reports,yes,2026-06-23 visibleHeaderFeatures
-bluearm-header-inventory-reports,,,Bluearm shell,L0,Inventory reports (hidden),no,Stock balance ledger ageing etc,,,,,stock workspace + /app/reports,yes,2026-06-23 visibleHeaderFeatures
-bluearm-selling-workspace,,,Bluearm /app/selling,L0,Selling workspace,yes,KPI tiles + report links,,,,,/app/selling,yes,2026-06-23 wired SellingWorkspacePage
+bluearm-header-finance-reports,,,Bluearm shell,L0,Finance reports (hidden),no,AR/AP aging budget reports etc,,,,,finance workspace + /app/reports,yes
+bluearm-header-inventory-reports,,,Bluearm shell,L0,Inventory reports (hidden),no,Stock balance ledger ageing etc,,,,,stock workspace + /app/reports,yes
+bluearm-selling-workspace,,,Bluearm /app/selling,L0,Selling workspace,yes,KPI tiles + report links,,,,,/app/selling,yes
+E040206-camp-all-0,E040206,Sales List status/list,L2,All,yes,list/filter pill,,,,,/app/sales/sales,yes,default
+E040206-camp-e-approval-1,E040206,Sales List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+E040206-camp-unconfirmed-2,E040206,Sales List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+E040206-camp-confirm-3,E040206,Sales List status/list,L2,Confirm,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+E040206-camp-completed-4,E040206,Sales List status/list,L2,Completed,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+E040206-camp-1-5,E040206,Sales List status/list,L2,1,no,list/filter pill,,,,,/app/sales/sales,yes,list template
+E040206-camp-2-6,E040206,Sales List status/list,L2,2,no,list/filter pill,,,,,/app/sales/sales,yes,list template
+E040206-camp-3-7,E040206,Sales List status/list,L2,3,no,list/filter pill,,,,,/app/sales/sales,yes,list template
+E040206-camp-4-8,E040206,Sales List status/list,L2,4,no,list/filter pill,,,,,/app/sales/sales,yes,list template
+E040206-camp-5-9,E040206,Sales List status/list,L2,5,no,list/filter pill,,,,,/app/sales/sales,yes,list template
+E040202-camp-all-0,E040202,Quotation List status/list,L2,All,yes,list/filter pill,,,,,/app/quotation/quotations,yes,Campaign A Jul 28 2026
+E040202-camp-e-approval-1,E040202,Quotation List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/quotation/quotations,yes,Campaign A Jul 28 2026
+E040202-camp-unconfirmed-2,E040202,Quotation List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/quotation/quotations,yes,Campaign A Jul 28 2026
+E040202-camp-confirm-3,E040202,Quotation List status/list,L2,Confirm,no,list/filter pill,,,,,/app/quotation/quotations,yes,Campaign A Jul 28 2026
+E040202-camp-in-progress-4,E040202,Quotation List status/list,L2,In Progress,no,list/filter pill,,,,,/app/quotation/quotations,yes,Campaign A Jul 28 2026
+E040202-camp-completed-5,E040202,Quotation List status/list,L2,Completed,no,list/filter pill,,,,,/app/quotation/quotations,yes,Campaign A Jul 28 2026
+E040202-camp-1-6,E040202,Quotation List status/list,L2,1,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-2-7,E040202,Quotation List status/list,L2,2,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-3-8,E040202,Quotation List status/list,L2,3,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-4-9,E040202,Quotation List status/list,L2,4,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-5-10,E040202,Quotation List status/list,L2,5,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-6-11,E040202,Quotation List status/list,L2,6,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-7-12,E040202,Quotation List status/list,L2,7,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-8-13,E040202,Quotation List status/list,L2,8,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-9-14,E040202,Quotation List status/list,L2,9,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040202-camp-10-15,E040202,Quotation List status/list,L2,10,no,list/filter pill,,,,,/app/quotation/quotations,yes,list template
+E040204-camp-all-0,E040204,Sales Order List status/list,L2,All,yes,list/filter pill,,,,,/app/sales-order/sales-orders,yes,Campaign A Jul 28 2026
+E040204-camp-e-approval-1,E040204,Sales Order List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,Campaign A Jul 28 2026
+E040204-camp-unconfirmed-2,E040204,Sales Order List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,Campaign A Jul 28 2026
+E040204-camp-confirm-3,E040204,Sales Order List status/list,L2,Confirm,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,Campaign A Jul 28 2026
+E040204-camp-in-progress-4,E040204,Sales Order List status/list,L2,In Progress,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,Campaign A Jul 28 2026
+E040204-camp-completed-5,E040204,Sales Order List status/list,L2,Completed,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,Campaign A Jul 28 2026
+E040204-camp-1-6,E040204,Sales Order List status/list,L2,1,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,list template
+E040204-camp-2-7,E040204,Sales Order List status/list,L2,2,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,list template
+E040204-camp-3-8,E040204,Sales Order List status/list,L2,3,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,list template
+E040204-camp-4-9,E040204,Sales Order List status/list,L2,4,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,list template
+E040204-camp-5-10,E040204,Sales Order List status/list,L2,5,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,list template
+E040201-camp-new-quotation-0,E040201,New Quotation status/list,L2,New Quotation,yes,list/filter pill,,,,,/app/quotation/quotations/new,yes,form template tab
+E040201-camp-quotation-1,E040201,New Quotation status/list,L2,Quotation,no,list/filter pill,,,,,/app/quotation/quotations/new,yes,header/type label area
+E040205-camp-sales-invoice-i-0,E040205,New Sales status/list,L2,Sales Invoice I,yes,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040205-camp-goods-receipt-i-1,E040205,New Sales status/list,L2,Goods Receipt I,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040205-camp-shipping-order-2,E040205,New Sales status/list,L2,Shipping Order,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040205-camp-new-sales-3,E040205,New Sales status/list,L2,New Sales,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040205-camp-details-4,E040205,New Sales status/list,L2,Details,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040215-camp-by-customer-vendor-0,E040215,Collective Invoicing (Sales) status/list,L2,By Customer/Vendor,yes,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
+E040215-camp-by-slip-1,E040215,Collective Invoicing (Sales) status/list,L2,by Slip,no,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
+E040215-camp-general-2,E040215,Collective Invoicing (Sales) status/list,L2,General,no,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
+E040215-camp-returns-3,E040215,Collective Invoicing (Sales) status/list,L2,Returns,no,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
+E040215-camp-others-4,E040215,Collective Invoicing (Sales) status/list,L2,Others,no,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
+E040215-camp-domestic-5,E040215,Collective Invoicing (Sales) status/list,L2,Domestic,no,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
+E040215-camp-foreign-6,E040215,Collective Invoicing (Sales) status/list,L2,Foreign,no,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
+E040302-camp-all-0,E040302,Purchase Order List status/list,L2,All,yes,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,Campaign A Jul 28 2026
+E040302-camp-e-approval-1,E040302,Purchase Order List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,Campaign A Jul 28 2026
+E040302-camp-unconfirmed-2,E040302,Purchase Order List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,Campaign A Jul 28 2026
+E040302-camp-confirm-3,E040302,Purchase Order List status/list,L2,Confirm,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,Campaign A Jul 28 2026
+E040302-camp-in-progress-4,E040302,Purchase Order List status/list,L2,In Progress,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,Campaign A Jul 28 2026
+E040302-camp-1-5,E040302,Purchase Order List status/list,L2,1,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-2-6,E040302,Purchase Order List status/list,L2,2,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-3-7,E040302,Purchase Order List status/list,L2,3,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-4-8,E040302,Purchase Order List status/list,L2,4,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-5-9,E040302,Purchase Order List status/list,L2,5,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-6-10,E040302,Purchase Order List status/list,L2,6,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-7-11,E040302,Purchase Order List status/list,L2,7,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-8-12,E040302,Purchase Order List status/list,L2,8,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-9-13,E040302,Purchase Order List status/list,L2,9,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040302-camp-10-14,E040302,Purchase Order List status/list,L2,10,no,list/filter pill,,,,,/app/purchase-order/purchase-orders,yes,list template
+E040304-camp-all-0,E040304,Purchase List status/list,L2,All,yes,list/filter pill,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+E040304-camp-e-approval-1,E040304,Purchase List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+E040304-camp-unconfirmed-2,E040304,Purchase List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+E040304-camp-confirm-3,E040304,Purchase List status/list,L2,Confirm,no,list/filter pill,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+E040304-camp-1-4,E040304,Purchase List status/list,L2,1,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+E040304-camp-2-5,E040304,Purchase List status/list,L2,2,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+E040304-camp-3-6,E040304,Purchase List status/list,L2,3,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+E040304-camp-4-7,E040304,Purchase List status/list,L2,4,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+E040304-camp-5-8,E040304,Purchase List status/list,L2,5,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+E040304-camp-6-9,E040304,Purchase List status/list,L2,6,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+E040303-camp-purchase-invoice-i-0,E040303,New Purchases status/list,L2,Purchase Invoice I,yes,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
+E040303-camp-new-purchase-1,E040303,New Purchases status/list,L2,New Purchase,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
+E040303-camp-new-purchases-2,E040303,New Purchases status/list,L2,New Purchases,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
+E040303-camp-new-quality-insp--request-3,E040303,New Purchases status/list,L2,New Quality Insp. Request,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
+E040315-camp-all-0,E040315,Purchase Request List status/list,L2,All,yes,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
+E040315-camp-e-approval-1,E040315,Purchase Request List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
+E040315-camp-unconfirmed-2,E040315,Purchase Request List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
+E040315-camp-confirm-3,E040315,Purchase Request List status/list,L2,Confirm,no,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
+E040315-camp-in-progress-4,E040315,Purchase Request List status/list,L2,In Progress,no,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
+E040315-camp-completed-5,E040315,Purchase Request List status/list,L2,Completed,no,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
+E040322-camp-all-0,E040322,RFQ List status/list,L2,All,yes,list/filter pill,,,,,/app/purchase-order/rfq,yes,Campaign A Jul 28 2026
+E040322-camp-e-approval-1,E040322,RFQ List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/purchase-order/rfq,yes,Campaign A Jul 28 2026
+E040322-camp-unconfirmed-2,E040322,RFQ List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/purchase-order/rfq,yes,Campaign A Jul 28 2026
+E040322-camp-confirm-3,E040322,RFQ List status/list,L2,Confirm,no,list/filter pill,,,,,/app/purchase-order/rfq,yes,Campaign A Jul 28 2026
+E040322-camp-in-progress-4,E040322,RFQ List status/list,L2,In Progress,no,list/filter pill,,,,,/app/purchase-order/rfq,yes,Campaign A Jul 28 2026
+E040322-camp-completed-5,E040322,RFQ List status/list,L2,Completed,no,list/filter pill,,,,,/app/purchase-order/rfq,yes,Campaign A Jul 28 2026
+C000004-camp-all-0,C000004,Sales List status/list,L2,All,yes,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-e-approval-1,C000004,Sales List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-unconfirmed-2,C000004,Sales List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-confirm-3,C000004,Sales List status/list,L2,Confirm,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-completed-4,C000004,Sales List status/list,L2,Completed,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-1-5,C000004,Sales List status/list,L2,1,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-2-6,C000004,Sales List status/list,L2,2,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-3-7,C000004,Sales List status/list,L2,3,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-4-8,C000004,Sales List status/list,L2,4,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000004-camp-5-9,C000004,Sales List status/list,L2,5,no,list/filter pill,,,,,/app/selling/sales,yes,Campaign A Jul 28 2026
+C000030-camp-all-0,C000030,Sales List status/list,L2,All,yes,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-e-approval-1,C000030,Sales List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-unconfirmed-2,C000030,Sales List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-confirm-3,C000030,Sales List status/list,L2,Confirm,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-completed-4,C000030,Sales List status/list,L2,Completed,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-1-5,C000030,Sales List status/list,L2,1,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-2-6,C000030,Sales List status/list,L2,2,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-3-7,C000030,Sales List status/list,L2,3,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-4-8,C000030,Sales List status/list,L2,4,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+C000030-camp-5-9,C000030,Sales List status/list,L2,5,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+E040210-camp-default-0,E040210,Print Sales Slips status/list,L2,Default,yes,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+E040210-camp-all-1,E040210,Print Sales Slips status/list,L2,All,no,list/filter pill,,,,,/app/sales/sales,yes,Campaign A Jul 28 2026
+E040221-camp-all-0,E040221,Shipping Order List status/list,L2,All,yes,list/filter pill,,,,,/app/sales-order/shipping-orders,yes,Campaign A Jul 28 2026
+E040221-camp-e-approval-1,E040221,Shipping Order List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/sales-order/shipping-orders,yes,Campaign A Jul 28 2026
+E040221-camp-confirm-2,E040221,Shipping Order List status/list,L2,Confirm,no,list/filter pill,,,,,/app/sales-order/shipping-orders,yes,Campaign A Jul 28 2026
+E040221-camp-in-progress-3,E040221,Shipping Order List status/list,L2,In Progress,no,list/filter pill,,,,,/app/sales-order/shipping-orders,yes,Campaign A Jul 28 2026
+E040221-camp-completed-4,E040221,Shipping Order List status/list,L2,Completed,no,list/filter pill,,,,,/app/sales-order/shipping-orders,yes,Campaign A Jul 28 2026
+E040226-camp-all-0,E040226,Shipment List status/list,L2,All,yes,list/filter pill,,,,,/app/sales-order/shipments,yes,Campaign A Jul 28 2026
+E040226-camp-e-approval-1,E040226,Shipment List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/sales-order/shipments,yes,Campaign A Jul 28 2026
+E040226-camp-unconfirmed-2,E040226,Shipment List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/sales-order/shipments,yes,Campaign A Jul 28 2026
+E040226-camp-confirm-3,E040226,Shipment List status/list,L2,Confirm,no,list/filter pill,,,,,/app/sales-order/shipments,yes,Campaign A Jul 28 2026
+E040224-camp-default-0,E040224,Change Sales Price-Batch status/list,L2,Default,yes,list/filter pill,,,,,/app/sales/price-lists,yes,Campaign A Jul 28 2026
+E040224-camp-all-1,E040224,Change Sales Price-Batch status/list,L2,All,no,list/filter pill,,,,,/app/sales/price-lists,yes,Campaign A Jul 28 2026
+E040230-camp-default-0,E040230,Release Sales Order status/list,L2,Default,yes,list/filter pill,,,,,/app/sales-order/sales-orders/release,yes,Campaign A Jul 28 2026
+E040230-camp-all-1,E040230,Release Sales Order status/list,L2,All,no,list/filter pill,,,,,/app/sales-order/sales-orders/release,yes,Campaign A Jul 28 2026
+E040230-camp-nonprocessed-2,E040230,Release Sales Order status/list,L2,Nonprocessed,no,list/filter pill,,,,,/app/sales-order/sales-orders/release,yes,Campaign A Jul 28 2026
+E040230-camp-process-3,E040230,Release Sales Order status/list,L2,Process,no,list/filter pill,,,,,/app/sales-order/sales-orders/release,yes,Campaign A Jul 28 2026
+E040203-camp-new-sales-order-0,E040203,New Sales Order status/list,L2,New Sales Order,yes,list/filter pill,,,,,/app/sales-order/sales-orders/new,yes,Campaign A Jul 28 2026
+E040203-camp-sales-order-1,E040203,New Sales Order status/list,L2,Sales Order,no,list/filter pill,,,,,/app/sales-order/sales-orders/new,yes,Campaign A Jul 28 2026
+E040203-camp-details-2,E040203,New Sales Order status/list,L2,Details,no,list/filter pill,,,,,/app/sales-order/sales-orders/new,yes,Campaign A Jul 28 2026
+E040203-camp-nes-sales-order-3,E040203,New Sales Order status/list,L2,Nes Sales Order,no,list/filter pill,,,,,/app/sales-order/sales-orders/new,yes,tenant template typo label
+E040220-camp-new-shipping-order-0,E040220,New Shipping Order status/list,L2,New Shipping Order,yes,list/filter pill,,,,,/app/sales-order/shipping-orders/new,yes,Campaign A Jul 28 2026
+E040220-camp-shipping-order-1,E040220,New Shipping Order status/list,L2,Shipping Order,no,list/filter pill,,,,,/app/sales-order/shipping-orders/new,yes,Campaign A Jul 28 2026
+E040225-camp-new-shipment-0,E040225,New Shipment status/list,L2,New Shipment,yes,list/filter pill,,,,,/app/sales-order/shipments/new,yes,Campaign A Jul 28 2026
+E040301-camp-new-purchase-order-0,E040301,New Purchase Order status/list,L2,New Purchase Order,yes,Header vendor/location/VAT + line grid,,,,,/app/purchase-order/purchase-orders/new,yes,Campaign A Jul 28 2026
+E040301-camp-option-1,E040301,New Purchase Order status/list,L2,Option,no,"Input Screen Settings, Condition Template, purchase limit by project, My Code/Text, Function Setup, Mapping Center, Change Progress Status",,,,,/app/purchase-order/purchase-orders/new,yes,Campaign A Jul 28 2026
+E040314-camp-new-purchase-request-0,E040314,New Purchase Request status/list,L2,New Purchase Request,yes,"Date, PIC, Location, VAT, Currency, Delivery Date, Cc, Project + lines",,,,,/app/purchase-request/purchase-requests/new,yes,Campaign A Jul 28 2026
+E040314-camp-option-1,E040314,New Purchase Request status/list,L2,Option,no,Form Option menu (opened),,,,,/app/purchase-request/purchase-requests/new,yes,Campaign A Jul 28 2026
+E040316-camp-new-purchase-plan-0,E040316,New Purchase Plan status/list,L2,New Purchase Plan,yes,"Date, PIC, Location-In, VAT, Currency, Delivery Date, Cc, Project + lines",,,,,/app/purchase-request/purchase-plans/new,yes,Campaign A Jul 28 2026
+E040316-camp-option-1,E040316,New Purchase Plan status/list,L2,Option,no,Form Option menu present,,,,,/app/purchase-request/purchase-plans/new,yes,Campaign A Jul 28 2026
+E040321-camp-new-rfq-0,E040321,New RFQ status/list,L2,New RFQ,yes,"Date, Customer, PIC, Expiration, Cc, Currency, Project + lines",,,,,/app/purchase-order/rfq/new,yes,Campaign A Jul 28 2026
+E040321-camp-option-1,E040321,New RFQ status/list,L2,Option,no,Form Option menu present,,,,,/app/purchase-order/rfq/new,yes,Campaign A Jul 28 2026

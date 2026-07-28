@@ -3,15 +3,15 @@ E010408,Acct. I,Fast Entry,Payment Journal,Payment Journal,form,1,1,in-progress,
 E010403,Acct. I,Fast Entry,Receipt Journal,Receipt Journal,form,1,1,in-progress,60,40,/app/finance/cash/receipts,partial,,P2,Live Jul 2026; Payment Agency Details; see E010403-receipt-journal.md
 C000029,Inv. I,Setup,Item,Item List,list,24,22,in-progress,195,92,/app/inventory/items,partial,,P1,Pass 7 Jul 2026; item 00002 edit 7 tabs + Inv. Count I Adjust; see C000029-item-list.md; known-parity: Item list+modal tabs/F3 — gaps P1 Done; residual reports
 C001130,Inv. I,Setup,Item Relation,Register Item Relation,form,2,2,in-progress,38,75,/app/inventory/items,partial,,P2,Pass 7 Jul 2026; Option=Default Setting; see C000029-item-list.md
-C000030,Inv. I,Sales,Sales List,Sales List,list,5,4,in-progress,55,45,/app/sales/sales,partial,,P1,Live Jul 2026; tenant alias C000004; New Sales = E040205; known-parity: Sales list pills + Load Slip + Cash In — gaps P1 Done
-C000004,Inv. I,Sales,Sales List,Sales List,list,5,4,in-progress,55,45,/app/selling/sales,partial,,P1,Alias prgId for Sales List in BLUEARM tenant; same as C000030
+C000030,Inv. I,Sales,Sales List,Sales List,list,10,10,depth-complete,70,100,/app/sales/sales,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; same UI as C000004/E040206 (tenant alias family)
+C000004,Inv. I,Sales,Sales List,Sales List,list,10,10,depth-complete,70,100,/app/selling/sales,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; tenant alias twin of E040206/C000030
 C000031,Inv. I,Purchases,Purchase List,Purchase List,list,11,6,in-progress,65,50,/app/purchases/purchases,partial,,P1,Pass 3 Jul 2026; status pills + list tabs 1-6; F2 inline form; see C000031-purchase-list.md; known-parity: Purchase list + Load Slip + Cash Out — gaps P1 Done
 C000032,Inv. I,Production,Goods Receipt List,Goods Receipt List,list,10,5,cataloged,55,40,/app/job-costing,missing,,P2,Extra GR I/II/III + source + delete pills
 C000033,Inv. I,Inv. Mov.,Location Tran. List,Location Tran. List,list,7,4,cataloged,50,35,/app/inventory/stock-movements,missing,,P2,Source + delete pills; Internal Use/Defect/Adj menus cataloged
 C000035,Inv. I,Reports,Reports hub,Reports,hub,0,0,cataloged,80,15,/app/reports,missing,,P2,Menu tree only; per-report Option pills TBD
 C000654,Inv. I,Online Store Mgmt,Register Online Store,Register Online Store,list,2,1,in-progress,35,25,—,missing,,P3,Pass 1 Jul 2026; Order Mgmt subtree; see C000654-online-store-orders.md
-E040205,Inv. I,Sales,New Sales,New Sales,form,4,4,in-progress,110,80,/app/sales/sales/new,partial,,P1,Pass 4 Jul 2026; Modify Sales + Cash In prefill + Link modal; see E040205-new-sales.md; known-parity: New Sales form parity partial — gaps P1 Done core
-E040303,Inv. I,Purchases,New Purchases,New Purchases,form,5,4,in-progress,85,70,/app/purchases/purchases/new,partial,,P1,Pass 8 Jul 2026; Load Slip + PO line picker; see E040303-new-purchases.md; known-parity: New Purchases form — gaps P1 Done core
+E040205,Inv. I,Sales,New Sales,New Sales,form,5,5,depth-complete,110,100,/app/sales/sales/new,partial,,P1,Campaign A G2 Jul 28 depth-complete; Save not submitted; Cash In opened Cancel-only; residuals: Goods Receipt I / Shipping Order template shells on New Sales workspace
+E040303,Inv. I,Purchases,New Purchases,New Purchases,form,4,4,depth-complete,90,100,/app/purchases/purchases/new,partial,,P1,"Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted; residuals: Quality Insp template shell, Slip Barcode"
 C000140,Inv. II,Costing,Monthly Profit,New Costing,list,0,0,cataloged,15,10,/app/job-costing,missing,,P3,Inv II default on module open; costing subtree only
 C000904,Inv. II,WMS,Select WMS Account,Select WMS Account,list,0,0,cataloged,20,15,/app/inventory/wms,missing,,P3,Pass 1 Jul 2026; menu tree; no WMS license in tenant; see inv2-wms-export-order-plan.md
 C000652,Inv. II,Export,Invoice / Packing List,Invoice / Packing List,list,3,3,in-progress,55,55,—,missing,,P3,Pass 3 Jul 2026; F2 opens Input Invoice/Packing List modal ESD028M; see inv2-wms-export-order-plan.md
@@ -116,39 +116,39 @@ E010857,Acct. I,Reports,Account In./De. Details,Account In./De. Details,report,0
 E010858,Inv. I,Reports,Communication Center,Sent Doc. History,report,1,1,in-progress,55,45,/app/reports/communication,partial,,P2,Pass 14 Jul 2026; email/SMS send log + Resend; see inv1-reports-communication-proof.md
 E040730,Inv. I,Reports,Proof Center,Proof Center,list,1,1,in-progress,40,35,/app/reports/proof,partial,,P2,Pass 14 Jul 2026; Attach Receipts + e-Sign; see inv1-reports-communication-proof.md
 E010861,Acct. I,Reports,Statement of Cash Flows,Statement of Cash Flows,report,1,1,in-progress,35,30,/app/finance/reports,partial,,P2,Pass 4 Jul 2026; Enter modal + Apply Formula grid; see acct1-reports-book.md
-E040201,Inv. I,Sales,New Quotation,New Quotation,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000486
-E040202,Inv. I,Sales,Quotation List,Quotation List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000487
-E040203,Inv. I,Sales,New Sales Order,New Sales Order,form,0,0,in-progress,55,50,/app/sales-order/sales-orders/new,partial,,P1,Pass 1 Jul 2026; Quotation pull; see E040203-new-sales-order.md; known-parity: New SO — crawled + wired
-E040204,Inv. I,Sales,Sales Order List,Sales Order List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000489
-E040206,Inv. I,Sales,Sales List,Sales List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000492
+E040201,Inv. I,Sales,New Quotation,New Quotation,form,2,2,depth-complete,60,100,/app/quotation/quotations/new,partial,,P1,"Campaign A G2 Jul 28 depth-complete; Save/Confirm not submitted; residuals: Calculate Profit, Verification, tenant template tabs"
+E040202,Inv. I,Sales,Quotation List,Quotation List,list,16,16,depth-complete,80,100,/app/quotation/quotations,partial,,P1,"Campaign A G2 Jul 28 depth-complete; SAFE blacklist Send/Delete/Excel not submitted; residuals: tenant list templates 1-10, Confirm group UX vs Bluearm discrete filters"
+E040203,Inv. I,Sales,New Sales Order,New Sales Order,form,4,4,depth-complete,70,100,/app/sales-order/sales-orders/new,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted
+E040204,Inv. I,Sales,Sales Order List,Sales Order List,list,11,11,depth-complete,75,100,/app/sales-order/sales-orders,partial,,P1,"Campaign A G2 Jul 28 depth-complete; residuals: list templates 1-5, Confirm group pill"
+E040206,Inv. I,Sales,Sales List,Sales List,list,10,10,depth-complete,70,100,/app/sales/sales,partial,,P1,"Campaign A G2 Jul 28 depth-complete; SAFE blacklist not exercised (Send/Delete/Excel); residuals vs Bluearm: list templates 1-5, Confirm pill group"
 E040207,Inv. I,Reports,Sales,Sales Status,report,2,2,in-progress,40,35,/app/selling/reports,partial,,P1,Pass 5 Jul 2026; Details/Summary/by Line; see inv1-sales-reports.md
 E040208,Inv. I,Reports,Sales,Quotation Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 6 Jul 2026; Status/Summary + Reference No.; see inv1-sales-reports.md
 E040209,Inv. I,Reports,Sales,Sales Order Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 6 Jul 2026; Status/Summary + Delivery Date; see inv1-sales-reports.md
-E040210,Inv. I,Sales,Print Sales Slips,Print Sales Slips,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000497
+E040210,Inv. I,Sales,Print Sales Slips,Print Sales Slips,list,2,2,depth-complete,40,100,/app/sales/sales,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; Confirm/Print not submitted (SAFE)
 E040211,Inv. I,Reports,Sales,Outstanding Quote Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 7 Jul 2026; as-of + Outstanding Quote Qty; see inv1-sales-reports.md
 E040212,Inv. I,Reports,Sales,Outstanding S/O Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 7 Jul 2026; mirror outstanding quote; see inv1-sales-reports.md
 E040214,Inv. I,Reports,Sales,A/R by Customer,report,2,2,in-progress,45,35,/app/selling/reports,partial,,P1,Pass 5 Jul 2026; By Customer/Vendor vs by PIC; see inv1-sales-reports.md
-E040215,Inv. I,Sales,Collective Invoicing (Sales),Collective Invoicing (Sales),list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000187
+E040215,Inv. I,Sales,Collective Invoicing (Sales),Collective Invoicing (Sales),list,7,7,depth-complete,55,100,/app/sales/collective-invoices,partial,,P1,"Campaign A G2 Jul 28 depth-complete; Generate not run; residuals: Option field parity, Print without code"
 E040216,Inv. I,Reports,Sales,Sales Discount Status,report,1,1,in-progress,30,30,/app/selling/reports,partial,,P1,Pass 9 Jul 2026; mirror Receipt Status; Discount Amount filter; tenant empty Jul MTD; see inv1-sales-reports.md
 E040217,Inv. I,Reports,Sales,Receipt Status,report,1,1,in-progress,30,30,/app/selling/reports,partial,,P1,Pass 5 Jul 2026; cash receipt inquiry; tenant empty Jul MTD; see inv1-sales-reports.md
 E040721,Inv. I,Reports,Sales,Receivable Status,report,1,1,in-progress,35,30,/app/selling/reports,parity,,P1,Pass 6 Jul 2026; as-of date (not range); tenant empty Jul; distinct from Acct II E060404; see inv1-sales-reports.md; known-parity: Receivable Status — gaps Done
 E040722,Inv. I,Reports,Purchases,Payable Status,report,1,1,in-progress,35,30,/app/buying/reports,parity,,P1,Pass 8 Jul 2026; mirror Receivable E040721; tenant empty Jul; see inv1-purchase-reports.md; known-parity: Payable Status — gaps Done
-E040220,Inv. I,Sales,New Shipping Order,New Shipping Order,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000659
-E040221,Inv. I,Sales,Shipping Order List,Shipping Order List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000660
+E040220,Inv. I,Sales,New Shipping Order,New Shipping Order,form,2,2,depth-complete,45,100,/app/sales-order/shipping-orders/new,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted
+E040221,Inv. I,Sales,Shipping Order List,Shipping Order List,list,5,5,depth-complete,50,100,/app/sales-order/shipping-orders,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; Unconfirmed pill not present in tenant
 E040222,Inv. I,Reports,Sales,Shipping Order Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 8 Jul 2026; Status/Summary + Details/by Line; tenant empty Jul MTD; see inv1-sales-reports.md
-E040224,Inv. I,Sales,Change Sales Price-Batch,Change Sales Price-Batch,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000725
-E040225,Inv. I,Sales,New Shipment,New Shipment,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000775
-E040226,Inv. I,Sales,Shipment List,Shipment List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000776
+E040224,Inv. I,Sales,Change Sales Price-Batch,Change Sales Price-Batch,list,2,2,depth-complete,40,100,/app/sales/price-lists,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; Confirm not submitted
+E040225,Inv. I,Sales,New Shipment,New Shipment,form,1,1,depth-complete,40,100,/app/sales-order/shipments/new,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted
+E040226,Inv. I,Sales,Shipment List,Shipment List,list,4,4,depth-complete,45,100,/app/sales-order/shipments,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete
 E040227,Inv. I,Reports,Sales,Shipment Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 7 Jul 2026; Status/Summary + Details/by Line; tenant empty Jul MTD; see inv1-sales-reports.md
 E040228,Inv. I,Reports,Sales,Pending Shipment Status,report,2,2,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 8 Jul 2026; as-of + Pending Shipment Qty; tenant empty as-of; see inv1-sales-reports.md
 E040609,Inv. I,Reports,Sales,Pre-Invoicing Status (Sales),report,1,1,in-progress,30,30,/app/selling/reports,partial,,P1,Pass 9 Jul 2026; Base Date as-of + Amount filter; see inv1-sales-reports.md
 E040723,Inv. I,Reports,Sales,Customer/Vendor Book I (AR),report,2,2,in-progress,40,35,/app/selling/reports,partial,,P1,Pass 9 Jul 2026; Summary Type By Slip+Details + Email; see inv1-sales-reports.md
 N000119,Inv. I,Reports,Sales,Sales Invoice Status (Inv.),report,1,1,in-progress,40,30,/app/selling/reports,partial,,P1,Pass 10 Jul 2026; N-prefix tax slip inquiry + Status Confirm pills; tenant empty Jul MTD; see inv1-sales-reports.md
 E040713,Inv. I,Reports,Sales,Monthly Receivable Change Details,report,1,1,in-progress,35,30,/app/selling/reports,partial,,P1,Pass 10 Jul 2026; month-range AR fluctuation; mirror E040714; see inv1-sales-reports.md
-E040230,Inv. I,Sales,Release Sales Order,Release Sales Order,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001647
-E040301,Inv. I,Purchases,New Purchase Order,New Purchase Order,form,0,0,in-progress,60,50,/app/purchase-order/purchase-orders/new,partial,,P1,Pass 1 Jul 2026; Load Slip/RFQ/PO Plan; see E040301-new-purchase-order.md; known-parity: New PO — crawled + wired
-E040302,Inv. I,Purchases,Purchase Order List,Purchase Order List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000509
-E040304,Inv. I,Purchases,Purchase List,Purchase List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000511
+E040230,Inv. I,Sales,Release Sales Order,Release Sales Order,list,4,4,depth-complete,50,100,/app/sales-order/sales-orders/release,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; Decrease/Excel not submitted
+E040301,Inv. I,Purchases,New Purchase Order,New Purchase Order,form,2,2,depth-complete,72,100,/app/purchase-order/purchase-orders/new,partial,,P1,"Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: Load Slip/RFQ/Purchase Plan pulls, per-line Delivery Date, BOM on PO"
+E040302,Inv. I,Purchases,Purchase Order List,Purchase Order List,list,15,15,depth-complete,70,100,/app/purchase-order/purchase-orders,partial,,P1,Campaign A G2 Jul 28 depth-complete; Completed pill not present in this tenant template; residuals: list templates 1-10
+E040304,Inv. I,Purchases,Purchase List,Purchase List,list,10,10,depth-complete,65,100,/app/purchases/purchases,partial,,P1,"Campaign A G2 Jul 28 depth-complete; twin of C000031 may need separate pass; residuals: list templates, Cash Payment toolbar"
 E040305,Inv. I,Reports,Purchases,Purchase Status,report,2,2,in-progress,40,35,/app/buying/reports,partial,,P1,Pass 6 Jul 2026; mirror Sales Status; see inv1-purchase-reports.md
 E040306,Inv. I,Reports,Purchases,Purchase Order Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 7 Jul 2026; mirror SO Status; see inv1-purchase-reports.md
 E040307,Inv. I,Reports,Purchases,Outstanding P/O Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 7 Jul 2026; mirror outstanding S/O; see inv1-purchase-reports.md
@@ -157,17 +157,17 @@ E040310,Inv. I,Reports,Purchases,Payment Status,report,1,1,in-progress,30,30,/ap
 E040311,Inv. I,Purchases,Change Purchases Price-Batch,Change Purchases Price-Batch,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001662
 E040312,Inv. I,Purchases,Collective Invoicing (Purchase),Collective Invoicing (Purchase),list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000193
 E040313,Inv. I,Reports,Purchases,Purchase Discount Status,report,1,1,in-progress,30,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; mirror Sales Discount; tenant empty Jul MTD; see inv1-purchase-reports.md
-E040314,Inv. I,Purchases,New Purchase Request,New Purchase Request,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000504
-E040315,Inv. I,Purchases,Purchase Request List,Purchase Request List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000505
-E040316,Inv. I,Purchases,New Purchase Plan,New Purchase Plan,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000506
+E040314,Inv. I,Purchases,New Purchase Request,New Purchase Request,form,2,2,depth-complete,48,100,/app/purchase-request/purchase-requests/new,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: Load Slip/BOM/Safety Stock parity depth
+E040315,Inv. I,Purchases,Purchase Request List,Purchase Request List,list,6,6,depth-complete,55,100,/app/purchase-request/purchase-requests,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete
+E040316,Inv. I,Purchases,New Purchase Plan,New Purchase Plan,form,2,2,depth-complete,45,100,/app/purchase-request/purchase-plans/new,partial,,P1,"Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: Purchase Request pull, Load Slip depth"
 E040317,Inv. I,Purchases,Purchase Plan List,Purchase Plan List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000507
 E040318,Inv. I,Reports,Purchases,Purchase Request Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; Details/by Line + PR No. + Delivery Date; see inv1-purchase-reports.md
 E040319,Inv. I,Reports,Purchases,Pre-Invoicing Status (Purchases),report,1,1,in-progress,30,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; Base Date as-of mirror E040609; see inv1-purchase-reports.md
 E040724,Inv. I,Reports,Purchases,Customer/Vendor Book I (AP),report,2,2,in-progress,40,35,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; mirror E040723 for AP; see inv1-purchase-reports.md
 N000127,Inv. I,Reports,Purchases,Purchase Invoice Status (Inv.),report,1,1,in-progress,40,30,/app/buying/reports,partial,,P1,Pass 10 Jul 2026; mirror N000119; hash quirk left menu; tenant empty Jul MTD; see inv1-purchase-reports.md
 E040714,Inv. I,Reports,Purchases,Monthly Payable Fluctuation,report,1,1,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 10 Jul 2026; mirror E040713; see inv1-purchase-reports.md
-E040321,Inv. I,Purchases,New RFQ,New RFQ,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001325
-E040322,Inv. I,Purchases,RFQ List,RFQ List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001326
+E040321,Inv. I,Purchases,New RFQ,New RFQ,form,2,2,depth-complete,42,100,/app/purchase-order/rfq/new,partial,,P1,"Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: multi-vendor RFQ depth, Purchase Plan pull"
+E040322,Inv. I,Purchases,RFQ List,RFQ List,list,6,6,depth-complete,50,100,/app/purchase-order/rfq,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete
 E040323,Inv. I,Purchases,RFQ Progress Status,RFQ Progress Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001912
 E040325,Inv. I,Purchases,RFQ Status,RFQ Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001913
 E040401,Inv. I,Production,BOM Design,BOM Design,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000520

@@ -2,6 +2,7 @@ import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "./api";
 import { InlineSerialBulkField } from "./InlineSerialBulkField";
 import { Modal } from "./Modal";
+import { DEFAULT_SERIAL_PREFIX } from "./printCode128Labels";
 import { inputClass } from "./SpreadsheetGrid";
 import { resolveSerialBulk } from "./resolveSerialBulk";
 import { ScannedSerialTable } from "./ScannedSerialTable";
@@ -357,11 +358,17 @@ function ReceiveSerialModal(props: ReceiveProps & { open: boolean; onClose: () =
 }
 
 function PlannedSerialModal(props: PlannedProps & { open: boolean; onClose: () => void }) {
+  const toast = useToast();
   const [text, setText] = createSignal("");
+  const [prefix, setPrefix] = createSignal(DEFAULT_SERIAL_PREFIX);
+  const [allocating, setAllocating] = createSignal(false);
   const targetQty = () => Math.max(1, Math.floor(props.qty));
 
   createEffect(() => {
-    if (props.open) setText(formatSerialBulkList(props.plannedSerials ?? []));
+    if (props.open) {
+      setText(formatSerialBulkList(props.plannedSerials ?? []));
+      setPrefix(DEFAULT_SERIAL_PREFIX);
+    }
   });
 
   const apply = () => {
@@ -370,16 +377,59 @@ function PlannedSerialModal(props: PlannedProps & { open: boolean; onClose: () =
     props.onClose();
   };
 
+  const autoGenerate = async () => {
+    const need = targetQty();
+    if (need < 1) return;
+    setAllocating(true);
+    const res = await apiFetch<{ serials: string[]; count: number }>("/api/v1/inventory/serial-units/allocate-numbers", {
+      method: "POST",
+      body: JSON.stringify({
+        qty: need,
+        prefix: (prefix() || DEFAULT_SERIAL_PREFIX).trim(),
+        register_date: new Date().toISOString().slice(0, 10),
+      }),
+    });
+    setAllocating(false);
+    if (!res.ok) {
+      toast.error(res.message || "Failed to allocate serial numbers.");
+      return;
+    }
+    const serials = res.data?.serials ?? [];
+    setText(formatSerialBulkList(serials));
+    toast.success(`Allocated ${serials.length} serial number(s). Review and Apply.`);
+  };
+
   return (
     <Modal open={props.open} title="Planned serial numbers" onClose={props.onClose} wide>
       <p class="mb-3 text-sm text-amber-800">
         Planned only — up to {targetQty()} expected serial{targetQty() === 1 ? "" : "s"}. Comma-separated or one per line.
+        Auto-generate uses prefix + date (MMDDYY) + sequence (e.g. BA072726000001).
       </p>
+      <div class="mb-3 flex flex-wrap items-end gap-2">
+        <label class="block text-xs font-medium text-text-secondary">
+          Company prefix
+          <input
+            class={`${inputClass} mt-1 w-28 font-mono`}
+            value={prefix()}
+            disabled={props.disabled || allocating()}
+            maxlength={16}
+            onInput={(e) => setPrefix(e.currentTarget.value)}
+          />
+        </label>
+        <button
+          type="button"
+          class="rounded-lg border border-brand-600 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+          disabled={props.disabled || allocating()}
+          onClick={() => void autoGenerate()}
+        >
+          {allocating() ? "Generating…" : `Auto-generate ${targetQty()}`}
+        </button>
+      </div>
       <textarea
         class={`${inputClass} mb-3 min-h-[120px] w-full font-mono text-sm`}
         value={text()}
         disabled={props.disabled}
-        placeholder="SN001, SN002, SN003"
+        placeholder="BA072726000001"
         onInput={(e) => setText(e.currentTarget.value)}
       />
       <div class="flex justify-end gap-2">

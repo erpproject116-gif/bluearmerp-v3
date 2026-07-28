@@ -1,0 +1,16 @@
+{
+  "prgId": "E040224",
+  "screen_name": "Change Sales Price-Batch",
+  "pills": [
+    {"label": "Default", "audited": true},
+    {"label": "All", "audited": true}
+  ],
+  "toolbar": ["Search(F3)", "Option", "Search (F8)", "Settings", "Reset"],
+  "toolbar_audited": ["Search(F3)", "Option", "Search (F8)", "Settings", "Reset"],
+  "controls_logged": 40,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/sales/price-lists",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch2 depth-complete; Confirm not submitted",
+  "mark_depth_complete": true
+}

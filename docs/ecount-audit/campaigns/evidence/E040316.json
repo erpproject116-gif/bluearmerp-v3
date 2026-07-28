@@ -1,0 +1,22 @@
+{
+  "prgId": "E040316",
+  "screen_name": "New Purchase Plan",
+  "pills": [
+    {"label": "New Purchase Plan", "audited": true, "fields_summary": "Date, PIC, Location-In, VAT, Currency, Delivery Date, Cc, Project + lines"},
+    {"label": "Option", "audited": true, "fields_summary": "Form Option menu present"}
+  ],
+  "toolbar": [
+    "Option", "Help", "Find (F3)", "Sort", "My Item", "BOM", "Sales Order", "Purchase Request", "Load Slip",
+    "VAT Inc. 12%", "Domestic", "Reset", "List", "ECOUNT Web Uploader"
+  ],
+  "toolbar_audited": [
+    "Option", "Help", "Find (F3)", "Sort", "My Item", "BOM", "Sales Order", "Purchase Request", "Load Slip",
+    "VAT Inc. 12%", "Domestic", "Reset", "List", "ECOUNT Web Uploader"
+  ],
+  "controls_logged": 45,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchase-request/purchase-plans/new",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: Purchase Request pull, Load Slip depth",
+  "mark_depth_complete": true
+}

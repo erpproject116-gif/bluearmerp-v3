@@ -1,10 +1,17 @@
 import { For, Show, createSignal } from "solid-js";
 import { A } from "@solidjs/router";
+import { downloadReportCsv } from "../../shared/reports/downloadReportCsv";
 import { usePlatformTickets } from "../../shared/usePlatform";
 
 export default function PlatformTicketsPage() {
   const [q, setQ] = createSignal("");
   const tickets = usePlatformTickets(() => q());
+
+  const exportUrl = (format: "csv" | "md") => {
+    const qs = new URLSearchParams({ format, status: "all" });
+    if (q().trim()) qs.set("q", q().trim());
+    return `/api/v1/platform/console/tickets/export?${qs}`;
+  };
 
   return (
     <div class="space-y-4">
@@ -13,12 +20,30 @@ export default function PlatformTicketsPage() {
           <h2 class="text-xl font-semibold">Support tickets</h2>
           <p class="mt-1 text-sm text-slate-500">Cross-tenant queue of open and waiting tickets.</p>
         </div>
-        <input
-          class="w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          placeholder="Search subject or ticket no…"
-          value={q()}
-          onInput={(e) => setQ(e.currentTarget.value)}
-        />
+        <div class="flex flex-wrap items-center gap-2">
+          <input
+            class="w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            placeholder="Search subject or ticket no…"
+            value={q()}
+            onInput={(e) => setQ(e.currentTarget.value)}
+          />
+          <button
+            type="button"
+            class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => void downloadReportCsv(exportUrl("csv"), "platform-tickets.csv")}
+            title="Export titles and full body as CSV"
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => void downloadReportCsv(exportUrl("md"), "platform-tickets.md")}
+            title="Export all tickets with title and full body for documentation"
+          >
+            Export docs (MD)
+          </button>
+        </div>
       </div>
       <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table class="min-w-full text-left text-sm">

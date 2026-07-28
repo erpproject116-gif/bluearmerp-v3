@@ -1,9 +1,10 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
+import { DEFAULT_SERIAL_PREFIX, formatAutoSerial, printCode128Labels } from "../../../shared/printCode128Labels";
 import { DEFAULT_SERIAL_SLIP_TYPE, SERIAL_SLIP_TYPES } from "../../../shared/serialSlipTypes";
 import { useToast } from "../../../shared/toast";
 
@@ -13,6 +14,9 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onGenerated: (serials: Generated[]) => void;
+  /** Prefill when opened from item master / list. */
+  initialItemId?: number | null;
+  initialItemLabel?: string;
 };
 
 function todayISO(): string {
@@ -37,6 +41,10 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
 }
 
+function normalizePrefix(raw: string): string {
+  return (raw || DEFAULT_SERIAL_PREFIX).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16) || DEFAULT_SERIAL_PREFIX;
+}
+
 export function SerialGenerateModal(props: Props) {
   const toast = useToast();
   const [saving, setSaving] = createSignal(false);
@@ -47,7 +55,7 @@ export function SerialGenerateModal(props: Props) {
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
   const [qty, setQty] = createSignal("1");
-  const [prefix, setPrefix] = createSignal("SN");
+  const [prefix, setPrefix] = createSignal(DEFAULT_SERIAL_PREFIX);
   const [remark, setRemark] = createSignal("");
   const [lastGenerated, setLastGenerated] = createSignal<Generated[]>([]);
 
@@ -59,9 +67,22 @@ export function SerialGenerateModal(props: Props) {
     setLocationId(null);
     setLocationLabel("");
     setQty("1");
-    setPrefix("SN");
+    setPrefix(DEFAULT_SERIAL_PREFIX);
     setRemark("");
     setLastGenerated([]);
+  };
+
+  createEffect(() => {
+    if (!props.open) return;
+    if (props.initialItemId) {
+      setItemId(props.initialItemId);
+      setItemLabel(props.initialItemLabel ?? "");
+    }
+  });
+
+  const formatPreview = () => {
+    const d = registerDate() ? new Date(registerDate() + "T12:00:00") : new Date();
+    return formatAutoSerial(normalizePrefix(prefix()), d, 1);
   };
 
   const generate = async () => {
@@ -83,7 +104,7 @@ export function SerialGenerateModal(props: Props) {
         location_id: locationId(),
         item_id: itemId(),
         qty: qtyNum,
-        prefix: prefix().trim() || "SN",
+        prefix: normalizePrefix(prefix()),
         remark: remark().trim(),
       }),
     });
@@ -105,26 +126,9 @@ export function SerialGenerateModal(props: Props) {
       toast.warning("Generate serials first.");
       return;
     }
-    const w = window.open("", "_blank", "noopener,noreferrer,width=800,height=900");
-    if (!w) {
+    if (!printCode128Labels({ title: "Serial labels", rows: rows.map((s) => ({ code: s.serial_no })) })) {
       toast.warning("Allow pop-ups to print labels.");
-      return;
     }
-    const labels = rows
-      .map((s) => {
-        const safe = s.serial_no.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-        return `<div class="label"><div class="code">${safe}</div><div class="bc">*|${safe}|*</div></div>`;
-      })
-      .join("");
-    w.document.write(`<!DOCTYPE html><html><head><title>Serial labels</title>
-<style>
-body{font-family:ui-monospace,Menlo,Consolas,monospace;margin:12px}
-.label{border:1px solid #333;padding:10px 12px;margin:0 8px 12px 0;display:inline-block;width:220px;vertical-align:top;page-break-inside:avoid}
-.code{font-size:13px;font-weight:700;margin-bottom:6px;word-break:break-all}
-.bc{letter-spacing:1px;font-size:14px;border-top:10px solid #000;border-bottom:10px solid #000;padding:4px 0;text-align:center}
-@media print{body{margin:0}}
-</style></head><body>${labels}<script>window.focus();setTimeout(function(){window.print()},200);<\/script></body></html>`);
-    w.document.close();
   };
 
   return (
@@ -143,11 +147,11 @@ body{font-family:ui-monospace,Menlo,Consolas,monospace;margin:12px}
         guideId="serial_generate"
         spanFull
         title="Unique serial labels"
-        summary="For units without a supplier serial — generate unique numbers, print labels, and attach them."
+        summary="Format: company prefix + date (MMDDYY) + sequence — e.g. BA072726000001. Prefix is customizable."
         steps={[
           "Pick a serial-tracked item and stock location.",
-          "Choose quantity (1–200). Numbers are unique per business (tenant).",
-          "Generate, then Print labels.",
+          "Set company prefix (default BA) and quantity (1–200).",
+          "Generate, then Print labels (Code128).",
         ]}
       />
       <Field label="Date *">
@@ -191,8 +195,15 @@ body{font-family:ui-monospace,Menlo,Consolas,monospace;margin:12px}
       <Field label="Qty *">
         <input class={inputClass} type="number" min="1" max="200" value={qty()} onInput={(e) => setQty(e.currentTarget.value)} />
       </Field>
-      <Field label="Prefix">
-        <input class={inputClass} value={prefix()} onInput={(e) => setPrefix(e.currentTarget.value)} maxlength={16} />
+      <Field label="Company prefix">
+        <input
+          class={inputClass}
+          value={prefix()}
+          onInput={(e) => setPrefix(e.currentTarget.value)}
+          maxlength={16}
+          placeholder={DEFAULT_SERIAL_PREFIX}
+        />
+        <p class="mt-1 font-mono text-xs text-text-secondary">Preview: {formatPreview()}</p>
       </Field>
       <Field label="Remark">
         <input class={inputClass} value={remark()} onInput={(e) => setRemark(e.currentTarget.value)} />

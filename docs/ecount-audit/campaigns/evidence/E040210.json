@@ -1,0 +1,16 @@
+{
+  "prgId": "E040210",
+  "screen_name": "Print Sales Slips",
+  "pills": [
+    {"label": "Default", "audited": true},
+    {"label": "All", "audited": true}
+  ],
+  "toolbar": ["Search(F3)", "Option", "Settings", "Reset"],
+  "toolbar_audited": ["Search(F3)", "Option", "Settings", "Reset"],
+  "controls_logged": 40,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/sales/sales",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch2 depth-complete; Confirm/Print not submitted (SAFE)",
+  "mark_depth_complete": true
+}

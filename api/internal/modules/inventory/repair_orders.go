@@ -89,6 +89,7 @@ type repairOrderBody struct {
 
 func registerRepairOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/repair-orders/preview-sequences", previewRepairSequences(pool))
+	r.Get("/repair-orders/rma-candidates", listRMACandidates(pool))
 	r.Get("/repair-orders/status-report/export", exportRepairOrderStatusReport(pool))
 	r.Get("/repair-orders/status-report", listRepairOrderStatusReport(pool))
 	r.Get("/repair-orders", listRepairOrders(pool))

@@ -239,10 +239,11 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
         onStatusChange={setStatusFilter}
         statusLabel="Progress"
         statusOptions={[
+          { value: "", label: "All" },
+          { value: "e_approval", label: progressStatusLabel("e_approval") },
           { value: "unconfirmed", label: progressStatusLabel("unconfirmed") },
           { value: "in_progress", label: progressStatusLabel("in_progress") },
           { value: "completed", label: progressStatusLabel("completed") },
-          { value: "", label: "All" },
         ]}
         onRefresh={invalidate}
         settingsHref={SALES_ORDER_SETTINGS_HREF.salesOrder}

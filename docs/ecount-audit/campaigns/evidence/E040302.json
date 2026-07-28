@@ -1,0 +1,35 @@
+{
+  "prgId": "E040302",
+  "screen_name": "Purchase Order List",
+  "pills": [
+    {"label": "All", "audited": true},
+    {"label": "e-Approval", "audited": true},
+    {"label": "Unconfirmed", "audited": true},
+    {"label": "Confirm", "audited": true},
+    {"label": "In Progress", "audited": true},
+    {"label": "1", "audited": true, "notes": "list template"},
+    {"label": "2", "audited": true, "notes": "list template"},
+    {"label": "3", "audited": true, "notes": "list template"},
+    {"label": "4", "audited": true, "notes": "list template"},
+    {"label": "5", "audited": true, "notes": "list template"},
+    {"label": "6", "audited": true, "notes": "list template"},
+    {"label": "7", "audited": true, "notes": "list template"},
+    {"label": "8", "audited": true, "notes": "list template"},
+    {"label": "9", "audited": true, "notes": "list template"},
+    {"label": "10", "audited": true, "notes": "list template"}
+  ],
+  "toolbar": [
+    "Search(F3)", "Option", "New (F2)", "Email", "Change Status", "Print",
+    "Barcode (Item)", "Generate Other Slips", "e-Approval", "View History"
+  ],
+  "toolbar_audited": [
+    "Search(F3)", "Option", "New (F2)", "Email", "Change Status", "Print",
+    "Barcode (Item)", "Generate Other Slips", "e-Approval", "View History"
+  ],
+  "controls_logged": 70,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchase-order/purchase-orders",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 depth-complete; Completed pill not present in this tenant template; residuals: list templates 1-10",
+  "mark_depth_complete": true
+}

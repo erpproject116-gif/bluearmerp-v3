@@ -1,0 +1,22 @@
+{
+  "prgId": "E040321",
+  "screen_name": "New RFQ",
+  "pills": [
+    {"label": "New RFQ", "audited": true, "fields_summary": "Date, Customer, PIC, Expiration, Cc, Currency, Project + lines"},
+    {"label": "Option", "audited": true, "fields_summary": "Form Option menu present"}
+  ],
+  "toolbar": [
+    "Option", "Help", "Find (F3)", "Sort", "View Trans.(RFQ)", "My Item", "Sales Order", "Purchase Plan",
+    "View Inv. Qty", "Domestic", "Reset", "List"
+  ],
+  "toolbar_audited": [
+    "Option", "Help", "Find (F3)", "Sort", "View Trans.(RFQ)", "My Item", "Sales Order", "Purchase Plan",
+    "View Inv. Qty", "Domestic", "Reset", "List"
+  ],
+  "controls_logged": 42,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchase-order/rfq/new",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: multi-vendor RFQ depth, Purchase Plan pull",
+  "mark_depth_complete": true
+}

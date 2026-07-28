@@ -1,0 +1,26 @@
+{
+  "prgId": "E040301",
+  "screen_name": "New Purchase Order",
+  "pills": [
+    {"label": "New Purchase Order", "audited": true, "fields_summary": "Header vendor/location/VAT + line grid"},
+    {"label": "Option", "audited": true, "fields_summary": "Input Screen Settings, Condition Template, purchase limit by project, My Code/Text, Function Setup, Mapping Center, Change Progress Status"}
+  ],
+  "toolbar": [
+    "Option", "Help", "Find (F3)", "Sort", "View Trans.(Purchase Order)", "My Item", "BOM", "Sales Order",
+    "Purchase Plan", "RFQ", "Load Slip", "View Inv. Qty", "Safety Stock by Item", "Created Slip",
+    "Barcode", "Item Code", "Summed Base Qty", "Slip Barcode", "Verification",
+    "VAT Inc. 12%", "Domestic", "Qty±", "Price", "%", "All", "F4", "Reset", "List", "ECOUNT Web Uploader"
+  ],
+  "toolbar_audited": [
+    "Option", "Help", "Find (F3)", "Sort", "View Trans.(Purchase Order)", "My Item", "BOM", "Sales Order",
+    "Purchase Plan", "RFQ", "Load Slip", "View Inv. Qty", "Safety Stock by Item", "Created Slip",
+    "Barcode", "Item Code", "Summed Base Qty", "Slip Barcode", "Verification",
+    "VAT Inc. 12%", "Domestic", "Qty±", "Price", "%", "All", "F4", "Reset", "List", "ECOUNT Web Uploader"
+  ],
+  "controls_logged": 72,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchase-order/purchase-orders/new",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: Load Slip/RFQ/Purchase Plan pulls, per-line Delivery Date, BOM on PO",
+  "mark_depth_complete": true
+}
