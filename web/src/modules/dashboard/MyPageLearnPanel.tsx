@@ -54,7 +54,7 @@ export function MyPageLearnPanel() {
       </div>
       <p class="mb-4 text-xs text-text-secondary">
         Start here for daily ops. Prefer these links over guessing menus (fewer wrong-screen tickets).
-        Sidebar under Operations: Stock → Sell → Buy.
+        Sidebar: Stocks (incl. Warehouse) → Sell → Buy → Accounting.
       </p>
       <div class="space-y-4">
         <For each={LEARN_GROUPS}>

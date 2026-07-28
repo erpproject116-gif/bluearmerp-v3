@@ -25,11 +25,6 @@ export const UI_COPY_GROUPS: UiCopyGroup[] = [
       { key: "common.new_row", label: "New row button", fallback: "+ New row" },
       { key: "common.no_rows", label: "Empty grid", fallback: "No rows yet. Press F2 to create one." },
       { key: "common.no_results", label: "No search results", fallback: "No results" },
-      {
-        key: "common.grid_hint",
-        label: "Grid keyboard hint",
-        fallback: "F2 new · ↑↓ navigate · Enter edit · click headers to sort",
-      },
       { key: "common.previous", label: "Pagination: Previous", fallback: "Previous" },
       { key: "common.next", label: "Pagination: Next", fallback: "Next" },
       { key: "common.import_csv", label: "Import CSV button", fallback: "Import CSV" },

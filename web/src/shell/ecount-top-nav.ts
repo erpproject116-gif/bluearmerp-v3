@@ -35,8 +35,9 @@ export const ECOUNT_TOP_MODULES: EcountTopModule[] = [
   {
     id: "inv2",
     label: "Warehouse",
-    hint: "Serial/lot and WMS",
+    hint: "Serial/lot and WMS under Stocks",
     href: "/app/inventory/serial-lot",
+    // Warehouse lives under Stocks — show the full Stock group.
     navGroupIds: ["stocks_management"],
   },
   {
@@ -169,13 +170,14 @@ export type HomeSidebarArea = {
   iconId: string;
   /** Optional top-module id for storage hint; path resolution still wins. */
   topId?: EcountTopId;
-  /** Expand this nav group after navigate (Operations children). */
+  /** Expand this nav group after navigate. */
   expandGroupId?: string;
+  /** Nested links shown under this area on Home (e.g. Warehouse under Stocks). */
+  children?: HomeSidebarArea[];
 };
 
 export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   { id: "home", label: "Home", href: "/app/dashboard", iconId: "dashboard", topId: "mypage" },
-  { id: "operations", label: "Operations", href: "/app/inventory/items", iconId: "inventory", topId: "inv1" },
   {
     id: "stocks",
     label: "Stocks",
@@ -183,6 +185,16 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "inventory",
     topId: "inv1",
     expandGroupId: "stocks_management",
+    children: [
+      {
+        id: "warehouse",
+        label: "Warehouse",
+        href: "/app/inventory/serial-lot",
+        iconId: "sub_warehouse",
+        topId: "inv2",
+        expandGroupId: "stocks_management",
+      },
+    ],
   },
   {
     id: "sell",
@@ -200,14 +212,31 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     topId: "inv1",
     expandGroupId: "procurement_process",
   },
-  { id: "warehouse", label: "Warehouse", href: "/app/inventory/serial-lot", iconId: "sub_warehouse", topId: "inv2" },
-  { id: "ledger", label: "Ledger", href: "/app/finance/acct-i/journal-entries", iconId: "sub_general_ledger", topId: "acct1" },
   {
-    id: "cash",
-    label: "Cash & AR/AP",
-    href: "/app/finance/collections",
-    iconId: "sub_ar_ap",
-    topId: "acct2",
+    id: "accounting",
+    label: "Accounting",
+    href: "/app/finance",
+    iconId: "finance",
+    topId: "acct1",
+    expandGroupId: "accounting_dept",
+    children: [
+      {
+        id: "ledger",
+        label: "Ledger",
+        href: "/app/finance/acct-i/journal-entries",
+        iconId: "sub_general_ledger",
+        topId: "acct1",
+        expandGroupId: "accounting_dept",
+      },
+      {
+        id: "cash",
+        label: "Cash & AR/AP",
+        href: "/app/finance/collections",
+        iconId: "sub_ar_ap",
+        topId: "acct2",
+        expandGroupId: "accounting_dept",
+      },
+    ],
   },
   { id: "more", label: "More Apps", href: "/app/crm/dashboard", iconId: "more_apps", topId: "more" },
   { id: "sitemap", label: "Site Map", href: "/app/dashboard/site-map", iconId: "dashboard", topId: "mypage" },
