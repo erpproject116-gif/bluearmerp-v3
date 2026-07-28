@@ -8,13 +8,23 @@ export type AcctNavLink = {
 
 export const ACCT_II_PREFIX = "/app/finance/acct-ii";
 
+/** Report paths linked from Acct II More menu (keep Acct II header when opened). */
+const ACCT_II_REPORT_PATHS = [
+  "/app/finance/reports/customer-vendor-book-ar",
+  "/app/finance/reports/customer-vendor-book-ap",
+  "/app/finance/reports/customer-vendor-book-ii-ar",
+  "/app/finance/reports/customer-vendor-book-ii-ap",
+  "/app/finance/reports/ar-aging-details",
+  "/app/finance/reports/ap-aging-details",
+] as const;
+
 /** BluearmERP Acct. II — receivable/payable depth, checks, budget, withholding, import cost, contracts, notes */
 export const acctIINavLinks: AcctNavLink[] = [
   { label: "Receivables", href: "/app/finance/collections", permissionCode: "finance.reports_ar_by_customer", headerPriority: "primary" },
   { label: "Payables", href: "/app/finance/disbursements", permissionCode: "finance.reports_ap_by_vendor", headerPriority: "primary" },
   { label: "Check Register", href: "/app/finance/acct-ii/checks", permissionCode: "finance.check_read", headerPriority: "primary" },
-  { label: "Withholding Tax", href: "/app/finance/acct-ii/withholding-codes", permissionCode: "finance.withholding_read", headerPriority: "primary" },
-  { label: "Notes", href: "/app/finance/acct-ii/notes", permissionCode: "finance.note_read", headerPriority: "primary" },
+  { label: "Withholding Tax", href: "/app/finance/acct-ii/withholding-codes", permissionCode: "finance.withholding_read", headerPriority: "overflow" },
+  { label: "Notes", href: "/app/finance/acct-ii/notes", permissionCode: "finance.note_read", headerPriority: "overflow" },
   { label: "Landed Cost", href: "/app/finance/acct-ii/landed-costs", permissionCode: "finance.landed_cost_read", headerPriority: "overflow" },
   { label: "Contracts", href: "/app/finance/acct-ii/contracts", permissionCode: "finance.contract_read", headerPriority: "overflow" },
   { label: "Setup", href: "/app/finance/acct-ii/setup", permissionCode: "settings.process_policies", headerPriority: "overflow" },
@@ -31,6 +41,9 @@ export function isAcctIIPath(pathname: string): boolean {
   if (pathname.startsWith("/app/finance/budgets")) return true;
   if (pathname.startsWith("/app/finance/collections")) return true;
   if (pathname.startsWith("/app/finance/disbursements")) return true;
+  for (const report of ACCT_II_REPORT_PATHS) {
+    if (pathname === report || pathname.startsWith(`${report}/`)) return true;
+  }
   return false;
 }
 
