@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
-import { getAccessToken } from "../../shared/api";
 import { GridExportButtons, type GridExportColumn } from "../../shared/gridExport";
+import { downloadApiFile, fetchApiText, parseCsvToAoa } from "../../shared/reports/downloadReportCsv";
 import { useToast } from "../../shared/toast";
 import type { Ticket } from "../../shared/useSupportTickets";
 
@@ -38,37 +38,39 @@ export function TicketListExportButtons(props: Props) {
   const title = () => props.title ?? "Support tickets";
   const filename = () => props.filename ?? "support-tickets";
 
+  const failMsg = (error?: string) => {
+    if (error === "html" || error === "network") {
+      return "Could not reach the tickets export API. Check API URL / redeploy, then try again.";
+    }
+    return "Failed to download tickets CSV.";
+  };
+
   const downloadFullCsv = async () => {
-    const token = await getAccessToken();
-    const res = await fetch(props.exportUrl("csv"), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) {
-      toast.warning("Failed to download tickets CSV.");
+    const result = await downloadApiFile(props.exportUrl("csv"), `${filename()}.csv`);
+    if (!result.ok) {
+      toast.warning(failMsg(result.error));
       return;
     }
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = `${filename()}.csv`;
-    a.click();
-    URL.revokeObjectURL(objectUrl);
     toast.success("Downloaded tickets with full description and comments.");
   };
 
   const downloadFullExcel = async () => {
     try {
-      const token = await getAccessToken();
-      const res = await fetch(props.exportUrl("csv"), {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) {
-        toast.warning("Failed to download tickets for Excel.");
+      const fetched = await fetchApiText(props.exportUrl("csv"));
+      if (!fetched.ok) {
+        toast.warning(failMsg(fetched.error));
         return;
       }
-      const text = await res.text();
-      const book = XLSX.read(text, { type: "string", raw: true });
+      const aoa = parseCsvToAoa(fetched.text);
+      if (aoa.length === 0) {
+        toast.warning("No ticket data to export.");
+        return;
+      }
+      // Build workbook from cells (same path as grid Excel). XLSX.read(csv)
+      // often fails on multiline description/comments fields.
+      const sheet = XLSX.utils.aoa_to_sheet(aoa);
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, sheet, "Tickets");
       XLSX.writeFile(book, `${filename()}.xlsx`);
       toast.success("Downloaded tickets with full description and comments.");
     } catch (err) {

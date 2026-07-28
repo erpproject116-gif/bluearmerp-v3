@@ -2,7 +2,7 @@ import { createSignal, For, onMount, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { DateInput } from "../../../shared/DateInput";
 import { Field } from "../../../shared/SpreadsheetGrid";
-import { getAccessToken } from "../../../shared/api";
+import { downloadApiFile } from "../../../shared/reports/downloadReportCsv";
 import { usePurchasePreInvoicingReport } from "../../../shared/usePurchasePreInvoicingReport";
 
 function todayISO() {
@@ -63,16 +63,7 @@ export default function PurchasePreInvoicingPage() {
   };
 
   const downloadCsv = async () => {
-    const token = await getAccessToken();
-    const res = await fetch(exportUrl(), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "purchase-pre-invoicing.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadApiFile(exportUrl(), "purchase-pre-invoicing.csv");
   };
 
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
