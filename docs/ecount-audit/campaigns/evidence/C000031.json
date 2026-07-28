@@ -1,0 +1,31 @@
+{
+  "prgId": "C000031",
+  "screen_name": "Purchase List",
+  "pills": [
+    {"label": "All", "audited": true},
+    {"label": "e-Approval", "audited": true},
+    {"label": "Unconfirmed", "audited": true},
+    {"label": "Confirm", "audited": true},
+    {"label": "1", "audited": true, "notes": "list template"},
+    {"label": "2", "audited": true, "notes": "list template"},
+    {"label": "3", "audited": true, "notes": "list template"},
+    {"label": "4", "audited": true, "notes": "list template"},
+    {"label": "5", "audited": true, "notes": "list template"},
+    {"label": "6", "audited": true, "notes": "list template"},
+    {"label": "Default", "audited": true, "fields_summary": "Option Default filters Date/Type/Location/Project/Customer/Item/Send"}
+  ],
+  "toolbar": [
+    "Search(F3)", "Option", "Help", "New(F2)", "Email", "Change Status", "Print",
+    "Barcode (Item)", "e-Approval", "View History"
+  ],
+  "toolbar_audited": [
+    "Search(F3)", "Option", "Help", "New(F2)", "Email", "Change Status", "Print",
+    "Barcode (Item)", "e-Approval", "View History"
+  ],
+  "controls_logged": 70,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchases/purchases",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; live tenant prgId twin E040304 (menuSeq MENUTREE_000511); SAFE blacklist Send/Delete/Excel not exercised; Applied Template BA-Purchase",
+  "mark_depth_complete": true
+}

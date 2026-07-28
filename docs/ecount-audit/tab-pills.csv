@@ -352,13 +352,6 @@ E040204-camp-2-7,E040204,Sales Order List status/list,L2,2,no,list/filter pill,,
 E040204-camp-3-8,E040204,Sales Order List status/list,L2,3,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,list template
 E040204-camp-4-9,E040204,Sales Order List status/list,L2,4,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,list template
 E040204-camp-5-10,E040204,Sales Order List status/list,L2,5,no,list/filter pill,,,,,/app/sales-order/sales-orders,yes,list template
-E040201-camp-new-quotation-0,E040201,New Quotation status/list,L2,New Quotation,yes,list/filter pill,,,,,/app/quotation/quotations/new,yes,form template tab
-E040201-camp-quotation-1,E040201,New Quotation status/list,L2,Quotation,no,list/filter pill,,,,,/app/quotation/quotations/new,yes,header/type label area
-E040205-camp-sales-invoice-i-0,E040205,New Sales status/list,L2,Sales Invoice I,yes,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
-E040205-camp-goods-receipt-i-1,E040205,New Sales status/list,L2,Goods Receipt I,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
-E040205-camp-shipping-order-2,E040205,New Sales status/list,L2,Shipping Order,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
-E040205-camp-new-sales-3,E040205,New Sales status/list,L2,New Sales,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
-E040205-camp-details-4,E040205,New Sales status/list,L2,Details,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
 E040215-camp-by-customer-vendor-0,E040215,Collective Invoicing (Sales) status/list,L2,By Customer/Vendor,yes,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
 E040215-camp-by-slip-1,E040215,Collective Invoicing (Sales) status/list,L2,by Slip,no,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
 E040215-camp-general-2,E040215,Collective Invoicing (Sales) status/list,L2,General,no,list/filter pill,,,,,/app/sales/collective-invoices,yes,Campaign A Jul 28 2026
@@ -391,10 +384,6 @@ E040304-camp-3-6,E040304,Purchase List status/list,L2,3,no,list/filter pill,,,,,
 E040304-camp-4-7,E040304,Purchase List status/list,L2,4,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
 E040304-camp-5-8,E040304,Purchase List status/list,L2,5,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
 E040304-camp-6-9,E040304,Purchase List status/list,L2,6,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
-E040303-camp-purchase-invoice-i-0,E040303,New Purchases status/list,L2,Purchase Invoice I,yes,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
-E040303-camp-new-purchase-1,E040303,New Purchases status/list,L2,New Purchase,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
-E040303-camp-new-purchases-2,E040303,New Purchases status/list,L2,New Purchases,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
-E040303-camp-new-quality-insp--request-3,E040303,New Purchases status/list,L2,New Quality Insp. Request,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
 E040315-camp-all-0,E040315,Purchase Request List status/list,L2,All,yes,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
 E040315-camp-e-approval-1,E040315,Purchase Request List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
 E040315-camp-unconfirmed-2,E040315,Purchase Request List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/purchase-request/purchase-requests,yes,Campaign A Jul 28 2026
@@ -459,3 +448,83 @@ E040316-camp-new-purchase-plan-0,E040316,New Purchase Plan status/list,L2,New Pu
 E040316-camp-option-1,E040316,New Purchase Plan status/list,L2,Option,no,Form Option menu present,,,,,/app/purchase-request/purchase-plans/new,yes,Campaign A Jul 28 2026
 E040321-camp-new-rfq-0,E040321,New RFQ status/list,L2,New RFQ,yes,"Date, Customer, PIC, Expiration, Cc, Currency, Project + lines",,,,,/app/purchase-order/rfq/new,yes,Campaign A Jul 28 2026
 E040321-camp-option-1,E040321,New RFQ status/list,L2,Option,no,Form Option menu present,,,,,/app/purchase-order/rfq/new,yes,Campaign A Jul 28 2026
+C000031-camp-all-0,C000031,Purchase List status/list,L2,All,yes,list/filter pill,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+C000031-camp-e-approval-1,C000031,Purchase List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+C000031-camp-unconfirmed-2,C000031,Purchase List status/list,L2,Unconfirmed,no,list/filter pill,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+C000031-camp-confirm-3,C000031,Purchase List status/list,L2,Confirm,no,list/filter pill,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+C000031-camp-1-4,C000031,Purchase List status/list,L2,1,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+C000031-camp-2-5,C000031,Purchase List status/list,L2,2,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+C000031-camp-3-6,C000031,Purchase List status/list,L2,3,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+C000031-camp-4-7,C000031,Purchase List status/list,L2,4,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+C000031-camp-5-8,C000031,Purchase List status/list,L2,5,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+C000031-camp-6-9,C000031,Purchase List status/list,L2,6,no,list/filter pill,,,,,/app/purchases/purchases,yes,list template
+C000031-camp-default-10,C000031,Purchase List status/list,L2,Default,no,Option Default filters Date/Type/Location/Project/Customer/Item/Send,,,,,/app/purchases/purchases,yes,Campaign A Jul 28 2026
+E040312-camp-default-0,E040312,Collective Invoicing (Purchase) status/list,L2,Default,yes,Date presets + VAT + Search filters,,,,,/app/purchases/purchases/collective,yes,Campaign A Jul 28 2026
+E040312-camp-all-1,E040312,Collective Invoicing (Purchase) status/list,L2,All,no,Status/filter All,,,,,/app/purchases/purchases/collective,yes,Campaign A Jul 28 2026
+E040312-camp-option-2,E040312,Collective Invoicing (Purchase) status/list,L2,Option,no,list/filter pill,,,,,/app/purchases/purchases/collective,yes,Campaign A Jul 28 2026
+E040317-camp-all-0,E040317,Purchase Plan List status/list,L2,All,yes,list/filter pill,,,,,/app/purchase-request/purchase-plans,yes,Campaign A Jul 28 2026
+E040317-camp-e-approval-1,E040317,Purchase Plan List status/list,L2,e-Approval,no,list/filter pill,,,,,/app/purchase-request/purchase-plans,yes,Campaign A Jul 28 2026
+E040317-camp-default-2,E040317,Purchase Plan List status/list,L2,Default,no,Date presets + Search filters,,,,,/app/purchase-request/purchase-plans,yes,Campaign A Jul 28 2026
+E040323-camp-default-0,E040323,RFQ Progress Status status/list,L2,Default,yes,Date presets + Search (F8),,,,,/app/purchase-order/rfq/progress,yes,Campaign A Jul 28 2026
+E040323-camp-option-1,E040323,RFQ Progress Status status/list,L2,Option,no,list/filter pill,,,,,/app/purchase-order/rfq/progress,yes,Campaign A Jul 28 2026
+E040325-camp-default-0,E040325,RFQ Status status/list,L2,Default,yes,Date presets + Search (F8),,,,,/app/purchase-order/rfq/status,yes,Campaign A Jul 28 2026
+E040325-camp-option-1,E040325,RFQ Status status/list,L2,Option,no,list/filter pill,,,,,/app/purchase-order/rfq/status,yes,Campaign A Jul 28 2026
+C000078-camp-purchase-request-0,C000078,Purchases status/list,L2,Purchase Request,yes,L1 folder — List/New/Status children,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000078-camp-purchase-plan-1,C000078,Purchases status/list,L2,Purchase Plan,no,L1 folder — List/New/Status,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000078-camp-rfq-2,C000078,Purchases status/list,L2,RFQ,no,L1 folder — List/New/Progress/Status,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000078-camp-purchase-order-3,C000078,Purchases status/list,L2,Purchase Order,no,L1 folder — List/New/Status/Outstanding,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000078-camp-purchases-4,C000078,Purchases status/list,L2,Purchases,no,L1 folder — Purchase List + New + status reports,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000078-camp-collective-invoicing--purchase-5,C000078,Purchases status/list,L2,Collective Invoicing (Purchase),no,L1 folder — Invoice List/Status,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000096-camp-purchase-request-0,C000096,Purchases status/list,L2,Purchase Request,yes,list/filter pill,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000096-camp-purchase-plan-1,C000096,Purchases status/list,L2,Purchase Plan,no,list/filter pill,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000096-camp-rfq-2,C000096,Purchases status/list,L2,RFQ,no,list/filter pill,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000096-camp-purchase-order-3,C000096,Purchases status/list,L2,Purchase Order,no,list/filter pill,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000096-camp-purchases-4,C000096,Purchases status/list,L2,Purchases,no,list/filter pill,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000096-camp-collective-invoicing--purchase-5,C000096,Purchases status/list,L2,Collective Invoicing (Purchase),no,list/filter pill,,,,,/app/purchases,yes,Campaign A Jul 28 2026
+C000073-camp-quotation-0,C000073,Sales status/list,L2,Quotation,yes,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000073-camp-sales-order-1,C000073,Sales status/list,L2,Sales Order,no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000073-camp-sales-2,C000073,Sales status/list,L2,Sales,no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000073-camp-collective-invoicing--sales-3,C000073,Sales status/list,L2,Collective Invoicing (Sales),no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000073-camp-shipping-order-4,C000073,Sales status/list,L2,Shipping Order,no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000073-camp-shipping-5,C000073,Sales status/list,L2,Shipping,no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000095-camp-quotation-0,C000095,Sales status/list,L2,Quotation,yes,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000095-camp-sales-order-1,C000095,Sales status/list,L2,Sales Order,no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000095-camp-sales-2,C000095,Sales status/list,L2,Sales,no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000095-camp-collective-invoicing--sales-3,C000095,Sales status/list,L2,Collective Invoicing (Sales),no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000095-camp-shipping-order-4,C000095,Sales status/list,L2,Shipping Order,no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+C000095-camp-shipping-5,C000095,Sales status/list,L2,Shipping,no,list/filter pill,,,,,/app/selling,yes,Campaign A Jul 28 2026
+E040311-camp-default-0,E040311,Change Purchases Price-Batch status/list,L2,Default,yes,Date presets + Search/Save Search filters,,,,,/app/purchases/purchases/change-price,yes,Campaign A Jul 28 2026
+E040311-camp-option-1,E040311,Change Purchases Price-Batch status/list,L2,Option,no,Option/Help present on batch price change,,,,,/app/purchases/purchases/change-price,yes,Campaign A Jul 28 2026
+E060607-camp-all-0,E060607,Checks Issued List status/list,L2,All,yes,list/filter pill,,,,,/app/finance/checks/issued,yes,Campaign A Jul 28 2026
+E060607-camp-default-1,E060607,Checks Issued List status/list,L2,Default,no,"Date, Check No, In/De Type, Transaction/Input Type, Customer, Dept, Project, Bank Account",,,,,/app/finance/checks/issued,yes,Campaign A Jul 28 2026
+E060608-camp-default-0,E060608,Checks Issued Status status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/issued/status,yes,Campaign A Jul 28 2026
+E060608-camp-option-1,E060608,Checks Issued Status status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/issued/status,yes,Campaign A Jul 28 2026
+E060603-camp-default-0,E060603,Checks Received List status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/received,yes,Campaign A Jul 28 2026
+E060603-camp-option-1,E060603,Checks Received List status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/received,yes,Campaign A Jul 28 2026
+E060604-camp-default-0,E060604,Checks Received Status status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/received/status,yes,Campaign A Jul 28 2026
+E060604-camp-option-1,E060604,Checks Received Status status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/received/status,yes,Campaign A Jul 28 2026
+E060612-camp-default-0,E060612,Decrease of Issued Checks Balance status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/issued/decrease,yes,Campaign A Jul 28 2026
+E060612-camp-option-1,E060612,Decrease of Issued Checks Balance status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/issued/decrease,yes,Campaign A Jul 28 2026
+E060610-camp-default-0,E060610,Decrease of Received Checks Balance status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/received/decrease,yes,Campaign A Jul 28 2026
+E060610-camp-option-1,E060610,Decrease of Received Checks Balance status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/received/decrease,yes,Campaign A Jul 28 2026
+E060611-camp-default-0,E060611,Increase of Issued Checks Balance status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/issued/increase,yes,Campaign A Jul 28 2026
+E060611-camp-option-1,E060611,Increase of Issued Checks Balance status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/issued/increase,yes,Campaign A Jul 28 2026
+E060614-camp-default-0,E060614,Issued Check Transactions status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/issued/transactions,yes,Campaign A Jul 28 2026
+E060614-camp-option-1,E060614,Issued Check Transactions status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/issued/transactions,yes,Campaign A Jul 28 2026
+E060606-camp-default-0,E060606,New Issued Check Clearance status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/issued/new-clearance,yes,Campaign A Jul 28 2026
+E060606-camp-option-1,E060606,New Issued Check Clearance status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/issued/new-clearance,yes,Campaign A Jul 28 2026
+E060602-camp-default-0,E060602,New RCVD. Check Payment status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/received/new-payment,yes,Campaign A Jul 28 2026
+E060602-camp-option-1,E060602,New RCVD. Check Payment status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/received/new-payment,yes,Campaign A Jul 28 2026
+E060613-camp-default-0,E060613,Received Check Transactions status/list,L2,Default,yes,Acct. II Check Management filters,,,,,/app/finance/checks/received/transactions,yes,Campaign A Jul 28 2026
+E060613-camp-option-1,E060613,Received Check Transactions status/list,L2,Option,no,list/filter pill,,,,,/app/finance/checks/received/transactions,yes,Campaign A Jul 28 2026
+E040205-camp-sales-invoice-i-0,E040205,New Sales status/list,L2,Sales Invoice I,yes,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040205-camp-goods-receipt-i-1,E040205,New Sales status/list,L2,Goods Receipt I,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040205-camp-shipping-order-2,E040205,New Sales status/list,L2,Shipping Order,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040205-camp-new-sales-3,E040205,New Sales status/list,L2,New Sales,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040205-camp-details-4,E040205,New Sales status/list,L2,Details,no,list/filter pill,,,,,/app/sales/sales/new,yes,Campaign A Jul 28 2026
+E040303-camp-purchase-invoice-i-0,E040303,New Purchases status/list,L2,Purchase Invoice I,yes,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
+E040303-camp-new-purchase-1,E040303,New Purchases status/list,L2,New Purchase,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
+E040303-camp-new-purchases-2,E040303,New Purchases status/list,L2,New Purchases,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
+E040303-camp-new-quality-insp--request-3,E040303,New Purchases status/list,L2,New Quality Insp. Request,no,list/filter pill,,,,,/app/purchases/purchases/new,yes,Campaign A Jul 28 2026
+E040201-camp-new-quotation-0,E040201,New Quotation status/list,L2,New Quotation,yes,list/filter pill,,,,,/app/quotation/quotations/new,yes,form template tab
+E040201-camp-quotation-1,E040201,New Quotation status/list,L2,Quotation,no,list/filter pill,,,,,/app/quotation/quotations/new,yes,header/type label area

@@ -22,7 +22,7 @@ export function EcountModuleStrip() {
       <A
         href="/app/dashboard/site-map"
         class="mr-2 rounded-md border border-stroke px-2 py-1 text-[11px] font-medium text-text-secondary hover:bg-brand-50 hover:text-brand-700"
-        title="Search all programs (Ecount Site Map)"
+        title="Search all programs"
       >
         Site Map
       </A>
@@ -35,6 +35,7 @@ export function EcountModuleStrip() {
               "bg-brand-600 text-white shadow-sm": active() === mod.id,
               "text-text-secondary hover:bg-brand-50 hover:text-brand-700": active() !== mod.id,
             }}
+            title={mod.hint}
             onClick={() => select(mod.id, mod.href)}
           >
             {mod.label}

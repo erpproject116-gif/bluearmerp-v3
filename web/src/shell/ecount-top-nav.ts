@@ -1,10 +1,13 @@
-/** Ecount-style top modules + path → module resolution for shell IA (Gate G4). */
+/** Top strip areas + path → module resolution for shell IA (Gate G4).
+ * Labels are process-oriented (not Ecount Inv. I / Acct. I jargon). */
 
 export type EcountTopId = "mypage" | "inv1" | "inv2" | "acct1" | "acct2" | "setup" | "more";
 
 export type EcountTopModule = {
   id: EcountTopId;
   label: string;
+  /** Short hint for title/tooltip */
+  hint?: string;
   /** Default landing when the strip is clicked */
   href: string;
   /** Sidebar navGroup ids visible under this top module */
@@ -16,44 +19,51 @@ export type EcountTopModule = {
 export const ECOUNT_TOP_MODULES: EcountTopModule[] = [
   {
     id: "mypage",
-    label: "MyPage",
+    label: "Home",
+    hint: "Dashboard and Site Map",
     href: "/app/dashboard",
     navGroupIds: [],
     ungroupedModuleIds: ["dashboard"],
   },
   {
     id: "inv1",
-    label: "Inv. I",
+    label: "Operations",
+    hint: "Stock, sell, and buy documents",
     href: "/app/inventory/items",
     navGroupIds: ["stocks_management", "sales_process", "procurement_process"],
   },
   {
     id: "inv2",
-    label: "Inv. II",
+    label: "Warehouse",
+    hint: "Serial/lot and WMS",
     href: "/app/inventory/serial-lot",
     navGroupIds: ["stocks_management"],
   },
   {
     id: "acct1",
-    label: "Acct. I",
+    label: "Ledger",
+    hint: "General ledger and taxes",
     href: "/app/finance/acct-i/journal-entries",
     navGroupIds: ["accounting_dept"],
   },
   {
     id: "acct2",
-    label: "Acct. II",
+    label: "Cash & AR/AP",
+    hint: "Collections, disbursements, checks",
     href: "/app/finance/collections",
     navGroupIds: ["accounting_dept"],
   },
   {
     id: "setup",
     label: "Setup",
+    hint: "Users, branding, help",
     href: "/app/user-management",
     navGroupIds: ["misc"],
   },
   {
     id: "more",
     label: "More",
+    hint: "CRM, POS, HR, and other apps",
     href: "/app/crm/dashboard",
     navGroupIds: ["more_apps"],
   },

@@ -24,6 +24,7 @@ import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
+import { postInventoryItemSearch } from "../../../shared/inventoryItemSearch";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
@@ -138,6 +139,8 @@ export function SupplierInvoiceModal(props: Props) {
   const [rfqPickerOpen, setRfqPickerOpen] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
+  const [slipBarcode, setSlipBarcode] = createSignal("");
+  const [slipBarcodeBusy, setSlipBarcodeBusy] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [showNewVendor, setShowNewVendor] = createSignal(false);
   const [newVendorName, setNewVendorName] = createSignal("");
@@ -381,6 +384,51 @@ export function SupplierInvoiceModal(props: Props) {
     } else {
       setLines(merged.length ? merged : newLines);
     }
+  };
+
+  /** Ecount Slip Barcode: scan/type item code → add purchase line (Bluearm barcodes map to item_code). */
+  const applySlipBarcode = async () => {
+    const code = slipBarcode().trim();
+    if (!code) {
+      toast.warning("Enter a slip / item barcode.");
+      return;
+    }
+    setSlipBarcodeBusy(true);
+    const res = await postInventoryItemSearch({
+      item_code: code,
+      keyword: code,
+      usage_status: "active",
+      page: 1,
+      pageSize: 5,
+    });
+    setSlipBarcodeBusy(false);
+    if (!res.success || !(res.data?.length)) {
+      toast.warning(res.message ?? `No item found for barcode “${code}”.`);
+      return;
+    }
+    const row = res.data.find((r) => r.item_code.toLowerCase() === code.toLowerCase()) ?? res.data[0];
+    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const price = row.sales_price != null ? String(row.sales_price) : "";
+    const filled = lines().filter((ln) => ln.item_id || ln.item_code);
+    const patch: PurchaseRequestLineRow = {
+      ...emptyPurchaseRequestLine(filled.length + 1, price, basis),
+      item_id: row.id,
+      item_code: row.item_code,
+      item_name: row.item_name,
+      unit_id: row.base_unit_id ?? null,
+      unit_code: row.base_unit_code ?? "",
+      qty: "1",
+      unit_price: price,
+    };
+    const merged = [...filled, patch].map((ln, i) => ({ ...ln, line_no: i + 1 }));
+    if (meta && taxTypeId()) {
+      setLines(await recalculatePurchaseRequestLines(merged, taxTypeId()!, meta));
+    } else {
+      setLines(merged);
+    }
+    setSlipBarcode("");
+    toast.success(`Added ${row.item_code}.`);
   };
 
   const applyPOLines = async (picked: OpenPOLine[]) => {
@@ -870,6 +918,30 @@ export function SupplierInvoiceModal(props: Props) {
                 if (id === "quotation") setQuotationPickerOpen(true);
               }}
             />
+            <label class="flex items-center gap-1.5 text-sm text-text-secondary">
+              <span class="whitespace-nowrap">Slip Barcode</span>
+              <input
+                class={`${inputClass} w-40`}
+                value={slipBarcode()}
+                placeholder="Item code…"
+                disabled={props.readOnly || slipBarcodeBusy()}
+                onInput={(e) => setSlipBarcode(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void applySlipBarcode();
+                  }
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+              disabled={props.readOnly || slipBarcodeBusy()}
+              onClick={() => void applySlipBarcode()}
+            >
+              {slipBarcodeBusy() ? "…" : "Add"}
+            </button>
             <p class="text-xs text-text-secondary">
               <Show
                 when={processPolicy.data?.purchase_require_gr_before_supplier_invoice}

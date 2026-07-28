@@ -53,7 +53,8 @@ export function MyPageLearnPanel() {
         </A>
       </div>
       <p class="mb-4 text-xs text-text-secondary">
-        Start here — same idea as Ecount MyPage. Prefer these links over guessing menus (fewer wrong-screen tickets).
+        Start here for daily ops. Prefer these links over guessing menus (fewer wrong-screen tickets).
+        Sidebar under Operations: Stock → Sell → Buy.
       </p>
       <div class="space-y-4">
         <For each={LEARN_GROUPS}>

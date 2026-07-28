@@ -1,0 +1,25 @@
+{
+  "prgId": "E040317",
+  "screen_name": "Purchase Plan List",
+  "pills": [
+    {"label": "All", "audited": true},
+    {"label": "e-Approval", "audited": true},
+    {"label": "Default", "audited": true, "fields_summary": "Date presets + Search filters"}
+  ],
+  "toolbar": [
+    "Search(F3)", "Option", "Help", "Search (F8)", "New (F2)", "Adj. Qty", "Generate Other Slips",
+    "Messenger", "Finish", "Today", "Prev. Day", "This Week (~ Today)", "Prev. Week",
+    "This Month (~ Today)", "Prev. Month", "End Date", "Settings", "Reset"
+  ],
+  "toolbar_audited": [
+    "Search(F3)", "Option", "Help", "Search (F8)", "New (F2)", "Adj. Qty", "Generate Other Slips",
+    "Messenger", "Finish", "Today", "Prev. Day", "This Week (~ Today)", "Prev. Week",
+    "This Month (~ Today)", "Prev. Month", "End Date", "Settings", "Reset"
+  ],
+  "controls_logged": 50,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchase-request/purchase-plans",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; SAFE blacklist Delete/Excel/Save not submitted; residuals: Adj. Qty + Generate Other Slips depth",
+  "mark_depth_complete": true
+}

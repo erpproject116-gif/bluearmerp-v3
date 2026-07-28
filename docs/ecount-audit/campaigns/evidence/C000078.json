@@ -1,0 +1,20 @@
+{
+  "prgId": "C000078",
+  "screen_name": "Purchases",
+  "pills": [
+    {"label": "Purchase Request", "audited": true, "fields_summary": "L1 folder — List/New/Status children"},
+    {"label": "Purchase Plan", "audited": true, "fields_summary": "L1 folder — List/New/Status"},
+    {"label": "RFQ", "audited": true, "fields_summary": "L1 folder — List/New/Progress/Status"},
+    {"label": "Purchase Order", "audited": true, "fields_summary": "L1 folder — List/New/Status/Outstanding"},
+    {"label": "Purchases", "audited": true, "fields_summary": "L1 folder — Purchase List + New + status reports"},
+    {"label": "Collective Invoicing (Purchase)", "audited": true, "fields_summary": "L1 folder — Invoice List/Status"}
+  ],
+  "toolbar": ["Site Map"],
+  "toolbar_audited": ["Site Map"],
+  "controls_logged": 20,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchases",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; menu hub (MENUTREE_000192) — child leaves audited separately in Campaign A Purchases queue",
+  "mark_depth_complete": true
+}

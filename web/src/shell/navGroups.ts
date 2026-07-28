@@ -35,26 +35,29 @@ export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
   [ACCT_II_PREFIX]: "finance.acct_ii",
 };
 
+/**
+ * Sidebar IA: process groups (Stock / Sell / Buy / Money), not Ecount Inv./Acct. labels.
+ * Document pipelines are ordered quote→order→invoice (and PR→PO→invoice); overview hubs last.
+ */
 export const navGroups: NavGroup[] = [
   {
     id: "stocks_management",
-    label: "Inv. I — Stock",
+    label: "Stock",
     iconId: "inventory",
-    defaultExpanded: false,
+    defaultExpanded: true,
     entries: [
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "Warehouse (Inv. II)" },
       { kind: "module", moduleId: "inventory" },
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Serial / Lot (Inv. II)" },
       { kind: "module", moduleId: "after_sales" },
+      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "Warehouse" },
+      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Serial / Lot" },
     ],
   },
   {
     id: "sales_process",
-    label: "Inv. I — Sales",
+    label: "Sell",
     iconId: "selling",
-    defaultExpanded: false,
+    defaultExpanded: true,
     entries: [
-      { kind: "module", moduleId: "selling" },
       { kind: "module", moduleId: "quotation" },
       { kind: "module", moduleId: "sales_order" },
       { kind: "module", moduleId: "sales" },
@@ -64,31 +67,32 @@ export const navGroups: NavGroup[] = [
         featureCode: "sales.collective_invoicing",
         branchLabel: "Combined invoices",
       },
+      { kind: "module", moduleId: "selling" },
     ],
   },
   {
     id: "procurement_process",
-    label: "Inv. I — Purchases",
+    label: "Buy",
     iconId: "buying",
-    defaultExpanded: false,
+    defaultExpanded: true,
     entries: [
-      { kind: "module", moduleId: "buying" },
       { kind: "module", moduleId: "purchase_request" },
       { kind: "module", moduleId: "purchase_order" },
       { kind: "module", moduleId: "purchases" },
+      { kind: "module", moduleId: "buying" },
     ],
   },
   {
     id: "accounting_dept",
-    label: "Acct. I / II",
+    label: "Money",
     iconId: "finance",
-    defaultExpanded: false,
+    defaultExpanded: true,
     entries: [
-      { kind: "module", moduleId: "finance" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "Acct. I — General ledger" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Acct. II — Receivables & payables" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "Ledger" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Receivables & payables" },
       { kind: "subBranch", moduleId: "finance", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "Review supplier payments" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "Supplier payments" },
+      { kind: "module", moduleId: "finance" },
     ],
   },
   {
