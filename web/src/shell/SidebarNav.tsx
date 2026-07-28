@@ -5,8 +5,9 @@ import { useShell } from "./shell-context";
 import { navGroups, navGroupStorageKey, isFinanceUnderSalesReportPath } from "./navGroups";
 import { isReviewPurchasesPath } from "./review-purchases-nav";
 import { isTaxMngtPath } from "./tax-mngt-nav";
+import { isTenantModuleEnabled } from "../shared/moduleAccess";
+import { useAuth, type MeData } from "../shared/auth-context";
 import {
-  resolveEcountTopFromPath,
   writeStoredEcountTop,
   HOME_SIDEBAR_AREAS,
   type HomeSidebarArea,
@@ -24,6 +25,11 @@ export function isFinanceModulePath(pathname: string): boolean {
 
 function pathStarts(pathname: string, bases: string[]): boolean {
   return bases.some((b) => pathname === b || pathname.startsWith(`${b}/`));
+}
+
+function areaEnabled(area: HomeSidebarArea, me: MeData | null | undefined): boolean {
+  if (!area.moduleId) return true;
+  return isTenantModuleEnabled(me, area.moduleId);
 }
 
 function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean; nested?: boolean }) {
@@ -86,9 +92,13 @@ function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean; nested?: 
   );
 }
 
-function HomeAreaBlock(props: { area: HomeSidebarArea; active: (a: HomeSidebarArea) => boolean }) {
+function HomeAreaBlock(props: {
+  area: HomeSidebarArea;
+  active: (a: HomeSidebarArea) => boolean;
+  childrenOf: (area: HomeSidebarArea) => HomeSidebarArea[];
+}) {
   const shell = useShell();
-  const children = () => props.area.children ?? [];
+  const children = () => props.childrenOf(props.area);
   const areaOrChildActive = () =>
     props.active(props.area) || children().some((c) => props.active(c));
   const initiallyOpen = () => {
@@ -102,11 +112,19 @@ function HomeAreaBlock(props: { area: HomeSidebarArea; active: (a: HomeSidebarAr
     if (areaOrChildActive()) setOpen(true);
   });
 
+  const parentArea = (): HomeSidebarArea => {
+    const kids = children();
+    if (kids.length === 0) return props.area;
+    // Prefer a working landing when the static parent href module is disabled.
+    if (kids.some((k) => k.href === props.area.href)) return props.area;
+    return { ...props.area, href: kids[0]!.href };
+  };
+
   return (
     <div class="space-y-0.5">
       <div class="flex items-center gap-0.5">
         <div class="min-w-0 flex-1">
-          <NavAreaLink area={props.area} active={props.active(props.area)} />
+          <NavAreaLink area={parentArea()} active={props.active(props.area)} />
         </div>
         <Show when={!shell.collapsed() && children().length > 0}>
           <button
@@ -134,6 +152,7 @@ function HomeAreaBlock(props: { area: HomeSidebarArea; active: (a: HomeSidebarAr
 }
 
 export function SidebarNav() {
+  const auth = useAuth();
   const loc = useLocation();
   let navEl: HTMLElement | undefined;
   let savedScrollTop = 0;
@@ -149,6 +168,9 @@ export function SidebarNav() {
     ),
   );
 
+  const childrenOf = (area: HomeSidebarArea) =>
+    (area.children ?? []).filter((c) => areaEnabled(c, auth.me));
+
   const homeActive = (area: HomeSidebarArea) => {
     const p = loc.pathname;
     if (area.id === "home") {
@@ -156,7 +178,6 @@ export function SidebarNav() {
     }
     if (area.id === "sitemap") return p.startsWith("/app/dashboard/site-map");
     if (area.id === "stocks") {
-      // Group label only — children carry the active state.
       return false;
     }
     if (area.id === "inventory") {
@@ -233,11 +254,26 @@ export function SidebarNav() {
         ]) || p.startsWith("/app/purchases/expenses")
       );
     }
-    if (area.id === "more") {
-      return resolveEcountTopFromPath(p) === "more";
+    if (area.id === "more" || area.id === "setup") {
+      return false;
     }
-    if (area.id === "setup") {
-      return resolveEcountTopFromPath(p) === "setup";
+    if (area.id === "crm") return pathStarts(p, ["/app/crm"]);
+    if (area.id === "booking") return pathStarts(p, ["/app/booking"]);
+    if (area.id === "comms") return pathStarts(p, ["/app/comms"]);
+    if (area.id === "operations") return pathStarts(p, ["/app/operations"]);
+    if (area.id === "sop") return pathStarts(p, ["/app/sop"]);
+    if (area.id === "okr") return pathStarts(p, ["/app/okr"]);
+    if (area.id === "quality") return pathStarts(p, ["/app/quality"]);
+    if (area.id === "reports") return pathStarts(p, ["/app/reports"]);
+    if (area.id === "support") return pathStarts(p, ["/app/support"]);
+    if (area.id === "pos") return pathStarts(p, ["/app/pos"]);
+    if (area.id === "hr") {
+      return pathStarts(p, ["/app/hr"]) && !p.startsWith("/app/hr/payroll-runs");
+    }
+    if (area.id === "activity_logs") return pathStarts(p, ["/app/activity-logs"]);
+    if (area.id === "documentation") return pathStarts(p, ["/app/documentation"]);
+    if (area.id === "user_management") {
+      return pathStarts(p, ["/app/user-management", "/app/branding"]);
     }
     return p === area.href || p.startsWith(`${area.href}/`);
   };
@@ -250,7 +286,9 @@ export function SidebarNav() {
         savedScrollTop = e.currentTarget.scrollTop;
       }}
     >
-      <For each={HOME_SIDEBAR_AREAS}>{(area) => <HomeAreaBlock area={area} active={homeActive} />}</For>
+      <For each={HOME_SIDEBAR_AREAS}>
+        {(area) => <HomeAreaBlock area={area} active={homeActive} childrenOf={childrenOf} />}
+      </For>
     </nav>
   );
 }

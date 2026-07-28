@@ -176,6 +176,8 @@ export type HomeSidebarArea = {
   children?: HomeSidebarArea[];
   /** When children exist, whether the group starts expanded (default true). */
   defaultExpanded?: boolean;
+  /** Tenant module id for enablement gating (sidebar children). */
+  moduleId?: string;
 };
 
 export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
@@ -341,14 +343,65 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
     ],
   },
-  { id: "more", label: "More Apps", href: "/app/crm/dashboard", iconId: "more_apps", topId: "more" },
+  {
+    id: "more",
+    label: "More Apps",
+    href: "/app/crm/dashboard",
+    iconId: "more_apps",
+    topId: "more",
+    expandGroupId: "more_apps",
+    defaultExpanded: false,
+    children: [
+      { id: "crm", label: "CRM", href: "/app/crm/dashboard", iconId: "crm", topId: "more", moduleId: "crm", expandGroupId: "more_apps" },
+      { id: "booking", label: "Booking", href: "/app/booking/bookings", iconId: "booking", topId: "more", moduleId: "booking", expandGroupId: "more_apps" },
+      { id: "comms", label: "Communications", href: "/app/comms/sent-documents", iconId: "comms", topId: "more", moduleId: "comms", expandGroupId: "more_apps" },
+      { id: "operations", label: "Project Management", href: "/app/operations", iconId: "operations", topId: "more", moduleId: "operations", expandGroupId: "more_apps" },
+      { id: "sop", label: "SOP", href: "/app/sop", iconId: "sop", topId: "more", moduleId: "sop", expandGroupId: "more_apps" },
+      { id: "okr", label: "OKRs", href: "/app/okr", iconId: "okr", topId: "more", moduleId: "okr", expandGroupId: "more_apps" },
+      { id: "quality", label: "Quality", href: "/app/quality/ncrs", iconId: "quality", topId: "more", moduleId: "quality", expandGroupId: "more_apps" },
+      { id: "reports", label: "Reports", href: "/app/reports", iconId: "reports", topId: "more", moduleId: "reports", expandGroupId: "more_apps" },
+      { id: "support", label: "Support", href: "/app/support/tickets", iconId: "support", topId: "more", moduleId: "support", expandGroupId: "more_apps" },
+      { id: "pos", label: "POS", href: "/app/pos", iconId: "pos", topId: "more", moduleId: "pos", expandGroupId: "more_apps" },
+      { id: "hr", label: "HR & Payroll", href: "/app/hr/employees", iconId: "hr", topId: "more", moduleId: "hr", expandGroupId: "more_apps" },
+    ],
+  },
   {
     id: "setup",
     label: "Setup",
-    href: "/app/user-management",
+    href: "/app/user-management/users",
     iconId: "setup",
     topId: "setup",
     expandGroupId: "misc",
+    defaultExpanded: false,
+    children: [
+      {
+        id: "activity_logs",
+        label: "Activity Logs",
+        href: "/app/activity-logs",
+        iconId: "activity_logs",
+        topId: "setup",
+        moduleId: "activity_logs",
+        expandGroupId: "misc",
+      },
+      {
+        id: "documentation",
+        label: "Help & guides",
+        href: "/app/documentation",
+        iconId: "documentation",
+        topId: "setup",
+        moduleId: "documentation",
+        expandGroupId: "misc",
+      },
+      {
+        id: "user_management",
+        label: "User Management",
+        href: "/app/user-management/users",
+        iconId: "user_management",
+        topId: "setup",
+        moduleId: "user_management",
+        expandGroupId: "misc",
+      },
+    ],
   },
   { id: "sitemap", label: "Site Map", href: "/app/dashboard/site-map", iconId: "dashboard", topId: "mypage" },
 ];
