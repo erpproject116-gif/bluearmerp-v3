@@ -1,0 +1,16 @@
+{
+  "prgId": "E060607",
+  "screen_name": "Checks Issued List",
+  "pills": [
+    {"label": "All", "audited": true},
+    {"label": "Default", "audited": true, "fields_summary": "Date, Check No, In/De Type, Transaction/Input Type, Customer, Dept, Project, Bank Account"}
+  ],
+  "toolbar": ["Search(F3)", "Option", "Help", "New (F2)", "Print issued checks"],
+  "toolbar_audited": ["Search(F3)", "Option", "Help", "New (F2)", "Print issued checks"],
+  "controls_logged": 35,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/finance/checks/issued",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3; Acct. II Check Management (not Inv. I Sales); SAFE blacklist Delete/Excel; residuals: check print + clearance chain",
+  "mark_depth_complete": true
+}

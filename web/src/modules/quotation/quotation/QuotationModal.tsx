@@ -34,6 +34,7 @@ import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import { LoadSlipMenu, QUOTATION_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
+import { QuotationProfitModal, type ProfitLineRow } from "./QuotationProfitModal";
 import { PurchaseRequestLinePickerModal } from "../../purchase-request/purchase-order/PurchaseRequestLinePickerModal";
 import { OpenPOLinePickerModal } from "../../finance/supplier-invoices/OpenPOLinePickerModal";
 import type { OpenPOLine } from "../../../shared/useSupplierInvoiceList";
@@ -244,6 +245,9 @@ export function QuotationModal(props: Props) {
   const [showNewTaxType, setShowNewTaxType] = createSignal(false);
   const [newTaxTypeName, setNewTaxTypeName] = createSignal("");
   const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [profitOpen, setProfitOpen] = createSignal(false);
+  const [profitRows, setProfitRows] = createSignal<ProfitLineRow[]>([]);
+  const [profitBusy, setProfitBusy] = createSignal(false);
   const [emailOpen, setEmailOpen] = createSignal(false);
   const [emailDefaultTo, setEmailDefaultTo] = createSignal("");
   const [newCustomerName, setNewCustomerName] = createSignal("");
@@ -633,6 +637,83 @@ export function QuotationModal(props: Props) {
     setEmailOpen(true);
   };
 
+  const runVerification = () => {
+    const issues: string[] = [];
+    if (!partnerId()) issues.push("Customer is required.");
+    if (!taxTypeId()) issues.push("Transaction type is required.");
+    if (!locationId()) issues.push("Location is required.");
+    const filled = lines().filter((ln) => ln.item_id || ln.item_code || ln.item_name);
+    if (filled.length === 0) issues.push("Add at least one line.");
+    for (const ln of filled) {
+      const qty = Number(ln.qty);
+      const price = Number(ln.unit_price);
+      if (!(qty > 0)) issues.push(`Line ${ln.line_no}: qty must be greater than 0.`);
+      if (!(price >= 0) || ln.unit_price === "") issues.push(`Line ${ln.line_no}: price is required.`);
+      if (!(ln.item_code || ln.item_name)) issues.push(`Line ${ln.line_no}: item code or name is required.`);
+    }
+    if (issues.length) {
+      toast.warning(issues.slice(0, 4).join(" "));
+      return;
+    }
+    toast.success(`Verification OK — ${filled.length} line(s).`);
+  };
+
+  const runCalculateProfit = async () => {
+    const filled = lines().filter((ln) => ln.item_id || ln.item_code || ln.item_name);
+    if (filled.length === 0) {
+      toast.warning("Add at least one line before Calculate Profit.");
+      return;
+    }
+    setProfitBusy(true);
+    const rows: ProfitLineRow[] = [];
+    for (const ln of filled) {
+      const qty = Number(ln.qty) || 0;
+      const sellUnit = Number(ln.unit_non_vat) || Number(ln.unit_price) || 0;
+      const sellTotal = Number(ln.non_vat_total) || sellUnit * qty;
+      let costUnit: number | null = null;
+      if (ln.item_id || ln.item_code) {
+        const qs = new URLSearchParams({
+          page: "1",
+          pageSize: "5",
+          status: "active",
+          q: ln.item_code || String(ln.item_id),
+        });
+        const res = await apiFetch<
+          { id: number; item_code: string; purchase_price: number; standard_costs?: Record<string, number> }[]
+        >(`/api/v1/inventory/items?${qs}`);
+        const hit =
+          res.data?.find((i) => ln.item_id && i.id === ln.item_id) ??
+          res.data?.find((i) => i.item_code.toLowerCase() === (ln.item_code || "").toLowerCase()) ??
+          res.data?.[0];
+        if (hit) {
+          const std =
+            hit.standard_costs &&
+            Object.values(hit.standard_costs).reduce((a, b) => a + (Number(b) || 0), 0);
+          if (std && std > 0) costUnit = std;
+          else if (hit.purchase_price > 0) costUnit = hit.purchase_price;
+        }
+      }
+      const costTotal = costUnit != null ? costUnit * qty : null;
+      const margin = costTotal != null ? sellTotal - costTotal : null;
+      const marginPct = margin != null && sellTotal > 0 ? (margin / sellTotal) * 100 : null;
+      rows.push({
+        line_no: ln.line_no,
+        item_code: ln.item_code,
+        item_name: ln.item_name,
+        qty,
+        sell_unit: sellUnit,
+        sell_total: sellTotal,
+        cost_unit: costUnit,
+        cost_total: costTotal,
+        margin,
+        margin_pct: marginPct,
+      });
+    }
+    setProfitBusy(false);
+    setProfitRows(rows);
+    setProfitOpen(true);
+  };
+
   return (
     <>
     <WideEntityModal
@@ -644,20 +725,38 @@ export function QuotationModal(props: Props) {
       readOnly={props.readOnly}
       saving={saving()}
       headerActions={
-        <Show when={effectiveEditing()}>
-          <Show when={canSendEmail()}>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-slate-50"
-              onClick={() => void openEmail()}
-            >
-              Email
+        <>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+            disabled={props.readOnly}
+            onClick={runVerification}
+          >
+            Verification
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+            disabled={props.readOnly || profitBusy()}
+            onClick={() => void runCalculateProfit()}
+          >
+            {profitBusy() ? "Profit…" : "Calculate Profit"}
+          </button>
+          <Show when={effectiveEditing()}>
+            <Show when={canSendEmail()}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-slate-50"
+                onClick={() => void openEmail()}
+              >
+                Email
+              </button>
+            </Show>
+            <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
+              History
             </button>
           </Show>
-          <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
-            History
-          </button>
-        </Show>
+        </>
       }
     >
       <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
@@ -902,6 +1001,8 @@ export function QuotationModal(props: Props) {
     </WideEntityModal>
 
     <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={effectiveEditing()?.id} title="History — Quotation" />
+
+    <QuotationProfitModal open={profitOpen()} rows={profitRows()} onClose={() => setProfitOpen(false)} />
 
     <QuickCustomerModal
       open={showNewCustomer()}

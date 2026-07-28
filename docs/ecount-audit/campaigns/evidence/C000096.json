@@ -1,0 +1,20 @@
+{
+  "prgId": "C000096",
+  "screen_name": "Purchases",
+  "pills": [
+    {"label": "Purchase Request", "audited": true},
+    {"label": "Purchase Plan", "audited": true},
+    {"label": "RFQ", "audited": true},
+    {"label": "Purchase Order", "audited": true},
+    {"label": "Purchases", "audited": true},
+    {"label": "Collective Invoicing (Purchase)", "audited": true}
+  ],
+  "toolbar": ["Site Map"],
+  "toolbar_audited": ["Site Map"],
+  "controls_logged": 20,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchases",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; tenant hub twin of C000078 (MENUTREE_000220); children audited via Purchases module crawl",
+  "mark_depth_complete": true
+}

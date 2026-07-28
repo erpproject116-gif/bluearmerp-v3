@@ -1,25 +1,54 @@
 {
-  "prgId": "E040205",
-  "screen_name": "New Sales",
-  "pills": [
-    {"label": "Sales Invoice I", "audited": true},
-    {"label": "Goods Receipt I", "audited": true},
-    {"label": "Shipping Order", "audited": true},
-    {"label": "New Sales", "audited": true},
-    {"label": "Details", "audited": true}
-  ],
-  "toolbar": [
-    "Option", "Load Slip", "Cash In", "Reset", "List", "Domestic", "Barcode",
-    "View Inv. Qty", "Sort"
-  ],
-  "toolbar_audited": [
-    "Option", "Load Slip", "Cash In", "Reset", "List", "Domestic", "Barcode",
-    "View Inv. Qty", "Sort"
-  ],
-  "controls_logged": 110,
-  "coverage_pct": 100,
-  "bluearm_route": "/app/sales/sales/new",
-  "bluearm_parity": "partial",
-  "notes": "Campaign A G2 Jul 28 depth-complete; Save not submitted; Cash In opened Cancel-only; residuals: Goods Receipt I / Shipping Order template shells on New Sales workspace",
-  "mark_depth_complete": true
+    "prgId":  "E040205",
+    "screen_name":  "New Sales",
+    "pills":  [
+                  {
+                      "label":  "Sales Invoice I",
+                      "audited":  true
+                  },
+                  {
+                      "label":  "Goods Receipt I",
+                      "audited":  true
+                  },
+                  {
+                      "label":  "Shipping Order",
+                      "audited":  true
+                  },
+                  {
+                      "label":  "New Sales",
+                      "audited":  true
+                  },
+                  {
+                      "label":  "Details",
+                      "audited":  true
+                  }
+              ],
+    "toolbar":  [
+                    "Option",
+                    "Load Slip",
+                    "Cash In",
+                    "Reset",
+                    "List",
+                    "Domestic",
+                    "Barcode",
+                    "View Inv. Qty",
+                    "Sort"
+                ],
+    "toolbar_audited":  [
+                            "Option",
+                            "Load Slip",
+                            "Cash In",
+                            "Reset",
+                            "List",
+                            "Domestic",
+                            "Barcode",
+                            "View Inv. Qty",
+                            "Sort"
+                        ],
+    "controls_logged":  110,
+    "coverage_pct":  100,
+    "bluearm_route":  "/app/sales/sales/new",
+    "bluearm_parity":  "partial",
+    "notes":  "Campaign A residual Batch 1 Jul 28: New Sales L2 shells shipped (Sales Invoice I + tax sub-tabs; Goods Receipt I honest CTA shell; Shipping Order embed openNew). Residuals remaining: Production GR I as real doc type; deeper Shipping workspace chrome.",
+    "mark_depth_complete":  true
 }

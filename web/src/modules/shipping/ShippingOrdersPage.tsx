@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal, onMount } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
@@ -22,6 +22,12 @@ type ShippingOrder = {
   freight_amount?: number | null;
 };
 
+type PageOptions = {
+  openNewOnMount?: boolean;
+  /** Skip ShippingLayout wrapper when embedded in another workspace (e.g. New Sales). */
+  embed?: boolean;
+};
+
 async function fetchPartners(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
   if (q) qs.set("q", q);
@@ -36,7 +42,7 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
 }
 
-export default function ShippingOrdersPage() {
+export function ShippingOrdersPageInner(props: PageOptions = {}) {
   const { page, setPage, sort, order, toggleSort, pageSize } = useListState("shipping_date", 25, {
     defaultOrder: "desc",
   });
@@ -87,6 +93,10 @@ export default function ShippingOrdersPage() {
     setModalOpen(true);
   };
 
+  onMount(() => {
+    if (props.openNewOnMount) openNew();
+  });
+
   const save = async () => {
     if (!partnerId() || !locationId()) {
       toast.warning("Partner and location are required.");
@@ -115,8 +125,8 @@ export default function ShippingOrdersPage() {
     invalidate();
   };
 
-  return (
-    <ShippingLayout>
+  const body = (
+    <>
       <SpreadsheetGrid<ShippingOrder>
         columns={[
           { key: "shipping_no", header: "Shipping no.", clickable: true },
@@ -220,6 +230,13 @@ export default function ShippingOrdersPage() {
           <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
         </Field>
       </EntityModal>
-    </ShippingLayout>
+    </>
   );
+
+  if (props.embed) return body;
+  return <ShippingLayout>{body}</ShippingLayout>;
+}
+
+export default function ShippingOrdersPage() {
+  return <ShippingOrdersPageInner />;
 }

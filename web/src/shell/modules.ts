@@ -111,7 +111,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "buying",
-    label: "Purchasing Dept",
+    label: "Buy overview",
     href: "/app/buying",
     basePath: "/app/buying",
     features: [
@@ -125,7 +125,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "selling",
-    label: "Sales Dept",
+    label: "Sell overview",
     href: "/app/selling",
     basePath: "/app/selling",
     features: [
@@ -202,7 +202,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "sales",
-    label: "Sales",
+    label: "Sales invoices",
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
@@ -308,7 +308,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "purchases",
-    label: "Purchases",
+    label: "Purchase invoices",
     href: "/app/purchases/purchases",
     basePath: "/app/purchases",
     features: [
@@ -478,7 +478,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "finance",
-    label: "Accounting Dept",
+    label: "Accounting overview",
     href: "/app/finance",
     basePath: "/app/finance",
     features: [
@@ -486,7 +486,6 @@ export const appModules: AppModule[] = [
       { label: "Reports", href: "/app/finance/reports", settingsHref: "/app/finance/official-receipts/settings", headerPriority: "primary" },
       { label: "Receipts", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Vouchers", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
-      { label: "Purchases", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Budgets", href: "/app/finance/budgets", settingsHref: "/app/finance/budgets" },
       { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
       { label: "Remittances", href: "/app/hr/remittances", settingsHref: "/app/hr/remittances" },
@@ -495,7 +494,7 @@ export const appModules: AppModule[] = [
     ],
     subBranches: [
       {
-        label: "General ledger",
+        label: "Ledger",
         prefix: ACCT_I_PREFIX,
         href: "/app/finance/acct-i/journal-entries",
         settingsHref: "/app/finance/acct-i/journal-entries",
@@ -516,7 +515,7 @@ export const appModules: AppModule[] = [
         featureCode: "quotation.tax_mngt",
       },
       {
-        label: "Review supplier payments",
+        label: "Supplier payments",
         prefix: REVIEW_PURCHASES_SUB_BRANCH,
         href: "/app/finance/payment-vouchers",
         settingsHref: "/app/finance/official-receipts/settings",

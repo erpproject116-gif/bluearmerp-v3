@@ -1,0 +1,20 @@
+{
+  "prgId": "C000073",
+  "screen_name": "Sales",
+  "pills": [
+    {"label": "Quotation", "audited": true},
+    {"label": "Sales Order", "audited": true},
+    {"label": "Sales", "audited": true},
+    {"label": "Collective Invoicing (Sales)", "audited": true},
+    {"label": "Shipping Order", "audited": true},
+    {"label": "Shipping", "audited": true}
+  ],
+  "toolbar": ["Site Map"],
+  "toolbar_audited": ["Site Map"],
+  "controls_logged": 20,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/selling",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; Sales menu hub (MENUTREE_000186); child leaves audited in Campaign A Sales batch",
+  "mark_depth_complete": true
+}

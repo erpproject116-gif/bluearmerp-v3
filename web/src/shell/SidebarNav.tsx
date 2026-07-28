@@ -436,11 +436,16 @@ export function SidebarNav() {
 
       <Show when={top() === "mypage"}>
         <p class="px-2 text-xs text-text-secondary">
-          Use the top strip (Inv. I / Acct. I …) or{" "}
+          Use the top strip (
+          <span class="font-medium text-text-primary">Operations</span>,{" "}
+          <span class="font-medium text-text-primary">Warehouse</span>,{" "}
+          <span class="font-medium text-text-primary">Ledger</span>,{" "}
+          <span class="font-medium text-text-primary">Cash &amp; AR/AP</span>
+          ) or{" "}
           <A href="/app/dashboard/site-map" class="font-medium text-brand-600 hover:underline">
             Site Map
           </A>{" "}
-          to open modules.
+          to open modules. Sidebar groups are Stock → Sell → Buy → Money.
         </p>
       </Show>
 

@@ -1,26 +1,72 @@
 {
-  "prgId": "E040303",
-  "screen_name": "New Purchases",
-  "pills": [
-    {"label": "Purchase Invoice I", "audited": true},
-    {"label": "New Purchase", "audited": true},
-    {"label": "New Purchases", "audited": true},
-    {"label": "New Quality Insp. Request", "audited": true}
-  ],
-  "toolbar": [
-    "Option", "Find (F3)", "Sort", "View Trans.(Purchases)", "My Item", "Domestic",
-    "Discount", "Load Slip", "View Inv. Qty", "Barcode", "Item Code", "Summed Base Qty",
-    "Slip Barcode", "Verification", "VAT Inc. 12%", "Qty±", "Price", "%", "All", "F4"
-  ],
-  "toolbar_audited": [
-    "Option", "Find (F3)", "Sort", "View Trans.(Purchases)", "My Item", "Domestic",
-    "Discount", "Load Slip", "View Inv. Qty", "Barcode", "Item Code", "Summed Base Qty",
-    "Slip Barcode", "Verification", "VAT Inc. 12%", "Qty±", "Price", "%", "All", "F4"
-  ],
-  "controls_logged": 90,
-  "coverage_pct": 100,
-  "bluearm_route": "/app/purchases/purchases/new",
-  "bluearm_parity": "partial",
-  "notes": "Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted; residuals: Quality Insp template shell, Slip Barcode",
-  "mark_depth_complete": true
+    "prgId":  "E040303",
+    "screen_name":  "New Purchases",
+    "pills":  [
+                  {
+                      "label":  "Purchase Invoice I",
+                      "audited":  true
+                  },
+                  {
+                      "label":  "New Purchase",
+                      "audited":  true
+                  },
+                  {
+                      "label":  "New Purchases",
+                      "audited":  true
+                  },
+                  {
+                      "label":  "New Quality Insp. Request",
+                      "audited":  true
+                  }
+              ],
+    "toolbar":  [
+                    "Option",
+                    "Find (F3)",
+                    "Sort",
+                    "View Trans.(Purchases)",
+                    "My Item",
+                    "Domestic",
+                    "Discount",
+                    "Load Slip",
+                    "View Inv. Qty",
+                    "Barcode",
+                    "Item Code",
+                    "Summed Base Qty",
+                    "Slip Barcode",
+                    "Verification",
+                    "VAT Inc. 12%",
+                    "Qty±",
+                    "Price",
+                    "%",
+                    "All",
+                    "F4"
+                ],
+    "toolbar_audited":  [
+                            "Option",
+                            "Find (F3)",
+                            "Sort",
+                            "View Trans.(Purchases)",
+                            "My Item",
+                            "Domestic",
+                            "Discount",
+                            "Load Slip",
+                            "View Inv. Qty",
+                            "Barcode",
+                            "Item Code",
+                            "Summed Base Qty",
+                            "Slip Barcode",
+                            "Verification",
+                            "VAT Inc. 12%",
+                            "Qty±",
+                            "Price",
+                            "%",
+                            "All",
+                            "F4"
+                        ],
+    "controls_logged":  90,
+    "coverage_pct":  100,
+    "bluearm_route":  "/app/purchases/purchases/new",
+    "bluearm_parity":  "partial",
+    "notes":  "Campaign A residual Batch 1 Jul 28: New Purchases L2 shells shipped (Purchase Invoice I; New Quality Insp. Request GR-linked create shell; Slip Barcode adds line by item code). Residuals remaining: richer QI form fields.",
+    "mark_depth_complete":  true
 }

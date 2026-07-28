@@ -1,0 +1,22 @@
+{
+  "prgId": "E040311",
+  "screen_name": "Change Purchases Price-Batch",
+  "pills": [
+    {"label": "Default", "audited": true, "fields_summary": "Date presets + Search/Save Search filters"},
+    {"label": "Option", "audited": true, "fields_summary": "Option/Help present on batch price change"}
+  ],
+  "toolbar": [
+    "Search(F3)", "Option", "Help", "Search (F8)", "Today", "Prev. Day",
+    "This Week (~ Today)", "Prev. Week", "This Month (~ Today)", "Prev. Month", "End Date", "Settings", "Reset"
+  ],
+  "toolbar_audited": [
+    "Search(F3)", "Option", "Help", "Search (F8)", "Today", "Prev. Day",
+    "This Week (~ Today)", "Prev. Week", "This Month (~ Today)", "Prev. Month", "End Date", "Settings", "Reset"
+  ],
+  "controls_logged": 40,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchases/purchases/change-price",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; Save/Search not submitted; residuals: batch apply price write path",
+  "mark_depth_complete": true
+}

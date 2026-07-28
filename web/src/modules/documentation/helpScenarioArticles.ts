@@ -12,7 +12,7 @@ export const helpScenarioArticles: KbArticle[] = [
     scenario:
       "You do not know which screen to open for sales, purchases, cash in/out, or stock — or you opened the wrong menu and filed a ticket.",
     intro:
-      "Open Home → MyPage. Use Learn to use BluearmERP for common lists and vouchers, or the Flow Chart to walk Quotation→Sales→Receipt and PR→PO→GR→Purchase→Pay. Use the top strip (Inv. I / Inv. II / Acct. I / Acct. II) like Ecount modules.",
+      "Open Home. Use Learn to use BluearmERP for common lists and vouchers, or the Flow Chart to walk Quotation→Sales→Receipt and PR→PO→GR→Purchase→Pay. Top strip: Operations (stock/sell/buy), Warehouse, Ledger, Cash & AR/AP.",
     blocks: [
       {
         type: "steps",
@@ -305,7 +305,7 @@ export const helpScenarioArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Accounting Dept → General ledger → Chart of accounts (/app/finance/acct-i/chart-of-accounts).",
+          "Open Money → Ledger → Chart of accounts (/app/finance/acct-i/chart-of-accounts).",
           "If the list is empty, choose Use standard Philippine chart to reload accounts and default mappings.",
           "Review account types (asset, liability, equity, income, expense) and rename codes to match your books if needed.",
           "Open Default account mappings. Set Purchases / COGS to an expense account — usually 5010 Cost of Goods Sold. Do not use inventory asset 1469 here.",
@@ -336,7 +336,7 @@ export const helpScenarioArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Accounting Dept → General ledger → Chart of accounts.",
+          "Open Money → Ledger → Chart of accounts.",
           "Find the account and use Delete / Archive (soft delete).",
           "Confirm it no longer appears in active pickers for new journals or documents.",
           "To restore, show inactive/deleted accounts (filter) and Restore the row.",
@@ -650,7 +650,7 @@ export const helpScenarioArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Accounting Dept → General ledger → Bank reconciliation.",
+          "Open Money → Ledger → Bank reconciliation.",
           "Import or enter statement lines for the bank account and period.",
           "For each line, match to an official receipt (inflow) or payment voucher (outflow) with the same amount.",
           "If nothing matches, create the missing OR/PV first, then return to reconciliation.",
@@ -676,7 +676,7 @@ export const helpScenarioArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Accounting Dept → General ledger → Journal entries and open the draft.",
+          "Open Money → Ledger → Journal entries and open the draft.",
           "Check line debits and credits sum to the same total.",
           "Replace soft-deleted or blank accounts with active Chart of Accounts codes.",
           "Confirm the posting date is inside an open fiscal year and open month (Accounting → General ledger → Fiscal years).",

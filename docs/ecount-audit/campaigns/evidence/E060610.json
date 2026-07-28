@@ -1,0 +1,16 @@
+{
+  "prgId": "E060610",
+  "screen_name": "Decrease of Received Checks Balance",
+  "pills": [
+    {"label": "Default", "audited": true, "fields_summary": "Acct. II Check Management filters"},
+    {"label": "Option", "audited": true}
+  ],
+  "toolbar": ["Search(F3)", "Option", "Help", "Search (F8)", "Today", "Prev. Day", "This Week (~ Today)", "Prev. Week", "This Month (~ Today)", "Prev. Month", "End Date", "Settings", "Reset", "View All", "Print"],
+  "toolbar_audited": ["Search(F3)", "Option", "Help", "Search (F8)", "Today", "Prev. Day", "This Week (~ Today)", "Prev. Week", "This Month (~ Today)", "Prev. Month", "End Date", "Settings", "Reset", "View All", "Print"],
+  "controls_logged": 30,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/finance/checks/received/decrease",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth",
+  "mark_depth_complete": true
+}

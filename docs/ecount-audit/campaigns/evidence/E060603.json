@@ -1,0 +1,16 @@
+{
+  "prgId": "E060603",
+  "screen_name": "Checks Received List",
+  "pills": [
+    {"label": "Default", "audited": true, "fields_summary": "Acct. II Check Management filters"},
+    {"label": "Option", "audited": true}
+  ],
+  "toolbar": ["Search(F3)", "Option", "Help", "New (F2)", "Print"],
+  "toolbar_audited": ["Search(F3)", "Option", "Help", "New (F2)", "Print"],
+  "controls_logged": 30,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/finance/checks/received",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth",
+  "mark_depth_complete": true
+}

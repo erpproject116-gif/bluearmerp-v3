@@ -5,13 +5,13 @@ C000029,Inv. I,Setup,Item,Item List,list,24,22,in-progress,195,92,/app/inventory
 C001130,Inv. I,Setup,Item Relation,Register Item Relation,form,2,2,in-progress,38,75,/app/inventory/items,partial,,P2,Pass 7 Jul 2026; Option=Default Setting; see C000029-item-list.md
 C000030,Inv. I,Sales,Sales List,Sales List,list,10,10,depth-complete,70,100,/app/sales/sales,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; same UI as C000004/E040206 (tenant alias family)
 C000004,Inv. I,Sales,Sales List,Sales List,list,10,10,depth-complete,70,100,/app/selling/sales,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; tenant alias twin of E040206/C000030
-C000031,Inv. I,Purchases,Purchase List,Purchase List,list,11,6,in-progress,65,50,/app/purchases/purchases,partial,,P1,Pass 3 Jul 2026; status pills + list tabs 1-6; F2 inline form; see C000031-purchase-list.md; known-parity: Purchase list + Load Slip + Cash Out — gaps P1 Done
+C000031,Inv. I,Purchases,Purchase List,Purchase List,list,11,11,depth-complete,70,100,/app/purchases/purchases,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live tenant prgId twin E040304 (menuSeq MENUTREE_000511); SAFE blacklist Send/Delete/Excel not exercised; Applied Template BA-Purchase
 C000032,Inv. I,Production,Goods Receipt List,Goods Receipt List,list,10,5,cataloged,55,40,/app/job-costing,missing,,P2,Extra GR I/II/III + source + delete pills
 C000033,Inv. I,Inv. Mov.,Location Tran. List,Location Tran. List,list,7,4,cataloged,50,35,/app/inventory/stock-movements,missing,,P2,Source + delete pills; Internal Use/Defect/Adj menus cataloged
 C000035,Inv. I,Reports,Reports hub,Reports,hub,0,0,cataloged,80,15,/app/reports,missing,,P2,Menu tree only; per-report Option pills TBD
 C000654,Inv. I,Online Store Mgmt,Register Online Store,Register Online Store,list,2,1,in-progress,35,25,—,missing,,P3,Pass 1 Jul 2026; Order Mgmt subtree; see C000654-online-store-orders.md
-E040205,Inv. I,Sales,New Sales,New Sales,form,5,5,depth-complete,110,100,/app/sales/sales/new,partial,,P1,Campaign A G2 Jul 28 depth-complete; Save not submitted; Cash In opened Cancel-only; residuals: Goods Receipt I / Shipping Order template shells on New Sales workspace
-E040303,Inv. I,Purchases,New Purchases,New Purchases,form,4,4,depth-complete,90,100,/app/purchases/purchases/new,partial,,P1,"Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted; residuals: Quality Insp template shell, Slip Barcode"
+E040205,Inv. I,Sales,New Sales,New Sales,form,5,5,depth-complete,110,100,/app/sales/sales/new,partial,,P1,Campaign A residual Batch 1 Jul 28: New Sales L2 shells shipped (Sales Invoice I + tax sub-tabs; Goods Receipt I honest CTA shell; Shipping Order embed openNew). Residuals remaining: Production GR I as real doc type; deeper Shipping workspace chrome.
+E040303,Inv. I,Purchases,New Purchases,New Purchases,form,4,4,depth-complete,90,100,/app/purchases/purchases/new,partial,,P1,Campaign A residual Batch 1 Jul 28: New Purchases L2 shells shipped (Purchase Invoice I; New Quality Insp. Request GR-linked create shell; Slip Barcode adds line by item code). Residuals remaining: richer QI form fields.
 C000140,Inv. II,Costing,Monthly Profit,New Costing,list,0,0,cataloged,15,10,/app/job-costing,missing,,P3,Inv II default on module open; costing subtree only
 C000904,Inv. II,WMS,Select WMS Account,Select WMS Account,list,0,0,cataloged,20,15,/app/inventory/wms,missing,,P3,Pass 1 Jul 2026; menu tree; no WMS license in tenant; see inv2-wms-export-order-plan.md
 C000652,Inv. II,Export,Invoice / Packing List,Invoice / Packing List,list,3,3,in-progress,55,55,—,missing,,P3,Pass 3 Jul 2026; F2 opens Input Invoice/Packing List modal ESD028M; see inv2-wms-export-order-plan.md
@@ -116,7 +116,7 @@ E010857,Acct. I,Reports,Account In./De. Details,Account In./De. Details,report,0
 E010858,Inv. I,Reports,Communication Center,Sent Doc. History,report,1,1,in-progress,55,45,/app/reports/communication,partial,,P2,Pass 14 Jul 2026; email/SMS send log + Resend; see inv1-reports-communication-proof.md
 E040730,Inv. I,Reports,Proof Center,Proof Center,list,1,1,in-progress,40,35,/app/reports/proof,partial,,P2,Pass 14 Jul 2026; Attach Receipts + e-Sign; see inv1-reports-communication-proof.md
 E010861,Acct. I,Reports,Statement of Cash Flows,Statement of Cash Flows,report,1,1,in-progress,35,30,/app/finance/reports,partial,,P2,Pass 4 Jul 2026; Enter modal + Apply Formula grid; see acct1-reports-book.md
-E040201,Inv. I,Sales,New Quotation,New Quotation,form,2,2,depth-complete,60,100,/app/quotation/quotations/new,partial,,P1,"Campaign A G2 Jul 28 depth-complete; Save/Confirm not submitted; residuals: Calculate Profit, Verification, tenant template tabs"
+E040201,Inv. I,Sales,New Quotation,New Quotation,form,2,2,depth-complete,60,100,/app/quotation/quotations/new,partial,,P1,Campaign A residual Batch 1 Jul 28: Verification (client checks) + Calculate Profit (purchase/standard cost margin modal) shipped. Residuals remaining: tenant template tabs 1-N; deep costing engine.
 E040202,Inv. I,Sales,Quotation List,Quotation List,list,16,16,depth-complete,80,100,/app/quotation/quotations,partial,,P1,"Campaign A G2 Jul 28 depth-complete; SAFE blacklist Send/Delete/Excel not submitted; residuals: tenant list templates 1-10, Confirm group UX vs Bluearm discrete filters"
 E040203,Inv. I,Sales,New Sales Order,New Sales Order,form,4,4,depth-complete,70,100,/app/sales-order/sales-orders/new,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted
 E040204,Inv. I,Sales,Sales Order List,Sales Order List,list,11,11,depth-complete,75,100,/app/sales-order/sales-orders,partial,,P1,"Campaign A G2 Jul 28 depth-complete; residuals: list templates 1-5, Confirm group pill"
@@ -154,13 +154,13 @@ E040306,Inv. I,Reports,Purchases,Purchase Order Status,report,2,2,in-progress,35
 E040307,Inv. I,Reports,Purchases,Outstanding P/O Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 7 Jul 2026; mirror outstanding S/O; see inv1-purchase-reports.md
 E040309,Inv. I,Reports,Purchases,A/P by Vendor,report,2,2,in-progress,45,35,/app/buying/reports,partial,,P1,Pass 6 Jul 2026; mirror A/R by Customer; see inv1-purchase-reports.md
 E040310,Inv. I,Reports,Purchases,Payment Status,report,1,1,in-progress,30,30,/app/buying/reports,partial,,P1,Pass 7 Jul 2026; mirror Receipt Status; tenant empty Jul MTD; see inv1-purchase-reports.md
-E040311,Inv. I,Purchases,Change Purchases Price-Batch,Change Purchases Price-Batch,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001662
-E040312,Inv. I,Purchases,Collective Invoicing (Purchase),Collective Invoicing (Purchase),list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000193
+E040311,Inv. I,Purchases,Change Purchases Price-Batch,Change Purchases Price-Batch,list,2,2,depth-complete,40,100,/app/purchases/purchases/change-price,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; Save/Search not submitted; residuals: batch apply price write path
+E040312,Inv. I,Purchases,Collective Invoicing (Purchase),Collective Invoicing (Purchase),list,3,3,depth-complete,45,100,/app/purchases/purchases/collective,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; Save/Search not submitted; residuals: collective post/invoice generation
 E040313,Inv. I,Reports,Purchases,Purchase Discount Status,report,1,1,in-progress,30,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; mirror Sales Discount; tenant empty Jul MTD; see inv1-purchase-reports.md
 E040314,Inv. I,Purchases,New Purchase Request,New Purchase Request,form,2,2,depth-complete,48,100,/app/purchase-request/purchase-requests/new,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: Load Slip/BOM/Safety Stock parity depth
 E040315,Inv. I,Purchases,Purchase Request List,Purchase Request List,list,6,6,depth-complete,55,100,/app/purchase-request/purchase-requests,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete
 E040316,Inv. I,Purchases,New Purchase Plan,New Purchase Plan,form,2,2,depth-complete,45,100,/app/purchase-request/purchase-plans/new,partial,,P1,"Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: Purchase Request pull, Load Slip depth"
-E040317,Inv. I,Purchases,Purchase Plan List,Purchase Plan List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000507
+E040317,Inv. I,Purchases,Purchase Plan List,Purchase Plan List,list,3,3,depth-complete,50,100,/app/purchase-request/purchase-plans,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; SAFE blacklist Delete/Excel/Save not submitted; residuals: Adj. Qty + Generate Other Slips depth
 E040318,Inv. I,Reports,Purchases,Purchase Request Status,report,2,2,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; Details/by Line + PR No. + Delivery Date; see inv1-purchase-reports.md
 E040319,Inv. I,Reports,Purchases,Pre-Invoicing Status (Purchases),report,1,1,in-progress,30,30,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; Base Date as-of mirror E040609; see inv1-purchase-reports.md
 E040724,Inv. I,Reports,Purchases,Customer/Vendor Book I (AP),report,2,2,in-progress,40,35,/app/buying/reports,partial,,P1,Pass 9 Jul 2026; mirror E040723 for AP; see inv1-purchase-reports.md
@@ -168,8 +168,8 @@ N000127,Inv. I,Reports,Purchases,Purchase Invoice Status (Inv.),report,1,1,in-pr
 E040714,Inv. I,Reports,Purchases,Monthly Payable Fluctuation,report,1,1,in-progress,35,30,/app/buying/reports,partial,,P1,Pass 10 Jul 2026; mirror E040713; see inv1-purchase-reports.md
 E040321,Inv. I,Purchases,New RFQ,New RFQ,form,2,2,depth-complete,42,100,/app/purchase-order/rfq/new,partial,,P1,"Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: multi-vendor RFQ depth, Purchase Plan pull"
 E040322,Inv. I,Purchases,RFQ List,RFQ List,list,6,6,depth-complete,50,100,/app/purchase-order/rfq,partial,,P1,Campaign A G2 Jul 28 batch2 depth-complete
-E040323,Inv. I,Purchases,RFQ Progress Status,RFQ Progress Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001912
-E040325,Inv. I,Purchases,RFQ Status,RFQ Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001913
+E040323,Inv. I,Purchases,RFQ Progress Status,RFQ Progress Status,report,2,2,depth-complete,40,100,/app/purchase-order/rfq/progress,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; report/status screen; residuals: progress columns vs Bluearm RFQ status
+E040325,Inv. I,Purchases,RFQ Status,RFQ Status,report,2,2,depth-complete,40,100,/app/purchase-order/rfq/status,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; Excel blacklisted; residuals: RFQ status report columns
 E040401,Inv. I,Production,BOM Design,BOM Design,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000520
 E040402,Inv. I,Production,BOM Design Status,BOM Design Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001952
 E040403,Inv. I,Production,Estimated BOM,Estimated BOM,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000521
@@ -259,18 +259,18 @@ E060505,Acct. II,Payable Management,Payable Transaction Details,Payable Transact
 E060506,Acct. II,Payable Management,Registered Payable Status,Registered Payable Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000720
 E060507,Acct. II,Payable Management,Payable Payment Status,Payable Payment Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000721
 E060508,Acct. II,Payable Management,AP Aging Details,AP Aging Details,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001315
-E060602,Inv. I,Sales,New RCVD. Check Payment,New RCVD. Check Payment,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000696
-E060603,Inv. I,Sales,Checks Received List,Checks Received List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000697
-E060604,Inv. I,Sales,Checks Received Status,Checks Received Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000698
-E060606,Inv. I,Sales,New Issued Check Clearance,New Issued Check Clearance,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000700
-E060607,Inv. I,Sales,Checks Issued List,Checks Issued List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000701
-E060608,Inv. I,Sales,Checks Issued Status,Checks Issued Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000702
+E060602,Inv. I,Sales,New RCVD. Check Payment,New RCVD. Check Payment,form,2,2,depth-complete,30,100,/app/finance/checks/received/new-payment,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
+E060603,Inv. I,Sales,Checks Received List,Checks Received List,list,2,2,depth-complete,30,100,/app/finance/checks/received,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
+E060604,Inv. I,Sales,Checks Received Status,Checks Received Status,report,2,2,depth-complete,30,100,/app/finance/checks/received/status,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
+E060606,Inv. I,Sales,New Issued Check Clearance,New Issued Check Clearance,form,2,2,depth-complete,30,100,/app/finance/checks/issued/new-clearance,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
+E060607,Inv. I,Sales,Checks Issued List,Checks Issued List,list,2,2,depth-complete,35,100,/app/finance/checks/issued,partial,,P1,Campaign A G2 Jul 28 batch3; Acct. II Check Management (not Inv. I Sales); SAFE blacklist Delete/Excel; residuals: check print + clearance chain
+E060608,Inv. I,Sales,Checks Issued Status,Checks Issued Status,report,2,2,depth-complete,30,100,/app/finance/checks/issued/status,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
 E060609,Acct. I,Reports,Checks Received Status Report,Checks Received Status Report,report,0,0,cataloged,0,5,—,missing,,P2,Site Map catalog Jul 2026; menuSeq MENUTREE_001750
-E060610,Inv. I,Sales,Decrease of Received Checks Balance,Decrease of Received Checks Balance,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001751
-E060611,Inv. I,Sales,Increase of Issued Checks Balance,Increase of Issued Checks Balance,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001752
-E060612,Inv. I,Sales,Decrease of Issued Checks Balance,Decrease of Issued Checks Balance,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001753
-E060613,Inv. I,Sales,Received Check Transactions,Received Check Transactions,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001941
-E060614,Inv. I,Sales,Issued Check Transactions,Issued Check Transactions,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001942
+E060610,Inv. I,Sales,Decrease of Received Checks Balance,Decrease of Received Checks Balance,report,2,2,depth-complete,30,100,/app/finance/checks/received/decrease,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
+E060611,Inv. I,Sales,Increase of Issued Checks Balance,Increase of Issued Checks Balance,report,2,2,depth-complete,30,100,/app/finance/checks/issued/increase,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
+E060612,Inv. I,Sales,Decrease of Issued Checks Balance,Decrease of Issued Checks Balance,report,2,2,depth-complete,30,100,/app/finance/checks/issued/decrease,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
+E060613,Inv. I,Sales,Received Check Transactions,Received Check Transactions,list,2,2,depth-complete,30,100,/app/finance/checks/received/transactions,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
+E060614,Inv. I,Sales,Issued Check Transactions,Issued Check Transactions,list,2,2,depth-complete,30,100,/app/finance/checks/issued/transactions,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; live under Acct. II Check Management; SAFE blacklist Save/Delete/Excel; residuals: Bluearm check module depth
 831J3K25VPD4SA3,MyPage,MyPage,,MyPage,other,0,0,cataloged,0,0,—,missing,,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=831J3K25VPD4SA3
 831J3K25W474SA4,MyPage,Default Group,,Default Group,other,0,0,cataloged,0,0,—,missing,,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=831J3K25W474SA4
 C000008,User Customization,User Customization,,User Customization,other,0,0,cataloged,0,0,—,deferred,Deferred — Ecount personalization; Bluearm uses branding + permissions,P3,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000008
@@ -300,11 +300,11 @@ C000053,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 cata
 C000062,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000137
 C000071,Inv. I,Quotation,,Quotation,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000184
 C000072,Inv. I,Sales Order,,Sales Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000185
-C000073,Inv. I,Sales,,Sales,hub,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000186
+C000073,Inv. I,Sales,,Sales,hub,6,6,depth-complete,20,100,/app/selling,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; Sales menu hub (MENUTREE_000186); child leaves audited in Campaign A Sales batch
 C000075,Inv. I,Purchase Request,,Purchase Request,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000189
 C000076,Inv. I,Purchase Plan,,Purchase Plan,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000190
 C000077,Inv. I,Purchase Order,,Purchase Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000191
-C000078,Inv. I,Purchases,,Purchases,hub,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000192
+C000078,Inv. I,Purchases,,Purchases,hub,6,6,depth-complete,20,100,/app/purchases,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; menu hub (MENUTREE_000192) — child leaves audited separately in Campaign A Purchases queue
 C000080,Inv. I,BOM,,BOM,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000195
 C000081,Inv. I,Job Order,,Job Order,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000196
 C000082,Inv. I,Goods Issued,,Goods Issued,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000197
@@ -315,8 +315,8 @@ C000087,Inv. I,Internal Use,,Internal Use,other,0,0,cataloged,0,0,—,missing,,P
 C000088,Inv. I,Product Defect,,Product Defect,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000203
 C000089,Inv. I,Inv. Adj.,,Inv. Adj.,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000204
 C000091,Inv. I,After-Sales Service,,After-Sales Service,other,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000206
-C000095,Inv. I,Sales,,Sales,hub,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000219
-C000096,Inv. I,Purchases,,Purchases,hub,0,0,cataloged,0,0,—,missing,,P1,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000220
+C000095,Inv. I,Sales,,Sales,hub,6,6,depth-complete,20,100,/app/selling,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; tenant hub twin of C000073 (MENUTREE_000219)
+C000096,Inv. I,Purchases,,Purchases,hub,6,6,depth-complete,20,100,/app/purchases,partial,,P1,Campaign A G2 Jul 28 batch3 depth-complete; tenant hub twin of C000078 (MENUTREE_000220); children audited via Purchases module crawl
 C000097,Inv. I,Reports,,Reports,report,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000225
 C000098,Inv. I,Monthly Profit,,Monthly Profit,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000226
 C000099,Inv. I,Daily Profit,,Daily Profit,other,0,0,cataloged,0,0,—,missing,,P2,G0 catalog stub from Site Map Jul 2026; menuSeq=MENUTREE_000227

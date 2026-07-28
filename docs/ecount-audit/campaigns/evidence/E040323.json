@@ -1,0 +1,24 @@
+{
+  "prgId": "E040323",
+  "screen_name": "RFQ Progress Status",
+  "pills": [
+    {"label": "Default", "audited": true, "fields_summary": "Date presets + Search (F8)"},
+    {"label": "Option", "audited": true}
+  ],
+  "toolbar": [
+    "Search(F3)", "Option", "Help", "Search (F8)", "New (F2)", "View All",
+    "Today", "Prev. Day", "This Week (~ Today)", "Prev. Week", "This Month (~ Today)",
+    "Prev. Month", "Current Year", "Prev. Year", "End Date", "Settings", "Reset"
+  ],
+  "toolbar_audited": [
+    "Search(F3)", "Option", "Help", "Search (F8)", "New (F2)", "View All",
+    "Today", "Prev. Day", "This Week (~ Today)", "Prev. Week", "This Month (~ Today)",
+    "Prev. Month", "Current Year", "Prev. Year", "End Date", "Settings", "Reset"
+  ],
+  "controls_logged": 40,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchase-order/rfq/progress",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; report/status screen; residuals: progress columns vs Bluearm RFQ status",
+  "mark_depth_complete": true
+}
