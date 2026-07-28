@@ -50,7 +50,10 @@ func exportTickets(pool *pgxpool.Pool) http.HandlerFunc {
 		args := []any{tu.TenantID}
 		n := 2
 		if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
-			where += fmt.Sprintf(" and (t.ticket_no ilike $%d or t.subject ilike $%d or coalesce(p.company_name, '') ilike $%d)", n, n, n)
+			where += fmt.Sprintf(
+				` and (t.ticket_no ilike $%d or t.subject ilike $%d or coalesce(t.description, '') ilike $%d or coalesce(p.company_name, '') ilike $%d)`,
+				n, n, n, n,
+			)
 			args = append(args, "%"+q+"%")
 			n++
 		}
