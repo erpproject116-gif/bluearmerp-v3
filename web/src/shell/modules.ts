@@ -3,7 +3,7 @@ import { COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
 import { SERIAL_LOT_PREFIX } from "./serial-lot-nav";
 import { WMS_PREFIX } from "./wms-nav";
 import { ACCT_I_PREFIX } from "./acct-i-nav";
-import { ACCT_II_PREFIX } from "./acct-ii-nav";
+import { ACCT_II_PREFIX, isAcctIIPath } from "./acct-ii-nav";
 import { isReviewPurchasesPath, REVIEW_PURCHASES_SUB_BRANCH } from "./review-purchases-nav";
 import { isSubBranchPath } from "./sub-branch-nav";
 import { setupFeatureTab } from "../shared/moduleSetupScopes";
@@ -644,6 +644,9 @@ export function resolveModule(pathname: string): AppModule | undefined {
 function matchesSubBranch(pathname: string, branch: ModuleFeature): boolean {
   if (branch.prefix === REVIEW_PURCHASES_SUB_BRANCH) {
     return isReviewPurchasesPath(pathname);
+  }
+  if (branch.prefix === ACCT_II_PREFIX) {
+    return isAcctIIPath(pathname);
   }
   return (
     branch.href === pathname ||

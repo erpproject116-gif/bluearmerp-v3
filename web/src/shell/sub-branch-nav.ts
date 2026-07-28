@@ -1,9 +1,11 @@
-import type { ModuleFeature } from "./modules";
+import { ACCT_II_PREFIX, isAcctIIPath } from "./acct-ii-nav";
 import { isReviewPurchasesPath, REVIEW_PURCHASES_SUB_BRANCH } from "./review-purchases-nav";
+import type { ModuleFeature } from "./modules";
 
 export function isSubBranchPath(pathname: string, prefix?: string): boolean {
   if (!prefix) return false;
   if (prefix === REVIEW_PURCHASES_SUB_BRANCH) return isReviewPurchasesPath(pathname);
+  if (prefix === ACCT_II_PREFIX) return isAcctIIPath(pathname);
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
