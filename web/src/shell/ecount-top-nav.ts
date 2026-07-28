@@ -239,5 +239,13 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     ],
   },
   { id: "more", label: "More Apps", href: "/app/crm/dashboard", iconId: "more_apps", topId: "more" },
+  {
+    id: "setup",
+    label: "Setup",
+    href: "/app/user-management",
+    iconId: "setup",
+    topId: "setup",
+    expandGroupId: "misc",
+  },
   { id: "sitemap", label: "Site Map", href: "/app/dashboard/site-map", iconId: "dashboard", topId: "mypage" },
 ];
