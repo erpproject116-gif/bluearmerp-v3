@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { createSignal, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { apiFetch } from "./api";
 import { EntityModal, Field, inputClass } from "./SpreadsheetGrid";
 import { useToast } from "./toast";
@@ -204,18 +204,44 @@ export function GridExportButtons(props: {
   /** Optional: scrape this element instead of props.rows/columns when set. */
   scrapeRoot?: () => HTMLElement | null | undefined;
   class?: string;
+  /** Override default CSV export (e.g. server full-body download). */
+  onDownloadCsv?: () => void | Promise<void>;
+  /** Override default Excel export. */
+  onDownloadExcel?: () => void | Promise<void>;
+  /** Tooltip on Download CSV menu item. */
+  csvHint?: string;
+  /** Tooltip on Download Excel menu item. */
+  excelHint?: string;
 }) {
   const toast = useToast();
+  const [menuOpen, setMenuOpen] = createSignal(false);
   const [emailOpen, setEmailOpen] = createSignal(false);
   const [toAddrs, setToAddrs] = createSignal("");
   const [ccAddrs, setCcAddrs] = createSignal("");
   const [subject, setSubject] = createSignal("");
   const [bodyHtml, setBodyHtml] = createSignal("");
   const [sending, setSending] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
   const [pendingPayload, setPendingPayload] = createSignal<{
     columns: GridExportColumn[];
     rows: Record<string, unknown>[];
   } | null>(null);
+
+  onMount(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest("[data-grid-export-menu]")) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKey);
+    onCleanup(() => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    });
+  });
 
   const resolve = (): { columns: GridExportColumn[]; rows: Record<string, unknown>[] } | null => {
     if (props.scrapeRoot) {
@@ -233,9 +259,22 @@ export function GridExportButtons(props: {
     return { columns, rows };
   };
 
+  const closeMenu = () => setMenuOpen(false);
+
+  const runAction = async (fn: () => void | Promise<void>) => {
+    closeMenu();
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openEmail = () => {
     const data = resolve();
     if (!data) return;
+    closeMenu();
     setPendingPayload(data);
     setSubject(`${props.title} — ${new Date().toLocaleDateString()}`);
     setBodyHtml(
@@ -291,66 +330,133 @@ export function GridExportButtons(props: {
     setEmailOpen(false);
   };
 
-  const btnClass =
+  const triggerClass =
     props.class ??
-    "rounded-lg border border-stroke bg-white px-2.5 py-1.5 text-xs font-medium text-text-primary transition hover:bg-slate-50 disabled:opacity-50";
+    "inline-flex items-center gap-1.5 rounded-lg border border-stroke bg-white px-2.5 py-1.5 text-xs font-medium text-text-primary transition hover:bg-slate-50 disabled:opacity-50";
+
+  const itemClass =
+    "flex w-full items-center px-3 py-2 text-left text-sm text-text-primary transition hover:bg-slate-50 disabled:opacity-50";
 
   return (
     <>
-      <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Export and print">
+      <div class="relative" data-grid-export-menu>
         <button
           type="button"
-          class={btnClass}
-          onClick={() => {
-            const data = resolve();
-            if (!data) return;
-            printRows(props.title, data.columns, data.rows);
+          class={triggerClass}
+          disabled={busy()}
+          aria-expanded={menuOpen()}
+          aria-haspopup="menu"
+          title="Print, download, or email this table"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen((v) => !v);
           }}
         >
-          Print
+          <svg class="h-3.5 w-3.5 shrink-0 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+          </svg>
+          Export
+          <svg
+            class="h-3 w-3 shrink-0 opacity-70 transition-transform"
+            classList={{ "rotate-180": menuOpen() }}
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+              clip-rule="evenodd"
+            />
+          </svg>
         </button>
-        <button
-          type="button"
-          class={btnClass}
-          onClick={() => {
-            const data = resolve();
-            if (!data) return;
-            exportRowsToCsv(props.filename, data.columns, data.rows);
-          }}
-        >
-          Download CSV
-        </button>
-        <button
-          type="button"
-          class={btnClass}
-          onClick={() => {
-            const data = resolve();
-            if (!data) return;
-            try {
-              exportRowsToXlsx(props.filename, data.columns, data.rows);
-            } catch (err) {
-              console.error(err);
-              window.alert("Excel download failed. Try Download CSV instead.");
-            }
-          }}
-        >
-          Download Excel
-        </button>
-        <button
-          type="button"
-          class={btnClass}
-          title="Downloads a printable file and opens Print — choose Save as PDF"
-          onClick={() => {
-            const data = resolve();
-            if (!data) return;
-            downloadRowsAsPdf(props.title, data.columns, data.rows, props.filename);
-          }}
-        >
-          Download PDF
-        </button>
-        <button type="button" class={btnClass} onClick={openEmail}>
-          Email report
-        </button>
+        <Show when={menuOpen()}>
+          <div
+            role="menu"
+            class="absolute right-0 z-[60] mt-1 min-w-[11.5rem] overflow-hidden rounded-lg border border-stroke bg-white py-1 shadow-lg"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              class={itemClass}
+              disabled={busy()}
+              onClick={() =>
+                void runAction(() => {
+                  const data = resolve();
+                  if (!data) return;
+                  printRows(props.title, data.columns, data.rows);
+                })
+              }
+            >
+              Print
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              class={itemClass}
+              disabled={busy()}
+              title={props.csvHint}
+              onClick={() =>
+                void runAction(async () => {
+                  if (props.onDownloadCsv) {
+                    await props.onDownloadCsv();
+                    return;
+                  }
+                  const data = resolve();
+                  if (!data) return;
+                  exportRowsToCsv(props.filename, data.columns, data.rows);
+                })
+              }
+            >
+              Download CSV
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              class={itemClass}
+              disabled={busy()}
+              title={props.excelHint}
+              onClick={() =>
+                void runAction(async () => {
+                  if (props.onDownloadExcel) {
+                    await props.onDownloadExcel();
+                    return;
+                  }
+                  const data = resolve();
+                  if (!data) return;
+                  try {
+                    exportRowsToXlsx(props.filename, data.columns, data.rows);
+                  } catch (err) {
+                    console.error(err);
+                    window.alert("Excel download failed. Try Download CSV instead.");
+                  }
+                })
+              }
+            >
+              Download Excel
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              class={itemClass}
+              disabled={busy()}
+              title="Downloads a printable file and opens Print — choose Save as PDF"
+              onClick={() =>
+                void runAction(() => {
+                  const data = resolve();
+                  if (!data) return;
+                  downloadRowsAsPdf(props.title, data.columns, data.rows, props.filename);
+                })
+              }
+            >
+              Download PDF
+            </button>
+            <div class="my-1 border-t border-stroke" />
+            <button type="button" role="menuitem" class={itemClass} disabled={busy()} onClick={openEmail}>
+              Email report
+            </button>
+          </div>
+        </Show>
       </div>
 
       <Show when={emailOpen()}>
