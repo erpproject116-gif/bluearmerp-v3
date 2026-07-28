@@ -80,9 +80,9 @@ function CssBarChart(props: { title: string; points: DashboardTrendPoint[]; valu
                   <div
                     class="w-full rounded-t bg-brand-500/80"
                     style={{ height: `${pct()}%` }}
-                    title={`${pt.label}: ${format(pt.value)}`}
+                    title={`${pt.period}: ${format(pt.value)}`}
                   />
-                  <span class="truncate text-[10px] text-text-secondary">{pt.label}</span>
+                  <span class="truncate text-[10px] text-text-secondary">{pt.period}</span>
                 </div>
               );
             }}
@@ -123,7 +123,7 @@ function RedFlagsTable(props: { categories: DashboardRedFlagCategory[]; total: n
         <ul class="divide-y divide-stroke">
           <For each={props.categories}>
             {(cat) => {
-              const href = redFlagLinks[cat.key];
+              const href = redFlagLinks[cat.code];
               const row = (
                 <div class="flex items-center justify-between gap-3 py-2 text-sm">
                   <span class="text-text-primary">{cat.label}</span>

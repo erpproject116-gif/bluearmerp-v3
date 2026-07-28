@@ -89,7 +89,8 @@ export function SerialGenerateModal(props: Props) {
     });
     setSaving(false);
     if (!res.ok) {
-      toast.error(res.error?.message || "Failed to generate serials.");
+      const fieldErr = res.errors ? Object.values(res.errors)[0] : undefined;
+      toast.error(fieldErr || res.message || "Failed to generate serials.");
       return;
     }
     const serials = res.data?.serials ?? [];
