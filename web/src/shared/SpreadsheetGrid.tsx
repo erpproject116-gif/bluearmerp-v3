@@ -347,7 +347,6 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               </div>
             </label>
           </Show>
-          <span class="hidden flex-1 pb-2 text-sm text-text-secondary lg:inline">{uiLabel("common.grid_hint")}</span>
           <div class="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 pb-0.5">
             <Show when={!props.hideExport && props.exportFilename !== false}>
               <GridExportButtons

@@ -327,7 +327,7 @@ function NavGroupBlock(props: {
   );
 }
 
-function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean }) {
+function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean; nested?: boolean }) {
   const shell = useShell();
   const loc = useLocation();
   const active = () => {
@@ -346,7 +346,6 @@ function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean }) {
     if (props.area.topId) writeStoredEcountTop(props.area.topId);
     if (props.area.expandGroupId) {
       try {
-        // Collapse other groups so the target section opens cleanly.
         for (const g of navGroups) {
           localStorage.setItem(navGroupStorageKey(g.id), g.id === props.area.expandGroupId ? "1" : "0");
         }
@@ -363,25 +362,64 @@ function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean }) {
       class="flex items-center rounded-lg text-sm font-medium transition-colors"
       classList={{
         "justify-center px-2 py-2.5": shell.collapsed(),
-        "gap-3 px-3 py-2.5": !shell.collapsed(),
+        "gap-3 px-3 py-2.5": !shell.collapsed() && !props.nested,
+        "gap-2 px-3 py-2": !shell.collapsed() && props.nested,
         "bg-brand-50 text-brand-600": active(),
         "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),
       }}
       onClick={onNavigate}
     >
       <span
-        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        class="flex shrink-0 items-center justify-center rounded-lg transition-colors"
         classList={{
+          "h-8 w-8": !props.nested,
+          "h-7 w-7": props.nested,
           "bg-brand-100 text-brand-600": active(),
           "erp-panel text-text-secondary": !active(),
         }}
       >
-        <ModuleIcon id={props.area.iconId} />
+        <ModuleIcon id={props.area.iconId} class={props.nested ? "h-3.5 w-3.5" : undefined} />
       </span>
       <Show when={!shell.collapsed()}>
         <span class="truncate">{props.area.label}</span>
       </Show>
     </A>
+  );
+}
+
+function HomeAreaBlock(props: { area: HomeSidebarArea; active: (a: HomeSidebarArea) => boolean }) {
+  const shell = useShell();
+  const children = () => props.area.children ?? [];
+  const [open, setOpen] = createSignal(children().length > 0);
+
+  return (
+    <div class="space-y-0.5">
+      <div class="flex items-center gap-0.5">
+        <div class="min-w-0 flex-1">
+          <NavAreaLink area={props.area} active={props.active(props.area)} />
+        </div>
+        <Show when={!shell.collapsed() && children().length > 0}>
+          <button
+            type="button"
+            class="mr-1 rounded p-1 text-text-secondary hover:bg-slate-50 hover:text-text-primary"
+            aria-expanded={open()}
+            aria-label={open() ? `Collapse ${props.area.label}` : `Expand ${props.area.label}`}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span class="block text-[10px] transition-transform" classList={{ "rotate-90": open() }} aria-hidden="true">
+              ▶
+            </span>
+          </button>
+        </Show>
+      </div>
+      <Show when={!shell.collapsed() && open() && children().length > 0}>
+        <div class="ml-4 space-y-0.5 border-l border-stroke pl-2">
+          <For each={children()}>
+            {(child) => <NavAreaLink area={child} active={props.active(child)} nested />}
+          </For>
+        </div>
+      </Show>
+    </div>
   );
 }
 
@@ -393,37 +431,16 @@ function initialOpenGroupId(): string | null {
 }
 
 function filterEntriesForTop(top: EcountTopId, groupId: string, entries: NavGroupEntry[]): NavGroupEntry[] {
+  // Stocks always includes Warehouse / Serial-Lot (no separate top-level Warehouse).
   if (top === "inv2" && groupId === "stocks_management") {
-    return entries.filter(
-      (e) =>
-        e.kind === "subBranch" &&
-        (e.featureCode === "inventory.serial_lot" || e.featureCode === "inventory.wms"),
-    );
+    return entries;
   }
   if (top === "inv1" && groupId === "stocks_management") {
-    return entries.filter(
-      (e) =>
-        !(
-          e.kind === "subBranch" &&
-          (e.featureCode === "inventory.serial_lot" || e.featureCode === "inventory.wms")
-        ),
-    );
+    return entries;
   }
-  if (top === "acct1" && groupId === "accounting_dept") {
-    return entries.filter(
-      (e) =>
-        e.kind === "module" ||
-        (e.kind === "subBranch" &&
-          (e.featureCode === "finance.acct_i" || e.featureCode === "quotation.tax_mngt")),
-    );
-  }
-  if (top === "acct2" && groupId === "accounting_dept") {
-    return entries.filter(
-      (e) =>
-        e.kind === "module" ||
-        (e.kind === "subBranch" &&
-          (e.featureCode === "finance.acct_ii" || e.featureCode === "finance.payment_vouchers")),
-    );
+  // Accounting always shows Ledger + Cash & AR/AP together under one group.
+  if ((top === "acct1" || top === "acct2") && groupId === "accounting_dept") {
+    return entries;
   }
   return entries;
 }
@@ -500,6 +517,37 @@ export function SidebarNav() {
       );
     }
     if (area.id === "sitemap") return loc.pathname.startsWith("/app/dashboard/site-map");
+    if (area.id === "stocks") {
+      return (
+        (loc.pathname === "/app/inventory" || loc.pathname.startsWith("/app/inventory/")) &&
+        !loc.pathname.startsWith("/app/inventory/serial-lot") &&
+        !loc.pathname.startsWith("/app/inventory/wms")
+      );
+    }
+    if (area.id === "warehouse") {
+      return (
+        loc.pathname.startsWith("/app/inventory/serial-lot") || loc.pathname.startsWith("/app/inventory/wms")
+      );
+    }
+    if (area.id === "accounting") {
+      return loc.pathname === "/app/finance" || loc.pathname === "/app/finance/";
+    }
+    if (area.id === "ledger") {
+      return (
+        loc.pathname.startsWith("/app/finance/acct-i") ||
+        loc.pathname.startsWith("/app/finance/journal") ||
+        loc.pathname.startsWith("/app/finance/official-receipts") ||
+        loc.pathname.startsWith("/app/finance/reports")
+      );
+    }
+    if (area.id === "cash") {
+      return (
+        loc.pathname.startsWith("/app/finance/acct-ii") ||
+        loc.pathname.startsWith("/app/finance/collections") ||
+        loc.pathname.startsWith("/app/finance/disbursements") ||
+        loc.pathname.startsWith("/app/finance/payment-vouchers")
+      );
+    }
     return loc.pathname === area.href || loc.pathname.startsWith(`${area.href}/`);
   };
 
@@ -537,7 +585,7 @@ export function SidebarNav() {
         }
       >
         <For each={HOME_SIDEBAR_AREAS}>
-          {(area) => <NavAreaLink area={area} active={homeActive(area)} />}
+          {(area) => <HomeAreaBlock area={area} active={homeActive} />}
         </For>
       </Show>
     </nav>

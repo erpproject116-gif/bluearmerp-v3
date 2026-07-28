@@ -36,13 +36,13 @@ export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
 };
 
 /**
- * Sidebar IA: process groups (Stock / Sell / Buy / Money), not Ecount Inv./Acct. labels.
+ * Sidebar IA: Stocks (incl. Warehouse) / Sell / Buy / Accounting.
  * Document pipelines are ordered quote→order→invoice (and PR→PO→invoice); overview hubs last.
  */
 export const navGroups: NavGroup[] = [
   {
     id: "stocks_management",
-    label: "Stock",
+    label: "Stocks",
     iconId: "inventory",
     defaultExpanded: true,
     entries: [
@@ -84,12 +84,12 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "accounting_dept",
-    label: "Money",
+    label: "Accounting",
     iconId: "finance",
     defaultExpanded: true,
     entries: [
       { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "Ledger" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Receivables & payables" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Cash & AR/AP" },
       { kind: "subBranch", moduleId: "finance", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
       { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "Supplier payments" },
       { kind: "module", moduleId: "finance" },

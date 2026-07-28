@@ -534,7 +534,7 @@ export const moduleKbArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Open Money → Receivables & payables → Customer/Vendor Book I (AR) or (AP).",
+          "Open Accounting → Cash & AR/AP → Customer/Vendor Book I (AR) or (AP).",
           "Set date from / date to and optional partner ID, then Search (F8).",
           "Export CSV with Excel when results are displayed.",
         ],
