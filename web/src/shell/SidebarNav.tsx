@@ -15,7 +15,6 @@ import {
   navGroupStorageKey,
   subBranchByFeature,
   belowGroupModuleIds,
-  ungroupedModuleIds,
   isFinanceUnderSalesReportPath,
   type NavGroupEntry,
   type NavGroup,
@@ -24,7 +23,14 @@ import { isAnySubBranchPath, isSubBranchPath } from "./sub-branch-nav";
 import { isReviewPurchasesPath } from "./review-purchases-nav";
 import { isTaxMngtPath } from "./tax-mngt-nav";
 import { useAuth } from "../shared/auth-context";
-import { ecountTopById, resolveEcountTopFromPath, type EcountTopId } from "./ecount-top-nav";
+import {
+  ecountTopById,
+  resolveEcountTopFromPath,
+  writeStoredEcountTop,
+  HOME_SIDEBAR_AREAS,
+  type EcountTopId,
+  type HomeSidebarArea,
+} from "./ecount-top-nav";
 
 function brandedLabel(labels: Record<string, string>, key: string, fallback: string): string {
   const v = labels[key];
@@ -321,6 +327,64 @@ function NavGroupBlock(props: {
   );
 }
 
+function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean }) {
+  const shell = useShell();
+  const loc = useLocation();
+  const active = () => {
+    if (props.active != null) return props.active;
+    const href = props.area.href;
+    if (href === "/app/dashboard") {
+      return loc.pathname === "/app/dashboard" || loc.pathname === "/app/dashboard/";
+    }
+    if (href === "/app/dashboard/site-map") {
+      return loc.pathname.startsWith("/app/dashboard/site-map");
+    }
+    return loc.pathname === href || loc.pathname.startsWith(`${href}/`);
+  };
+
+  const onNavigate = () => {
+    if (props.area.topId) writeStoredEcountTop(props.area.topId);
+    if (props.area.expandGroupId) {
+      try {
+        // Collapse other groups so the target section opens cleanly.
+        for (const g of navGroups) {
+          localStorage.setItem(navGroupStorageKey(g.id), g.id === props.area.expandGroupId ? "1" : "0");
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+
+  return (
+    <A
+      href={props.area.href}
+      title={shell.collapsed() ? props.area.label : undefined}
+      class="flex items-center rounded-lg text-sm font-medium transition-colors"
+      classList={{
+        "justify-center px-2 py-2.5": shell.collapsed(),
+        "gap-3 px-3 py-2.5": !shell.collapsed(),
+        "bg-brand-50 text-brand-600": active(),
+        "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),
+      }}
+      onClick={onNavigate}
+    >
+      <span
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        classList={{
+          "bg-brand-100 text-brand-600": active(),
+          "erp-panel text-text-secondary": !active(),
+        }}
+      >
+        <ModuleIcon id={props.area.iconId} />
+      </span>
+      <Show when={!shell.collapsed()}>
+        <span class="truncate">{props.area.label}</span>
+      </Show>
+    </A>
+  );
+}
+
 function initialOpenGroupId(): string | null {
   for (const group of navGroups) {
     if (readExpanded(group.id, group.defaultExpanded)) return group.id;
@@ -383,6 +447,7 @@ export function SidebarNav() {
   let savedScrollTop = 0;
   const [openGroupId, setOpenGroupId] = createSignal<string | null>(initialOpenGroupId());
   const top = () => resolveEcountTopFromPath(loc.pathname);
+  const onHome = () => top() === "mypage";
 
   const openGroup = (groupId: string) => {
     const prev = openGroupId();
@@ -407,15 +472,18 @@ export function SidebarNav() {
     ),
   );
 
-  const ungrouped = () => {
-    const cfg = ecountTopById(top());
-    const ids = cfg.ungroupedModuleIds ?? (top() === "mypage" ? ungroupedModuleIds : []);
-    // Always show Home when on mypage; when elsewhere still allow Home via strip
-    const list = top() === "mypage" ? ungroupedModuleIds : ids;
-    return list
-      .map((id) => appModules.find((m) => m.id === id))
-      .filter((m): m is AppModule => !!m && isTenantModuleEnabled(auth.me, m.id));
-  };
+  // Re-read expanded group when entering Operations from Home (Stocks/Sell/Buy).
+  createEffect(
+    on(
+      () => top(),
+      (t) => {
+        if (t === "inv1") {
+          const next = initialOpenGroupId();
+          if (next) setOpenGroupId(next);
+        }
+      },
+    ),
+  );
 
   const belowGroup = () =>
     belowGroupModuleIds
@@ -424,46 +492,54 @@ export function SidebarNav() {
 
   const groups = () => visibleNavGroups(top());
 
+  const homeActive = (area: HomeSidebarArea) => {
+    if (area.id === "home") {
+      return (
+        (loc.pathname === "/app/dashboard" || loc.pathname === "/app/dashboard/") &&
+        !loc.pathname.startsWith("/app/dashboard/site-map")
+      );
+    }
+    if (area.id === "sitemap") return loc.pathname.startsWith("/app/dashboard/site-map");
+    return loc.pathname === area.href || loc.pathname.startsWith(`${area.href}/`);
+  };
+
   return (
     <nav
       ref={navEl}
-      class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1"
+      class="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1"
       onScroll={(e) => {
         savedScrollTop = e.currentTarget.scrollTop;
       }}
     >
-      <For each={ungrouped()}>{(module) => <NavModuleLink module={module} />}</For>
-
-      <Show when={top() === "mypage"}>
-        <p class="px-2 text-xs text-text-secondary">
-          Use the top strip (
-          <span class="font-medium text-text-primary">Operations</span>,{" "}
-          <span class="font-medium text-text-primary">Warehouse</span>,{" "}
-          <span class="font-medium text-text-primary">Ledger</span>,{" "}
-          <span class="font-medium text-text-primary">Cash &amp; AR/AP</span>
-          ) or{" "}
-          <A href="/app/dashboard/site-map" class="font-medium text-brand-600 hover:underline">
-            Site Map
-          </A>{" "}
-          to open modules. Sidebar groups are Stock → Sell → Buy → Money.
-        </p>
+      <Show
+        when={onHome()}
+        fallback={
+          <>
+            <NavAreaLink
+              area={{ id: "home", label: "Home", href: "/app/dashboard", iconId: "dashboard", topId: "mypage" }}
+              active={false}
+            />
+            <For each={groups()}>
+              {(group) => (
+                <NavGroupBlock
+                  groupId={group.id}
+                  label={group.label}
+                  iconId={group.iconId}
+                  open={openGroupId() === group.id}
+                  onOpen={() => openGroup(group.id)}
+                  onClose={() => closeGroup(group.id)}
+                  entries={group.entries}
+                />
+              )}
+            </For>
+            <For each={belowGroup()}>{(module) => <NavModuleLink module={module} />}</For>
+          </>
+        }
+      >
+        <For each={HOME_SIDEBAR_AREAS}>
+          {(area) => <NavAreaLink area={area} active={homeActive(area)} />}
+        </For>
       </Show>
-
-      <For each={groups()}>
-        {(group) => (
-          <NavGroupBlock
-            groupId={group.id}
-            label={group.label}
-            iconId={group.iconId}
-            open={openGroupId() === group.id}
-            onOpen={() => openGroup(group.id)}
-            onClose={() => closeGroup(group.id)}
-            entries={group.entries}
-          />
-        )}
-      </For>
-
-      <For each={belowGroup()}>{(module) => <NavModuleLink module={module} />}</For>
     </nav>
   );
 }

@@ -160,3 +160,55 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
 export function ecountTopById(id: EcountTopId): EcountTopModule {
   return ECOUNT_TOP_MODULES.find((m) => m.id === id) ?? ECOUNT_TOP_MODULES[0]!;
 }
+
+/** Home sidebar: vertical area stack (replaces the horizontal module strip). */
+export type HomeSidebarArea = {
+  id: string;
+  label: string;
+  href: string;
+  iconId: string;
+  /** Optional top-module id for storage hint; path resolution still wins. */
+  topId?: EcountTopId;
+  /** Expand this nav group after navigate (Operations children). */
+  expandGroupId?: string;
+};
+
+export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
+  { id: "home", label: "Home", href: "/app/dashboard", iconId: "dashboard", topId: "mypage" },
+  { id: "operations", label: "Operations", href: "/app/inventory/items", iconId: "inventory", topId: "inv1" },
+  {
+    id: "stocks",
+    label: "Stocks",
+    href: "/app/inventory",
+    iconId: "inventory",
+    topId: "inv1",
+    expandGroupId: "stocks_management",
+  },
+  {
+    id: "sell",
+    label: "Sell",
+    href: "/app/quotation/quotations",
+    iconId: "selling",
+    topId: "inv1",
+    expandGroupId: "sales_process",
+  },
+  {
+    id: "buy",
+    label: "Buy",
+    href: "/app/purchase-request/purchase-requests",
+    iconId: "buying",
+    topId: "inv1",
+    expandGroupId: "procurement_process",
+  },
+  { id: "warehouse", label: "Warehouse", href: "/app/inventory/serial-lot", iconId: "sub_warehouse", topId: "inv2" },
+  { id: "ledger", label: "Ledger", href: "/app/finance/acct-i/journal-entries", iconId: "sub_general_ledger", topId: "acct1" },
+  {
+    id: "cash",
+    label: "Cash & AR/AP",
+    href: "/app/finance/collections",
+    iconId: "sub_ar_ap",
+    topId: "acct2",
+  },
+  { id: "more", label: "More Apps", href: "/app/crm/dashboard", iconId: "more_apps", topId: "more" },
+  { id: "sitemap", label: "Site Map", href: "/app/dashboard/site-map", iconId: "dashboard", topId: "mypage" },
+];
