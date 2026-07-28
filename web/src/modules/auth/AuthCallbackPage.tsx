@@ -1,7 +1,6 @@
 import { onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "../../shared/api";
-import { setActiveTenantId } from "../../shared/activeContext";
 import { useAuth, type MeData } from "../../shared/auth-context";
 import { resolveAppEntryPath } from "../../shared/resolveAppEntryPath";
 
@@ -78,19 +77,18 @@ export default function AuthCallbackPage() {
 
     try {
       let me = await fetchMeWithRetry();
-      if (!me.success && (me.status === 403 || me.code === "ERR_FORBIDDEN")) {
-        const trial = await apiFetch<{ tenant_id: number }>(
-          "/api/v1/platform/trial/provision",
-          { method: "POST" },
-          { silent: true },
-        );
-        if (trial.success && trial.data?.tenant_id) {
-          setActiveTenantId(trial.data.tenant_id);
-          me = await fetchMeWithRetry();
-        } else {
-          navigate("/welcome", { replace: true });
+      if (!me.success && me.status === 403) {
+        if (me.code === "ERR_TENANT_PENDING_APPROVAL") {
+          navigate("/pending-approval", { replace: true });
           return;
         }
+        navigate("/welcome", { replace: true });
+        return;
+      }
+
+      if (!me.success && me.code === "ERR_TENANT_PENDING_APPROVAL") {
+        navigate("/pending-approval", { replace: true });
+        return;
       }
 
       if (!me.success) {

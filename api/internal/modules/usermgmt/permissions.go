@@ -37,13 +37,15 @@ type rolePermissionsPayload struct {
 }
 
 type userPermissionsPayload struct {
-	UserID      int64             `json:"user_id"`
-	Email       string            `json:"email"`
-	FullName    string            `json:"full_name"`
-	TenantRole  string            `json:"tenant_role"`
-	RolePerms   map[string]string `json:"role_permissions"`
-	Overrides   map[string]string `json:"overrides"`
-	Effective   map[string]string `json:"effective"`
+	UserID         int64             `json:"user_id"`
+	Email          string            `json:"email"`
+	FullName       string            `json:"full_name"`
+	TenantRole     string            `json:"tenant_role"`
+	RolePerms      map[string]string `json:"role_permissions"`
+	GroupPerms     map[string]string `json:"group_permissions"`
+	Overrides      map[string]string `json:"overrides"`
+	Effective      map[string]string `json:"effective"`
+	GroupNames     []string          `json:"group_names,omitempty"`
 }
 
 type permissionsBody struct {
@@ -218,15 +220,21 @@ func getUserPermissions(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load role permissions.", "ERR_INTERNAL")
 			return
 		}
+		groupPerms, groupNames, err := loadMergedGroupPermissions(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load group permissions.", "ERR_INTERNAL")
+			return
+		}
 		overrides, err := loadUserOverrides(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load overrides.", "ERR_INTERNAL")
 			return
 		}
-		effective := mergePermissions(rolePerms, overrides)
+		effective := computeEffectivePermissions(rolePerms, groupPerms, overrides)
 		response.OK(w, userPermissionsPayload{
 			UserID: id, Email: email, FullName: fullName, TenantRole: tenantRole,
-			RolePerms: rolePerms, Overrides: overrides, Effective: effective,
+			RolePerms: rolePerms, GroupPerms: groupPerms, Overrides: overrides, Effective: effective,
+			GroupNames: groupNames,
 		}, "OK")
 	}
 }
@@ -267,10 +275,13 @@ func putUserPermissions(pool *pgxpool.Pool) http.HandlerFunc {
 			select email, full_name, tenant_role from public.users where id = $1`, id).
 			Scan(&email, &fullName, &tenantRole)
 		rolePerms, _ := loadRolePermissions(r.Context(), pool, tu.TenantID, tenantRole)
+		groupPerms, groupNames, _ := loadMergedGroupPermissions(r.Context(), pool, tu.TenantID, id)
 		overrides, _ := loadUserOverrides(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, userPermissionsPayload{
 			UserID: id, Email: email, FullName: fullName, TenantRole: tenantRole,
-			RolePerms: rolePerms, Overrides: overrides, Effective: mergePermissions(rolePerms, overrides),
+			RolePerms: rolePerms, GroupPerms: groupPerms, Overrides: overrides,
+			Effective: computeEffectivePermissions(rolePerms, groupPerms, overrides),
+			GroupNames: groupNames,
 		}, "Permissions saved.")
 	}
 }

@@ -151,6 +151,10 @@ export default function UserGroupsPage() {
 
   return (
     <>
+      <p class="mb-3 text-sm text-text-secondary">
+        Optional team packs that add permissions on top of a user’s role. Assign members here or from Users. Groups do
+        not replace the role.
+      </p>
       <SpreadsheetGrid
         columns={[
           { key: "group_code", header: "Code" },
@@ -166,7 +170,7 @@ export default function UserGroupsPage() {
                   Edit
                 </button>
                 <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => openPermissions(row)}>
-                  Permissions
+                  Add-on permissions
                 </button>
                 <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => void openMembers(row)}>
                   Members
@@ -198,6 +202,9 @@ export default function UserGroupsPage() {
         <Field label="Description">
           <input class={inputClass} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} />
         </Field>
+        <p class="text-xs text-text-secondary">
+          Adds to each member’s role; does not replace it. Prefer changing Roles when everyone in a job needs the same access.
+        </p>
         <Show when={editing()}>
           <Field label="Active">
             <label class="flex items-center gap-2 text-sm">
@@ -208,21 +215,24 @@ export default function UserGroupsPage() {
         </Show>
       </EntityModal>
 
-      <EntityModal open={permOpen()} title={`Group permissions — ${groupPerms.data?.group_name ?? ""}`} onClose={() => setPermOpen(false)} onSave={() => void savePermissions()} saving={saving()} wide singleColumn>
+      <EntityModal open={permOpen()} title={`Group add-on permissions — ${groupPerms.data?.group_name ?? ""}`} onClose={() => setPermOpen(false)} onSave={() => void savePermissions()} saving={saving()} wide singleColumn>
+        <p class="mb-3 text-sm text-text-secondary">
+          These permissions add on top of each member’s role (highest level wins). They do not replace the role matrix.
+        </p>
         <PermissionMatrix
           groups={registry.data ?? []}
           values={permValues()}
           loading={registry.isLoading || groupPerms.isLoading}
-          title="Bulk permission template for this group (modules on under Module & Features). Members inherit the highest access from role and groups."
+          title="Bulk permission add-ons for this group (modules on under Module & Features)."
           enabledModuleCodes={auth.me?.enabled_module_codes ?? null}
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
         />
       </EntityModal>
 
       <EntityModal open={membersOpen()} title="Group members" onClose={() => setMembersOpen(false)} onSave={() => void saveMembers()} saving={saving()} wide singleColumn>
-        <p class="mb-3 text-sm text-text-secondary">Users can belong to multiple groups. Permissions merge using the highest level granted.</p>
+        <p class="mb-3 text-sm text-text-secondary">Users can belong to multiple groups. Soft-deleted users still appear but cannot sign in until restored on Users.</p>
         <div class="max-h-96 overflow-y-auto rounded-lg border border-stroke p-3">
-          <For each={users.data?.rows ?? []}>
+          <For each={(users.data?.rows ?? []).filter((u) => u.status !== "disabled")}>
             {(u) => (
               <label class="flex cursor-pointer items-center gap-2 border-b border-stroke/50 py-2 text-sm last:border-0">
                 <input type="checkbox" checked={memberIds().includes(u.id)} onChange={() => toggleMember(u.id)} />

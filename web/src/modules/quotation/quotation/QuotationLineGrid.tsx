@@ -16,7 +16,6 @@ import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
 import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { QuotationItemSearchModal } from "./QuotationItemSearchModal";
 import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
-import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
 
 export type QuotationLineRow = {
   line_no: number;
@@ -363,7 +362,7 @@ export function QuotationLineGrid(props: Props) {
                     <Show when={line().item_id && line().track_serial} fallback={<SerialCellHint hasItem={Boolean(line().item_id)} />}>
                       <div class="space-y-1">
                         <p class="text-[10px] uppercase tracking-wide text-text-secondary">
-                          Planned · {trackingPolicyLabel(line().serial_policy)}
+                          Planned · optional on quotation
                         </p>
                         <SerialLineCell
                           mode="planned"

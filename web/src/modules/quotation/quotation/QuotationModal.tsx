@@ -659,6 +659,14 @@ export function QuotationModal(props: Props) {
   };
 
   const runCalculateProfit = async () => {
+    if (!taxTypeId()) {
+      toast.warning("Select transaction type (tax) before Calculate Profit.");
+      return;
+    }
+    if (!currencyId()) {
+      toast.warning("Select currency before Calculate Profit.");
+      return;
+    }
     const filled = lines().filter((ln) => ln.item_id || ln.item_code || ln.item_name);
     if (filled.length === 0) {
       toast.warning("Add at least one line before Calculate Profit.");
@@ -780,6 +788,8 @@ export function QuotationModal(props: Props) {
         fieldKey="tax_type_id"
         fallbackLabel="Transaction type"
         fallbackRequired
+        forceVisible
+        forceRequired
         value={taxTypeLabel}
         selectedId={taxTypeId}
         onInput={setTaxTypeLabel}
@@ -801,7 +811,7 @@ export function QuotationModal(props: Props) {
           <p class="mt-1 text-xs text-text-secondary md:col-span-2">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
         )}
       </Show>
-      <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
+      <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired forceVisible forceRequired>
         {(m) => (
           <select
             class={inputClass}
@@ -1002,7 +1012,13 @@ export function QuotationModal(props: Props) {
 
     <HistoryLogModal open={historyOpen} onClose={() => setHistoryOpen(false)} targetType="quo_quotation" targetId={effectiveEditing()?.id} title="History — Quotation" />
 
-    <QuotationProfitModal open={profitOpen()} rows={profitRows()} onClose={() => setProfitOpen(false)} />
+    <QuotationProfitModal
+      open={profitOpen()}
+      rows={profitRows()}
+      taxTypeLabel={taxTypeLabel() || selectedTaxType()?.name || "—"}
+      currencyCode={currencies().find((c) => c.id === currencyId())?.currency_code ?? "—"}
+      onClose={() => setProfitOpen(false)}
+    />
 
     <QuickCustomerModal
       open={showNewCustomer()}

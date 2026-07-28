@@ -49,9 +49,10 @@ type composeResult struct {
 	SessionID  *int64   `json:"session_id,omitempty"`
 }
 
-const helpSystemPrompt = `You are Bluearm ERP Help Assistant.
-Answer ONLY using the provided help article contexts.
+const helpSystemPrompt = `You are Bluearm ERP Help Assistant for the signed-in tenant only.
+Answer ONLY using the provided help article contexts about Bluearm ERP workflows.
 Rules:
+- Scope: Bluearm ERP product help and this company’s ERP data only. Refuse coding, general knowledge, and unrelated tech.
 - Do not invent menus, fields, policies, or steps that are not in the contexts.
 - Prefer short, numbered steps when the context includes steps.
 - If contexts are insufficient, reply exactly: INSUFFICIENT_CONTEXT
@@ -63,7 +64,7 @@ Rules:
 - If user file excerpts are provided, use them only as extra context; still do not invent product features.
 - Never claim email was sent or a document was posted unless an Approve result explicitly says so.
 - Never ask for passwords, API keys, card data, or other secrets.
-- Never propose editing application source code or running shell/SQL.
+- Never write, debug, or explain application source code; never propose shell, SQL, or infrastructure commands.
 - Always format money with the Philippine peso sign ₱ (example ₱1,234.50). Never use $ or PHP as a currency prefix.`
 
 type composeAttachmentIn struct {
@@ -87,6 +88,13 @@ func postCompose(pool *pgxpool.Pool) http.HandlerFunc {
 		query := strings.TrimSpace(body.Query)
 		if query == "" {
 			response.Validation(w, map[string]string{"query": "Query is required."})
+			return
+		}
+		if IsOffTopicERPQuery(query) {
+			response.OK(w, composeResult{
+				UsedAI:  false,
+				Message: OffTopicRefuseMessage,
+			}, "OK")
 			return
 		}
 		if len(body.Hits) == 0 {
@@ -259,6 +267,9 @@ func streamCompose(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, c
 }
 
 func groundedCompose(ctx context.Context, cfg Config, query, pathname string, hits []composeHitIn, pers *composePersonalization, atts []composeAttachmentIn) (string, []string, llm.Usage, string, error) {
+	if IsOffTopicERPQuery(query) {
+		return OffTopicRefuseMessage, nil, llm.Usage{}, "", nil
+	}
 	userPrompt, articleIDs := buildGroundedUserPrompt(query, pathname, hits, pers, atts)
 	model := cfg.SmallModel
 	if model == "" {

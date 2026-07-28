@@ -80,8 +80,8 @@ export default function SignInPage() {
       <Show when={!auth.me} fallback={<SessionLoading />}>
         <AuthShell
           title="Sign in"
-          subtitle="Sign up or sign in — Google works for both"
-          footer={
+      subtitle="Sign in with Google or email — invited members join their company workspace"
+      footer={
             <p class="mt-8 text-xs text-text-secondary">
               New to Bluearm?{" "}
               <button type="button" class="font-medium text-brand-600 hover:underline" onClick={() => navigate("/signup")}>
@@ -97,7 +97,7 @@ export default function SignInPage() {
               onError={setError}
             />
             <p class="text-center text-xs text-text-secondary">
-              New users get a 90-day trial workspace automatically.
+              Invited by your company? Sign in with the same Google email your admin used. To open your own trial workspace, use Welcome after sign-in.
             </p>
             <Show when={demoSignInEnabled}>
               <button

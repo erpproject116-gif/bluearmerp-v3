@@ -1093,18 +1093,24 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "user-management-admin",
-    title: "Users, roles, and process policies",
+    title: "Users, roles, groups, and data scopes (RBAC)",
     scenario: "You administer who can do what in the workspace.",
-    intro: "User Management covers users, roles, groups, permissions, process policies, and mapping center.",
+    intro:
+      "Bluearm uses RBAC plus optional data scopes—not full ABAC. Users get a role (job template), optional groups (team add-ons), rare per-user overrides, and optional customer/location scopes.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Invite users under User Management → Users.",
-          "Assign roles or fine-tune permissions per user.",
-          "Set process policies: quotation before SO, GR before supplier invoice, SO release mode, required attachments, etc.",
-          "Use Mapping Center for document conversion rules between modules.",
+          "Module & Features — turn on what the company bought.",
+          "Roles — default access for a job (Accountant, Warehouse). Prefer roles first.",
+          "Groups — optional shared add-ons on top of a role (e.g. Manila sales). Does not replace the role.",
+          "Users — invite people, assign role (+ groups), soft-delete/restore, open Overrides only for exceptions.",
+          "Data scopes — if the role has Apply user data scopes, limit which customers/locations they see.",
         ],
+      },
+      {
+        type: "tip",
+        text: "Delete a user on Users (soft-delete). That stops access but keeps role, groups, overrides, and scopes for Restore. Do not look for delete on Data scopes.",
       },
     ],
     primaryHref: "/app/user-management/users",

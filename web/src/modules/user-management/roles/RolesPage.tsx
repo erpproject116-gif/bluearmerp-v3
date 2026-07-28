@@ -138,6 +138,9 @@ export default function RolesPage() {
 
   return (
     <>
+      <p class="mb-3 text-sm text-text-secondary">
+        Job templates. Edit the permission matrix for everyone with this role. Prefer roles first; use Groups only for shared team add-ons.
+      </p>
       <SpreadsheetGrid
         columns={[
           { key: "role_code", header: "Code" },
@@ -146,6 +149,11 @@ export default function RolesPage() {
             key: "is_system",
             header: "System",
             render: (row) => <span>{row.is_system ? "Yes" : "No"}</span>,
+          },
+          {
+            key: "apply_user_scopes",
+            header: "Uses data scopes",
+            render: (row) => <span>{row.apply_user_scopes ? "Yes" : "No"}</span>,
           },
           {
             key: "is_active",
@@ -232,16 +240,17 @@ export default function RolesPage() {
               checked={applyUserScopes()}
               onChange={(e) => setApplyUserScopes(e.currentTarget.checked)}
             />
-            Restrict document lists to customers/locations assigned per user
+            This role uses Data scopes (limit which customers/locations the user can see)
           </label>
           <p class="mt-1 text-xs text-text-secondary">
-            Leave off for company admins (for example seeded <code class="text-[11px]">store_admin</code>) who should
-            see all branches. Turn on for branch-only staff, then assign locations under User permissions → Data scopes.
+            Leave off for company admins who should see all branches. Turn on for branch-only staff, then assign
+            customers/locations under{" "}
+            <span class="font-medium">User Management → Data scopes</span>.
           </p>
           <Show when={applyUserScopes()}>
             <p class="mt-1 text-xs text-amber-700">
               Fail-closed: a user with this role sees <strong>no records</strong> until you assign them
-              customers/locations under User permissions &rarr; Data scopes.
+              customers/locations under Data scopes.
             </p>
           </Show>
         </Field>

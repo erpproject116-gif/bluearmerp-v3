@@ -684,7 +684,7 @@ func computeQuotationLines(ctx context.Context, pool *pgxpool.Pool, tenantID int
 			continue
 		}
 		planned := inventory.NormalizePlannedSerialNos(ln.PlannedSerialNos)
-		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.LineNo, ln.ItemID, ln.Qty, planned); err != nil {
+		if err := inventory.ValidatePlannedSerialNos(ctx, pool, tenantID, ln.LineNo, ln.ItemID, ln.Qty, planned, false); err != nil {
 			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}

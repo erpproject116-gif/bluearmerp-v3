@@ -246,6 +246,14 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"query": "Query is too long (max 4000 characters)."})
 			return
 		}
+		if helpassistant.IsOffTopicERPQuery(query) {
+			response.OK(w, finalizeAskResult(askResult{
+				Mode:    "docs",
+				Message: helpassistant.OffTopicRefuseMessage,
+				UsedAI:  false,
+			}), "OK")
+			return
+		}
 		if len(body.Attachments) > 4 {
 			response.Validation(w, map[string]string{"attachments": "Too many attachments (max 4)."})
 			return
@@ -509,16 +517,17 @@ func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg 
 	}
 }
 
-const opsSystemPrompt = `You are Bluearm Copilot summarizing live ERP tool JSON for an executive.
+const opsSystemPrompt = `You are Bluearm Copilot summarizing live ERP tool JSON for an executive in this tenant only.
 Rules:
-- Use ONLY the tool JSON provided. Do not invent numbers.
+- Scope: only Bluearm ERP and this company’s tool-scoped data. Refuse coding, general knowledge, and unrelated tech.
+- Use ONLY the tool JSON provided. Do not invent numbers. Do not free-chat outside the tools.
 - Format with Markdown: short ## headings when useful, **bold** key figures, bullet lists for clarity.
 - Prefer deep links as Markdown [Label](/app/...) when helpful. Never invent external URLs.
 - Be concise (under 180 words).
 - If a tool was denied, say permission is required.
 - Do not claim you posted, emailed, or changed anything unless an Approve result explicitly says so.
 - Never ask for passwords, API keys, card data, or other secrets.
-- Never propose editing application source code or running shell/SQL.
+- Never write or debug source code; never propose shell, SQL, or infrastructure commands.
 - For expenses: prefer recurring.monthly_burn / yearly_burn and cash.outflow_mtd / outflow_ytd (and as_of).
 - For revenue / year-end projections: you do NOT have a crystal ball. Give a transparent estimate from live figures only — e.g. YTD inflow/revenue run-rate × remaining months, plus open pipeline / open quotations if present. Label it clearly as an estimate, list assumptions, and never present it as a booked forecast.
 - Always format money with the Philippine peso sign ₱ and thousands separators (example ₱1,234.50). Never use $ or the letters PHP as a currency prefix.`

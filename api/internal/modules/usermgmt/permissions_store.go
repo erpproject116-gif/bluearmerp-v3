@@ -81,6 +81,88 @@ func mergePermissions(rolePerms, overrides map[string]string) map[string]string 
 	return out
 }
 
+func accessRank(level string) int {
+	switch level {
+	case "write":
+		return 2
+	case "read":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func mergeAccessHighest(current, next string) string {
+	if accessRank(next) > accessRank(current) {
+		return next
+	}
+	return current
+}
+
+// computeEffectivePermissions mirrors runtime auth: role + groups (highest wins), then overrides replace.
+func computeEffectivePermissions(rolePerms, groupPerms, overrides map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range rolePerms {
+		out[k] = v
+	}
+	for k, v := range groupPerms {
+		out[k] = mergeAccessHighest(out[k], v)
+	}
+	for k, v := range overrides {
+		out[k] = v
+	}
+	return out
+}
+
+func loadMergedGroupPermissions(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64) (map[string]string, []string, error) {
+	nameRows, err := pool.Query(ctx, `
+		select g.group_name
+		from public.tenant_user_group_members gm
+		join public.tenant_user_groups g on g.id = gm.group_id and g.is_active = true
+		where gm.tenant_id = $1 and gm.user_id = $2
+		order by g.group_name`, tenantID, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	var names []string
+	for nameRows.Next() {
+		var name string
+		if err := nameRows.Scan(&name); err != nil {
+			nameRows.Close()
+			return nil, nil, err
+		}
+		names = append(names, name)
+	}
+	nameRows.Close()
+	if err := nameRows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		select gp.permission_code, gp.access_level
+		from public.tenant_user_group_members gm
+		join public.tenant_user_group_permissions gp
+		  on gp.group_id = gm.group_id and gp.tenant_id = gm.tenant_id
+		join public.tenant_user_groups g on g.id = gm.group_id and g.is_active = true
+		where gm.tenant_id = $1 and gm.user_id = $2`, tenantID, userID)
+	if err != nil {
+		return nil, names, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var code, lvl string
+		if err := rows.Scan(&code, &lvl); err != nil {
+			return nil, names, err
+		}
+		out[code] = mergeAccessHighest(out[code], lvl)
+	}
+	if names == nil {
+		names = []string{}
+	}
+	return out, names, rows.Err()
+}
+
 func saveRolePermissions(ctx context.Context, pool *pgxpool.Pool, tenantID int64, roleCode string, perms map[string]string, canSubmit, canCancel map[string]bool) error {
 	if perms == nil {
 		perms = map[string]string{}

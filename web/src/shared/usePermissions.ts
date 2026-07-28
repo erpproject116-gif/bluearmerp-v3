@@ -35,8 +35,10 @@ export type UserPermissionsPayload = {
   full_name: string;
   tenant_role: string;
   role_permissions: Record<string, string>;
+  group_permissions?: Record<string, string>;
   overrides: Record<string, string>;
   effective: Record<string, string>;
+  group_names?: string[];
 };
 
 export function usePermissionRegistry() {

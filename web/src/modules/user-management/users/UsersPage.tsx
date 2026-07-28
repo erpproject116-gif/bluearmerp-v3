@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -24,7 +25,7 @@ import {
 
 function statusLabel(status: string) {
   if (status === "invited") return "Invited";
-  if (status === "disabled") return "Disabled";
+  if (status === "disabled") return "Deleted";
   return "Active";
 }
 
@@ -36,7 +37,9 @@ export default function UsersPage() {
   const [inviteOpen, setInviteOpen] = createSignal(false);
   const [editOpen, setEditOpen] = createSignal(false);
   const [permOpen, setPermOpen] = createSignal(false);
+  const [previewOpen, setPreviewOpen] = createSignal(false);
   const [permUserId, setPermUserId] = createSignal<number | null>(null);
+  const [previewUserId, setPreviewUserId] = createSignal<number | null>(null);
   const [permValues, setPermValues] = createSignal<Record<string, MatrixValue>>({});
   const [editing, setEditing] = createSignal<TenantUserRow | null>(null);
   const [inviteEmail, setInviteEmail] = createSignal("");
@@ -54,6 +57,7 @@ export default function UsersPage() {
   const groups = useUserGroupList();
   const registry = usePermissionRegistry();
   const userPerms = useUserPermissions(permUserId);
+  const previewPerms = useUserPermissions(previewUserId);
 
   const list = useTenantUserList(() => ({
     page: page(),
@@ -84,13 +88,26 @@ export default function UsersPage() {
     }
   };
 
-  const openPermissions = (row: TenantUserRow) => {
+  const openOverrides = (row: TenantUserRow) => {
     if (row.is_owner) {
-      toast.warning("Tenant owner has full access; permissions cannot be overridden.");
+      toast.warning("Tenant owner has full access; overrides cannot be set.");
+      return;
+    }
+    if (row.status === "disabled") {
+      toast.warning("Restore this user before editing overrides.");
       return;
     }
     setPermUserId(row.id);
     setPermOpen(true);
+  };
+
+  const openEffectivePreview = (row: TenantUserRow) => {
+    if (row.is_owner) {
+      toast.warning("Tenant owner has full write access to all modules.");
+      return;
+    }
+    setPreviewUserId(row.id);
+    setPreviewOpen(true);
   };
 
   createEffect(() => {
@@ -103,7 +120,7 @@ export default function UsersPage() {
     setPermValues(next);
   });
 
-  const saveUserPermissions = async () => {
+  const saveUserOverrides = async () => {
     const id = permUserId();
     if (id == null) return;
     setSaving(true);
@@ -114,11 +131,12 @@ export default function UsersPage() {
     const res = await saveUserPermissionOverrides(id, overrides);
     setSaving(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not save permissions.");
+      toast.warning(res.message ?? "Could not save overrides.");
       return;
     }
     setPermOpen(false);
     permInvalidate.user(id);
+    toast.success("Overrides saved.");
   };
 
   const sendInvite = async () => {
@@ -140,7 +158,7 @@ export default function UsersPage() {
           }),
         }, { silent: true }),
       toast,
-      `User invited. They must sign in with Google using ${email}.`,
+      `User invited. Ask them to sign in at /signin with Google using ${email} (same address). They will join this company as a member—not start a separate trial.`,
     );
     setSaving(false);
     if (!ok) return;
@@ -183,8 +201,50 @@ export default function UsersPage() {
       }
     }
     setSaving(false);
-    if (!ok) return;
     setEditOpen(false);
+    invalidate.all();
+  };
+
+  const softDelete = async (row: TenantUserRow) => {
+    if (row.is_owner) {
+      toast.warning("Cannot delete the tenant owner.");
+      return;
+    }
+    if (row.id === auth.me?.user?.id) {
+      toast.warning("You cannot delete your own account.");
+      return;
+    }
+    if (
+      !confirm(
+        `Soft-delete ${row.full_name || row.email}? They lose access immediately. Role, groups, overrides, and data scopes are kept for restore.`,
+      )
+    ) {
+      return;
+    }
+    const res = await apiFetch(
+      `/api/v1/user-management/users/${row.id}`,
+      { method: "PATCH", body: JSON.stringify({ status: "disabled" }) },
+      { silent: true },
+    );
+    if (!res.ok) {
+      toast.warning(res.message ?? "Could not delete user.");
+      return;
+    }
+    toast.success("User deleted (access stopped). Restore anytime from the Deleted filter.");
+    invalidate.all();
+  };
+
+  const restoreUser = async (row: TenantUserRow) => {
+    const res = await apiFetch(
+      `/api/v1/user-management/users/${row.id}`,
+      { method: "PATCH", body: JSON.stringify({ status: "active" }) },
+      { silent: true },
+    );
+    if (!res.ok) {
+      toast.warning(res.message ?? "Could not restore user.");
+      return;
+    }
+    toast.success("User restored with prior role, groups, and scopes.");
     invalidate.all();
   };
 
@@ -203,8 +263,23 @@ export default function UsersPage() {
 
   const rows = () => list.data?.rows ?? [];
 
+  const previewEntries = () => {
+    const eff = previewPerms.data?.effective ?? {};
+    return Object.entries(eff)
+      .filter(([, lvl]) => lvl && lvl !== "deny")
+      .sort(([a], [b]) => a.localeCompare(b));
+  };
+
   return (
-    <>
+    <div class="space-y-3">
+      <p class="text-sm text-text-secondary">
+        Invite people, assign a role (and optional groups), soft-delete/restore. Open{" "}
+        <strong>Overrides</strong> only for exceptions. Limit customers/locations on{" "}
+        <A href="/app/user-management/user-permissions" class="text-brand-600 hover:underline">
+          Data scopes
+        </A>
+        .
+      </p>
       <SpreadsheetGrid
         columns={[
           { key: "email", header: "Email", sortable: true },
@@ -220,9 +295,21 @@ export default function UsersPage() {
             ),
           },
           {
+            key: "group_names",
+            header: "Groups",
+            render: (row) => <span class="text-xs text-text-secondary">{row.group_names || "—"}</span>,
+          },
+          {
             key: "status",
             header: "Status",
-            render: (row) => <span>{statusLabel(row.status)}</span>,
+            render: (row) => (
+              <Show
+                when={row.status === "disabled"}
+                fallback={<span>{statusLabel(row.status)}</span>}
+              >
+                <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">Deleted</span>
+              </Show>
+            ),
           },
           {
             key: "auth_linked",
@@ -230,37 +317,71 @@ export default function UsersPage() {
             render: (row) => <span>{row.auth_linked ? "Yes" : "No"}</span>,
           },
           {
-            key: "invited_at",
-            header: "Invited",
-            render: (row) => (
-              <span>{row.invited_at ? new Date(row.invited_at).toLocaleDateString() : "—"}</span>
-            ),
-          },
-          {
             key: "actions",
             header: "Actions",
             render: (row) => (
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
                   class="text-sm text-brand-600 hover:underline"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openEdit(row);
+                    void openEdit(row);
                   }}
                 >
                   Edit
                 </button>
-                <Show when={row.status !== "invited" && !row.is_owner}>
+                <Show when={row.status !== "invited" && !row.is_owner && row.status !== "disabled"}>
                   <button
                     type="button"
                     class="text-sm text-brand-600 hover:underline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openPermissions(row);
+                      openOverrides(row);
                     }}
                   >
-                    Permissions
+                    Overrides
+                  </button>
+                  <button
+                    type="button"
+                    class="text-sm text-brand-600 hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEffectivePreview(row);
+                    }}
+                  >
+                    Effective access
+                  </button>
+                  <A
+                    href="/app/user-management/user-permissions"
+                    class="text-sm text-brand-600 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Data scopes
+                  </A>
+                </Show>
+                <Show when={row.status === "active" && !row.is_owner}>
+                  <button
+                    type="button"
+                    class="text-sm text-red-600 hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void softDelete(row);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </Show>
+                <Show when={row.status === "disabled"}>
+                  <button
+                    type="button"
+                    class="text-sm text-emerald-700 hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void restoreUser(row);
+                    }}
+                  >
+                    Restore
                   </button>
                 </Show>
                 <Show when={row.status === "invited" && row.invite_id}>
@@ -283,7 +404,7 @@ export default function UsersPage() {
         loading={list.isLoading}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onEdit={openEdit}
+        onEdit={(row) => void openEdit(row)}
         onNew={openInvite}
         codeKey="email"
         nameKey="full_name"
@@ -304,7 +425,7 @@ export default function UsersPage() {
           { value: "", label: "All" },
           { value: "active", label: "Active" },
           { value: "invited", label: "Invited" },
-          { value: "disabled", label: "Disabled" },
+          { value: "disabled", label: "Deleted" },
         ]}
         onRefresh={() => invalidate.users()}
       />
@@ -388,7 +509,7 @@ export default function UsersPage() {
                   onChange={(e) => setEditStatus(e.currentTarget.value)}
                 >
                   <option value="active">Active</option>
-                  <option value="disabled">Disabled</option>
+                  <option value="disabled">Deleted</option>
                   <Show when={row().status === "invited"}>
                     <option value="invited">Invited</option>
                   </Show>
@@ -397,7 +518,7 @@ export default function UsersPage() {
               <Show when={!row().is_owner}>
                 <Field label="Groups">
                   <p class="mb-2 text-xs text-text-secondary">
-                    Users can belong to multiple groups. Access merges with role permissions (highest level wins).
+                    Optional team packs that add permissions on top of the user’s role (highest level wins).
                   </p>
                   <div class="max-h-40 overflow-y-auto rounded-lg border border-stroke p-2">
                     <For each={groups.data ?? []}>
@@ -427,16 +548,20 @@ export default function UsersPage() {
 
       <EntityModal
         open={permOpen()}
-        title={`Permissions — ${userPerms.data?.full_name ?? "User"}`}
+        title={`Exception overrides — ${userPerms.data?.full_name ?? "User"}`}
         onClose={() => setPermOpen(false)}
-        onSave={() => void saveUserPermissions()}
+        onSave={() => void saveUserOverrides()}
         saving={saving()}
         wide
         singleColumn
       >
         <p class="mb-3 text-sm text-text-secondary">
-          Per-user overrides on top of role and group permissions. Choose <strong>Role</strong> to inherit the
-          effective default from <span class="font-medium">{userPerms.data?.tenant_role}</span> plus all groups.
+          Rare exceptions on top of role <span class="font-medium">{userPerms.data?.tenant_role}</span>
+          <Show when={(userPerms.data?.group_names?.length ?? 0) > 0}>
+            {" "}and groups {(userPerms.data?.group_names ?? []).join(", ")}
+          </Show>
+          . Choose <strong>Role</strong> to inherit the effective default (role + groups). Prefer changing the role
+          matrix when many people need the same access.
         </p>
         <PermissionMatrix
           groups={registry.data ?? []}
@@ -444,11 +569,54 @@ export default function UsersPage() {
           allowInherit
           roleDefaults={userPerms.data?.effective as Record<string, AccessLevel> | undefined}
           loading={registry.isLoading || userPerms.isLoading}
-          title="Per-user overrides for modules that are turned on under Module & Features. Effective access is the highest from role, all groups, then these overrides."
+          title="Per-user overrides. Effective access is the highest from role, all groups, then these overrides."
           enabledModuleCodes={auth.me?.enabled_module_codes ?? null}
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
         />
       </EntityModal>
-    </>
+
+      <EntityModal
+        open={previewOpen()}
+        title={`Effective access — ${previewPerms.data?.full_name ?? "User"}`}
+        onClose={() => setPreviewOpen(false)}
+        onSave={() => setPreviewOpen(false)}
+        saveLabel="Close"
+        wide
+        singleColumn
+      >
+        <p class="mb-3 text-sm text-text-secondary">
+          Runtime matrix for role <strong>{previewPerms.data?.tenant_role}</strong>
+          <Show when={(previewPerms.data?.group_names?.length ?? 0) > 0}>
+            {" "}+ groups {(previewPerms.data?.group_names ?? []).join(", ")}
+          </Show>
+          , then overrides. Matches what the app enforces after sign-in.
+        </p>
+        <Show when={previewPerms.isLoading}>
+          <p class="text-sm text-text-secondary">Loading…</p>
+        </Show>
+        <Show when={!previewPerms.isLoading}>
+          <div class="max-h-96 overflow-y-auto rounded-lg border border-stroke">
+            <table class="min-w-full text-left text-sm">
+              <thead class="bg-slate-50 text-xs uppercase text-text-secondary">
+                <tr>
+                  <th class="px-3 py-2">Permission</th>
+                  <th class="px-3 py-2">Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For each={previewEntries()} fallback={<tr><td class="px-3 py-3 text-text-secondary" colspan={2}>No non-deny permissions.</td></tr>}>
+                  {([code, lvl]) => (
+                    <tr class="border-t border-stroke">
+                      <td class="px-3 py-1.5 font-mono text-xs">{code}</td>
+                      <td class="px-3 py-1.5 capitalize">{lvl}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </Show>
+      </EntityModal>
+    </div>
   );
 }
