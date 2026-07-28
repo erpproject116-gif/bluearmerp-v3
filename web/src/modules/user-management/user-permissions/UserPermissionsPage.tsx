@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createSignal, For, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
@@ -12,9 +13,17 @@ import { apiFetch } from "../../../shared/api";
 
 type ScopeOption = { id: number; label: string };
 
+function statusLabel(status: string) {
+  if (status === "invited") return "Invited";
+  if (status === "disabled") return "Deleted";
+  return "Active";
+}
+
 export default function UserPermissionsPage() {
   const toast = useToast();
-  const { page, setPage, q, setQ, sort, order, pageSize } = useListState("email");
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, pageSize } = useListState("email", 25, {
+    defaultStatus: "active",
+  });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<TenantUserRow | null>(null);
@@ -30,6 +39,7 @@ export default function UserPermissionsPage() {
     sort: sort(),
     order: order(),
     q: q() || undefined,
+    status: statusFilter() || undefined,
   }));
 
   const loadOptions = async () => {
@@ -47,6 +57,10 @@ export default function UserPermissionsPage() {
   };
 
   const openScopes = async (row: TenantUserRow) => {
+    if (row.status === "disabled") {
+      toast.warning("Restore this user on Users before editing data scopes.");
+      return;
+    }
     setEditing(row);
     setModalOpen(true);
     setLoadingScopes(true);
@@ -70,6 +84,10 @@ export default function UserPermissionsPage() {
   const save = async () => {
     const user = editing();
     if (!user) return;
+    if (user.status === "disabled") {
+      toast.warning("Cannot edit scopes for a deleted user.");
+      return;
+    }
     setSaving(true);
     const res = await saveUserDataScopes(user.id, scopes());
     setSaving(false);
@@ -83,29 +101,53 @@ export default function UserPermissionsPage() {
 
   return (
     <div class="space-y-4">
-      <p class="text-sm text-text-secondary">
-        Restrict users to specific customers, locations, or warehouses when their role has{" "}
-        <strong>Apply user scopes</strong> enabled.
-      </p>
+      <div class="space-y-1">
+        <h2 class="text-lg font-semibold text-text-primary">Data scopes</h2>
+        <p class="text-sm text-text-secondary">
+          Limit which customers and locations this user can see when their role has{" "}
+          <strong>Apply user data scopes</strong>. Not for roles or delete — manage accounts on{" "}
+          <A href="/app/user-management/users" class="text-brand-600 hover:underline">
+            Users
+          </A>
+          .
+        </p>
+      </div>
       <SpreadsheetGrid
         columns={[
           { key: "email", header: "Email", clickable: true },
           { key: "full_name", header: "Name" },
           { key: "tenant_role", header: "Role" },
           {
+            key: "status",
+            header: "Status",
+            render: (row) => (
+              <Show
+                when={row.status === "disabled"}
+                fallback={<span>{statusLabel(row.status)}</span>}
+              >
+                <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">Deleted</span>
+              </Show>
+            ),
+          },
+          {
             key: "actions",
             header: "Actions",
             render: (row) => (
-              <button
-                type="button"
-                class="text-sm text-brand-600 hover:underline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void openScopes(row);
-                }}
+              <Show
+                when={row.status !== "disabled"}
+                fallback={<span class="text-xs text-text-secondary">Restore on Users</span>}
               >
-                Data scopes
-              </button>
+                <button
+                  type="button"
+                  class="text-sm text-brand-600 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void openScopes(row);
+                  }}
+                >
+                  Edit scopes
+                </button>
+              </Show>
             ),
           },
         ]}
@@ -115,6 +157,7 @@ export default function UserPermissionsPage() {
         onSelect={setSelectedId}
         onEdit={(row) => void openScopes(row)}
         onNew={() => {}}
+        showNew={false}
         codeKey="email"
         nameKey="full_name"
         page={page()}
@@ -124,6 +167,15 @@ export default function UserPermissionsPage() {
         search={q()}
         onSearchChange={setQ}
         searchPlaceholder="Search users…"
+        status={statusFilter()}
+        onStatusChange={setStatusFilter}
+        statusLabel="Status"
+        statusOptions={[
+          { value: "active", label: "Active" },
+          { value: "", label: "All" },
+          { value: "invited", label: "Invited" },
+          { value: "disabled", label: "Deleted" },
+        ]}
         onRefresh={() => list.refetch()}
       />
 

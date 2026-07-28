@@ -130,6 +130,12 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
+					if HasPendingApprovalTenant(r.Context(), pool, claims.Sub, claims.Email) {
+						response.Err(w, http.StatusForbidden,
+							"Your company workspace is waiting for Bluearm product owner approval. You will get access after they approve it in Platform Command.",
+							"ERR_TENANT_PENDING_APPROVAL")
+						return
+					}
 					response.Err(w, http.StatusForbidden,
 						"No tenant profile for this account. Ask an administrator to invite you, then sign in with Google using the invited email.",
 						"ERR_FORBIDDEN")
@@ -250,7 +256,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		left join public.user_active_tenant uat on uat.auth_user_id = u.auth_user_id
 		where u.auth_user_id = $1::uuid
 		  and u.status = 'active'
-		  and t.status not in ('suspended', 'cancelled')
+		  and t.status not in ('suspended', 'cancelled', 'pending_approval')
 		order by
 		  (case when u.tenant_id = $2 then 0 else 1 end),
 		  (case when u.tenant_id = coalesce(uat.tenant_id, 0) then 0 else 1 end),

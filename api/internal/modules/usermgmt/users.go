@@ -27,6 +27,7 @@ type UserRow struct {
 	Status       string     `json:"status"`
 	AuthLinked   bool       `json:"auth_linked"`
 	IsOwner      bool       `json:"is_owner"`
+	GroupNames   string     `json:"group_names,omitempty"`
 	InviteID     *int64     `json:"invite_id,omitempty"`
 	InvitedAt    *time.Time `json:"invited_at,omitempty"`
 	InvitedBy    *int64     `json:"invited_by_user_id,omitempty"`
@@ -100,6 +101,12 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 			  u.status,
 			  u.auth_user_id is not null,
 			  t.owner_user_id = u.id,
+			  coalesce((
+			    select string_agg(g.group_name, ', ' order by g.group_name)
+			    from public.tenant_user_group_members gm
+			    join public.tenant_user_groups g on g.id = gm.group_id and g.is_active = true
+			    where gm.tenant_id = u.tenant_id and gm.user_id = u.id
+			  ), ''),
 			  ui.id,
 			  ui.invited_at,
 			  ui.invited_by_user_id,
@@ -131,7 +138,7 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 			var row UserRow
 			if err := rows.Scan(
 				&row.ID, &row.Email, &row.FullName, &row.TenantRole, &row.Status,
-				&row.AuthLinked, &row.IsOwner, &row.InviteID, &row.InvitedAt, &row.InvitedBy, &total,
+				&row.AuthLinked, &row.IsOwner, &row.GroupNames, &row.InviteID, &row.InvitedAt, &row.InvitedBy, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to list users.", "ERR_INTERNAL")
 				return
@@ -336,8 +343,14 @@ func patchUser(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		row.IsOwner = isOwner
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.update", "user", &id, nil, map[string]any{
-			"tenant_role": role, "status": status,
+		auditAction := "user.update"
+		if currentStatus != status && status == "disabled" {
+			auditAction = "user.soft_delete"
+		} else if currentStatus != status && status == "active" && currentStatus == "disabled" {
+			auditAction = "user.restore"
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, auditAction, "user", &id, nil, map[string]any{
+			"tenant_role": role, "status": status, "previous_status": currentStatus,
 		})
 		_ = auth.InvalidateUserByAppUserID(r.Context(), pool, id)
 		response.OK(w, row, "User updated.")

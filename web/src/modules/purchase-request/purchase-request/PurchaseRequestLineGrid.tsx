@@ -18,7 +18,6 @@ import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
 import { DocumentSerialScanBar } from "../../../shared/DocumentSerialScanBar";
 import type { ResolvedSerialUnit } from "../../../shared/serialScanTypes";
 import { useToast } from "../../../shared/toast";
-import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
 
 export type PurchaseRequestLineRow = {
   line_no: number;
@@ -569,7 +568,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                       <div class="space-y-1">
                         <Show when={line().item_id && line().track_serial}>
                           <p class="text-[10px] uppercase tracking-wide text-text-secondary">
-                            Planned · {trackingPolicyLabel(line().serial_policy)}
+                            Planned · optional on purchase request
                           </p>
                         </Show>
                         <Show when={!line().item_id}>

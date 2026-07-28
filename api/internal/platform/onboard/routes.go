@@ -113,6 +113,42 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 
+	// Pending store invite: join that tenant as the invited member — never create a second owner workspace.
+	if inviteTenantID, inviteCode, hasInvite := auth.PendingInviteTenant(ctx, s.pool, email); hasInvite {
+		if err := auth.LinkProvisionedUser(ctx, s.pool, claims.Sub, email); err != nil {
+			response.Err(w, http.StatusForbidden,
+				"You have a pending company invite. Sign in with the invited Google email, or ask your admin to re-invite you.",
+				"ERR_FORBIDDEN")
+			return
+		}
+		_ = auth.SetActiveTenant(ctx, s.pool, claims.Sub, inviteTenantID)
+		leadgenID, _ := customerregistry.LeadgenTenantIDFromCfg(ctx, s.pool, s.cfg)
+		var fullName string
+		_ = s.pool.QueryRow(ctx, `
+			select coalesce(full_name, '') from public.users
+			where auth_user_id = $1::uuid and tenant_id = $2 limit 1`, claims.Sub, inviteTenantID).Scan(&fullName)
+		_ = customerregistry.EnsureCustomerForLinkedUser(
+			ctx, s.pool, leadgenID, claims.Sub, email, fullName,
+			customerregistry.EntryInvite, inviteTenantID)
+		response.OK(w, map[string]any{
+			"tenant_id":           inviteTenantID,
+			"company_code":        inviteCode,
+			"joined_invite":       true,
+			"already_provisioned": true,
+		}, "Joined your company workspace from invite.")
+		return
+	}
+
+	if tid, code, ok := auth.PendingApprovalTenant(ctx, s.pool, claims.Sub, email); ok {
+		response.OK(w, map[string]any{
+			"tenant_id":         tid,
+			"company_code":      code,
+			"pending_approval":  true,
+			"already_provisioned": true,
+		}, "Workspace is waiting for product owner approval.")
+		return
+	}
+
 	if tid, code, ok := customerregistry.ExistingTrialTenant(ctx, s.pool, email); ok {
 		var endsAt *time.Time
 		_ = s.pool.QueryRow(ctx, `
@@ -187,11 +223,12 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 	_, _ = customerregistry.UpdateCustomerUrgency(ctx, s.pool, res.CustomerID, time.Now())
 
 	response.OK(w, map[string]any{
-		"tenant_id":     tenantID,
-		"company_code":  companyCode,
-		"trial_ends_at": endsAt,
-		"customer_id":   res.CustomerID,
-	}, "Trial workspace ready.")
+		"tenant_id":        tenantID,
+		"company_code":     companyCode,
+		"trial_ends_at":    endsAt,
+		"customer_id":      res.CustomerID,
+		"pending_approval": true,
+	}, "Trial workspace submitted for product owner approval.")
 }
 
 type trialArgs struct {
@@ -214,7 +251,7 @@ func (s *service) createTrialTenant(ctx context.Context, a trialArgs) (int64, er
 		insert into public.tenants
 		  (company_name, company_code, industry_type, country, currency, status,
 		   is_demo, auto_enable_all_modules)
-		values ($1, $2, 'general', 'PH', 'PHP', 'active', false, true)
+		values ($1, $2, 'general', 'PH', 'PHP', 'pending_approval', false, true)
 		returning id`,
 		a.company, a.companyCode).Scan(&tenantID); err != nil {
 		return 0, err

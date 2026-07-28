@@ -19,6 +19,7 @@ import (
 func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	label := strings.TrimSpace(r.URL.Query().Get("urgency_label"))
+	tenantStatus := strings.TrimSpace(r.URL.Query().Get("tenant_status"))
 	limit := 50
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 200 {
@@ -36,10 +37,14 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 		args = append(args, label)
 		where += fmt.Sprintf(" and pc.urgency_label = $%d", len(args))
 	}
+	if tenantStatus != "" {
+		args = append(args, tenantStatus)
+		where += fmt.Sprintf(" and t.status = $%d", len(args))
+	}
 
 	query := `
 		select pc.id, pc.email, pc.full_name, pc.company_name, pc.entry_source,
-		       pc.urgency_label, pc.tenant_id, t.company_code,
+		       pc.urgency_label, pc.tenant_id, t.company_code, coalesce(t.status, '') as tenant_status,
 		       ps.plan_kind, ps.status as sub_status, ps.ends_at,
 		       pc.crm_lead_id, pc.created_at
 		from public.platform_customers pc
@@ -51,7 +56,9 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 		  order by created_at desc limit 1
 		) ps on true
 		` + where + `
-		order by pc.urgency_updated_at desc, pc.id desc
+		order by
+		  case when t.status = 'pending_approval' then 0 else 1 end,
+		  pc.urgency_updated_at desc, pc.id desc
 		limit $1`
 
 	rows, err := s.pool.Query(r.Context(), query, args...)
@@ -65,21 +72,21 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var (
 			id                                                      int64
-			email, fullName, entrySource, urgency                   string
+			email, fullName, entrySource, urgency, tenantStatusVal  string
 			company, companyCode, planKind, subStatus               *string
-			tenantID, leadID                                          *int64
-			endsAt                                                    *time.Time
-			createdAt                                                 time.Time
+			tenantID, leadID                                        *int64
+			endsAt                                                  *time.Time
+			createdAt                                               time.Time
 		)
 		if err := rows.Scan(&id, &email, &fullName, &company, &entrySource, &urgency, &tenantID,
-			&companyCode, &planKind, &subStatus, &endsAt, &leadID, &createdAt); err != nil {
+			&companyCode, &tenantStatusVal, &planKind, &subStatus, &endsAt, &leadID, &createdAt); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to read customer.", "ERR_INTERNAL")
 			return
 		}
 		row := map[string]any{
 			"id": id, "email": email, "full_name": fullName, "company_name": company,
 			"entry_source": entrySource, "urgency_label": urgency,
-			"tenant_id": tenantID, "company_code": companyCode,
+			"tenant_id": tenantID, "company_code": companyCode, "tenant_status": tenantStatusVal,
 			"plan_kind": planKind, "subscription_status": subStatus, "ends_at": endsAt,
 			"crm_lead_id": leadID, "created_at": createdAt,
 		}
@@ -129,6 +136,13 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 		from public.platform_subscriptions where customer_id = $1 order by created_at desc`, id)
 	subs := scanSubscriptions(subRows)
 
+	var tenantStatus, companyCode string
+	if tenantID != nil {
+		_ = s.pool.QueryRow(r.Context(), `
+			select coalesce(status,''), coalesce(company_code,'') from public.tenants where id = $1`, *tenantID).
+			Scan(&tenantStatus, &companyCode)
+	}
+
 	invRows, _ := s.pool.Query(r.Context(), `
 		select i.id, i.invoice_no, i.period_start, i.period_end, i.amount, i.currency,
 		       i.due_date, i.paid_at, i.status, i.notes, s.plan_kind
@@ -142,6 +156,7 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 			"id": id, "email": email, "full_name": fullName, "company_name": company,
 			"mobile": mobile, "entry_source": entrySource, "urgency_label": urgency,
 			"tenant_id": tenantID, "auth_user_id": authUserID,
+			"tenant_status": tenantStatus, "company_code": companyCode,
 			"crm_lead_id": leadID, "crm_lead_tenant_id": leadTenantID,
 			"onboarding_progress": json.RawMessage(onboarding), "created_at": createdAt,
 		},

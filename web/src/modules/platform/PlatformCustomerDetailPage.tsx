@@ -74,8 +74,36 @@ export default function PlatformCustomerDetailPage() {
                   <p class="text-sm text-text-secondary">{String(c().email)}</p>
                   <p class="mt-1 text-xs">
                     Urgency: <strong>{String(c().urgency_label)}</strong> · Source: {String(c().entry_source)}
+                    <Show when={c().tenant_status}>
+                      {" "}· Workspace: <strong>{String(c().tenant_status).replace(/_/g, " ")}</strong>
+                      <Show when={c().company_code}> ({String(c().company_code)})</Show>
+                    </Show>
                   </p>
                 </div>
+
+                <Show when={String(c().tenant_status ?? "") === "pending_approval"}>
+                  <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p class="flex-1 text-sm text-amber-950">
+                      Self-serve signup waiting for product owner approval before this company can use the ERP.
+                    </p>
+                    <button
+                      type="button"
+                      class="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                      disabled={busy()}
+                      onClick={() => void act(`/api/v1/platform/console/customers/${id()}/approve`)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 disabled:opacity-50"
+                      disabled={busy()}
+                      onClick={() => void act(`/api/v1/platform/console/customers/${id()}/reject`, { reason: "Rejected by product owner" })}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </Show>
 
                 <Show when={ov()}>
                   <section class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3">

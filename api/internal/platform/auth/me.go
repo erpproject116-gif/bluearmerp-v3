@@ -121,7 +121,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 		join public.tenants t on t.id = u.tenant_id
 		where u.auth_user_id = (select auth_user_id from public.users where id = $1)
 		  and u.status = 'active'
-		  and t.status not in ('suspended', 'cancelled')
+		  and t.status not in ('suspended', 'cancelled', 'pending_approval')
 		order by t.company_name`, tu.AppUserID)
 	if err != nil {
 		return MePayload{}, err

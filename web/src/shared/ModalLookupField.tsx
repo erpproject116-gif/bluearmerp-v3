@@ -16,6 +16,10 @@ type Props = {
   fallbackLabel: string;
   fallbackRequired?: boolean;
   fallbackPlaceholder?: string;
+  /** When true, field stays visible even if form settings hide it. */
+  forceVisible?: boolean;
+  /** When true, field is always treated as required. */
+  forceRequired?: boolean;
   value: () => string;
   selectedId: () => number | null;
   onInput: (text: string) => void;
@@ -29,9 +33,9 @@ type Props = {
 export function ModalLookupField(props: Props) {
   const meta = (): ModalFieldMeta | null => {
     const f = props.settings()[props.fieldKey];
-    if (!fieldVisible(f, true)) return null;
+    if (!props.forceVisible && !fieldVisible(f, true)) return null;
     const label = f?.label?.trim() || props.fallbackLabel;
-    const required = fieldRequired(f, props.fallbackRequired ?? false);
+    const required = props.forceRequired || fieldRequired(f, props.fallbackRequired ?? false);
     const disabled = fieldDisabled(f);
     const placeholder = fieldPlaceholder(f, props.fallbackPlaceholder);
     return {

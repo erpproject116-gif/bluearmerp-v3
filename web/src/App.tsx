@@ -14,6 +14,7 @@ import ForgotPasswordPage from "./modules/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./modules/auth/ResetPasswordPage";
 import DemoSignupPage from "./modules/auth/DemoSignupPage";
 import WelcomePage from "./modules/auth/WelcomePage";
+import PendingApprovalPage from "./modules/auth/PendingApprovalPage";
 import AuthCallbackPage from "./modules/auth/AuthCallbackPage";
 import {
   RepairOrderReceiptPrintPage,
@@ -368,6 +369,7 @@ export default function App() {
         <Route path="/auth/reset-password" component={ResetPasswordPage} />
         <Route path="/demo" component={DemoSignupPage} />
         <Route path="/welcome" component={WelcomePage} />
+        <Route path="/pending-approval" component={PendingApprovalPage} />
         <Route path="/auth/callback" component={AuthCallbackPage} />
         <Route path="/portal/login" component={PortalLoginPage} />
         <Route path="/portal/dashboard" component={PortalDashboardPage} />

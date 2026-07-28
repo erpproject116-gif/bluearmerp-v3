@@ -1,6 +1,6 @@
 import { For, Show } from "solid-js";
 import { EntityModal } from "../../../shared/SpreadsheetGrid";
-import { formatMoney } from "../../../shared/money";
+import { formatMoneyWithCode } from "../../../shared/money";
 
 export type ProfitLineRow = {
   line_no: number;
@@ -18,6 +18,8 @@ export type ProfitLineRow = {
 type Props = {
   open: boolean;
   rows: ProfitLineRow[];
+  taxTypeLabel: string;
+  currencyCode: string;
   onClose: () => void;
 };
 
@@ -31,6 +33,7 @@ export function QuotationProfitModal(props: Props) {
     const c = costSum();
     return c == null ? null : sellSum() - c;
   };
+  const money = (n: number) => formatMoneyWithCode(n, props.currencyCode);
 
   return (
     <EntityModal
@@ -43,8 +46,17 @@ export function QuotationProfitModal(props: Props) {
       stacked
       singleColumn
     >
+      <div class="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
+        <p>
+          Tax / transaction type: <span class="font-medium text-text-primary">{props.taxTypeLabel}</span>
+        </p>
+        <p>
+          Currency: <span class="font-medium text-text-primary">{props.currencyCode}</span>
+        </p>
+      </div>
       <p class="mb-3 text-sm text-text-secondary">
-        Margin uses item purchase price when set (not a full costing engine). Lines without cost show “cost not set”.
+        Sell amounts follow this quotation’s tax-shaped line totals. Margin uses item purchase price when set (not a full
+        costing engine). Lines without cost show “cost not set”.
       </p>
       <div class="overflow-x-auto rounded-lg border border-stroke">
         <table class="min-w-full text-sm">
@@ -53,8 +65,8 @@ export function QuotationProfitModal(props: Props) {
               <th class="px-3 py-2">#</th>
               <th class="px-3 py-2">Item</th>
               <th class="px-3 py-2 text-right">Qty</th>
-              <th class="px-3 py-2 text-right">Sell</th>
-              <th class="px-3 py-2 text-right">Cost</th>
+              <th class="px-3 py-2 text-right">Sell ({props.currencyCode})</th>
+              <th class="px-3 py-2 text-right">Cost ({props.currencyCode})</th>
               <th class="px-3 py-2 text-right">Margin</th>
               <th class="px-3 py-2 text-right">%</th>
             </tr>
@@ -69,15 +81,15 @@ export function QuotationProfitModal(props: Props) {
                     <div class="text-xs text-text-secondary">{r.item_name}</div>
                   </td>
                   <td class="px-3 py-2 text-right">{r.qty}</td>
-                  <td class="px-3 py-2 text-right">{formatMoney(r.sell_total)}</td>
+                  <td class="px-3 py-2 text-right">{money(r.sell_total)}</td>
                   <td class="px-3 py-2 text-right">
                     <Show when={r.cost_total != null} fallback={<span class="text-amber-700">cost not set</span>}>
-                      {formatMoney(r.cost_total!)}
+                      {money(r.cost_total!)}
                     </Show>
                   </td>
                   <td class="px-3 py-2 text-right">
                     <Show when={r.margin != null} fallback="—">
-                      {formatMoney(r.margin!)}
+                      {money(r.margin!)}
                     </Show>
                   </td>
                   <td class="px-3 py-2 text-right">
@@ -94,15 +106,15 @@ export function QuotationProfitModal(props: Props) {
               <td class="px-3 py-2" colSpan={3}>
                 Total
               </td>
-              <td class="px-3 py-2 text-right">{formatMoney(sellSum())}</td>
+              <td class="px-3 py-2 text-right">{money(sellSum())}</td>
               <td class="px-3 py-2 text-right">
                 <Show when={costSum() != null} fallback="—">
-                  {formatMoney(costSum()!)}
+                  {money(costSum()!)}
                 </Show>
               </td>
               <td class="px-3 py-2 text-right">
                 <Show when={marginSum() != null} fallback="—">
-                  {formatMoney(marginSum()!)}
+                  {money(marginSum()!)}
                 </Show>
               </td>
               <td class="px-3 py-2 text-right">

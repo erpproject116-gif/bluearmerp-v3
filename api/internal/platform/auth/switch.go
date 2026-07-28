@@ -59,7 +59,7 @@ func switchTenantHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			  where u.auth_user_id = $1::uuid
 			    and u.tenant_id = $2
 			    and u.status = 'active'
-			    and t.status not in ('suspended', 'cancelled')
+			    and t.status not in ('suspended', 'cancelled', 'pending_approval')
 			)`, tu.AuthUserID, body.TenantID).Scan(&isMember)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to switch business.", "ERR_INTERNAL")

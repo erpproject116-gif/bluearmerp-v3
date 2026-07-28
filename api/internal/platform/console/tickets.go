@@ -19,10 +19,25 @@ import (
 func (s *service) listTickets(w http.ResponseWriter, r *http.Request) {
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	page, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page")))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page_size")))
+	if pageSize < 1 {
+		pageSize = 50
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	offset := (page - 1) * pageSize
+
 	args := []any{}
 	where := "where 1=1"
 	n := 1
-	if status != "" {
+	if status == "all" {
+		// no status filter
+	} else if status != "" {
 		args = append(args, status)
 		where += " and t.status = $" + strconv.Itoa(n)
 		n++
@@ -31,16 +46,33 @@ func (s *service) listTickets(w http.ResponseWriter, r *http.Request) {
 	}
 	if q != "" {
 		args = append(args, "%"+strings.ToLower(q)+"%")
-		where += " and (lower(t.subject) like $" + strconv.Itoa(n) + " or lower(coalesce(t.ticket_no,'')) like $" + strconv.Itoa(n) + ")"
+		where += " and (lower(t.subject) like $" + strconv.Itoa(n) + " or lower(coalesce(t.ticket_no,'')) like $" + strconv.Itoa(n) +
+			" or lower(coalesce(p.company_name,'')) like $" + strconv.Itoa(n) + ")"
 		n++
 	}
-	_ = n
+
+	var total int64
+	countArgs := append([]any{}, args...)
+	if err := s.pool.QueryRow(r.Context(), `
+		select count(*) from public.sup_support_tickets t
+		join public.tenants tn on tn.id = t.tenant_id
+		left join public.inv_partners p on p.id = t.partner_id and p.tenant_id = t.tenant_id
+		`+where, countArgs...).Scan(&total); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to list tickets.", "ERR_INTERNAL")
+		return
+	}
+
+	args = append(args, pageSize, offset)
+	limitParam := "$" + strconv.Itoa(n)
+	offsetParam := "$" + strconv.Itoa(n+1)
 	rows, err := s.pool.Query(r.Context(), `
 		select t.id, t.tenant_id, t.ticket_no, t.subject, t.status, t.priority, t.created_at, t.updated_at,
 		       pc.id as customer_id, coalesce(pc.company_name, pc.full_name, '') as customer_name,
-		       tn.company_code
+		       tn.company_code, coalesce(tn.company_name, '') as tenant_name,
+		       coalesce(p.company_name, '') as partner_name
 		from public.sup_support_tickets t
 		join public.tenants tn on tn.id = t.tenant_id
+		left join public.inv_partners p on p.id = t.partner_id and p.tenant_id = t.tenant_id
 		left join lateral (
 		  select id, company_name, full_name
 		  from public.platform_customers
@@ -50,7 +82,7 @@ func (s *service) listTickets(w http.ResponseWriter, r *http.Request) {
 		) pc on true
 		`+where+`
 		order by t.updated_at desc nulls last, t.created_at desc
-		limit 100`, args...)
+		limit `+limitParam+` offset `+offsetParam, args...)
 	if err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to list tickets.", "ERR_INTERNAL")
 		return
@@ -62,17 +94,23 @@ func (s *service) listTickets(w http.ResponseWriter, r *http.Request) {
 		var ticketNo, subject, st, priority string
 		var created, updated time.Time
 		var customerID *int64
-		var customerName, companyCode string
-		if rows.Scan(&id, &tenantID, &ticketNo, &subject, &st, &priority, &created, &updated, &customerID, &customerName, &companyCode) != nil {
+		var customerName, companyCode, tenantName, partnerName string
+		if rows.Scan(&id, &tenantID, &ticketNo, &subject, &st, &priority, &created, &updated, &customerID, &customerName, &companyCode, &tenantName, &partnerName) != nil {
 			continue
 		}
 		list = append(list, map[string]any{
 			"id": id, "tenant_id": tenantID, "ticket_no": ticketNo, "subject": subject,
 			"status": st, "priority": priority, "created_at": created, "updated_at": updated,
 			"customer_id": customerID, "customer_name": customerName, "company_code": companyCode,
+			"tenant_name": tenantName, "partner_name": partnerName,
 		})
 	}
-	response.OK(w, map[string]any{"tickets": list}, "OK")
+	response.OK(w, map[string]any{
+		"tickets": list,
+		"page":    page,
+		"page_size": pageSize,
+		"total":   total,
+	}, "OK")
 }
 
 func (s *service) customerTickets(w http.ResponseWriter, r *http.Request) {
@@ -113,12 +151,18 @@ func (s *service) getTicket(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var tenantID int64
 	var ticketNo, subject, status, priority, description, gapTag, gapNote string
+	var companyCode, tenantName, partnerName string
 	var created, updated time.Time
 	err := s.pool.QueryRow(r.Context(), `
-		select tenant_id, ticket_no, subject, status, priority, coalesce(description,''),
-		       coalesce(product_gap_tag,''), coalesce(product_gap_note,''), created_at, updated_at
-		from public.sup_support_tickets where id = $1`, id).
-		Scan(&tenantID, &ticketNo, &subject, &status, &priority, &description, &gapTag, &gapNote, &created, &updated)
+		select t.tenant_id, t.ticket_no, t.subject, t.status, t.priority, coalesce(t.description,''),
+		       coalesce(t.product_gap_tag,''), coalesce(t.product_gap_note,''), t.created_at, t.updated_at,
+		       tn.company_code, coalesce(tn.company_name, ''), coalesce(p.company_name, '')
+		from public.sup_support_tickets t
+		join public.tenants tn on tn.id = t.tenant_id
+		left join public.inv_partners p on p.id = t.partner_id and p.tenant_id = t.tenant_id
+		where t.id = $1`, id).
+		Scan(&tenantID, &ticketNo, &subject, &status, &priority, &description, &gapTag, &gapNote, &created, &updated,
+			&companyCode, &tenantName, &partnerName)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			response.Err(w, http.StatusNotFound, "Ticket not found.", "ERR_NOT_FOUND")
@@ -132,6 +176,27 @@ func (s *service) getTicket(w http.ResponseWriter, r *http.Request) {
 	_ = s.pool.QueryRow(r.Context(), `
 		select id, coalesce(company_name, full_name, '') from public.platform_customers where tenant_id = $1 order by id limit 1`, tenantID).
 		Scan(&customerID, &customerName)
+
+	comments := []map[string]any{}
+	crows, cerr := s.pool.Query(r.Context(), `
+		select id, user_id, author_name, body, created_at
+		from public.sup_support_ticket_comments
+		where ticket_id = $1
+		order by created_at`, id)
+	if cerr == nil {
+		defer crows.Close()
+		for crows.Next() {
+			var cid int64
+			var userID *int64
+			var name, body string
+			var at time.Time
+			if crows.Scan(&cid, &userID, &name, &body, &at) == nil {
+				comments = append(comments, map[string]any{
+					"id": cid, "user_id": userID, "author_name": name, "body": body, "created_at": at,
+				})
+			}
+		}
+	}
 
 	notes := []map[string]any{}
 	nrows, err := s.pool.Query(r.Context(), `
@@ -169,6 +234,8 @@ func (s *service) getTicket(w http.ResponseWriter, r *http.Request) {
 		"product_gap_tag": gapTag, "product_gap_note": gapNote,
 		"created_at": created, "updated_at": updated,
 		"customer_id": customerID, "customer_name": customerName,
+		"company_code": companyCode, "tenant_name": tenantName, "partner_name": partnerName,
+		"comments": comments,
 		"internal_notes": notes,
 	}, "OK")
 }

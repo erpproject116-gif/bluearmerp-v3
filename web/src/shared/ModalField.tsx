@@ -23,6 +23,10 @@ type Props = {
   fallbackLabel: string;
   fallbackRequired?: boolean;
   fallbackPlaceholder?: string;
+  /** When true, field stays visible even if form settings hide it. */
+  forceVisible?: boolean;
+  /** When true, field is always treated as required. */
+  forceRequired?: boolean;
   span?: "full";
   children: (meta: ModalFieldMeta) => JSX.Element;
 };
@@ -30,11 +34,13 @@ type Props = {
 export function ModalField(props: Props) {
   const meta = (): ModalFieldMeta | null => {
     const f = props.settings()[props.fieldKey];
-    if (!fieldVisible(f, true)) return null;
+    if (!props.forceVisible && !fieldVisible(f, true)) return null;
     const label = f?.label?.trim() || props.fallbackLabel;
-    const required = DEFAULTED_STATUS_FIELDS.has(props.fieldKey)
-      ? false
-      : fieldRequired(f, props.fallbackRequired ?? false);
+    const required = props.forceRequired
+      ? true
+      : DEFAULTED_STATUS_FIELDS.has(props.fieldKey)
+        ? false
+        : fieldRequired(f, props.fallbackRequired ?? false);
     const disabled = fieldDisabled(f);
     const placeholder = fieldPlaceholder(f, props.fallbackPlaceholder);
     return {

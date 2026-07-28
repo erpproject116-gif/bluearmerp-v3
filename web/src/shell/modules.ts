@@ -577,12 +577,12 @@ export const appModules: AppModule[] = [
         settingsHref: "/app/user-management/roles",
       },
       {
-        label: "User Groups",
+        label: "Groups",
         href: "/app/user-management/groups",
         settingsHref: "/app/user-management/groups",
       },
       {
-        label: "User Permissions",
+        label: "Data scopes",
         href: "/app/user-management/user-permissions",
         settingsHref: "/app/user-management/user-permissions",
       },

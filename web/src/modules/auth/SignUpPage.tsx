@@ -86,11 +86,11 @@ export default function SignUpPage() {
       title="Create your account"
       subtitle="Register with Google or email. Your admin can also invite you to a company workspace."
       heroTitle="Start with a workspace you can trust."
-      heroBody="Create your login in minutes. Launch a free trial or demo on your own—or join your company when an admin invites you with the same email."
+      heroBody="Create your login in minutes. Join your company when an admin invites you with the same email—or start a free trial yourself from the welcome screen."
       trustPoints={[
-        "90-day free trial with a real, empty workspace",
+        "Join by invite: sign in with the invited Google email",
+        "Optional 90-day trial workspace when you choose Start trial",
         "Demo sandbox with sample data—no setup required",
-        "Same secure sign-in whether you trial, demo, or join by invite",
       ]}
       footer={
         <p class="mt-8 text-xs text-text-secondary">
@@ -123,7 +123,7 @@ export default function SignUpPage() {
               onError={setError}
             />
             <p class="text-center text-xs text-text-secondary">
-              Starts a 90-day trial workspace after you pick your Google account.
+              Company invite? Use the same email your admin invited, then sign in. Starting a trial is an explicit choice on the next screen—not automatic.
             </p>
           </div>
 

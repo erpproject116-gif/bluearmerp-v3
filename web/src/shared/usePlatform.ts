@@ -20,6 +20,7 @@ export type PlatformCustomer = {
   urgency_label: string;
   tenant_id?: number | null;
   company_code?: string | null;
+  tenant_status?: string | null;
   plan_kind?: string | null;
   subscription_status?: string | null;
   ends_at?: string | null;
@@ -131,18 +132,25 @@ export function usePlatformBillingSummary() {
   }));
 }
 
-export function usePlatformCustomers(q?: () => string) {
-  return createQuery(() => ({
-    queryKey: ["platform-customers", q?.() ?? ""],
-    queryFn: async () => {
-      const search = q?.() ? `?q=${encodeURIComponent(q()!)}` : "";
-      const res = await apiFetch<{ customers: PlatformCustomer[] }>(
-        `/api/v1/platform/console/customers${search}`,
-      );
-      if (!res.ok) throw new Error(res.message ?? "Failed to load customers");
-      return res.data?.customers ?? [];
-    },
-  }));
+export function usePlatformCustomers(opts?: { q?: () => string; tenantStatus?: () => string }) {
+  return createQuery(() => {
+    const q = opts?.q?.() ?? "";
+    const tenantStatus = opts?.tenantStatus?.() ?? "";
+    return {
+      queryKey: ["platform-customers", q, tenantStatus],
+      queryFn: async () => {
+        const params = new URLSearchParams();
+        if (q.trim()) params.set("q", q.trim());
+        if (tenantStatus) params.set("tenant_status", tenantStatus);
+        const search = params.toString() ? `?${params}` : "";
+        const res = await apiFetch<{ customers: PlatformCustomer[] }>(
+          `/api/v1/platform/console/customers${search}`,
+        );
+        if (!res.ok) throw new Error(res.message ?? "Failed to load customers");
+        return res.data?.customers ?? [];
+      },
+    };
+  });
 }
 
 export function usePlatformCustomer(id: () => number | undefined) {
@@ -345,22 +353,53 @@ export type PlatformTicket = {
   customer_id?: number | null;
   customer_name?: string;
   company_code?: string;
+  tenant_name?: string;
+  partner_name?: string;
   description?: string;
   product_gap_tag?: string;
   product_gap_note?: string;
+  comments?: Array<{ id: number; user_id?: number | null; author_name: string; body: string; created_at: string }>;
   internal_notes?: Array<{ id: number; author_email: string; author_name: string; body: string; created_at: string }>;
 };
 
-export function usePlatformTickets(q?: () => string) {
-  return createQuery(() => ({
-    queryKey: ["platform-tickets", q?.() ?? ""],
-    queryFn: async () => {
-      const search = q?.() ? `?q=${encodeURIComponent(q()!)}` : "";
-      const res = await apiFetch<{ tickets: PlatformTicket[] }>(`/api/v1/platform/console/tickets${search}`);
-      if (!res.ok) throw new Error(res.message ?? "Failed to load tickets");
-      return res.data?.tickets ?? [];
-    },
-  }));
+export type PlatformTicketsPage = {
+  tickets: PlatformTicket[];
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export function usePlatformTickets(opts?: {
+  q?: () => string;
+  status?: () => string;
+  page?: () => number;
+  pageSize?: () => number;
+}) {
+  return createQuery(() => {
+    const q = opts?.q?.() ?? "";
+    const status = opts?.status?.() ?? "";
+    const page = opts?.page?.() ?? 1;
+    const pageSize = opts?.pageSize?.() ?? 50;
+    return {
+      queryKey: ["platform-tickets", q, status, page, pageSize],
+      queryFn: async () => {
+        const params = new URLSearchParams();
+        if (q.trim()) params.set("q", q.trim());
+        if (status) params.set("status", status);
+        params.set("page", String(page));
+        params.set("page_size", String(pageSize));
+        const search = `?${params}`;
+        const res = await apiFetch<PlatformTicketsPage>(`/api/v1/platform/console/tickets${search}`);
+        if (!res.ok) throw new Error(res.message ?? "Failed to load tickets");
+        return {
+          tickets: res.data?.tickets ?? [],
+          page: res.data?.page ?? page,
+          page_size: res.data?.page_size ?? pageSize,
+          total: res.data?.total ?? 0,
+        } satisfies PlatformTicketsPage;
+      },
+    };
+  });
 }
 
 export function usePlatformTicket(id: () => number | undefined) {

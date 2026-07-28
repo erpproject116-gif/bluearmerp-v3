@@ -1,11 +1,11 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { DEFAULT_SERIAL_PREFIX, formatAutoSerial, printCode128Labels } from "../../../shared/printCode128Labels";
-import { DEFAULT_SERIAL_SLIP_TYPE, SERIAL_SLIP_TYPES } from "../../../shared/serialSlipTypes";
+import { DEFAULT_SERIAL_SLIP_TYPE } from "../../../shared/serialSlipTypes";
 import { useToast } from "../../../shared/toast";
 
 type Generated = { id: number; serial_no: string; item_id: number };
@@ -49,7 +49,6 @@ export function SerialGenerateModal(props: Props) {
   const toast = useToast();
   const [saving, setSaving] = createSignal(false);
   const [registerDate, setRegisterDate] = createSignal(todayISO());
-  const [slipType, setSlipType] = createSignal(DEFAULT_SERIAL_SLIP_TYPE);
   const [itemId, setItemId] = createSignal<number | null>(null);
   const [itemLabel, setItemLabel] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
@@ -61,7 +60,6 @@ export function SerialGenerateModal(props: Props) {
 
   const reset = () => {
     setRegisterDate(todayISO());
-    setSlipType(DEFAULT_SERIAL_SLIP_TYPE);
     setItemId(null);
     setItemLabel("");
     setLocationId(null);
@@ -100,7 +98,7 @@ export function SerialGenerateModal(props: Props) {
       method: "POST",
       body: JSON.stringify({
         register_date: registerDate(),
-        slip_type: slipType(),
+        slip_type: DEFAULT_SERIAL_SLIP_TYPE,
         location_id: locationId(),
         item_id: itemId(),
         qty: qtyNum,
@@ -156,11 +154,6 @@ export function SerialGenerateModal(props: Props) {
       />
       <Field label="Date *">
         <DateInput value={registerDate()} onInput={(e) => setRegisterDate(e.currentTarget.value)} />
-      </Field>
-      <Field label="Slip type *">
-        <select class={inputClass} value={slipType()} onChange={(e) => setSlipType(e.currentTarget.value)}>
-          <For each={[...SERIAL_SLIP_TYPES]}>{(t) => <option value={t.value}>{t.label}</option>}</For>
-        </select>
       </Field>
       <LookupCombo
         label="Item *"

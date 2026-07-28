@@ -32,7 +32,9 @@ func NormalizePlannedSerialNos(raw []string) []string {
 }
 
 // ValidatePlannedSerialNos checks planned serial count against line qty and item serial policy.
-func ValidatePlannedSerialNos(ctx context.Context, pool *pgxpool.Pool, tenantID int64, lineNo int, itemID *int64, qty float64, planned []string) error {
+// When requireCapture is false (quotations / purchase requests), planned serials stay optional
+// even if the item's serial_policy is "required" — physical capture starts at SO/PO/receive/sale.
+func ValidatePlannedSerialNos(ctx context.Context, pool *pgxpool.Pool, tenantID int64, lineNo int, itemID *int64, qty float64, planned []string, requireCapture bool) error {
 	planned = NormalizePlannedSerialNos(planned)
 	if itemID == nil || *itemID <= 0 {
 		if len(planned) > 0 {
@@ -53,7 +55,11 @@ func ValidatePlannedSerialNos(ctx context.Context, pool *pgxpool.Pool, tenantID 
 	if lineNo <= 0 {
 		lineNo = 1
 	}
-	if err := ValidatePlannedSerialCapture(lineNo, settings.SerialPolicy, len(planned), qty); err != nil {
+	policy := settings.SerialPolicy
+	if !requireCapture {
+		policy = TrackingPolicyOptional
+	}
+	if err := ValidatePlannedSerialCapture(lineNo, policy, len(planned), qty); err != nil {
 		return err
 	}
 	if len(planned) == 0 {

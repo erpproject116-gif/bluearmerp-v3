@@ -174,6 +174,87 @@ func repairBootstrapPlatformAccess(ctx context.Context, pool *pgxpool.Pool, tu T
 	return tx.Commit(ctx)
 }
 
+// LinkProvisionedUser links all invited/pre-provisioned users rows for this email to the auth identity.
+func LinkProvisionedUser(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) error {
+	return tryAutoLinkProvisionedUser(ctx, pool, authUserID, email)
+}
+
+// PendingInviteTenant returns the first tenant where this email still has an unclaimed invite.
+func PendingInviteTenant(ctx context.Context, pool *pgxpool.Pool, email string) (tenantID int64, companyCode string, ok bool) {
+	email = normalizeEmail(email)
+	if email == "" {
+		return 0, "", false
+	}
+	err := pool.QueryRow(ctx, `
+		select u.tenant_id, t.company_code
+		from public.users u
+		join public.tenants t on t.id = u.tenant_id
+		where lower(u.email) = $1
+		  and u.auth_user_id is null
+		  and u.status = 'invited'
+		  and exists (
+		    select 1 from public.user_invites ui
+		    where ui.user_id = u.id
+		      and ui.revoked_at is null
+		      and ui.accepted_at is null
+		  )
+		order by u.id
+		limit 1`, email).Scan(&tenantID, &companyCode)
+	if err != nil {
+		return 0, "", false
+	}
+	return tenantID, companyCode, true
+}
+
+// SetActiveTenant records the user's preferred active tenant after invite join.
+func SetActiveTenant(ctx context.Context, pool *pgxpool.Pool, authUserID string, tenantID int64) error {
+	_, err := pool.Exec(ctx, `
+		insert into public.user_active_tenant (auth_user_id, tenant_id)
+		values ($1::uuid, $2)
+		on conflict (auth_user_id) do update
+		  set tenant_id = excluded.tenant_id, updated_at = now()`,
+		authUserID, tenantID)
+	return err
+}
+
+// HasPendingApprovalTenant reports whether this auth identity (or email) belongs to a
+// self-serve workspace still waiting for Platform Command approval.
+func HasPendingApprovalTenant(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) bool {
+	email = normalizeEmail(email)
+	var n int
+	err := pool.QueryRow(ctx, `
+		select 1
+		from public.users u
+		join public.tenants t on t.id = u.tenant_id
+		where t.status = 'pending_approval'
+		  and (
+		    u.auth_user_id = nullif($1, '')::uuid
+		    or ($2 <> '' and lower(u.email) = $2)
+		  )
+		limit 1`, authUserID, email).Scan(&n)
+	return err == nil
+}
+
+// PendingApprovalTenant returns the pending-approval workspace for this email/auth user.
+func PendingApprovalTenant(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) (tenantID int64, companyCode string, ok bool) {
+	email = normalizeEmail(email)
+	err := pool.QueryRow(ctx, `
+		select t.id, t.company_code
+		from public.users u
+		join public.tenants t on t.id = u.tenant_id
+		where t.status = 'pending_approval'
+		  and (
+		    u.auth_user_id = nullif($1, '')::uuid
+		    or ($2 <> '' and lower(u.email) = $2)
+		  )
+		order by t.id
+		limit 1`, authUserID, email).Scan(&tenantID, &companyCode)
+	if err != nil {
+		return 0, "", false
+	}
+	return tenantID, companyCode, true
+}
+
 // tryAutoLinkInvitedUser is kept as an alias for tests and call sites during rename.
 func tryAutoLinkInvitedUser(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) error {
 	return tryAutoLinkProvisionedUser(ctx, pool, authUserID, email)

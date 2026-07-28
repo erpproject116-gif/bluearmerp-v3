@@ -80,6 +80,11 @@ export default function PlatformTicketDetailPage() {
                 <div>
                   <h2 class="text-xl font-semibold">{t().ticket_no}</h2>
                   <p class="mt-1 text-slate-700">{t().subject}</p>
+                  <p class="mt-2 text-xs text-slate-500">
+                    Tenant: <span class="font-medium text-slate-700">{t().company_code}</span>
+                    <Show when={t().tenant_name}> — {t().tenant_name}</Show>
+                    <Show when={t().partner_name}> · Partner: {t().partner_name}</Show>
+                  </p>
                 </div>
                 <div class="text-right text-sm">
                   <p class="capitalize">{t().status.replace("_", " ")} · {t().priority}</p>
@@ -100,6 +105,28 @@ export default function PlatformTicketDetailPage() {
                 </p>
               </Show>
             </div>
+
+            <section class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-1 text-sm font-semibold">Tenant comments</h3>
+              <p class="mb-3 text-xs text-slate-500">Visible in the customer’s ERP Support ticket thread.</p>
+              <Show
+                when={(t().comments ?? []).length > 0}
+                fallback={<p class="text-sm text-slate-400">No tenant comments yet.</p>}
+              >
+                <ul class="space-y-3">
+                  <For each={t().comments ?? []}>
+                    {(c) => (
+                      <li class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                        <p class="text-xs text-slate-500">
+                          {c.author_name || "User"} · {new Date(c.created_at).toLocaleString()}
+                        </p>
+                        <p class="mt-1 whitespace-pre-wrap text-slate-800">{c.body}</p>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
+            </section>
 
             <section class="rounded-xl border border-slate-200 bg-white p-5">
               <h3 class="mb-1 text-sm font-semibold">Product gap tag</h3>
@@ -131,10 +158,11 @@ export default function PlatformTicketDetailPage() {
               </div>
             </section>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
-              <h3 class="mb-3 text-sm font-semibold">Internal notes</h3>
+            <section class="rounded-xl border border-amber-200 bg-amber-50/40 p-5">
+              <h3 class="mb-1 text-sm font-semibold">Internal notes (platform only)</h3>
+              <p class="mb-3 text-xs text-slate-500">Not visible to the tenant in ERP Support.</p>
               <textarea
-                class="mb-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                class="mb-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
                 rows={3}
                 value={note()}
                 onInput={(e) => setNote(e.currentTarget.value)}
@@ -151,7 +179,7 @@ export default function PlatformTicketDetailPage() {
               <ul class="mt-4 space-y-3">
                 <For each={t().internal_notes ?? []}>
                   {(n) => (
-                    <li class="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                    <li class="rounded-lg bg-white px-3 py-2 text-sm shadow-sm">
                       <p class="text-xs text-slate-500">{n.author_name || n.author_email} · {new Date(n.created_at).toLocaleString()}</p>
                       <p class="mt-1 whitespace-pre-wrap text-slate-800">{n.body}</p>
                     </li>

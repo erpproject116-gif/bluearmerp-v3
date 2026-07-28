@@ -39,10 +39,11 @@ function planOptionLabel(p: PlatformPlan) {
 
 export default function PlatformCustomersPage() {
   const [search, setSearch] = createSignal("");
+  const [tenantStatus, setTenantStatus] = createSignal("");
   const [showModal, setShowModal] = createSignal(false);
   const [form, setForm] = createSignal<ProvisionForm>(emptyForm());
   const [busy, setBusy] = createSignal(false);
-  const q = usePlatformCustomers(search);
+  const q = usePlatformCustomers({ q: () => search(), tenantStatus: () => tenantStatus() });
   const summaryQ = usePlatformBillingSummary();
   const plansQ = usePlatformPlansAdmin();
   const queryClient = useQueryClient();
@@ -149,6 +150,16 @@ export default function PlatformCustomersPage() {
           >
             Add customer &amp; provision
           </button>
+          <select
+            class="rounded-lg border border-stroke px-3 py-2 text-sm"
+            value={tenantStatus()}
+            onChange={(e) => setTenantStatus(e.currentTarget.value)}
+          >
+            <option value="">All workspaces</option>
+            <option value="pending_approval">Pending approval</option>
+            <option value="active">Active</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
           <input
             type="search"
             placeholder="Search email or company…"
@@ -275,6 +286,7 @@ export default function PlatformCustomersPage() {
               <thead class="border-b border-stroke bg-slate-50 text-xs uppercase text-text-secondary">
                 <tr>
                   <th class="px-4 py-3">Customer</th>
+                  <th class="px-4 py-3">Workspace</th>
                   <th class="px-4 py-3">Plan</th>
                   <th class="px-4 py-3">Urgency</th>
                   <th class="px-4 py-3">Days left</th>
@@ -290,6 +302,18 @@ export default function PlatformCustomersPage() {
                         <div class="text-xs text-text-secondary">{c.email}</div>
                         <Show when={c.company_code}>
                           <div class="text-xs text-text-secondary">{c.company_code}</div>
+                        </Show>
+                      </td>
+                      <td class="px-4 py-3">
+                        <Show
+                          when={c.tenant_status === "pending_approval"}
+                          fallback={
+                            <span class="capitalize text-text-secondary">{(c.tenant_status || "—").replace(/_/g, " ")}</span>
+                          }
+                        >
+                          <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                            Pending approval
+                          </span>
                         </Show>
                       </td>
                       <td class="px-4 py-3">{c.plan_kind ?? "—"}</td>
