@@ -110,13 +110,14 @@ export default function TicketsPage() {
         search={q()}
         onSearchChange={setQ}
         searchPlaceholder="Search tickets…"
+        hideExport
         toolbarExtra={
           <>
             <button
               type="button"
               class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
               onClick={exportCsv}
-              title="Export ticket titles and full body text as CSV"
+              title="Download all matching tickets with full description and comments (CSV)"
             >
               Export CSV
             </button>
@@ -124,7 +125,7 @@ export default function TicketsPage() {
               type="button"
               class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
               onClick={exportMarkdown}
-              title="Export all tickets with title and full body for documentation"
+              title="Download all matching tickets with full description and comments (Markdown docs)"
             >
               Export docs (MD)
             </button>

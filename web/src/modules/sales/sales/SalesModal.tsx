@@ -519,12 +519,14 @@ export function SalesModal(props: Props) {
       setCreatedSale(null);
       setPostSaveOpen(false);
       setCashInOpen(false);
+      setActiveTab("details");
       return;
     }
     const ed = props.editing;
     if (ed) {
       hydrateFromDetail(ed);
-    } else {
+      setActiveTab("details");
+    } else if (!createdSale()) {
       const seed = takeDocSeed("sales");
       const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
         ...emptySalesLine(index + 1),
@@ -559,6 +561,7 @@ export function SalesModal(props: Props) {
         setLines([emptySalesLine(1)]);
       }
       setCommissions([]);
+      setActiveTab("details");
       void loadPreview(todayISO());
     }
   });
@@ -626,6 +629,7 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
+    toast.success("Sales Order lines loaded. Click Save to create the sales invoice — the Invoice tab opens after save.");
   };
 
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
@@ -660,6 +664,7 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
+    toast.success("Quotation lines loaded. Click Save to create the sales invoice — the Invoice tab opens after save.");
   };
 
   const applyShippingLines = async (picked: PickedShippingSlipLine[]) => {
@@ -695,6 +700,7 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
+    toast.success("Shipping Order lines loaded. Click Save to create the sales invoice — the Invoice tab opens after save.");
   };
 
   /** Cross-side map: copy item/qty only — never adopt vendor as customer or consume buying residual FKs. */
@@ -868,7 +874,7 @@ export function SalesModal(props: Props) {
     };
 
     setSaving(true);
-    const ed = props.editing;
+    const ed = props.editing ?? createdSale();
     const res = await (ed
       ? apiFetch<SalesDetail>(`/api/v1/sales/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
       : apiFetch<SalesDetail>("/api/v1/sales", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
@@ -883,26 +889,27 @@ export function SalesModal(props: Props) {
     }
     await draft.clearOnSave();
     props.onSaved();
-    if (ed) {
-      const autoOk = await tryAutoSaveSalesInvoice(ed.id);
-      if (autoOk) {
-        toast.success("Accounting invoice ready — open balance shows in A/R Aging & Customer Book (AR) after Search.");
-      } else {
-        toast.warning("Map Sales + Receivable accounts under Chart of Accounts defaults to post the A/R invoice.");
-      }
-      props.onClose();
-      return;
-    }
-    setCreatedSale(res.data);
     const autoOk = await tryAutoSaveSalesInvoice(res.data.id);
     if (autoOk) {
-      toast.success("Accounting invoice prepared — receivable is open for Official Receipts / A/R reports.");
+      toast.success(
+        ed && props.editing
+          ? "Accounting invoice ready — open balance shows in A/R Aging & Customer Book (AR) after Search."
+          : "Accounting invoice prepared — receivable is open for Official Receipts / A/R reports.",
+      );
     } else {
-      toast.warning("Sale saved. Map CoA defaults (Sales + Receivable) to auto-prepare the accounting invoice.");
+      toast.warning(
+        ed
+          ? "Map Sales + Receivable accounts under Chart of Accounts defaults to post the A/R invoice."
+          : "Sale saved. Map CoA defaults (Sales + Receivable) to auto-prepare the accounting invoice.",
+      );
     }
-    // Saving is terminal for this transaction window. Follow-up actions remain
-    // available from the saved record in the Sales list.
-    props.onClose();
+    setCreatedSale(res.data);
+    setSalesNo(res.data.sales_no);
+    setDateNoDisplay(res.data.date_no_display);
+    setProgressStatus(res.data.progress_status);
+    // Keep window open with Invoice tab (Load Slip → Save → Invoice).
+    setActiveTab("invoice");
+    if (!props.editing) setPostSaveOpen(true);
   };
 
   const finishPostSave = () => {
@@ -1219,7 +1226,9 @@ export function SalesModal(props: Props) {
             }}
           />
           <p class="text-xs text-text-secondary">
-            Load Slip spans Selling and Buying. Same-side sources apply residual qty; cross-side sources map item/qty without mixing ledgers. Browse all partners inside the monitor.
+            Load Slip fills this form from another document. Click <strong>Save</strong> to create the sales
+            invoice — the <strong>Invoice</strong> tab then opens for the accounting voucher. Same-side sources
+            apply residual qty; cross-side sources map item/qty only.
           </p>
           <Show when={!props.editing}>
             <button
