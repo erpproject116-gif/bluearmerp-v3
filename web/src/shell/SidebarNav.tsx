@@ -91,7 +91,12 @@ function HomeAreaBlock(props: { area: HomeSidebarArea; active: (a: HomeSidebarAr
   const children = () => props.area.children ?? [];
   const areaOrChildActive = () =>
     props.active(props.area) || children().some((c) => props.active(c));
-  const [open, setOpen] = createSignal(areaOrChildActive() || children().length > 0);
+  const initiallyOpen = () => {
+    if (areaOrChildActive()) return true;
+    if (children().length === 0) return false;
+    return props.area.defaultExpanded !== false;
+  };
+  const [open, setOpen] = createSignal(initiallyOpen());
 
   createEffect(() => {
     if (areaOrChildActive()) setOpen(true);
@@ -151,23 +156,61 @@ export function SidebarNav() {
     }
     if (area.id === "sitemap") return p.startsWith("/app/dashboard/site-map");
     if (area.id === "stocks") {
+      // Group label only — children carry the active state.
+      return false;
+    }
+    if (area.id === "inventory") {
       return (
-        pathStarts(p, ["/app/after-sales", "/app/job-costing"]) ||
-        ((p === "/app/inventory" || p.startsWith("/app/inventory/")) &&
-          !p.startsWith("/app/inventory/serial-lot") &&
-          !p.startsWith("/app/inventory/wms"))
+        (p === "/app/inventory" || p.startsWith("/app/inventory/")) &&
+        !p.startsWith("/app/inventory/serial-lot") &&
+        !p.startsWith("/app/inventory/wms")
       );
     }
+    if (area.id === "after_sales") {
+      return pathStarts(p, ["/app/after-sales", "/app/job-costing"]);
+    }
     if (area.id === "warehouse") {
-      return pathStarts(p, ["/app/inventory/serial-lot", "/app/inventory/wms"]);
+      return pathStarts(p, ["/app/inventory/wms"]);
+    }
+    if (area.id === "serial_lot") {
+      return pathStarts(p, ["/app/inventory/serial-lot"]);
     }
     if (area.id === "sell") {
+      return false;
+    }
+    if (area.id === "quotation") {
+      return pathStarts(p, ["/app/quotation"]) && !p.startsWith("/app/quotation/tax-mngt");
+    }
+    if (area.id === "sales_order") {
+      return pathStarts(p, ["/app/sales-order"]);
+    }
+    if (area.id === "sales") {
       if (isFinanceUnderSalesReportPath(p)) return false;
-      return pathStarts(p, ["/app/quotation", "/app/sales-order", "/app/sales", "/app/selling"]);
+      return (
+        pathStarts(p, ["/app/sales"]) && !p.startsWith("/app/sales/collective-invoicing")
+      );
+    }
+    if (area.id === "combined_invoices") {
+      return pathStarts(p, ["/app/sales/collective-invoicing"]);
+    }
+    if (area.id === "selling") {
+      return pathStarts(p, ["/app/selling"]);
     }
     if (area.id === "buy") {
+      return false;
+    }
+    if (area.id === "purchase_request") {
+      return pathStarts(p, ["/app/purchase-request"]);
+    }
+    if (area.id === "purchase_order") {
+      return pathStarts(p, ["/app/purchase-order"]);
+    }
+    if (area.id === "purchases") {
       if (p.startsWith("/app/purchases/expenses")) return false;
-      return pathStarts(p, ["/app/purchase-request", "/app/purchase-order", "/app/purchases", "/app/buying"]);
+      return pathStarts(p, ["/app/purchases"]);
+    }
+    if (area.id === "buying") {
+      return pathStarts(p, ["/app/buying"]);
     }
     if (area.id === "accounting") {
       return p === "/app/finance" || p === "/app/finance/";

@@ -174,6 +174,8 @@ export type HomeSidebarArea = {
   expandGroupId?: string;
   /** Nested links shown under this area on Home (e.g. Warehouse under Stocks). */
   children?: HomeSidebarArea[];
+  /** When children exist, whether the group starts expanded (default true). */
+  defaultExpanded?: boolean;
 };
 
 export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
@@ -185,12 +187,37 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "inventory",
     topId: "inv1",
     expandGroupId: "stocks_management",
+    defaultExpanded: false,
     children: [
+      {
+        id: "inventory",
+        label: "Inventory",
+        href: "/app/inventory",
+        iconId: "inventory",
+        topId: "inv1",
+        expandGroupId: "stocks_management",
+      },
+      {
+        id: "after_sales",
+        label: "After-Sales",
+        href: "/app/after-sales/repair-orders",
+        iconId: "after_sales",
+        topId: "inv1",
+        expandGroupId: "stocks_management",
+      },
       {
         id: "warehouse",
         label: "Warehouse",
-        href: "/app/inventory/serial-lot",
+        href: "/app/inventory/wms/scheduled-receipts",
         iconId: "sub_warehouse",
+        topId: "inv2",
+        expandGroupId: "stocks_management",
+      },
+      {
+        id: "serial_lot",
+        label: "Serial / Lot",
+        href: "/app/inventory/serial-lot/registry",
+        iconId: "sub_serial_lot",
         topId: "inv2",
         expandGroupId: "stocks_management",
       },
@@ -203,6 +230,48 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "selling",
     topId: "inv1",
     expandGroupId: "sales_process",
+    children: [
+      {
+        id: "quotation",
+        label: "Quotation",
+        href: "/app/quotation/quotations",
+        iconId: "quotation",
+        topId: "inv1",
+        expandGroupId: "sales_process",
+      },
+      {
+        id: "sales_order",
+        label: "Sales Order",
+        href: "/app/sales-order/sales-orders",
+        iconId: "sales_order",
+        topId: "inv1",
+        expandGroupId: "sales_process",
+      },
+      {
+        id: "sales",
+        label: "Sales invoices",
+        href: "/app/sales/sales",
+        iconId: "sales",
+        topId: "inv1",
+        expandGroupId: "sales_process",
+      },
+      {
+        id: "combined_invoices",
+        label: "Combined invoices",
+        href: "/app/sales/collective-invoicing/list",
+        iconId: "sub_combined_invoices",
+        topId: "inv1",
+        expandGroupId: "sales_process",
+      },
+      {
+        id: "selling",
+        label: "Sell overview",
+        href: "/app/selling",
+        iconId: "selling",
+        topId: "inv1",
+        expandGroupId: "sales_process",
+      },
+    ],
   },
   {
     id: "buy",
@@ -211,6 +280,40 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "buying",
     topId: "inv1",
     expandGroupId: "procurement_process",
+    children: [
+      {
+        id: "purchase_request",
+        label: "Purchase Request",
+        href: "/app/purchase-request/purchase-requests",
+        iconId: "purchase_request",
+        topId: "inv1",
+        expandGroupId: "procurement_process",
+      },
+      {
+        id: "purchase_order",
+        label: "Purchase Order",
+        href: "/app/purchase-order/purchase-orders",
+        iconId: "purchase_order",
+        topId: "inv1",
+        expandGroupId: "procurement_process",
+      },
+      {
+        id: "purchases",
+        label: "Purchase invoices",
+        href: "/app/purchases/purchases",
+        iconId: "purchases",
+        topId: "inv1",
+        expandGroupId: "procurement_process",
+      },
+      {
+        id: "buying",
+        label: "Buy overview",
+        href: "/app/buying",
+        iconId: "buying",
+        topId: "inv1",
+        expandGroupId: "procurement_process",
+      },
+    ],
   },
   {
     id: "accounting",
