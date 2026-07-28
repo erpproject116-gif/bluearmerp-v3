@@ -1,0 +1,18 @@
+{
+  "prgId": "E040230",
+  "screen_name": "Release Sales Order",
+  "pills": [
+    {"label": "Default", "audited": true},
+    {"label": "All", "audited": true},
+    {"label": "Nonprocessed", "audited": true},
+    {"label": "Process", "audited": true}
+  ],
+  "toolbar": ["Search(F3)", "Option", "Search (F8)", "Settings", "Reset"],
+  "toolbar_audited": ["Search(F3)", "Option", "Search (F8)", "Settings", "Reset"],
+  "controls_logged": 50,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/sales-order/sales-orders/release",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch2 depth-complete; Decrease/Excel not submitted",
+  "mark_depth_complete": true
+}

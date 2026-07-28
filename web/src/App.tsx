@@ -279,6 +279,7 @@ import {
   SavedViewsPage,
   DashboardPage,
   ApprovalsQueuePage,
+  SiteMapPage,
   DocumentationPage,
   BudgetListPage,
   BudgetDetailPage,
@@ -421,6 +422,7 @@ export default function App() {
         <Route path="/app" component={AppLayout}>
           <Route path="/dashboard" component={DashboardPage} />
           <Route path="/dashboard/approvals" component={ApprovalsQueuePage} />
+          <Route path="/dashboard/site-map" component={SiteMapPage} />
           <Route path="/reports/saved-views" component={SavedViewsPage} />
           <Route path="/reports" component={ReportsIndexPage} />
           <Route path="/documentation/kb/:articleId" component={DocumentationPage} />

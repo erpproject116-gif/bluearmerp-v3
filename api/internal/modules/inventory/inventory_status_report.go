@@ -86,11 +86,14 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 		from public.inv_item_location_balances bal
 		join public.inv_items i on i.id = bal.item_id and i.tenant_id = bal.tenant_id and i.deleted_at is null
 		join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id and l.deleted_at is null
+		  and coalesce(l.is_rma, false) = false
 		left join public.inv_units bu on bu.id = i.base_unit_id
 		left join public.inv_item_categories c on c.id = i.item_category_id
 		left join lateral (
 		  select coalesce(sum(b.qty_on_hand - b.qty_reserved), 0) as company_available_qty
 		  from public.inv_item_location_balances b
+		  join public.inv_locations loc on loc.id = b.location_id and loc.tenant_id = b.tenant_id
+		    and coalesce(loc.is_rma, false) = false and loc.deleted_at is null
 		  where b.tenant_id = bal.tenant_id and b.item_id = bal.item_id
 		) co_bal on true
 		left join lateral (

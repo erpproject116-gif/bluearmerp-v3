@@ -23,7 +23,8 @@ type Location struct {
 	LocationName      string `json:"location_name"`
 	LocationType      string `json:"location_type"`
 	ProductionProcess string `json:"production_process"`
-	Status            string         `json:"status"`
+	Status            string `json:"status"`
+	IsRMA             bool   `json:"is_rma"`
 	CustomValues      map[string]any `json:"custom_values,omitempty"`
 }
 
@@ -32,6 +33,7 @@ type locationBody struct {
 	LocationType      string         `json:"location_type"`
 	ProductionProcess string         `json:"production_process"`
 	Status            string         `json:"status"`
+	IsRMA             bool           `json:"is_rma"`
 	CustomValues      map[string]any `json:"custom_values"`
 }
 
@@ -66,7 +68,7 @@ func listLocations(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		where, args := buildWhere(tu.TenantID, p, "location_name", "location_code", deletedAtPredicate(lc))
 		order := orderSQL(p.Order)
-		q := fmt.Sprintf(`select id, location_code, location_name, location_type, production_process, status, count(*) over() as total_count
+		q := fmt.Sprintf(`select id, location_code, location_name, location_type, production_process, status, coalesce(is_rma, false), count(*) over() as total_count
 			from public.inv_locations where %s order by %s %s limit $%d offset $%d`,
 			where, p.Sort, order, len(args)+1, len(args)+2)
 		args = append(args, p.PageSize, offset)
@@ -80,7 +82,7 @@ func listLocations(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		for rows.Next() {
 			var row Location
-			if err := rows.Scan(&row.ID, &row.LocationCode, &row.LocationName, &row.LocationType, &row.ProductionProcess, &row.Status, &total); err != nil {
+			if err := rows.Scan(&row.ID, &row.LocationCode, &row.LocationName, &row.LocationType, &row.ProductionProcess, &row.Status, &row.IsRMA, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read.", "ERR_INTERNAL")
 				return
 			}
@@ -110,10 +112,10 @@ func createLocation(pool *pgxpool.Pool) http.HandlerFunc {
 			var id int64
 			var row Location
 			err := tx.QueryRow(ctx, `
-				insert into public.inv_locations (tenant_id, location_code, location_name, location_type, production_process, status)
-				values ($1,$2,$3,$4,$5,$6) returning id, location_code, location_name, location_type, production_process, status`,
-				tu.TenantID, code, strings.TrimSpace(body.LocationName), body.LocationType, body.ProductionProcess, defaultStatus(body.Status)).
-				Scan(&id, &row.LocationCode, &row.LocationName, &row.LocationType, &row.ProductionProcess, &row.Status)
+				insert into public.inv_locations (tenant_id, location_code, location_name, location_type, production_process, status, is_rma)
+				values ($1,$2,$3,$4,$5,$6,$7) returning id, location_code, location_name, location_type, production_process, status, coalesce(is_rma, false)`,
+				tu.TenantID, code, strings.TrimSpace(body.LocationName), body.LocationType, body.ProductionProcess, defaultStatus(body.Status), body.IsRMA).
+				Scan(&id, &row.LocationCode, &row.LocationName, &row.LocationType, &row.ProductionProcess, &row.Status, &row.IsRMA)
 			row.ID = id
 			return id, row, err
 		})
@@ -148,9 +150,9 @@ func updateLocation(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 		tag, err := tx.Exec(r.Context(), `
-			update public.inv_locations set location_name=$1, location_type=$2, production_process=$3, status=$4, updated_at=now()
-			where id=$5 and tenant_id=$6 and deleted_at is null`,
-			strings.TrimSpace(body.LocationName), body.LocationType, body.ProductionProcess, defaultStatus(body.Status), id, tu.TenantID)
+			update public.inv_locations set location_name=$1, location_type=$2, production_process=$3, status=$4, is_rma=$5, updated_at=now()
+			where id=$6 and tenant_id=$7 and deleted_at is null`,
+			strings.TrimSpace(body.LocationName), body.LocationType, body.ProductionProcess, defaultStatus(body.Status), body.IsRMA, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
 			return

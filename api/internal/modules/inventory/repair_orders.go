@@ -55,6 +55,12 @@ type RepairOrder struct {
 	ScheduledCompletionDate *string           `json:"scheduled_completion_date,omitempty"`
 	LatestUpdate            *string           `json:"latest_update,omitempty"`
 	RepairDetails           *string           `json:"repair_details,omitempty"`
+	SalesID                 *int64            `json:"sales_id,omitempty"`
+	SalesLineID             *int64            `json:"sales_line_id,omitempty"`
+	SerialUnitID            *int64            `json:"serial_unit_id,omitempty"`
+	ReleaseLocationID       *int64            `json:"release_location_id,omitempty"`
+	SalesNo                 *string           `json:"sales_no,omitempty"`
+	SerialNo                *string           `json:"serial_no,omitempty"`
 	Lines                   []RepairOrderLine `json:"lines,omitempty"`
 	CustomValues            map[string]any    `json:"custom_values,omitempty"`
 }
@@ -72,12 +78,18 @@ type repairOrderBody struct {
 	ScheduledCompletionDate *string           `json:"scheduled_completion_date"`
 	LatestUpdate            *string           `json:"latest_update"`
 	RepairDetails           *string           `json:"repair_details"`
+	SalesID                 *int64            `json:"sales_id"`
+	SalesLineID             *int64            `json:"sales_line_id"`
+	SerialUnitID            *int64            `json:"serial_unit_id"`
+	ReleaseLocationID       *int64            `json:"release_location_id"`
+	ReceiveToRMA            bool              `json:"receive_to_rma"`
 	Lines                   []RepairOrderLine `json:"lines"`
 	CustomValues            map[string]any    `json:"custom_values"`
 }
 
 func registerRepairOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/repair-orders/preview-sequences", previewRepairSequences(pool))
+	r.Get("/repair-orders/rma-candidates", listRMACandidates(pool))
 	r.Get("/repair-orders/status-report/export", exportRepairOrderStatusReport(pool))
 	r.Get("/repair-orders/status-report", listRepairOrderStatusReport(pool))
 	r.Get("/repair-orders", listRepairOrders(pool))
@@ -288,16 +300,22 @@ func loadRepairOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64
 		  ro.partner_id, p.company_name, ro.pic_user_id, ro.pic_name,
 		  ro.location_id, l.location_name, ro.project_id, ro.project_name,
 		  ro.technician_name, ro.progress_status, ro.scheduled_completion_date,
-		  ro.latest_update, ro.repair_details
+		  ro.latest_update, ro.repair_details,
+		  ro.sales_id, ro.sales_line_id, ro.serial_unit_id, ro.release_location_id,
+		  s.sales_no, su.serial_no
 		from public.inv_repair_orders ro
 		join public.inv_partners p on p.id = ro.partner_id
 		join public.inv_locations l on l.id = ro.location_id
+		left join public.sa_sales s on s.id = ro.sales_id
+		left join public.inv_serial_units su on su.id = ro.serial_unit_id
 		where ro.id = $1 and ro.tenant_id = $2 and ro.deleted_at is null`,
 		id, tenantID).Scan(
 		&ro.ID, &orderDate, &ro.DateSeq, &ro.RepairOrderNo,
 		&ro.PartnerID, &ro.CustomerName, &ro.PicUserID, &ro.PicName,
 		&ro.LocationID, &ro.LocationName, &ro.ProjectID, &projectName,
 		&tech, &ro.ProgressStatus, &sched, &latest, &details,
+		&ro.SalesID, &ro.SalesLineID, &ro.SerialUnitID, &ro.ReleaseLocationID,
+		&ro.SalesNo, &ro.SerialNo,
 	)
 	if err != nil {
 		return RepairOrder{}, err
@@ -391,16 +409,35 @@ func createRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			  tenant_id, order_date, date_seq, repair_order_no,
 			  partner_id, pic_user_id, pic_name, location_id,
 			  project_id, project_name, technician_name, progress_status,
-			  scheduled_completion_date, latest_update, repair_details
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+			  scheduled_completion_date, latest_update, repair_details,
+			  sales_id, sales_line_id, serial_unit_id, release_location_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 			returning id`,
 			tu.TenantID, orderDate, dateSeq, repairOrderNo,
 			body.PartnerID, body.PicUserID, strings.TrimSpace(body.PicName), body.LocationID,
 			body.ProjectID, body.ProjectName, body.TechnicianName, defaultProgress(body.ProgressStatus),
-			sched, body.LatestUpdate, body.RepairDetails).Scan(&id)
+			sched, body.LatestUpdate, body.RepairDetails,
+			body.SalesID, body.SalesLineID, body.SerialUnitID, body.ReleaseLocationID).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to insert repair order.", "ERR_INTERNAL")
 			return
+		}
+
+		if body.ReceiveToRMA || (body.SerialUnitID != nil && *body.SerialUnitID > 0) {
+			if err := applyRepairRMAReceive(r.Context(), tx, tu.TenantID, id, body.LocationID, body.SalesID, body.SalesLineID, body.SerialUnitID); err != nil {
+				response.Validation(w, map[string]string{"serial_unit_id": err.Error()})
+				return
+			}
+		}
+		if defaultProgress(body.ProgressStatus) == "released" {
+			relLoc := int64(0)
+			if body.ReleaseLocationID != nil {
+				relLoc = *body.ReleaseLocationID
+			}
+			if err := applyRepairRMARelease(r.Context(), tx, tu.TenantID, id, relLoc, body.SerialUnitID); err != nil {
+				response.Validation(w, map[string]string{"release_location_id": err.Error()})
+				return
+			}
 		}
 
 		if err := replaceRepairOrderLines(r.Context(), tx, id, body.Lines); err != nil {
@@ -463,15 +500,40 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			  order_date = $1, partner_id = $2, pic_user_id = $3, pic_name = $4,
 			  location_id = $5, project_id = $6, project_name = $7, technician_name = $8,
 			  progress_status = $9, scheduled_completion_date = $10,
-			  latest_update = $11, repair_details = $12, updated_at = now()
-			where id = $13 and tenant_id = $14 and deleted_at is null`,
+			  latest_update = $11, repair_details = $12,
+			  sales_id = $13, sales_line_id = $14, serial_unit_id = coalesce($15, serial_unit_id),
+			  release_location_id = $16,
+			  updated_at = now()
+			where id = $17 and tenant_id = $18 and deleted_at is null`,
 			orderDate, body.PartnerID, body.PicUserID, strings.TrimSpace(body.PicName),
 			body.LocationID, body.ProjectID, body.ProjectName, body.TechnicianName,
 			defaultProgress(body.ProgressStatus), sched, body.LatestUpdate, body.RepairDetails,
+			body.SalesID, body.SalesLineID, body.SerialUnitID, body.ReleaseLocationID,
 			id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Repair order not found.", "ERR_NOT_FOUND")
 			return
+		}
+
+		if body.ReceiveToRMA || (body.SerialUnitID != nil && *body.SerialUnitID > 0 && defaultProgress(body.ProgressStatus) == "received") {
+			if err := applyRepairRMAReceive(r.Context(), tx, tu.TenantID, id, body.LocationID, body.SalesID, body.SalesLineID, body.SerialUnitID); err != nil {
+				response.Validation(w, map[string]string{"serial_unit_id": err.Error()})
+				return
+			}
+		}
+		if defaultProgress(body.ProgressStatus) == "released" {
+			relLoc := int64(0)
+			if body.ReleaseLocationID != nil {
+				relLoc = *body.ReleaseLocationID
+			}
+			var serialID *int64 = body.SerialUnitID
+			if serialID == nil {
+				_ = tx.QueryRow(r.Context(), `select serial_unit_id from public.inv_repair_orders where id = $1`, id).Scan(&serialID)
+			}
+			if err := applyRepairRMARelease(r.Context(), tx, tu.TenantID, id, relLoc, serialID); err != nil {
+				response.Validation(w, map[string]string{"release_location_id": err.Error()})
+				return
+			}
 		}
 
 		if err := replaceRepairOrderLines(r.Context(), tx, id, body.Lines); err != nil {
@@ -531,8 +593,8 @@ func validateRepairOrderBody(b repairOrderBody, create bool) map[string]string {
 	if b.LocationID <= 0 {
 		errs["location_id"] = "Location is required."
 	}
-	if b.ProgressStatus != "" && b.ProgressStatus != "received" && b.ProgressStatus != "finished" {
-		errs["progress_status"] = "Must be received or finished."
+	if b.ProgressStatus != "" && !isValidRepairProgress(b.ProgressStatus) {
+		errs["progress_status"] = "Invalid progress status."
 	}
 	if len(errs) > 0 {
 		return errs
@@ -540,9 +602,18 @@ func validateRepairOrderBody(b repairOrderBody, create bool) map[string]string {
 	return nil
 }
 
+func isValidRepairProgress(s string) bool {
+	switch s {
+	case "received", "diagnosing", "repairing", "awaiting_parts", "finished", "released":
+		return true
+	default:
+		return false
+	}
+}
+
 func defaultProgress(s string) string {
-	if s == "finished" {
-		return "finished"
+	if isValidRepairProgress(s) {
+		return s
 	}
 	return "received"
 }

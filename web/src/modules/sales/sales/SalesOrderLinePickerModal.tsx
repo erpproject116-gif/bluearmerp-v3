@@ -68,8 +68,9 @@ export function SalesOrderLinePickerModal(props: Props) {
       dateFrom: "",
       dateTo: "",
       docNo: "",
-      partnerId: props.partnerId ?? null,
-      partnerLocked: Boolean(props.partnerId),
+      // Default: all partners' open SO lines (Ecount-style). Users can still filter by partner.
+      partnerId: null,
+      partnerLocked: false,
       partnerLabel: props.partnerLabel ?? "",
     });
   });

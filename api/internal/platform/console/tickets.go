@@ -1,7 +1,9 @@
 package console
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -255,4 +257,190 @@ func nullIfZero(v int64) any {
 		return nil
 	}
 	return v
+}
+
+// exportTickets downloads all matching tickets with title (subject) and full body for documentation.
+// Query: format=csv|md, optional status/q. Default status filter matches list (open/in_progress/waiting) unless status=all.
+func (s *service) exportTickets(w http.ResponseWriter, r *http.Request) {
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format == "" {
+		format = "csv"
+	}
+	if format == "markdown" {
+		format = "md"
+	}
+	if format != "csv" && format != "md" {
+		response.Validation(w, map[string]string{"format": "Use format=csv or format=md."})
+		return
+	}
+
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	args := []any{}
+	where := "where 1=1"
+	n := 1
+	if status == "all" {
+		// no status filter
+	} else if status != "" {
+		args = append(args, status)
+		where += " and t.status = $" + strconv.Itoa(n)
+		n++
+	} else {
+		where += " and t.status in ('open','in_progress','waiting')"
+	}
+	if q != "" {
+		args = append(args, "%"+strings.ToLower(q)+"%")
+		where += " and (lower(t.subject) like $" + strconv.Itoa(n) + " or lower(coalesce(t.ticket_no,'')) like $" + strconv.Itoa(n) + ")"
+		n++
+	}
+	_ = n
+
+	rows, err := s.pool.Query(r.Context(), `
+		select t.id, t.ticket_no, t.subject, coalesce(t.description,''), t.status, t.priority,
+		       coalesce(t.category,''), tn.company_code, coalesce(pc.company_name, pc.full_name, ''),
+		       t.created_at::text, t.updated_at::text,
+		       coalesce(t.product_gap_tag,''), coalesce(t.product_gap_note,'')
+		from public.sup_support_tickets t
+		join public.tenants tn on tn.id = t.tenant_id
+		left join lateral (
+		  select company_name, full_name
+		  from public.platform_customers
+		  where tenant_id = t.tenant_id
+		  order by id
+		  limit 1
+		) pc on true
+		`+where+`
+		order by t.updated_at desc nulls last, t.created_at desc
+		limit 5000`, args...)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to export tickets.", "ERR_INTERNAL")
+		return
+	}
+	defer rows.Close()
+
+	type row struct {
+		ID, TicketNo, Subject, Body, Status, Priority, Category, CompanyCode, Customer string
+		Created, Updated, GapTag, GapNote                                              string
+		Comments, Notes                                                                string
+	}
+	var out []row
+	var ids []int64
+	idx := map[int64]int{}
+	for rows.Next() {
+		var id int64
+		var rrow row
+		if rows.Scan(
+			&id, &rrow.TicketNo, &rrow.Subject, &rrow.Body, &rrow.Status, &rrow.Priority,
+			&rrow.Category, &rrow.CompanyCode, &rrow.Customer, &rrow.Created, &rrow.Updated,
+			&rrow.GapTag, &rrow.GapNote,
+		) != nil {
+			continue
+		}
+		rrow.ID = strconv.FormatInt(id, 10)
+		idx[id] = len(out)
+		ids = append(ids, id)
+		out = append(out, rrow)
+	}
+
+	if len(ids) > 0 {
+		if crows, err := s.pool.Query(r.Context(), `
+			select ticket_id, coalesce(author_name,''), body, created_at::text
+			from public.sup_support_ticket_comments
+			where ticket_id = any($1)
+			order by ticket_id, created_at`, ids); err == nil {
+			defer crows.Close()
+			by := map[int64][]string{}
+			for crows.Next() {
+				var tid int64
+				var author, body, at string
+				if crows.Scan(&tid, &author, &body, &at) != nil {
+					continue
+				}
+				by[tid] = append(by[tid], fmt.Sprintf("[%s] %s: %s", at, author, body))
+			}
+			for tid, lines := range by {
+				if i, ok := idx[tid]; ok {
+					out[i].Comments = strings.Join(lines, "\n---\n")
+				}
+			}
+		}
+		if nrows, err := s.pool.Query(r.Context(), `
+			select ticket_id, coalesce(author_name,''), body, created_at::text
+			from public.platform_ticket_internal_notes
+			where ticket_id = any($1)
+			order by ticket_id, created_at`, ids); err == nil {
+			defer nrows.Close()
+			by := map[int64][]string{}
+			for nrows.Next() {
+				var tid int64
+				var author, body, at string
+				if nrows.Scan(&tid, &author, &body, &at) != nil {
+					continue
+				}
+				by[tid] = append(by[tid], fmt.Sprintf("[%s] %s: %s", at, author, body))
+			}
+			for tid, lines := range by {
+				if i, ok := idx[tid]; ok {
+					out[i].Notes = strings.Join(lines, "\n---\n")
+				}
+			}
+		}
+	}
+
+	stamp := time.Now().UTC().Format("20060102")
+	if format == "md" {
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="platform-tickets-%s.md"`, stamp))
+		var b strings.Builder
+		b.WriteString("# Platform support tickets export\n\n")
+		b.WriteString(fmt.Sprintf("Exported %s UTC · %d ticket(s)\n\n", stamp, len(out)))
+		for _, rrow := range out {
+			b.WriteString("---\n\n")
+			b.WriteString(fmt.Sprintf("## %s — %s\n\n", rrow.TicketNo, strings.ReplaceAll(rrow.Subject, "\n", " ")))
+			b.WriteString(fmt.Sprintf("- **Tenant:** %s\n", rrow.CompanyCode))
+			if rrow.Customer != "" {
+				b.WriteString(fmt.Sprintf("- **Customer:** %s\n", rrow.Customer))
+			}
+			b.WriteString(fmt.Sprintf("- **Status:** %s · **Priority:** %s · **Category:** %s\n", rrow.Status, rrow.Priority, rrow.Category))
+			b.WriteString(fmt.Sprintf("- **Created:** %s · **Updated:** %s\n", rrow.Created, rrow.Updated))
+			if rrow.GapTag != "" || rrow.GapNote != "" {
+				b.WriteString(fmt.Sprintf("- **Product gap:** %s — %s\n", rrow.GapTag, rrow.GapNote))
+			}
+			b.WriteString("\n### Body\n\n")
+			if strings.TrimSpace(rrow.Body) == "" {
+				b.WriteString("_(empty)_\n\n")
+			} else {
+				b.WriteString(rrow.Body)
+				b.WriteString("\n\n")
+			}
+			if strings.TrimSpace(rrow.Comments) != "" {
+				b.WriteString("### Comments\n\n")
+				b.WriteString(rrow.Comments)
+				b.WriteString("\n\n")
+			}
+			if strings.TrimSpace(rrow.Notes) != "" {
+				b.WriteString("### Internal notes\n\n")
+				b.WriteString(rrow.Notes)
+				b.WriteString("\n\n")
+			}
+		}
+		_, _ = w.Write([]byte(b.String()))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="platform-tickets-%s.csv"`, stamp))
+	cw := csv.NewWriter(w)
+	_ = cw.Write([]string{
+		"ticket_no", "title", "body", "company_code", "customer", "status", "priority", "category",
+		"created_at", "updated_at", "product_gap_tag", "product_gap_note", "comments", "internal_notes",
+	})
+	for _, rrow := range out {
+		_ = cw.Write([]string{
+			rrow.TicketNo, rrow.Subject, rrow.Body, rrow.CompanyCode, rrow.Customer,
+			rrow.Status, rrow.Priority, rrow.Category, rrow.Created, rrow.Updated,
+			rrow.GapTag, rrow.GapNote, rrow.Comments, rrow.Notes,
+		})
+	}
+	cw.Flush()
 }

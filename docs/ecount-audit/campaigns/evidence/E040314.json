@@ -1,0 +1,24 @@
+{
+  "prgId": "E040314",
+  "screen_name": "New Purchase Request",
+  "pills": [
+    {"label": "New Purchase Request", "audited": true, "fields_summary": "Date, PIC, Location, VAT, Currency, Delivery Date, Cc, Project + lines"},
+    {"label": "Option", "audited": true, "fields_summary": "Form Option menu (opened)"}
+  ],
+  "toolbar": [
+    "Option", "Help", "Find (F3)", "Sort", "My Item", "BOM", "Sales Order", "Load Slip",
+    "View Inv. Qty", "Safety Stock by Item", "Barcode", "Slip Barcode", "Verification",
+    "VAT Inc. 12%", "Domestic", "Reset", "List", "ECOUNT Web Uploader"
+  ],
+  "toolbar_audited": [
+    "Option", "Help", "Find (F3)", "Sort", "My Item", "BOM", "Sales Order", "Load Slip",
+    "View Inv. Qty", "Safety Stock by Item", "Barcode", "Slip Barcode", "Verification",
+    "VAT Inc. 12%", "Domestic", "Reset", "List", "ECOUNT Web Uploader"
+  ],
+  "controls_logged": 48,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchase-request/purchase-requests/new",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch3 depth-complete; Save not submitted; residuals: Load Slip/BOM/Safety Stock parity depth",
+  "mark_depth_complete": true
+}

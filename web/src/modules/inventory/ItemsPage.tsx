@@ -22,7 +22,9 @@ import {
   type ItemFormState,
   type ItemTab,
 } from "./ItemMasterModal";
+import { ItemBarcodeModal } from "./ItemBarcodeModal";
 import { ItemsAdvancedSearch, emptyItemsAdvancedFilters, type ItemsAdvancedFilters } from "./ItemsAdvancedSearch";
+import { SerialGenerateModal } from "./serial-lot/SerialGenerateModal";
 import { downloadReportCsv } from "../../shared/reports/downloadReportCsv";
 
 type Item = {
@@ -113,6 +115,8 @@ export default function ItemsPage() {
   const [advancedOpen, setAdvancedOpen] = createSignal(false);
   const [advancedFilters, setAdvancedFilters] = createSignal<ItemsAdvancedFilters>(emptyItemsAdvancedFilters());
   const [saving, setSaving] = createSignal(false);
+  const [barcodeOpen, setBarcodeOpen] = createSignal(false);
+  const [generateOpen, setGenerateOpen] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const lifecycle = useMasterLifecycle({
@@ -256,6 +260,40 @@ export default function ItemsPage() {
     );
   };
 
+  const selectedItemsForBarcode = (): Item[] => {
+    const ids = new Set(lifecycle.selectedIds());
+    const rows = list.data?.rows ?? [];
+    if (ids.size > 0) return rows.filter((r) => ids.has(r.id));
+    const sid = selectedId();
+    if (sid != null) {
+      const one = rows.find((r) => r.id === sid);
+      return one ? [one] : [];
+    }
+    return [];
+  };
+
+  const openBarcode = () => {
+    if (selectedItemsForBarcode().length === 0) {
+      toast.warning("Select one or more items to print barcodes.");
+      return;
+    }
+    setBarcodeOpen(true);
+  };
+
+  const openGenerateSerials = () => {
+    const pick = selectedItemsForBarcode().find((r) => r.track_serial) ?? selectedItemsForBarcode()[0];
+    if (pick && !pick.track_serial) {
+      toast.warning("Selected item does not track serial numbers. Choose a serial-tracked item or open Generate and pick one.");
+    }
+    setGenerateOpen(true);
+  };
+
+  const generateInitial = () => {
+    const pick = selectedItemsForBarcode().find((r) => r.track_serial);
+    if (!pick) return { id: null as number | null, label: "" };
+    return { id: pick.id, label: `${pick.item_code} — ${pick.item_name}` };
+  };
+
   return (
     <div>
       <SpreadsheetGrid
@@ -319,6 +357,20 @@ export default function ItemsPage() {
             <button
               type="button"
               class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
+              onClick={openBarcode}
+            >
+              Barcode (Item)
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
+              onClick={openGenerateSerials}
+            >
+              Generate serials
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
               onClick={exportItems}
             >
               Export CSV
@@ -327,6 +379,20 @@ export default function ItemsPage() {
         }
       />
       <lifecycle.BulkDialog />
+      <ItemBarcodeModal
+        open={barcodeOpen()}
+        items={selectedItemsForBarcode()}
+        onClose={() => setBarcodeOpen(false)}
+      />
+      <SerialGenerateModal
+        open={generateOpen()}
+        initialItemId={generateInitial().id}
+        initialItemLabel={generateInitial().label}
+        onClose={() => setGenerateOpen(false)}
+        onGenerated={() => {
+          invalidate("items");
+        }}
+      />
       <ItemMasterModal
         open={modalOpen()}
         editing={Boolean(editing())}

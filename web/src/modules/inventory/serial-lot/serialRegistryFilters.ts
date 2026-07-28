@@ -35,6 +35,7 @@ export const SERIAL_STATUS_OPTIONS = [
   { value: "in_transit", label: "In transit" },
   { value: "void", label: "Void" },
   { value: "scrapped", label: "Scrapped" },
+  { value: "rma", label: "RMA / repair" },
 ];
 
 export function serialStatusLabel(status: string): string {

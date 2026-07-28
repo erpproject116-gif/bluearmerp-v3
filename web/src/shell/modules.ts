@@ -45,12 +45,13 @@ export type AppModule = {
 export const appModules: AppModule[] = [
   {
     id: "dashboard",
-    label: "Business Dashboard",
+    label: "Home",
     href: "/app/dashboard",
     basePath: "/app/dashboard",
     features: [
-      { label: "Overview", href: "/app/dashboard", settingsHref: "/app/dashboard" },
+      { label: "MyPage", href: "/app/dashboard", settingsHref: "/app/dashboard" },
       { label: "Approvals", href: "/app/dashboard/approvals", settingsHref: "/app/dashboard/approvals" },
+      { label: "Site Map", href: "/app/dashboard/site-map", settingsHref: "/app/dashboard/site-map" },
     ],
   },
   {

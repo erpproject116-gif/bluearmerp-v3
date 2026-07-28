@@ -1,0 +1,24 @@
+{
+  "prgId": "E040203",
+  "screen_name": "New Sales Order",
+  "pills": [
+    {"label": "New Sales Order", "audited": true},
+    {"label": "Sales Order", "audited": true},
+    {"label": "Details", "audited": true},
+    {"label": "Nes Sales Order", "audited": true, "notes": "tenant template typo label"}
+  ],
+  "toolbar": [
+    "Option", "Find (F3)", "Sort", "Load Slip", "My Item", "Discount", "Domestic",
+    "Barcode", "View Inv. Qty", "Created Slip", "Verification", "Reset"
+  ],
+  "toolbar_audited": [
+    "Option", "Find (F3)", "Sort", "Load Slip", "My Item", "Discount", "Domestic",
+    "Barcode", "View Inv. Qty", "Created Slip", "Verification", "Reset"
+  ],
+  "controls_logged": 70,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/sales-order/sales-orders/new",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted",
+  "mark_depth_complete": true
+}

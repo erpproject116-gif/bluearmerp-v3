@@ -52,6 +52,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 
 		// Tickets / onboarding / follow-ups
 		cr.With(requirePlatformPermission("platform.tickets.read")).Get("/platform/console/tickets", svc.listTickets)
+		cr.With(requirePlatformPermission("platform.tickets.read")).Get("/platform/console/tickets/export", svc.exportTickets)
 		cr.With(requirePlatformPermission("platform.tickets.read")).Get("/platform/console/tickets/{id}", svc.getTicket)
 		cr.With(requirePlatformPermission("platform.tickets.write")).Post("/platform/console/tickets/{id}/internal-notes", svc.addTicketInternalNote)
 		cr.With(requirePlatformPermission("platform.tickets.write")).Patch("/platform/console/tickets/{id}", svc.patchTicket)

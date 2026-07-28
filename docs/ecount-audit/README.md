@@ -4,9 +4,38 @@ Systematic capture of ECount modules, screens, controls, and business rules for 
 
 **Critical:** Tab pills at every nesting level must be audited — see [`tab-pill-protocol.md`](tab-pill-protocol.md).
 
+**Live scorecard:** [`scorecard.md`](scorecard.md) — regenerate with `python scripts/reconcile-sitemap-coverage.py`.  
+**Gate language rules:** [`GATE-DISCIPLINE.md`](GATE-DISCIPLINE.md).  
+**Safe live crawl (no data mutation):** [`SAFE-ECOUNT-CRAWL-PLAN.md`](SAFE-ECOUNT-CRAWL-PLAN.md).  
+**Deferred (explicit skips):** [`deferred-register.md`](deferred-register.md).  
+**Orphans (Bluearm routes):** [`bluearm-orphan-report.md`](bluearm-orphan-report.md) — `python scripts/bluearm-orphan-map.py`.  
+**Module rollup:** [`module-parity-status.md`](module-parity-status.md) — `python scripts/module-parity-report.py`.
+
+### Completeness gates (do not claim “done” without numbers)
+
+| Gate | Pass when |
+|------|-----------|
+| **G0** Universe | Every Site Map `prgId` has a `coverage-matrix.csv` row (`--check` exits 0) |
+| **G1** Catalog | Every row has `bluearm_parity` + `deferred_reason` when deferred |
+| **G2** Depth | Target module rows are `depth-complete` (tab pills 100%, toolbar ≥95%) |
+| **G3** Parity | Target P0/P1 rows are `parity` or `partial` with residual list — never silent `missing` |
+| **G4** Shell IA | Inv.I/II + Acct.I/II left trees cover catalog leaves (live link or deferred stub) |
+| **G7** Drift | CI / weekly reconcile reports 0 new Site Map orphans |
+
+Never say “nothing can be missed” or “audit complete” without citing these gates.
+
 ## How to run the audit
 
-### Phase 0 — Tab pill registry (parallel with everything)
+### Phase 0 — Universe reconcile + tab pill registry
+
+```bash
+cd docs/ecount-audit
+python scripts/reconcile-sitemap-coverage.py          # G0: add missing Site Map rows + parity columns
+python scripts/reconcile-sitemap-coverage.py --check  # CI: fail if G0 broken
+python scripts/bluearm-orphan-map.py                  # G6: Bluearm routes vs matrix
+```
+
+### Phase 0b — Tab pill registry (parallel with everything)
 
 1. On every screen open, scan for pill-shaped links/tabs at L0–L4 (see protocol).
 2. Add one row per pill to `tab-pills.csv` before marking the screen complete.

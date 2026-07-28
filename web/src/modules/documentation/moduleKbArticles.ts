@@ -1029,22 +1029,29 @@ export const moduleKbArticles: KbArticle[] = [
     id: "after-sales-repair",
     title: "After-Sales: repair orders",
     scenario: "You service products returned by customers.",
-    intro: "Repair orders track intake, technician work, parts consumption, and warranty.",
+    intro:
+      "Repair orders track intake, technician work, parts, and warranty. For defective serials that must stay out of sellable stock, use an RMA-flagged location and Pick from SI — not Sales Return (which restores sellable inventory).",
     blocks: [
       {
         type: "steps",
         items: [
           "Create a repair order under After-Sales → New Repair Order.",
-          "Set customer, location, and progress status.",
+          "Set customer and an RMA-flagged location (lookup shows “(RMA)”).",
+          "Use Pick from SI to link the sold serial and sales line, then enable Receive into RMA.",
           "Add parts lines and post consumption when parts are used from stock.",
+          "When finished, set Released and choose a non-RMA active location to return the unit to sellable stock.",
           "Print receipt or warranty documents from the repair order actions.",
           "Open History on the list or repair modal to review progress changes, edits, and attachment uploads.",
         ],
       },
+      {
+        type: "tip",
+        text: "Sales Return vs Repair Order: restock/credit → Sales Returns; repair hold / RMA → Repair Order. See Help scenario “Sales Return vs Repair Order (RMA)”.",
+      },
     ],
     primaryHref: "/app/after-sales/repair-orders/new",
     primaryLabel: "New repair order",
-    relatedGuideIds: ["activity-logs-audit"],
+    relatedGuideIds: ["activity-logs-audit", "sales-return-vs-repair-rma", "sales-return-serial"],
   },
   {
     id: "wms-and-shipping",

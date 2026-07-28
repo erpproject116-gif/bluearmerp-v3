@@ -1,0 +1,24 @@
+{
+  "prgId": "C000030",
+  "screen_name": "Sales List",
+  "pills": [
+    {"label": "All", "audited": true},
+    {"label": "e-Approval", "audited": true},
+    {"label": "Unconfirmed", "audited": true},
+    {"label": "Confirm", "audited": true},
+    {"label": "Completed", "audited": true},
+    {"label": "1", "audited": true},
+    {"label": "2", "audited": true},
+    {"label": "3", "audited": true},
+    {"label": "4", "audited": true},
+    {"label": "5", "audited": true}
+  ],
+  "toolbar": ["Search(F3)", "Option", "New(F2)", "Email", "Change Status", "Print", "Barcode (Item)", "e-Approval", "View History"],
+  "toolbar_audited": ["Search(F3)", "Option", "New(F2)", "Email", "Change Status", "Print", "Barcode (Item)", "e-Approval", "View History"],
+  "controls_logged": 70,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/sales/sales",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch2 depth-complete; same UI as C000004/E040206 (tenant alias family)",
+  "mark_depth_complete": true
+}

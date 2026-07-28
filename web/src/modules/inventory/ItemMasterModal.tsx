@@ -460,6 +460,9 @@ export function ItemMasterModal(props: Props) {
           <A href="/app/inventory/serial-lot/registry" class="text-brand-600 hover:underline">Serial registry</A>
           {" · "}
           <A href="/app/inventory/serial-lot/lots" class="text-brand-600 hover:underline">Lot batches</A>
+          {" · "}
+          Auto serial format: company prefix + MMDDYY + 6-digit sequence (e.g. BA072726000001). Use{" "}
+          <span class="font-medium text-text-primary">Generate serials</span> on the item list or serial registry.
         </p>
       </Show>
     </EntityModal>

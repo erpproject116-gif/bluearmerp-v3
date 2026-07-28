@@ -79,6 +79,7 @@ export const knowledgebaseGroups: KbGroup[] = [
       "sales-cash-in-after-save",
       "official-receipt-after-si",
       "sales-return-serial",
+      "sales-return-vs-repair-rma",
     ],
   },
   {
@@ -161,6 +162,7 @@ export const knowledgebaseGroups: KbGroup[] = [
       "gmail-comms-connect",
       "crm-follow-ups",
       "after-sales-repair",
+      "sales-return-vs-repair-rma",
       "support-tickets",
       "support-ticket-from-after-sales",
       "booking-services",

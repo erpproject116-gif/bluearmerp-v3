@@ -1,0 +1,21 @@
+{
+  "prgId": "E040215",
+  "screen_name": "Collective Invoicing (Sales)",
+  "pills": [
+    {"label": "By Customer/Vendor", "audited": true},
+    {"label": "by Slip", "audited": true},
+    {"label": "General", "audited": true},
+    {"label": "Returns", "audited": true},
+    {"label": "Others", "audited": true},
+    {"label": "Domestic", "audited": true},
+    {"label": "Foreign", "audited": true}
+  ],
+  "toolbar": ["Option", "Search(F8)", "Settings", "Reset", "Vat Included"],
+  "toolbar_audited": ["Option", "Search(F8)", "Settings", "Reset", "Vat Included"],
+  "controls_logged": 55,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/sales/collective-invoices",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 depth-complete; Generate not run; residuals: Option field parity, Print without code",
+  "mark_depth_complete": true
+}

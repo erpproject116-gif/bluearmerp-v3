@@ -1,0 +1,15 @@
+{
+  "prgId": "E040225",
+  "screen_name": "New Shipment",
+  "pills": [
+    {"label": "New Shipment", "audited": true}
+  ],
+  "toolbar": ["Option", "Load Slip", "Sort", "Barcode", "Reset"],
+  "toolbar_audited": ["Option", "Load Slip", "Sort", "Barcode", "Reset"],
+  "controls_logged": 40,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/sales-order/shipments/new",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch2 depth-complete; Save not submitted",
+  "mark_depth_complete": true
+}

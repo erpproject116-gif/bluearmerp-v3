@@ -78,6 +78,7 @@ type commentBody struct {
 
 func registerTicketRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/tickets", listTickets(pool))
+	r.Get("/tickets/export", exportTickets(pool))
 	r.With(auth.RequirePermission("support.tickets_new", auth.AccessWrite)).Post("/tickets", createTicket(pool))
 	r.Get("/tickets/{id}", getTicket(pool))
 	// Auth is enforced inside patchTicket: IT may update all fields; creators may edit subject/description.

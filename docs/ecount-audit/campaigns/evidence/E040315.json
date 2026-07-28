@@ -1,0 +1,26 @@
+{
+  "prgId": "E040315",
+  "screen_name": "Purchase Request List",
+  "pills": [
+    {"label": "All", "audited": true},
+    {"label": "e-Approval", "audited": true},
+    {"label": "Unconfirmed", "audited": true},
+    {"label": "Confirm", "audited": true},
+    {"label": "In Progress", "audited": true},
+    {"label": "Completed", "audited": true}
+  ],
+  "toolbar": [
+    "Search(F3)", "Option", "New(F2)", "Email", "Change Status", "Print",
+    "Barcode (Item)", "Generate Other Slips", "e-Approval", "View History"
+  ],
+  "toolbar_audited": [
+    "Search(F3)", "Option", "New(F2)", "Email", "Change Status", "Print",
+    "Barcode (Item)", "Generate Other Slips", "e-Approval", "View History"
+  ],
+  "controls_logged": 55,
+  "coverage_pct": 100,
+  "bluearm_route": "/app/purchase-request/purchase-requests",
+  "bluearm_parity": "partial",
+  "notes": "Campaign A G2 Jul 28 batch2 depth-complete",
+  "mark_depth_complete": true
+}
