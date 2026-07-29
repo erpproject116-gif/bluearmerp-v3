@@ -126,6 +126,9 @@ import {
   SalesSiReceiptStatusPage,
   SalesArByCustomerPage,
   CustomerCreditBalancePage,
+  CreditNotesPage,
+  RetainerInvoicesPage,
+  RecurringInvoicesPage,
   SalesDiscountStatusPage,
   SalesDiscountStatusPrintPage,
   SalesPrintSlipsLauncherPage,
@@ -574,6 +577,9 @@ export default function App() {
           <Route path="/sales/collective-invoicing/status" component={CollectiveInvoiceStatusPage} />
           <Route path="/sales/reports/print-slips" component={SalesPrintSlipsLauncherPage} />
           <Route path="/sales/sales-returns" component={SalesReturnsPage} />
+          <Route path="/sales/credit-notes" component={CreditNotesPage} />
+          <Route path="/sales/retainer-invoices" component={RetainerInvoicesPage} />
+          <Route path="/sales/recurring-invoices" component={RecurringInvoicesPage} />
           <Route path="/finance/acct-ii/contracts" component={ContractsPage} />
           <Route path="/finance/acct-ii/landed-costs" component={LandedCostPage} />
           <Route path="/finance/acct-ii/notes" component={NotesPage} />

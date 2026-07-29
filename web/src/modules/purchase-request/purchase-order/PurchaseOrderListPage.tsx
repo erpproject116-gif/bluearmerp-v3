@@ -463,6 +463,7 @@ export default function PurchaseOrderListPage() {
           setViewingDeleted(false);
           setPoModalOpen(true);
         }}
+        newLabel="New Purchase Order"
         codeKey="purchase_order_no"
         nameKey="date_no_display"
         sortKey={sort()}

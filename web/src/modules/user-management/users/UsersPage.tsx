@@ -30,7 +30,7 @@ export default function UsersPage() {
   const auth = useAuth();
   const navigate = useNavigate();
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
-    useListState("email");
+    useListState("email", 25, { defaultStatus: "active_pending" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [menuOpenId, setMenuOpenId] = createSignal<number | null>(null);
   const [menuPos, setMenuPos] = createSignal<RowMenuPos | null>(null);
@@ -214,6 +214,8 @@ export default function UsersPage() {
     setSaving(false);
     if (!ok) return;
     setInviteOpen(false);
+    // Keep pending invites visible after invite (default Active filter used to hide them).
+    if (statusFilter() === "active") setStatusFilter("active_pending");
     invalidate.all();
   };
 
@@ -363,15 +365,24 @@ export default function UsersPage() {
   return (
     <div class="space-y-3">
       <p class="text-sm text-text-secondary">
-        Invite people, assign a role (and optional groups), soft-delete/restore.{" "}
-        <strong>Status</strong> shows Pending invite / Active / Deleted — filter{" "}
-        <strong>Pending invite</strong> for people who have not joined yet. Open <strong>Overrides</strong>{" "}
-        only for exceptions. Limit customers/locations on{" "}
+        Invite people, assign a role (and optional groups), soft-delete/restore. The list defaults to{" "}
+        <strong>Active + pending</strong> so outstanding invites stay visible until the person signs in with Google
+        and joins — then their status becomes <strong>Active</strong>. Open <strong>Overrides</strong> only for
+        exceptions. Limit customers/locations on{" "}
         <A href="/app/user-management/user-permissions" class="text-brand-600 hover:underline">
           Data scopes
         </A>
         .
       </p>
+      <Show when={(list.data?.rows ?? []).some((r) => r.status === "invited")}>
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950">
+          <span class="font-medium">
+            {(list.data?.rows ?? []).filter((r) => r.status === "invited").length} pending invite
+            {(list.data?.rows ?? []).filter((r) => r.status === "invited").length === 1 ? "" : "s"}
+          </span>{" "}
+          on this page — waiting for Google sign-in. They move to Active automatically after they access the app.
+        </div>
+      </Show>
       <SpreadsheetGrid
         columns={[
           { key: "email", header: "Email", sortable: true },
@@ -407,11 +418,18 @@ export default function UsersPage() {
                     }
                   >
                     <span
-                      class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-950 ring-1 ring-amber-200"
-                      title="Invite sent — waiting for Google sign-in to join this company"
+                      class="inline-flex flex-col items-start gap-0.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-amber-200"
+                      title="Invite sent — waiting for Google sign-in. Status becomes Active after they join."
                     >
-                      <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
-                      Pending invite
+                      <span class="inline-flex items-center gap-1.5">
+                        <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+                        Pending invite
+                      </span>
+                      <Show when={row.invited_at}>
+                        <span class="pl-3 font-normal text-amber-900/80">
+                          Sent {new Date(row.invited_at!).toLocaleString()}
+                        </span>
+                      </Show>
                     </span>
                   </Show>
                 }
@@ -477,10 +495,11 @@ export default function UsersPage() {
         onStatusChange={setStatusFilter}
         statusLabel="Status"
         statusOptions={[
-          { value: "", label: "All" },
-          { value: "active", label: "Active" },
+          { value: "active_pending", label: "Active + pending" },
+          { value: "active", label: "Active only" },
           { value: "invited", label: "Pending invite" },
           { value: "disabled", label: "Deleted" },
+          { value: "", label: "All" },
         ]}
         onRefresh={() => invalidate.users()}
       />

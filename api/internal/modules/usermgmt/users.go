@@ -83,9 +83,13 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 			n++
 		}
 		if p.Status != "" && p.Status != "all" {
-			where += fmt.Sprintf(" and u.status = $%d", n)
-			args = append(args, p.Status)
-			n++
+			if p.Status == "active_pending" {
+				where += " and u.status in ('active', 'invited')"
+			} else {
+				where += fmt.Sprintf(" and u.status = $%d", n)
+				args = append(args, p.Status)
+				n++
+			}
 		}
 
 		order := orderSQL(p.Order)
@@ -93,6 +97,8 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 		if sortCol == "" {
 			sortCol = "u.email"
 		}
+		// Pending invites first so inviters see outstanding joins without hunting.
+		priorityOrder := "case when u.status = 'invited' then 0 else 1 end,"
 		q := fmt.Sprintf(`
 			select
 			  u.id,
@@ -122,8 +128,8 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 			  limit 1
 			) ui on true
 			where %s
-			order by %s %s
-			limit $%d offset $%d`, where, sortCol, order, n, n+1)
+			order by %s %s %s
+			limit $%d offset $%d`, where, priorityOrder, sortCol, order, n, n+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)

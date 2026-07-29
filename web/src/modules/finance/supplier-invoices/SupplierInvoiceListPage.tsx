@@ -192,6 +192,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
+        newLabel="New Purchases"
         codeKey="invoice_no"
         nameKey="date_no_display"
         sortKey={sort()}
