@@ -306,6 +306,7 @@ export default function RetainerInvoicesPage() {
         onClose={() => setSalesPickerOpen(false)}
         onSelect={pickSales}
         initialQ={applyOpen()?.customer_name ?? ""}
+        partnerId={applyOpen()?.partner_id}
       />
     </div>
   );

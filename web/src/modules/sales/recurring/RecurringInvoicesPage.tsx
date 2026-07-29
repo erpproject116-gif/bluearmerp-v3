@@ -42,6 +42,7 @@ export default function RecurringInvoicesPage() {
   const [saving, setSaving] = createSignal(false);
   const [busyId, setBusyId] = createSignal<number | null>(null);
   const [lastGenerated, setLastGenerated] = createSignal<{ sales_no: string; sales_id: number } | null>(null);
+  const [previewRow, setPreviewRow] = createSignal<RecurringInvoice | null>(null);
 
   const list = createQuery(() => ({
     queryKey: ["recurring-invoices", showInactive()],
@@ -191,11 +192,18 @@ export default function RecurringInvoicesPage() {
                       <Show when={row.is_active}>
                         <button
                           type="button"
+                          class="text-text-secondary hover:underline"
+                          onClick={() => setPreviewRow(row)}
+                        >
+                          Preview
+                        </button>
+                        <button
+                          type="button"
                           class="text-brand-600 hover:underline disabled:opacity-50"
                           disabled={busyId() === row.id}
                           onClick={() => void generate(row)}
                         >
-                          {busyId() === row.id ? "…" : "Generate invoice"}
+                          {busyId() === row.id ? "…" : "Generate"}
                         </button>
                       </Show>
                       <Show when={row.last_sales_id}>
@@ -263,6 +271,40 @@ export default function RecurringInvoicesPage() {
             </button>
           </div>
         </div>
+      </Show>
+
+      <Show when={previewRow()}>
+        {(row) => (
+          <div class="fixed inset-0 z-[55] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center">
+            <div class="w-full max-w-md rounded-2xl border border-stroke bg-white p-6 shadow-xl">
+              <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold">Preview next invoice</h2>
+                <button type="button" class={modalDismissClass} onClick={() => setPreviewRow(null)}>Close</button>
+              </div>
+              <dl class="space-y-2 text-sm">
+                <div class="flex justify-between"><dt class="text-text-secondary">Schedule</dt><dd class="font-medium">{row().name}</dd></div>
+                <div class="flex justify-between"><dt class="text-text-secondary">Customer</dt><dd>{row().customer_name || "—"}</dd></div>
+                <div class="flex justify-between"><dt class="text-text-secondary">Invoice date</dt><dd>{row().next_run_date}</dd></div>
+                <div class="flex justify-between"><dt class="text-text-secondary">Description</dt><dd>{row().description || "—"}</dd></div>
+                <div class="flex justify-between"><dt class="text-text-secondary">Amount</dt><dd class="font-semibold">{formatPeso(row().amount)}</dd></div>
+                <div class="flex justify-between"><dt class="text-text-secondary">Frequency</dt><dd class="capitalize">{row().frequency}</dd></div>
+              </dl>
+              <div class="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                  disabled={busyId() === row().id}
+                  onClick={() => { setPreviewRow(null); void generate(row()); }}
+                >
+                  Generate now
+                </button>
+                <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50" onClick={() => setPreviewRow(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Show>
 
       <PartnerSearchModal open={partnerPickerOpen()} onClose={() => setPartnerPickerOpen(false)} onSelect={pickPartner} />

@@ -5,6 +5,9 @@ export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: s
   // Product kill-switch: keep routes/code but hide from nav and ModuleAccessGate.
   if (moduleId === "data_center") return false;
   if (moduleId === "documentation") return true;
+  // Reports is a catalog shell, not a tenant-toggle module. Individual report pages
+  // still enforce their own module/feature/permission gates.
+  if (moduleId === "reports") return true;
   if (moduleId === "buying") return isTenantModuleEnabled(me, "purchase_order");
   if (moduleId === "selling") {
     return (

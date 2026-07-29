@@ -1,4 +1,3 @@
-import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
@@ -151,19 +150,23 @@ export default function CreditNotesPage() {
     const row = refundOpen();
     if (!row) return;
     setSaving(true);
-    const res = await apiFetch(`/api/v1/finance/credit-notes/${row.id}/convert-to-cash`, {
-      method: "POST",
-      body: JSON.stringify({
-        refund_method: refundMethod(),
-        refund_reference: refundRef().trim(),
-      }),
-    });
+    const res = await apiFetch<{ expense_id: number; expense_no: string; amount: number }>(
+      `/api/v1/finance/credit-notes/${row.id}/convert-to-cash`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          refund_method: refundMethod(),
+          refund_reference: refundRef().trim(),
+        }),
+      },
+    );
     setSaving(false);
     if (!res.success) {
       toast.warning(res.message ?? "Could not convert to cash.");
       return;
     }
-    toast.success("Converted remaining credit to cash refund.");
+    const expNo = res.data?.expense_no ?? "";
+    toast.success(`Refund recorded as expense ${expNo}. View under Expenses.`);
     setRefundOpen(null);
     invalidate();
   };
@@ -357,9 +360,7 @@ export default function CreditNotesPage() {
               <input class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={refundRef()} onInput={(e) => setRefundRef(e.currentTarget.value)} />
             </label>
             <p class="mb-4 text-xs text-text-secondary">
-              Tip: record the cash out under{" "}
-              <A href="/app/finance/disbursements" class="text-brand-600 hover:underline">Disbursements</A>{" "}
-              if you need a payment voucher.
+              A refund expense record will be created automatically under Expenses.
             </p>
             <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" disabled={saving()} onClick={() => void convertToCash()}>
               {saving() ? "Processing…" : "Convert to cash"}
@@ -374,6 +375,7 @@ export default function CreditNotesPage() {
         onClose={() => setSalesPickerOpen(false)}
         onSelect={pickSales}
         initialQ={applyOpen()?.customer_name ?? ""}
+        partnerId={applyOpen()?.partner_id}
       />
     </div>
   );
