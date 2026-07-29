@@ -95,11 +95,38 @@ export function useProcessPolicy(enabled: () => boolean = () => true) {
     queryKey: ["process-policy"],
     enabled: enabled(),
     queryFn: async () => {
-      const res = await apiFetch<{ policy: ProcessPolicy; can_manage: boolean }>(
-        "/api/v1/settings/process-policies",
-      );
+      const res = await apiFetch<{
+        policy: ProcessPolicy;
+        can_manage: boolean;
+        module_enabled?: boolean;
+      }>("/api/v1/settings/process-policies");
       if (!res.success) throw new Error(res.message ?? "Failed to load process policies");
-      return res.data?.policy;
+      const policy = res.data?.policy;
+      if (!policy) return undefined;
+      // Module off → treat as all attachment/flow gates inactive for client-side checks.
+      if (res.data?.module_enabled === false) {
+        return {
+          ...policy,
+          sales_require_quotation: false,
+          sales_require_so: false,
+          sales_require_reservation: false,
+          sales_require_delivery_receipt: false,
+          purchase_require_pr: false,
+          purchase_require_pr_approval: false,
+          purchase_require_gr_before_supplier_invoice: false,
+          sales_enforce_credit_limit: false,
+          sales_require_so_approval: false,
+          purchase_require_po_approval: false,
+          finance_require_je_approval: false,
+          budget_control_mode: "off",
+          quotation_require_attachment: false,
+          sales_order_require_attachment: false,
+          sales_require_attachment: false,
+          purchase_order_require_attachment: false,
+          supplier_invoice_require_attachment: false,
+        };
+      }
+      return policy;
     },
     staleTime: 60_000,
   }));

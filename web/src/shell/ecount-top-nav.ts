@@ -227,7 +227,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   },
   {
     id: "sell",
-    label: "Sell",
+    label: "Sales",
     href: "/app/quotation/quotations",
     iconId: "selling",
     topId: "inv1",
@@ -251,7 +251,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "sales",
-        label: "Sales invoices",
+        label: "Sales list",
         href: "/app/sales/sales",
         iconId: "sales",
         topId: "inv1",
@@ -267,7 +267,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "selling",
-        label: "Sell overview",
+        label: "Sale overview",
         href: "/app/selling",
         iconId: "selling",
         topId: "inv1",
@@ -277,7 +277,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   },
   {
     id: "buy",
-    label: "Buy",
+    label: "Purchase",
     href: "/app/purchase-request/purchase-requests",
     iconId: "buying",
     topId: "inv1",
@@ -309,7 +309,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "buying",
-        label: "Buy overview",
+        label: "Purchase overview",
         href: "/app/buying",
         iconId: "buying",
         topId: "inv1",
@@ -400,6 +400,27 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         topId: "setup",
         moduleId: "user_management",
         expandGroupId: "misc",
+        defaultExpanded: false,
+        children: [
+          {
+            id: "um_users",
+            label: "Users",
+            href: "/app/user-management/users",
+            iconId: "user_management",
+            topId: "setup",
+            moduleId: "user_management",
+            expandGroupId: "misc",
+          },
+          {
+            id: "um_process_policies",
+            label: "Process Policies",
+            href: "/app/user-management/process-policies",
+            iconId: "user_management",
+            topId: "setup",
+            moduleId: "user_management",
+            expandGroupId: "misc",
+          },
+        ],
       },
     ],
   },

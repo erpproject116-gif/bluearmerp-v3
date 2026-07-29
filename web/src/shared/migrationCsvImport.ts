@@ -27,6 +27,8 @@ export const MIG_ENTITY_FIELDS: Record<MigKind, string[]> = {
     "status",
     "track_serial",
     "track_lot",
+    "serial_policy",
+    "lot_policy",
     "track_inventory_qty",
     "warranty_duration_months",
     "spec_name",

@@ -333,20 +333,20 @@ export const documentationSections: DocSection[] = [
   },
   {
     id: "sales",
-    title: "Sales invoices",
+    title: "Sales list",
     iconId: "sales",
-    intro: "Create sales invoices (SI) and track billing status.",
+    intro: "Create sales and track billing status.",
     primaryHref: "/app/sales/sales",
-    primaryLabel: "Open Sales List",
+    primaryLabel: "Open Sales list",
     blocks: [
       {
         type: "paragraph",
-        text: "Sales invoices are your billing documents. Lines can come from released sales orders or be entered directly for walk-in sales. When you invoice from a sales order line, the system checks that you have released enough quantity first.",
+        text: "Sales list holds your billing documents (sales). Lines can come from released sales orders or be entered directly for walk-in sales. When you bill from a sales order line, the system checks that you have released enough quantity first.",
       },
       {
         type: "steps",
         items: [
-          "Click New Sales to create an invoice.",
+          "Click New sales to create a sale.",
           "Select the customer, then use Load Slip to pull lines from Sales Order, Quotation, or Shipping Order — or enter lines manually.",
           "For serial-tracked items, pick the serial numbers that match the quantity.",
           "Save as Unconfirmed first. Upload attachments in the Attachments section if your store requires files before Confirm.",

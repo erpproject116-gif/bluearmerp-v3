@@ -12,16 +12,16 @@ import (
 
 // Policy holds tenant-level commercial flow gates (skip-friendly defaults).
 type Policy struct {
-	TenantID                            int64 `json:"tenant_id"`
-	SalesRequireQuotation               bool  `json:"sales_require_quotation"`
-	SalesRequireSO                      bool  `json:"sales_require_so"`
-	SalesRequireReservation             bool  `json:"sales_require_reservation"`
-	SalesRequireDeliveryReceipt         bool  `json:"sales_require_delivery_receipt"`
-	PurchaseRequirePR                   bool  `json:"purchase_require_pr"`
-	PurchaseRequirePRApproval           bool  `json:"purchase_require_pr_approval"`
-	PurchaseRequireGRBeforeSupplierInv  bool  `json:"purchase_require_gr_before_supplier_invoice"`
-	LegacyCombinedSORelease             bool  `json:"legacy_combined_so_release"`
-	SalesEnforceCreditLimit             bool  `json:"sales_enforce_credit_limit"`
+	TenantID                            int64  `json:"tenant_id"`
+	SalesRequireQuotation               bool   `json:"sales_require_quotation"`
+	SalesRequireSO                      bool   `json:"sales_require_so"`
+	SalesRequireReservation             bool   `json:"sales_require_reservation"`
+	SalesRequireDeliveryReceipt         bool   `json:"sales_require_delivery_receipt"`
+	PurchaseRequirePR                   bool   `json:"purchase_require_pr"`
+	PurchaseRequirePRApproval           bool   `json:"purchase_require_pr_approval"`
+	PurchaseRequireGRBeforeSupplierInv  bool   `json:"purchase_require_gr_before_supplier_invoice"`
+	LegacyCombinedSORelease             bool   `json:"legacy_combined_so_release"`
+	SalesEnforceCreditLimit             bool   `json:"sales_enforce_credit_limit"`
 	AccountsAutoPostOR                  bool   `json:"accounts_auto_post_or"`
 	AccountsAutoPostPV                  bool   `json:"accounts_auto_post_pv"`
 	AccountsAutoPostSales               bool   `json:"accounts_auto_post_sales"`
@@ -91,8 +91,8 @@ const selectCols = `
   coalesce(supplier_invoice_require_attachment, true)
 `
 
-// Load returns the tenant policy, inserting skip-friendly defaults when missing.
-func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, error) {
+// LoadStored returns the tenant policy as stored (for admin UI), inserting defaults when missing.
+func LoadStored(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, error) {
 	_, err := pool.Exec(ctx, `
 		insert into public.tenant_process_policies (tenant_id)
 		values ($1)
@@ -131,6 +131,68 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, erro
 		&p.SupplierInvoiceRequireAttachment,
 	)
 	return p, err
+}
+
+// BypassFromStored returns a policy with all require-* gates off while preserving
+// non-gate settings (auto-post accounting, legacy SO release) from the stored row.
+func BypassFromStored(stored Policy) Policy {
+	out := stored
+	out.SalesRequireQuotation = false
+	out.SalesRequireSO = false
+	out.SalesRequireReservation = false
+	out.SalesRequireDeliveryReceipt = false
+	out.PurchaseRequirePR = false
+	out.PurchaseRequirePRApproval = false
+	out.PurchaseRequireGRBeforeSupplierInv = false
+	out.SalesEnforceCreditLimit = false
+	out.SalesRequireSOApproval = false
+	out.PurchaseRequirePOApproval = false
+	out.FinanceRequireJEApproval = false
+	out.BudgetControlMode = "off"
+	out.QuotationRequireAttachment = false
+	out.SalesOrderRequireAttachment = false
+	out.SalesRequireAttachment = false
+	out.PurchaseOrderRequireAttachment = false
+	out.SupplierInvoiceRequireAttachment = false
+	return out
+}
+
+// BypassPolicy is a fully relaxed policy when no stored row is available.
+func BypassPolicy(tenantID int64) Policy {
+	return BypassFromStored(Policy{TenantID: tenantID, LegacyCombinedSORelease: true, BudgetControlMode: "off"})
+}
+
+// ModuleEnabled reports whether process policy enforcement is on for the tenant.
+// Missing tenant_modules row is treated as enabled (legacy / pre-migration safe).
+func ModuleEnabled(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (bool, error) {
+	var enabled bool
+	err := pool.QueryRow(ctx, `
+		select is_enabled from public.tenant_modules
+		where tenant_id = $1 and module_code = 'process_policies'`, tenantID).Scan(&enabled)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return true, nil
+		}
+		return false, err
+	}
+	return enabled, nil
+}
+
+// Load returns the effective policy for transaction enforcement.
+// When the process_policies module is off, require-* gates are bypassed.
+func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy, error) {
+	stored, err := LoadStored(ctx, pool, tenantID)
+	if err != nil {
+		return Policy{}, err
+	}
+	on, err := ModuleEnabled(ctx, pool, tenantID)
+	if err != nil {
+		return Policy{}, err
+	}
+	if !on {
+		return BypassFromStored(stored), nil
+	}
+	return stored, nil
 }
 
 // ApplyPatch merges non-nil patch fields onto current.
@@ -269,7 +331,7 @@ const updatePolicySQL = `
 
 // Update merges a patch into the stored policy.
 func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, patch Patch) (Policy, error) {
-	current, err := Load(ctx, pool, tenantID)
+	current, err := LoadStored(ctx, pool, tenantID)
 	if err != nil {
 		return Policy{}, err
 	}
@@ -283,7 +345,7 @@ func Update(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, pat
 
 // UpdateTx merges a patch inside an existing transaction.
 func UpdateTx(ctx context.Context, tx pgx.Tx, tenantID, userID int64, patch Patch) (Policy, error) {
-	current, err := LoadTx(ctx, tx, tenantID)
+	current, err := loadStoredTx(ctx, tx, tenantID)
 	if err != nil {
 		return Policy{}, err
 	}
@@ -305,8 +367,7 @@ func DecodePatch(raw json.RawMessage) (Patch, error) {
 	return p, err
 }
 
-// LoadTx loads policy inside an existing transaction.
-func LoadTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error) {
+func loadStoredTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error) {
 	_, err := tx.Exec(ctx, `
 		insert into public.tenant_process_policies (tenant_id)
 		values ($1)
@@ -345,4 +406,26 @@ func LoadTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error) {
 		&p.SupplierInvoiceRequireAttachment,
 	)
 	return p, err
+}
+
+// LoadTx loads the effective policy inside an existing transaction (module gate applied).
+func LoadTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error) {
+	p, err := loadStoredTx(ctx, tx, tenantID)
+	if err != nil {
+		return Policy{}, err
+	}
+	var enabled bool
+	err = tx.QueryRow(ctx, `
+		select is_enabled from public.tenant_modules
+		where tenant_id = $1 and module_code = 'process_policies'`, tenantID).Scan(&enabled)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return p, nil
+		}
+		return Policy{}, err
+	}
+	if !enabled {
+		return BypassFromStored(p), nil
+	}
+	return p, nil
 }

@@ -62,6 +62,25 @@ export function handleSaveResult(
     return false;
   }
 
+  if (res.code === "ERR_MODULE_DISABLED" || res.code === "ERR_FEATURE_DISABLED") {
+    const next =
+      res.data && typeof res.data === "object" && "next" in res.data
+        ? String((res.data as { next?: string }).next ?? "")
+        : "/app/user-management/tenant-modules";
+    if (toast.action) {
+      toast.action({
+        type: "warning",
+        title: res.message ?? "This module is turned off for the workspace.",
+        message: "Turn it on under Modules & Features, then try again.",
+        actionLabel: "Open Modules & Features",
+        href: next.includes("tenant-modules") ? next : "/app/user-management/tenant-modules",
+      });
+      return false;
+    }
+    toast.warning(res.message ?? "This module is turned off for the workspace.");
+    return false;
+  }
+
   if (res.code === "ERR_VALIDATION") {
     toast.warning(res.message ?? "Validation failed. Check the form and try again.");
     return false;

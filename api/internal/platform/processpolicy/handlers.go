@@ -27,7 +27,12 @@ func getPolicy(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 			return
 		}
-		p, err := Load(r.Context(), pool, tu.TenantID)
+		p, err := LoadStored(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		moduleOn, err := ModuleEnabled(r.Context(), pool, tu.TenantID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
 			return
@@ -36,8 +41,9 @@ func getPolicy(pool *pgxpool.Pool) http.HandlerFunc {
 		canManage := tu2.HasPermission("settings.process_policies", auth.AccessWrite) ||
 			tu2.IsStoreAdmin || tu2.IsTenantOwner || tu2.IsPlatformSuperadmin
 		response.OK(w, map[string]any{
-			"policy":     p,
-			"can_manage": canManage,
+			"policy":         p,
+			"can_manage":     canManage,
+			"module_enabled": moduleOn,
 		}, "OK")
 	}
 }
