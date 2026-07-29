@@ -180,13 +180,79 @@ func createInvite(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		var existingID int64
 		var existingStatus string
+		var existingLinked bool
 		err := pool.QueryRow(r.Context(), `
-			select status from public.users
-			where tenant_id = $1 and lower(email) = $2`, tu.TenantID, email).Scan(&existingStatus)
+			select id, status, auth_user_id is not null
+			from public.users
+			where tenant_id = $1 and lower(email) = $2`, tu.TenantID, email).
+			Scan(&existingID, &existingStatus, &existingLinked)
 		if err == nil {
 			if existingStatus == "invited" {
 				response.Err(w, http.StatusConflict, "This email already has a pending invite.", "ERR_CONFLICT")
+				return
+			}
+			// Re-invite: revoked/soft-deleted never-linked row — reopen invite without a new user.
+			if existingStatus == "disabled" && !existingLinked {
+				tx, txErr := pool.Begin(r.Context())
+				if txErr != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
+					return
+				}
+				defer tx.Rollback(r.Context())
+
+				_, txErr = tx.Exec(r.Context(), `
+					update public.users
+					set status = 'invited', full_name = $1, tenant_role = $2,
+					    auth_revision = auth_revision + 1, updated_at = now()
+					where id = $3 and tenant_id = $4`,
+					fullName, roleCode, existingID, tu.TenantID)
+				if txErr != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
+					return
+				}
+
+				var inviteID int64
+				var invitedAt time.Time
+				txErr = tx.QueryRow(r.Context(), `
+					update public.user_invites
+					set revoked_at = null,
+					    accepted_at = null,
+					    full_name = $1,
+					    role_code = $2,
+					    invited_by_user_id = $3,
+					    invited_at = now()
+					where tenant_id = $4 and user_id = $5
+					returning id, invited_at`,
+					fullName, roleCode, tu.AppUserID, tu.TenantID, existingID).
+					Scan(&inviteID, &invitedAt)
+				if txErr == pgx.ErrNoRows {
+					txErr = tx.QueryRow(r.Context(), `
+						insert into public.user_invites
+						  (tenant_id, user_id, email, full_name, role_code, invited_by_user_id)
+						values ($1, $2, $3, $4, $5, $6)
+						returning id, invited_at`,
+						tu.TenantID, existingID, email, fullName, roleCode, tu.AppUserID).
+						Scan(&inviteID, &invitedAt)
+				}
+				if txErr != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
+					return
+				}
+				if err := tx.Commit(r.Context()); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
+					return
+				}
+
+				_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.reinvite", "user", &existingID, nil, map[string]any{
+					"email": email, "tenant_role": roleCode,
+				})
+				response.OK(w, UserRow{
+					ID: existingID, Email: email, FullName: fullName, TenantRole: roleCode,
+					Status: "invited", AuthLinked: false, InviteID: &inviteID, InvitedAt: &invitedAt,
+					InvitedBy: &tu.AppUserID,
+				}, "User re-invited. They must sign in with Google using this email.")
 				return
 			}
 			response.Err(w, http.StatusConflict, "A user with this email already exists.", "ERR_CONFLICT")

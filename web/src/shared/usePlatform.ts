@@ -26,6 +26,7 @@ export type PlatformCustomer = {
   ends_at?: string | null;
   days_remaining?: number;
   crm_lead_id?: number | null;
+  likely_misjoin?: boolean;
 };
 
 export type PlatformBillingSummary = {
@@ -282,6 +283,7 @@ export function usePlatformCommandOverview() {
           open_follow_ups: number;
           overdue_follow_ups?: number;
           pending_invites: number;
+          pending_approvals?: number;
           product_gap_tickets?: number;
           no_docs_trials?: number;
           churn_risk?: number;

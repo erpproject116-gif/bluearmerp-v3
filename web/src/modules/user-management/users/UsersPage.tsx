@@ -75,6 +75,13 @@ export default function UsersPage() {
     setInviteOpen(true);
   };
 
+  const openReInvite = (row: TenantUserRow) => {
+    setInviteEmail(row.email);
+    setInviteName(row.full_name ?? "");
+    setInviteRole(row.tenant_role || "member");
+    setInviteOpen(true);
+  };
+
   const openEdit = async (row: TenantUserRow) => {
     setEditing(row);
     setEditName(row.full_name ?? "");
@@ -273,8 +280,9 @@ export default function UsersPage() {
   return (
     <div class="space-y-3">
       <p class="text-sm text-text-secondary">
-        Invite people, assign a role (and optional groups), soft-delete/restore. Open{" "}
-        <strong>Overrides</strong> only for exceptions. Limit customers/locations on{" "}
+        Invite people, assign a role (and optional groups), soft-delete/restore.{" "}
+        <strong>Status</strong> shows Invited / Active / Deleted — filter <strong>Invited</strong> for pending
+        joins. Open <strong>Overrides</strong> only for exceptions. Limit customers/locations on{" "}
         <A href="/app/user-management/user-permissions" class="text-brand-600 hover:underline">
           Data scopes
         </A>
@@ -305,7 +313,14 @@ export default function UsersPage() {
             render: (row) => (
               <Show
                 when={row.status === "disabled"}
-                fallback={<span>{statusLabel(row.status)}</span>}
+                fallback={
+                  <Show
+                    when={row.status === "invited"}
+                    fallback={<span>{statusLabel(row.status)}</span>}
+                  >
+                    <span class="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900">Invited</span>
+                  </Show>
+                }
               >
                 <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">Deleted</span>
               </Show>
@@ -372,7 +387,19 @@ export default function UsersPage() {
                     Delete
                   </button>
                 </Show>
-                <Show when={row.status === "disabled"}>
+                <Show when={row.status === "disabled" && !row.auth_linked}>
+                  <button
+                    type="button"
+                    class="text-sm text-brand-600 hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openReInvite(row);
+                    }}
+                  >
+                    Re-invite
+                  </button>
+                </Show>
+                <Show when={row.status === "disabled" && row.auth_linked}>
                   <button
                     type="button"
                     class="text-sm text-emerald-700 hover:underline"

@@ -15,7 +15,7 @@ func (s *service) commandOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var openTickets, trialEnding, inactiveTrials, openFollowUps, pendingInvites int
-	var overdueFollowUps, productGapTickets, noDocsTrials, churnRisk int
+	var overdueFollowUps, productGapTickets, noDocsTrials, churnRisk, pendingApprovals int
 	_ = s.pool.QueryRow(ctx, `
 		select count(*) from public.sup_support_tickets
 		where status in ('open','in_progress','waiting')`).Scan(&openTickets)
@@ -41,6 +41,8 @@ func (s *service) commandOverview(w http.ResponseWriter, r *http.Request) {
 	_ = s.pool.QueryRow(ctx, `
 		select count(*) from public.platform_user_invites
 		where accepted_at is null and revoked_at is null and expires_at > now()`).Scan(&pendingInvites)
+	_ = s.pool.QueryRow(ctx, `
+		select count(*) from public.tenants where status = 'pending_approval'`).Scan(&pendingApprovals)
 	_ = s.pool.QueryRow(ctx, `
 		select count(*) from public.sup_support_tickets
 		where status in ('open','in_progress','waiting') and coalesce(product_gap_tag,'') <> ''`).Scan(&productGapTickets)
@@ -225,6 +227,7 @@ func (s *service) commandOverview(w http.ResponseWriter, r *http.Request) {
 			"open_follow_ups":     openFollowUps,
 			"overdue_follow_ups":  overdueFollowUps,
 			"pending_invites":     pendingInvites,
+			"pending_approvals":   pendingApprovals,
 			"product_gap_tickets": productGapTickets,
 			"no_docs_trials":      noDocsTrials,
 			"churn_risk":          churnRisk,

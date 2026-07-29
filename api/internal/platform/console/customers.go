@@ -46,7 +46,21 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 		select pc.id, pc.email, pc.full_name, pc.company_name, pc.entry_source,
 		       pc.urgency_label, pc.tenant_id, t.company_code, coalesce(t.status, '') as tenant_status,
 		       ps.plan_kind, ps.status as sub_status, ps.ends_at,
-		       pc.crm_lead_id, pc.created_at
+		       pc.crm_lead_id, pc.created_at,
+		       (
+		         (pc.entry_source = 'self_signup' or coalesce(t.status,'') = 'pending_approval')
+		         and exists (
+		           select 1
+		           from public.users u
+		           join public.user_invites ui on ui.user_id = u.id
+		           where lower(u.email) = lower(pc.email)
+		             and u.status = 'invited'
+		             and u.auth_user_id is null
+		             and (pc.tenant_id is null or u.tenant_id <> pc.tenant_id)
+		             and ui.revoked_at is null
+		             and ui.accepted_at is null
+		         )
+		       ) as likely_misjoin
 		from public.platform_customers pc
 		left join public.tenants t on t.id = pc.tenant_id
 		left join lateral (
@@ -77,9 +91,10 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 			tenantID, leadID                                        *int64
 			endsAt                                                  *time.Time
 			createdAt                                               time.Time
+			likelyMisjoin                                           bool
 		)
 		if err := rows.Scan(&id, &email, &fullName, &company, &entrySource, &urgency, &tenantID,
-			&companyCode, &tenantStatusVal, &planKind, &subStatus, &endsAt, &leadID, &createdAt); err != nil {
+			&companyCode, &tenantStatusVal, &planKind, &subStatus, &endsAt, &leadID, &createdAt, &likelyMisjoin); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to read customer.", "ERR_INTERNAL")
 			return
 		}
@@ -88,7 +103,7 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 			"entry_source": entrySource, "urgency_label": urgency,
 			"tenant_id": tenantID, "company_code": companyCode, "tenant_status": tenantStatusVal,
 			"plan_kind": planKind, "subscription_status": subStatus, "ends_at": endsAt,
-			"crm_lead_id": leadID, "created_at": createdAt,
+			"crm_lead_id": leadID, "created_at": createdAt, "likely_misjoin": likelyMisjoin,
 		}
 		if endsAt != nil {
 			days := int(time.Until(*endsAt).Hours() / 24)
@@ -143,6 +158,22 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 			Scan(&tenantStatus, &companyCode)
 	}
 
+	likelyMisjoin := false
+	if entrySource == customerregistry.EntrySelfSignup || tenantStatus == "pending_approval" {
+		_ = s.pool.QueryRow(r.Context(), `
+			select exists (
+			  select 1
+			  from public.users u
+			  join public.user_invites ui on ui.user_id = u.id
+			  where lower(u.email) = lower($1)
+			    and u.status = 'invited'
+			    and u.auth_user_id is null
+			    and ($2::bigint is null or u.tenant_id <> $2)
+			    and ui.revoked_at is null
+			    and ui.accepted_at is null
+			)`, email, tenantID).Scan(&likelyMisjoin)
+	}
+
 	invRows, _ := s.pool.Query(r.Context(), `
 		select i.id, i.invoice_no, i.period_start, i.period_end, i.amount, i.currency,
 		       i.due_date, i.paid_at, i.status, i.notes, s.plan_kind
@@ -159,6 +190,7 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 			"tenant_status": tenantStatus, "company_code": companyCode,
 			"crm_lead_id": leadID, "crm_lead_tenant_id": leadTenantID,
 			"onboarding_progress": json.RawMessage(onboarding), "created_at": createdAt,
+			"likely_misjoin": likelyMisjoin,
 		},
 		"subscriptions": subs,
 		"invoices":      invoices,
