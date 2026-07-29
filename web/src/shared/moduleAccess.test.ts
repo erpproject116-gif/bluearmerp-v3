@@ -23,9 +23,10 @@ function me(partial: Partial<MeData> & { enabled_module_codes?: string[]; module
 }
 
 describe("isTenantModuleEnabled", () => {
-  it("kills data_center and always allows documentation", () => {
+  it("kills data_center and always allows non-toggle shells", () => {
     expect(isTenantModuleEnabled(me({ enabled_module_codes: ["data_center"] }), "data_center")).toBe(false);
     expect(isTenantModuleEnabled(me({ enabled_module_codes: [] }), "documentation")).toBe(true);
+    expect(isTenantModuleEnabled(me({ enabled_module_codes: ["sales"] }), "reports")).toBe(true);
   });
 
   it("requires code in enabled_module_codes when list present", () => {

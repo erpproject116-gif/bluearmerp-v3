@@ -312,7 +312,30 @@ func convertCreditNoteToCash(pool *pgxpool.Pool) http.HandlerFunc {
 		if method == "" {
 			method = "cash"
 		}
-		tag, err := pool.Exec(r.Context(), `
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to start transaction.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var remaining float64
+		var customerName string
+		var partnerID *int64
+		var creditNo string
+		err = tx.QueryRow(r.Context(), `
+			select remaining_amount::float8, customer_name, partner_id, credit_no
+			from public.fin_credit_notes
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			  and status in ('open', 'applied') and remaining_amount > 0
+			for update`, id, tu.TenantID).Scan(&remaining, &customerName, &partnerID, &creditNo)
+		if err != nil {
+			response.Err(w, http.StatusBadRequest, "Only open credit with remaining balance can convert to cash.", "ERR_BAD_REQUEST")
+			return
+		}
+
+		_, err = tx.Exec(r.Context(), `
 			update public.fin_credit_notes set
 			  status = 'refunded',
 			  remaining_amount = 0,
@@ -320,15 +343,44 @@ func convertCreditNoteToCash(pool *pgxpool.Pool) http.HandlerFunc {
 			  refund_method = $3,
 			  refund_reference = nullif($4, ''),
 			  updated_at = now()
-			where id = $1 and tenant_id = $2 and deleted_at is null
-			  and status in ('open', 'applied') and remaining_amount > 0`,
+			where id = $1 and tenant_id = $2`,
 			id, tu.TenantID, method, strings.TrimSpace(body.RefundReference))
-		if err != nil || tag.RowsAffected() == 0 {
-			response.Err(w, http.StatusBadRequest, "Only open credit with remaining balance can convert to cash.", "ERR_BAD_REQUEST")
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update credit note.", "ERR_INTERNAL")
 			return
 		}
+
+		// Create a refund expense record as the real cash-out document
+		var expenseID int64
+		today := time.Now().Format("2006-01-02")
+		expenseNo := fmt.Sprintf("REF-%s", creditNo)
+		err = tx.QueryRow(r.Context(), `
+			insert into public.fin_expenses (
+			  tenant_id, expense_date, expense_no, partner_id, vendor_name,
+			  category, description, amount, tax_amount,
+			  payment_status, paid_at, reference, created_by_user_id
+			) values ($1, $2::date, $3, $4, $5, 'refund', $6, $7, 0, 'paid', now(), $8, $9)
+			returning id`,
+			tu.TenantID, today, expenseNo, partnerID, customerName,
+			fmt.Sprintf("Refund from credit note %s", creditNo),
+			remaining, strings.TrimSpace(body.RefundReference), tu.AppUserID,
+		).Scan(&expenseID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create refund expense record.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to commit.", "ERR_INTERNAL")
+			return
+		}
+
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "credit_note.convert_to_cash", "credit_note", &id, nil, nil)
-		response.OK(w, nil, "Credit note converted to cash refund.")
+		response.OK(w, map[string]any{
+			"expense_id": expenseID,
+			"expense_no": expenseNo,
+			"amount":     remaining,
+		}, "Credit note converted to cash refund. Expense record created.")
 	}
 }
 

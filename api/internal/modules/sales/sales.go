@@ -264,6 +264,13 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
+		if pid := strings.TrimSpace(r.URL.Query().Get("partner_id")); pid != "" {
+			if pidVal, e := strconv.ParseInt(pid, 10, 64); e == nil && pidVal > 0 {
+				where += fmt.Sprintf(" and s.partner_id = $%d", argN)
+				args = append(args, pidVal)
+				argN++
+			}
+		}
 		progress := strings.TrimSpace(r.URL.Query().Get("progress_status"))
 		if progress == "unconfirmed" || progress == "e_approval" || progress == "completed" {
 			where += fmt.Sprintf(" and s.progress_status = $%d", argN)

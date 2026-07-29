@@ -10,6 +10,8 @@ type Props = {
   onSelect: (row: SalesRow) => void;
   /** Optional customer name / sales no filter seed */
   initialQ?: string;
+  /** Filter results to this partner/customer only */
+  partnerId?: number | null;
 };
 
 export function SalesInvoicePickerModal(props: Props) {
@@ -29,6 +31,7 @@ export function SalesInvoicePickerModal(props: Props) {
     });
     const needle = (query ?? q()).trim();
     if (needle) qs.set("q", needle);
+    if (props.partnerId) qs.set("partner_id", String(props.partnerId));
     const res = await apiFetch<SalesRow[]>(`/api/v1/sales?${qs}`);
     setLoading(false);
     if (!res.success) {
