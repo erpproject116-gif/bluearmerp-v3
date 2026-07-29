@@ -59,8 +59,13 @@ export default function PlatformCustomerDetailPage() {
   const act = async (path: string, body?: object) => {
     setBusy(true);
     const res = await apiFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }, { silent: true });
-    await q.refetch();
     setBusy(false);
+    if (!res.ok) {
+      window.alert(res.message ?? "Action failed.");
+      return res;
+    }
+    window.alert(res.message ?? "Done.");
+    await q.refetch();
     return res;
   };
 
