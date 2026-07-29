@@ -39,6 +39,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 
 	r.Post("/platform/intake", svc.postIntake)
 	r.Post("/platform/trial/provision", svc.postTrialProvision)
+	r.Get("/platform/onboarding/status", svc.getOnboardingStatus)
 }
 
 type intakeRequest struct {
@@ -46,6 +47,43 @@ type intakeRequest struct {
 	Email       string `json:"email"`
 	CompanyName string `json:"company_name"`
 	Mobile      string `json:"mobile"`
+}
+
+func (s *service) getOnboardingStatus(w http.ResponseWriter, r *http.Request) {
+	if s.validator == nil {
+		response.Err(w, http.StatusServiceUnavailable, "Auth is not configured on the server.", "ERR_UNAVAILABLE")
+		return
+	}
+	token := bearer(r)
+	if token == "" {
+		response.Err(w, http.StatusUnauthorized, "Missing bearer token.", "ERR_UNAUTHORIZED")
+		return
+	}
+	claims, err := s.validator.Parse(token)
+	if err != nil || claims.Sub == "" {
+		response.Err(w, http.StatusUnauthorized, "Invalid token.", "ERR_UNAUTHORIZED")
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	ctx := r.Context()
+
+	out := map[string]any{
+		"pending_invite":   nil,
+		"pending_approval": nil,
+	}
+	if inviteTenantID, inviteCode, hasInvite := auth.PendingInviteTenant(ctx, s.pool, email); hasInvite {
+		out["pending_invite"] = map[string]any{
+			"tenant_id":    inviteTenantID,
+			"company_code": inviteCode,
+		}
+	}
+	if tid, code, ok := auth.PendingApprovalTenant(ctx, s.pool, claims.Sub, email); ok {
+		out["pending_approval"] = map[string]any{
+			"tenant_id":    tid,
+			"company_code": code,
+		}
+	}
+	response.OK(w, out, "OK")
 }
 
 func (s *service) postIntake(w http.ResponseWriter, r *http.Request) {

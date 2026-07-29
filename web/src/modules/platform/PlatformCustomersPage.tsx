@@ -1,10 +1,16 @@
-import { A } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
-import { usePlatformCustomers, usePlatformPlansAdmin, usePlatformBillingSummary, type PlatformPlan } from "../../shared/usePlatform";
+import {
+  usePlatformCommandOverview,
+  usePlatformCustomers,
+  usePlatformPlansAdmin,
+  usePlatformBillingSummary,
+  type PlatformPlan,
+} from "../../shared/usePlatform";
 import { LoadingText } from "../../shared/LoadingText";
 
 const urgencyBadge: Record<string, string> = {
@@ -38,16 +44,23 @@ function planOptionLabel(p: PlatformPlan) {
 }
 
 export default function PlatformCustomersPage() {
+  const [searchParams] = useSearchParams();
+  const initialStatus = () => {
+    const v = searchParams.tenant_status;
+    return typeof v === "string" ? v : Array.isArray(v) ? (v[0] ?? "") : "";
+  };
   const [search, setSearch] = createSignal("");
-  const [tenantStatus, setTenantStatus] = createSignal("");
+  const [tenantStatus, setTenantStatus] = createSignal(initialStatus());
   const [showModal, setShowModal] = createSignal(false);
   const [form, setForm] = createSignal<ProvisionForm>(emptyForm());
   const [busy, setBusy] = createSignal(false);
   const q = usePlatformCustomers({ q: () => search(), tenantStatus: () => tenantStatus() });
   const summaryQ = usePlatformBillingSummary();
+  const commandQ = usePlatformCommandOverview();
   const plansQ = usePlatformPlansAdmin();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const pendingApprovals = () => commandQ.data?.counts?.pending_approvals ?? 0;
 
   const planOptions = () => {
     const plans = plansQ.data ?? [];
@@ -172,7 +185,16 @@ export default function PlatformCustomersPage() {
 
       <Show when={summaryQ.data}>
         {(s) => (
-          <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <button
+              type="button"
+              class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-left hover:bg-amber-100"
+              onClick={() => setTenantStatus("pending_approval")}
+            >
+              <p class="text-xs uppercase text-amber-900">Pending approvals</p>
+              <p class="mt-1 text-2xl font-semibold text-amber-950">{pendingApprovals()}</p>
+              <p class="text-xs text-amber-900">Self-serve signups waiting</p>
+            </button>
             <div class="rounded-xl border border-stroke bg-white p-4">
               <p class="text-xs uppercase text-text-secondary">MRR</p>
               <p class="mt-1 text-2xl font-semibold text-text-primary">{formatPeso(s().mrr)}</p>
@@ -302,6 +324,11 @@ export default function PlatformCustomersPage() {
                         <div class="text-xs text-text-secondary">{c.email}</div>
                         <Show when={c.company_code}>
                           <div class="text-xs text-text-secondary">{c.company_code}</div>
+                        </Show>
+                        <Show when={c.likely_misjoin}>
+                          <span class="mt-1 inline-block rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900">
+                            Likely mis-join
+                          </span>
                         </Show>
                       </td>
                       <td class="px-4 py-3">

@@ -81,6 +81,13 @@ export default function PlatformCustomerDetailPage() {
                   </p>
                 </div>
 
+                <Show when={Boolean(c().likely_misjoin)}>
+                  <div class="rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950">
+                    Likely mis-join: this email also has an open company invite on another workspace. Prefer rejecting
+                    this self-serve signup and having them accept the invite, unless they truly need their own company.
+                  </div>
+                </Show>
+
                 <Show when={String(c().tenant_status ?? "") === "pending_approval"}>
                   <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <p class="flex-1 text-sm text-amber-950">
@@ -90,7 +97,17 @@ export default function PlatformCustomerDetailPage() {
                       type="button"
                       class="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                       disabled={busy()}
-                      onClick={() => void act(`/api/v1/platform/console/customers/${id()}/approve`)}
+                      onClick={() => {
+                        if (
+                          c().likely_misjoin &&
+                          !confirm(
+                            "This email also has a pending invite on another company. Approve this separate workspace anyway?",
+                          )
+                        ) {
+                          return;
+                        }
+                        void act(`/api/v1/platform/console/customers/${id()}/approve`);
+                      }}
                     >
                       Approve
                     </button>
