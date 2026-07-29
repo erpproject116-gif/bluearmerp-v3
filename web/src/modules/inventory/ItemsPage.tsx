@@ -1,9 +1,14 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { formatAmount } from "../../shared/money";
 import { PRICE_LEVEL_KEYS, SAFETY_DOC_TYPES } from "../../shared/itemMasterConstants";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import {
+  BulkItemTrackingModal,
+  type BulkTrackingAction,
+  type BulkTrackingOutcome,
+} from "../../shared/BulkItemTrackingModal";
 import { validateCustomFields } from "../../shared/CustomFieldsSection";
 import { requireFields, submitEntity } from "../../shared/handleSaveResult";
 import { useToast } from "../../shared/toast";
@@ -117,6 +122,10 @@ export default function ItemsPage() {
   const [saving, setSaving] = createSignal(false);
   const [barcodeOpen, setBarcodeOpen] = createSignal(false);
   const [generateOpen, setGenerateOpen] = createSignal(false);
+  const [trackOpen, setTrackOpen] = createSignal(false);
+  const [trackAction, setTrackAction] = createSignal<BulkTrackingAction>("enable_serial");
+  const [trackSubmitting, setTrackSubmitting] = createSignal(false);
+  const [trackOutcome, setTrackOutcome] = createSignal<BulkTrackingOutcome | null>(null);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const lifecycle = useMasterLifecycle({
@@ -125,6 +134,50 @@ export default function ItemsPage() {
     canManage: () => hasPermission(auth.me, "inventory.items", "write"),
     onChanged: () => invalidate("items"),
   });
+  const canManageItems = () => hasPermission(auth.me, "inventory.items", "write");
+
+  const openBulkTracking = (action: BulkTrackingAction) => {
+    if (!canManageItems() || lifecycle.selectedIds().size === 0) return;
+    setTrackAction(action);
+    setTrackOutcome(null);
+    setTrackOpen(true);
+  };
+
+  const submitBulkTracking = async (opts: { serial_policy?: string; lot_policy?: string }) => {
+    const ids = [...lifecycle.selectedIds()];
+    if (ids.length === 0) return;
+    const action = trackAction();
+    const body: Record<string, unknown> = { ids };
+    if (action === "enable_serial") {
+      body.track_serial = true;
+      body.serial_policy = opts.serial_policy ?? "required";
+    } else if (action === "disable_serial") {
+      body.track_serial = false;
+    } else if (action === "enable_lot") {
+      body.track_lot = true;
+      body.lot_policy = opts.lot_policy ?? "required";
+    } else {
+      body.track_lot = false;
+    }
+    setTrackSubmitting(true);
+    const res = await apiFetch<BulkTrackingOutcome>("/api/v1/inventory/items/actions/bulk-tracking", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }, { silent: true });
+    setTrackSubmitting(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Bulk tracking update failed.");
+      return;
+    }
+    setTrackOutcome(res.data);
+    if (res.data.updated > 0) {
+      toast.success(`Tracking updated on ${res.data.updated} item(s); ${res.data.skipped} skipped.`);
+      lifecycle.onSelectionChange(new Set());
+      invalidate("items");
+    } else {
+      toast.warning("No items were updated.");
+    }
+  };
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.items);
 
@@ -346,6 +399,35 @@ export default function ItemsPage() {
         toolbarExtra={
           <>
             <lifecycle.BulkToolbar />
+            <Show when={canManageItems() && lifecycle.filter() !== "deleted"}>
+              <div class="flex items-end gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+                  disabled={lifecycle.selectedIds().size === 0}
+                  onClick={() => openBulkTracking("enable_serial")}
+                  title="Enable Track serial numbers on selected items"
+                >
+                  Enable serial{lifecycle.selectedIds().size > 0 ? ` (${lifecycle.selectedIds().size})` : ""}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel disabled:opacity-40"
+                  disabled={lifecycle.selectedIds().size === 0}
+                  onClick={() => openBulkTracking("disable_serial")}
+                >
+                  Disable serial
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel disabled:opacity-40"
+                  disabled={lifecycle.selectedIds().size === 0}
+                  onClick={() => openBulkTracking("enable_lot")}
+                >
+                  Enable lot
+                </button>
+              </div>
+            </Show>
             <lifecycle.FilterControl />
             <button
               type="button"
@@ -379,6 +461,19 @@ export default function ItemsPage() {
         }
       />
       <lifecycle.BulkDialog />
+      <BulkItemTrackingModal
+        open={trackOpen()}
+        action={trackAction()}
+        count={lifecycle.selectedIds().size}
+        submitting={trackSubmitting()}
+        outcome={trackOutcome()}
+        onClose={() => {
+          if (trackSubmitting()) return;
+          setTrackOpen(false);
+          setTrackOutcome(null);
+        }}
+        onConfirm={(opts) => void submitBulkTracking(opts)}
+      />
       <ItemBarcodeModal
         open={barcodeOpen()}
         items={selectedItemsForBarcode()}

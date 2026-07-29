@@ -32,8 +32,9 @@ func NormalizePlannedSerialNos(raw []string) []string {
 }
 
 // ValidatePlannedSerialNos checks planned serial count against line qty and item serial policy.
-// When requireCapture is false (quotations / purchase requests), planned serials stay optional
-// even if the item's serial_policy is "required" — physical capture starts at SO/PO/receive/sale.
+// When requireCapture is false (quotations, sales orders, purchase requests/orders), planned
+// serials stay optional even if the item's serial_policy is "required" — those docs are planning
+// only. Physical capture is enforced on stock-movement docs (sale, purchase, GR, transfer, RMA).
 func ValidatePlannedSerialNos(ctx context.Context, pool *pgxpool.Pool, tenantID int64, lineNo int, itemID *int64, qty float64, planned []string, requireCapture bool) error {
 	planned = NormalizePlannedSerialNos(planned)
 	if itemID == nil || *itemID <= 0 {

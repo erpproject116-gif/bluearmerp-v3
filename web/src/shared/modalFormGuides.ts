@@ -31,7 +31,7 @@ export const MODAL_FORM_GUIDES: Record<string, ModalFormGuideDef> = {
   },
   sales: {
     id: "sales",
-    title: "Creating a sales invoice",
+    title: "Creating a sale",
     summary: "A sales invoice is the bill you issue when you sell goods or services.",
     steps: [
       "Choose the customer and sales date.",

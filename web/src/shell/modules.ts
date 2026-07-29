@@ -111,7 +111,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "buying",
-    label: "Buy overview",
+    label: "Purchase overview",
     href: "/app/buying",
     basePath: "/app/buying",
     features: [
@@ -125,7 +125,7 @@ export const appModules: AppModule[] = [
   },
   {
     id: "selling",
-    label: "Sell overview",
+    label: "Sale overview",
     href: "/app/selling",
     basePath: "/app/selling",
     features: [
@@ -202,11 +202,11 @@ export const appModules: AppModule[] = [
   },
   {
     id: "sales",
-    label: "Sales invoices",
+    label: "Sales list",
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
-      { label: "Sales Invoice List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
+      { label: "Sales list", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
       { label: "Reports", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
       { label: "Sales Invoice Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
       {
@@ -595,6 +595,7 @@ export const appModules: AppModule[] = [
         label: "Process Policies",
         href: "/app/user-management/process-policies",
         settingsHref: "/app/user-management/process-policies",
+        featureCode: "process_policies",
       },
       {
         label: "Mapping Center",

@@ -14,7 +14,7 @@ import (
 var migEntityFields = map[string][]string{
 	"items": {
 		"item_name", "purchase_price", "sales_price", "vip_price", "status",
-		"track_serial", "track_lot", "track_inventory_qty", "warranty_duration_months",
+		"track_serial", "track_lot", "serial_policy", "lot_policy", "track_inventory_qty", "warranty_duration_months",
 		"spec_name", "unit", "item_category", "item_type", "oe_price",
 	},
 	"partners": {"company_name", "partner_kind", "ceo_name", "phone", "mobile", "email", "address", "tin", "status"},

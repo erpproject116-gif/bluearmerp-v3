@@ -1,5 +1,6 @@
 import { A, useNavigate } from "@solidjs/router";
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { Portal } from "solid-js/web";
 import { apiFetch } from "../../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
@@ -23,6 +24,8 @@ import {
   useUserPermissions,
 } from "../../../shared/usePermissions";
 
+type RowMenuPos = { top: number; left: number };
+
 function statusLabel(status: string) {
   if (status === "invited") return "Invited";
   if (status === "disabled") return "Deleted";
@@ -36,6 +39,27 @@ export default function UsersPage() {
     useListState("email");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [menuOpenId, setMenuOpenId] = createSignal<number | null>(null);
+  const [menuPos, setMenuPos] = createSignal<RowMenuPos | null>(null);
+  const [menuRow, setMenuRow] = createSignal<TenantUserRow | null>(null);
+
+  const closeRowMenu = () => {
+    setMenuOpenId(null);
+    setMenuPos(null);
+    setMenuRow(null);
+  };
+
+  const openRowMenu = (row: TenantUserRow, anchor: HTMLElement) => {
+    if (menuOpenId() === row.id) {
+      closeRowMenu();
+      return;
+    }
+    const rect = anchor.getBoundingClientRect();
+    const menuWidth = 208;
+    const left = Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8);
+    setMenuPos({ top: rect.bottom + 4, left });
+    setMenuRow(row);
+    setMenuOpenId(row.id);
+  };
   const [inviteOpen, setInviteOpen] = createSignal(false);
   const [editOpen, setEditOpen] = createSignal(false);
   const [permOpen, setPermOpen] = createSignal(false);
@@ -64,16 +88,24 @@ export default function UsersPage() {
   onMount(() => {
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
-      if (!t.closest("[data-user-row-menu]")) setMenuOpenId(null);
+      if (!t.closest("[data-user-row-menu]")) closeRowMenu();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpenId(null);
+      if (e.key === "Escape") closeRowMenu();
+    };
+    const onScrollOrResize = () => {
+      if (menuOpenId() != null) closeRowMenu();
     };
     document.addEventListener("click", onDocClick);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onScrollOrResize);
+    // Capture scroll from table overflow containers so the fixed menu does not float detached.
+    document.addEventListener("scroll", onScrollOrResize, true);
     onCleanup(() => {
       document.removeEventListener("click", onDocClick);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onScrollOrResize);
+      document.removeEventListener("scroll", onScrollOrResize, true);
     });
   });
 
@@ -313,7 +345,7 @@ export default function UsersPage() {
   };
 
   const openDataScopes = (row: TenantUserRow) => {
-    setMenuOpenId(null);
+    closeRowMenu();
     navigate(`/app/user-management/user-permissions?userId=${row.id}`);
   };
 
@@ -392,7 +424,7 @@ export default function UsersPage() {
             key: "actions",
             header: "Actions",
             render: (row) => (
-              <div class="relative flex items-center gap-2" data-user-row-menu onClick={(e) => e.stopPropagation()}>
+              <div class="flex items-center gap-2" data-user-row-menu onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   class="text-sm text-brand-600 hover:underline"
@@ -401,132 +433,18 @@ export default function UsersPage() {
                   Edit
                 </button>
                 <Show when={hasMoreItems(row)}>
-                  <div class="relative">
-                    <button
-                      type="button"
-                      class="rounded border border-stroke px-2 py-0.5 text-xs font-medium text-text-secondary hover:bg-slate-50"
-                      aria-expanded={menuOpenId() === row.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMenuOpenId((id) => (id === row.id ? null : row.id));
-                      }}
-                    >
-                      More ▾
-                    </button>
-                    <Show when={menuOpenId() === row.id}>
-                      <div class="absolute right-0 z-20 mt-1 min-w-[12rem] rounded-lg border border-stroke bg-white py-1 shadow-lg">
-                        <Show when={row.status === "active" && !row.is_owner}>
-                          <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-                            Access
-                          </p>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
-                            onClick={() => {
-                              setMenuOpenId(null);
-                              openOverrides(row);
-                            }}
-                          >
-                            Overrides
-                          </button>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
-                            onClick={() => {
-                              setMenuOpenId(null);
-                              openEffectivePreview(row);
-                            }}
-                          >
-                            Effective access
-                          </button>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
-                            onClick={() => openDataScopes(row)}
-                          >
-                            Data scopes
-                          </button>
-                        </Show>
-                        <Show when={row.is_owner}>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
-                            onClick={() => {
-                              setMenuOpenId(null);
-                              openEffectivePreview(row);
-                            }}
-                          >
-                            Effective access
-                          </button>
-                        </Show>
-                        <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-                          Lifecycle
-                        </p>
-                        <Show when={row.status === "active" && !row.is_owner}>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
-                            onClick={() => {
-                              setMenuOpenId(null);
-                              void softDelete(row);
-                            }}
-                          >
-                            Delete
-                          </button>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
-                            onClick={() => void resetForReinvite(row)}
-                          >
-                            Remove &amp; reset for re-invite
-                          </button>
-                        </Show>
-                        <Show when={row.status === "disabled" && row.auth_linked}>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-emerald-700 hover:bg-emerald-50"
-                            onClick={() => {
-                              setMenuOpenId(null);
-                              void restoreUser(row);
-                            }}
-                          >
-                            Restore
-                          </button>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
-                            onClick={() => void resetForReinvite(row)}
-                          >
-                            Reset for re-invite
-                          </button>
-                        </Show>
-                        <Show when={row.status === "disabled" && !row.auth_linked}>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-brand-600 hover:bg-slate-50"
-                            onClick={() => {
-                              setMenuOpenId(null);
-                              openReInvite(row);
-                            }}
-                          >
-                            Re-invite
-                          </button>
-                        </Show>
-                        <Show when={row.status === "invited" && row.invite_id}>
-                          <button
-                            type="button"
-                            class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
-                            onClick={() => {
-                              setMenuOpenId(null);
-                              void revokeInvite(row);
-                            }}
-                          >
-                            Revoke
-                          </button>
-                        </Show>
-                      </div>
-                    </Show>
-                  </div>
+                  <button
+                    type="button"
+                    class="rounded border border-stroke px-2 py-0.5 text-xs font-medium text-text-secondary hover:bg-slate-50"
+                    aria-expanded={menuOpenId() === row.id}
+                    aria-haspopup="menu"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openRowMenu(row, e.currentTarget);
+                    }}
+                  >
+                    More ▾
+                  </button>
                 </Show>
               </div>
             ),
@@ -561,6 +479,153 @@ export default function UsersPage() {
         ]}
         onRefresh={() => invalidate.users()}
       />
+
+      <Show when={menuOpenId() != null && menuPos() && menuRow()}>
+        <Portal>
+          <div
+            data-user-row-menu
+            role="menu"
+            class="fixed z-[80] min-w-[13rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
+            style={{ top: `${menuPos()!.top}px`, left: `${menuPos()!.left}px` }}
+          >
+            <Show when={menuRow()!.status === "active" && !menuRow()!.is_owner}>
+              <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                Access
+              </p>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  closeRowMenu();
+                  openOverrides(row);
+                }}
+              >
+                Overrides
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  closeRowMenu();
+                  openEffectivePreview(row);
+                }}
+              >
+                Effective access
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  openDataScopes(row);
+                }}
+              >
+                Data scopes
+              </button>
+            </Show>
+            <Show when={menuRow()!.is_owner}>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  closeRowMenu();
+                  openEffectivePreview(row);
+                }}
+              >
+                Effective access
+              </button>
+            </Show>
+            <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+              Lifecycle
+            </p>
+            <Show when={menuRow()!.status === "active" && !menuRow()!.is_owner}>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  closeRowMenu();
+                  void softDelete(row);
+                }}
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  void resetForReinvite(row);
+                }}
+              >
+                Remove &amp; reset for re-invite
+              </button>
+            </Show>
+            <Show when={menuRow()!.status === "disabled" && menuRow()!.auth_linked}>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-emerald-700 hover:bg-emerald-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  closeRowMenu();
+                  void restoreUser(row);
+                }}
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  void resetForReinvite(row);
+                }}
+              >
+                Reset for re-invite
+              </button>
+            </Show>
+            <Show when={menuRow()!.status === "disabled" && !menuRow()!.auth_linked}>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-brand-600 hover:bg-slate-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  closeRowMenu();
+                  openReInvite(row);
+                }}
+              >
+                Re-invite
+              </button>
+            </Show>
+            <Show when={menuRow()!.status === "invited" && menuRow()!.invite_id}>
+              <button
+                type="button"
+                role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  closeRowMenu();
+                  void revokeInvite(row);
+                }}
+              >
+                Revoke
+              </button>
+            </Show>
+          </div>
+        </Portal>
+      </Show>
 
       <EntityModal
         open={inviteOpen()}

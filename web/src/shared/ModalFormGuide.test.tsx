@@ -9,7 +9,7 @@ describe("ModalFormGuide", () => {
 
   it("starts expanded on first visit and collapses with persistence", () => {
     render(() => <ModalFormGuide guideId="sales" />);
-    expect(screen.getByText("Creating a sales invoice")).toBeInTheDocument();
+    expect(screen.getByText("Creating a sale")).toBeInTheDocument();
     expect(screen.getByText(/bill you issue/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Hide" }));

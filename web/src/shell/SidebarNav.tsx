@@ -143,7 +143,14 @@ function HomeAreaBlock(props: {
       <Show when={!shell.collapsed() && open() && children().length > 0}>
         <div class="ml-4 space-y-0.5 border-l border-stroke pl-2">
           <For each={children()}>
-            {(child) => <NavAreaLink area={child} active={props.active(child)} nested />}
+            {(child) => (
+              <Show
+                when={(child.children ?? []).length > 0}
+                fallback={<NavAreaLink area={child} active={props.active(child)} nested />}
+              >
+                <HomeAreaBlock area={child} active={props.active} childrenOf={props.childrenOf} />
+              </Show>
+            )}
           </For>
         </div>
       </Show>
@@ -274,6 +281,12 @@ export function SidebarNav() {
     if (area.id === "documentation") return pathStarts(p, ["/app/documentation"]);
     if (area.id === "user_management") {
       return pathStarts(p, ["/app/user-management", "/app/branding"]);
+    }
+    if (area.id === "um_users") {
+      return pathStarts(p, ["/app/user-management/users"]);
+    }
+    if (area.id === "um_process_policies") {
+      return pathStarts(p, ["/app/user-management/process-policies"]);
     }
     return p === area.href || p.startsWith(`${area.href}/`);
   };

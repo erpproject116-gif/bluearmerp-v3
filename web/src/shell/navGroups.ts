@@ -36,7 +36,7 @@ export const SUB_BRANCH_FEATURE_CODES: Record<string, string> = {
 };
 
 /**
- * Sidebar IA: Stocks (incl. Warehouse) / Sell / Buy / Accounting.
+ * Sidebar IA: Stocks (incl. Warehouse) / Sales / Purchase / Accounting.
  * Document pipelines are ordered quote→order→invoice (and PR→PO→invoice); overview hubs last.
  */
 export const navGroups: NavGroup[] = [
@@ -54,7 +54,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "sales_process",
-    label: "Sell",
+    label: "Sales",
     iconId: "selling",
     defaultExpanded: true,
     entries: [
@@ -72,7 +72,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: "procurement_process",
-    label: "Buy",
+    label: "Purchase",
     iconId: "buying",
     defaultExpanded: true,
     entries: [

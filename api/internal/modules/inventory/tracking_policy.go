@@ -112,7 +112,8 @@ func ValidateGRLotCapture(lineID int64, policy string, lotQty, receivedQty float
 }
 
 // ValidatePlannedSerialCapture enforces planned serial list when policy is required.
-// Callers that allow empty planned lists (quotations / PRs) should pass TrackingPolicyOptional.
+// Callers that allow empty planned lists (quotations / SO / PO / PR) should pass TrackingPolicyOptional
+// via ValidatePlannedSerialNos(..., requireCapture=false).
 func ValidatePlannedSerialCapture(lineNo int, policy string, plannedCount int, qty float64) error {
 	if plannedCount > 0 {
 		maxQty := int(math.Floor(qty + 0.0001))

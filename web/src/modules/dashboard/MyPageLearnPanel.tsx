@@ -19,7 +19,7 @@ export const LEARN_GROUPS: LearnGroup[] = [
   {
     title: "Enter / view inventory slips",
     links: [
-      { label: "Sales List", href: "/app/sales/sales", ready: true },
+      { label: "Sales list", href: "/app/sales/sales", ready: true },
       { label: "Purchase List", href: "/app/purchases/purchases", ready: true },
       { label: "Goods Receipt List", href: "/app/purchase-order/goods-receipt", ready: true },
     ],
@@ -27,7 +27,7 @@ export const LEARN_GROUPS: LearnGroup[] = [
   {
     title: "Enter accounting vouchers",
     links: [
-      { label: "Sales Invoice", href: "/app/sales/sales/new", ready: true },
+      { label: "New sales", href: "/app/sales/sales/new", ready: true },
       { label: "Purchase Invoice", href: "/app/purchases/purchases/new", ready: true },
       { label: "Cash In — From Customer", href: "/app/finance/official-receipts", ready: true },
       { label: "Cash Out — To Vendor", href: "/app/finance/payment-vouchers", ready: true },
@@ -54,7 +54,7 @@ export function MyPageLearnPanel() {
       </div>
       <p class="mb-4 text-xs text-text-secondary">
         Start here for daily ops. Prefer these links over guessing menus (fewer wrong-screen tickets).
-        Sidebar: Stocks (incl. Warehouse) → Sell → Buy → Accounting.
+        Sidebar: Stocks (incl. Warehouse) → Sales → Purchase → Accounting.
       </p>
       <div class="space-y-4">
         <For each={LEARN_GROUPS}>

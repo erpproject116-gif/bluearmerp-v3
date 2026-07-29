@@ -25,11 +25,11 @@ const (
 var itemImportRequiredHeaders = []string{"item_name"}
 var itemImportOptionalHeaders = []string{
 	"purchase_price", "sales_price", "vip_price", "status",
-	"track_serial", "track_lot", "track_inventory_qty", "warranty_duration_months",
+	"track_serial", "track_lot", "serial_policy", "lot_policy", "track_inventory_qty", "warranty_duration_months",
 	"spec_name", "unit", "item_category", "item_type", "oe_price",
 }
 var itemImportAllHeaders = append(append([]string{}, itemImportRequiredHeaders...), itemImportOptionalHeaders...)
-var itemImportExample = []string{"Widget A", "100.00", "150.00", "140.00", "active", "true", "false", "true", "24"}
+var itemImportExample = []string{"Widget A", "100.00", "150.00", "140.00", "active", "true", "false", "required", "required", "true", "24"}
 
 type importRowError struct {
 	Row     int    `json:"row"`
@@ -177,6 +177,17 @@ func parseImportItemBody(row map[string]string) (itemBody, error) {
 		}
 		body.TrackLot = &b
 	}
+	if boolOrFalse(body.TrackSerial) && boolOrFalse(body.TrackLot) {
+		return itemBody{}, fmt.Errorf("track_serial and track_lot cannot both be true")
+	}
+	if v := strings.TrimSpace(row["serial_policy"]); v != "" {
+		p := NormalizeTrackingPolicy(v)
+		body.SerialPolicy = &p
+	}
+	if v := strings.TrimSpace(row["lot_policy"]); v != "" {
+		p := NormalizeTrackingPolicy(v)
+		body.LotPolicy = &p
+	}
 	if v := strings.TrimSpace(row["track_inventory_qty"]); v != "" {
 		b, err := parseCSVBool(v, "track_inventory_qty")
 		if err != nil {
@@ -228,12 +239,20 @@ func bulkImportItems(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 		}
 		var id int64
 		specName, unit, itemCategory, itemType, _, oePrice, _ := itemBodyScalars(row.body)
+		serialPolicy := SanitizeTrackingPolicy(row.body.SerialPolicy)
+		lotPolicy := SanitizeTrackingPolicy(row.body.LotPolicy)
+		if !boolOrFalse(row.body.TrackSerial) {
+			serialPolicy = TrackingPolicyRequired
+		}
+		if !boolOrFalse(row.body.TrackLot) {
+			lotPolicy = TrackingPolicyRequired
+		}
 		err := tx.QueryRow(ctx, `
-			insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, item_category, item_type, purchase_price, sales_price, vip_price, oe_price, warranty_duration_months, track_serial, track_lot, track_inventory_qty, status)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+			insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, item_category, item_type, purchase_price, sales_price, vip_price, oe_price, warranty_duration_months, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 			returning id`,
 			tu.TenantID, code, row.body.ItemName, specName, unit, itemCategory, itemType, row.body.PurchasePrice, row.body.SalesPrice, row.body.VipPrice, oePrice,
-			row.body.WarrantyDurationMonths, boolOrFalse(row.body.TrackSerial), boolOrFalse(row.body.TrackLot), boolOrFalse(row.body.TrackInventoryQty), row.body.Status).
+			row.body.WarrantyDurationMonths, boolOrFalse(row.body.TrackSerial), boolOrFalse(row.body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(row.body.TrackInventoryQty), row.body.Status).
 			Scan(&id)
 		if err != nil {
 			return nil, err
