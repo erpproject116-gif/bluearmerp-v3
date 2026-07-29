@@ -46,6 +46,11 @@ export default function PlatformCustomerDetailPage() {
   const plansQ = usePlatformPlansAdmin();
   const [busy, setBusy] = createSignal(false);
   const [openSessionId, setOpenSessionId] = createSignal<number | null>(null);
+  const [wipeOpen, setWipeOpen] = createSignal(false);
+  const [wipeCode, setWipeCode] = createSignal("");
+  const [wipeAck, setWipeAck] = createSignal(false);
+  const [wipeBlockers, setWipeBlockers] = createSignal<string[]>([]);
+  const [wipeCan, setWipeCan] = createSignal(true);
   const sessionDetail = usePlatformCustomerSession(id, openSessionId);
 
   const paidPlans = () =>
@@ -53,9 +58,63 @@ export default function PlatformCustomerDetailPage() {
 
   const act = async (path: string, body?: object) => {
     setBusy(true);
-    await apiFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
+    const res = await apiFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }, { silent: true });
     await q.refetch();
     setBusy(false);
+    return res;
+  };
+
+  const openWipe = async () => {
+    setWipeCode("");
+    setWipeAck(false);
+    setWipeBlockers([]);
+    setWipeCan(true);
+    setBusy(true);
+    const res = await apiFetch<{
+      can_wipe?: boolean;
+      blockers?: string[];
+      company_code?: string;
+    }>(`/api/v1/platform/console/customers/${id()}/wipe-preflight`, undefined, { silent: true });
+    setBusy(false);
+    if (!res.ok) {
+      window.alert(res.message ?? "Wipe preflight failed.");
+      return;
+    }
+    setWipeCan(Boolean(res.data?.can_wipe));
+    setWipeBlockers(res.data?.blockers ?? []);
+    setWipeOpen(true);
+  };
+
+  const runWipe = async () => {
+    const code = String((q.data?.customer as Record<string, unknown> | undefined)?.company_code ?? "");
+    if (!wipeAck() || wipeCode().trim() !== code) {
+      window.alert("Type the exact company code and acknowledge irreversible wipe.");
+      return;
+    }
+    if (!wipeCan()) {
+      window.alert("Wipe is blocked by schema preflight.");
+      return;
+    }
+    if (!confirm(`Permanently delete all business data for ${code}? This cannot be undone.`)) return;
+    setBusy(true);
+    const res = await apiFetch(
+      `/api/v1/platform/console/customers/${id()}/wipe`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          confirm_company_code: wipeCode().trim(),
+          acknowledge_irreversible: true,
+        }),
+      },
+      { silent: true },
+    );
+    setBusy(false);
+    if (!res.ok) {
+      window.alert(res.message ?? "Wipe failed.");
+      return;
+    }
+    setWipeOpen(false);
+    await q.refetch();
   };
 
   return (
@@ -119,6 +178,112 @@ export default function PlatformCustomerDetailPage() {
                     >
                       Reject
                     </button>
+                  </div>
+                </Show>
+
+                <Show when={String(c().tenant_status ?? "") === "active" || String(c().tenant_status ?? "") === "suspended"}>
+                  <div class="space-y-3 rounded-xl border border-stroke bg-white p-4">
+                    <h2 class="text-sm font-semibold text-text-primary">Workspace lifecycle</h2>
+                    <p class="text-xs text-text-secondary">
+                      Suspend keeps all business data and locks ERP access. Close &amp; wipe permanently deletes the
+                      tenant and data; you can provision a new empty workspace for this customer afterward.
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                      <Show when={String(c().tenant_status) === "active"}>
+                        <button
+                          type="button"
+                          class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-950 disabled:opacity-50"
+                          disabled={busy()}
+                          onClick={() => {
+                            if (!confirm("Suspend this workspace? Users lose ERP access; data is kept.")) return;
+                            void act(`/api/v1/platform/console/customers/${id()}/suspend`);
+                          }}
+                        >
+                          Suspend access
+                        </button>
+                      </Show>
+                      <Show when={String(c().tenant_status) === "suspended"}>
+                        <button
+                          type="button"
+                          class="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                          disabled={busy()}
+                          onClick={() => void act(`/api/v1/platform/console/customers/${id()}/reactivate`)}
+                        >
+                          Reactivate
+                        </button>
+                      </Show>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 disabled:opacity-50"
+                        disabled={busy()}
+                        onClick={() => void openWipe()}
+                      >
+                        Close &amp; wipe…
+                      </button>
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={!c().tenant_id}>
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+                    No workspace linked. Use <strong>Provision</strong> on the customers list (or create subscription /
+                    provision flow) to create a new empty company for this email.
+                  </div>
+                </Show>
+
+                <Show when={wipeOpen()}>
+                  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div class="w-full max-w-md space-y-3 rounded-xl border border-stroke bg-white p-6 shadow-lg">
+                      <h2 class="text-lg font-semibold text-red-800">Close &amp; wipe workspace</h2>
+                      <p class="text-sm text-text-secondary">
+                        Deletes tenant <strong>{String(c().company_code)}</strong> and all cascaded business data.
+                        Customer lead is kept for re-provision.
+                      </p>
+                      <Show when={wipeBlockers().length > 0}>
+                        <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+                          <p class="font-medium">Wipe blocked by FK preflight:</p>
+                          <ul class="mt-1 list-disc pl-4">
+                            <For each={wipeBlockers()}>{(b) => <li>{b}</li>}</For>
+                          </ul>
+                        </div>
+                      </Show>
+                      <label class="block text-sm">
+                        Type company code to confirm
+                        <input
+                          class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
+                          value={wipeCode()}
+                          onInput={(e) => setWipeCode(e.currentTarget.value)}
+                          placeholder={String(c().company_code ?? "")}
+                        />
+                      </label>
+                      <label class="flex items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          class="mt-1"
+                          checked={wipeAck()}
+                          onChange={(e) => setWipeAck(e.currentTarget.checked)}
+                        />
+                        <span>I understand this is irreversible and business data will be destroyed.</span>
+                      </label>
+                      <div class="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
+                          disabled={busy()}
+                          onClick={() => setWipeOpen(false)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          class="rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                          disabled={busy() || !wipeCan()}
+                          onClick={() => void runWipe()}
+                        >
+                          Wipe permanently
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </Show>
 

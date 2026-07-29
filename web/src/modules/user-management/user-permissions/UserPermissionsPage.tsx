@@ -1,5 +1,5 @@
-import { A } from "@solidjs/router";
-import { createSignal, For, Show } from "solid-js";
+import { A, useSearchParams } from "@solidjs/router";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useListState } from "../../../shared/useListState";
@@ -21,6 +21,7 @@ function statusLabel(status: string) {
 
 export default function UserPermissionsPage() {
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, pageSize } = useListState("email", 25, {
     defaultStatus: "active",
   });
@@ -32,6 +33,7 @@ export default function UserPermissionsPage() {
   const [locations, setLocations] = createSignal<ScopeOption[]>([]);
   const [saving, setSaving] = createSignal(false);
   const [loadingScopes, setLoadingScopes] = createSignal(false);
+  const [deepLinkHandled, setDeepLinkHandled] = createSignal(false);
 
   const list = useTenantUserList(() => ({
     page: page(),
@@ -69,6 +71,41 @@ export default function UserPermissionsPage() {
     setScopes(res.data ?? []);
     setLoadingScopes(false);
   };
+
+  createEffect(() => {
+    if (deepLinkHandled() || list.isLoading) return;
+    const raw = searchParams.userId;
+    const idStr = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : "";
+    const userId = Number(idStr);
+    if (!userId || Number.isNaN(userId)) return;
+
+    const fromPage = (list.data?.rows ?? []).find((u) => u.id === userId);
+    if (fromPage) {
+      setDeepLinkHandled(true);
+      setSelectedId(fromPage.id);
+      void openScopes(fromPage);
+      setSearchParams({ userId: undefined });
+      return;
+    }
+
+    // Not on current page/filter — fetch directly then open.
+    void (async () => {
+      setDeepLinkHandled(true);
+      const res = await apiFetch<{ rows: TenantUserRow[] }>(
+        `/api/v1/user-management/users?page=1&pageSize=500&status=`,
+        undefined,
+        { silent: true },
+      );
+      const row = (res.data?.rows ?? []).find((u) => u.id === userId);
+      setSearchParams({ userId: undefined });
+      if (!row) {
+        toast.warning("User not found for data scopes.");
+        return;
+      }
+      setSelectedId(row.id);
+      await openScopes(row);
+    })();
+  });
 
   const toggleScope = (scopeType: string, recordId: number, checked: boolean) => {
     setScopes((prev) => {

@@ -171,6 +171,7 @@ export default function PlatformCustomersPage() {
             <option value="">All workspaces</option>
             <option value="pending_approval">Pending approval</option>
             <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
             <option value="cancelled">Cancelled</option>
           </select>
           <input
@@ -335,7 +336,16 @@ export default function PlatformCustomersPage() {
                         <Show
                           when={c.tenant_status === "pending_approval"}
                           fallback={
-                            <span class="capitalize text-text-secondary">{(c.tenant_status || "—").replace(/_/g, " ")}</span>
+                            <Show
+                              when={c.tenant_status === "suspended"}
+                              fallback={
+                                <span class="capitalize text-text-secondary">{(c.tenant_status || "—").replace(/_/g, " ")}</span>
+                              }
+                            >
+                              <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">
+                                Suspended
+                              </span>
+                            </Show>
                           }
                         >
                           <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
