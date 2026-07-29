@@ -300,6 +300,7 @@ export function QuotationListPageInner(props: PageOptions = {}) {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
+        newLabel="New Quotation"
         codeKey="reference_no"
         nameKey="date_no_display"
         sortKey={sort()}

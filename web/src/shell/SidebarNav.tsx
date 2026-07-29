@@ -183,6 +183,9 @@ export function SidebarNav() {
     if (area.id === "home") {
       return (p === "/app/dashboard" || p === "/app/dashboard/") && !p.startsWith("/app/dashboard/site-map");
     }
+    if (area.id === "reports_home" || area.id === "reports") {
+      return pathStarts(p, ["/app/reports"]);
+    }
     if (area.id === "sitemap") return p.startsWith("/app/dashboard/site-map");
     if (area.id === "stocks") {
       return false;
@@ -206,17 +209,36 @@ export function SidebarNav() {
     if (area.id === "sell") {
       return false;
     }
+    if (area.id === "customers") {
+      return pathStarts(p, ["/app/inventory/partners"]);
+    }
     if (area.id === "quotation") {
       return pathStarts(p, ["/app/quotation"]) && !p.startsWith("/app/quotation/tax-mngt");
     }
     if (area.id === "sales_order") {
       return pathStarts(p, ["/app/sales-order"]);
     }
+    if (area.id === "accounts_receivable") {
+      return p === "/app/sales/reports/ar-by-customer" || p.startsWith("/app/selling/reports/receivable-status");
+    }
     if (area.id === "sales") {
       if (isFinanceUnderSalesReportPath(p)) return false;
+      if (p === "/app/sales/reports/ar-by-customer") return false;
+      if (pathStarts(p, ["/app/sales/credit-notes", "/app/sales/retainer-invoices", "/app/sales/recurring-invoices"])) {
+        return false;
+      }
       return (
         pathStarts(p, ["/app/sales"]) && !p.startsWith("/app/sales/collective-invoicing")
       );
+    }
+    if (area.id === "credit_notes") {
+      return pathStarts(p, ["/app/sales/credit-notes"]);
+    }
+    if (area.id === "retainer_invoices") {
+      return pathStarts(p, ["/app/sales/retainer-invoices"]);
+    }
+    if (area.id === "recurring_invoices") {
+      return pathStarts(p, ["/app/sales/recurring-invoices"]);
     }
     if (area.id === "combined_invoices") {
       return pathStarts(p, ["/app/sales/collective-invoicing"]);
@@ -227,14 +249,26 @@ export function SidebarNav() {
     if (area.id === "buy") {
       return false;
     }
+    if (area.id === "vendors") {
+      return pathStarts(p, ["/app/inventory/partners"]);
+    }
     if (area.id === "purchase_request") {
       return pathStarts(p, ["/app/purchase-request"]);
     }
     if (area.id === "purchase_order") {
       return pathStarts(p, ["/app/purchase-order"]);
     }
+    if (area.id === "expenses") {
+      return pathStarts(p, ["/app/purchases/expenses"]);
+    }
+    if (area.id === "accounts_payable") {
+      return p === "/app/purchases/purchases/ap-by-vendor" || p.startsWith("/app/purchases/purchases/ap-by-vendor/");
+    }
     if (area.id === "purchases") {
       if (p.startsWith("/app/purchases/expenses")) return false;
+      if (p === "/app/purchases/purchases/ap-by-vendor" || p.startsWith("/app/purchases/purchases/ap-by-vendor/")) {
+        return false;
+      }
       return pathStarts(p, ["/app/purchases"]);
     }
     if (area.id === "buying") {

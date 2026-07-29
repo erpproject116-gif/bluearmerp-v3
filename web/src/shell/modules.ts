@@ -185,8 +185,8 @@ export const appModules: AppModule[] = [
     href: "/app/quotation/quotations",
     basePath: "/app/quotation",
     features: [
-      { label: "List", href: "/app/quotation/quotations", settingsHref: "/app/quotation/quotations/settings", headerPriority: "primary" },
-      { label: "Status", href: "/app/quotation/quotations/status", settingsHref: "/app/quotation/quotations/settings" },
+      { label: "Quotation List", href: "/app/quotation/quotations", settingsHref: "/app/quotation/quotations/settings", headerPriority: "primary" },
+      { label: "Quotation Status", href: "/app/quotation/quotations/status", settingsHref: "/app/quotation/quotations/settings" },
       {
         label: "Open quotes",
         href: "/app/quotation/quotations/outstanding",
@@ -202,13 +202,16 @@ export const appModules: AppModule[] = [
   },
   {
     id: "sales",
-    label: "Sales list",
+    label: "Sales",
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
-      { label: "Sales list", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
+      { label: "Sales List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
+      { label: "Retainer Invoices", href: "/app/sales/retainer-invoices", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
+      { label: "Recurring Invoices", href: "/app/sales/recurring-invoices", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
+      { label: "Credit Notes", href: "/app/sales/credit-notes", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
       { label: "Reports", href: "/app/selling/reports", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
-      { label: "Sales Invoice Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
+      { label: "Sales Status", href: "/app/sales/sales/status", settingsHref: "/app/sales/sales/settings" },
       {
         label: "Pre-invoicing",
         href: "/app/sales/sales/pre-invoicing",
@@ -244,9 +247,9 @@ export const appModules: AppModule[] = [
     href: "/app/sales-order/sales-orders",
     basePath: "/app/sales-order",
     features: [
-      { label: "List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings", headerPriority: "primary" },
+      { label: "Sales Order List", href: "/app/sales-order/sales-orders", settingsHref: "/app/sales-order/sales-orders/settings", headerPriority: "primary" },
       { label: "Reports", href: "/app/sales-order/reports", settingsHref: "/app/sales-order/sales-orders/settings", headerPriority: "primary" },
-      { label: "Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
+      { label: "Sales Order Status", href: "/app/sales-order/sales-orders/status", settingsHref: "/app/sales-order/sales-orders/settings" },
       {
         label: "Open orders",
         href: "/app/sales-order/sales-orders/outstanding",
@@ -278,7 +281,7 @@ export const appModules: AppModule[] = [
     href: "/app/purchase-request/purchase-requests",
     basePath: "/app/purchase-request",
     features: [
-      { label: "List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings", headerPriority: "primary" },
+      { label: "Purchase Request List", href: "/app/purchase-request/purchase-requests", settingsHref: "/app/purchase-request/purchase-requests/settings", headerPriority: "primary" },
       { label: "Status", href: "/app/purchase-request/purchase-requests/status", settingsHref: "/app/purchase-request/purchase-requests/settings" },
       setupFeatureTab("/app/purchase-request"),
     ],
@@ -289,7 +292,8 @@ export const appModules: AppModule[] = [
     href: "/app/purchase-order/purchase-orders",
     basePath: "/app/purchase-order",
     features: [
-      { label: "List", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings", headerPriority: "primary" },
+      { label: "Purchase Order List", href: "/app/purchase-order/purchase-orders", settingsHref: "/app/purchase-order/purchase-orders/settings", headerPriority: "primary" },
+      { label: "Purchase Order Status", href: "/app/purchase-order/purchase-orders/status", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/purchase-order/purchase-orders/settings", headerPriority: "primary" },
       {
         label: "RFQ",
@@ -300,7 +304,6 @@ export const appModules: AppModule[] = [
       { label: "Returns", href: "/app/purchase-order/purchase-returns", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Receiving", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/goods-receipt/settings" },
       { label: "PO analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "PO status", href: "/app/purchase-order/purchase-orders/status", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "Open POs", href: "/app/purchase-order/purchase-orders/outstanding", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "To receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       setupFeatureTab("/app/purchase-order"),
@@ -308,14 +311,14 @@ export const appModules: AppModule[] = [
   },
   {
     id: "purchases",
-    label: "Purchase invoices",
+    label: "Purchases",
     href: "/app/purchases/purchases",
     basePath: "/app/purchases",
     features: [
-      { label: "Purchase Invoice List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
+      { label: "Purchase List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
+      { label: "Purchases Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Expenses", href: "/app/purchases/expenses", settingsHref: "/app/purchases/expenses", featureCode: "finance.expenses", headerPriority: "primary" },
       { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
-      { label: "Purchase Invoice Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       {
         label: "Pre-invoicing",
         href: "/app/purchases/purchases/pre-invoicing",
