@@ -49,6 +49,7 @@ func registerUserRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/users", listUsers(pool))
 	r.Post("/invites", createInvite(pool))
 	r.Patch("/users/{id}", patchUser(pool))
+	r.Post("/users/{id}/reset-for-reinvite", resetUserForReinvite(pool))
 	r.Get("/users/{id}/groups", getUserGroups(pool))
 	r.Put("/users/{id}/groups", putUserGroups(pool))
 	r.Post("/invites/{id}/revoke", revokeInvite(pool))
@@ -521,6 +522,160 @@ func revokeInvite(pool *pgxpool.Pool) http.HandlerFunc {
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.invite_revoke", "user", &userID, nil, nil)
 		response.OK(w, map[string]any{"id": userID, "invite_id": inviteID}, "Invite revoked.")
+	}
+}
+
+func resetUserForReinvite(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		if id == tu.AppUserID {
+			response.Err(w, http.StatusBadRequest, "You cannot reset your own account for re-invite.", "ERR_BAD_REQUEST")
+			return
+		}
+
+		var body struct {
+			FullName   *string `json:"full_name"`
+			TenantRole *string `json:"tenant_role"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reset user.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var (
+			email, fullName, roleCode, status string
+			authUserID                        *string
+			ownerUserID                       *int64
+		)
+		err = tx.QueryRow(r.Context(), `
+			select u.email, u.full_name, u.tenant_role, u.status, u.auth_user_id::text, t.owner_user_id
+			from public.users u
+			join public.tenants t on t.id = u.tenant_id
+			where u.id = $1 and u.tenant_id = $2
+			for update of u`, id, tu.TenantID).
+			Scan(&email, &fullName, &roleCode, &status, &authUserID, &ownerUserID)
+		if err == pgx.ErrNoRows {
+			response.Err(w, http.StatusNotFound, "User not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load user.", "ERR_INTERNAL")
+			return
+		}
+		if ownerUserID != nil && *ownerUserID == id {
+			response.Err(w, http.StatusBadRequest, "Cannot reset the tenant owner for re-invite.", "ERR_BAD_REQUEST")
+			return
+		}
+		if status != "active" && status != "disabled" {
+			response.Err(w, http.StatusBadRequest, "Only active or deleted users can be reset for re-invite (status="+status+").", "ERR_BAD_REQUEST")
+			return
+		}
+
+		if body.FullName != nil {
+			fn := stringsTrim(*body.FullName)
+			if fn == "" {
+				response.Validation(w, map[string]string{"full_name": "Full name cannot be empty."})
+				return
+			}
+			fullName = fn
+		}
+		if body.TenantRole != nil {
+			role := stringsTrim(*body.TenantRole)
+			if !validRoleCode(role) || !roleExists(r.Context(), pool, tu.TenantID, role) {
+				response.Validation(w, map[string]string{"tenant_role": "Invalid role."})
+				return
+			}
+			roleCode = role
+		}
+
+		if _, err := tx.Exec(r.Context(), `
+			delete from public.user_data_scopes where tenant_id = $1 and user_id = $2`, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to clear data scopes.", "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `
+			delete from public.user_permission_overrides where tenant_id = $1 and user_id = $2`, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to clear overrides.", "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `
+			delete from public.tenant_user_group_members where tenant_id = $1 and user_id = $2`, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to clear groups.", "ERR_INTERNAL")
+			return
+		}
+
+		if authUserID != nil && *authUserID != "" {
+			_, _ = tx.Exec(r.Context(), `
+				delete from public.user_active_tenant
+				where auth_user_id = $1::uuid and tenant_id = $2`, *authUserID, tu.TenantID)
+		}
+
+		_, err = tx.Exec(r.Context(), `
+			update public.users
+			set auth_user_id = null,
+			    status = 'invited',
+			    full_name = $1,
+			    tenant_role = $2,
+			    auth_revision = auth_revision + 1,
+			    updated_at = now()
+			where id = $3 and tenant_id = $4`, fullName, roleCode, id, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reset user.", "ERR_INTERNAL")
+			return
+		}
+
+		var inviteID int64
+		var invitedAt time.Time
+		err = tx.QueryRow(r.Context(), `
+			update public.user_invites
+			set revoked_at = null,
+			    accepted_at = null,
+			    full_name = $1,
+			    role_code = $2,
+			    invited_by_user_id = $3,
+			    invited_at = now(),
+			    email = $4
+			where tenant_id = $5 and user_id = $6
+			returning id, invited_at`,
+			fullName, roleCode, tu.AppUserID, email, tu.TenantID, id).
+			Scan(&inviteID, &invitedAt)
+		if err == pgx.ErrNoRows {
+			err = tx.QueryRow(r.Context(), `
+				insert into public.user_invites
+				  (tenant_id, user_id, email, full_name, role_code, invited_by_user_id)
+				values ($1, $2, $3, $4, $5, $6)
+				returning id, invited_at`,
+				tu.TenantID, id, email, fullName, roleCode, tu.AppUserID).
+				Scan(&inviteID, &invitedAt)
+		}
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reopen invite.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to reset user.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = auth.InvalidateUserByAppUserID(r.Context(), pool, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.reset_for_reinvite", "user", &id, nil, map[string]any{
+			"email": email, "tenant_role": roleCode,
+		})
+		response.OK(w, UserRow{
+			ID: id, Email: email, FullName: fullName, TenantRole: roleCode,
+			Status: "invited", AuthLinked: false, InviteID: &inviteID, InvitedAt: &invitedAt,
+			InvitedBy: &tu.AppUserID,
+		}, "User reset for re-invite. They must sign in with Google using this email.")
 	}
 }
 

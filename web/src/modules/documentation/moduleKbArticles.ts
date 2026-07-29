@@ -1110,7 +1110,7 @@ export const moduleKbArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Delete a user on Users (soft-delete). That stops access but keeps role, groups, overrides, and scopes for Restore. Do not look for delete on Data scopes.",
+        text: "Soft-delete stops access but keeps role, groups, overrides, and scopes for Restore. Use Remove & reset for re-invite (More menu) to clear scopes/overrides/groups, unlink Google, and invite again. Platform Command → Customers: Suspend keeps company data; Close & wipe deletes the tenant (then Provision again).",
       },
     ],
     primaryHref: "/app/user-management/users",

@@ -1,5 +1,5 @@
-import { A } from "@solidjs/router";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { A, useNavigate } from "@solidjs/router";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
@@ -31,9 +31,11 @@ function statusLabel(status: string) {
 
 export default function UsersPage() {
   const auth = useAuth();
+  const navigate = useNavigate();
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
     useListState("email");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [menuOpenId, setMenuOpenId] = createSignal<number | null>(null);
   const [inviteOpen, setInviteOpen] = createSignal(false);
   const [editOpen, setEditOpen] = createSignal(false);
   const [permOpen, setPermOpen] = createSignal(false);
@@ -58,6 +60,22 @@ export default function UsersPage() {
   const registry = usePermissionRegistry();
   const userPerms = useUserPermissions(permUserId);
   const previewPerms = useUserPermissions(previewUserId);
+
+  onMount(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest("[data-user-row-menu]")) setMenuOpenId(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpenId(null);
+    };
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKey);
+    onCleanup(() => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    });
+  });
 
   const list = useTenantUserList(() => ({
     page: page(),
@@ -268,7 +286,46 @@ export default function UsersPage() {
     }
   };
 
+  const resetForReinvite = async (row: TenantUserRow) => {
+    if (row.is_owner) {
+      toast.warning("Cannot reset the tenant owner.");
+      return;
+    }
+    if (
+      !confirm(
+        `Remove access and reset ${row.full_name || row.email} for re-invite?\n\nClears data scopes, overrides, and groups; unlinks Google; status becomes Invited. Soft-delete Restore will no longer apply.`,
+      )
+    ) {
+      return;
+    }
+    setMenuOpenId(null);
+    const res = await apiFetch(
+      `/api/v1/user-management/users/${row.id}/reset-for-reinvite`,
+      { method: "POST", body: JSON.stringify({}) },
+      { silent: true },
+    );
+    if (!res.ok) {
+      toast.warning(res.message ?? "Could not reset user for re-invite.");
+      return;
+    }
+    toast.success("User reset. They must sign in with Google using this email to rejoin.");
+    invalidate.all();
+  };
+
+  const openDataScopes = (row: TenantUserRow) => {
+    setMenuOpenId(null);
+    navigate(`/app/user-management/user-permissions?userId=${row.id}`);
+  };
+
   const rows = () => list.data?.rows ?? [];
+
+  const hasMoreItems = (row: TenantUserRow) => {
+    if (row.is_owner) return true; // Effective access tip only — still show More with Effective
+    if (row.status === "invited") return Boolean(row.invite_id);
+    if (row.status === "disabled") return true;
+    if (row.status === "active") return true;
+    return false;
+  };
 
   const previewEntries = () => {
     const eff = previewPerms.data?.effective ?? {};
@@ -335,93 +392,141 @@ export default function UsersPage() {
             key: "actions",
             header: "Actions",
             render: (row) => (
-              <div class="flex flex-wrap gap-2">
+              <div class="relative flex items-center gap-2" data-user-row-menu onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   class="text-sm text-brand-600 hover:underline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void openEdit(row);
-                  }}
+                  onClick={() => void openEdit(row)}
                 >
                   Edit
                 </button>
-                <Show when={row.status !== "invited" && !row.is_owner && row.status !== "disabled"}>
-                  <button
-                    type="button"
-                    class="text-sm text-brand-600 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openOverrides(row);
-                    }}
-                  >
-                    Overrides
-                  </button>
-                  <button
-                    type="button"
-                    class="text-sm text-brand-600 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEffectivePreview(row);
-                    }}
-                  >
-                    Effective access
-                  </button>
-                  <A
-                    href="/app/user-management/user-permissions"
-                    class="text-sm text-brand-600 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Data scopes
-                  </A>
-                </Show>
-                <Show when={row.status === "active" && !row.is_owner}>
-                  <button
-                    type="button"
-                    class="text-sm text-red-600 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void softDelete(row);
-                    }}
-                  >
-                    Delete
-                  </button>
-                </Show>
-                <Show when={row.status === "disabled" && !row.auth_linked}>
-                  <button
-                    type="button"
-                    class="text-sm text-brand-600 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openReInvite(row);
-                    }}
-                  >
-                    Re-invite
-                  </button>
-                </Show>
-                <Show when={row.status === "disabled" && row.auth_linked}>
-                  <button
-                    type="button"
-                    class="text-sm text-emerald-700 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void restoreUser(row);
-                    }}
-                  >
-                    Restore
-                  </button>
-                </Show>
-                <Show when={row.status === "invited" && row.invite_id}>
-                  <button
-                    type="button"
-                    class="text-sm text-red-600 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void revokeInvite(row);
-                    }}
-                  >
-                    Revoke
-                  </button>
+                <Show when={hasMoreItems(row)}>
+                  <div class="relative">
+                    <button
+                      type="button"
+                      class="rounded border border-stroke px-2 py-0.5 text-xs font-medium text-text-secondary hover:bg-slate-50"
+                      aria-expanded={menuOpenId() === row.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpenId((id) => (id === row.id ? null : row.id));
+                      }}
+                    >
+                      More ▾
+                    </button>
+                    <Show when={menuOpenId() === row.id}>
+                      <div class="absolute right-0 z-20 mt-1 min-w-[12rem] rounded-lg border border-stroke bg-white py-1 shadow-lg">
+                        <Show when={row.status === "active" && !row.is_owner}>
+                          <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                            Access
+                          </p>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              openOverrides(row);
+                            }}
+                          >
+                            Overrides
+                          </button>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              openEffectivePreview(row);
+                            }}
+                          >
+                            Effective access
+                          </button>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                            onClick={() => openDataScopes(row)}
+                          >
+                            Data scopes
+                          </button>
+                        </Show>
+                        <Show when={row.is_owner}>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              openEffectivePreview(row);
+                            }}
+                          >
+                            Effective access
+                          </button>
+                        </Show>
+                        <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                          Lifecycle
+                        </p>
+                        <Show when={row.status === "active" && !row.is_owner}>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              void softDelete(row);
+                            }}
+                          >
+                            Delete
+                          </button>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                            onClick={() => void resetForReinvite(row)}
+                          >
+                            Remove &amp; reset for re-invite
+                          </button>
+                        </Show>
+                        <Show when={row.status === "disabled" && row.auth_linked}>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-emerald-700 hover:bg-emerald-50"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              void restoreUser(row);
+                            }}
+                          >
+                            Restore
+                          </button>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                            onClick={() => void resetForReinvite(row)}
+                          >
+                            Reset for re-invite
+                          </button>
+                        </Show>
+                        <Show when={row.status === "disabled" && !row.auth_linked}>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-brand-600 hover:bg-slate-50"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              openReInvite(row);
+                            }}
+                          >
+                            Re-invite
+                          </button>
+                        </Show>
+                        <Show when={row.status === "invited" && row.invite_id}>
+                          <button
+                            type="button"
+                            class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              void revokeInvite(row);
+                            }}
+                          >
+                            Revoke
+                          </button>
+                        </Show>
+                      </div>
+                    </Show>
+                  </div>
                 </Show>
               </div>
             ),
