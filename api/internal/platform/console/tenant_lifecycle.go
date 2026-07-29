@@ -3,6 +3,7 @@ package console
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -40,28 +41,26 @@ func (s *service) suspendCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		response.Err(w, http.StatusInternalServerError, "Failed to suspend workspace.", "ERR_INTERNAL")
-		return
-	}
-	defer tx.Rollback(r.Context())
-
-	tag, err := tx.Exec(r.Context(), `
+	// Do not wrap best-effort subscription cancel in the same TX as the tenant update:
+	// a failed secondary statement aborts the whole Postgres transaction.
+	tag, err := s.pool.Exec(r.Context(), `
 		update public.tenants set status = 'suspended', updated_at = now()
 		where id = $1 and status = 'active'`, tenantID)
-	if err != nil || tag.RowsAffected() == 0 {
-		response.Err(w, http.StatusInternalServerError, "Failed to suspend workspace.", "ERR_INTERNAL")
+	if err != nil {
+		log.Printf("console: suspend tenant %d: %v", tenantID, err)
+		response.Err(w, http.StatusInternalServerError, "Failed to suspend workspace: "+err.Error(), "ERR_INTERNAL")
 		return
 	}
-	_, _ = tx.Exec(r.Context(), `
+	if tag.RowsAffected() == 0 {
+		response.Err(w, http.StatusConflict, "Workspace is no longer active.", "ERR_CONFLICT")
+		return
+	}
+	if _, err := s.pool.Exec(r.Context(), `
 		update public.platform_subscriptions
 		set status = 'cancelled', updated_at = now(),
 		    notes = coalesce(notes,'') || E'\n[suspend] Access suspended by platform; data retained.'
-		where customer_id = $1 and status in ('active','trialing','past_due')`, id)
-	if err := tx.Commit(r.Context()); err != nil {
-		response.Err(w, http.StatusInternalServerError, "Failed to suspend workspace.", "ERR_INTERNAL")
-		return
+		where customer_id = $1 and status in ('active','trialing','past_due','pending')`, id); err != nil {
+		log.Printf("console: suspend customer %d cancel subscriptions (best-effort): %v", id, err)
 	}
 
 	customerregistry.AppendCRMLeadNote(r.Context(), s.pool, id, "[lifecycle] Workspace suspended — ERP access removed; business data kept.")
@@ -103,8 +102,13 @@ func (s *service) reactivateCustomer(w http.ResponseWriter, r *http.Request) {
 	tag, err := s.pool.Exec(r.Context(), `
 		update public.tenants set status = 'active', updated_at = now()
 		where id = $1 and status = 'suspended'`, tenantID)
-	if err != nil || tag.RowsAffected() == 0 {
-		response.Err(w, http.StatusInternalServerError, "Failed to reactivate workspace.", "ERR_INTERNAL")
+	if err != nil {
+		log.Printf("console: reactivate tenant %d: %v", tenantID, err)
+		response.Err(w, http.StatusInternalServerError, "Failed to reactivate workspace: "+err.Error(), "ERR_INTERNAL")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		response.Err(w, http.StatusConflict, "Workspace is no longer suspended.", "ERR_CONFLICT")
 		return
 	}
 	customerregistry.AppendCRMLeadNote(r.Context(), s.pool, id, "[lifecycle] Workspace reactivated — same tenant and business data.")
@@ -141,7 +145,17 @@ func (s *service) wipePreflightCustomer(w http.ResponseWriter, r *http.Request) 
 	}
 	blockers, err := s.tenantWipeBlockers(r.Context())
 	if err != nil {
-		response.Err(w, http.StatusInternalServerError, "Failed to run wipe preflight.", "ERR_INTERNAL")
+		log.Printf("console: wipe preflight customer %d: %v", id, err)
+		// Still open the dialog — surface catalog failure as a soft blocker instead of HTTP 500.
+		response.OK(w, map[string]any{
+			"tenant_id":     tenantID,
+			"company_code":  code,
+			"tenant_status": status,
+			"can_wipe":      false,
+			"blockers":      []string{"Wipe preflight catalog check failed: " + err.Error()},
+			"irreversible":  true,
+			"customer_kept": true,
+		}, "OK")
 		return
 	}
 	response.OK(w, map[string]any{
@@ -198,8 +212,9 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 
 	blockers, err := s.tenantWipeBlockers(r.Context())
 	if err != nil {
-		response.Err(w, http.StatusInternalServerError, "Failed to run wipe preflight.", "ERR_INTERNAL")
-		return
+		log.Printf("console: wipe blockers customer %d: %v", id, err)
+		// Catalog check failed — proceed; DELETE will surface real FK violations.
+		blockers = nil
 	}
 	if len(blockers) > 0 {
 		response.Err(w, http.StatusConflict,
@@ -215,11 +230,15 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
-	_, _ = tx.Exec(r.Context(), `
+	if _, err := tx.Exec(r.Context(), `
 		update public.platform_subscriptions
 		set status = 'cancelled', updated_at = now(),
 		    notes = coalesce(notes,'') || E'\n[wipe] Workspace wiped; tenant deleted.'
-		where customer_id = $1`, id)
+		where customer_id = $1`, id); err != nil {
+		log.Printf("console: wipe cancel subscriptions customer %d: %v", id, err)
+		response.Err(w, http.StatusInternalServerError, "Failed to cancel subscriptions: "+err.Error(), "ERR_INTERNAL")
+		return
+	}
 	_, err = tx.Exec(r.Context(), `
 		update public.platform_customers set tenant_id = null, updated_at = now() where id = $1`, id)
 	if err != nil {
@@ -273,14 +292,29 @@ func (s *service) loadCustomerTenant(ctx context.Context, customerID int64) (ten
 }
 
 // tenantWipeBlockers lists FK constraints from tables with tenant_id → tenants(id)
-// that are NOT ON DELETE CASCADE (would block or orphan on DELETE tenants).
+// that are NOT ON DELETE CASCADE / SET NULL (would block DELETE tenants).
 func (s *service) tenantWipeBlockers(ctx context.Context) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `
-		select c.conrelid::regclass::text || '.' || a.attname || ' (del=' || c.confdeltype || ')'
-		from pg_constraint c
-		join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
+		select format('%I.%I.tenant_id (ON DELETE %s)', n.nspname, cl.relname,
+		  case c.confdeltype
+		    when 'a' then 'NO ACTION'
+		    when 'r' then 'RESTRICT'
+		    else c.confdeltype::text
+		  end)
+		from pg_catalog.pg_constraint c
+		join pg_catalog.pg_class cl on cl.oid = c.conrelid
+		join pg_catalog.pg_namespace n on n.oid = cl.relnamespace
+		join lateral unnest(c.conkey) as u(attnum) on true
+		join pg_catalog.pg_attribute a
+		  on a.attrelid = c.conrelid and a.attnum = u.attnum and not a.attisdropped
 		where c.contype = 'f'
-		  and c.confrelid = 'public.tenants'::regclass
+		  and c.confrelid = (
+		    select c2.oid
+		    from pg_catalog.pg_class c2
+		    join pg_catalog.pg_namespace n2 on n2.oid = c2.relnamespace
+		    where n2.nspname = 'public' and c2.relname = 'tenants'
+		    limit 1
+		  )
 		  and a.attname = 'tenant_id'
 		  and c.confdeltype in ('a', 'r')
 		order by 1`)

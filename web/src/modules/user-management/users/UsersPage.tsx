@@ -26,12 +26,6 @@ import {
 
 type RowMenuPos = { top: number; left: number };
 
-function statusLabel(status: string) {
-  if (status === "invited") return "Invited";
-  if (status === "disabled") return "Deleted";
-  return "Active";
-}
-
 export default function UsersPage() {
   const auth = useAuth();
   const navigate = useNavigate();
@@ -325,7 +319,7 @@ export default function UsersPage() {
     }
     if (
       !confirm(
-        `Remove access and reset ${row.full_name || row.email} for re-invite?\n\nClears data scopes, overrides, and groups; unlinks Google; status becomes Invited. Soft-delete Restore will no longer apply.`,
+        `Remove access and reset ${row.full_name || row.email} for re-invite?\n\nClears data scopes, overrides, and groups; unlinks Google; status becomes Pending invite. Soft-delete Restore will no longer apply.`,
       )
     ) {
       return;
@@ -370,8 +364,9 @@ export default function UsersPage() {
     <div class="space-y-3">
       <p class="text-sm text-text-secondary">
         Invite people, assign a role (and optional groups), soft-delete/restore.{" "}
-        <strong>Status</strong> shows Invited / Active / Deleted — filter <strong>Invited</strong> for pending
-        joins. Open <strong>Overrides</strong> only for exceptions. Limit customers/locations on{" "}
+        <strong>Status</strong> shows Pending invite / Active / Deleted — filter{" "}
+        <strong>Pending invite</strong> for people who have not joined yet. Open <strong>Overrides</strong>{" "}
+        only for exceptions. Limit customers/locations on{" "}
         <A href="/app/user-management/user-permissions" class="text-brand-600 hover:underline">
           Data scopes
         </A>
@@ -405,9 +400,19 @@ export default function UsersPage() {
                 fallback={
                   <Show
                     when={row.status === "invited"}
-                    fallback={<span>{statusLabel(row.status)}</span>}
+                    fallback={
+                      <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">
+                        Active
+                      </span>
+                    }
                   >
-                    <span class="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900">Invited</span>
+                    <span
+                      class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-950 ring-1 ring-amber-200"
+                      title="Invite sent — waiting for Google sign-in to join this company"
+                    >
+                      <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+                      Pending invite
+                    </span>
                   </Show>
                 }
               >
@@ -474,7 +479,7 @@ export default function UsersPage() {
         statusOptions={[
           { value: "", label: "All" },
           { value: "active", label: "Active" },
-          { value: "invited", label: "Invited" },
+          { value: "invited", label: "Pending invite" },
           { value: "disabled", label: "Deleted" },
         ]}
         onRefresh={() => invalidate.users()}
@@ -708,7 +713,7 @@ export default function UsersPage() {
                   <option value="active">Active</option>
                   <option value="disabled">Deleted</option>
                   <Show when={row().status === "invited"}>
-                    <option value="invited">Invited</option>
+                    <option value="invited">Pending invite</option>
                   </Show>
                 </select>
               </Field>

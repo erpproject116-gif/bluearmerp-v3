@@ -280,12 +280,12 @@ export function SidebarNav() {
     if (area.id === "activity_logs") return pathStarts(p, ["/app/activity-logs"]);
     if (area.id === "documentation") return pathStarts(p, ["/app/documentation"]);
     if (area.id === "user_management") {
-      return pathStarts(p, ["/app/user-management", "/app/branding"]);
+      return (
+        (pathStarts(p, ["/app/user-management"]) || pathStarts(p, ["/app/branding"])) &&
+        !p.startsWith("/app/user-management/process-policies")
+      );
     }
-    if (area.id === "um_users") {
-      return pathStarts(p, ["/app/user-management/users"]);
-    }
-    if (area.id === "um_process_policies") {
+    if (area.id === "process_policies") {
       return pathStarts(p, ["/app/user-management/process-policies"]);
     }
     return p === area.href || p.startsWith(`${area.href}/`);
