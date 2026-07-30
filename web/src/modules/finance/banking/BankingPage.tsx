@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
@@ -158,7 +159,7 @@ export default function BankingPage() {
       : await apiFetch("/api/v1/finance/bank-accounts", { method: "POST", body: JSON.stringify(body) });
     setSaving(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not save account.");
+      handleSaveResult(res, toast);
       return;
     }
     toast.success(ed ? "Account updated." : "Account added.");
@@ -175,11 +176,7 @@ export default function BankingPage() {
       method: "PATCH",
       body: JSON.stringify({ is_active: false, bank_account_name: row.bank_account_name, gl_account_code: row.gl_account_code }),
     });
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not deactivate.");
-      return;
-    }
-    toast.success("Account deactivated.");
+    if (!handleSaveResult(res, toast, "Account deactivated.")) return;
     void client.invalidateQueries({ queryKey: ["banking-accounts"] });
   };
 

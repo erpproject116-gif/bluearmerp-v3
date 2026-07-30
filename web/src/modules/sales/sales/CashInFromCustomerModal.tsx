@@ -1,5 +1,6 @@
 import { createSignal, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
 import { formatPeso } from "../../../shared/money";
@@ -44,11 +45,7 @@ export function CashInFromCustomerModal(props: Props) {
       }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to record cash in.");
-      return;
-    }
-    toast.success("Cash In recorded.");
+    if (!handleSaveResult(res, toast, "Cash In recorded.")) return;
     props.onSaved();
     props.onClose();
   };

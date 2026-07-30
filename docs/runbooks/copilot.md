@@ -9,6 +9,8 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 3. Small model (`COPILOT_SMALL_MODEL`) for doc rewrite; medium (`COPILOT_MEDIUM_MODEL`) for tool synthesis; VL stays RFQ-only.
 4. Writes never auto-post.
 5. No second Python service.
+6. **Full-page workspace** at `/app/copilot` (nav: Help & guides → Copilot). Drawer (Ctrl+Shift+H) remains for contextual help. Shared session state.
+7. **Smart Assist** on transaction failures is separate — see `docs/runbooks/smart-assist.md`. Zero LLM tokens on those toasts.
 
 ## Chat window hard limits
 

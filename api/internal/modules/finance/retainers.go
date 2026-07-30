@@ -363,7 +363,7 @@ func applyRetainer(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if officialReceiptID == nil || *officialReceiptID <= 0 {
-			response.Validation(w, map[string]string{"official_receipt_id": "Retainer must be funded via OR."})
+			response.ValidationSmart(w, map[string]string{"official_receipt_id": "Retainer must be funded via OR."})
 			return
 		}
 		if status != "open" && status != "applied" {
@@ -371,7 +371,7 @@ func applyRetainer(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if body.AppliedAmount > remaining+0.0001 {
-			response.Validation(w, map[string]string{"applied_amount": "Amount exceeds remaining retainer."})
+			response.ValidationSmart(w, map[string]string{"applied_amount": "Amount exceeds remaining retainer."})
 			return
 		}
 		var locked float64

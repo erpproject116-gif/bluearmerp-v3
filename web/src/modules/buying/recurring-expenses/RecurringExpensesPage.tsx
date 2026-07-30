@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
@@ -120,7 +121,7 @@ export default function RecurringExpensesPage() {
       : await apiFetch("/api/v1/finance/recurring-expenses", { method: "POST", body: JSON.stringify(payload) });
     setSaving(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to save schedule.");
+      handleSaveResult(res, toast);
       return;
     }
     toast.success(id ? "Schedule updated." : "Recurring expense schedule created.");
@@ -138,7 +139,7 @@ export default function RecurringExpensesPage() {
     );
     setBusyId(null);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Could not generate expense.");
+      handleSaveResult(res, toast);
       return;
     }
     setLastGenerated({ expense_id: res.data.expense_id, expense_no: res.data.expense_no });
@@ -149,11 +150,7 @@ export default function RecurringExpensesPage() {
   const remove = async (row: RecurringExpense) => {
     if (!confirm(`Delete recurring schedule “${row.name}”?`)) return;
     const res = await apiFetch(`/api/v1/finance/recurring-expenses/${row.id}`, { method: "DELETE" });
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not delete.");
-      return;
-    }
-    toast.success("Deleted.");
+    if (!handleSaveResult(res, toast, "Deleted.")) return;
     invalidate();
   };
 

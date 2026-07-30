@@ -44,9 +44,13 @@ func getConfig() http.HandlerFunc {
 				"draft_recurring_expense",
 				"import_rfq_pdf",
 				"run_smart_rfq",
+				"map_import_dataset",
+				"propose_serial_lot_import",
 				"draft_quotation_from_rfq",
 				"draft_follow_up",
+				"draft_generate_quotation",
 				"draft_open_document",
+				"draft_send_quotation_email",
 				"draft_send_document_email",
 			},
 			"actions": []string{

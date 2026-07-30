@@ -566,6 +566,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/documentation",
     features: [
       { label: "Help & guides", href: "/app/documentation", settingsHref: "/app/documentation" },
+      { label: "Copilot", href: "/app/copilot", settingsHref: "/app/copilot", headerPriority: "primary" },
     ],
   },
   {

@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
@@ -133,7 +134,7 @@ export default function ExpensesPage() {
     });
     setSaving(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to create expense.");
+      handleSaveResult(res, toast);
       return;
     }
     toast.success(payNow() ? "Expense created and paid." : "Expense created.");
@@ -158,11 +159,7 @@ export default function ExpensesPage() {
       body: JSON.stringify(paymentPayload()),
     });
     setBusyId(null);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not mark paid.");
-      return;
-    }
-    toast.success("Expense paid. Payment voucher recorded.");
+    if (!handleSaveResult(res, toast, "Expense paid. Payment voucher recorded.")) return;
     setPayOpen(null);
     invalidate();
   };

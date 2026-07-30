@@ -2,6 +2,7 @@ import { A, useParams, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
@@ -122,11 +123,7 @@ export default function BankingAccountPage() {
       }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Transfer failed.");
-      return;
-    }
-    toast.success("Transfer recorded.");
+    if (!handleSaveResult(res, toast, "Transfer recorded.")) return;
     setTransferOpen(false);
     setAmount("");
     setReference("");

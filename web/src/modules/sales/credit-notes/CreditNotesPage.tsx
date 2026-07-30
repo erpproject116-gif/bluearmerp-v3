@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import { SalesInvoicePickerModal } from "../../../shared/SalesInvoicePickerModal";
@@ -110,11 +111,7 @@ export default function CreditNotesPage() {
       }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to create credit note.");
-      return;
-    }
-    toast.success("Credit note created.");
+    if (!handleSaveResult(res, toast, "Credit note created.")) return;
     setCreateOpen(false);
     setCustomerName("");
     setPartnerId(null);
@@ -129,11 +126,7 @@ export default function CreditNotesPage() {
     setBusyId(row.id);
     const res = await apiFetch(`/api/v1/finance/credit-notes/${row.id}/cancel`, { method: "POST" });
     setBusyId(null);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not cancel.");
-      return;
-    }
-    toast.success("Credit note cancelled.");
+    if (!handleSaveResult(res, toast, "Credit note cancelled.")) return;
     invalidate();
   };
 
@@ -143,7 +136,7 @@ export default function CreditNotesPage() {
       { id: number; sales_id: number; sales_no: string; applied_amount: number; created_at: string }[]
     >(`/api/v1/finance/credit-notes/${row.id}/applications`);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not load history.");
+      handleSaveResult(res, toast);
       setHistoryRows([]);
       return;
     }
@@ -154,11 +147,7 @@ export default function CreditNotesPage() {
     setBusyId(row.id);
     const res = await apiFetch(`/api/v1/finance/credit-notes/${row.id}/post`, { method: "POST" });
     setBusyId(null);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not post.");
-      return;
-    }
-    toast.success("Credit note opened.");
+    if (!handleSaveResult(res, toast, "Credit note opened.")) return;
     invalidate();
   };
 
@@ -177,11 +166,7 @@ export default function CreditNotesPage() {
       body: JSON.stringify({ sales_id: sid, applied_amount: amt }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not apply credit.");
-      return;
-    }
-    toast.success("Credit applied to sales invoice.");
+    if (!handleSaveResult(res, toast, "Credit applied to sales invoice.")) return;
     setApplyOpen(null);
     setSalesId(null);
     setSalesLabel("");
@@ -205,7 +190,7 @@ export default function CreditNotesPage() {
     );
     setSaving(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not convert to cash.");
+      handleSaveResult(res, toast);
       return;
     }
     const pvNo = res.data?.payment_no;

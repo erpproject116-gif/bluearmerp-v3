@@ -422,7 +422,7 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if errs := validatePaymentApplications(r.Context(), pool, tu.TenantID, body.PartnerID, body.Applications, nil); errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 		amountTotal := sumPaymentApplicationAmounts(body.Applications)
@@ -467,13 +467,13 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 		var payeeName string
 		_ = tx.QueryRow(r.Context(), `select company_name from public.inv_partners where id = $1 and tenant_id = $2`, body.PartnerID, tu.TenantID).Scan(&payeeName)
 		if err := insertWithholdingLines(r.Context(), tx, tu.TenantID, "payment_voucher", id, body.WithholdingLines); err != nil {
-			response.Validation(w, map[string]string{"withholding_lines": err.Error()})
+			response.ValidationSmart(w, map[string]string{"withholding_lines": err.Error()})
 			return
 		}
 
 		whtTotal, err := sumWithholdingTax(r.Context(), tx, tu.TenantID, body.WithholdingLines)
 		if err != nil {
-			response.Validation(w, map[string]string{"withholding_lines": err.Error()})
+			response.ValidationSmart(w, map[string]string{"withholding_lines": err.Error()})
 			return
 		}
 		netPay := amountTotal - whtTotal

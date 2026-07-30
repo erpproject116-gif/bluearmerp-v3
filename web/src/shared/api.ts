@@ -46,6 +46,20 @@ export async function getAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+/** Deterministic Smart Assist recovery payload from the API (no LLM). */
+export type ApiAssistAction = {
+  label: string;
+  href?: string;
+};
+
+export type ApiAssist = {
+  code: string;
+  title: string;
+  detail: string;
+  field?: string;
+  actions?: ApiAssistAction[];
+};
+
 export type ApiEnvelope<T> = {
   success: boolean;
   message?: string;
@@ -53,6 +67,7 @@ export type ApiEnvelope<T> = {
   meta?: { page: number; per_page: number; total: number };
   errors?: Record<string, string>;
   code?: string;
+  assist?: ApiAssist;
 };
 
 export type ApiResult<T> = ApiEnvelope<T> & {

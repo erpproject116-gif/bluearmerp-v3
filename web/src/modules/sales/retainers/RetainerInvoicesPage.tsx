@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import { SalesInvoicePickerModal } from "../../../shared/SalesInvoicePickerModal";
@@ -98,11 +99,7 @@ export default function RetainerInvoicesPage() {
       }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to create retainer.");
-      return;
-    }
-    toast.success("Retainer invoice created.");
+    if (!handleSaveResult(res, toast, "Retainer invoice created.")) return;
     setCreateOpen(false);
     setCustomerName("");
     setPartnerId(null);
@@ -115,11 +112,7 @@ export default function RetainerInvoicesPage() {
     setBusyId(row.id);
     const res = await apiFetch(`/api/v1/finance/retainer-invoices/${row.id}/post`, { method: "POST" });
     setBusyId(null);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not open retainer.");
-      return;
-    }
-    toast.success("Retainer opened.");
+    if (!handleSaveResult(res, toast, "Retainer opened.")) return;
     invalidate();
   };
 
@@ -137,7 +130,7 @@ export default function RetainerInvoicesPage() {
     );
     setSaving(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Could not record payment.");
+      handleSaveResult(res, toast);
       return;
     }
     toast.success(`Official receipt ${res.data.receipt_no} created.`);
@@ -159,11 +152,7 @@ export default function RetainerInvoicesPage() {
       body: JSON.stringify({ official_receipt_id: rid }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not link official receipt.");
-      return;
-    }
-    toast.success("Official receipt linked.");
+    if (!handleSaveResult(res, toast, "Official receipt linked.")) return;
     setFundOpen(null);
     setLinkReceiptId("");
     invalidate();
@@ -173,11 +162,7 @@ export default function RetainerInvoicesPage() {
     setBusyId(row.id);
     const res = await apiFetch(`/api/v1/finance/retainer-invoices/${row.id}/cancel`, { method: "POST" });
     setBusyId(null);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not cancel.");
-      return;
-    }
-    toast.success("Retainer cancelled.");
+    if (!handleSaveResult(res, toast, "Retainer cancelled.")) return;
     invalidate();
   };
 
@@ -187,7 +172,7 @@ export default function RetainerInvoicesPage() {
       { id: number; sales_id: number; sales_no: string; applied_amount: number; created_at: string }[]
     >(`/api/v1/finance/retainer-invoices/${row.id}/applications`);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not load history.");
+      handleSaveResult(res, toast);
       setHistoryRows([]);
       return;
     }
@@ -209,11 +194,7 @@ export default function RetainerInvoicesPage() {
       body: JSON.stringify({ sales_id: sid, applied_amount: amt }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not apply retainer.");
-      return;
-    }
-    toast.success("Down payment applied to sales invoice.");
+    if (!handleSaveResult(res, toast, "Down payment applied to sales invoice.")) return;
     setApplyOpen(null);
     setSalesId(null);
     setSalesLabel("");
