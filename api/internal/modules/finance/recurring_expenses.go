@@ -1,6 +1,7 @@
 package finance
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
@@ -42,10 +44,11 @@ type recurringExpenseBody struct {
 }
 
 func registerRecurringExpenseRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.With(auth.RequirePermission("finance.contract_read", auth.AccessRead)).Get("/recurring-expenses", listRecurringExpenses(pool))
-	r.With(auth.RequirePermission("finance.contract_write", auth.AccessWrite)).Post("/recurring-expenses", createRecurringExpense(pool))
-	r.With(auth.RequirePermission("finance.contract_write", auth.AccessWrite)).Patch("/recurring-expenses/{id}", updateRecurringExpense(pool))
-	r.With(auth.RequirePermission("finance.contract_write", auth.AccessWrite)).Delete("/recurring-expenses/{id}", deleteRecurringExpense(pool))
+	r.With(auth.RequirePermission("finance.recurring_expenses", auth.AccessRead)).Get("/recurring-expenses", listRecurringExpenses(pool))
+	r.With(auth.RequirePermission("finance.recurring_expenses_write", auth.AccessWrite)).Post("/recurring-expenses", createRecurringExpense(pool))
+	r.With(auth.RequirePermission("finance.recurring_expenses_write", auth.AccessWrite)).Patch("/recurring-expenses/{id}", updateRecurringExpense(pool))
+	r.With(auth.RequirePermission("finance.recurring_expenses_write", auth.AccessWrite)).Post("/recurring-expenses/{id}/generate", generateRecurringExpense(pool))
+	r.With(auth.RequirePermission("finance.recurring_expenses_write", auth.AccessWrite)).Delete("/recurring-expenses/{id}", deleteRecurringExpense(pool))
 }
 
 func listRecurringExpenses(pool *pgxpool.Pool) http.HandlerFunc {
@@ -217,7 +220,137 @@ func deleteRecurringExpense(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
 			return
 		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.recurring.delete", "fin_recurring_expense", &id, nil, nil)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.recurring_expense.delete", "fin_recurring_expense", &id, nil, nil)
 		response.OK(w, map[string]any{"id": id}, "Deleted")
 	}
+}
+
+func generateRecurringExpense(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to start transaction.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		expenseID, expenseNo, nextDue, stillActive, genErr := generateRecurringExpenseInTx(r.Context(), tx, tu.TenantID, tu.AppUserID, id)
+		if genErr != nil {
+			if genErr == pgx.ErrNoRows {
+				response.Err(w, http.StatusNotFound, "Recurring expense not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if strings.Contains(genErr.Error(), "inactive") {
+				response.Err(w, http.StatusBadRequest, genErr.Error(), "ERR_BAD_REQUEST")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, genErr.Error(), "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to commit.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.recurring_expense.generate", "fin_recurring_expense", &id, nil, map[string]any{
+			"expense_id": expenseID, "expense_no": expenseNo,
+		})
+		response.OK(w, map[string]any{
+			"expense_id":    expenseID,
+			"expense_no":    expenseNo,
+			"next_due_date": nextDue,
+			"is_active":     stillActive,
+		}, "Expense generated from recurring schedule.")
+	}
+}
+
+func generateRecurringExpenseInTx(ctx context.Context, tx pgx.Tx, tenantID, userID, recurringID int64) (expenseID int64, expenseNo, nextDue string, stillActive bool, err error) {
+	var (
+		name       string
+		category   string
+		vendorName string
+		amount     float64
+		frequency  string
+		nextDueStr *string
+		isActive   bool
+		partnerID  *int64
+		notes      string
+	)
+	err = tx.QueryRow(ctx, `
+		select name, category, vendor_name, amount::float8, frequency, next_due_date::text,
+		  is_active, partner_id, coalesce(notes, '')
+		from public.fin_recurring_expenses
+		where id = $1 and tenant_id = $2 and deleted_at is null
+		for update`, recurringID, tenantID).Scan(
+		&name, &category, &vendorName, &amount, &frequency, &nextDueStr, &isActive, &partnerID, &notes,
+	)
+	if err != nil {
+		return 0, "", "", false, err
+	}
+	if !isActive {
+		return 0, "", "", false, fmt.Errorf("recurring expense is inactive")
+	}
+
+	expenseDate := time.Now()
+	if nextDueStr != nil && strings.TrimSpace(*nextDueStr) != "" {
+		if d, e := time.Parse("2006-01-02", strings.TrimSpace(*nextDueStr)); e == nil {
+			expenseDate = d
+		}
+	}
+	vendor := strings.TrimSpace(vendorName)
+	if vendor == "" && partnerID != nil {
+		_ = tx.QueryRow(ctx, `select coalesce(company_name, '') from public.inv_partners where id = $1 and tenant_id = $2`, *partnerID, tenantID).Scan(&vendor)
+	}
+	cat := strings.TrimSpace(category)
+	if cat == "" {
+		cat = "other"
+	}
+	desc := strings.TrimSpace(notes)
+	if desc == "" {
+		desc = fmt.Sprintf("Generated from recurring expense: %s", name)
+	}
+
+	var seq int
+	_ = tx.QueryRow(ctx, `
+		select coalesce(max(date_seq), 0) + 1 from public.fin_expenses
+		where tenant_id = $1 and expense_date = $2::date`, tenantID, expenseDate.Format("2006-01-02")).Scan(&seq)
+	if seq <= 0 {
+		seq = 1
+	}
+	expenseNo = fmt.Sprintf("EXP-%s-%d", expenseDate.Format("20060102"), seq)
+	err = tx.QueryRow(ctx, `
+		insert into public.fin_expenses (
+		  tenant_id, expense_date, date_seq, expense_no, partner_id, vendor_name,
+		  category, description, amount, tax_amount, reference, created_by_user_id
+		) values ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11)
+		returning id`,
+		tenantID, expenseDate.Format("2006-01-02"), seq, expenseNo, partnerID, vendor,
+		cat, desc, amount, name, userID,
+	).Scan(&expenseID)
+	if err != nil {
+		return 0, "", "", false, err
+	}
+
+	baseDue := expenseDate
+	if nextDueStr != nil && strings.TrimSpace(*nextDueStr) != "" {
+		if d, e := time.Parse("2006-01-02", strings.TrimSpace(*nextDueStr)); e == nil {
+			baseDue = d
+		}
+	}
+	newNext := advanceRecurringDate(baseDue, frequency)
+	stillActive = true
+	_, err = tx.Exec(ctx, `
+		update public.fin_recurring_expenses set
+		  next_due_date = $3::date, is_active = $4, updated_at = now()
+		where id = $1 and tenant_id = $2`, recurringID, tenantID, newNext.Format("2006-01-02"), stillActive)
+	if err != nil {
+		return 0, "", "", false, err
+	}
+	return expenseID, expenseNo, newNext.Format("2006-01-02"), stillActive, nil
 }

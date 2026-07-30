@@ -117,6 +117,7 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Workspace", href: "/app/buying", settingsHref: "/app/buying", headerPriority: "primary" },
       { label: "Expenses", href: "/app/purchases/expenses", settingsHref: "/app/purchases/expenses", featureCode: "finance.expenses", headerPriority: "primary" },
+      { label: "Recurring Expenses", href: "/app/purchases/recurring-expenses", settingsHref: "/app/purchases/recurring-expenses", featureCode: "finance.recurring_expenses", headerPriority: "primary" },
       { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/buying", headerPriority: "primary" },
       { label: "Purchase Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Pre-Invoicing (Purchases)", href: "/app/purchases/purchases/pre-invoicing", settingsHref: "/app/purchases/purchases/settings" },
@@ -318,6 +319,8 @@ export const appModules: AppModule[] = [
       { label: "Purchase List", href: "/app/purchases/purchases", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
       { label: "Purchases Status", href: "/app/purchases/purchases/status", settingsHref: "/app/purchases/purchases/settings" },
       { label: "Expenses", href: "/app/purchases/expenses", settingsHref: "/app/purchases/expenses", featureCode: "finance.expenses", headerPriority: "primary" },
+      { label: "Recurring Expenses", href: "/app/purchases/recurring-expenses", settingsHref: "/app/purchases/recurring-expenses", featureCode: "finance.recurring_expenses", headerPriority: "primary" },
+      { label: "Vendor Credits", href: "/app/purchases/vendor-credits", settingsHref: "/app/purchases/purchases/settings", featureCode: "finance.vendor_credits", headerPriority: "primary" },
       { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/purchases/purchases/settings", headerPriority: "primary" },
       {
         label: "Pre-invoicing",

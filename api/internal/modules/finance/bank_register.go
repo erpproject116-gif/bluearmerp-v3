@@ -160,13 +160,16 @@ func listBankRegister(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		rows.Close()
 
-		// Withdrawals from payment vouchers linked via check register
+		// Withdrawals from payment vouchers linked via check register (incl. expense payments)
 		wdQ := `
 			select coalesce(c.check_date, pv.payment_date), coalesce(nullif(c.check_no, ''), pv.payment_no),
-			  coalesce(nullif(c.payee_name, ''), coalesce(p.company_name, 'Payment')),
-			  coalesce(c.amount, pv.amount_total)::float8, pv.id
+			  coalesce(nullif(c.payee_name, ''), coalesce(nullif(e.vendor_name, ''), p.company_name, 'Payment')),
+			  coalesce(c.amount, pv.amount_total)::float8,
+			  case when e.id is not null then e.id else pv.id end,
+			  case when e.id is not null then 'expense' else 'payment_voucher' end
 			from public.fin_checks c
 			join public.fin_payment_vouchers pv on pv.id = c.payment_voucher_id and pv.tenant_id = c.tenant_id and pv.deleted_at is null
+			left join public.fin_expenses e on e.payment_voucher_id = pv.id and e.tenant_id = pv.tenant_id and e.deleted_at is null and e.payment_status = 'paid'
 			left join public.inv_partners p on p.id = pv.partner_id
 			where c.tenant_id = $1 and c.bank_account_id = $2`
 		wdArgs := []any{tu.TenantID, id}
@@ -189,13 +192,12 @@ func listBankRegister(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var t rawTxn
 			var refID int64
-			if err := rows.Scan(&t.TxnDate, &t.DocumentNo, &t.Description, &t.MoneyOut, &refID); err != nil {
+			if err := rows.Scan(&t.TxnDate, &t.DocumentNo, &t.Description, &t.MoneyOut, &refID, &t.RefType); err != nil {
 				rows.Close()
 				response.Err(w, http.StatusInternalServerError, "Failed to read withdrawals.", "ERR_INTERNAL")
 				return
 			}
 			t.TxnType = "withdrawal"
-			t.RefType = "payment_voucher"
 			t.RefID = &refID
 			txns = append(txns, t)
 		}

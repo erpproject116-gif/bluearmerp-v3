@@ -1,14 +1,18 @@
 package finance
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
@@ -30,12 +34,18 @@ type retainerRow struct {
 }
 
 type retainerBody struct {
-	RetainerDate string  `json:"retainer_date"`
-	PartnerID    *int64  `json:"partner_id"`
-	CustomerName string  `json:"customer_name"`
-	AmountTotal  float64 `json:"amount_total"`
-	Notes        string  `json:"notes"`
-	Status       string  `json:"status"`
+	RetainerDate      string  `json:"retainer_date"`
+	PartnerID         *int64  `json:"partner_id"`
+	CustomerName      string  `json:"customer_name"`
+	AmountTotal       float64 `json:"amount_total"`
+	Notes             string  `json:"notes"`
+	Status            string  `json:"status"`
+	OfficialReceiptID *int64  `json:"official_receipt_id"`
+}
+
+type retainerRecordPaymentBody struct {
+	ReceiptDate   string `json:"receipt_date"`
+	PaymentMethod string `json:"payment_method"`
 }
 
 type retainerApplyBody struct {
@@ -48,7 +58,10 @@ func registerRetainerRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("finance.retainers_write", auth.AccessWrite)).Post("/retainer-invoices", createRetainer(pool))
 	r.With(auth.RequirePermission("finance.retainers_write", auth.AccessWrite)).Patch("/retainer-invoices/{id}", updateRetainer(pool))
 	r.With(auth.RequirePermission("finance.retainers_write", auth.AccessWrite)).Post("/retainer-invoices/{id}/post", postRetainer(pool))
+	r.With(auth.RequirePermission("finance.retainers_write", auth.AccessWrite)).Post("/retainer-invoices/{id}/record-payment", recordRetainerPayment(pool))
 	r.With(auth.RequirePermission("finance.retainers_write", auth.AccessWrite)).Post("/retainer-invoices/{id}/apply", applyRetainer(pool))
+	r.With(auth.RequirePermission("finance.retainers_write", auth.AccessWrite)).Post("/retainer-invoices/{id}/cancel", cancelRetainer(pool))
+	r.With(auth.RequirePermission("finance.retainers", auth.AccessRead)).Get("/retainer-invoices/{id}/applications", listRetainerApplications(pool))
 	r.With(auth.RequirePermission("finance.retainers_write", auth.AccessWrite)).Delete("/retainer-invoices/{id}", softDeleteRetainer(pool))
 }
 
@@ -164,17 +177,28 @@ func updateRetainer(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
+		if body.OfficialReceiptID != nil && *body.OfficialReceiptID > 0 {
+			var partnerID *int64
+			_ = pool.QueryRow(r.Context(), `
+				select partner_id from public.fin_retainer_invoices
+				where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID).Scan(&partnerID)
+			if err := validateRetainerOfficialReceipt(r.Context(), pool, tu.TenantID, *body.OfficialReceiptID, partnerID); err != nil {
+				response.Validation(w, map[string]string{"official_receipt_id": err.Error()})
+				return
+			}
+		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.fin_retainer_invoices set
 			  customer_name = coalesce(nullif($3, ''), customer_name),
 			  partner_id = coalesce($4, partner_id),
 			  notes = coalesce(nullif($5, ''), notes),
-			  amount_total = case when status = 'draft' and $6::numeric >= 0 then $6 else amount_total end,
-			  remaining_amount = case when status = 'draft' and $6::numeric >= 0 then $6 else remaining_amount end,
+			  amount_total = case when status = 'draft' and $6::numeric > 0 then $6 else amount_total end,
+			  remaining_amount = case when status = 'draft' and $6::numeric > 0 then $6 else remaining_amount end,
+			  official_receipt_id = case when $7::bigint > 0 then $7 else official_receipt_id end,
 			  updated_at = now()
 			where id = $1 and tenant_id = $2 and deleted_at is null and status in ('draft', 'open')`,
 			id, tu.TenantID, strings.TrimSpace(body.CustomerName), body.PartnerID,
-			strings.TrimSpace(body.Notes), body.AmountTotal)
+			strings.TrimSpace(body.Notes), body.AmountTotal, bodyOfficialReceiptID(body.OfficialReceiptID))
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Retainer not found or not editable.", "ERR_NOT_FOUND")
 			return
@@ -191,15 +215,116 @@ func postRetainer(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		var body retainerBody
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body.OfficialReceiptID != nil && *body.OfficialReceiptID > 0 {
+			var partnerID *int64
+			_ = pool.QueryRow(r.Context(), `
+				select partner_id from public.fin_retainer_invoices
+				where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID).Scan(&partnerID)
+			if err := validateRetainerOfficialReceipt(r.Context(), pool, tu.TenantID, *body.OfficialReceiptID, partnerID); err != nil {
+				response.Validation(w, map[string]string{"official_receipt_id": err.Error()})
+				return
+			}
+		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.fin_retainer_invoices
-			set status = 'open', remaining_amount = amount_total, updated_at = now()
-			where id = $1 and tenant_id = $2 and deleted_at is null and status = 'draft'`, id, tu.TenantID)
+			set status = 'open',
+			  remaining_amount = amount_total,
+			  official_receipt_id = case when $3::bigint > 0 then $3 else official_receipt_id end,
+			  updated_at = now()
+			where id = $1 and tenant_id = $2 and deleted_at is null and status = 'draft'`,
+			id, tu.TenantID, bodyOfficialReceiptID(body.OfficialReceiptID))
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusBadRequest, "Only draft retainers can be posted.", "ERR_BAD_REQUEST")
 			return
 		}
 		response.OK(w, nil, "Retainer opened (ready to apply to invoices).")
+	}
+}
+
+func recordRetainerPayment(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body retainerRecordPaymentBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to start transaction.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var partnerID *int64
+		var amountTotal float64
+		var retainerNo string
+		var existingOR *int64
+		err = tx.QueryRow(r.Context(), `
+			select partner_id, amount_total::float8, retainer_no, official_receipt_id
+			from public.fin_retainer_invoices
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			  and status in ('draft', 'open')
+			for update`, id, tu.TenantID).Scan(&partnerID, &amountTotal, &retainerNo, &existingOR)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Retainer not found or not editable.", "ERR_NOT_FOUND")
+			return
+		}
+		if existingOR != nil && *existingOR > 0 {
+			response.Err(w, http.StatusBadRequest, "Retainer is already funded via official receipt.", "ERR_BAD_REQUEST")
+			return
+		}
+		if partnerID == nil || *partnerID <= 0 {
+			response.Validation(w, map[string]string{"partner_id": "Link a customer partner before recording payment."})
+			return
+		}
+		if amountTotal <= 0 {
+			response.Validation(w, map[string]string{"amount_total": "Retainer amount must be greater than zero."})
+			return
+		}
+
+		receiptDate := time.Now()
+		if strings.TrimSpace(body.ReceiptDate) != "" {
+			d, perr := time.Parse("2006-01-02", strings.TrimSpace(body.ReceiptDate))
+			if perr != nil {
+				response.Validation(w, map[string]string{"receipt_date": "Invalid date. Use YYYY-MM-DD."})
+				return
+			}
+			receiptDate = d
+		}
+		paymentMethod := strings.TrimSpace(body.PaymentMethod)
+		if paymentMethod != "cash" && paymentMethod != "check" && paymentMethod != "bank_transfer" {
+			paymentMethod = "cash"
+		}
+
+		orID, receiptNo, err := insertRetainerOfficialReceipt(r.Context(), tx, tu.TenantID, &tu.AppUserID, *partnerID, amountTotal, receiptDate, paymentMethod, retainerNo)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create official receipt.", "ERR_INTERNAL")
+			return
+		}
+		_, err = tx.Exec(r.Context(), `
+			update public.fin_retainer_invoices
+			set official_receipt_id = $3, updated_at = now()
+			where id = $1 and tenant_id = $2`, id, tu.TenantID, orID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to link official receipt.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to commit.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "retainer.record_payment", "retainer_invoice", &id, nil, map[string]any{
+			"official_receipt_id": orID, "receipt_no": receiptNo,
+		})
+		response.OK(w, map[string]any{"official_receipt_id": orID, "receipt_no": receiptNo}, "Official receipt recorded for retainer.")
 	}
 }
 
@@ -229,11 +354,16 @@ func applyRetainer(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var remaining float64
 		var status string
+		var officialReceiptID *int64
 		err = tx.QueryRow(r.Context(), `
-			select remaining_amount::float8, status from public.fin_retainer_invoices
-			where id = $1 and tenant_id = $2 and deleted_at is null for update`, id, tu.TenantID).Scan(&remaining, &status)
+			select remaining_amount::float8, status, official_receipt_id from public.fin_retainer_invoices
+			where id = $1 and tenant_id = $2 and deleted_at is null for update`, id, tu.TenantID).Scan(&remaining, &status, &officialReceiptID)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Retainer not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if officialReceiptID == nil || *officialReceiptID <= 0 {
+			response.Validation(w, map[string]string{"official_receipt_id": "Retainer must be funded via OR."})
 			return
 		}
 		if status != "open" && status != "applied" {
@@ -244,12 +374,25 @@ func applyRetainer(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"applied_amount": "Amount exceeds remaining retainer."})
 			return
 		}
-		var salesOK bool
-		_ = tx.QueryRow(r.Context(), `
-			select exists(select 1 from public.sa_sales where id = $1 and tenant_id = $2 and deleted_at is null)`,
-			body.SalesID, tu.TenantID).Scan(&salesOK)
-		if !salesOK {
+		var locked float64
+		err = tx.QueryRow(r.Context(), `
+			select grand_total::float8 from public.sa_sales
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			for update`, body.SalesID, tu.TenantID).Scan(&locked)
+		if err != nil {
 			response.Validation(w, map[string]string{"sales_id": "Sales invoice not found."})
+			return
+		}
+		_ = locked
+		outstanding, err := saleOutstandingAmountQ(r.Context(), tx, tu.TenantID, body.SalesID, nil)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to compute outstanding.", "ERR_INTERNAL")
+			return
+		}
+		if body.AppliedAmount > outstanding+0.0001 {
+			response.Validation(w, map[string]string{
+				"applied_amount": fmt.Sprintf("Amount exceeds invoice outstanding (%.4f).", outstanding),
+			})
 			return
 		}
 		_, err = tx.Exec(r.Context(), `
@@ -287,4 +430,129 @@ func softDeleteRetainer(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		softDelete(pool, w, r, "fin_retainer_invoices", "retainer.delete", "retainer_invoice")
 	}
+}
+
+func cancelRetainer(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			update public.fin_retainer_invoices
+			set status = 'cancelled', updated_at = now()
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			  and status in ('draft', 'open')
+			  and remaining_amount = amount_total`, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusBadRequest, "Only unapplied draft/open retainers can be cancelled.", "ERR_BAD_REQUEST")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "retainer.cancel", "retainer_invoice", &id, nil, nil)
+		response.OK(w, nil, "Retainer cancelled.")
+	}
+}
+
+func listRetainerApplications(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var ok bool
+		_ = pool.QueryRow(r.Context(), `
+			select exists(select 1 from public.fin_retainer_invoices where id = $1 and tenant_id = $2 and deleted_at is null)`,
+			id, tu.TenantID).Scan(&ok)
+		if !ok {
+			response.Err(w, http.StatusNotFound, "Retainer not found.", "ERR_NOT_FOUND")
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select a.id, a.sales_id, s.sales_no, a.applied_amount::float8, a.created_at::text
+			from public.fin_retainer_applications a
+			join public.sa_sales s on s.id = a.sales_id
+			where a.retainer_id = $1
+			order by a.created_at desc, a.id desc`, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list applications.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		type appRow struct {
+			ID            int64   `json:"id"`
+			SalesID       int64   `json:"sales_id"`
+			SalesNo       string  `json:"sales_no"`
+			AppliedAmount float64 `json:"applied_amount"`
+			CreatedAt     string  `json:"created_at"`
+		}
+		out := []appRow{}
+		for rows.Next() {
+			var row appRow
+			if err := rows.Scan(&row.ID, &row.SalesID, &row.SalesNo, &row.AppliedAmount, &row.CreatedAt); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read applications.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, row)
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+func bodyOfficialReceiptID(id *int64) int64 {
+	if id == nil || *id <= 0 {
+		return 0
+	}
+	return *id
+}
+
+func validateRetainerOfficialReceipt(ctx context.Context, pool *pgxpool.Pool, tenantID, receiptID int64, partnerID *int64) error {
+	var receiptPartnerID int64
+	err := pool.QueryRow(ctx, `
+		select partner_id from public.fin_official_receipts
+		where id = $1 and tenant_id = $2 and deleted_at is null`, receiptID, tenantID).Scan(&receiptPartnerID)
+	if err != nil {
+		return fmt.Errorf("Official receipt not found.")
+	}
+	if partnerID != nil && *partnerID > 0 && receiptPartnerID != *partnerID {
+		return fmt.Errorf("Official receipt customer does not match retainer.")
+	}
+	return nil
+}
+
+func insertRetainerOfficialReceipt(
+	ctx context.Context, tx pgx.Tx, tenantID int64, userID *int64,
+	partnerID int64, amount float64, receiptDate time.Time, paymentMethod, retainerNo string,
+) (int64, string, error) {
+	var currencyID int64
+	err := tx.QueryRow(ctx, `
+		select id from public.quo_currencies
+		where tenant_id = $1 and status = 'active' and deleted_at is null
+		order by is_default desc, id limit 1`, tenantID).Scan(&currencyID)
+	if err != nil {
+		return 0, "", err
+	}
+	var dateSeq int
+	var receiptNo string
+	if err := tx.QueryRow(ctx,
+		`select date_seq, receipt_no from public.allocate_fin_receipt_sequences($1, $2::date)`,
+		tenantID, receiptDate).Scan(&dateSeq, &receiptNo); err != nil {
+		return 0, "", err
+	}
+	notes := fmt.Sprintf("Retainer payment: %s", retainerNo)
+	var id int64
+	err = tx.QueryRow(ctx, `
+		insert into public.fin_official_receipts (
+		  tenant_id, receipt_date, date_seq, receipt_no,
+		  partner_id, currency_id, payment_method, notes,
+		  amount_total, created_by_user_id, accounting_slip_no
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		returning id`,
+		tenantID, receiptDate, dateSeq, receiptNo,
+		partnerID, currencyID, paymentMethod, notes, amount, userID, "CR "+receiptNo,
+	).Scan(&id)
+	return id, receiptNo, err
 }

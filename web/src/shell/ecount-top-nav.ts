@@ -115,7 +115,9 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
     pathname.startsWith("/app/finance/disbursements") ||
     pathname.startsWith("/app/finance/payment-vouchers") ||
     pathname.startsWith("/app/finance/banking") ||
-    pathname.startsWith("/app/purchases/expenses")
+    pathname.startsWith("/app/purchases/expenses") ||
+    pathname.startsWith("/app/purchases/recurring-expenses") ||
+    pathname.startsWith("/app/purchases/vendor-credits")
   ) {
     return "acct2";
   }
@@ -375,6 +377,24 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         id: "expenses",
         label: "Expenses",
         href: "/app/purchases/expenses",
+        iconId: "purchases",
+        topId: "inv1",
+        expandGroupId: "procurement_process",
+        moduleId: "purchases",
+      },
+      {
+        id: "recurring_expenses",
+        label: "Recurring Expenses",
+        href: "/app/purchases/recurring-expenses",
+        iconId: "purchases",
+        topId: "inv1",
+        expandGroupId: "procurement_process",
+        moduleId: "purchases",
+      },
+      {
+        id: "vendor_credits",
+        label: "Vendor Credits",
+        href: "/app/purchases/vendor-credits",
         iconId: "purchases",
         topId: "inv1",
         expandGroupId: "procurement_process",

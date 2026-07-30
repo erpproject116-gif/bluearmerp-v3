@@ -1371,27 +1371,3 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func supplierInvoiceOutstanding(ctx context.Context, pool *pgxpool.Pool, tenantID, invoiceID int64, excludePaymentID *int64) (float64, error) {
-	var grandTotal float64
-	err := pool.QueryRow(ctx, `
-		select grand_total::float8 from public.fin_supplier_invoices
-		where id = $1 and tenant_id = $2 and deleted_at is null`, invoiceID, tenantID).Scan(&grandTotal)
-	if err != nil {
-		return 0, err
-	}
-	q := `
-		select coalesce(sum(a.applied_amount), 0)::float8
-		from public.fin_payment_applications a
-		join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		where a.supplier_invoice_id = $1 and pv.tenant_id = $2 and pv.deleted_at is null`
-	args := []any{invoiceID, tenantID}
-	if excludePaymentID != nil {
-		q += ` and pv.id <> $3`
-		args = append(args, *excludePaymentID)
-	}
-	var applied float64
-	if err := pool.QueryRow(ctx, q, args...).Scan(&applied); err != nil {
-		return 0, err
-	}
-	return grandTotal - applied, nil
-}

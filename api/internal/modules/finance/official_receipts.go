@@ -290,32 +290,6 @@ func loadReceiptApplications(ctx context.Context, pool *pgxpool.Pool, tenantID, 
 	return apps, nil
 }
 
-func saleOutstandingAmount(ctx context.Context, pool *pgxpool.Pool, tenantID, salesID int64, excludeReceiptID *int64) (float64, error) {
-	var grandTotal float64
-	err := pool.QueryRow(ctx, `
-		select grand_total::float8 from public.sa_sales
-		where id = $1 and tenant_id = $2 and deleted_at is null`, salesID, tenantID).Scan(&grandTotal)
-	if err != nil {
-		return 0, err
-	}
-
-	q := `
-		select coalesce(sum(a.applied_amount), 0)::float8
-		from public.fin_receipt_applications a
-		join public.fin_official_receipts r on r.id = a.official_receipt_id
-		where a.sales_id = $1 and r.tenant_id = $2 and r.deleted_at is null`
-	args := []any{salesID, tenantID}
-	if excludeReceiptID != nil {
-		q += ` and r.id <> $3`
-		args = append(args, *excludeReceiptID)
-	}
-	var applied float64
-	if err := pool.QueryRow(ctx, q, args...).Scan(&applied); err != nil {
-		return 0, err
-	}
-	return grandTotal - applied, nil
-}
-
 func validateReceiptBody(body receiptBody) map[string]string {
 	errs := map[string]string{}
 	if strings.TrimSpace(body.ReceiptDate) == "" {
@@ -569,24 +543,20 @@ func lockAndCheckReceiptApplications(ctx context.Context, tx pgx.Tx, tenantID, r
 	ordered := make([]applicationBody, len(apps))
 	copy(ordered, apps)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].SalesID < ordered[j].SalesID })
+	excludeID := receiptID
 	for _, app := range ordered {
-		var grandTotal float64
+		var locked float64
 		if err := tx.QueryRow(ctx, `
 			select grand_total::float8 from public.sa_sales
 			where id = $1 and tenant_id = $2 and deleted_at is null
-			for update`, app.SalesID, tenantID).Scan(&grandTotal); err != nil {
+			for update`, app.SalesID, tenantID).Scan(&locked); err != nil {
 			return err
 		}
-		var applied float64
-		if err := tx.QueryRow(ctx, `
-			select coalesce(sum(a.applied_amount), 0)::float8
-			from public.fin_receipt_applications a
-			join public.fin_official_receipts r on r.id = a.official_receipt_id
-			where a.sales_id = $1 and r.tenant_id = $2 and r.deleted_at is null and r.id <> $3`,
-			app.SalesID, tenantID, receiptID).Scan(&applied); err != nil {
+		outstanding, err := saleOutstandingAmountQ(ctx, tx, tenantID, app.SalesID, &excludeID)
+		if err != nil {
 			return err
 		}
-		if outstanding := grandTotal - applied; app.AppliedAmount > outstanding+0.0001 {
+		if app.AppliedAmount > outstanding+0.0001 {
 			return overAppliedError{message: fmt.Sprintf("Applied amount exceeds outstanding balance (%.4f) for sales %d. Another payment may have been applied concurrently.", outstanding, app.SalesID)}
 		}
 	}

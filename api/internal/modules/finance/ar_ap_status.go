@@ -61,12 +61,7 @@ func arApStatusSQL(tenantID int64, asOf time.Time, statusType string, partnerID 
 		  select s.partner_id,
 		    coalesce(sum(s.grand_total), 0)::float8 - coalesce(sum(recv.received), 0)::float8 as balance
 		  from public.sa_sales s
-		  left join lateral (
-		    select coalesce(sum(a.applied_amount), 0)::float8 as received
-		    from public.fin_receipt_applications a
-		    join public.fin_official_receipts r on r.id = a.official_receipt_id
-		    where a.sales_id = s.id and r.deleted_at is null and r.receipt_date <= $2::date
-		  ) recv on true
+		  ` + saleAppliedLateralSQLAsOf("s", "$2::date") + `
 		  where s.tenant_id = $1 and s.deleted_at is null and s.order_date <= $2::date
 		  group by s.partner_id
 		),

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
@@ -34,15 +35,24 @@ type expenseRow struct {
 }
 
 type expenseBody struct {
-	ExpenseDate string  `json:"expense_date"`
-	PartnerID   *int64  `json:"partner_id"`
-	VendorName  string  `json:"vendor_name"`
-	Category    string  `json:"category"`
-	Description string  `json:"description"`
-	Amount      float64 `json:"amount"`
-	TaxAmount   float64 `json:"tax_amount"`
-	Reference   *string `json:"reference"`
-	Notes       *string `json:"notes"`
+	ExpenseDate   string  `json:"expense_date"`
+	PartnerID     *int64  `json:"partner_id"`
+	VendorName    string  `json:"vendor_name"`
+	Category      string  `json:"category"`
+	Description   string  `json:"description"`
+	Amount        float64 `json:"amount"`
+	TaxAmount     float64 `json:"tax_amount"`
+	Reference     *string `json:"reference"`
+	Notes         *string `json:"notes"`
+	PayNow        *bool   `json:"pay_now"`
+	PaymentMethod string  `json:"payment_method"`
+	BankAccountID *int64  `json:"bank_account_id"`
+}
+
+type markExpensePaidBody struct {
+	PaymentMethod string  `json:"payment_method"`
+	BankAccountID *int64  `json:"bank_account_id"`
+	ReferenceNo   *string `json:"reference_no"`
 }
 
 func registerExpenseRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -122,12 +132,30 @@ func createExpense(pool *pgxpool.Pool) http.HandlerFunc {
 			expenseDate = d
 		}
 		vendor := strings.TrimSpace(body.VendorName)
+		if vendor == "" && body.PartnerID != nil {
+			_ = pool.QueryRow(r.Context(), `
+				select coalesce(company_name, '') from public.inv_partners
+				where id = $1 and tenant_id = $2`, *body.PartnerID, tu.TenantID).Scan(&vendor)
+		}
 		category := strings.TrimSpace(body.Category)
 		if category == "" {
 			category = "general"
 		}
+		payNow := body.PayNow != nil && *body.PayNow
+		if payNow && (body.PartnerID == nil || *body.PartnerID <= 0) {
+			response.Validation(w, map[string]string{"partner_id": "Select a vendor partner to pay immediately."})
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create expense.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
 		var seq int
-		_ = pool.QueryRow(r.Context(), `
+		_ = tx.QueryRow(r.Context(), `
 			select coalesce(max(date_seq), 0) + 1 from public.fin_expenses
 			where tenant_id = $1 and expense_date = $2::date`, tu.TenantID, expenseDate.Format("2006-01-02")).Scan(&seq)
 		if seq <= 0 {
@@ -135,7 +163,7 @@ func createExpense(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		expenseNo := fmt.Sprintf("EXP-%s-%d", expenseDate.Format("20060102"), seq)
 		var id int64
-		err := pool.QueryRow(r.Context(), `
+		err = tx.QueryRow(r.Context(), `
 			insert into public.fin_expenses (
 			  tenant_id, expense_date, date_seq, expense_no, partner_id, vendor_name,
 			  category, description, amount, tax_amount, reference, notes, created_by_user_id
@@ -149,8 +177,32 @@ func createExpense(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create expense.", "ERR_INTERNAL")
 			return
 		}
+
+		var paymentVoucherID *int64
+		if payNow {
+			pvID, payErr := payExpenseInTx(r.Context(), tx, tu.TenantID, tu.AppUserID, id, expensePayOpts{
+				PaymentMethod: body.PaymentMethod,
+				BankAccountID: body.BankAccountID,
+				ReferenceNo:   body.Reference,
+			})
+			if payErr != nil {
+				response.Validation(w, map[string]string{"pay_now": payErr.Error()})
+				return
+			}
+			paymentVoucherID = &pvID
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save expense.", "ERR_INTERNAL")
+			return
+		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.expense_create", "fin_expense", &id, nil, nil)
-		response.OK(w, map[string]any{"id": id, "expense_no": expenseNo}, "Expense created.")
+		out := map[string]any{"id": id, "expense_no": expenseNo, "payment_status": "unpaid"}
+		if paymentVoucherID != nil {
+			out["payment_status"] = "paid"
+			out["payment_voucher_id"] = *paymentVoucherID
+		}
+		response.OK(w, out, "Expense created.")
 	}
 }
 
@@ -207,17 +259,50 @@ func markExpensePaid(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
-		tag, err := pool.Exec(r.Context(), `
-			update public.fin_expenses
-			set payment_status = 'paid', paid_at = now(), updated_at = now()
-			where id = $1 and tenant_id = $2 and deleted_at is null and payment_status = 'unpaid'`,
-			id, tu.TenantID)
-		if err != nil || tag.RowsAffected() == 0 {
-			response.Err(w, http.StatusConflict, "Expense not found or already paid.", "ERR_CONFLICT")
+		var body markExpensePaidBody
+		if r.ContentLength > 0 {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				response.Validation(w, map[string]string{"body": "Invalid JSON."})
+				return
+			}
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to mark paid.", "ERR_INTERNAL")
 			return
 		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.expense_mark_paid", "fin_expense", &id, nil, nil)
-		response.OK(w, map[string]any{"id": id, "payment_status": "paid"}, "Marked as paid.")
+		defer tx.Rollback(r.Context())
+
+		pvID, err := payExpenseInTx(r.Context(), tx, tu.TenantID, tu.AppUserID, id, expensePayOpts{
+			PaymentMethod: body.PaymentMethod,
+			BankAccountID: body.BankAccountID,
+			ReferenceNo:   body.ReferenceNo,
+		})
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				response.Err(w, http.StatusNotFound, "Expense not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if strings.Contains(err.Error(), "already paid") {
+				response.Err(w, http.StatusConflict, "Expense already paid.", "ERR_CONFLICT")
+				return
+			}
+			response.Validation(w, map[string]string{"payment": err.Error()})
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to mark paid.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.expense_mark_paid", "fin_expense", &id, nil, map[string]any{
+			"payment_voucher_id": pvID,
+		})
+		response.OK(w, map[string]any{
+			"id":                 id,
+			"payment_status":     "paid",
+			"payment_voucher_id": pvID,
+		}, "Expense paid and payment voucher recorded.")
 	}
 }
 

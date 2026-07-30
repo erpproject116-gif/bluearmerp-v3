@@ -127,6 +127,7 @@ import {
   SalesArByCustomerPage,
   CustomerCreditBalancePage,
   CreditNotesPage,
+  CreditNotePrintPage,
   RetainerInvoicesPage,
   RecurringInvoicesPage,
   SalesDiscountStatusPage,
@@ -273,6 +274,9 @@ import {
   CollectionsHubPage,
   DisbursementsHubPage,
   ExpensesPage,
+  RecurringExpensesPage,
+  VendorCreditsPage,
+  VendorCreditPrintPage,
   SellingWorkspacePage,
   SellingReportsPage,
   BuyingReportsHubPage,
@@ -399,6 +403,9 @@ export default function App() {
         <Route path="/app/sales/sales/:id/invoice/print" component={SalesInvoicePrintPage} />
         <Route path="/app/finance/supplier-invoices/:id/print" component={PurchaseInvoicePrintPage} />
         <Route path="/app/purchases/purchases/:id/print" component={PurchaseInvoicePrintPage} />
+        <Route path="/app/sales/credit-notes/:id/print" component={CreditNotePrintPage} />
+        <Route path="/app/purchases/vendor-credits/:id/print" component={VendorCreditPrintPage} />
+        <Route path="/app/buying/vendor-credits/:id/print" component={VendorCreditPrintPage} />
         <Route path="/app/finance/payment-vouchers/:id/2307" component={Bir2307PrintPage} />
         <Route path="/app/sales/reports/discount-status/print" component={SalesDiscountStatusPrintPage} />
         <Route path="/app/sales/collective-invoicing/status/print" component={CollectiveInvoiceStatusPrintPage} />
@@ -591,8 +598,10 @@ export default function App() {
           <Route path="/finance/collections" component={CollectionsHubPage} />
           <Route path="/finance/disbursements" component={DisbursementsHubPage} />
           <Route path="/purchases/expenses" component={ExpensesPage} />
+          <Route path="/purchases/recurring-expenses" component={RecurringExpensesPage} />
+          <Route path="/purchases/vendor-credits" component={VendorCreditsPage} />
           <Route path="/buying/expenses" component={ExpensesPage} />
-          <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
+          <Route path="/buying/vendor-credits" component={VendorCreditsPage} />          <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
           <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
           <Route path="/finance/acct-i/reports/cash-flow-statement" component={CashFlowStatementPage} />
           <Route path="/finance/acct-i/reports/cash-book" component={() => <CashBookReportPage />} />

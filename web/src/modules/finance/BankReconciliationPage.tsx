@@ -2,6 +2,10 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
+import {
+  downloadBankStatementImportTemplate,
+  importBankStatementCsv,
+} from "../../shared/bankStatementCsvImport";
 import { formatMoney } from "../../shared/money";
 import { inputClass } from "../../shared/SpreadsheetGrid";
 import { GridExportButtons } from "../../shared/gridExport";
@@ -38,6 +42,8 @@ export default function BankReconciliationPage() {
   const [selectedStatementLineId, setSelectedStatementLineId] = createSignal<number | null>(null);
   const [matching, setMatching] = createSignal<number | null>(null);
   const [pendingMatch, setPendingMatch] = createSignal<UnmatchedPayment | null>(null);
+  const [importing, setImporting] = createSignal(false);
+  let importFileInput: HTMLInputElement | undefined;
 
   const accounts = createQuery(() => ({
     queryKey: ["finance-bank-accounts-options"],
@@ -104,6 +110,32 @@ export default function BankReconciliationPage() {
     void client.invalidateQueries({ queryKey: ["finance-bank-recon-unmatched"] });
   };
 
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const result = await importBankStatementCsv(file, bankAccountId() || undefined);
+      if (!result.success) {
+        toast.warning(result.message ?? "Import failed.");
+        return;
+      }
+      const created = result.data?.created ?? 0;
+      const failed = result.data?.failed ?? 0;
+      const firstErr = result.data?.row_errors?.[0];
+      const detail = firstErr ? ` Row ${firstErr.row}: ${firstErr.message}` : "";
+      if (failed > 0) {
+        toast.warning(`Imported ${created} line(s); ${failed} failed.${detail}`);
+      } else {
+        toast.success(`Imported ${created} statement line(s).`);
+      }
+      refresh();
+    } catch {
+      toast.warning("Import failed.");
+    } finally {
+      setImporting(false);
+      if (importFileInput) importFileInput.value = "";
+    }
+  };
+
   const amountDelta = createMemo(() => {
     const stmt = selectedStatementLine();
     const pay = pendingMatch();
@@ -143,6 +175,7 @@ export default function BankReconciliationPage() {
         <p class="font-medium text-text-primary">Weekly bank reconciliation</p>
         <ol class="mt-2 list-decimal space-y-1 pl-5">
           <li>Select a bank account (or leave All to scan every account).</li>
+          <li>Import a bank statement CSV (date, reference, description, amount).</li>
           <li>Click an unmatched statement line on the left.</li>
           <li>Match a payment on the right — closest amounts are listed first.</li>
         </ol>
@@ -186,6 +219,33 @@ export default function BankReconciliationPage() {
         <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={refresh}>
           Refresh
         </button>
+        <input
+          ref={importFileInput}
+          type="file"
+          accept=".csv,text/csv"
+          class="hidden"
+          onChange={(e) => {
+            const file = e.currentTarget.files?.[0];
+            if (file) void handleImportFile(file);
+          }}
+        />
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={importing()}
+          onClick={() => importFileInput?.click()}
+        >
+          {importing() ? "Importing…" : "Import CSV"}
+        </button>
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+          onClick={() => {
+            void downloadBankStatementImportTemplate().catch(() => toast.warning("Could not download template."));
+          }}
+        >
+          Template
+        </button>
         <GridExportButtons
           title="Bank Reconciliation — Unmatched Statement Lines"
           filename="bank-recon-statement-lines"
@@ -219,7 +279,16 @@ export default function BankReconciliationPage() {
           <Show when={!statements.isLoading} fallback={<p class="p-4 text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
             <Show
               when={(statements.data ?? []).length > 0}
-              fallback={<p class="p-4 text-sm text-text-secondary">No unmatched statement lines. Import a bank statement or clear filters.</p>}
+              fallback={
+                <div class="space-y-3 p-4 text-sm text-text-secondary">
+                  <p>No unmatched statement lines.</p>
+                  <p>
+                    Use <span class="font-medium text-text-primary">Import CSV</span> above
+                    {bankAccountId() ? "" : " (select a bank account first, or include bank_account_code in each row)"}.
+                    Columns: date, reference, description, amount.
+                  </p>
+                </div>
+              }
             >
             <table class="min-w-full text-sm">
               <thead class="bg-slate-50">

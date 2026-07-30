@@ -104,6 +104,7 @@ export const PreInvoicingStatusPage = lazy(() => import("../modules/sales/sales/
 export const ChangeSalesPriceBatchPage = lazy(() => import("../modules/sales/sales/ChangeSalesPriceBatchPage"));
 export const SalesReturnsPage = lazy(() => import("../modules/sales/SalesReturnsPage"));
 export const CreditNotesPage = lazy(() => import("../modules/sales/credit-notes/CreditNotesPage"));
+export const CreditNotePrintPage = lazy(() => import("../modules/sales/credit-notes/CreditNotePrintPage"));
 export const RetainerInvoicesPage = lazy(() => import("../modules/sales/retainers/RetainerInvoicesPage"));
 export const RecurringInvoicesPage = lazy(() => import("../modules/sales/recurring/RecurringInvoicesPage"));
 export const PackingSlipPrintPage = lazy(() => import("../modules/sales/sales/PackingSlipPrintPage"));
@@ -260,6 +261,9 @@ export const ReceivableStatusReportPage = lazy(() => import("../modules/selling/
 export const CollectionsHubPage = lazy(() => import("../modules/finance/collections/CollectionsHubPage"));
 export const DisbursementsHubPage = lazy(() => import("../modules/finance/collections/DisbursementsHubPage"));
 export const ExpensesPage = lazy(() => import("../modules/buying/expenses/ExpensesPage"));
+export const RecurringExpensesPage = lazy(() => import("../modules/buying/recurring-expenses/RecurringExpensesPage"));
+export const VendorCreditsPage = lazy(() => import("../modules/buying/vendor-credits/VendorCreditsPage"));
+export const VendorCreditPrintPage = lazy(() => import("../modules/buying/vendor-credits/VendorCreditPrintPage"));
 export const AcctInventoryReconciliationPage = lazy(() => import("../modules/finance/reports/AcctInventoryReconciliationPage"));
 export const PaymentEntriesPage = lazy(() => import("../modules/finance/PaymentEntriesPage"));
 export const ChartOfAccountsPage = lazy(() => import("../modules/finance/ChartOfAccountsPage"));
