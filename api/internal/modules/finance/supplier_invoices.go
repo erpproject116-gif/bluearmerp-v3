@@ -650,6 +650,11 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 }
 
 func grLineBalance(ctx context.Context, tx pgx.Tx, tenantID, grLineID int64) (float64, int64, int64, int64, error) {
+	return grLineBalanceExcluding(ctx, tx, tenantID, grLineID, 0)
+}
+
+// grLineBalanceExcluding returns open GR qty, optionally ignoring an invoice being updated.
+func grLineBalanceExcluding(ctx context.Context, tx pgx.Tx, tenantID, grLineID, excludeInvoiceID int64) (float64, int64, int64, int64, error) {
 	var receivedQty float64
 	var poLineID, poID int64
 	var partnerID int64
@@ -668,20 +673,36 @@ func grLineBalance(ctx context.Context, tx pgx.Tx, tenantID, grLineID int64) (fl
 	_ = tx.QueryRow(ctx, `
 		select coalesce(sum(qty), 0)::float8
 		from public.gr_goods_receipt_slip_lines
-		where goods_receipt_line_id = $1 and slip_type = 'supplier_invoice'`, grLineID).Scan(&billed)
+		where goods_receipt_line_id = $1 and slip_type = 'supplier_invoice'
+		  and ($2::bigint = 0 or supplier_invoice_id is distinct from $2)`,
+		grLineID, excludeInvoiceID).Scan(&billed)
 	return receivedQty - billed, poLineID, poID, partnerID, nil
 }
 
 func poLineBalance(ctx context.Context, tx pgx.Tx, tenantID, poLineID int64) (float64, int64, int64, error) {
+	return poLineBalanceExcluding(ctx, tx, tenantID, poLineID, 0)
+}
+
+// poLineBalanceExcluding returns open billed qty, optionally ignoring an invoice being updated
+// so re-save does not treat the document's own lines as already consuming the PO.
+func poLineBalanceExcluding(ctx context.Context, tx pgx.Tx, tenantID, poLineID, excludeInvoiceID int64) (float64, int64, int64, error) {
 	var orderedQty, billedQty float64
 	var poID, partnerID int64
 	err := tx.QueryRow(ctx, `
-		select pol.qty::float8, coalesce(pol.billed_qty, 0)::float8, po.id, po.partner_id
+		select pol.qty::float8,
+		  coalesce((
+		    select sum(sil.qty)
+		    from public.fin_supplier_invoice_lines sil
+		    join public.fin_supplier_invoices si on si.id = sil.supplier_invoice_id and si.deleted_at is null
+		    where sil.purchase_order_line_id = pol.id
+		      and ($3::bigint = 0 or sil.supplier_invoice_id <> $3)
+		  ), 0)::float8,
+		  po.id, po.partner_id
 		from public.po_purchase_order_lines pol
 		join public.po_purchase_orders po on po.id = pol.purchase_order_id
 		where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null
 		  and po.status in ('confirmed', 'partially_received', 'received')`,
-		poLineID, tenantID).Scan(&orderedQty, &billedQty, &poID, &partnerID)
+		poLineID, tenantID, excludeInvoiceID).Scan(&orderedQty, &billedQty, &poID, &partnerID)
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -729,6 +750,10 @@ func validateSupplierInvoiceBody(body supplierInvoiceBody) map[string]string {
 }
 
 func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, partnerID int64, policy processpolicy.Policy, lines []supplierInvoiceLineBody) map[string]string {
+	return validateSupplierInvoiceLinesExcluding(ctx, tx, tenantID, partnerID, 0, policy, lines)
+}
+
+func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenantID, partnerID, excludeInvoiceID int64, policy processpolicy.Policy, lines []supplierInvoiceLineBody) map[string]string {
 	errs := map[string]string{}
 	seenGR := map[int64]bool{}
 	seenPO := map[int64]bool{}
@@ -769,7 +794,7 @@ func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, part
 				continue
 			}
 			seenGR[*ln.GoodsReceiptLineID] = true
-			balance, _, poID, linePartnerID, err := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
+			balance, _, poID, linePartnerID, err := grLineBalanceExcluding(ctx, tx, tenantID, *ln.GoodsReceiptLineID, excludeInvoiceID)
 			if err != nil {
 				errs[key+".goods_receipt_line_id"] = "Goods receipt line not found or not posted."
 				continue
@@ -791,13 +816,26 @@ func validateSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, part
 				continue
 			}
 			seenPO[*ln.PurchaseOrderLineID] = true
-			balance, poID, linePartnerID, err := poLineBalance(ctx, tx, tenantID, *ln.PurchaseOrderLineID)
+			balance, poID, linePartnerID, err := poLineBalanceExcluding(ctx, tx, tenantID, *ln.PurchaseOrderLineID, excludeInvoiceID)
 			if err != nil {
 				errs[key+".purchase_order_line_id"] = "Purchase order line not found or not confirmed."
 				continue
 			}
 			if linePartnerID != partnerID {
 				errs[key+".purchase_order_line_id"] = "Vendor does not match purchase order."
+			}
+			// Serial/lot items must be received first; block PO-only billing while qty is still open to receive.
+			var ordered, received float64
+			var trackSerial, trackLot bool
+			_ = tx.QueryRow(ctx, `
+				select pol.qty::float8, coalesce(pol.received_qty, 0)::float8,
+				  coalesce(i.track_serial, false), coalesce(i.track_lot, false)
+				from public.po_purchase_order_lines pol
+				left join public.inv_items i on i.id = pol.item_id
+				where pol.id = $1`, *ln.PurchaseOrderLineID).Scan(&ordered, &received, &trackSerial, &trackLot)
+			if (trackSerial || trackLot) && ordered-received > 0.0001 {
+				errs[key+".purchase_order_line_id"] = "Serial/lot items require Goods Receipt (Receiving) before purchase. Use Load Slip → Goods Receipt."
+				continue
 			}
 			if ln.Qty > balance+0.0001 {
 				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds PO balance (%.4f).", balance)
@@ -1271,7 +1309,9 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		if errs := validateSupplierInvoiceLines(r.Context(), tx, tu.TenantID, body.PartnerID, policy, body.Lines); errs != nil {
+		// Exclude this invoice so re-save (common when adding serials) does not
+		// treat its own quantities as already consuming PO/GR balance.
+		if errs := validateSupplierInvoiceLinesExcluding(r.Context(), tx, tu.TenantID, body.PartnerID, id, policy, body.Lines); errs != nil {
 			response.Validation(w, errs)
 			return
 		}

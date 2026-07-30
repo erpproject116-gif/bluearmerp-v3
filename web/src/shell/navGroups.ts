@@ -127,6 +127,13 @@ export const navGroups: NavGroup[] = [
       { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Cash & AR/AP" },
       { kind: "subBranch", moduleId: "finance", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
       { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "Supplier payments" },
+      {
+        kind: "link",
+        moduleId: "finance",
+        label: "Banking",
+        href: "/app/finance/banking",
+        basePath: "/app/finance/banking",
+      },
       { kind: "module", moduleId: "finance" },
     ],
   },

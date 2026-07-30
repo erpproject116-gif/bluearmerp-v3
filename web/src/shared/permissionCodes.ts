@@ -201,6 +201,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/finance/acct-i/chart-of-accounts": "finance.journal_entries",
   "/app/finance/acct-i/fiscal-years": "finance.journal_entries",
   "/app/finance/acct-i/bank-reconciliation": "finance.journal_entries",
+  "/app/finance/banking": "finance.official_receipts",
   "/app/finance/acct-i/payment-entries": "finance.official_receipts",
   "/app/finance/acct-i/reports/trial-balance": "finance.journal_entries",
   "/app/finance/acct-i/reports/general-ledger": "finance.journal_entries",
