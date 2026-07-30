@@ -6,7 +6,7 @@ import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { formatMoney } from "../../../shared/money";
 import { fetchPartnerOptions } from "../../../shared/useDocumentLookups";
-import { ModalLookupField } from "../../../shared/ModalLookupField";
+import { LookupCombo } from "../../../shared/LookupCombo";
 
 type Certificate = {
   id: number;
@@ -178,15 +178,24 @@ export default function Bir2307CertificatesPage() {
         exportTitle="2307 Certificates"
       />
       <EntityModal open={modalOpen()} title="New 2307 certificate" onClose={() => setModalOpen(false)} onSave={() => void save()} saving={saving()} singleColumn>
-        <ModalLookupField
+        <LookupCombo
           label="Payee (vendor) *"
-          value={payeeId()}
-          displayValue={payeeLabel()}
-          onChange={(id, label) => {
-            setPayeeId(id);
-            setPayeeLabel(label);
+          value={() => payeeLabel()}
+          selectedId={() => payeeId()}
+          onInput={(text) => {
+            setPayeeLabel(text);
+            if (payeeId() != null) setPayeeId(null);
+          }}
+          onSelect={(opt) => {
+            setPayeeId(opt.id);
+            setPayeeLabel(opt.label);
+          }}
+          onClear={() => {
+            setPayeeId(null);
+            setPayeeLabel("");
           }}
           fetchOptions={(q) => fetchPartnerOptions(q, "vendor")}
+          placeholder="Search vendor…"
         />
         <Field label="Period from *">
           <input class={inputClass} type="date" value={periodFrom()} onInput={(e) => setPeriodFrom(e.currentTarget.value)} />

@@ -220,7 +220,7 @@ export default function RecurringInvoicesPage() {
     }
     const count = res.data?.processed ?? 0;
     if (count === 0) {
-      toast.info("No due recurring invoices to generate.");
+      toast.success("No due recurring invoices to generate.");
     } else {
       toast.success(`Generated ${count} invoice(s).`);
       const last = res.data?.generated?.[res.data.generated.length - 1];

@@ -27,7 +27,7 @@ function CreditNotePrintView() {
 
   return (
     <div class="quotation-print">
-      <PrintToolbar />
+      <PrintToolbar onPrint={() => window.print()} />
       <Show when={data.loading}>
         <PrintLoading />
       </Show>

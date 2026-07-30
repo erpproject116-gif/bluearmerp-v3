@@ -47,7 +47,11 @@ export default function BooksOfAccountsPage() {
         <p class="mt-1 text-sm text-text-secondary">Posted journal lines filtered by book type and fiscal period. CSV for spreadsheets; HTML for print/PDF.</p>
         <div class="mt-4 grid gap-3 sm:grid-cols-2">
           <Field label="Book">
-            <select class={inputClass} value={book()} onChange={(e) => setBook(e.currentTarget.value as typeof book)}>
+            <select
+              class={inputClass}
+              value={book()}
+              onChange={(e) => setBook(e.currentTarget.value as (typeof BOOKS)[number]["id"])}
+            >
               <For each={BOOKS}>{(b) => <option value={b.id}>{b.label}</option>}</For>
             </select>
           </Field>
