@@ -24,6 +24,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/invoicejournal"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -80,7 +81,8 @@ type SupplierInvoice struct {
 	PaymentStatus   string                `json:"payment_status,omitempty"`
 	ProgressStatus  string                `json:"progress_status"`
 	CreatedByName   string                `json:"created_by_name,omitempty"`
-	Lines           []SupplierInvoiceLine `json:"lines,omitempty"`
+	Lines            []SupplierInvoiceLine     `json:"lines,omitempty"`
+	WithholdingLines []WithholdingLineResponse `json:"withholding_lines,omitempty"`
 }
 
 type supplierInvoiceLineBody struct {
@@ -121,7 +123,8 @@ type supplierInvoiceBody struct {
 	Reference       *string                   `json:"reference"`
 	Notes           *string                   `json:"notes"`
 	ProgressStatus  string                    `json:"progress_status"`
-	Lines           []supplierInvoiceLineBody `json:"lines"`
+	Lines            []supplierInvoiceLineBody `json:"lines"`
+	WithholdingLines []withholdingLineBody     `json:"withholding_lines"`
 }
 
 type openPOLineRow struct {
@@ -646,6 +649,11 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 	if inv.Lines == nil {
 		inv.Lines = []SupplierInvoiceLine{}
 	}
+	wht, err := listWithholdingLines(ctx, pool, tenantID, "supplier_invoice", id)
+	if err != nil {
+		return SupplierInvoice{}, err
+	}
+	inv.WithholdingLines = wht
 	return inv, nil
 }
 
@@ -948,6 +956,10 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		dateNoDisplay := formatDateNoDisplay(invoiceDate, dateSeq)
 		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, invoiceNo, dateNoDisplay, body.Lines); err != nil {
 			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
+		}
+		if err := insertWithholdingLines(r.Context(), tx, tu.TenantID, "supplier_invoice", id, body.WithholdingLines); err != nil {
+			response.Validation(w, map[string]string{"withholding_lines": err.Error()})
 			return
 		}
 
@@ -1291,6 +1303,16 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Supplier invoice not found.", "ERR_NOT_FOUND")
 			return
 		}
+		var existingJE *int64
+		_ = pool.QueryRow(r.Context(), `
+			select invoice_journal_entry_id from public.fin_supplier_invoices
+			where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID).Scan(&existingJE)
+		if jeStatus, _ := invoicejournal.EntryStatus(r.Context(), pool, tu.TenantID, existingJE); jeStatus == "posted" {
+			response.Err(w, http.StatusConflict,
+				"This purchase is posted to the general ledger. Edit the journal entry first or reverse it before changing lines or withholding.",
+				"ERR_POSTED_LOCKED")
+			return
+		}
 		if before.ProgressStatus == "e_approval" {
 			response.Validation(w, map[string]string{"progress_status": "Cannot edit a purchase pending approval."})
 			return
@@ -1359,6 +1381,10 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"lines": err.Error()})
 			return
 		}
+		if err := replaceWithholdingLines(r.Context(), tx, tu.TenantID, "supplier_invoice", id, body.WithholdingLines); err != nil {
+			response.Validation(w, map[string]string{"withholding_lines": err.Error()})
+			return
+		}
 
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
@@ -1371,27 +1397,3 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func supplierInvoiceOutstanding(ctx context.Context, pool *pgxpool.Pool, tenantID, invoiceID int64, excludePaymentID *int64) (float64, error) {
-	var grandTotal float64
-	err := pool.QueryRow(ctx, `
-		select grand_total::float8 from public.fin_supplier_invoices
-		where id = $1 and tenant_id = $2 and deleted_at is null`, invoiceID, tenantID).Scan(&grandTotal)
-	if err != nil {
-		return 0, err
-	}
-	q := `
-		select coalesce(sum(a.applied_amount), 0)::float8
-		from public.fin_payment_applications a
-		join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		where a.supplier_invoice_id = $1 and pv.tenant_id = $2 and pv.deleted_at is null`
-	args := []any{invoiceID, tenantID}
-	if excludePaymentID != nil {
-		q += ` and pv.id <> $3`
-		args = append(args, *excludePaymentID)
-	}
-	var applied float64
-	if err := pool.QueryRow(ctx, q, args...).Scan(&applied); err != nil {
-		return 0, err
-	}
-	return grandTotal - applied, nil
-}

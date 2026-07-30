@@ -11,6 +11,7 @@ import {
   PartnerSearchModal,
   type PartnerSearchRow,
 } from "../../purchase-request/purchase-request/PartnerSearchModal";
+import { openCreditNotePrint } from "./creditNotePrint";
 
 type CreditNote = {
   id: number;
@@ -45,6 +46,13 @@ export default function CreditNotesPage() {
   const [applyAmount, setApplyAmount] = createSignal("");
   const [refundMethod, setRefundMethod] = createSignal("cash");
   const [refundRef, setRefundRef] = createSignal("");
+  const [sourceSalesId, setSourceSalesId] = createSignal<number | null>(null);
+  const [sourceSalesLabel, setSourceSalesLabel] = createSignal("");
+  const [sourcePickerOpen, setSourcePickerOpen] = createSignal(false);
+  const [historyOpen, setHistoryOpen] = createSignal<CreditNote | null>(null);
+  const [historyRows, setHistoryRows] = createSignal<
+    { id: number; sales_id: number; sales_no: string; applied_amount: number; created_at: string }[]
+  >([]);
   const [saving, setSaving] = createSignal(false);
   const [busyId, setBusyId] = createSignal<number | null>(null);
 
@@ -71,6 +79,13 @@ export default function CreditNotesPage() {
     setSalesLabel(`${row.sales_no} · ${row.customer_name} · ${formatPeso(row.grand_total)}`);
   };
 
+  const pickSourceSales = (row: SalesRow) => {
+    setSourceSalesId(row.id);
+    setSourceSalesLabel(`${row.sales_no} · ${row.customer_name}`);
+    if (!partnerId() && row.partner_id) setPartnerId(row.partner_id);
+    if (!customerName().trim() && row.customer_name) setCustomerName(row.customer_name);
+  };
+
   const create = async () => {
     const amt = Number(amount());
     if (!customerName().trim()) {
@@ -88,6 +103,7 @@ export default function CreditNotesPage() {
         credit_date: creditDate(),
         customer_name: customerName().trim(),
         partner_id: partnerId(),
+        source_sales_id: sourceSalesId(),
         amount_total: amt,
         reason: reason().trim(),
         status: "open",
@@ -102,9 +118,36 @@ export default function CreditNotesPage() {
     setCreateOpen(false);
     setCustomerName("");
     setPartnerId(null);
+    setSourceSalesId(null);
+    setSourceSalesLabel("");
     setAmount("0");
     setReason("");
     invalidate();
+  };
+
+  const cancelNote = async (row: CreditNote) => {
+    setBusyId(row.id);
+    const res = await apiFetch(`/api/v1/finance/credit-notes/${row.id}/cancel`, { method: "POST" });
+    setBusyId(null);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not cancel.");
+      return;
+    }
+    toast.success("Credit note cancelled.");
+    invalidate();
+  };
+
+  const openHistory = async (row: CreditNote) => {
+    setHistoryOpen(row);
+    const res = await apiFetch<
+      { id: number; sales_id: number; sales_no: string; applied_amount: number; created_at: string }[]
+    >(`/api/v1/finance/credit-notes/${row.id}/applications`);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not load history.");
+      setHistoryRows([]);
+      return;
+    }
+    setHistoryRows(res.data ?? []);
   };
 
   const post = async (row: CreditNote) => {
@@ -150,7 +193,7 @@ export default function CreditNotesPage() {
     const row = refundOpen();
     if (!row) return;
     setSaving(true);
-    const res = await apiFetch<{ expense_id: number; expense_no: string; amount: number }>(
+    const res = await apiFetch<{ expense_id?: number; expense_no?: string; payment_voucher_id?: number; payment_no?: string; amount: number }>(
       `/api/v1/finance/credit-notes/${row.id}/convert-to-cash`,
       {
         method: "POST",
@@ -165,8 +208,9 @@ export default function CreditNotesPage() {
       toast.warning(res.message ?? "Could not convert to cash.");
       return;
     }
+    const pvNo = res.data?.payment_no;
     const expNo = res.data?.expense_no ?? "";
-    toast.success(`Refund recorded as expense ${expNo}. View under Expenses.`);
+    toast.success(pvNo ? `Refund recorded as payment voucher ${pvNo}.` : `Refund recorded as expense ${expNo}. View under Expenses.`);
     setRefundOpen(null);
     invalidate();
   };
@@ -191,6 +235,7 @@ export default function CreditNotesPage() {
             <option value="open">Open</option>
             <option value="applied">Applied</option>
             <option value="refunded">Refunded</option>
+            <option value="cancelled">Cancelled</option>
           </select>
           <button
             type="button"
@@ -232,11 +277,22 @@ export default function CreditNotesPage() {
                   <td class="px-3 py-2 capitalize">{row.status}</td>
                   <td class="px-3 py-2">
                     <div class="flex flex-wrap gap-2">
+                      <button type="button" class="text-brand-600 hover:underline" onClick={() => openCreditNotePrint(row.id)}>
+                        Print
+                      </button>
                       <Show when={row.status === "draft"}>
                         <button type="button" class="text-brand-600 hover:underline disabled:opacity-50" disabled={busyId() === row.id} onClick={() => void post(row)}>
                           Open
                         </button>
                       </Show>
+                      <Show when={row.status === "draft" || (row.status === "open" && row.remaining_amount === row.amount_total)}>
+                        <button type="button" class="text-red-600 hover:underline disabled:opacity-50" disabled={busyId() === row.id} onClick={() => void cancelNote(row)}>
+                          Cancel
+                        </button>
+                      </Show>
+                      <button type="button" class="text-brand-600 hover:underline" onClick={() => void openHistory(row)}>
+                        History
+                      </button>
                       <Show when={(row.status === "open" || row.status === "applied") && row.remaining_amount > 0}>
                         <button
                           type="button"
@@ -291,6 +347,20 @@ export default function CreditNotesPage() {
             <label class="mb-3 block text-sm">
               <span class="text-text-secondary">Amount</span>
               <input type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={amount()} onInput={(e) => setAmount(e.currentTarget.value)} />
+            </label>
+            <label class="mb-3 block text-sm">
+              <span class="text-text-secondary">Source sales invoice (optional)</span>
+              <div class="mt-1 flex gap-2">
+                <input
+                  class="w-full rounded border border-stroke px-2 py-1.5"
+                  readOnly
+                  value={sourceSalesLabel() || (sourceSalesId() ? `Sales #${sourceSalesId()}` : "")}
+                  placeholder="Link originating invoice…"
+                />
+                <button type="button" class="shrink-0 rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50" onClick={() => setSourcePickerOpen(true)}>
+                  Find…
+                </button>
+              </div>
             </label>
             <label class="mb-4 block text-sm">
               <span class="text-text-secondary">Reason</span>
@@ -360,11 +430,42 @@ export default function CreditNotesPage() {
               <input class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={refundRef()} onInput={(e) => setRefundRef(e.currentTarget.value)} />
             </label>
             <p class="mb-4 text-xs text-text-secondary">
-              A refund expense record will be created automatically under Expenses.
+              Creates a payment voucher when the customer is linked to a partner; otherwise falls back to an expense record.
             </p>
             <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" disabled={saving()} onClick={() => void convertToCash()}>
               {saving() ? "Processing…" : "Convert to cash"}
             </button>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={historyOpen()}>
+        <div class="fixed inset-0 z-[55] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center">
+          <div class="w-full max-w-lg rounded-2xl border border-stroke bg-white p-6 shadow-xl">
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="text-lg font-semibold">Applications · {historyOpen()!.credit_no}</h2>
+              <button type="button" class={modalDismissClass} onClick={() => setHistoryOpen(null)}>Close</button>
+            </div>
+            <table class="min-w-full text-sm">
+              <thead>
+                <tr class="text-left text-text-secondary">
+                  <th class="py-1">Sales</th>
+                  <th class="py-1 text-right">Amount</th>
+                  <th class="py-1">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For each={historyRows()} fallback={<tr><td class="py-4 text-text-secondary" colSpan={3}>No applications yet.</td></tr>}>
+                  {(h) => (
+                    <tr class="border-t border-stroke/60">
+                      <td class="py-1.5">{h.sales_no}</td>
+                      <td class="py-1.5 text-right">{formatPeso(h.applied_amount)}</td>
+                      <td class="py-1.5">{h.created_at?.slice(0, 19) ?? "—"}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
           </div>
         </div>
       </Show>
@@ -376,6 +477,13 @@ export default function CreditNotesPage() {
         onSelect={pickSales}
         initialQ={applyOpen()?.customer_name ?? ""}
         partnerId={applyOpen()?.partner_id}
+      />
+      <SalesInvoicePickerModal
+        open={sourcePickerOpen()}
+        onClose={() => setSourcePickerOpen(false)}
+        onSelect={pickSourceSales}
+        initialQ={customerName()}
+        partnerId={partnerId() ?? undefined}
       />
     </div>
   );

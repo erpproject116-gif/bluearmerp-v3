@@ -16,7 +16,7 @@ func sumDebitsCredits(lines []ledger.PostingLine) (debit, credit float64) {
 }
 
 func TestBuildPVPostingEventBalancesWithWithholding(t *testing.T) {
-	ev := buildPVPostingEvent(1, 42, 7, 1000, 20, "bank_transfer")
+	ev := buildPVPostingEvent(1, 42, 7, 1000, 20, "bank_transfer", "2040")
 	if ev.SourceType != "payment_voucher" || ev.SourceID != 42 {
 		t.Fatalf("unexpected source: %s-%d", ev.SourceType, ev.SourceID)
 	}
@@ -27,10 +27,10 @@ func TestBuildPVPostingEventBalancesWithWithholding(t *testing.T) {
 	var creditAcct string
 	var whtCredit float64
 	for _, ln := range ev.Lines {
-		if ln.Credit > 0 && ln.AccountCode != "2360" {
+		if ln.Credit > 0 && ln.AccountCode != "2040" {
 			creditAcct = ln.AccountCode
 		}
-		if ln.AccountCode == "2360" {
+		if ln.AccountCode == "2040" {
 			whtCredit = ln.Credit
 		}
 	}
@@ -45,7 +45,7 @@ func TestBuildPVPostingEventBalancesWithWithholding(t *testing.T) {
 func TestBuildPVPostingEventCreditAccountByMethod(t *testing.T) {
 	cases := map[string]string{"cash": "1020", "check": "1029", "bank_transfer": "1023"}
 	for method, want := range cases {
-		ev := buildPVPostingEvent(1, 1, 7, 500, 0, method)
+		ev := buildPVPostingEvent(1, 1, 7, 500, 0, method, "2040")
 		var got string
 		for _, ln := range ev.Lines {
 			if ln.Credit > 0 {

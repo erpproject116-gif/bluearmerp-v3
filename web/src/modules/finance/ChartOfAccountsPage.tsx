@@ -35,6 +35,10 @@ type FinanceDefaults = {
   output_vat_account_id?: number | null;
   commission_expense_account_id?: number | null;
   commission_payable_account_id?: number | null;
+  ewt_payable_account_id?: number | null;
+  fwt_payable_account_id?: number | null;
+  compensation_wht_payable_account_id?: number | null;
+  ewt_receivable_account_id?: number | null;
   auto_post_commission_journal?: boolean;
   disabled_account_types?: string[];
 };
@@ -58,6 +62,26 @@ const PH_BANDS: Record<AccountRow["account_type"], string> = {
   expense: "5000–5999",
 };
 
+const TYPE_LABELS: Record<AccountRow["account_type"], string> = {
+  asset: "Assets",
+  liability: "Liabilities",
+  equity: "Equity",
+  income: "Income",
+  expense: "Expenses",
+};
+
+const COA_VIEW_KEY = "coa.viewMode";
+
+function loadCoaViewMode(): "simple" | "accountant" {
+  try {
+    const v = localStorage.getItem(COA_VIEW_KEY);
+    if (v === "accountant" || v === "simple") return v;
+  } catch {
+    /* ignore */
+  }
+  return "simple";
+}
+
 const DEFAULT_SLOTS: DefaultSlot[] = [
   { key: "cash_account_id", label: "Cash / bank receipts", hint: "Official receipts, POS cash", types: ["asset"] },
   { key: "receivable_account_id", label: "Accounts receivable", hint: "Sales on credit, POS A/R", types: ["asset"] },
@@ -68,6 +92,10 @@ const DEFAULT_SLOTS: DefaultSlot[] = [
   { key: "output_vat_account_id", label: "Output VAT", hint: "VAT collected on sales (BIR)", types: ["liability"] },
   { key: "commission_expense_account_id", label: "Sales commissions (expense)", hint: "Debit when commissions accrue", types: ["expense"] },
   { key: "commission_payable_account_id", label: "Commissions payable", hint: "Credit until commissions are paid", types: ["liability"] },
+  { key: "ewt_payable_account_id", label: "EWT payable", hint: "Expanded withholding on payment vouchers (BIR 2307)", types: ["liability"] },
+  { key: "fwt_payable_account_id", label: "FWT payable", hint: "Final withholding tax payable", types: ["liability"] },
+  { key: "compensation_wht_payable_account_id", label: "Compensation WHT payable", hint: "Payroll withholding payable", types: ["liability"] },
+  { key: "ewt_receivable_account_id", label: "EWT receivable", hint: "Creditable withholding receivable from customers", types: ["asset"] },
 ];
 
 const emptyDefaults = (): FinanceDefaults => ({
@@ -80,6 +108,10 @@ const emptyDefaults = (): FinanceDefaults => ({
   output_vat_account_id: null,
   commission_expense_account_id: null,
   commission_payable_account_id: null,
+  ewt_payable_account_id: null,
+  fwt_payable_account_id: null,
+  compensation_wht_payable_account_id: null,
+  ewt_receivable_account_id: null,
   disabled_account_types: [],
 });
 
@@ -91,17 +123,20 @@ export default function ChartOfAccountsPage() {
   const client = useQueryClient();
   const [searchParams] = useSearchParams();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, statusFilter, setStatusFilter } = useListState(
-    "sort_order",
-    25,
-    { defaultStatus: "" },
+    "account_code",
+    200,
+    { defaultStatus: "active" },
   );
-  const [typeFilter, setTypeFilter] = createSignal("");
+  const [typeFilter, setTypeFilter] = createSignal<AccountRow["account_type"] | "">("asset");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set<number>());
   const [modalOpen, setModalOpen] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [importing, setImporting] = createSignal(false);
-  const [defaultsOpen, setDefaultsOpen] = createSignal(true);
+  const [defaultsOpen, setDefaultsOpen] = createSignal(false);
+  const [advancedOpen, setAdvancedOpen] = createSignal(false);
+  const [viewMode, setViewMode] = createSignal<"simple" | "accountant">(loadCoaViewMode());
+  const [collapsedGroups, setCollapsedGroups] = createSignal<Set<number>>(new Set());
   const [defaultsForm, setDefaultsForm] = createSignal<FinanceDefaults>(emptyDefaults());
   const [mappingsDirty, setMappingsDirty] = createSignal(false);
   const [savingDefaults, setSavingDefaults] = createSignal(false);
@@ -121,10 +156,19 @@ export default function ChartOfAccountsPage() {
   const accountLabel = (acc: { account_code: string; account_name: string }) =>
     `${acc.account_code} - ${acc.account_name}`;
 
+  const setCoaViewMode = (mode: "simple" | "accountant") => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem(COA_VIEW_KEY, mode);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(viewMode() === "simple" ? 2000 : pageSize),
       sort: sort(),
       order: order(),
       q: q(),
@@ -132,7 +176,7 @@ export default function ChartOfAccountsPage() {
       account_type: typeFilter(),
     });
     return {
-      queryKey: ["finance-accounts", page(), sort(), order(), q(), statusFilter(), typeFilter()],
+      queryKey: ["finance-accounts", page(), sort(), order(), q(), statusFilter(), typeFilter(), viewMode()],
       queryFn: async () => {
         const res = await apiFetch<AccountRow[]>(`/api/v1/finance/accounts?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load accounts");
@@ -141,6 +185,63 @@ export default function ChartOfAccountsPage() {
       placeholderData: (prev: { rows: AccountRow[]; total: number } | undefined) => prev,
     };
   });
+
+  type TreeNode = { row: AccountRow; depth: number; children: TreeNode[] };
+  const simpleTree = createMemo(() => {
+    const rows = list.data?.rows ?? [];
+    const byParent = new Map<number | null, AccountRow[]>();
+    for (const r of rows) {
+      const pid = r.parent_id ?? null;
+      const list = byParent.get(pid) ?? [];
+      list.push(r);
+      byParent.set(pid, list);
+    }
+    const sortRows = (a: AccountRow, b: AccountRow) => a.account_code.localeCompare(b.account_code);
+    const build = (parentId: number | null, depth: number): TreeNode[] => {
+      const kids = (byParent.get(parentId) ?? []).slice().sort(sortRows);
+      return kids.map((row) => ({
+        row,
+        depth,
+        children: build(row.id, depth + 1),
+      }));
+    };
+    // Prefer roots with no parent in the filtered set; also include orphans whose parent is outside filter.
+    const ids = new Set(rows.map((r) => r.id));
+    const roots = rows
+      .filter((r) => r.parent_id == null || !ids.has(r.parent_id))
+      .slice()
+      .sort(sortRows);
+    return roots.map((row) => ({
+      row,
+      depth: 0,
+      children: build(row.id, 1),
+    }));
+  });
+
+  const flattenVisibleTree = createMemo(() => {
+    const out: { row: AccountRow; depth: number }[] = [];
+    const walk = (nodes: TreeNode[]) => {
+      for (const n of nodes) {
+        out.push({ row: n.row, depth: n.depth });
+        if (n.row.is_group && !collapsedGroups().has(n.row.id)) {
+          walk(n.children);
+        } else if (!n.row.is_group) {
+          walk(n.children);
+        }
+      }
+    };
+    walk(simpleTree());
+    return out;
+  });
+
+  const toggleGroup = (id: number) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const parentOptions = createQuery(() => ({
     queryKey: ["finance-accounts-parent-options"],
@@ -331,7 +432,17 @@ export default function ChartOfAccountsPage() {
   });
 
   const currentRows = createMemo(() => list.data?.rows ?? []);
-  const isEmpty = createMemo(() => !list.isFetching && (list.data?.total ?? 0) === 0 && !q() && !typeFilter());
+  const isEmpty = createMemo(() => !list.isFetching && (list.data?.total ?? 0) === 0 && !q());
+  // True empty chart (no accounts of any type) — used for first-run setup banner.
+  const chartCompletelyEmpty = createQuery(() => ({
+    queryKey: ["finance-accounts-empty-check"],
+    queryFn: async () => {
+      const res = await apiFetch<AccountRow[]>(`/api/v1/finance/accounts?page=1&pageSize=1&status=`);
+      if (!res.success) return false;
+      return (res.meta?.total ?? 0) === 0;
+    },
+  }));
+  const showSetupBanner = createMemo(() => chartCompletelyEmpty.data === true);
   const resolvedIds = (): number[] => {
     const multi = [...selectedIds()];
     if (multi.length > 0) return multi;
@@ -348,6 +459,7 @@ export default function ChartOfAccountsPage() {
     void client.invalidateQueries({ queryKey: ["finance-accounts"] });
     void client.invalidateQueries({ queryKey: ["finance-accounts-parent-options"] });
     void client.invalidateQueries({ queryKey: ["finance-account-defaults"] });
+    void client.invalidateQueries({ queryKey: ["finance-accounts-empty-check"] });
   };
 
   const openCreate = (seed?: {
@@ -643,13 +755,11 @@ export default function ChartOfAccountsPage() {
 
   return (
     <FinanceLayout>
-      <Show when={isEmpty()}>
+      <Show when={showSetupBanner()}>
         <div class="mb-4 rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-slate-700">
           <p class="font-medium text-brand-800">Set up your accounts</p>
           <p class="mt-1">
-            Load a standard Philippine SME chart (Assets 1000–1999, Liabilities 2000–2999, Equity 3000–3999,
-            Revenue 4000–4999, Expenses 5000–5999) so receipts and invoices can post. You can edit any account later.
-            Bank accounts used for deposits and transfers are set up separately — this chart is the general ledger only.
+            Load a standard Philippine SME chart so receipts and invoices can post. You can edit any account later.
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
             <button
@@ -671,7 +781,7 @@ export default function ChartOfAccountsPage() {
         </div>
       </Show>
 
-      <Show when={!isEmpty() && purchaseNeedsEnsure()}>
+      <Show when={!showSetupBanner() && purchaseNeedsEnsure()}>
         <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p class="font-medium">Purchases / COGS needs an expense account</p>
           <p class="mt-1 text-amber-900/80">
@@ -706,39 +816,91 @@ export default function ChartOfAccountsPage() {
         </div>
       </Show>
 
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="inline-flex rounded-lg border border-stroke p-0.5 text-sm">
+            <button
+              type="button"
+              class={`rounded-md px-3 py-1.5 ${viewMode() === "simple" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+              onClick={() => setCoaViewMode("simple")}
+            >
+              Simple
+            </button>
+            <button
+              type="button"
+              class={`rounded-md px-3 py-1.5 ${viewMode() === "accountant" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+              onClick={() => setCoaViewMode("accountant")}
+            >
+              Accountant
+            </button>
+          </div>
+          <Show when={viewMode() === "simple"}>
+            <div class="flex flex-wrap gap-1">
+              <For each={accountTypeOptions}>
+                {(t) => (
+                  <button
+                    type="button"
+                    class={`rounded-full border px-3 py-1 text-sm ${
+                      typeFilter() === t ? "border-brand-600 bg-brand-50 text-brand-800" : "border-stroke text-slate-600 hover:bg-slate-50"
+                    }`}
+                    onClick={() => {
+                      setTypeFilter(t);
+                      setPage(1);
+                      clearSelection();
+                    }}
+                  >
+                    {TYPE_LABELS[t]}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+          <Show when={viewMode() === "accountant"}>
+            <label class="text-sm text-slate-600">
+              Type
+              <select
+                class={`${inputClass} ml-2 w-44`}
+                value={typeFilter()}
+                onChange={(e) => {
+                  setTypeFilter(e.currentTarget.value as AccountRow["account_type"] | "");
+                  setSelectedIds(new Set<number>());
+                  setPage(1);
+                }}
+              >
+                <option value="">All</option>
+                <For each={accountTypeOptions}>{(t) => <option value={t}>{TYPE_LABELS[t]}</option>}</For>
+              </select>
+            </label>
+            <label class="text-sm text-slate-600">
+              Status
+              <select
+                class={`${inputClass} ml-2 w-36`}
+                value={statusFilter()}
+                onChange={(e) => {
+                  setStatusFilter(e.currentTarget.value);
+                  setSelectedIds(new Set<number>());
+                  setPage(1);
+                }}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="">All (non-deleted)</option>
+                <option value="deleted">Deleted</option>
+              </select>
+            </label>
+          </Show>
+        </div>
+        <button
+          type="button"
+          class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          onClick={() => openCreate({ account_type: typeFilter() || "asset" })}
+        >
+          New account
+        </button>
+      </div>
+
+      <Show when={viewMode() === "accountant"}>
       <div class="mb-3 flex flex-wrap items-center gap-2">
-        <label class="text-sm text-slate-600">
-          Type
-          <select
-            class={`${inputClass} ml-2 w-44`}
-            value={typeFilter()}
-            onChange={(e) => {
-              setTypeFilter(e.currentTarget.value);
-              setSelectedIds(new Set<number>());
-              setPage(1);
-            }}
-          >
-            <option value="">All</option>
-            <For each={accountTypeOptions}>{(t) => <option value={t}>{t}</option>}</For>
-          </select>
-        </label>
-        <label class="text-sm text-slate-600">
-          Status
-          <select
-            class={`${inputClass} ml-2 w-36`}
-            value={statusFilter()}
-            onChange={(e) => {
-              setStatusFilter(e.currentTarget.value);
-              setSelectedIds(new Set<number>());
-              setPage(1);
-            }}
-          >
-            <option value="">All active</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="deleted">Deleted</option>
-          </select>
-        </label>
         <button
           type="button"
           class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-40"
@@ -754,13 +916,6 @@ export default function ChartOfAccountsPage() {
           onClick={() => void deactivate()}
         >
           Deactivate selected{resolvedIds().length > 0 ? ` (${resolvedIds().length})` : ""}
-        </button>
-        <button
-          type="button"
-          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
-          onClick={() => void deactivateAllOfType()}
-        >
-          Deactivate all of filtered type
         </button>
         <button
           type="button"
@@ -780,6 +935,106 @@ export default function ChartOfAccountsPage() {
             Restore selected{resolvedIds().length > 0 ? ` (${resolvedIds().length})` : ""}
           </button>
         </Show>
+      </div>
+      <div class="mb-3 rounded-xl border border-stroke bg-white">
+        <button
+          type="button"
+          class="flex w-full items-center justify-between px-4 py-2 text-left text-sm"
+          onClick={() => setAdvancedOpen((v) => !v)}
+        >
+          <span class="font-medium text-slate-700">Advanced</span>
+          <span class="text-slate-400">{advancedOpen() ? "▾" : "▸"}</span>
+        </button>
+        <Show when={advancedOpen()}>
+          <div class="flex flex-wrap gap-2 border-t border-stroke px-4 py-3">
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+              onClick={() => void deactivateAllOfType()}
+            >
+              Deactivate all of filtered type
+            </button>
+            <Show when={!isEmpty()}>
+              <button
+                type="button"
+                class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+                disabled={importing()}
+                onClick={() => void importTemplate(true)}
+              >
+                {importing() ? "Replacing…" : "Replace with PH template"}
+              </button>
+            </Show>
+            <Show when={isEmpty()}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+                disabled={importing()}
+                onClick={() => void importTemplate(false)}
+              >
+                Import PH template
+              </button>
+            </Show>
+          </div>
+        </Show>
+      </div>
+      </Show>
+
+      <Show when={viewMode() === "simple" && !isEmpty()}>
+        <div class="mb-4 overflow-hidden rounded-xl border border-stroke bg-white">
+          <div class="border-b border-stroke bg-slate-50 px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+            {typeFilter() ? TYPE_LABELS[typeFilter() as AccountRow["account_type"]] : "All"} · Code · Name · Status
+          </div>
+          <table class="min-w-full text-sm">
+            <tbody>
+              <For
+                each={flattenVisibleTree()}
+                fallback={
+                  <tr>
+                    <td class="px-4 py-6 text-center text-slate-500">No accounts in this category.</td>
+                  </tr>
+                }
+              >
+                {(item) => (
+                  <tr
+                    class="border-t border-stroke/60 hover:bg-slate-50"
+                    classList={{ "bg-slate-50/80 font-medium": item.row.is_group }}
+                  >
+                    <td class="px-4 py-2">
+                      <div class="flex items-center gap-2" style={{ "padding-left": `${item.depth * 1.25}rem` }}>
+                        <Show when={item.row.is_group}>
+                          <button
+                            type="button"
+                            class="w-5 text-slate-400 hover:text-slate-700"
+                            onClick={() => toggleGroup(item.row.id)}
+                            aria-label="Toggle section"
+                          >
+                            {collapsedGroups().has(item.row.id) ? "▸" : "▾"}
+                          </button>
+                        </Show>
+                        <span class="font-mono text-xs text-slate-500">{item.row.account_code}</span>
+                        <button
+                          type="button"
+                          class="text-left text-slate-800 hover:text-brand-700 hover:underline"
+                          onClick={() => openEdit(item.row)}
+                        >
+                          {item.row.account_name}
+                        </button>
+                      </div>
+                    </td>
+                    <td class="w-24 px-4 py-2 text-right text-xs text-slate-500">
+                      {item.row.is_group ? "Section" : item.row.is_active ? "Active" : "Inactive"}
+                    </td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
+      </Show>
+
+      {/* accountant toolbar remnant placeholder removed — grid below */}
+      <Show when={false}>
+      <div class="mb-3 flex flex-wrap items-center gap-2">
         <Show when={isEmpty()}>
           <button
             type="button"
@@ -802,6 +1057,7 @@ export default function ChartOfAccountsPage() {
           </button>
         </Show>
       </div>
+      </Show>
 
       <Show when={!isEmpty()}>
         <div id="default-account-mappings" class="mb-4 scroll-mt-4 rounded-xl border border-stroke bg-white shadow-sm">
@@ -811,9 +1067,9 @@ export default function ChartOfAccountsPage() {
             onClick={() => setDefaultsOpen((v) => !v)}
           >
             <div>
-              <p class="text-sm font-medium text-slate-800">Default account mappings (incl. Purchases / COGS)</p>
+              <p class="text-sm font-medium text-slate-800">Where money posts (VAT, bank, tax)</p>
               <p class="text-xs text-slate-500">
-                Used by sales, purchases, receipts, and POS auto-posting. {defaultsMappedCount()} of {DEFAULT_SLOTS.length} mapped.
+                Used by sales, purchases, receipts, and POS. {defaultsMappedCount()} of {DEFAULT_SLOTS.length} mapped.
               </p>
             </div>
             <span class="text-sm text-slate-400">{defaultsOpen() ? "▾" : "▸"}</span>
@@ -924,11 +1180,16 @@ export default function ChartOfAccountsPage() {
         </div>
       </Show>
 
+      <Show when={viewMode() === "accountant"}>
       <SpreadsheetGrid
         columns={[
           { key: "account_code", header: "Code" },
           { key: "account_name", header: "Name" },
-          { key: "account_type", header: "Type" },
+          {
+            key: "account_type",
+            header: "Type",
+            render: (r) => TYPE_LABELS[r.account_type] ?? r.account_type,
+          },
           { key: "parent_code", header: "Parent", render: (r) => (r.parent_code ? `${r.parent_code} - ${r.parent_name ?? ""}` : "—") },
           { key: "is_group", header: "Group", render: (r) => (r.is_group ? "Yes" : "No"), sortable: false },
           { key: "is_active", header: "Active", render: (r) => (r.is_active ? "Yes" : "No") },
@@ -959,6 +1220,19 @@ export default function ChartOfAccountsPage() {
         onSearchChange={setQ}
         onRefresh={invalidate}
       />
+      </Show>
+
+      <Show when={viewMode() === "simple"}>
+        <div class="mb-3">
+          <input
+            type="search"
+            class={`${inputClass} max-w-sm`}
+            placeholder="Search code or name…"
+            value={q()}
+            onInput={(e) => setQ(e.currentTarget.value)}
+          />
+        </div>
+      </Show>
 
       <EntityModal
         open={modalOpen()}

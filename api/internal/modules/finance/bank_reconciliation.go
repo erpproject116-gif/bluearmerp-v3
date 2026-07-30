@@ -1,15 +1,20 @@
 package finance
 
 import (
+	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -36,10 +41,312 @@ type bankStatementPlaceholder struct {
 	IsMatched     bool    `json:"is_matched"`
 }
 
+const (
+	statementImportMaxRows  = 500
+	statementImportMaxBytes = 5 << 20
+)
+
+var (
+	statementImportRequiredHeaders = []string{"date", "reference", "description", "amount"}
+	statementImportOptionalHeaders = []string{"bank_account_code"}
+	statementImportAllHeaders      = append(append([]string{}, statementImportRequiredHeaders...), statementImportOptionalHeaders...)
+	statementImportExample         = []string{"2026-01-15", "CHK-1001", "Customer deposit", "15000.00", "BDO-MAIN"}
+)
+
+type statementImportRowError struct {
+	Row     int    `json:"row"`
+	Message string `json:"message"`
+}
+
+type statementImportResult struct {
+	Created   int                       `json:"created"`
+	Failed    int                       `json:"failed"`
+	RowErrors []statementImportRowError `json:"row_errors,omitempty"`
+}
+
+type validatedStatementImportRow struct {
+	rowNum        int
+	bankAccountID int64
+	statementDate time.Time
+	referenceNo   string
+	description   string
+	amount        float64
+}
+
 func registerBankReconciliationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/bank-reconciliation/unmatched", listUnmatchedPayments(pool))
 	r.Get("/bank-reconciliation/statement-lines", listBankStatementLines(pool))
+	r.Get("/bank-reconciliation/statement-lines/import-template", bankStatementImportTemplateHandler())
+	r.Post("/bank-reconciliation/statement-lines/import", importBankStatementLines(pool))
 	r.Post("/bank-reconciliation/match", matchBankStatementLine(pool))
+	registerBankMatchRuleRoutes(r, pool)
+}
+
+func bankStatementImportTemplateHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="bank-statement-import-template.csv"`)
+		cw := csv.NewWriter(w)
+		_ = cw.Write(statementImportAllHeaders)
+		_ = cw.Write(statementImportExample)
+		cw.Flush()
+	}
+}
+
+func importBankStatementLines(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		if err := r.ParseMultipartForm(statementImportMaxBytes); err != nil {
+			response.Validation(w, map[string]string{"file": "Invalid upload."})
+			return
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			response.Validation(w, map[string]string{"file": "File is required."})
+			return
+		}
+		defer file.Close()
+
+		defaultBankAccountID := int64(0)
+		if v := strings.TrimSpace(r.FormValue("bank_account_id")); v != "" {
+			id, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || id <= 0 {
+				response.Validation(w, map[string]string{"bank_account_id": "Invalid bank account id."})
+				return
+			}
+			defaultBankAccountID = id
+		}
+
+		peek := make([]byte, 4096)
+		n, _ := file.Read(peek)
+		peek = peek[:n]
+		fileName := ""
+		if header != nil {
+			fileName = header.Filename
+		}
+
+		if isOFXContent(fileName, peek) {
+			content := string(peek)
+			if rest, err := io.ReadAll(file); err == nil {
+				content += string(rest)
+			}
+			ofxRows, err := parseOFXTransactions(content)
+			if err != nil {
+				response.Validation(w, map[string]string{"file": err.Error()})
+				return
+			}
+			if defaultBankAccountID <= 0 {
+				response.Validation(w, map[string]string{"bank_account_id": "Bank account is required for OFX/QFX import."})
+				return
+			}
+			var valid []validatedStatementImportRow
+			for i, row := range ofxRows {
+				valid = append(valid, validatedStatementImportRow{
+					rowNum:        i + 1,
+					bankAccountID: defaultBankAccountID,
+					statementDate: row.statementDate,
+					referenceNo:   row.referenceNo,
+					description:   row.description,
+					amount:        row.amount,
+				})
+			}
+			createdIDs, err := bulkImportStatementLines(r.Context(), pool, tu.TenantID, valid)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Import failed: "+err.Error(), "ERR_INTERNAL")
+				return
+			}
+			result := statementImportResult{Created: len(createdIDs)}
+			response.OK(w, result, fmt.Sprintf("Imported %d OFX/QFX statement line(s).", result.Created))
+			return
+		}
+
+		records, err := csv.NewReader(io.MultiReader(strings.NewReader(string(peek)), file)).ReadAll()
+		if err != nil {
+			response.Validation(w, map[string]string{"file": "Could not read CSV."})
+			return
+		}
+		if len(records) < 2 {
+			response.Validation(w, map[string]string{"file": "CSV must include a header row and at least one data row."})
+			return
+		}
+		colIdx, err := mapStatementCSVHeaders(records[0], statementImportRequiredHeaders)
+		if err != nil {
+			response.Validation(w, map[string]string{"file": err.Error()})
+			return
+		}
+
+		dataRows := records[1:]
+		if len(dataRows) > statementImportMaxRows {
+			response.Validation(w, map[string]string{"file": fmt.Sprintf("Maximum %d rows per import.", statementImportMaxRows)})
+			return
+		}
+
+		bankCodeCache := map[string]int64{}
+		result := statementImportResult{}
+		var valid []validatedStatementImportRow
+		for i, raw := range dataRows {
+			rowNum := i + 2
+			if isEmptyStatementCSVRow(raw) {
+				continue
+			}
+			row := extractStatementCSVRow(raw, colIdx, statementImportAllHeaders)
+			parsed, err := parseStatementImportRow(r.Context(), pool, tu.TenantID, row, defaultBankAccountID, bankCodeCache)
+			if err != nil {
+				result.Failed++
+				result.RowErrors = append(result.RowErrors, statementImportRowError{Row: rowNum, Message: err.Error()})
+				continue
+			}
+			parsed.rowNum = rowNum
+			valid = append(valid, parsed)
+		}
+		if len(valid) == 0 && result.Failed == 0 {
+			response.Validation(w, map[string]string{"file": "No data rows found."})
+			return
+		}
+		if len(valid) == 0 {
+			msg := fmt.Sprintf("Imported 0 row(s); %d failed.", result.Failed)
+			response.OK(w, result, msg)
+			return
+		}
+
+		createdIDs, err := bulkImportStatementLines(r.Context(), pool, tu.TenantID, valid)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Import failed: "+err.Error(), "ERR_INTERNAL")
+			return
+		}
+		result.Created = len(createdIDs)
+		_ = audit.LogSync(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.bank_statement.import_batch", "fin_bank_statement_line", nil, nil, map[string]any{
+			"imported_count":           result.Created,
+			"skipped_validation_count":   result.Failed,
+			"created_ids":              createdIDs,
+			"default_bank_account_id":  defaultBankAccountID,
+		})
+		msg := fmt.Sprintf("Imported %d statement line(s).", result.Created)
+		if result.Failed > 0 {
+			msg = fmt.Sprintf("Imported %d statement line(s); %d failed validation.", result.Created, result.Failed)
+		}
+		response.OK(w, result, msg)
+	}
+}
+
+func parseStatementImportRow(ctx context.Context, pool *pgxpool.Pool, tenantID int64, row map[string]string, defaultBankAccountID int64, bankCodeCache map[string]int64) (validatedStatementImportRow, error) {
+	dateRaw := strings.TrimSpace(row["date"])
+	if dateRaw == "" {
+		return validatedStatementImportRow{}, fmt.Errorf("date is required")
+	}
+	stmtDate, err := time.Parse("2006-01-02", dateRaw)
+	if err != nil {
+		return validatedStatementImportRow{}, fmt.Errorf("date must be YYYY-MM-DD")
+	}
+
+	amountRaw := strings.TrimSpace(row["amount"])
+	if amountRaw == "" {
+		return validatedStatementImportRow{}, fmt.Errorf("amount is required")
+	}
+	amount, err := strconv.ParseFloat(amountRaw, 64)
+	if err != nil {
+		return validatedStatementImportRow{}, fmt.Errorf("amount must be a number")
+	}
+	if amount == 0 {
+		return validatedStatementImportRow{}, fmt.Errorf("amount cannot be zero")
+	}
+
+	bankAccountID := defaultBankAccountID
+	code := strings.TrimSpace(row["bank_account_code"])
+	if code != "" {
+		if id, ok := bankCodeCache[code]; ok {
+			bankAccountID = id
+		} else {
+			var id int64
+			err := pool.QueryRow(ctx, `
+				select id from public.fin_bank_accounts
+				where tenant_id = $1 and bank_account_code = $2 and deleted_at is null`,
+				tenantID, code,
+			).Scan(&id)
+			if err != nil {
+				return validatedStatementImportRow{}, fmt.Errorf("bank account code not found: %s", code)
+			}
+			bankCodeCache[code] = id
+			bankAccountID = id
+		}
+	}
+	if bankAccountID <= 0 {
+		return validatedStatementImportRow{}, fmt.Errorf("bank account is required (select an account above or add bank_account_code column)")
+	}
+
+	return validatedStatementImportRow{
+		bankAccountID: bankAccountID,
+		statementDate: stmtDate,
+		referenceNo:   strings.TrimSpace(row["reference"]),
+		description:   strings.TrimSpace(row["description"]),
+		amount:        amount,
+	}, nil
+}
+
+func bulkImportStatementLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rows []validatedStatementImportRow) ([]int64, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var ids []int64
+	for _, row := range rows {
+		var id int64
+		err := tx.QueryRow(ctx, `
+			insert into public.fin_bank_statement_lines (
+			  tenant_id, bank_account_id, statement_date, reference_no, description, amount
+			) values ($1, $2, $3::date, nullif($4, ''), nullif($5, ''), $6)
+			returning id`,
+			tenantID, row.bankAccountID, row.statementDate.Format("2006-01-02"),
+			row.referenceNo, row.description, row.amount,
+		).Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+func mapStatementCSVHeaders(headerRow []string, expected []string) (map[string]int, error) {
+	idx := map[string]int{}
+	for i, h := range headerRow {
+		key := strings.ToLower(strings.TrimSpace(h))
+		if key == "" {
+			continue
+		}
+		idx[key] = i
+	}
+	for _, col := range expected {
+		if _, ok := idx[col]; !ok {
+			return nil, fmt.Errorf("missing required column: %s", col)
+		}
+	}
+	return idx, nil
+}
+
+func extractStatementCSVRow(raw []string, colIdx map[string]int, headers []string) map[string]string {
+	row := make(map[string]string, len(headers))
+	for _, col := range headers {
+		i := colIdx[col]
+		if i < len(raw) {
+			row[col] = strings.TrimSpace(raw[i])
+		}
+	}
+	return row
+}
+
+func isEmptyStatementCSVRow(row []string) bool {
+	for _, c := range row {
+		if strings.TrimSpace(c) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 func listUnmatchedPayments(pool *pgxpool.Pool) http.HandlerFunc {
@@ -242,6 +549,10 @@ func listBankStatementLines(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if out == nil {
 			out = []bankStatementPlaceholder{}
+		}
+		if r.URL.Query().Get("include_suggestions") == "true" {
+			response.OKList(w, enrichStatementLinesWithSuggestions(r.Context(), pool, tu.TenantID, out), p.Page, p.PageSize, total)
+			return
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)
 	}

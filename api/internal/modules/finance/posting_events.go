@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/ledger"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -40,13 +41,16 @@ func buildORPostingEvent(tenantID, receiptID int64, lines []journalLineBody) led
 	return ev
 }
 
-func buildPVPostingEvent(tenantID, paymentID, partnerID int64, amountTotal, withholdingTotal float64, paymentMethod string) ledger.PostingEvent {
+func buildPVPostingEvent(tenantID, paymentID, partnerID int64, amountTotal, withholdingTotal float64, paymentMethod, ewtPayableCode string) ledger.PostingEvent {
 	creditAcct := "1020"
 	switch strings.TrimSpace(paymentMethod) {
 	case "bank_transfer":
 		creditAcct = "1023"
 	case "check":
 		creditAcct = "1029"
+	}
+	if strings.TrimSpace(ewtPayableCode) == "" {
+		ewtPayableCode = "2040"
 	}
 	partner := partnerID
 	netPay := amountTotal - withholdingTotal
@@ -58,7 +62,7 @@ func buildPVPostingEvent(tenantID, paymentID, partnerID int64, amountTotal, with
 		{AccountCode: creditAcct, Credit: netPay, PartyID: &partner},
 	}
 	if withholdingTotal > 0.0001 {
-		lines = append(lines, ledger.PostingLine{AccountCode: "2360", Credit: withholdingTotal, PartyID: &partner})
+		lines = append(lines, ledger.PostingLine{AccountCode: ewtPayableCode, Credit: withholdingTotal, PartyID: &partner})
 	}
 	return ledger.PostingEvent{
 		TenantID:   tenantID,
@@ -66,6 +70,25 @@ func buildPVPostingEvent(tenantID, paymentID, partnerID int64, amountTotal, with
 		SourceID:   paymentID,
 		Lines:      lines,
 	}
+}
+
+func resolveEWTPayableCode(ctx context.Context, q rowQuerier, tenantID int64) (string, error) {
+	id, err := financedefaults.ResolveByRole(ctx, q, tenantID, financedefaults.RoleEWTPayable)
+	if err != nil {
+		return "2360", nil
+	}
+	var code string
+	if err := q.QueryRow(ctx, `
+		select account_code from public.fin_accounts
+		where id = $1 and tenant_id = $2 and deleted_at is null`, id, tenantID).Scan(&code); err != nil {
+		return "2360", nil
+	}
+	return code, nil
+}
+
+func mustEWTPayableCode(ctx context.Context, q rowQuerier, tenantID int64) string {
+	code, _ := resolveEWTPayableCode(ctx, q, tenantID)
+	return code
 }
 
 type rowQuerier interface {

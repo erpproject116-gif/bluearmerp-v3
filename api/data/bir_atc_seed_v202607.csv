@@ -1,0 +1,25 @@
+# DISCLAIMER: Published BIR ATC reference for ERP setup only. Your CPA must verify rates, applicability, and RR references before filing.
+# Source: Commonly cited PH EWT/FWT ATC tables (Jul 2026). Not legal or tax advice.
+code,atc_code,tax_type,description,rate_pct,income_payment_type,rr_reference,effective_from,effective_to,legacy_code
+WC010,WC010,EWT,Income payment to suppliers of goods,1.0,goods,RR-2-1998,2020-01-01,,WHT001
+WC020,WC020,EWT,Income payment to suppliers of services,2.0,services,RR-2-1998,2020-01-01,,WHT002
+WC030,WC030,EWT,Income payment to suppliers (15%),15.0,services,RR-2-1998,2020-01-01,,WHT015
+WC120,WC120,EWT,Professional fees paid to juridical persons,10.0,professional,RR-2-1998,2020-01-01,,WHT010
+WC160,WC160,EWT,Rental of real property,5.0,rent,RR-2-1998,2020-01-01,,WHT005
+WC515,WC515,EWT,Commission and brokerage fees,10.0,commission,RR-2-1998,2020-01-01,,
+WI010,WI010,EWT,Professional/talent fees (individual) 10%,10.0,professional,RR-2-1998,2020-01-01,,
+WI020,WI020,EWT,Professional/talent fees (individual) 5%,5.0,professional,RR-2-1998,2020-01-01,,
+WI030,WI030,EWT,Professional/talent fees (individual) 15%,15.0,professional,RR-2-1998,2020-01-01,,
+WI050,WI050,EWT,Professional/talent fees (individual) 2%,2.0,professional,RR-2-1998,2020-01-01,,
+WI100,WI100,EWT,Income distribution to beneficiaries,10.0,other,RR-2-1998,2020-01-01,,
+WI151,WI151,EWT,Income payment to OCW / seaman,5.0,compensation,RR-2-1998,2020-01-01,,
+WI156,WI156,EWT,Income payment to OCW / seaman (agency),2.0,compensation,RR-2-1998,2020-01-01,,
+WI330,WI330,EWT,Income payment to non-resident alien,25.0,other,RR-2-1998,2020-01-01,,
+WB010,WB010,FWT,Fringe benefit tax,35.0,fringe,RR-3-1998,2020-01-01,,
+WC100,WC100,EWT,Rental of personal property,5.0,rent,RR-2-1998,2020-01-01,,
+WC140,WC140,EWT,Income payment to general professional partnerships,10.0,professional,RR-2-1998,2020-01-01,,
+WC170,WC170,EWT,Income payment to partners in GPP,10.0,professional,RR-2-1998,2020-01-01,,
+WC190,WC190,EWT,Income payment to top management,20.0,compensation,RR-2-1998,2020-01-01,,
+WC250,WC250,EWT,Income payment to non-resident alien (corporate),25.0,other,RR-2-1998,2020-01-01,,
+WC280,WC280,EWT,Income payment to non-resident alien (individual),25.0,other,RR-2-1998,2020-01-01,,
+COMP01,COMP01,compensation,Compensation withholding (payroll),0.0,compensation,RR-2-1998,2020-01-01,,

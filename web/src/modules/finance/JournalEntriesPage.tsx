@@ -11,8 +11,9 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 
 type JournalEntryRow = { id: number; entry_no: string; status: string; remarks?: string };
 
-type JournalLine = { account_code: string; debit: string; credit: string };
+type JournalLine = { account_code: string; debit: string; credit: string; dept_id: string; project_id: string };
 type AccountOption = { id: number; account_code: string; account_name: string; is_active: boolean };
+type DimOption = { id: number; name?: string; department_name?: string; project_name?: string };
 
 export default function JournalEntriesPage() {
   const toast = useToast();
@@ -21,8 +22,8 @@ export default function JournalEntriesPage() {
   const [modalOpen, setModalOpen] = createSignal(false);
   const [remarks, setRemarks] = createSignal("");
   const [lines, setLines] = createSignal<JournalLine[]>([
-    { account_code: "", debit: "", credit: "" },
-    { account_code: "", debit: "", credit: "" },
+    { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
+    { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
   ]);
   const [saving, setSaving] = createSignal(false);
   const [posting, setPosting] = createSignal(false);
@@ -45,13 +46,31 @@ export default function JournalEntriesPage() {
     },
   }));
 
+  const departments = createQuery(() => ({
+    queryKey: ["hr-departments-picker"],
+    queryFn: async () => {
+      const res = await apiFetch<DimOption[]>("/api/v1/hr/departments?page=1&pageSize=200");
+      if (!res.success) return [];
+      return res.data ?? [];
+    },
+  }));
+
+  const projects = createQuery(() => ({
+    queryKey: ["inv-projects-picker"],
+    queryFn: async () => {
+      const res = await apiFetch<DimOption[]>("/api/v1/inventory/projects?page=1&pageSize=200");
+      if (!res.success) return [];
+      return res.data ?? [];
+    },
+  }));
+
   const invalidate = () => void client.invalidateQueries({ queryKey: ["journal-entries"] });
 
   const openCreate = () => {
     setRemarks("");
     setLines([
-      { account_code: "", debit: "", credit: "" },
-      { account_code: "", debit: "", credit: "" },
+      { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
+      { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
     ]);
     setModalOpen(true);
   };
@@ -62,7 +81,7 @@ export default function JournalEntriesPage() {
     getPayload: () => ({ remarks: remarks(), lines: lines() }),
     onApply: (payload) => {
       setRemarks(payload.remarks);
-      setLines(payload.lines?.length ? payload.lines : [{ account_code: "", debit: "", credit: "" }, { account_code: "", debit: "", credit: "" }]);
+      setLines(payload.lines?.length ? payload.lines : [{ account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }, { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }]);
     },
     enabled: () => modalOpen(),
     autoApply: () => modalOpen(),
@@ -74,6 +93,8 @@ export default function JournalEntriesPage() {
         account_code: ln.account_code.trim(),
         debit: Number(ln.debit) || 0,
         credit: Number(ln.credit) || 0,
+        dept_id: ln.dept_id ? Number(ln.dept_id) : undefined,
+        project_id: ln.project_id ? Number(ln.project_id) : undefined,
       }))
       .filter((ln) => ln.account_code);
     if (parsed.length < 2) {
@@ -208,7 +229,7 @@ export default function JournalEntriesPage() {
           <p class="text-sm font-medium text-text-primary">Lines</p>
           <For each={lines()}>
             {(ln, i) => (
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-5 gap-2">
                 <select
                   class={inputClass}
                   value={ln.account_code}
@@ -222,6 +243,34 @@ export default function JournalEntriesPage() {
                       <option value={acc.account_code}>
                         {acc.account_code} - {acc.account_name}
                       </option>
+                    )}
+                  </For>
+                </select>
+                <select
+                  class={inputClass}
+                  value={ln.dept_id}
+                  onChange={(e) =>
+                    setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, dept_id: e.currentTarget.value } : r)))
+                  }
+                >
+                  <option value="">Dept (opt)</option>
+                  <For each={departments.data ?? []}>
+                    {(d) => (
+                      <option value={d.id}>{d.department_name ?? d.name ?? `#${d.id}`}</option>
+                    )}
+                  </For>
+                </select>
+                <select
+                  class={inputClass}
+                  value={ln.project_id}
+                  onChange={(e) =>
+                    setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, project_id: e.currentTarget.value } : r)))
+                  }
+                >
+                  <option value="">Project (opt)</option>
+                  <For each={projects.data ?? []}>
+                    {(p) => (
+                      <option value={p.id}>{p.project_name ?? p.name ?? `#${p.id}`}</option>
                     )}
                   </For>
                 </select>
@@ -249,7 +298,7 @@ export default function JournalEntriesPage() {
           <button
             type="button"
             class="text-sm text-brand-600 hover:underline"
-            onClick={() => setLines((rows) => [...rows, { account_code: "", debit: "", credit: "" }])}
+            onClick={() => setLines((rows) => [...rows, { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }])}
           >
             + Add line
           </button>

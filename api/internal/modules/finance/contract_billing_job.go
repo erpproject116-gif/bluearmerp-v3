@@ -22,9 +22,17 @@ type billMilestonesResult struct {
 	StatusSynced     int `json:"status_synced"`
 }
 
+type runRecurringJobResult struct {
+	TenantsProcessed int `json:"tenants_processed"`
+	InvoicesGenerated int `json:"invoices_generated"`
+	Errors           []string `json:"errors,omitempty"`
+}
+
 // RegisterJobRoutes mounts secret-protected contract billing cron endpoints.
 func RegisterJobRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/finance/jobs/bill-contract-milestones", billContractMilestonesJob(pool))
+	r.Post("/finance/jobs/run-recurring-invoices", runRecurringInvoicesJob(pool))
+	registerRecurringExpenseJobRoutes(r, pool)
 }
 
 func billContractMilestonesJob(pool *pgxpool.Pool) http.HandlerFunc {
@@ -191,4 +199,76 @@ func CountUnbilledDueMilestones(ctx context.Context, pool *pgxpool.Pool, tenantI
 		  and m.due_date is not null
 		  and m.due_date <= $2::date`, tenantID, today).Scan(&count)
 	return count, err
+}
+
+func runRecurringInvoicesJob(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		secret := strings.TrimSpace(os.Getenv("FINANCE_JOB_SECRET"))
+		if secret == "" {
+			secret = strings.TrimSpace(os.Getenv("CRM_JOB_SECRET"))
+		}
+		if secret == "" {
+			response.Err(w, http.StatusServiceUnavailable, "Finance job secret not configured.", "ERR_UNAVAILABLE")
+			return
+		}
+		hdr := strings.TrimSpace(r.Header.Get("X-Finance-Job-Secret"))
+		if hdr == "" {
+			hdr = strings.TrimSpace(r.Header.Get("X-CRM-Job-Secret"))
+		}
+		if hdr != secret {
+			response.Err(w, http.StatusUnauthorized, "Invalid job secret.", "ERR_UNAUTHORIZED")
+			return
+		}
+
+		tenantFilter := int64(0)
+		if v := strings.TrimSpace(r.URL.Query().Get("tenant_id")); v != "" {
+			var id int64
+			if _, err := fmt.Sscan(v, &id); err == nil && id > 0 {
+				tenantFilter = id
+			}
+		}
+
+		result, err := runRecurringInvoicesJobAllTenants(r.Context(), pool, tenantFilter)
+		if err != nil {
+			log.Printf("finance recurring invoices job: %v", err)
+			response.Err(w, http.StatusInternalServerError, "Recurring invoices job failed.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, result, "Processed.")
+	}
+}
+
+func runRecurringInvoicesJobAllTenants(ctx context.Context, pool *pgxpool.Pool, tenantFilter int64) (runRecurringJobResult, error) {
+	var result runRecurringJobResult
+	today := time.Now().Format("2006-01-02")
+
+	tenantQ := `select id from public.tenants where status = 'active'`
+	args := []any{}
+	if tenantFilter > 0 {
+		tenantQ += ` and id = $1`
+		args = append(args, tenantFilter)
+	}
+	rows, err := pool.Query(ctx, tenantQ, args...)
+	if err != nil {
+		return result, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tenantID int64
+		if err := rows.Scan(&tenantID); err != nil {
+			return result, err
+		}
+		result.TenantsProcessed++
+
+		tenantResult, err := runDueRecurringInvoicesForTenant(ctx, pool, tenantID, nil, today)
+		if err != nil {
+			return result, err
+		}
+		result.InvoicesGenerated += tenantResult.Processed
+		if len(tenantResult.Errors) > 0 {
+			result.Errors = append(result.Errors, tenantResult.Errors...)
+		}
+	}
+	return result, rows.Err()
 }

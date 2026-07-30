@@ -24,6 +24,9 @@ export const acctIINavLinks: AcctNavLink[] = [
   { label: "Payables", href: "/app/finance/disbursements", permissionCode: "finance.reports_ap_by_vendor", headerPriority: "primary" },
   { label: "Check Register", href: "/app/finance/acct-ii/checks", permissionCode: "finance.check_read", headerPriority: "primary" },
   { label: "Withholding Tax", href: "/app/finance/acct-ii/withholding-codes", permissionCode: "finance.withholding_read", headerPriority: "overflow" },
+  { label: "BIR Statutory", href: "/app/finance/statutory", permissionCode: "finance.statutory_read", headerPriority: "overflow" },
+  { label: "BIR Taxpayer", href: "/app/finance/statutory/taxpayer-profile", permissionCode: "finance.statutory_read", headerPriority: "overflow" },
+  { label: "Document Series", href: "/app/finance/statutory/document-series", permissionCode: "finance.statutory_read", headerPriority: "overflow" },
   { label: "Notes", href: "/app/finance/acct-ii/notes", permissionCode: "finance.note_read", headerPriority: "overflow" },
   { label: "Landed Cost", href: "/app/finance/acct-ii/landed-costs", permissionCode: "finance.landed_cost_read", headerPriority: "overflow" },
   { label: "Contracts", href: "/app/finance/acct-ii/contracts", permissionCode: "finance.contract_read", headerPriority: "overflow" },
@@ -38,6 +41,8 @@ export const acctIINavLinks: AcctNavLink[] = [
 
 export function isAcctIIPath(pathname: string): boolean {
   if (pathname.startsWith(ACCT_II_PREFIX)) return true;
+  if (pathname.startsWith("/app/finance/statutory")) return true;
+  if (pathname.startsWith("/app/finance/statutory")) return true;
   if (pathname.startsWith("/app/finance/budgets")) return true;
   if (pathname.startsWith("/app/finance/collections")) return true;
   if (pathname.startsWith("/app/finance/disbursements")) return true;

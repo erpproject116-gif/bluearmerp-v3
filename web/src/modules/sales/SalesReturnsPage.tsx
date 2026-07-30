@@ -66,6 +66,7 @@ export default function SalesReturnsPage() {
   const [returnSerials, setReturnSerials] = createSignal<Record<number, number[]>>({});
   const [creating, setCreating] = createSignal(false);
   const [submittingId, setSubmittingId] = createSignal<number | null>(null);
+  const [creditNoteBusyId, setCreditNoteBusyId] = createSignal<number | null>(null);
 
   const list = createQuery(() => ({
     queryKey: ["sales-returns"],
@@ -170,6 +171,21 @@ export default function SalesReturnsPage() {
     invalidate();
   };
 
+  const createCreditNote = async (row: SalesReturnRow) => {
+    if (row.status !== "submitted") return;
+    setCreditNoteBusyId(row.id);
+    const res = await apiFetch<{ id: number; credit_no: string }>(
+      `/api/v1/finance/credit-notes/from-sales-return/${row.id}`,
+      { method: "POST" },
+    );
+    setCreditNoteBusyId(null);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to create credit note.");
+      return;
+    }
+    toast.success(`Draft credit note ${res.data?.credit_no ?? "created"}. Open Credit Notes to review.`);
+  };
+
   return (
     <div class="space-y-4">
       <div class="flex items-center justify-between">
@@ -212,6 +228,16 @@ export default function SalesReturnsPage() {
                         targetId={row.id}
                         title={`History — ${row.return_no}`}
                       />
+                      <Show when={row.status === "submitted"}>
+                        <button
+                          type="button"
+                          class="text-brand-600 hover:underline disabled:opacity-50"
+                          disabled={creditNoteBusyId() === row.id}
+                          onClick={() => void createCreditNote(row)}
+                        >
+                          {creditNoteBusyId() === row.id ? "Creating…" : "Create credit note"}
+                        </button>
+                      </Show>
                       <Show when={row.status === "draft"}>
                         <button
                           type="button"

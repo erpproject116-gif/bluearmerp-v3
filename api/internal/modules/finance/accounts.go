@@ -411,6 +411,8 @@ func importAccountTemplate(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to import template.", "ERR_INTERNAL")
 			return
 		}
+		// Zoho-style group headers (migration 226); ignore if function not yet applied.
+		_, _ = pool.Exec(r.Context(), `select public.apply_ph_sme_coa_hierarchy($1)`, tu.TenantID)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.account.import_template", "fin_account", nil, nil, body)
 
 		var total int64
@@ -617,6 +619,10 @@ func validateFinanceDefaults(r *http.Request, pool *pgxpool.Pool, tenantID int64
 		{"output_vat_account_id", body.OutputVATAccountID, []string{"liability"}},
 		{"commission_expense_account_id", body.CommissionExpenseAccountID, []string{"expense"}},
 		{"commission_payable_account_id", body.CommissionPayableAccountID, []string{"liability"}},
+		{"ewt_payable_account_id", body.EWTPayableAccountID, []string{"liability"}},
+		{"fwt_payable_account_id", body.FWTPayableAccountID, []string{"liability"}},
+		{"compensation_wht_payable_account_id", body.CompensationWHTPayableAccountID, []string{"liability"}},
+		{"ewt_receivable_account_id", body.EWTReceivableAccountID, []string{"asset"}},
 	}
 	for _, c := range checks {
 		if c.id == nil || *c.id <= 0 {

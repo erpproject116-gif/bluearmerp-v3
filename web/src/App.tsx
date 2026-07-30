@@ -127,6 +127,7 @@ import {
   SalesArByCustomerPage,
   CustomerCreditBalancePage,
   CreditNotesPage,
+  CreditNotePrintPage,
   RetainerInvoicesPage,
   RecurringInvoicesPage,
   SalesDiscountStatusPage,
@@ -263,6 +264,7 @@ import {
   ChartOfAccountsPage,
   BankReconciliationPage,
   BankingPage,
+  BankingAccountPage,
   FiscalYearsPage,
   BuyingWorkspacePage,
   PurchaseStatusPage,
@@ -272,6 +274,9 @@ import {
   CollectionsHubPage,
   DisbursementsHubPage,
   ExpensesPage,
+  RecurringExpensesPage,
+  VendorCreditsPage,
+  VendorCreditPrintPage,
   SellingWorkspacePage,
   SellingReportsPage,
   BuyingReportsHubPage,
@@ -296,6 +301,20 @@ import {
   ShippingRulesPage,
   DeliveryTripsPage,
   WithholdingCodesPage,
+  TaxpayerProfilePage,
+  DocumentSeriesPage,
+  StatutoryHubPage,
+  Bir2307CertificatesPage,
+  Statutory1601EQPage,
+  CompensationWHTPage,
+  BooksOfAccountsPage,
+  StatutoryAttachmentsPage,
+  YearEndClosePage,
+  Statutory2550Page,
+  VatSalesRegisterPage,
+  VatPurchasesRegisterPage,
+  PercentageTaxStubPage,
+  Bir2307CertificatePrintPage,
   CheckRegisterPage,
   NotesPage,
   LandedCostPage,
@@ -398,7 +417,11 @@ export default function App() {
         <Route path="/app/sales/sales/:id/invoice/print" component={SalesInvoicePrintPage} />
         <Route path="/app/finance/supplier-invoices/:id/print" component={PurchaseInvoicePrintPage} />
         <Route path="/app/purchases/purchases/:id/print" component={PurchaseInvoicePrintPage} />
+        <Route path="/app/sales/credit-notes/:id/print" component={CreditNotePrintPage} />
+        <Route path="/app/purchases/vendor-credits/:id/print" component={VendorCreditPrintPage} />
+        <Route path="/app/buying/vendor-credits/:id/print" component={VendorCreditPrintPage} />
         <Route path="/app/finance/payment-vouchers/:id/2307" component={Bir2307PrintPage} />
+        <Route path="/app/finance/statutory/2307-certificates/:id/print" component={Bir2307CertificatePrintPage} />
         <Route path="/app/sales/reports/discount-status/print" component={SalesDiscountStatusPrintPage} />
         <Route path="/app/sales/collective-invoicing/status/print" component={CollectiveInvoiceStatusPrintPage} />
         <Route path="/app/sales/collective-invoicing/:id/slip/print" component={CollectiveInvoiceSlipPrintPage} />
@@ -585,13 +608,28 @@ export default function App() {
           <Route path="/finance/acct-ii/landed-costs" component={LandedCostPage} />
           <Route path="/finance/acct-ii/notes" component={NotesPage} />
           <Route path="/finance/acct-ii/withholding-codes" component={WithholdingCodesPage} />
+          <Route path="/finance/statutory" component={StatutoryHubPage} />
+          <Route path="/finance/statutory/taxpayer-profile" component={TaxpayerProfilePage} />
+          <Route path="/finance/statutory/document-series" component={DocumentSeriesPage} />
+          <Route path="/finance/statutory/2307-certificates" component={Bir2307CertificatesPage} />
+          <Route path="/finance/statutory/1601-eq" component={Statutory1601EQPage} />
+          <Route path="/finance/statutory/compensation-wht" component={CompensationWHTPage} />
+          <Route path="/finance/statutory/books" component={BooksOfAccountsPage} />
+          <Route path="/finance/statutory/year-end-close" component={YearEndClosePage} />
+          <Route path="/finance/statutory/attachments" component={StatutoryAttachmentsPage} />
+          <Route path="/finance/statutory/vat/sales" component={VatSalesRegisterPage} />
+          <Route path="/finance/statutory/vat/purchases" component={VatPurchasesRegisterPage} />
+          <Route path="/finance/statutory/2550" component={Statutory2550Page} />
+          <Route path="/finance/statutory/percentage-tax" component={PercentageTaxStubPage} />
           <Route path="/finance/acct-ii/checks" component={CheckRegisterPage} />
           <Route path="/finance/acct-ii/setup" component={ModuleSetupHubPage} />
           <Route path="/finance/collections" component={CollectionsHubPage} />
           <Route path="/finance/disbursements" component={DisbursementsHubPage} />
           <Route path="/purchases/expenses" component={ExpensesPage} />
+          <Route path="/purchases/recurring-expenses" component={RecurringExpensesPage} />
+          <Route path="/purchases/vendor-credits" component={VendorCreditsPage} />
           <Route path="/buying/expenses" component={ExpensesPage} />
-          <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
+          <Route path="/buying/vendor-credits" component={VendorCreditsPage} />          <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
           <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
           <Route path="/finance/acct-i/reports/cash-flow-statement" component={CashFlowStatementPage} />
           <Route path="/finance/acct-i/reports/cash-book" component={() => <CashBookReportPage />} />
@@ -602,6 +640,7 @@ export default function App() {
           <Route path="/finance/acct-i/payment-entries" component={PaymentEntriesPage} />
           <Route path="/finance/acct-i/bank-reconciliation" component={BankReconciliationPage} />
           <Route path="/finance/banking" component={BankingPage} />
+          <Route path="/finance/banking/:id" component={BankingAccountPage} />
           <Route path="/finance/acct-i/fiscal-years" component={FiscalYearsPage} />
           <Route path="/finance/acct-i/chart-of-accounts" component={ChartOfAccountsPage} />
           <Route path="/finance/acct-i/journal-entries" component={JournalEntriesPage} />

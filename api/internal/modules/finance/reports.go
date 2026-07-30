@@ -146,12 +146,7 @@ func arByCustomerBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID,
 		    coalesce(sum(s.grand_total), 0)::float8 as inv_sales,
 		    coalesce(sum(recv.received), 0)::float8 as total_received
 		  from public.sa_sales s
-		  left join lateral (
-		    select coalesce(sum(a.applied_amount), 0)::float8 as received
-		    from public.fin_receipt_applications a
-		    join public.fin_official_receipts r on r.id = a.official_receipt_id
-		    where a.sales_id = s.id and r.deleted_at is null
-		  ) recv on true
+		  `+saleAppliedLateralSQL("s")+`
 		  where s.tenant_id = $1 and s.deleted_at is null%s%s
 		  group by s.partner_id
 		),
@@ -335,12 +330,7 @@ func receiptStatusFromClause() string {
 		from public.sa_sales s
 		join public.sa_sales_lines ln on ln.sales_id = s.id
 		join public.inv_partners p on p.id = s.partner_id
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as received
-		  from public.fin_receipt_applications a
-		  join public.fin_official_receipts r on r.id = a.official_receipt_id
-		  where a.sales_id = s.id and r.deleted_at is null
-		) recv on true`
+		` + saleAppliedLateralSQL("s")
 }
 
 func buildReceiptStatusWhere(f receiptStatusFilters, tenantID int64) (string, []any) {

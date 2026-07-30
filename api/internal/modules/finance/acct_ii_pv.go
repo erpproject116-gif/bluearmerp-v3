@@ -95,9 +95,33 @@ func sumWithholdingTax(ctx context.Context, tx pgx.Tx, tenantID int64, lines []w
 	return total, nil
 }
 
+func replaceWithholdingLines(ctx context.Context, tx pgx.Tx, tenantID int64, refType string, refID int64, lines []withholdingLineBody) error {
+	if _, err := tx.Exec(ctx, `
+		delete from public.fin_withholding_tax_lines
+		where tenant_id = $1 and ref_type = $2 and ref_id = $3`, tenantID, refType, refID); err != nil {
+		return err
+	}
+	return insertWithholdingLines(ctx, tx, tenantID, refType, refID, lines)
+}
+
+func sumWithholdingTaxAmounts(ctx context.Context, q rowQuerier, tenantID int64, refType string, refID int64) (float64, error) {
+	var total *float64
+	err := q.QueryRow(ctx, `
+		select coalesce(sum(tax_amount), 0)::float8
+		from public.fin_withholding_tax_lines
+		where tenant_id = $1 and ref_type = $2 and ref_id = $3`, tenantID, refType, refID).Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	if total == nil {
+		return 0, nil
+	}
+	return *total, nil
+}
+
 func listWithholdingLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, refType string, refID int64) ([]WithholdingLineResponse, error) {
 	rows, err := pool.Query(ctx, `
-		select wl.id, wl.tax_code_id, tc.code, tc.description, tc.rate_pct::float8, wl.base_amount::float8, wl.tax_amount::float8
+		select wl.id, wl.tax_code_id, coalesce(nullif(trim(tc.atc_code), ''), tc.code), tc.description, tc.rate_pct::float8, wl.base_amount::float8, wl.tax_amount::float8
 		from public.fin_withholding_tax_lines wl
 		join public.fin_withholding_tax_codes tc on tc.id = wl.tax_code_id
 		where wl.tenant_id = $1 and wl.ref_type = $2 and wl.ref_id = $3

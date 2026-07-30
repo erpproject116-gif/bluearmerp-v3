@@ -88,12 +88,7 @@ func arAgingSQL(extraWhere string) string {
 		  end as age_bucket
 		from public.sa_sales s
 		join public.inv_partners p on p.id = s.partner_id
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as received
-		  from public.fin_receipt_applications a
-		  join public.fin_official_receipts r on r.id = a.official_receipt_id
-		  where a.sales_id = s.id and r.deleted_at is null
-		) recv on true
+		` + saleAppliedLateralSQL("s") + `
 		where s.tenant_id = $1
 		  and s.deleted_at is null
 		  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001` + extraWhere

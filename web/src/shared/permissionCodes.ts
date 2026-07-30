@@ -95,6 +95,9 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/finance/disbursements": "finance.reports_ap_by_vendor",
   "/app/purchases/expenses": "finance.expenses",
   "/app/buying/expenses": "finance.expenses",
+  "/app/purchases/recurring-expenses": "finance.recurring_expenses",
+  "/app/purchases/vendor-credits": "finance.vendor_credits",
+  "/app/buying/vendor-credits": "finance.vendor_credits",
   "/app/sales/credit-notes": "finance.credit_notes",
   "/app/sales/retainer-invoices": "finance.retainers",
   "/app/sales/recurring-invoices": "finance.recurring_invoices",
@@ -217,6 +220,15 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/hr/employees/settings": "hr.employees",
   "/app/finance/acct-ii/checks": "finance.check_read",
   "/app/finance/acct-ii/withholding-codes": "finance.withholding_read",
+  "/app/finance/statutory": "finance.statutory_read",
+  "/app/finance/statutory/taxpayer-profile": "finance.statutory_read",
+  "/app/finance/statutory/document-series": "finance.statutory_read",
+  "/app/finance/statutory/2307-certificates": "finance.statutory_read",
+  "/app/finance/statutory/1601-eq": "finance.statutory_read",
+  "/app/finance/statutory/vat/sales": "finance.statutory_read",
+  "/app/finance/statutory/vat/purchases": "finance.statutory_read",
+  "/app/finance/statutory/2550": "finance.statutory_read",
+  "/app/finance/statutory/percentage-tax": "finance.statutory_read",
   "/app/finance/acct-ii/notes": "finance.note_read",
   "/app/finance/acct-ii/landed-costs": "finance.landed_cost_read",
   "/app/finance/acct-ii/contracts": "finance.contract_read",
@@ -236,6 +248,7 @@ export function permissionCodeForHref(href: string): string | undefined {
   if (path.startsWith("/app/booking/")) return "booking.bookings";
   if (path.startsWith("/app/user-management/migration-center")) return "migration.center";
   if (path.startsWith("/app/finance/budgets/")) return "finance.budget_read";
+  if (path.startsWith("/app/finance/banking")) return "finance.official_receipts";
   const base = path.replace(/\/settings$/, "").replace(/\/new$/, "");
   return hrefPermissionCode[base];
 }

@@ -69,6 +69,8 @@ func createJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 				AccountCode string  `json:"account_code"`
 				Debit       float64 `json:"debit"`
 				Credit      float64 `json:"credit"`
+				DeptID      *int64  `json:"dept_id,omitempty"`
+				ProjectID   *int64  `json:"project_id,omitempty"`
 			} `json:"lines"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Lines) < 2 {
@@ -99,8 +101,8 @@ func createJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			_, err = tx.Exec(r.Context(), `
-				insert into public.fin_journal_entry_lines (journal_entry_id, line_no, account_id, debit, credit)
-				values ($1,$2,$3,$4,$5)`, id, i+1, accountID, ln.Debit, ln.Credit)
+				insert into public.fin_journal_entry_lines (journal_entry_id, line_no, account_id, debit, credit, dept_id, project_id)
+				values ($1,$2,$3,$4,$5,$6,$7)`, id, i+1, accountID, ln.Debit, ln.Credit, ln.DeptID, ln.ProjectID)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to insert line.", "ERR_INTERNAL")
 				return

@@ -152,6 +152,7 @@ func main() {
 			comms.RegisterRoutes(protected, pool)
 			processpolicy.RegisterRoutes(protected, pool)
 			approval.RegisterRoutes(protected, pool)
+			approval.RegisterAmountPolicyRoutes(protected, pool)
 			docgen.RegisterRoutes(protected, pool)
 			demodata.RegisterRoutes(protected, pool)
 			activitylog.RegisterRoutes(protected, pool)
