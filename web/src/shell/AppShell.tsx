@@ -455,12 +455,12 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   );
 
   return (
-    <Show when={auth.me} fallback={layout}>
-      <HelpAssistantProvider>
-        {layout}
+    <HelpAssistantProvider>
+      {layout}
+      <Show when={auth.me}>
         <OnboardingProminentPanel />
-      </HelpAssistantProvider>
-    </Show>
+      </Show>
+    </HelpAssistantProvider>
   );
 }
 
