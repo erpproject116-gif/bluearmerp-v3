@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
@@ -17,6 +18,8 @@ type BankAccount = {
   gl_account_name?: string;
   keyword?: string | null;
   remark?: string | null;
+  opening_balance?: number;
+  opening_balance_date?: string | null;
   is_active: boolean;
 };
 
@@ -47,6 +50,8 @@ function emptyForm() {
     gl_account_code: "",
     keyword: "",
     remark: "",
+    opening_balance: "0",
+    opening_balance_date: new Date().toISOString().slice(0, 10),
   };
 }
 
@@ -114,6 +119,8 @@ export default function BankingPage() {
       gl_account_code: row.gl_account_code,
       keyword: row.keyword ?? "",
       remark: row.remark ?? "",
+      opening_balance: String(row.opening_balance ?? 0),
+      opening_balance_date: row.opening_balance_date ?? new Date().toISOString().slice(0, 10),
     });
     setFormOpen(true);
   };
@@ -142,6 +149,8 @@ export default function BankingPage() {
       gl_account_code: f.gl_account_code,
       keyword: f.keyword.trim() || null,
       remark: f.remark.trim() || null,
+      opening_balance: Number(f.opening_balance) || 0,
+      opening_balance_date: f.opening_balance_date || null,
     };
     const ed = editing();
     const res = ed
@@ -179,7 +188,11 @@ export default function BankingPage() {
       <div class="flex items-start justify-between gap-2">
         <div>
           <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">{typeLabel(props.row.account_type)}</p>
-          <h3 class="mt-1 text-base font-semibold text-text-primary">{props.row.bank_account_name}</h3>
+          <h3 class="mt-1 text-base font-semibold text-text-primary">
+            <A href={`/app/finance/banking/${props.row.id}`} class="hover:text-brand-600 hover:underline">
+              {props.row.bank_account_name}
+            </A>
+          </h3>
           <p class="text-sm text-text-secondary">{props.row.bank_account_code}</p>
         </div>
         <Show when={!props.row.is_active}>
@@ -200,6 +213,10 @@ export default function BankingPage() {
           </div>
         </Show>
         <div class="flex justify-between gap-2">
+          <dt class="text-text-secondary">Opening</dt>
+          <dd>{formatPeso(props.row.opening_balance ?? 0)}</dd>
+        </div>
+        <div class="flex justify-between gap-2">
           <dt class="text-text-secondary">GL</dt>
           <dd class="text-right">
             {props.row.gl_account_code}
@@ -210,11 +227,23 @@ export default function BankingPage() {
         </div>
       </dl>
       <div class="mt-4 flex flex-wrap gap-2">
+        <A href={`/app/finance/banking/${props.row.id}`} class="text-sm text-brand-600 hover:underline">
+          Register
+        </A>
         <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => openEdit(props.row)}>
           Edit
         </button>
-        <A href="/app/finance/acct-i/bank-reconciliation" class="text-sm text-text-secondary hover:underline">
+        <A
+          href={`/app/finance/acct-i/bank-reconciliation?bank_account_id=${props.row.id}`}
+          class="text-sm text-text-secondary hover:underline"
+        >
           Reconcile
+        </A>
+        <A
+          href={`/app/finance/banking/${props.row.id}?transfer=1`}
+          class="text-sm text-text-secondary hover:underline"
+        >
+          Transfer
         </A>
         <Show when={props.row.is_active}>
           <button type="button" class="text-sm text-red-600 hover:underline" onClick={() => void deactivate(props.row)}>
@@ -421,6 +450,27 @@ export default function BankingPage() {
                 </For>
               </select>
             </label>
+            <div class="mb-3 grid grid-cols-2 gap-3">
+              <label class="block text-sm">
+                <span class="text-text-secondary">Opening balance</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  class="mt-1 w-full rounded border border-stroke px-2 py-1.5"
+                  value={form().opening_balance}
+                  onInput={(e) => setForm({ ...form(), opening_balance: e.currentTarget.value })}
+                />
+              </label>
+              <label class="block text-sm">
+                <span class="text-text-secondary">As of date</span>
+                <input
+                  type="date"
+                  class="mt-1 w-full rounded border border-stroke px-2 py-1.5"
+                  value={form().opening_balance_date}
+                  onInput={(e) => setForm({ ...form(), opening_balance_date: e.currentTarget.value })}
+                />
+              </label>
+            </div>
             <label class="mb-3 block text-sm">
               <span class="text-text-secondary">Keyword</span>
               <input

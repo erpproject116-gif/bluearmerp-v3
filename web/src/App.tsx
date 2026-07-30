@@ -263,6 +263,7 @@ import {
   ChartOfAccountsPage,
   BankReconciliationPage,
   BankingPage,
+  BankingAccountPage,
   FiscalYearsPage,
   BuyingWorkspacePage,
   PurchaseStatusPage,
@@ -602,6 +603,7 @@ export default function App() {
           <Route path="/finance/acct-i/payment-entries" component={PaymentEntriesPage} />
           <Route path="/finance/acct-i/bank-reconciliation" component={BankReconciliationPage} />
           <Route path="/finance/banking" component={BankingPage} />
+          <Route path="/finance/banking/:id" component={BankingAccountPage} />
           <Route path="/finance/acct-i/fiscal-years" component={FiscalYearsPage} />
           <Route path="/finance/acct-i/chart-of-accounts" component={ChartOfAccountsPage} />
           <Route path="/finance/acct-i/journal-entries" component={JournalEntriesPage} />

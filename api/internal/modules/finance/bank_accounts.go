@@ -29,6 +29,8 @@ type BankAccount struct {
 	Keyword             *string `json:"keyword,omitempty"`
 	Remark              *string `json:"remark,omitempty"`
 	ForeignCurrencyCode *string `json:"foreign_currency_code,omitempty"`
+	OpeningBalance      float64 `json:"opening_balance"`
+	OpeningBalanceDate  *string `json:"opening_balance_date,omitempty"`
 	IsActive            bool    `json:"is_active"`
 }
 
@@ -38,16 +40,18 @@ type GLAccount struct {
 }
 
 type bankAccountBody struct {
-	BankAccountCode     string  `json:"bank_account_code"`
-	BankAccountName     string  `json:"bank_account_name"`
-	AccountType         string  `json:"account_type"`
-	InstitutionName     string  `json:"institution_name"`
-	AccountNumber       string  `json:"account_number"`
-	GLAccountCode       string  `json:"gl_account_code"`
-	Keyword             *string `json:"keyword"`
-	Remark              *string `json:"remark"`
-	ForeignCurrencyCode *string `json:"foreign_currency_code"`
-	IsActive            *bool   `json:"is_active"`
+	BankAccountCode     string   `json:"bank_account_code"`
+	BankAccountName     string   `json:"bank_account_name"`
+	AccountType         string   `json:"account_type"`
+	InstitutionName     string   `json:"institution_name"`
+	AccountNumber       string   `json:"account_number"`
+	GLAccountCode       string   `json:"gl_account_code"`
+	Keyword             *string  `json:"keyword"`
+	Remark              *string  `json:"remark"`
+	ForeignCurrencyCode *string  `json:"foreign_currency_code"`
+	OpeningBalance      *float64 `json:"opening_balance"`
+	OpeningBalanceDate  *string  `json:"opening_balance_date"`
+	IsActive            *bool    `json:"is_active"`
 }
 
 func normalizeBankAccountType(raw string) string {
@@ -66,6 +70,7 @@ func registerBankAccountRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/bank-accounts", listBankAccounts(pool))
 	r.Post("/bank-accounts", createBankAccount(pool))
 	r.Patch("/bank-accounts/{id}", updateBankAccount(pool))
+	registerBankRegisterRoutes(r, pool)
 }
 
 func listGLAccounts(pool *pgxpool.Pool) http.HandlerFunc {
@@ -143,7 +148,9 @@ func listBankAccounts(pool *pgxpool.Pool) http.HandlerFunc {
 			select b.id, b.bank_account_code, b.bank_account_name,
 			  coalesce(b.account_type, 'bank'), coalesce(b.institution_name, ''), coalesce(b.account_number, ''),
 			  b.gl_account_code, g.account_name,
-			  b.keyword, b.remark, b.foreign_currency_code, b.is_active
+			  b.keyword, b.remark, b.foreign_currency_code,
+			  coalesce(b.opening_balance, 0)::float8, b.opening_balance_date::text,
+			  b.is_active
 			from public.fin_bank_accounts b
 			join public.fin_gl_accounts g on g.account_code = b.gl_account_code
 			where %s
@@ -164,7 +171,9 @@ func listBankAccounts(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.ID, &row.BankAccountCode, &row.BankAccountName,
 				&row.AccountType, &row.InstitutionName, &row.AccountNumber,
 				&row.GLAccountCode, &row.GLAccountName,
-				&row.Keyword, &row.Remark, &row.ForeignCurrencyCode, &row.IsActive,
+				&row.Keyword, &row.Remark, &row.ForeignCurrencyCode,
+				&row.OpeningBalance, &row.OpeningBalanceDate,
+				&row.IsActive,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read bank accounts.", "ERR_INTERNAL")
 				return
@@ -211,14 +220,23 @@ func createBankAccount(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"gl_account_code": "GL account not found."})
 			return
 		}
+		openingBal := 0.0
+		if body.OpeningBalance != nil {
+			openingBal = *body.OpeningBalance
+		}
+		var openingDate any
+		if body.OpeningBalanceDate != nil && strings.TrimSpace(*body.OpeningBalanceDate) != "" {
+			openingDate = strings.TrimSpace(*body.OpeningBalanceDate)
+		}
 		var id int64
 		err := pool.QueryRow(r.Context(), `
 			insert into public.fin_bank_accounts (
 			  tenant_id, bank_account_code, bank_account_name, account_type, institution_name, account_number,
-			  gl_account_code, keyword, remark, foreign_currency_code
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			  gl_account_code, keyword, remark, foreign_currency_code, opening_balance, opening_balance_date
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 			returning id`,
 			tu.TenantID, code, name, accountType, institution, accountNo, gl, body.Keyword, body.Remark, body.ForeignCurrencyCode,
+			openingBal, openingDate,
 		).Scan(&id)
 		if err != nil {
 			if strings.Contains(err.Error(), "unique") {
@@ -229,11 +247,17 @@ func createBankAccount(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.bank_account.create", "fin_bank_account", &id, nil, body)
+		var openDatePtr *string
+		if body.OpeningBalanceDate != nil && strings.TrimSpace(*body.OpeningBalanceDate) != "" {
+			d := strings.TrimSpace(*body.OpeningBalanceDate)
+			openDatePtr = &d
+		}
 		response.OK(w, BankAccount{
 			ID: id, BankAccountCode: code, BankAccountName: name,
 			AccountType: accountType, InstitutionName: institution, AccountNumber: accountNo,
 			GLAccountCode: gl, GLAccountName: glName,
-			Keyword: body.Keyword, Remark: body.Remark, ForeignCurrencyCode: body.ForeignCurrencyCode, IsActive: true,
+			Keyword: body.Keyword, Remark: body.Remark, ForeignCurrencyCode: body.ForeignCurrencyCode,
+			OpeningBalance: openingBal, OpeningBalanceDate: openDatePtr, IsActive: true,
 		}, "Created.")
 	}
 }
@@ -274,6 +298,20 @@ func updateBankAccount(pool *pgxpool.Pool) http.HandlerFunc {
 		if body.IsActive != nil {
 			active = *body.IsActive
 		}
+		openingBal := before.OpeningBalance
+		if body.OpeningBalance != nil {
+			openingBal = *body.OpeningBalance
+		}
+		var openingDate any
+		if body.OpeningBalanceDate != nil {
+			if strings.TrimSpace(*body.OpeningBalanceDate) == "" {
+				openingDate = nil
+			} else {
+				openingDate = strings.TrimSpace(*body.OpeningBalanceDate)
+			}
+		} else if before.OpeningBalanceDate != nil {
+			openingDate = *before.OpeningBalanceDate
+		}
 		var glName string
 		if err := pool.QueryRow(r.Context(), `select account_name from public.fin_gl_accounts where account_code = $1`, gl).Scan(&glName); err != nil {
 			response.Validation(w, map[string]string{"gl_account_code": "GL account not found."})
@@ -289,21 +327,30 @@ func updateBankAccount(pool *pgxpool.Pool) http.HandlerFunc {
 			  keyword = $8,
 			  remark = $9,
 			  foreign_currency_code = $10,
-			  is_active = $11,
+			  opening_balance = $11,
+			  opening_balance_date = $12,
+			  is_active = $13,
 			  updated_at = now()
 			where id = $1 and tenant_id = $2`,
 			id, tu.TenantID, name, accountType, institution, accountNo, gl,
-			body.Keyword, body.Remark, body.ForeignCurrencyCode, active)
+			body.Keyword, body.Remark, body.ForeignCurrencyCode, openingBal, openingDate, active)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusInternalServerError, "Failed to update bank account.", "ERR_INTERNAL")
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.bank_account.update", "fin_bank_account", &id, before, body)
+		var openDatePtr *string
+		if openingDate != nil {
+			if s, ok := openingDate.(string); ok {
+				openDatePtr = &s
+			}
+		}
 		response.OK(w, BankAccount{
 			ID: id, BankAccountCode: before.BankAccountCode, BankAccountName: name,
 			AccountType: accountType, InstitutionName: institution, AccountNumber: accountNo,
 			GLAccountCode: gl, GLAccountName: glName,
-			Keyword: body.Keyword, Remark: body.Remark, ForeignCurrencyCode: body.ForeignCurrencyCode, IsActive: active,
+			Keyword: body.Keyword, Remark: body.Remark, ForeignCurrencyCode: body.ForeignCurrencyCode,
+			OpeningBalance: openingBal, OpeningBalanceDate: openDatePtr, IsActive: active,
 		}, "Updated.")
 	}
 }
@@ -314,14 +361,18 @@ func lookupBankAccount(ctx context.Context, pool *pgxpool.Pool, tenantID, id int
 		select b.id, b.bank_account_code, b.bank_account_name,
 		  coalesce(b.account_type, 'bank'), coalesce(b.institution_name, ''), coalesce(b.account_number, ''),
 		  b.gl_account_code, g.account_name,
-		  b.keyword, b.remark, b.foreign_currency_code, b.is_active
+		  b.keyword, b.remark, b.foreign_currency_code,
+		  coalesce(b.opening_balance, 0)::float8, b.opening_balance_date::text,
+		  b.is_active
 		from public.fin_bank_accounts b
 		join public.fin_gl_accounts g on g.account_code = b.gl_account_code
 		where b.id = $1 and b.tenant_id = $2`, id, tenantID).Scan(
 		&row.ID, &row.BankAccountCode, &row.BankAccountName,
 		&row.AccountType, &row.InstitutionName, &row.AccountNumber,
 		&row.GLAccountCode, &row.GLAccountName,
-		&row.Keyword, &row.Remark, &row.ForeignCurrencyCode, &row.IsActive,
+		&row.Keyword, &row.Remark, &row.ForeignCurrencyCode,
+		&row.OpeningBalance, &row.OpeningBalanceDate,
+		&row.IsActive,
 	)
 	return row, err
 }

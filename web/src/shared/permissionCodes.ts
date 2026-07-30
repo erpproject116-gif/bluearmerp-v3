@@ -236,6 +236,7 @@ export function permissionCodeForHref(href: string): string | undefined {
   if (path.startsWith("/app/booking/")) return "booking.bookings";
   if (path.startsWith("/app/user-management/migration-center")) return "migration.center";
   if (path.startsWith("/app/finance/budgets/")) return "finance.budget_read";
+  if (path.startsWith("/app/finance/banking")) return "finance.official_receipts";
   const base = path.replace(/\/settings$/, "").replace(/\/new$/, "");
   return hrefPermissionCode[base];
 }

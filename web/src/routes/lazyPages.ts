@@ -265,6 +265,7 @@ export const PaymentEntriesPage = lazy(() => import("../modules/finance/PaymentE
 export const ChartOfAccountsPage = lazy(() => import("../modules/finance/ChartOfAccountsPage"));
 export const BankReconciliationPage = lazy(() => import("../modules/finance/BankReconciliationPage"));
 export const BankingPage = lazy(() => import("../modules/finance/banking/BankingPage"));
+export const BankingAccountPage = lazy(() => import("../modules/finance/banking/BankingAccountPage"));
 export const FiscalYearsPage = lazy(() => import("../modules/finance/FiscalYearsPage"));
 export const SellingWorkspacePage = lazy(() => import("../modules/selling/SellingWorkspacePage"));
 export const BuyingWorkspacePage = lazy(() => import("../modules/buying/BuyingWorkspacePage"));

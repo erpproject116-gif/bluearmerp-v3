@@ -1,5 +1,6 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { formatMoney } from "../../shared/money";
 import { inputClass } from "../../shared/SpreadsheetGrid";
@@ -32,7 +33,8 @@ type StatementLine = {
 export default function BankReconciliationPage() {
   const toast = useToast();
   const client = useQueryClient();
-  const [bankAccountId, setBankAccountId] = createSignal("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [bankAccountId, setBankAccountId] = createSignal(String(searchParams.bank_account_id ?? ""));
   const [selectedStatementLineId, setSelectedStatementLineId] = createSignal<number | null>(null);
   const [matching, setMatching] = createSignal<number | null>(null);
   const [pendingMatch, setPendingMatch] = createSignal<UnmatchedPayment | null>(null);
@@ -73,6 +75,13 @@ export default function BankReconciliationPage() {
   });
 
   const selectedStatementLine = createMemo(() => (statements.data ?? []).find((s) => s.id === selectedStatementLineId()) ?? null);
+
+  createEffect(() => {
+    const fromUrl = String(searchParams.bank_account_id ?? "");
+    if (fromUrl && fromUrl !== bankAccountId()) {
+      setBankAccountId(fromUrl);
+    }
+  });
 
   createEffect(() => {
     const list = accounts.data;
@@ -137,6 +146,18 @@ export default function BankReconciliationPage() {
           <li>Click an unmatched statement line on the left.</li>
           <li>Match a payment on the right — closest amounts are listed first.</li>
         </ol>
+        <p class="mt-2">
+          Manage accounts in{" "}
+          <A href="/app/finance/banking" class="text-brand-600 hover:underline">
+            Banking
+          </A>
+          <Show when={bankAccountId()}>
+            {" · "}
+            <A href={`/app/finance/banking/${bankAccountId()}`} class="text-brand-600 hover:underline">
+              Open register
+            </A>
+          </Show>
+        </p>
       </div>
 
       <div class="mb-4 flex flex-wrap items-center gap-3">
@@ -146,8 +167,10 @@ export default function BankReconciliationPage() {
             class={`${inputClass} ml-2 w-72`}
             value={bankAccountId()}
             onChange={(e) => {
-              setBankAccountId(e.currentTarget.value);
+              const v = e.currentTarget.value;
+              setBankAccountId(v);
               setSelectedStatementLineId(null);
+              setSearchParams({ bank_account_id: v || undefined });
             }}
           >
             <option value="">All bank accounts</option>
