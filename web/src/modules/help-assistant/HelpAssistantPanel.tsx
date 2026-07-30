@@ -1,4 +1,4 @@
-import { useLocation } from "@solidjs/router";
+import { useLocation, A } from "@solidjs/router";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { extractAttachment, type ExtractedAttachment } from "./extractAttachment";
 import {
@@ -312,6 +312,13 @@ export function HelpAssistantPanel(props: {
               >
                 New
               </button>
+              <A
+                href="/app/copilot"
+                class="rounded px-2 py-1 text-xs text-text-secondary hover:bg-slate-100"
+                onClick={() => props.onClose()}
+              >
+                Full page
+              </A>
               <button
                 type="button"
                 class="rounded px-2 py-1 text-xs text-text-secondary hover:bg-slate-100"

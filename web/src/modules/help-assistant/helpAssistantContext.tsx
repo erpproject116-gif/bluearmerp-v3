@@ -16,10 +16,13 @@ import { NewSupportTicketModal } from "../support/NewSupportTicketModal";
 import { canViewCrm, hasPermission, useAuth } from "../../shared/auth-context";
 import { isTenantModuleEnabled } from "../../shared/moduleAccess";
 
+type Assistant = ReturnType<typeof useHelpAssistant>;
+
 type HelpAssistantUi = {
   open: () => boolean;
   toggle: () => void;
   openWithQuery: (query: string) => void;
+  assistant: Assistant;
 };
 
 const HelpAssistantContext = createContext<HelpAssistantUi>();
@@ -32,10 +35,22 @@ export function HelpAssistantProvider(props: ParentProps) {
   const [queuedQuery, setQueuedQuery] = createSignal<string | null>(null);
   const [ticketOpen, setTicketOpen] = createSignal(false);
 
-  const toggle = () => setOpen((v) => !v);
+  const onCopilotPage = () => loc.pathname === "/app/copilot" || loc.pathname.startsWith("/app/copilot/");
+
+  const toggle = () => {
+    if (onCopilotPage()) {
+      setOpen(false);
+      return;
+    }
+    setOpen((v) => !v);
+  };
 
   const openWithQuery = (query: string) => {
     const q = query.trim();
+    if (onCopilotPage()) {
+      if (q) queueMicrotask(() => assistant.ask(q));
+      return;
+    }
     setOpen(true);
     if (q) setQueuedQuery(q);
   };
@@ -54,6 +69,10 @@ export function HelpAssistantProvider(props: ParentProps) {
     queueMicrotask(() => assistant.ask(q));
   });
 
+  createEffect(() => {
+    if (onCopilotPage()) setOpen(false);
+  });
+
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.key.toLowerCase() !== "h") return;
@@ -66,7 +85,7 @@ export function HelpAssistantProvider(props: ParentProps) {
     onCleanup(() => window.removeEventListener("keydown", onKey));
   });
 
-  const value: HelpAssistantUi = { open, toggle, openWithQuery };
+  const value: HelpAssistantUi = { open, toggle, openWithQuery, assistant };
 
   return (
     <HelpAssistantContext.Provider value={value}>
@@ -77,7 +96,9 @@ export function HelpAssistantProvider(props: ParentProps) {
         onHelpClick={toggle}
         onSupportClick={() => setTicketOpen(true)}
       />
-      <HelpAssistantPanel open={open()} onClose={() => setOpen(false)} assistant={assistant} />
+      <Show when={open() && !onCopilotPage()}>
+        <HelpAssistantPanel open={true} onClose={() => setOpen(false)} assistant={assistant} />
+      </Show>
       <Show when={showSupportFab()}>
         <NewSupportTicketModal open={ticketOpen()} onClose={() => setTicketOpen(false)} />
       </Show>

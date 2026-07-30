@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import {
@@ -96,11 +97,7 @@ export default function VendorCreditsPage() {
       }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to create vendor credit.");
-      return;
-    }
-    toast.success("Vendor credit created.");
+    if (!handleSaveResult(res, toast, "Vendor credit created.")) return;
     setCreateOpen(false);
     setVendorName("");
     setPartnerId(null);
@@ -113,11 +110,7 @@ export default function VendorCreditsPage() {
     setBusyId(row.id);
     const res = await apiFetch(`/api/v1/finance/vendor-credits/${row.id}/post`, { method: "POST" });
     setBusyId(null);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not post.");
-      return;
-    }
-    toast.success("Vendor credit opened.");
+    if (!handleSaveResult(res, toast, "Vendor credit opened.")) return;
     invalidate();
   };
 
@@ -136,11 +129,7 @@ export default function VendorCreditsPage() {
       body: JSON.stringify({ supplier_invoice_id: id, applied_amount: amt }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not apply vendor credit.");
-      return;
-    }
-    toast.success("Vendor credit applied to supplier invoice.");
+    if (!handleSaveResult(res, toast, "Vendor credit applied to supplier invoice.")) return;
     setApplyOpen(null);
     setSiId(null);
     setSiLabel("");
@@ -164,7 +153,7 @@ export default function VendorCreditsPage() {
     );
     setSaving(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not convert to cash.");
+      handleSaveResult(res, toast);
       return;
     }
     toast.success(`Refund received as OR ${res.data?.receipt_no ?? ""}.`);

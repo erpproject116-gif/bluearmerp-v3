@@ -45,6 +45,24 @@ export function handleSaveResult(
     return true;
   }
 
+  // Smart Assist: server-authored recovery (prefer over generic field toasts).
+  const assist = res.assist;
+  if (assist?.title && toast.action) {
+    const primary = assist.actions?.[0];
+    toast.action({
+      type: "warning",
+      title: assist.title,
+      message: assist.detail || undefined,
+      actionLabel: primary?.label ?? "View",
+      href: primary?.href,
+    });
+    return false;
+  }
+  if (assist?.title) {
+    toast.warning([assist.title, assist.detail].filter(Boolean).join(" — "));
+    return false;
+  }
+
   const fieldErrors = formatApiErrors(res.errors);
   const hint = resolvePolicyActionHint(res.errors);
   if (fieldErrors && hint && toast.action) {

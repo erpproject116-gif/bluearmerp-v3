@@ -150,6 +150,7 @@ export const DemoDataPage = lazy(() => import("../modules/user-management/demo-d
 export const BookingsPage = lazy(() => import("../modules/booking/BookingsPage"));
 export const BookingCalendarPage = lazy(() => import("../modules/booking/BookingCalendarPage"));
 export const HelpFeedbackPage = lazy(() => import("../modules/user-management/help-feedback/HelpFeedbackPage"));
+export const CopilotWorkspacePage = lazy(() => import("../modules/help-assistant/CopilotWorkspacePage"));
 export const ActivityLogListPage = lazy(() => import("../modules/activity-logs/ActivityLogListPage"));
 export const ChangeLogListPage = lazy(() => import("../modules/activity-logs/ChangeLogListPage"));
 export const CrmDashboardPage = lazy(() => import("../modules/crm/CrmDashboardPage"));

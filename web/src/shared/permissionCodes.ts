@@ -3,6 +3,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/dashboard": "dashboard.view",
   "/app/dashboard/approvals": "dashboard.view",
   "/app/dashboard/site-map": "dashboard.view",
+  "/app/copilot": "dashboard.view",
   "/app/reports/saved-views": "bi.saved_views",
   "/app/selling/reports": "selling.sales_reports",
   "/app/selling/reports/receivable-status": "selling.sales_reports",

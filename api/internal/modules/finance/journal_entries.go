@@ -127,7 +127,7 @@ func postJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.fin_journal_entries je on je.id = jel.journal_entry_id
 			where je.id = $1 and je.tenant_id = $2 and je.status = 'draft'`, id, tu.TenantID).Scan(&debit, &credit)
 		if err != nil || debit != credit {
-			response.Validation(w, map[string]string{"lines": "Journal entry must balance before posting."})
+			response.ValidationSmart(w, map[string]string{"lines": "Journal entry must balance before posting."})
 			return
 		}
 		var entryDate time.Time
@@ -138,7 +138,7 @@ func postJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if errs := validatePostingDate(r.Context(), pool, tu.TenantID, entryDate); len(errs) > 0 {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)

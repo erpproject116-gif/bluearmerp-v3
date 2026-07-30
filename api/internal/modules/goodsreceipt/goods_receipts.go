@@ -1005,7 +1005,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			hasReceiptQty = true
 			openQty := ln.POQty - ln.POReceivedQty
 			if ln.ReceivedQty > openQty+0.0001 {
-				response.Validation(w, map[string]string{
+				response.ValidationSmart(w, map[string]string{
 					"received_qty": fmt.Sprintf("Line %d exceeds open PO quantity (%.4f available).", ln.ID, openQty),
 				})
 				return

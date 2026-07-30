@@ -2,6 +2,7 @@ import { uiLabel } from "../../shared/branding/uiLabel";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { handleSaveResult } from "../../shared/handleSaveResult";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { GridExportButtons } from "../../shared/gridExport";
@@ -107,11 +108,7 @@ export default function JournalEntriesPage() {
       body: JSON.stringify({ remarks: remarks(), lines: parsed }),
     });
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to create journal entry.");
-      return;
-    }
-    toast.success("Draft journal entry created.");
+    if (!handleSaveResult(res, toast, "Draft journal entry created.")) return;
     await draft.clearOnSave();
     setModalOpen(false);
     invalidate();
@@ -131,11 +128,7 @@ export default function JournalEntriesPage() {
     setPosting(true);
     const res = await apiFetch(`/api/v1/finance/journal-entries/${id}/post`, { method: "POST" });
     setPosting(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to post journal entry.");
-      return;
-    }
-    toast.success("Journal entry posted.");
+    if (!handleSaveResult(res, toast, "Journal entry posted.")) return;
     invalidate();
   };
 

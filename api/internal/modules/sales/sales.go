@@ -515,7 +515,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if errs := validateSaleBody(body, true); errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 
@@ -540,7 +540,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		body.Lines = applyPartnerRatesToSaleLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeSaleLines(tt, templateCode, body.Lines)
 		if errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 		resolveComputedLineUnits(r.Context(), pool, tu.TenantID, computed)
@@ -716,7 +716,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if errs := validateSaleBody(body, false); errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 
@@ -741,7 +741,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		body.Lines = applyPartnerRatesToSaleLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeSaleLines(tt, templateCode, body.Lines)
 		if errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 		resolveComputedLineUnits(r.Context(), pool, tu.TenantID, computed)

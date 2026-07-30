@@ -352,6 +352,14 @@ export async function deleteCopilotSession(id: number) {
   return apiFetch<{ id: number }>(`/api/v1/copilot/sessions/${id}`, { method: "DELETE" }, { silent: true });
 }
 
+export async function patchCopilotSession(id: number, title: string) {
+  return apiFetch<{ id: number; title: string }>(
+    `/api/v1/copilot/sessions/${id}`,
+    { method: "PATCH", body: JSON.stringify({ title }) },
+    { silent: true },
+  );
+}
+
 export async function approveCopilotAction(draft: CopilotActionDraft, sessionId?: number) {
   return apiFetch<{ decision: string; result?: unknown }>("/api/v1/copilot/actions/approve", {
     method: "POST",

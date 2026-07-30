@@ -458,7 +458,7 @@ func postDeliveryReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				where ln.id = $1`, ln.SalesOrderLineID).Scan(&releasedQty, &deliveredQty)
 			if v := processpolicy.ValidateDeliveryRequiresRelease(policy, releasedQty, deliveredQty, ln.Qty); v != nil {
 				for k, msg := range v {
-					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].%s", i, k): msg})
+					response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].%s", i, k): msg})
 					return
 				}
 			}

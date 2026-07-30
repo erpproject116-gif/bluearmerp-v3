@@ -900,7 +900,7 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 
 		if errs := validateSupplierInvoiceLines(r.Context(), tx, tu.TenantID, body.PartnerID, policy, body.Lines); errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 
@@ -955,11 +955,11 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 
 		dateNoDisplay := formatDateNoDisplay(invoiceDate, dateSeq)
 		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, invoiceNo, dateNoDisplay, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
 		if err := insertWithholdingLines(r.Context(), tx, tu.TenantID, "supplier_invoice", id, body.WithholdingLines); err != nil {
-			response.Validation(w, map[string]string{"withholding_lines": err.Error()})
+			response.ValidationSmart(w, map[string]string{"withholding_lines": err.Error()})
 			return
 		}
 
@@ -1334,7 +1334,7 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		// Exclude this invoice so re-save (common when adding serials) does not
 		// treat its own quantities as already consuming PO/GR balance.
 		if errs := validateSupplierInvoiceLinesExcluding(r.Context(), tx, tu.TenantID, body.PartnerID, id, policy, body.Lines); errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 
@@ -1378,11 +1378,11 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		parsedDate, _ := parseDate(body.InvoiceDate)
 		dateNoDisplay := formatDateNoDisplay(parsedDate, before.DateSeq)
 		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, before.InvoiceNo, dateNoDisplay, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
 		if err := replaceWithholdingLines(r.Context(), tx, tu.TenantID, "supplier_invoice", id, body.WithholdingLines); err != nil {
-			response.Validation(w, map[string]string{"withholding_lines": err.Error()})
+			response.ValidationSmart(w, map[string]string{"withholding_lines": err.Error()})
 			return
 		}
 

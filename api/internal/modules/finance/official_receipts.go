@@ -386,7 +386,7 @@ func createOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if errs := validateApplications(r.Context(), pool, tu.TenantID, body.PartnerID, body.Applications, nil); errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 		amountTotal := sumApplicationAmounts(body.Applications)
@@ -471,7 +471,7 @@ func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if errs := validateApplications(r.Context(), pool, tu.TenantID, body.PartnerID, body.Applications, &id); errs != nil {
-			response.Validation(w, errs)
+			response.ValidationSmart(w, errs)
 			return
 		}
 		amountTotal := sumApplicationAmounts(body.Applications)
@@ -589,7 +589,7 @@ func insertReceiptApplications(ctx context.Context, tx pgx.Tx, tenantID, receipt
 func respondApplicationSaveError(w http.ResponseWriter, err error) {
 	var oa overAppliedError
 	if errors.As(err, &oa) {
-		response.Err(w, http.StatusConflict, oa.message, "ERR_OVER_APPLIED")
+		response.ErrAssist(w, http.StatusConflict, oa.message, "ERR_OVER_APPLIED", response.AssistPaymentOverApplied(oa.message))
 		return
 	}
 	response.Err(w, http.StatusInternalServerError, "Failed to save applications.", "ERR_INTERNAL")
