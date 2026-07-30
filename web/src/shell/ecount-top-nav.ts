@@ -114,6 +114,7 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
     pathname.startsWith("/app/finance/collections") ||
     pathname.startsWith("/app/finance/disbursements") ||
     pathname.startsWith("/app/finance/payment-vouchers") ||
+    pathname.startsWith("/app/finance/banking") ||
     pathname.startsWith("/app/purchases/expenses")
   ) {
     return "acct2";
@@ -421,6 +422,15 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         href: "/app/finance/collections",
         iconId: "sub_ar_ap",
         topId: "acct2",
+        expandGroupId: "accounting_dept",
+      },
+      {
+        id: "banking",
+        label: "Banking",
+        href: "/app/finance/banking",
+        iconId: "sub_ar_ap",
+        topId: "acct2",
+        moduleId: "finance",
         expandGroupId: "accounting_dept",
       },
     ],

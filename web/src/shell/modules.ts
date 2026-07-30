@@ -486,6 +486,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/finance",
     features: [
       { label: "Workspace", href: "/app/finance", settingsHref: "/app/finance/official-receipts/settings", headerPriority: "primary" },
+      { label: "Banking", href: "/app/finance/banking", settingsHref: "/app/finance/banking", headerPriority: "primary" },
       { label: "Reports", href: "/app/finance/reports", settingsHref: "/app/finance/official-receipts/settings", headerPriority: "primary" },
       { label: "Receipts", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Vouchers", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },

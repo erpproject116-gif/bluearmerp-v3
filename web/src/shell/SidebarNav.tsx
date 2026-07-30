@@ -293,7 +293,10 @@ export function SidebarNav() {
           "/app/finance/disbursements",
           "/app/finance/payment-vouchers",
         ]) || p.startsWith("/app/purchases/expenses")
-      );
+      ) && !p.startsWith("/app/finance/banking");
+    }
+    if (area.id === "banking") {
+      return pathStarts(p, ["/app/finance/banking"]);
     }
     if (area.id === "more" || area.id === "setup") {
       return false;
