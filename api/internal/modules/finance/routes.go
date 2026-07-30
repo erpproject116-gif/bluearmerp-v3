@@ -29,6 +29,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerAccountRoutes(fr, pool)
 		registerWithholdingRoutes(fr, pool)
 		registerWithholdingPrintRoutes(fr, pool)
+		registerStatutoryRoutes(fr, pool)
 		registerCheckRoutes(fr, pool)
 		registerNoteRoutes(fr, pool)
 		registerLandedCostRoutes(fr, pool)

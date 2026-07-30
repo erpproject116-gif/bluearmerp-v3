@@ -23,6 +23,7 @@ func registerPayrollDepthRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessRead)).Get("/pay-periods/{id}/preview-checklist", previewChecklist(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessRead)).Get("/employees/{id}/tax-certificate", taxCertificatePack(pool))
 	r.With(auth.RequirePermission("hr.remittances", auth.AccessRead)).Get("/export-packs/1601c", export1601CPack(pool))
+	r.With(auth.RequirePermission("hr.remittances", auth.AccessRead)).Get("/export-packs/employee-alphalist", exportEmployeeAlphalist(pool))
 }
 
 func lockPayPeriod(pool *pgxpool.Pool) http.HandlerFunc {
@@ -227,7 +228,7 @@ func taxCertificatePack(pool *pgxpool.Pool) http.HandlerFunc {
 
 		html := fmt.Sprintf(`<!DOCTYPE html><html><head><title>2316-style pack %d</title></head><body>
 <h1>Employee annual withholding certificate data (2316-equivalent field pack)</h1>
-<p><em>Not a certified BIR eFPS submission. Accountant must review before filing.</em></p>
+<p><em>For accountant review — not certified eFPS.</em></p>
 <table border="1" cellpadding="6">
 <tr><th>Tax year</th><td>%d</td></tr>
 <tr><th>Employee no</th><td>%s</td></tr>
@@ -291,14 +292,73 @@ func export1601CPack(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="1601C_spreadsheet_pack_%s.csv"`, month))
 		cw := csv.NewWriter(w)
 		_ = cw.Write([]string{"profile", "1601-C spreadsheet pack (not certified eFPS)"})
+		_ = cw.Write([]string{"disclaimer", "For accountant review — not certified eFPS"})
 		_ = cw.Write([]string{"month", month})
 		_ = cw.Write([]string{"employee_no", "full_name", "tin", "gross", "deductions", "withholding_tax"})
+		var totalGross, totalDed, totalWHT float64
 		for rows.Next() {
 			var no, name, tin string
 			var gross, ded, wht float64
 			_ = rows.Scan(&no, &name, &tin, &gross, &ded, &wht)
+			totalGross += gross
+			totalDed += ded
+			totalWHT += wht
 			_ = cw.Write([]string{no, name, tin, fmt.Sprintf("%.2f", gross), fmt.Sprintf("%.2f", ded), fmt.Sprintf("%.2f", wht)})
 		}
+		_ = cw.Write([]string{"TOTALS", "", "", fmt.Sprintf("%.2f", totalGross), fmt.Sprintf("%.2f", totalDed), fmt.Sprintf("%.2f", totalWHT)})
+		cw.Flush()
+	}
+}
+
+func exportEmployeeAlphalist(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		year := time.Now().Year()
+		if y := strings.TrimSpace(r.URL.Query().Get("year")); y != "" {
+			if n, err := strconv.Atoi(y); err == nil {
+				year = n
+			}
+		}
+		rows, err := pool.Query(r.Context(), `
+			select e.employee_no, e.full_name, coalesce(e.tin,''), coalesce(e.tax_status,''),
+			  coalesce(sum(ps.gross_pay),0)::float8,
+			  coalesce(sum(ps.deductions),0)::float8,
+			  coalesce(sum(ps.net_pay),0)::float8,
+			  coalesce((select sum(pl.amount) from public.hr_payslip_lines pl
+			    join public.hr_payslips p2 on p2.id=pl.payslip_id
+			    join public.hr_pay_periods pp2 on pp2.id=p2.pay_period_id
+			    where p2.employee_id=e.id and p2.tenant_id=$1 and p2.status='posted'
+			      and extract(year from pp2.period_end)=$2 and pl.line_code in ('WHT','WITHHOLDING_TAX')),0)::float8
+			from public.hr_employees e
+			left join public.hr_payslips ps on ps.employee_id=e.id and ps.tenant_id=$1 and ps.status='posted'
+			left join public.hr_pay_periods pp on pp.id=ps.pay_period_id and extract(year from pp.period_end)=$2
+			where e.tenant_id=$1 and e.status='active'
+			group by e.id, e.employee_no, e.full_name, e.tin, e.tax_status
+			having coalesce(sum(ps.gross_pay),0) > 0
+			order by e.employee_no`, tu.TenantID, year)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to build alphalist.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="employee_alphalist_%d.csv"`, year))
+		cw := csv.NewWriter(w)
+		_ = cw.Write([]string{"disclaimer", "For accountant review — not certified eFPS"})
+		_ = cw.Write([]string{"tax_year", strconv.Itoa(year)})
+		_ = cw.Write([]string{"employee_no", "full_name", "tin", "tax_status", "gross_ytd", "deductions_ytd", "net_ytd", "withholding_tax_ytd"})
+		var totalGross, totalDed, totalNet, totalWHT float64
+		for rows.Next() {
+			var no, name, tin, taxStatus string
+			var gross, ded, net, wht float64
+			_ = rows.Scan(&no, &name, &tin, &taxStatus, &gross, &ded, &net, &wht)
+			totalGross += gross
+			totalDed += ded
+			totalNet += net
+			totalWHT += wht
+			_ = cw.Write([]string{no, name, tin, taxStatus, fmt.Sprintf("%.2f", gross), fmt.Sprintf("%.2f", ded), fmt.Sprintf("%.2f", net), fmt.Sprintf("%.2f", wht)})
+		}
+		_ = cw.Write([]string{"TOTALS", "", "", "", fmt.Sprintf("%.2f", totalGross), fmt.Sprintf("%.2f", totalDed), fmt.Sprintf("%.2f", totalNet), fmt.Sprintf("%.2f", totalWHT)})
 		cw.Flush()
 	}
 }

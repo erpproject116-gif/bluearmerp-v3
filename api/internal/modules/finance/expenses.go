@@ -274,6 +274,23 @@ func markExpensePaid(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
+		var amount float64
+		if err := tx.QueryRow(r.Context(), `
+			select amount::float8 from public.fin_expenses
+			where id = $1 and tenant_id = $2 and deleted_at is null and payment_status = 'unpaid'`,
+			id, tu.TenantID).Scan(&amount); err != nil {
+			if err == pgx.ErrNoRows {
+				response.Err(w, http.StatusNotFound, "Expense not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to load expense.", "ERR_INTERNAL")
+			return
+		}
+		if v := validateExpenseAmountApproval(r.Context(), tx, tu, id, amount); v != nil {
+			response.Validation(w, v)
+			return
+		}
+
 		pvID, err := payExpenseInTx(r.Context(), tx, tu.TenantID, tu.AppUserID, id, expensePayOpts{
 			PaymentMethod: body.PaymentMethod,
 			BankAccountID: body.BankAccountID,

@@ -20,6 +20,11 @@ import (
 // inputVatCode is the GL account debited for input VAT paid to vendors.
 const inputVatCode = "1359"
 
+// ewtPayableCode is credited when supplier-invoice withholding is recognized at post
+// (same GL as payment-voucher withholding in buildPVPostingEvent).
+const ewtPayableCode = "2360"
+
+
 type purchaseInvoice struct {
 	SupplierInvoiceID   int64   `json:"supplier_invoice_id"`
 	InvoiceNo           string  `json:"invoice_no"`
@@ -184,7 +189,22 @@ func putPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 				lines = append(lines, invoicejournal.Line{AccountID: taxAcct, Debit: taxTotal, Remark: "Input VAT - " + invoiceNo})
 			}
 		}
-		lines = append(lines, invoicejournal.Line{AccountID: body.WithdrawalAccountID, Credit: grandTotal, PartyID: &partnerID, Remark: "A/P - " + invoiceNo})
+		whtTotal, err := sumWithholdingTaxAmounts(r.Context(), pool, tu.TenantID, "supplier_invoice", id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load withholding lines.", "ERR_INTERNAL")
+			return
+		}
+		apCredit := grandTotal - whtTotal
+		if apCredit < 0 {
+			apCredit = 0
+		}
+		// Net A/P: vendor is owed grand total minus EWT withheld at source (mirrors PV net-pay logic).
+		lines = append(lines, invoicejournal.Line{AccountID: body.WithdrawalAccountID, Credit: apCredit, PartyID: &partnerID, Remark: "A/P - " + invoiceNo})
+		if whtTotal > 0.0001 {
+			if whtAcct, e := invoicejournal.ResolveAccountID(r.Context(), pool, tu.TenantID, ewtPayableCode); e == nil {
+				lines = append(lines, invoicejournal.Line{AccountID: whtAcct, Credit: whtTotal, PartyID: &partnerID, Remark: "EWT payable - " + invoiceNo})
+			}
+		}
 
 		autoPost := siReadAutoPost(r.Context(), pool, tu.TenantID, "accounts_auto_post_purchase")
 		jeID, err := invoicejournal.Sync(r.Context(), pool, tu.TenantID, tu.AppUserID, invoiceDate, "Purchase "+invoiceNo, existingJE, lines, autoPost)

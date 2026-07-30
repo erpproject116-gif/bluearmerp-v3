@@ -55,7 +55,7 @@ export default function BankReconciliationPage() {
   }));
 
   const statements = createQuery(() => {
-    const qs = new URLSearchParams({ page: "1", pageSize: "100", unmatched_only: "true" });
+    const qs = new URLSearchParams({ page: "1", pageSize: "100", unmatched_only: "true", include_suggestions: "true" });
     if (bankAccountId()) qs.set("bank_account_id", bankAccountId());
     return {
       queryKey: ["finance-bank-recon-statements", bankAccountId()],
@@ -222,7 +222,7 @@ export default function BankReconciliationPage() {
         <input
           ref={importFileInput}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.ofx,.qfx,text/csv,application/x-ofx,application/vnd.intu.qfx"
           class="hidden"
           onChange={(e) => {
             const file = e.currentTarget.files?.[0];

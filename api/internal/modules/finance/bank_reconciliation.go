@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -78,6 +79,7 @@ func registerBankReconciliationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/bank-reconciliation/statement-lines/import-template", bankStatementImportTemplateHandler())
 	r.Post("/bank-reconciliation/statement-lines/import", importBankStatementLines(pool))
 	r.Post("/bank-reconciliation/match", matchBankStatementLine(pool))
+	registerBankMatchRuleRoutes(r, pool)
 }
 
 func bankStatementImportTemplateHandler() http.HandlerFunc {
@@ -98,9 +100,9 @@ func importBankStatementLines(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"file": "Invalid upload."})
 			return
 		}
-		file, _, err := r.FormFile("file")
+		file, header, err := r.FormFile("file")
 		if err != nil {
-			response.Validation(w, map[string]string{"file": "CSV file is required."})
+			response.Validation(w, map[string]string{"file": "File is required."})
 			return
 		}
 		defer file.Close()
@@ -115,7 +117,50 @@ func importBankStatementLines(pool *pgxpool.Pool) http.HandlerFunc {
 			defaultBankAccountID = id
 		}
 
-		records, err := csv.NewReader(file).ReadAll()
+		peek := make([]byte, 4096)
+		n, _ := file.Read(peek)
+		peek = peek[:n]
+		fileName := ""
+		if header != nil {
+			fileName = header.Filename
+		}
+
+		if isOFXContent(fileName, peek) {
+			content := string(peek)
+			if rest, err := io.ReadAll(file); err == nil {
+				content += string(rest)
+			}
+			ofxRows, err := parseOFXTransactions(content)
+			if err != nil {
+				response.Validation(w, map[string]string{"file": err.Error()})
+				return
+			}
+			if defaultBankAccountID <= 0 {
+				response.Validation(w, map[string]string{"bank_account_id": "Bank account is required for OFX/QFX import."})
+				return
+			}
+			var valid []validatedStatementImportRow
+			for i, row := range ofxRows {
+				valid = append(valid, validatedStatementImportRow{
+					rowNum:        i + 1,
+					bankAccountID: defaultBankAccountID,
+					statementDate: row.statementDate,
+					referenceNo:   row.referenceNo,
+					description:   row.description,
+					amount:        row.amount,
+				})
+			}
+			createdIDs, err := bulkImportStatementLines(r.Context(), pool, tu.TenantID, valid)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Import failed: "+err.Error(), "ERR_INTERNAL")
+				return
+			}
+			result := statementImportResult{Created: len(createdIDs)}
+			response.OK(w, result, fmt.Sprintf("Imported %d OFX/QFX statement line(s).", result.Created))
+			return
+		}
+
+		records, err := csv.NewReader(io.MultiReader(strings.NewReader(string(peek)), file)).ReadAll()
 		if err != nil {
 			response.Validation(w, map[string]string{"file": "Could not read CSV."})
 			return
@@ -504,6 +549,10 @@ func listBankStatementLines(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if out == nil {
 			out = []bankStatementPlaceholder{}
+		}
+		if r.URL.Query().Get("include_suggestions") == "true" {
+			response.OKList(w, enrichStatementLinesWithSuggestions(r.Context(), pool, tu.TenantID, out), p.Page, p.PageSize, total)
+			return
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)
 	}

@@ -73,6 +73,7 @@ func registerPaymentVoucherRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("finance.payment_vouchers_new", auth.AccessWrite)).Post("/payment-vouchers", createPaymentVoucher(pool))
 	r.Get("/payment-vouchers/{id}", getPaymentVoucher(pool))
 	r.With(auth.RequirePermission("finance.payment_vouchers", auth.AccessWrite)).Delete("/payment-vouchers/{id}", deletePaymentVoucher(pool))
+	registerPaymentVoucherApprovalRoutes(r, pool)
 }
 
 func previewPaymentVoucherSequences(pool *pgxpool.Pool) http.HandlerFunc {
@@ -484,10 +485,17 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		ev := buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod)
-		if err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
+		ev := buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod, mustEWTPayableCode(r.Context(), tx, tu.TenantID))
+		deferredApproval, _, err := ensureAmountApproval(r.Context(), tx, tu, "payment_voucher", id, amountTotal)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to check approval policy.", "ERR_INTERNAL")
 			return
+		}
+		if !deferredApproval {
+			if err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
+				return
+			}
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
@@ -497,7 +505,11 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.payment_voucher.create", "fin_payment_voucher", &id, nil, body)
 		pv, _ := loadPaymentVoucher(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, pv, "Created.")
+		msg := "Created."
+		if deferredApproval {
+			msg = "Created. Amount exceeds approval threshold — journal posting deferred until approved."
+		}
+		response.OK(w, pv, msg)
 	}
 }
 

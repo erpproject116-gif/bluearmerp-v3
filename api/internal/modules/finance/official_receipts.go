@@ -400,7 +400,13 @@ func createOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var dateSeq int
 		var receiptNo string
-		if err := tx.QueryRow(r.Context(),
+		if seriesNo, used, err := allocateSeriesNumber(r.Context(), tx, tu.TenantID, "official_receipt"); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to allocate document series.", "ERR_INTERNAL")
+			return
+		} else if used {
+			receiptNo = seriesNo
+			dateSeq = 1
+		} else if err := tx.QueryRow(r.Context(),
 			`select date_seq, receipt_no from public.allocate_fin_receipt_sequences($1, $2::date)`,
 			tu.TenantID, receiptDate).Scan(&dateSeq, &receiptNo); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to allocate sequences.", "ERR_INTERNAL")

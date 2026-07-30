@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { useQueryClient } from "@tanstack/solid-query";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
 import { type LookupOption } from "../../../shared/LookupCombo";
@@ -15,6 +15,8 @@ import { useToast } from "../../../shared/toast";
 import { useAuth, hasPermission } from "../../../shared/auth-context";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
+import { DecimalInput } from "../../../shared/DecimalInput";
+import { formatMoney } from "../../../shared/money";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
@@ -173,6 +175,36 @@ export function SupplierInvoiceModal(props: Props) {
   const [progressStatus, setProgressStatus] = createSignal("unconfirmed");
   const [lines, setLines] = createSignal<PurchaseRequestLineRow[]>([emptyPurchaseRequestLine(1)]);
 
+  type WhtRow = { tax_code_id: number | null; code: string; rate_pct: number; base_amount: string };
+  const [withholdingLines, setWithholdingLines] = createSignal<WhtRow[]>([]);
+
+  const whtCodes = createQuery(() => ({
+    queryKey: ["withholding-codes-si"],
+    queryFn: async () => {
+      const res = await apiFetch<{ id: number; code: string; description: string; rate_pct: number; atc_code?: string | null }[]>(
+        "/api/v1/finance/withholding-codes",
+      );
+      if (!res.success) throw new Error(res.message ?? "Failed to load withholding codes");
+      return res.data ?? [];
+    },
+    enabled: () => props.open,
+  }));
+
+  const totalWithheld = () =>
+    withholdingLines().reduce((sum, row) => {
+      const base = Number(row.base_amount) || 0;
+      return sum + base * (row.rate_pct / 100);
+    }, 0);
+
+  const addWhtLine = () => {
+    const codes = whtCodes.data ?? [];
+    const first = codes[0];
+    setWithholdingLines((rows) => [
+      ...rows,
+      { tax_code_id: first?.id ?? null, code: first?.code ?? "", rate_pct: first?.rate_pct ?? 0, base_amount: "" },
+    ]);
+  };
+
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
 
   createEffect(() => {
@@ -280,6 +312,14 @@ export function SupplierInvoiceModal(props: Props) {
       setNotes(ed.notes ?? "");
       setProgressStatus(ed.progress_status || "unconfirmed");
       setLines(linesFromDetail(ed.lines));
+      setWithholdingLines(
+        (ed.withholding_lines ?? []).map((ln) => ({
+          tax_code_id: ln.tax_code_id,
+          code: ln.code,
+          rate_pct: ln.rate_pct,
+          base_amount: String(ln.base_amount ?? ""),
+        })),
+      );
       setActiveTab("details");
     } else {
       const seed = takeDocSeed("purchases");
@@ -305,6 +345,7 @@ export function SupplierInvoiceModal(props: Props) {
       setReference("");
       setNotes("");
       setProgressStatus("unconfirmed");
+      setWithholdingLines([]);
       seededNewLines = seedLines.length > 0;
       if (seededNewLines) {
         setLines(seedLines);
@@ -575,6 +616,9 @@ export function SupplierInvoiceModal(props: Props) {
           line_total: ln.line_total === "" ? 0 : Number(ln.line_total),
           remark: ln.remark || null,
         })),
+      withholding_lines: withholdingLines()
+        .filter((ln) => ln.tax_code_id && Number(ln.base_amount) > 0)
+        .map((ln) => ({ tax_code_id: ln.tax_code_id!, base_amount: Number(ln.base_amount) })),
     };
 
     if (body.lines.length === 0) {
@@ -960,6 +1004,72 @@ export function SupplierInvoiceModal(props: Props) {
             hidePartnerColumns
             lineViewKey={`${PURCHASES_ENTITY.purchases}.lines`}
           />
+          <Show when={!props.readOnly}>
+            <div class="col-span-full space-y-2 border-t border-stroke pt-4">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-text-primary">Withholding tax (2307)</p>
+                <button type="button" class="text-sm text-brand-600" onClick={addWhtLine}>
+                  + Add withholding line
+                </button>
+              </div>
+              <For each={withholdingLines()}>
+                {(_, index) => (
+                  <div class="grid grid-cols-3 gap-2">
+                    <Field label="Tax code">
+                      <select
+                        class={inputClass}
+                        value={withholdingLines()[index()]?.tax_code_id ?? ""}
+                        onChange={(e) => {
+                          const id = Number(e.currentTarget.value);
+                          const code = (whtCodes.data ?? []).find((c) => c.id === id);
+                          setWithholdingLines((rows) =>
+                            rows.map((r, idx) =>
+                              idx === index()
+                                ? { ...r, tax_code_id: id || null, code: code?.code ?? "", rate_pct: code?.rate_pct ?? 0 }
+                                : r,
+                            ),
+                          );
+                        }}
+                      >
+                        <option value="">Select code…</option>
+                        {(whtCodes.data ?? []).map((c) => (
+                          <option value={String(c.id)}>
+                            {c.atc_code ?? c.code} — {c.description} ({c.rate_pct}%)
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Income base amount">
+                      <DecimalInput
+                        class={inputClass}
+                        value={withholdingLines()[index()]?.base_amount ?? ""}
+                        onValue={(v) =>
+                          setWithholdingLines((rows) => rows.map((r, idx) => (idx === index() ? { ...r, base_amount: v } : r)))
+                        }
+                      />
+                    </Field>
+                    <Field label="Tax withheld">
+                      <input
+                        class={inputClass}
+                        readOnly
+                        value={(() => {
+                          const row = withholdingLines()[index()];
+                          if (!row) return "";
+                          const base = Number(row.base_amount) || 0;
+                          return formatMoney(base * (row.rate_pct / 100));
+                        })()}
+                      />
+                    </Field>
+                  </div>
+                )}
+              </For>
+              <Show when={withholdingLines().length > 0}>
+                <p class="text-sm text-text-secondary">
+                  Total withheld: {formatMoney(totalWithheld())} — posted to EWT payable when purchase is posted to GL.
+                </p>
+              </Show>
+            </div>
+          </Show>
           <Show when={effectiveEditing()}>
             <SupplierInvoiceApprovalPanel
               supplierInvoiceId={effectiveEditing()!.id}

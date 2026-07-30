@@ -57,6 +57,15 @@ export type SupplierInvoiceDetail = SupplierInvoiceRow & {
   subtotal: number;
   tax_total: number;
   lines?: SupplierInvoiceLine[];
+  withholding_lines?: {
+    id?: number;
+    tax_code_id: number;
+    code: string;
+    description?: string;
+    rate_pct: number;
+    base_amount: number;
+    tax_amount: number;
+  }[];
 };
 
 export type OpenGRLine = {

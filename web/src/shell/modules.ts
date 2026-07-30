@@ -494,6 +494,7 @@ export const appModules: AppModule[] = [
       { label: "Receipts", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Vouchers", href: "/app/finance/payment-vouchers", settingsHref: "/app/finance/official-receipts/settings" },
       { label: "Budgets", href: "/app/finance/budgets", settingsHref: "/app/finance/budgets" },
+      { label: "BIR Statutory", href: "/app/finance/statutory", settingsHref: "/app/finance/statutory/document-series", featureCode: "finance.statutory_read", headerPriority: "overflow" },
       { label: "Payroll", href: "/app/hr/payroll-runs", settingsHref: "/app/hr/payroll-runs" },
       { label: "Remittances", href: "/app/hr/remittances", settingsHref: "/app/hr/remittances" },
       { label: "Assets", href: "/app/fixed-assets", settingsHref: "/app/fixed-assets" },
