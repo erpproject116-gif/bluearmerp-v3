@@ -15,7 +15,7 @@ const (
 	defaultDailyCap    = int64(500_000)
 )
 
-// Config controls optional DashScope grounding for Help Assistant / Copilot.
+// Config controls optional DashScope grounding for Help Assistant / Baiko.
 type Config struct {
 	Enabled     bool
 	CopilotOn   bool
@@ -74,7 +74,7 @@ func (c Config) newLLMClient() llm.Client {
 	return client
 }
 
-// NewDashScopeClient returns a DashScope client for compose / copilot.
+// NewDashScopeClient returns a DashScope client for compose / Baiko.
 func (c Config) NewDashScopeClient() dashscope.Client {
 	return c.newDashScopeClient()
 }

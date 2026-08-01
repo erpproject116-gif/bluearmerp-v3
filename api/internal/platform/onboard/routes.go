@@ -212,7 +212,7 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 		FullName:      fullName,
 		EntrySource:   customerregistry.EntrySelfSignup,
 		CRMLeadSource: "self_signup",
-		LeadNote:      "90-day trial provisioning started.",
+		LeadNote:      "Free trial provisioning started.",
 	})
 	if err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to register customer.", "ERR_INTERNAL")
@@ -227,7 +227,13 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 
 	displayCompany := fullName + "'s Workspace"
 	startsAt := time.Now()
-	endsAt := startsAt.Add(customerregistry.TrialDays * 24 * time.Hour)
+	trialDays := customerregistry.TrialDays
+	var trialPlanID *int64
+	if tp, err := plans.GetByCode(ctx, s.pool, customerregistry.PlanTrial90d); err == nil {
+		trialPlanID = &tp.ID
+		trialDays = customerregistry.ResolveTrialDays(tp.TrialDays)
+	}
+	endsAt := startsAt.Add(time.Duration(trialDays) * 24 * time.Hour)
 
 	tenantID, err := s.createTrialTenant(ctx, trialArgs{
 		authUserID:  claims.Sub,
@@ -242,12 +248,9 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = customerregistry.LinkTenant(ctx, s.pool, res.CustomerID, tenantID, claims.Sub)
-	var trialPlanID *int64
-	if tp, err := plans.GetByCode(ctx, s.pool, customerregistry.PlanTrial90d); err == nil {
-		trialPlanID = &tp.ID
-	}
 	_, _ = customerregistry.CreateSubscription(ctx, s.pool, res.CustomerID, tenantID,
-		customerregistry.PlanTrial90d, trialPlanID, startsAt, &endsAt, 0, 0, 0, "90-day free trial")
+		customerregistry.PlanTrial90d, trialPlanID, startsAt, &endsAt, 0, 0, 0,
+		strconv.Itoa(trialDays)+"-day free trial")
 
 	customerregistry.AppendCRMLeadNote(ctx, s.pool, res.CustomerID,
 		"[trial] Email confirmed; trial workspace #"+strconv.FormatInt(tenantID, 10)+" provisioned.")

@@ -4,7 +4,9 @@ import type { HelpReplyHit } from "./helpTypes";
 
 export type HelpAIConfig = {
   enabled: boolean;
+  /** API flag; product name is Baiko. */
   copilot?: boolean;
+  baiko?: boolean;
   provider: string;
   model: string;
   small_model?: string;
@@ -12,6 +14,10 @@ export type HelpAIConfig = {
   daily_cap?: number;
   corpus_count?: number;
 };
+
+export function isBaikoEnabled(cfg: HelpAIConfig | null | undefined): boolean {
+  return Boolean(cfg?.baiko || cfg?.copilot);
+}
 
 export type HelpComposeAIResult = {
   used_ai: boolean;
@@ -267,7 +273,7 @@ export async function askCopilot(input: {
   entities?: CopilotEntityRef[];
 }): Promise<CopilotAskResult | null> {
   const cfg = await fetchHelpAIConfig();
-  if (!cfg?.copilot) return null;
+  if (!isBaikoEnabled(cfg)) return null;
   const res = await apiFetch<CopilotAskResult>(
     "/api/v1/copilot/ask",
     {
@@ -380,7 +386,7 @@ const ACTION_HINT =
   /\b(create recurring|add recurring|smart rfq|analyze rfq|process rfq|run rfq|quotation from rfq|draft quotation from rfq|import rfq|upload rfq|rfq pdf|generate quotation|create quotation|new quotation|send email|email quotation|send quotation|create follow[- ]?up|schedule follow[- ]?up|crm task|create sales order|new sales order|new sales|sales invoice|purchase request|create pr|purchase order|create po|create rfq|new rfq|supplier invoice|new purchase|bulk inventory|import items|pc build|product bundle|item build|bill of materials|compose email)\b/i;
 const MENTION_HINT = /@\[|[^\S\r\n]@\w|^\s*@/;
 
-/** Kept for tests / callers; Copilot UI now routes all asks to /copilot/ask when enabled. */
+/** Kept for tests / callers; Baiko UI now routes all asks to /copilot/ask when enabled. */
 export function shouldUseCopilotAsk(query: string): boolean {
   return OPS_HINT.test(query) || ACTION_HINT.test(query) || MENTION_HINT.test(query);
 }

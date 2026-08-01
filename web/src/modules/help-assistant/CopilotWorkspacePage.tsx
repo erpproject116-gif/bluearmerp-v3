@@ -6,7 +6,7 @@ import { useHelpAssistant } from "./useHelpAssistant";
 import { COPILOT_WORKFLOW_GROUPS, COPILOT_WORKFLOW_TILES } from "./copilotWorkflows";
 
 /**
- * Full-page Copilot workspace: same ask/approve/session state as the drawer.
+ * Full-page Baiko workspace: same ask/approve/session state as the drawer.
  * Workflow tiles send canned queries — no LLM invents tools.
  */
 export default function CopilotWorkspacePage() {
@@ -55,7 +55,7 @@ export default function CopilotWorkspacePage() {
       <aside class="flex w-full shrink-0 flex-col border-b border-stroke bg-white md:w-64 md:border-b-0 md:border-r">
         <div class="flex items-center justify-between gap-2 border-b border-stroke px-3 py-3">
           <div>
-            <h1 class="text-sm font-semibold text-text-primary">Bluearm Copilot</h1>
+            <h1 class="text-sm font-semibold text-text-primary">Baiko</h1>
             <p class="text-[11px] text-text-secondary">Workspace</p>
           </div>
           <button
@@ -95,7 +95,7 @@ export default function CopilotWorkspacePage() {
             fallback={
               <div class="mx-auto max-w-3xl space-y-6">
                 <div>
-                  <h2 class="text-2xl font-semibold tracking-tight text-text-primary">Bluearm Copilot</h2>
+                  <h2 class="text-2xl font-semibold tracking-tight text-text-primary">Baiko</h2>
                   <p class="mt-1 text-sm text-text-secondary">
                     Ask questions, launch approve-to-act drafts, or open a work queue. Nothing posts money until you
                     Approve.
@@ -135,7 +135,7 @@ export default function CopilotWorkspacePage() {
             <div class="mx-auto max-w-3xl">
               <HelpChatThread
                 messages={assistant().messages()}
-                pathname="/app/copilot"
+                  pathname="/app/baiko"
                 onAsk={(text) => assistant().ask(text)}
                 streamingText={assistant().streamingText()}
                 busy={assistant().busy()}
@@ -155,7 +155,7 @@ export default function CopilotWorkspacePage() {
             <textarea
               rows={2}
               class="min-w-0 flex-1 resize-none rounded-xl border border-stroke px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-              placeholder="Message Copilot… Enter to send"
+              placeholder="Message Baiko… Enter to send"
               value={draft()}
               disabled={assistant().busy()}
               onInput={(e) => setDraft(e.currentTarget.value)}
@@ -179,7 +179,7 @@ export default function CopilotWorkspacePage() {
               Help & guides
             </A>
             {" · "}
-            Guides and live tools only — Copilot will not invent numbers.
+            Guides and live tools only — Baiko will not invent numbers.
           </p>
         </footer>
       </div>

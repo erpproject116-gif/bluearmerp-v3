@@ -1,6 +1,6 @@
-# Help Assistant AI + Bluearm Copilot
+# Help Assistant AI + Baiko
 
-The in-app Help Assistant retrieves Knowledge Base / guide chunks (keyword RAG). Optional DashScope wording runs on the Go API. Copilot adds live read-only tools and approve-to-act drafts.
+The in-app Help Assistant retrieves Knowledge Base / guide chunks (keyword RAG). Optional DashScope wording runs on the Go API. Baiko adds live read-only tools and approve-to-act drafts.
 
 ## Migrations
 
@@ -71,7 +71,7 @@ POST /api/v1/help/compose
 
 Set `"stream": true` for SSE (`event: delta` / `event: done`). Empty hits are rejected (no invent). Daily token cap → `ERR_COPILOT_CAP`.
 
-## Copilot ask (docs | ops | action)
+## Baiko ask (docs | ops | action)
 
 ```http
 GET /api/v1/copilot/config
@@ -109,6 +109,6 @@ RFQ import draft points users to existing Quotations → Import RFQ (same VL sta
 
 ## Related
 
-- Copilot operator day-to-day: `docs/runbooks/copilot.md`
+- Baiko operator day-to-day: `docs/runbooks/copilot.md`
 - RFQ vision: `docs/runbooks/dashscope-rfq-ai.md`
 - Golden queries: `web/src/modules/help-assistant/helpGoldenQueries.ts`

@@ -9,7 +9,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/llm"
 )
 
-// ComposeHit is the grounded article payload for compose / copilot.
+// ComposeHit is the grounded article payload for compose / Baiko.
 type ComposeHit = composeHitIn
 
 // ComposePersonalization is optional context injected into the small-model prompt.

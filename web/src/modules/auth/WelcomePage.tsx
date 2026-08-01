@@ -180,8 +180,8 @@ export default function WelcomePage() {
             {loading()
               ? "Setting up your workspace…"
               : hasInvite()
-                ? "Start 90-day trial (joins invite if still pending)"
-                : "Start 90-day free trial"}
+                ? "Start 30-day trial (joins invite if still pending)"
+                : "Start 30-day free trial"}
           </button>
           <p class="text-xs text-text-secondary">
             {hasInvite()

@@ -555,7 +555,7 @@ export function SalesModal(props: Props) {
       if (seededNewLines) {
         setLines(seedLines);
         if (seed?.needs_qty_review) {
-          toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
+          toast.warning("Baiko prefilled item lines with qty 1 — review quantities before saving.");
         }
       } else {
         setLines([emptySalesLine(1)]);
@@ -605,6 +605,16 @@ export function SalesModal(props: Props) {
     setCurrencyId(first.currency_id);
     setPicName(first.pic_name);
     setSourceSalesOrderId(first.sales_order_id);
+    if (first.payment_terms) setPaymentTerms(first.payment_terms);
+    if (first.notes) setNotes(first.notes);
+    if (first.project_id) {
+      setProjectId(first.project_id);
+      setProjectLabel(first.project_name ?? "");
+      setProjectName(first.project_name ?? "");
+    } else if (first.project_name) {
+      setProjectName(first.project_name);
+      setProjectLabel(first.project_name);
+    }
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
     setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
@@ -629,7 +639,7 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
-    toast.success("Sales Order lines loaded. Click Save to create the sales invoice — the Invoice tab opens after save.");
+    toast.success("Sales Order lines loaded. Attachments copy when you Save. Click Save to create the sales invoice — the Invoice tab opens after save.");
   };
 
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {

@@ -59,7 +59,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
                   <ul class="mt-3 list-inside list-disc space-y-1 text-sm text-text-secondary">
                     <li>
                       <a href="/welcome" class="font-medium text-brand-600 hover:underline">
-                        Start a 90-day free trial
+                        Start a 30-day free trial
                       </a>{" "}
                       (empty workspace for real data)
                     </li>

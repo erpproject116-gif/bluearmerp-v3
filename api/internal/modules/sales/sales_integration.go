@@ -32,6 +32,10 @@ type openSalesOrderLineRow struct {
 	TaxTypeID            int64   `json:"tax_type_id"`
 	CurrencyID           int64   `json:"currency_id"`
 	PicName              string  `json:"pic_name"`
+	ProjectID            *int64  `json:"project_id,omitempty"`
+	ProjectName          string  `json:"project_name"`
+	PaymentTerms         string  `json:"payment_terms"`
+	Notes                string  `json:"notes"`
 	ItemID               *int64  `json:"item_id,omitempty"`
 	ItemCode             string  `json:"item_code"`
 	ItemName             string  `json:"item_name"`
@@ -84,7 +88,9 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		if p.Q != "" {
 			where += fmt.Sprintf(` and (
 				so.sales_order_no ilike $%d or p.company_name ilike $%d or
-				ln.item_code ilike $%d or ln.item_name ilike $%d)`, argN, argN, argN, argN)
+				coalesce(p.partner_code, '') ilike $%d or
+				ln.item_code ilike $%d or ln.item_name ilike $%d or
+				coalesce(ln.remark, '') ilike $%d)`, argN, argN, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
@@ -106,6 +112,8 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no,
 			  p.company_name, so.location_id, l.location_name, so.partner_id,
 			  so.tax_type_id, so.currency_id, so.pic_name,
+			  so.project_id, coalesce(so.project_name, ''),
+			  coalesce(so.payment_terms, ''), coalesce(so.notes, ''),
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  coalesce(rel.released, 0)::float8,
 			  coalesce(dr.delivered, 0)::float8,
@@ -158,6 +166,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.SalesOrderNo,
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
+				&row.ProjectID, &row.ProjectName, &row.PaymentTerms, &row.Notes,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
 				&row.ReleasedQty, &row.DeliveredQty, &row.BalanceQty,
 				&row.UnitID, &row.UnitCode,

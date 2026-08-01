@@ -99,7 +99,7 @@ export function OpenTransactionMonitor(props: Props) {
               Search
               <input
                 class={`${inputClass} mt-0.5 min-w-[12rem]`}
-                placeholder="Partner, item, remark…"
+                placeholder="Customer, partner code, SO no, item…"
                 value={props.filters.q}
                 onInput={(e) => {
                   patch({ q: e.currentTarget.value });

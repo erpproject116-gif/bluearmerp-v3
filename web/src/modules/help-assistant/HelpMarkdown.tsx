@@ -147,7 +147,7 @@ function BlockView(props: { block: Block }) {
   );
 }
 
-/** Safe, dependency-free markdown for Copilot replies. */
+/** Safe, dependency-free markdown for Baiko replies. */
 export function HelpMarkdown(props: { content: string; class?: string; hideExternalNote?: boolean }) {
   return (
     <div class={`help-md space-y-2.5 text-sm leading-relaxed text-text-primary ${props.class ?? ""}`}>

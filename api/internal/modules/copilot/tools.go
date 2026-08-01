@@ -339,13 +339,13 @@ func toolRunSmartRFQ(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 		})
 	}
 	if len(input.Pages) > 100 || len(input.Tables) > 100 {
-		return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ input is too large; use a page range (max 100 pages/tables in Copilot)."}
+		return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ input is too large; use a page range (max 100 pages/tables in Baiko)."}
 	}
 	imageBytes := 0
 	for _, image := range input.PageImages {
 		imageBytes += len(image.ImageBase64)
 		if imageBytes > 12_000_000 {
-			return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ page images exceed the Copilot limit; use Import RFQ with a page range."}
+			return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ page images exceed the Baiko limit; use Import RFQ with a page range."}
 		}
 	}
 	totalText := 0
@@ -355,7 +355,7 @@ func toolRunSmartRFQ(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 		}
 		totalText += len(input.Pages[i].Text)
 		if totalText > 250_000 {
-			return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ extracted text exceeds the Copilot limit; use Import RFQ with a page range."}
+			return toolResult{Name: "run_smart_rfq", OK: false, Error: "Smart RFQ extracted text exceeds the Baiko limit; use Import RFQ with a page range."}
 		}
 	}
 
@@ -451,7 +451,7 @@ func toolDraftFollowUp(args map[string]any) toolResult {
 	} else if sale != nil {
 		title = "Follow-up: " + sale.Label
 	} else if strings.TrimSpace(q) != "" {
-		title = "Follow-up from Copilot"
+		title = "Follow-up from Baiko"
 	}
 	payload := map[string]any{
 		"task_type": "quote_follow_up",

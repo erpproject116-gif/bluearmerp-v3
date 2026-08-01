@@ -16,6 +16,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
@@ -159,6 +160,15 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 		if poid, ok := optionalInt64Query(r, "purchase_order_id"); ok {
 			where += fmt.Sprintf(" and po.id = $%d", argN)
 			args = append(args, *poid)
+			argN++
+		}
+		qParam := strings.TrimSpace(r.URL.Query().Get("q"))
+		if qParam != "" {
+			where += fmt.Sprintf(` and (
+				po.purchase_order_no ilike $%d or coalesce(p.company_name, '') ilike $%d or
+				coalesce(p.partner_code, '') ilike $%d or
+				pol.item_code ilike $%d or pol.item_name ilike $%d)`, argN, argN, argN, argN, argN)
+			args = append(args, "%"+qParam+"%")
 			argN++
 		}
 		f := openlines.ParseFilters(r, 0)
@@ -374,6 +384,15 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 		f := openlines.ParseFilters(r, 0)
 		f.PartnerID = nil
 		where, args, argN = f.Apply(where, args, argN, "", "gr.receipt_date", "po.purchase_order_no")
+		qParam := strings.TrimSpace(r.URL.Query().Get("q"))
+		if qParam != "" {
+			where += fmt.Sprintf(` and (
+				po.purchase_order_no ilike $%d or coalesce(p.company_name, '') ilike $%d or
+				coalesce(p.partner_code, '') ilike $%d or
+				pol.item_code ilike $%d or pol.item_name ilike $%d)`, argN, argN, argN, argN, argN)
+			args = append(args, "%"+qParam+"%")
+			argN++
+		}
 
 		q := fmt.Sprintf(`
 			select grl.id, gr.id, pol.id, po.purchase_order_no,
@@ -966,6 +985,33 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
+		}
+
+		// Load Slip → Save: copy originating PO attachments when lines reference PO lines.
+		poIDs := map[int64]struct{}{}
+		for _, ln := range body.Lines {
+			if ln.PurchaseOrderLineID == nil || *ln.PurchaseOrderLineID <= 0 {
+				continue
+			}
+			var poID int64
+			if err := pool.QueryRow(r.Context(),
+				`select purchase_order_id from public.po_purchase_order_lines where id = $1`,
+				*ln.PurchaseOrderLineID).Scan(&poID); err == nil && poID > 0 {
+				poIDs[poID] = struct{}{}
+			}
+		}
+		for poID := range poIDs {
+			_ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
+				SrcBaseDir: attachmentx.Dir("purchase_order"),
+				DstBaseDir: attachmentx.Dir("supplier_invoice"),
+				SrcTable:   "public.po_purchase_order_attachments",
+				SrcFKCol:   "purchase_order_id",
+				SrcID:      poID,
+				DstTable:   "public.fin_supplier_invoice_attachments",
+				DstFKCol:   "supplier_invoice_id",
+				DstID:      id,
+				TenantID:   tu.TenantID,
+			})
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.supplier_invoice.create", "fin_supplier_invoice", &id, nil, body)

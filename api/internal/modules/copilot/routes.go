@@ -9,7 +9,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/helpassistant"
 )
 
-// RegisterRoutes mounts Copilot ask / tools / approve-to-act endpoints.
+// RegisterRoutes mounts Baiko ask / tools / approve-to-act endpoints.
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/copilot", func(cr chi.Router) {
 		cr.Get("/config", getConfig())

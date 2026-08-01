@@ -29,6 +29,7 @@ func getAIConfig() http.HandlerFunc {
 		writeOK(w, map[string]any{
 			"enabled":      c.Available(),
 			"copilot":      c.CopilotAvailable(),
+			"baiko":        c.CopilotAvailable(),
 			"provider":     "dashscope",
 			"model":        c.Model,
 			"small_model":  c.SmallModel,

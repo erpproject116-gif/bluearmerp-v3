@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
@@ -612,6 +613,21 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
+		}
+
+		// Load Slip → Save: copy quotation attachments onto the new sales order.
+		if body.SourceQuotationID != nil && *body.SourceQuotationID > 0 {
+			_ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
+				SrcBaseDir: attachmentx.Dir("quotation"),
+				DstBaseDir: attachmentx.Dir("sales_order"),
+				SrcTable:   "public.quo_quotation_attachments",
+				SrcFKCol:   "quotation_id",
+				SrcID:      *body.SourceQuotationID,
+				DstTable:   "public.so_sales_order_attachments",
+				DstFKCol:   "sales_order_id",
+				DstID:      id,
+				TenantID:   tu.TenantID,
+			})
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.create", "so_sales_order", &id, nil, body)

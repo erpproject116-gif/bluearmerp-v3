@@ -51,7 +51,6 @@ export const appModules: AppModule[] = [
     features: [
       { label: "MyPage", href: "/app/dashboard", settingsHref: "/app/dashboard" },
       { label: "Approvals", href: "/app/dashboard/approvals", settingsHref: "/app/dashboard/approvals" },
-      { label: "Site Map", href: "/app/dashboard/site-map", settingsHref: "/app/dashboard/site-map" },
     ],
   },
   {
@@ -566,7 +565,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/documentation",
     features: [
       { label: "Help & guides", href: "/app/documentation", settingsHref: "/app/documentation" },
-      { label: "Copilot", href: "/app/copilot", settingsHref: "/app/copilot", headerPriority: "primary" },
+      { label: "Baiko", href: "/app/baiko", settingsHref: "/app/baiko", headerPriority: "primary" },
     ],
   },
   {

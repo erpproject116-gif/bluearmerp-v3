@@ -1,4 +1,4 @@
-# Bluearm Copilot — operator runbook
+# Baiko — operator runbook
 
 Cost-efficient Ask over existing Help guides, then live read-only tools, then approve-to-act. Orchestration stays in the Go API next to auth/datascope.
 
@@ -9,7 +9,7 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 3. Small model (`COPILOT_SMALL_MODEL`) for doc rewrite; medium (`COPILOT_MEDIUM_MODEL`) for tool synthesis; VL stays RFQ-only.
 4. Writes never auto-post.
 5. No second Python service.
-6. **Full-page workspace** at `/app/copilot` (nav: Help & guides → Copilot). Drawer (Ctrl+Shift+H) remains for contextual help. Shared session state.
+6. **Full-page workspace** at `/app/baiko` (nav: Help & guides → Baiko). Legacy `/app/copilot` redirects here. Drawer (Ctrl+Shift+H) remains for contextual help. Shared session state.
 7. **Smart Assist** on transaction failures is separate — see `docs/runbooks/smart-assist.md`. Zero LLM tokens on those toasts.
 
 ## Chat window hard limits
@@ -41,19 +41,19 @@ Cost-efficient Ask over existing Help guides, then live read-only tools, then ap
 
 5. Apply migration `208_copilot_chat_ux.sql` for session titles + attachment metadata.
 
-6. Chat UX: maximize the Copilot panel (▣), use **History** for prior sessions, attach PDF/DOCX/XLSX/CSV/images via **+**.
+6. Chat UX: maximize the Baiko panel (▣), use **History** for prior sessions, attach PDF/DOCX/XLSX/CSV/images via **+**.
 
 7. Entity tags: type **@** in the composer to search and tag items, customers, vendors, serials, invoices, quotations, POs, SOs, and load-slip refs (`@[type:id|label]`). Ask e.g. “generate quotation for @…”, “create follow-up for @…”, “send email quotation @…”, then **Approve** (writes never auto-post; quote/email open the UI).
 
-8. **Auto-escalate:** if intent is “docs” but guides/KB return no hit, `INSUFFICIENT_CONTEXT`, or only an ungrounded title list, Copilot automatically runs live tools (financial health, etc.) and prefixes the reply that guides weren’t enough.
+8. **Auto-escalate:** if intent is “docs” but guides/KB return no hit, `INSUFFICIENT_CONTEXT`, or only an ungrounded title list, Baiko automatically runs live tools (financial health, etc.) and prefixes the reply that guides weren’t enough.
 
 9. **Action catalog (approve-to-act):** quotation, sales order, sales invoice, purchase request, RFQ, purchase order, purchases, email send, bulk inventory (import/stock UI), product bundle / PC build, manufacturing BOM, CRM follow-up (full create). Document actions open the ERP form with tagged @entities — they do **not** auto-post. Ops tools: recommend items, compare pricing, smart notifications.
 
-10. **Agentic Smart RFQ:** `run_smart_rfq` uses the quotation module's single `RunRfqImportPipeline` contract (classify → parse → conditional Qwen VL → sanitize → inventory match). It never uses a second Copilot extraction prompt/stack. If chat does not contain complete extracted page/table payload, Copilot opens the existing Import RFQ UI instead of pretending it parsed the binary.
+10. **Agentic Smart RFQ:** `run_smart_rfq` uses the quotation module's single `RunRfqImportPipeline` contract (classify → parse → conditional Qwen VL → sanitize → inventory match). It never uses a second Baiko extraction prompt/stack. If chat does not contain complete extracted page/table payload, Baiko opens the existing Import RFQ UI instead of pretending it parsed the binary.
 
 11. **RFQ approve boundary:** `draft_quotation_from_rfq` / `create_quotation_from_rfq` allows at most 200 sanitized lines. Approve stages the seed in the browser and opens `/app/quotation/quotations/new`; it does not insert, save, confirm, post, or email a quotation. The user reviews and saves in the standard form. Invoice-like documents and spec sheets are blocked and cannot produce an Approve draft.
 
-12. **Attach → map → import (`map_import_dataset`):** a sheet attachment (CSV/XLSX) plus an import-style ask produces a draft that auto-detects the Migration Center entity (items / partners / accounts) and auto-maps columns (same aliases as the modal). Approve stages `bluearm.migImportSeed` in `sessionStorage` and opens `/app/user-management/migration-center`, where the existing mapped-import modal opens prefilled — nothing imports until the user confirms there (`migration.center` write enforced by the import API). If the sheet reads like an RFQ (e.g. "REQUEST FOR QUOTATION", PhilGEPS), Copilot hands off to Import RFQ instead.
+12. **Attach → map → import (`map_import_dataset`):** a sheet attachment (CSV/XLSX) plus an import-style ask produces a draft that auto-detects the Migration Center entity (items / partners / accounts) and auto-maps columns (same aliases as the modal). Approve stages `bluearm.migImportSeed` in `sessionStorage` and opens `/app/user-management/migration-center`, where the existing mapped-import modal opens prefilled — nothing imports until the user confirms there (`migration.center` write enforced by the import API). If the sheet reads like an RFQ (e.g. "REQUEST FOR QUOTATION", PhilGEPS), Baiko hands off to Import RFQ instead.
 
 13. **Generalized document seeds:** `open_quotation|open_sales_order|open_sales|open_purchase_request|open_rfq|open_purchase_order|open_purchases` drafts that carry a partner and/or tagged `@item` lines return a sanitized seed on Approve (allowlisted fields, ≤ 200 lines, server-side `sanitizeDocSeedPayload`, write permission on the target module required when the payload seeds content). The client stores it under `bluearm.docSeed.<kind>` and the create form consumes it once; lines seeded from bare `@item` tags get qty 1 plus an amber "review quantities" warning. Copy always says "Review and save" — never "created".
 

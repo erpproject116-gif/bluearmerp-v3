@@ -49,7 +49,7 @@ export const MIG_REQUIRED: Record<MigKind, string[]> = {
 
 const migBase = `${apiBase}/api/v1/migration`;
 
-/** Copilot "map_import_dataset" Approve stages this seed; Migration Center consumes it once. */
+/** Baiko "map_import_dataset" Approve stages this seed; Migration Center consumes it once. */
 export type MigImportSeed = {
   kind: MigKind;
   file_name?: string;

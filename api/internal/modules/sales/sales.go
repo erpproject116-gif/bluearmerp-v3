@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
@@ -694,6 +695,21 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
+		}
+
+		// Load Slip → Save: copy SO attachments onto the new sale (same as CreateFromSalesOrder).
+		if body.SourceSalesOrderID != nil && *body.SourceSalesOrderID > 0 {
+			_ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
+				SrcBaseDir: attachmentx.Dir("sales_order"),
+				DstBaseDir: attachmentx.Dir("sales"),
+				SrcTable:   "public.so_sales_order_attachments",
+				SrcFKCol:   "sales_order_id",
+				SrcID:      *body.SourceSalesOrderID,
+				DstTable:   "public.sa_sales_attachments",
+				DstFKCol:   "sales_id",
+				DstID:      id,
+				TenantID:   tu.TenantID,
+			})
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.create", "sa_sales", &id, nil, body)

@@ -80,7 +80,7 @@ test.describe("Copilot seed handoffs", () => {
 
     // Modal auto-opens for the seeded kind with the Copilot note and mapped headers.
     await expect(modalHeading).toBeVisible();
-    await expect(page.getByText(/Prefilled from your Copilot attachment/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Prefilled from your Baiko attachment/i)).toBeVisible({ timeout: 15_000 });
     await expect(page.locator("select").filter({ hasText: "Item Name" }).first()).toBeVisible();
     const remaining = await page.evaluate(() => sessionStorage.getItem("bluearm.migImportSeed"));
     expect(remaining).toBeNull();
@@ -109,7 +109,7 @@ test.describe("Copilot seed handoffs", () => {
     await page.goto("/app/inventory/serial-lot/receive");
 
     // Staged toast confirms the propose-only handoff; seed is consumed.
-    await expect(page.getByText(/Copilot staged 2 serial\(s\)/i)).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText(/Baiko staged 2 serial\(s\)/i)).toBeVisible({ timeout: 25_000 });
     const remaining = await page.evaluate(() => sessionStorage.getItem("bluearm.serialLotSeed"));
     expect(remaining).toBeNull();
   });

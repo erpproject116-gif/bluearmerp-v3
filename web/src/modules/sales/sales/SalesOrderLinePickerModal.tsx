@@ -18,6 +18,10 @@ export type OpenSalesOrderLineRow = {
   tax_type_id: number;
   currency_id: number;
   pic_name: string;
+  project_id?: number | null;
+  project_name?: string;
+  payment_terms?: string;
+  notes?: string;
   item_id?: number | null;
   item_code: string;
   item_name: string;
@@ -43,7 +47,7 @@ type Props = {
   partnerLabel?: string;
 };
 
-const pageSize = 50;
+const pageSize = 100;
 
 export function SalesOrderLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -132,7 +136,7 @@ export function SalesOrderLinePickerModal(props: Props) {
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
       onApply={confirm}
-      emptyHint="No confirmed Sales Order lines with open qty. Confirm the SO (progress Confirmed/Complete), clear the customer lock if needed, or use Sales Order → Pick List for serial-tracked items. Split-release stores also need a delivery receipt first."
+      emptyHint="No confirmed Sales Order lines with open qty. Confirm the SO (progress Confirmed/Complete). If your store requires Delivery Receipt before invoice, post a DR first. Clear Search/Doc No, use Clear dates, or check that your user data scope includes that customer. Serial-tracked items need Pick List release first."
       columns={[
         { key: "date_no", header: "Date-No.", cell: (r) => String(r.date_no_display ?? "") },
         { key: "so", header: "SO No.", cell: (r) => String(r.sales_order_no ?? "") },

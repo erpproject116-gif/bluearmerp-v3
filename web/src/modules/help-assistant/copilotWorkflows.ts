@@ -1,4 +1,4 @@
-/** Fixed Copilot workspace starters — tools/catalog only, no free invent. */
+/** Fixed Baiko workspace starters — tools/catalog only, no free invent. */
 
 export type CopilotWorkflowTile = {
   id: string;

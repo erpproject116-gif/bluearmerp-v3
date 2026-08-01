@@ -20,7 +20,7 @@ export const ECOUNT_TOP_MODULES: EcountTopModule[] = [
   {
     id: "mypage",
     label: "Home",
-    hint: "Dashboard and Site Map",
+    hint: "Dashboard",
     href: "/app/dashboard",
     navGroupIds: [],
     ungroupedModuleIds: ["dashboard"],
@@ -524,5 +524,4 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
     ],
   },
-  { id: "sitemap", label: "Site Map", href: "/app/dashboard/site-map", iconId: "dashboard", topId: "mypage" },
 ];

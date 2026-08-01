@@ -148,7 +148,8 @@ func (s *service) convertDemo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	startsAt := time.Now()
-	endsAt := startsAt.Add(customerregistry.TrialDays * 24 * time.Hour)
+	trialDays := customerregistry.ResolveTrialDays(trialPlan.TrialDays)
+	endsAt := startsAt.Add(time.Duration(trialDays) * 24 * time.Hour)
 	pid := trialPlan.ID
 	subID, err := customerregistry.CreateSubscription(r.Context(), s.pool, customerID, tenantID,
 		customerregistry.PlanTrial90d, &pid, startsAt, &endsAt, 0, 0, 0, "Converted from demo to trial.")
@@ -156,7 +157,8 @@ func (s *service) convertDemo(w http.ResponseWriter, r *http.Request) {
 		response.Err(w, http.StatusInternalServerError, "Failed to convert.", "ERR_INTERNAL")
 		return
 	}
-	customerregistry.AppendCRMLeadNote(r.Context(), s.pool, customerID, "[admin] Demo converted to 90-day trial.")
+	customerregistry.AppendCRMLeadNote(r.Context(), s.pool, customerID,
+		"[admin] Demo converted to "+strconv.Itoa(trialDays)+"-day trial.")
 	_, _ = customerregistry.UpdateCustomerUrgency(r.Context(), s.pool, customerID, time.Now())
 	response.OK(w, map[string]any{"subscription_id": subID, "trial_ends_at": endsAt}, "Converted to trial.")
 }

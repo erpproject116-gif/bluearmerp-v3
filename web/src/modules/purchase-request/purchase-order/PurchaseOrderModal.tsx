@@ -386,7 +386,7 @@ export function PurchaseOrderModal(props: Props) {
       setLines(seedLines.length > 0 ? seedLines : [emptyPurchaseRequestLine(1)]);
     }
     if (seedLines.length > 0 && seed?.needs_qty_review) {
-      toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
+      toast.warning("Baiko prefilled item lines with qty 1 — review quantities before saving.");
     }
     const def = cc.find((c) => c.is_default) ?? cc[0];
     setCurrencyId(def?.id ?? null);

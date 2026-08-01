@@ -38,6 +38,9 @@ export default function PlatformPlanEditPage() {
   const [inclusions, setInclusions] = createSignal("");
   const [isActive, setIsActive] = createSignal(true);
   const [isPublic, setIsPublic] = createSignal(true);
+  const [isTrial, setIsTrial] = createSignal(false);
+  const [isDemo, setIsDemo] = createSignal(false);
+  const [trialDays, setTrialDays] = createSignal(30);
   const [sortOrder, setSortOrder] = createSignal(50);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -59,6 +62,9 @@ export default function PlatformPlanEditPage() {
     setInclusions(formatInclusions(p.inclusions));
     setIsActive(Boolean(p.is_active));
     setIsPublic(Boolean(p.is_public));
+    setIsTrial(Boolean(p.is_trial));
+    setIsDemo(Boolean(p.is_demo));
+    setTrialDays(Number(p.trial_days ?? 0) || 30);
     setSortOrder(Number(p.sort_order ?? 0));
   });
 
@@ -70,6 +76,7 @@ export default function PlatformPlanEditPage() {
       display_name: displayName().trim(),
       description: description().trim(),
       lock_in_months: lockInMonths(),
+      trial_days: isTrial() ? trialDays() : 0,
       regular_monthly_amount: regularMonthly(),
       regular_total_amount: regularTotal() === "" ? null : Number(regularTotal()),
       promo_monthly_amount: promoMonthly() === "" ? null : Number(promoMonthly()),
@@ -78,8 +85,8 @@ export default function PlatformPlanEditPage() {
       promo_starts_at: promoStarts() || null,
       promo_ends_at: promoEnds() || null,
       inclusions: parseInclusions(inclusions()),
-      is_trial: false,
-      is_demo: false,
+      is_trial: isTrial(),
+      is_demo: isDemo(),
       is_active: isActive(),
       is_public: isPublic(),
       sort_order: sortOrder(),
@@ -158,6 +165,32 @@ export default function PlatformPlanEditPage() {
             />
           </label>
         </div>
+
+        <div class="flex flex-wrap gap-4 text-sm">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" checked={isTrial()} onChange={(e) => setIsTrial(e.currentTarget.checked)} />
+            Trial plan
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" checked={isDemo()} onChange={(e) => setIsDemo(e.currentTarget.checked)} />
+            Demo plan
+          </label>
+        </div>
+
+        <Show when={isTrial()}>
+          <label class="block text-sm">
+            <span class="font-medium">Trial length (days)</span>
+            <DecimalInput
+              mode="integer"
+              class="mt-1 w-full max-w-xs rounded-lg border border-stroke px-3 py-2 text-sm"
+              value={String(trialDays())}
+              onValue={(v) => setTrialDays(Math.max(1, parseNum(v) || 30))}
+            />
+            <p class="mt-1 text-xs text-text-secondary">
+              Used when provisioning new trial workspaces. Default is 30.
+            </p>
+          </label>
+        </Show>
 
         <fieldset class="rounded-xl border border-stroke p-4">
           <legend class="px-1 text-sm font-semibold">Regular pricing</legend>

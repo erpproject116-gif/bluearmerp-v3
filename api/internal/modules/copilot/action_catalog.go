@@ -13,7 +13,7 @@ import (
 )
 
 // openDocSpec describes an approve-to-act "open UI to create/send" draft.
-// Full document create stays in the ERP forms (policies, lines, tax) — Copilot tags context only.
+// Full document create stays in the ERP forms (policies, lines, tax) — Baiko tags context only.
 type openDocSpec struct {
 	Kind      string // tool suffix / matcher key
 	DraftType string
@@ -29,43 +29,43 @@ var openDocumentCatalog = []openDocSpec{
 		Kind: "quotation", DraftType: "open_quotation", Label: "Quotation",
 		UI: "/app/quotation/quotations/new", API: "/api/v1/quotation/quotations",
 		PartnerAs: "customer",
-		Hint:      "Create the quotation in the UI — Copilot tags customer/items only; nothing is auto-posted.",
+		Hint:      "Create the quotation in the UI — Baiko tags customer/items only; nothing is auto-posted.",
 	},
 	{
 		Kind: "sales_order", DraftType: "open_sales_order", Label: "Sales order",
 		UI: "/app/sales-order/sales-orders/new", API: "/api/v1/sales-order/sales-orders",
 		PartnerAs: "customer",
-		Hint:      "Create the sales order in the UI — Copilot does not auto-post.",
+		Hint:      "Create the sales order in the UI — Baiko does not auto-post.",
 	},
 	{
 		Kind: "sales", DraftType: "open_sales", Label: "Sales invoice",
 		UI: "/app/sales/sales/new", API: "/api/v1/sales/",
 		PartnerAs: "customer",
-		Hint:      "Create the sales invoice in the UI — Copilot does not auto-post.",
+		Hint:      "Create the sales invoice in the UI — Baiko does not auto-post.",
 	},
 	{
 		Kind: "purchase_request", DraftType: "open_purchase_request", Label: "Purchase request",
 		UI: "/app/purchase-request/purchase-requests/new", API: "/api/v1/purchase-request/purchase-requests",
 		PartnerAs: "",
-		Hint:      "Create the purchase request in the UI — Copilot does not auto-post.",
+		Hint:      "Create the purchase request in the UI — Baiko does not auto-post.",
 	},
 	{
 		Kind: "rfq", DraftType: "open_rfq", Label: "RFQ",
 		UI: "/app/purchase-order/rfq", API: "/api/v1/purchase-order/rfq",
 		PartnerAs: "vendor",
-		Hint:      "Create or continue the RFQ in Purchase Order → RFQ. Copilot does not auto-post.",
+		Hint:      "Create or continue the RFQ in Purchase Order → RFQ. Baiko does not auto-post.",
 	},
 	{
 		Kind: "purchase_order", DraftType: "open_purchase_order", Label: "Purchase order",
 		UI: "/app/purchase-order/purchase-orders", API: "/api/v1/purchase-order/purchase-orders",
 		PartnerAs: "vendor",
-		Hint:      "Open Purchase Orders and create/confirm there — Copilot does not auto-post.",
+		Hint:      "Open Purchase Orders and create/confirm there — Baiko does not auto-post.",
 	},
 	{
 		Kind: "purchases", DraftType: "open_purchases", Label: "Supplier invoice / Purchase",
 		UI: "/app/purchases/purchases/new", API: "/api/v1/finance/supplier-invoices",
 		PartnerAs: "vendor",
-		Hint:      "Create the supplier invoice in Purchases — Copilot does not auto-post.",
+		Hint:      "Create the supplier invoice in Purchases — Baiko does not auto-post.",
 	},
 	{
 		Kind: "product_bundle", DraftType: "open_product_bundle", Label: "Product bundle / PC build",
@@ -77,7 +77,7 @@ var openDocumentCatalog = []openDocSpec{
 		Kind: "bom", DraftType: "open_bom", Label: "BOM / item build",
 		UI: "/app/inventory/serial-lot/manufacturing/boms", API: "/api/v1/manufacturing/boms",
 		PartnerAs: "",
-		Hint:      "Define manufacturing BOMs under Serial & Lot → Manufacturing. Copilot does not auto-create BOMs.",
+		Hint:      "Define manufacturing BOMs under Serial & Lot → Manufacturing. Baiko does not auto-create BOMs.",
 	},
 	{
 		Kind: "bulk_inventory", DraftType: "bulk_inventory", Label: "Bulk inventory",
