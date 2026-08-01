@@ -60,6 +60,7 @@ type planBody struct {
 	IsActive             bool            `json:"is_active"`
 	IsPublic             bool            `json:"is_public"`
 	SortOrder            int             `json:"sort_order"`
+	TrialDays            int             `json:"trial_days"`
 }
 
 func parsePlanBody(body planBody) (plans.UpsertInput, map[string]string) {
@@ -74,6 +75,9 @@ func parsePlanBody(body planBody) (plans.UpsertInput, map[string]string) {
 	}
 	if body.RegularMonthlyAmount < 0 {
 		errs["regular_monthly_amount"] = "Must be zero or positive."
+	}
+	if body.TrialDays < 0 {
+		errs["trial_days"] = "Must be zero or positive."
 	}
 	in := plans.UpsertInput{
 		PlanCode:             code,
@@ -91,6 +95,7 @@ func parsePlanBody(body planBody) (plans.UpsertInput, map[string]string) {
 		IsActive:             body.IsActive,
 		IsPublic:             body.IsPublic,
 		SortOrder:            body.SortOrder,
+		TrialDays:            body.TrialDays,
 	}
 	if body.PromoStartsAt != nil && strings.TrimSpace(*body.PromoStartsAt) != "" {
 		t, err := time.Parse(time.RFC3339, strings.TrimSpace(*body.PromoStartsAt))

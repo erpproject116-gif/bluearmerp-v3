@@ -241,7 +241,7 @@ export function HelpAssistantPanel(props: {
       <section
         class="erp-surface fixed z-[61] flex overflow-hidden border border-stroke shadow-2xl"
         style={panelStyle()}
-        aria-label="Bluearm Copilot"
+        aria-label="Baiko"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKey}
       >
@@ -289,7 +289,7 @@ export function HelpAssistantPanel(props: {
         <div class="flex min-w-0 flex-1 flex-col">
           <header class="flex items-center justify-between gap-2 border-b border-stroke px-4 py-3">
             <div>
-              <h2 class="text-sm font-semibold text-text-primary">Bluearm Copilot</h2>
+              <h2 class="text-sm font-semibold text-text-primary">Baiko</h2>
               <p class="text-xs text-text-secondary">
                 {props.assistant.aiEnabled() ? "Ask, look up, or draft an action" : "In-app help"}
               </p>
@@ -313,7 +313,7 @@ export function HelpAssistantPanel(props: {
                 New
               </button>
               <A
-                href="/app/copilot"
+                href="/app/baiko"
                 class="rounded px-2 py-1 text-xs text-text-secondary hover:bg-slate-100"
                 onClick={() => props.onClose()}
               >
@@ -473,7 +473,7 @@ export function HelpAssistantPanel(props: {
                 ref={inputEl}
                 rows={props.assistant.maximized() ? 3 : 2}
                 class="min-w-0 flex-1 resize-none rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-                placeholder="Message Copilot… type @ for menu · Enter to send"
+                placeholder="Message Baiko… type @ for menu · Enter to send"
                 value={draft()}
                 disabled={props.assistant.busy()}
                 onInput={(e) => {

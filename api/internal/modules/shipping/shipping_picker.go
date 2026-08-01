@@ -75,7 +75,8 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		if p.Q != "" {
 			where += fmt.Sprintf(` and (
 				sh.shipping_no ilike $%d or so.sales_order_no ilike $%d or p.company_name ilike $%d or
-				ln.item_code ilike $%d or ln.item_name ilike $%d)`, argN, argN, argN, argN, argN)
+				coalesce(p.partner_code, '') ilike $%d or
+				ln.item_code ilike $%d or ln.item_name ilike $%d)`, argN, argN, argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}

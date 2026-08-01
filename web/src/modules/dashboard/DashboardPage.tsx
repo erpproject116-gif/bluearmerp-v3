@@ -215,12 +215,6 @@ export default function DashboardPage() {
           >
             Approvals queue
           </A>
-          <A
-            href="/app/dashboard/site-map"
-            class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-text-secondary shadow-sm transition hover:shadow-md"
-          >
-            Site Map
-          </A>
         </div>
       </div>
 

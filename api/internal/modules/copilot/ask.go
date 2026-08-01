@@ -220,7 +220,7 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg := helpassistant.ConfigFromEnv()
 		if !cfg.CopilotAvailable() {
-			response.Err(w, http.StatusServiceUnavailable, "Copilot is not enabled.", "ERR_COPILOT_DISABLED")
+			response.Err(w, http.StatusServiceUnavailable, "Baiko is not enabled.", "ERR_COPILOT_DISABLED")
 			return
 		}
 		tu, ok := auth.FromContext(r.Context())
@@ -229,7 +229,7 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if !allowCopilotRate(tu.TenantID, tu.AppUserID, "ask") {
-			response.Err(w, http.StatusTooManyRequests, "Too many Copilot asks. Please wait a moment.", "ERR_COPILOT_RATE")
+			response.Err(w, http.StatusTooManyRequests, "Too many Baiko asks. Please wait a moment.", "ERR_COPILOT_RATE")
 			return
 		}
 		var body askBody
@@ -517,7 +517,7 @@ func askAction(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg 
 	}
 }
 
-const opsSystemPrompt = `You are Bluearm Copilot summarizing live ERP tool JSON for an executive in this tenant only.
+const opsSystemPrompt = `You are Baiko summarizing live ERP tool JSON for an executive in this tenant only.
 Rules:
 - Scope: only Bluearm ERP and this company’s tool-scoped data. Refuse coding, general knowledge, and unrelated tech.
 - Use ONLY the tool JSON provided. Do not invent numbers. Do not free-chat outside the tools.

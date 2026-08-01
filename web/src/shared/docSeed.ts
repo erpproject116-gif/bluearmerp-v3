@@ -1,5 +1,5 @@
 /**
- * Copilot approve-to-seed handoff for document create forms.
+ * Baiko approve-to-seed handoff for document create forms.
  *
  * On Approve of an `open_*` draft the chat stages a sanitized seed in
  * sessionStorage under `bluearm.docSeed.<kind>`; the target create form takes
@@ -72,7 +72,7 @@ export function takeDocSeed(kind: DocSeedKind): DocSeed | null {
 }
 
 /**
- * Copilot "propose_serial_lot_import" Approve stages this seed; the Serial &
+ * Baiko "propose_serial_lot_import" Approve stages this seed; the Serial &
  * Lot receive page consumes it once into the paste-serials buffer. Nothing is
  * registered until the user imports via the existing capture controls.
  */

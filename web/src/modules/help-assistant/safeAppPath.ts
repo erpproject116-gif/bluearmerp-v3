@@ -1,4 +1,4 @@
-/** Safe in-app deep-link paths for Copilot navigation (mirrors server SafeAppPath). */
+/** Safe in-app deep-link paths for Baiko navigation (mirrors server SafeAppPath). */
 export function safeAppPath(href: string): string | null {
   const h = (href || "").trim();
   if (!h) return null;

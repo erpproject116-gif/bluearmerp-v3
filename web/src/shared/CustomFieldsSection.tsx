@@ -43,15 +43,17 @@ export function CustomFieldsSection(props: Props) {
               : "Configured in Settings for this feature."}
           </p>
         </div>
-        <For each={defs()}>
-          {(def) => (
-            <CustomFieldInput
-              def={def}
-              value={() => props.values()[def.field_key]}
-              onChange={props.onChange}
-            />
-          )}
-        </For>
+        <div class="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+          <For each={defs()}>
+            {(def) => (
+              <CustomFieldInput
+                def={def}
+                value={() => props.values()[def.field_key]}
+                onChange={props.onChange}
+              />
+            )}
+          </For>
+        </div>
         <InlineCustomFieldAdder entityType={props.entityType} />
       </div>
     </Show>

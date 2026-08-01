@@ -182,9 +182,9 @@ export function FloatingActionDock(props: Props) {
         type="button"
         data-fab-action="help"
         class="flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2"
-        aria-label={props.helpOpen ? "Close help assistant" : "Open help assistant"}
+        aria-label={props.helpOpen ? "Close Baiko" : "Open Baiko"}
         aria-expanded={props.helpOpen}
-        title="Help assistant (Ctrl+Shift+H)"
+        title="Baiko (Ctrl+Shift+H)"
         onClick={maybeClick(props.onHelpClick)}
       >
         <Show when={props.helpOpen} fallback={<span class="text-lg" aria-hidden="true">?</span>}>

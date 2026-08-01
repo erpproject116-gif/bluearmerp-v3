@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Per-user Copilot ask/approve rate limits (in-process token buckets).
+// Per-user Baiko ask/approve rate limits (in-process token buckets).
 const (
 	copilotAskRPM     = 20
 	copilotApproveRPM = 30

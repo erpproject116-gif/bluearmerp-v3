@@ -290,7 +290,7 @@ export default function PurchaseOrderListPage() {
   const [editingPoId, setEditingPoId] = createSignal<number | null>(null);
   const [viewingDeleted, setViewingDeleted] = createSignal(false);
 
-  // Copilot approve-to-seed handoff: a staged PO seed auto-opens the create modal.
+  // Baiko approve-to-seed handoff: a staged PO seed auto-opens the create modal.
   onMount(() => {
     if (hasDocSeed("purchase_order")) {
       setEditingPoId(null);

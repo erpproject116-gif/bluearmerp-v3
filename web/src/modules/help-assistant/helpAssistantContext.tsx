@@ -35,10 +35,14 @@ export function HelpAssistantProvider(props: ParentProps) {
   const [queuedQuery, setQueuedQuery] = createSignal<string | null>(null);
   const [ticketOpen, setTicketOpen] = createSignal(false);
 
-  const onCopilotPage = () => loc.pathname === "/app/copilot" || loc.pathname.startsWith("/app/copilot/");
+  const onBaikoPage = () =>
+    loc.pathname === "/app/baiko" ||
+    loc.pathname.startsWith("/app/baiko/") ||
+    loc.pathname === "/app/copilot" ||
+    loc.pathname.startsWith("/app/copilot/");
 
   const toggle = () => {
-    if (onCopilotPage()) {
+    if (onBaikoPage()) {
       setOpen(false);
       return;
     }
@@ -47,7 +51,7 @@ export function HelpAssistantProvider(props: ParentProps) {
 
   const openWithQuery = (query: string) => {
     const q = query.trim();
-    if (onCopilotPage()) {
+    if (onBaikoPage()) {
       if (q) queueMicrotask(() => assistant.ask(q));
       return;
     }
@@ -70,7 +74,7 @@ export function HelpAssistantProvider(props: ParentProps) {
   });
 
   createEffect(() => {
-    if (onCopilotPage()) setOpen(false);
+    if (onBaikoPage()) setOpen(false);
   });
 
   onMount(() => {
@@ -96,7 +100,7 @@ export function HelpAssistantProvider(props: ParentProps) {
         onHelpClick={toggle}
         onSupportClick={() => setTicketOpen(true)}
       />
-      <Show when={open() && !onCopilotPage()}>
+      <Show when={open() && !onBaikoPage()}>
         <HelpAssistantPanel open={true} onClose={() => setOpen(false)} assistant={assistant} />
       </Show>
       <Show when={showSupportFab()}>

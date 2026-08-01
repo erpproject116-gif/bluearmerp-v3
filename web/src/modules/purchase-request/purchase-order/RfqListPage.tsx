@@ -52,7 +52,7 @@ export default function RfqListPage() {
   const [lines, setLines] = createSignal<RfqLineDraft[]>([emptyRfqLine()]);
   const [creating, setCreating] = createSignal(false);
 
-  // Copilot approve-to-seed handoff: staged RFQ lines open the create panel prefilled.
+  // Baiko approve-to-seed handoff: staged RFQ lines open the create panel prefilled.
   onMount(() => {
     const seed = takeDocSeed("rfq");
     if (!seed?.lines?.length) return;
@@ -68,7 +68,7 @@ export default function RfqListPage() {
     setLines(seeded);
     setCreateOpen(true);
     if (seed.needs_qty_review) {
-      toast.warning("Copilot prefilled RFQ lines with qty 1 — review quantities before creating.");
+      toast.warning("Baiko prefilled RFQ lines with qty 1 — review quantities before creating.");
     }
   });
 

@@ -426,7 +426,7 @@ export default function SerialReceivePage() {
   onMount(() => {
     const gr = goodsReceipt();
     if (gr) scanQueue.initFromStorage(gr.id);
-    // Copilot approve-to-seed handoff: stage proposed serials into the paste
+    // Baiko approve-to-seed handoff: stage proposed serials into the paste
     // buffer only — nothing is registered until the user clicks Import.
     const seed = takeSerialLotSeed();
     if (seed?.rows?.length) {
@@ -437,7 +437,7 @@ export default function SerialReceivePage() {
         setPasteText(serials.join("\n"));
         setPasteOpen(true);
         toast.success(
-          `Copilot staged ${serials.length} serial(s) from ${seed.file_name || "your attachment"}. ` +
+          `Baiko staged ${serials.length} serial(s) from ${seed.file_name || "your attachment"}. ` +
             "Create or select a goods receipt, pick the scan line, then Import to confirm.",
         );
       }

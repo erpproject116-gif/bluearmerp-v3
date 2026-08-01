@@ -89,7 +89,7 @@ export default function SignUpPage() {
       heroBody="Create your login in minutes. Join your company when an admin invites you with the same email—or start a free trial yourself from the welcome screen."
       trustPoints={[
         "Join by invite: sign in with the invited Google email",
-        "Optional 90-day trial workspace when you choose Start trial",
+        "Optional 30-day trial workspace when you choose Start trial",
         "Demo sandbox with sample data—no setup required",
       ]}
       footer={

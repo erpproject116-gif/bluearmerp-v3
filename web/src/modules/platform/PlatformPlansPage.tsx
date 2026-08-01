@@ -79,6 +79,9 @@ export default function PlatformPlansPage() {
                       <Show when={p.lock_in_months > 0}>
                         <p class="text-xs text-text-secondary">{p.lock_in_months}-month lock-in</p>
                       </Show>
+                      <Show when={(p.trial_days ?? 0) > 0}>
+                        <p class="text-xs text-text-secondary">{p.trial_days}-day trial</p>
+                      </Show>
                     </div>
                   </div>
 

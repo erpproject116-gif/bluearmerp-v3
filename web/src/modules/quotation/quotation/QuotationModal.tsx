@@ -180,7 +180,7 @@ function takeRfqQuotationSeed(): RfqQuotationSeed | null {
   try {
     const raw = sessionStorage.getItem("bluearm.rfqQuotationSeed");
     if (!raw) {
-      // Copilot "open_quotation" drafts stage the generalized doc seed instead.
+      // Baiko "open_quotation" drafts stage the generalized doc seed instead.
       return (takeDocSeed("quotation") as RfqQuotationSeed | null) ?? null;
     }
     sessionStorage.removeItem("bluearm.rfqQuotationSeed");
@@ -486,7 +486,7 @@ export function QuotationModal(props: Props) {
           setLines(rfqLines);
         }
         if (rfqSeed?.needs_qty_review) {
-          toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
+          toast.warning("Baiko prefilled item lines with qty 1 — review quantities before saving.");
         }
       } else {
         setLines([emptyQuotationLine(1)]);

@@ -42,7 +42,7 @@ type Props = {
   partnerLabel?: string;
 };
 
-const pageSize = 50;
+const pageSize = 100;
 
 export function QuotationLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -67,8 +67,9 @@ export function QuotationLinePickerModal(props: Props) {
       dateFrom: "",
       dateTo: "",
       docNo: "",
-      partnerId: props.partnerId ?? null,
-      partnerLocked: Boolean(props.partnerId),
+      // Default: all partners (Ecount-style). Form partner is a hint label only.
+      partnerId: null,
+      partnerLocked: false,
       partnerLabel: props.partnerLabel ?? "",
     });
   });

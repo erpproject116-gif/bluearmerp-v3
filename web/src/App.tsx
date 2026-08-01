@@ -459,7 +459,8 @@ export default function App() {
           <Route path="/documentation/kb" component={DocumentationPage} />
           <Route path="/documentation" component={DocumentationPage} />
           <Route path="/documentation/:sectionId" component={DocumentationPage} />
-          <Route path="/copilot" component={CopilotWorkspacePage} />
+          <Route path="/baiko" component={CopilotWorkspacePage} />
+          <Route path="/copilot" component={() => <Navigate href="/app/baiko" />} />
           <Route path="/pos/setup" component={ModuleSetupHubPage} />
           <Route path="/pos/manage" component={PosSettingsPage} />
           <Route path="/inventory" component={StockWorkspacePage} />

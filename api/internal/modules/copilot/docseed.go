@@ -7,7 +7,7 @@ import (
 
 // docSeedSpec gates the approve-to-seed handoff for "open document" drafts:
 // Approve returns a sanitized seed the create form consumes; the user still
-// reviews and saves — Copilot never posts commercial documents.
+// reviews and saves — Baiko never posts commercial documents.
 type docSeedSpec struct {
 	WritePermission string
 	// SeedKind is the client sessionStorage suffix (bluearm.docSeed.<kind>).

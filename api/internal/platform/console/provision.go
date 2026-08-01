@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -110,15 +111,17 @@ func (s *service) provisionCustomer(w http.ResponseWriter, r *http.Request) {
 	var planCode string
 
 	if planKind == customerregistry.PlanTrial90d && body.PlanID <= 0 {
-		endsAt := startsAt.Add(customerregistry.TrialDays * 24 * time.Hour)
-		trialEndsAt = &endsAt
+		trialDays := customerregistry.TrialDays
 		var trialPlanID *int64
 		if tp, err := plans.GetByCode(ctx, s.pool, customerregistry.PlanTrial90d); err == nil {
 			trialPlanID = &tp.ID
+			trialDays = customerregistry.ResolveTrialDays(tp.TrialDays)
 		}
+		endsAt := startsAt.Add(time.Duration(trialDays) * 24 * time.Hour)
+		trialEndsAt = &endsAt
 		subID, err = customerregistry.CreateSubscription(ctx, s.pool, res.CustomerID, tenantRes.TenantID,
 			customerregistry.PlanTrial90d, trialPlanID, startsAt, &endsAt, 0, 0, 0,
-			"90-day trial (platform admin provisioned)")
+			strconv.Itoa(trialDays)+"-day trial (platform admin provisioned)")
 		planCode = customerregistry.PlanTrial90d
 	} else {
 		plan, ep, err := plans.ResolvePaidPlan(ctx, s.pool, planKind, body.PlanID)

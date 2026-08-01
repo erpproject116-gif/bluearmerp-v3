@@ -43,6 +43,7 @@ export type PlatformPlan = {
   display_name: string;
   description?: string;
   lock_in_months: number;
+  trial_days?: number;
   regular_monthly_amount: number;
   regular_total_amount?: number | null;
   promo_monthly_amount?: number | null;
@@ -56,6 +57,8 @@ export type PlatformPlan = {
   promo_active: boolean;
   is_active: boolean;
   is_public: boolean;
+  is_trial?: boolean;
+  is_demo?: boolean;
   sort_order: number;
 };
 

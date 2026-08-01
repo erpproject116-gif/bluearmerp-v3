@@ -19,7 +19,7 @@ type Props = {
   title: string;
   onClose: () => void;
   onImported: () => void;
-  /** Optional Copilot attachment seed: prefills the file and column map for review. */
+  /** Optional Baiko attachment seed: prefills the file and column map for review. */
   seed?: MigImportSeed | null;
 };
 
@@ -71,8 +71,8 @@ export function MigrationMappedImportModal(props: Props) {
     }
     setSeedNote(
       seed.truncated
-        ? "Prefilled from your Copilot attachment, but the extracted text was truncated — pick the original file above before importing."
-        : "Prefilled from your Copilot attachment. Review the mapping, then Import.",
+        ? "Prefilled from your Baiko attachment, but the extracted text was truncated — pick the original file above before importing."
+        : "Prefilled from your Baiko attachment. Review the mapping, then Import.",
     );
     if (seed.truncated) setFile(null);
   };

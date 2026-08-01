@@ -1,5 +1,5 @@
 /**
- * Static @-mention catalog for Bluearm Copilot.
+ * Static @-mention catalog for Baiko.
  * Shown immediately on bare "@"; filtered as the user types, then merged with entity search.
  */
 

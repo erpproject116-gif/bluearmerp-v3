@@ -121,7 +121,7 @@ These are prompt/parser regression fixtures, not DashScope model-weight fine-tun
 
 ## Live verification checklist
 
-Record results after a real DashScope-enabled import. Nine captured samples (ground truth in `testdata/rfq_corpus/payloads/expected.json`) plus the Copilot attachment handoffs:
+Record results after a real DashScope-enabled import. Nine captured samples (ground truth in `testdata/rfq_corpus/payloads/expected.json`) plus the Baiko attachment handoffs:
 
 | Sample | Expected | Observed (fill in) |
 |--------|----------|--------------------|
@@ -134,12 +134,12 @@ Record results after a real DashScope-enabled import. Nine captured samples (gro
 | UPS spec PDF | `spec_sheet`, blocked with warning, 0 lines | |
 | Desktop PC Mid-Range Specs (scan) | OCR path (requires `web/public/tess/` assets); no junk lines | |
 | RFQ.xls | `spreadsheet_boq` via SheetJS tables; footer rows filtered | |
-| Items CSV in Copilot chat | `map_import_dataset` draft → Approve opens Migration Center mapped-import modal prefilled; nothing imports until confirmed there | |
-| Serial CSV in Copilot chat | `propose_serial_lot_import` draft → Approve stages serials in Serial & Lot → Receive paste buffer; no DB write | |
+| Items CSV in Baiko chat | `map_import_dataset` draft → Approve opens Migration Center mapped-import modal prefilled; nothing imports until confirmed there | |
+| Serial CSV in Baiko chat | `propose_serial_lot_import` draft → Approve stages serials in Serial & Lot → Receive paste buffer; no DB write | |
 
 ## Agentic boundary
 
-Copilot may call `run_smart_rfq`, summarize matched lines, and prepare a `create_quotation_from_rfq` approval draft. Approve only stages sanitized lines in browser session storage and opens `/app/quotation/quotations/new`. The user must review and save the quotation form. Copilot does not insert, confirm, post, or email the quotation.
+Baiko may call `run_smart_rfq`, summarize matched lines, and prepare a `create_quotation_from_rfq` approval draft. Approve only stages sanitized lines in browser session storage and opens `/app/quotation/quotations/new`. The user must review and save the quotation form. Baiko does not insert, confirm, post, or email the quotation.
 
 ## Security
 

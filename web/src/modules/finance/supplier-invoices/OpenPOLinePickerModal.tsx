@@ -17,7 +17,7 @@ type Props = {
   mapOnly?: boolean;
 };
 
-const pageSize = 50;
+const pageSize = 100;
 
 export function OpenPOLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -42,8 +42,8 @@ export function OpenPOLinePickerModal(props: Props) {
       dateFrom: "",
       dateTo: "",
       docNo: "",
-      partnerId: props.partnerId ?? null,
-      partnerLocked: Boolean(props.partnerId),
+      partnerId: null,
+      partnerLocked: false,
       partnerLabel: props.partnerLabel ?? "",
     });
   });

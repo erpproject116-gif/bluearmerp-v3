@@ -1,4 +1,4 @@
-/** Client-side text extraction for Copilot attachments (reuses existing pdf/xlsx/docx deps). */
+/** Client-side text extraction for Baiko attachments (reuses existing pdf/xlsx/docx deps). */
 
 export type ExtractedAttachment = {
   name: string;

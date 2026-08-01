@@ -32,8 +32,17 @@ const (
 	Amount12MoMonthly = 1800.00
 	Amount6MoTotal    = 12000.00
 	Amount12MoTotal   = 21600.00
-	TrialDays         = 90
+	// TrialDays is the fallback when a trial plan has no trial_days configured.
+	TrialDays = 30
 )
+
+// ResolveTrialDays returns the trial length for a plan, falling back to TrialDays.
+func ResolveTrialDays(trialDays int) int {
+	if trialDays > 0 {
+		return trialDays
+	}
+	return TrialDays
+}
 
 type UpsertParams struct {
 	Email        string

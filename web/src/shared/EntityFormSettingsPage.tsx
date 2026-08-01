@@ -196,9 +196,15 @@ export function EntityFormSettingsPage(props: Props) {
   };
 
   const removeCustomField = async (id: number | undefined, label: string) => {
-    if (!id) return;
+    if (!id) {
+      toast.error(`Cannot remove "${label}" — missing field id. Refresh the page and try again.`);
+      return;
+    }
+    if (!window.confirm(`Remove custom field "${label}"? It will be hidden from forms (soft delete).`)) {
+      return;
+    }
     const res = await apiFetch(`/api/v1/custom-fields/${id}`, { method: "DELETE" }, {
-      successMessage: `Custom field "${label}" disabled.`,
+      successMessage: `Custom field "${label}" removed.`,
     });
     if (!res.success) {
       toast.error(formatApiErrors(res.message, res.errors));
@@ -209,7 +215,7 @@ export function EntityFormSettingsPage(props: Props) {
   };
 
   return (
-    <div class="mx-auto max-w-5xl">
+    <div class="mx-auto max-w-6xl">
       <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p class="text-sm text-text-secondary">
@@ -253,8 +259,8 @@ export function EntityFormSettingsPage(props: Props) {
         </p>
       </Show>
 
-      <div class="overflow-hidden rounded-xl border border-stroke bg-white shadow-sm">
-        <table class="erp-grid w-full text-left text-sm">
+      <div class="overflow-x-auto rounded-xl border border-stroke bg-white shadow-sm">
+        <table class="erp-grid min-w-[56rem] w-full text-left text-sm">
           <thead class="text-xs uppercase tracking-wide text-text-secondary">
             <tr>
               <th class="px-4 py-3 font-semibold">Field</th>
@@ -265,7 +271,7 @@ export function EntityFormSettingsPage(props: Props) {
               <th class="px-4 py-3 font-semibold">Required</th>
               <th class="px-4 py-3 font-semibold">Disabled</th>
               <th class="px-4 py-3 font-semibold">Active</th>
-              <th class="px-4 py-3 font-semibold" />
+              <th class="sticky right-0 bg-white px-4 py-3 font-semibold shadow-[-4px_0_8px_rgba(15,23,42,0.06)]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -342,11 +348,11 @@ export function EntityFormSettingsPage(props: Props) {
                       />
                     </Show>
                   </td>
-                  <td class="px-4 py-3">
+                  <td class="sticky right-0 bg-white px-4 py-3 shadow-[-4px_0_8px_rgba(15,23,42,0.06)]">
                     <Show when={row().kind === "custom" && canEdit()}>
                       <button
                         type="button"
-                        class="text-xs text-red-600 hover:underline"
+                        class="text-xs font-medium text-red-600 hover:underline"
                         onClick={() => void removeCustomField(row().id, row().label)}
                       >
                         Remove
@@ -361,7 +367,7 @@ export function EntityFormSettingsPage(props: Props) {
       </div>
 
       <Show when={showLineColumns()}>
-        <div class="mt-10 overflow-hidden rounded-xl border border-stroke bg-white shadow-sm">
+        <div class="mt-10 overflow-x-auto rounded-xl border border-stroke bg-white shadow-sm">
           <div class="border-b border-stroke px-4 py-3">
             <h3 class="text-sm font-semibold text-text-primary">{uiLabel("form_settings.line_column_heading")}</h3>
             <p class="mt-1 text-xs text-text-secondary">{uiLabel("form_settings.line_column_description")}</p>

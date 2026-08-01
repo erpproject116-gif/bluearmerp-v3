@@ -238,7 +238,7 @@ export function HelpChatThread(props: {
               class="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"
               aria-hidden="true"
             />
-            <span>Copilot is thinking…</span>
+            <span>Baiko is thinking…</span>
           </div>
         </div>
       </Show>

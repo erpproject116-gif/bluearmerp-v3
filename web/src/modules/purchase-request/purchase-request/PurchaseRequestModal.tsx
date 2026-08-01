@@ -430,7 +430,7 @@ export function PurchaseRequestModal(props: Props) {
       if (seededNewLines) {
         setLines(seedLines);
         if (seed?.needs_qty_review) {
-          toast.warning("Copilot prefilled item lines with qty 1 — review quantities before saving.");
+          toast.warning("Baiko prefilled item lines with qty 1 — review quantities before saving.");
         }
       } else {
         setLines([emptyPurchaseRequestLine(1)]);

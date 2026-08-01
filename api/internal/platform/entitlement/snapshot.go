@@ -136,7 +136,7 @@ func ShouldBlockWrites(planKind, status string, endsAt *time.Time, urgency strin
 func BlockMessage(urgency string) string {
 	switch urgency {
 	case customerregistry.UrgencyTrialExpired:
-		return "Your 90-day trial has ended. Contact sales or your administrator to subscribe."
+		return "Your free trial has ended. Contact sales or your administrator to subscribe."
 	case customerregistry.UrgencyDemoExpired:
 		return "Your demo workspace has expired. Start a trial or contact sales to continue."
 	case customerregistry.UrgencyPaymentOverdue:

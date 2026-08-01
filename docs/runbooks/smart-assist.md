@@ -45,6 +45,6 @@ Second wave (same matcher): `SA_DR_EXCEEDS_RELEASED`, `SA_SI_EXCEEDS_DELIVERED`,
 
 ## Non-goals
 
-- No Copilot page required to unblock a save
+- No Baiko page required to unblock a save
 - No LLM generation of titles, amounts, or hrefs
 - No auto-post from assist CTAs

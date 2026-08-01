@@ -7,6 +7,7 @@ import {
   deleteCopilotSession,
   fetchHelpAIConfig,
   getCopilotSession,
+  isBaikoEnabled,
   listCopilotSessions,
   parseEntityMentions,
   type CopilotSessionSummary,
@@ -35,7 +36,7 @@ export function useHelpAssistant(getPathname: () => string) {
   const [maximized, setMaximized] = createSignal(false);
 
   const refreshAIConfig = () => {
-    void fetchHelpAIConfig().then((cfg) => setAiEnabled(!!(cfg?.enabled || cfg?.copilot)));
+    void fetchHelpAIConfig().then((cfg) => setAiEnabled(!!(cfg?.enabled || isBaikoEnabled(cfg))));
   };
 
   const refreshSessions = async () => {
@@ -103,21 +104,21 @@ export function useHelpAssistant(getPathname: () => string) {
         const attPayload = toPayload(attachments);
         const sid = sessionId();
 
-        // When Copilot is enabled, always use /copilot/ask — the API classifies
+        // When Baiko is enabled, always use /copilot/ask — the API classifies
         // docs vs live ops vs approve-to-act. A narrow keyword gate was dropping
         // real finance questions (expenses, revenue, projections) into KB-only mode.
-        if (cfg?.copilot) {
-          const copilot = await askCopilot({
+        if (isBaikoEnabled(cfg)) {
+          const askRes = await askCopilot({
             query: displayQ,
             pathname,
             sessionId: sid,
             attachments: attPayload,
             entities: parseEntityMentions(displayQ),
           });
-          if (copilot?.message) {
-            if (copilot.session_id) setSessionId(copilot.session_id);
+          if (askRes?.message) {
+            if (askRes.session_id) setSessionId(askRes.session_id);
             const hits =
-              copilot.hits?.map((h) => ({
+              askRes.hits?.map((h) => ({
                 articleId: h.article_id,
                 title: h.title,
                 snippet: h.snippet ?? "",
@@ -127,12 +128,12 @@ export function useHelpAssistant(getPathname: () => string) {
               query: displayQ,
               hits,
               fallback: false,
-              message: copilot.message,
-              usedAi: copilot.used_ai,
-              deepLinks: copilot.deep_links,
-              actionDraft: copilot.action_draft ?? null,
-              sessionId: copilot.session_id,
-              mode: copilot.mode,
+              message: askRes.message,
+              usedAi: askRes.used_ai,
+              deepLinks: askRes.deep_links,
+              actionDraft: askRes.action_draft ?? null,
+              sessionId: askRes.session_id,
+              mode: askRes.mode,
             };
             setAiEnabled(true);
             setMessages((prev) => [...prev, { id: nextId(), role: "assistant", reply }]);

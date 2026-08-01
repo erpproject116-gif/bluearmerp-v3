@@ -30,6 +30,7 @@ type Plan struct {
 	IsActive             bool            `json:"is_active"`
 	IsPublic             bool            `json:"is_public"`
 	SortOrder            int             `json:"sort_order"`
+	TrialDays            int             `json:"trial_days"`
 	// Computed on read:
 	EffectiveMonthlyAmount float64  `json:"effective_monthly_amount"`
 	EffectiveTotalAmount   *float64 `json:"effective_total_amount,omitempty"`
@@ -86,7 +87,8 @@ const planSelect = `
 	       regular_monthly_amount, regular_total_amount,
 	       promo_monthly_amount, promo_total_amount, promo_label,
 	       promo_starts_at, promo_ends_at, inclusions,
-	       is_trial, is_demo, is_active, is_public, sort_order
+	       is_trial, is_demo, is_active, is_public, sort_order,
+	       coalesce(trial_days, 0)
 	from public.platform_plans`
 
 func scanPlan(row pgx.Row) (Plan, error) {
@@ -98,6 +100,7 @@ func scanPlan(row pgx.Row) (Plan, error) {
 		&p.PromoMonthlyAmount, &p.PromoTotalAmount, &p.PromoLabel,
 		&p.PromoStartsAt, &p.PromoEndsAt, &inclusions,
 		&p.IsTrial, &p.IsDemo, &p.IsActive, &p.IsPublic, &p.SortOrder,
+		&p.TrialDays,
 	)
 	if err != nil {
 		return Plan{}, err
@@ -199,6 +202,7 @@ type UpsertInput struct {
 	IsActive             bool
 	IsPublic             bool
 	SortOrder            int
+	TrialDays            int
 }
 
 func Create(ctx context.Context, pool *pgxpool.Pool, in UpsertInput) (int64, error) {
@@ -213,14 +217,14 @@ func Create(ctx context.Context, pool *pgxpool.Pool, in UpsertInput) (int64, err
 		  regular_monthly_amount, regular_total_amount,
 		  promo_monthly_amount, promo_total_amount, promo_label,
 		  promo_starts_at, promo_ends_at, inclusions,
-		  is_trial, is_demo, is_active, is_public, sort_order
-		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		  is_trial, is_demo, is_active, is_public, sort_order, trial_days
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		returning id`,
 		in.PlanCode, in.DisplayName, in.Description, in.LockInMonths,
 		in.RegularMonthlyAmount, in.RegularTotalAmount,
 		in.PromoMonthlyAmount, in.PromoTotalAmount, in.PromoLabel,
 		in.PromoStartsAt, in.PromoEndsAt, incl,
-		in.IsTrial, in.IsDemo, in.IsActive, in.IsPublic, in.SortOrder,
+		in.IsTrial, in.IsDemo, in.IsActive, in.IsPublic, in.SortOrder, in.TrialDays,
 	).Scan(&id)
 	return id, err
 }
@@ -237,13 +241,13 @@ func Update(ctx context.Context, pool *pgxpool.Pool, id int64, in UpsertInput) e
 		  promo_monthly_amount = $7, promo_total_amount = $8, promo_label = $9,
 		  promo_starts_at = $10, promo_ends_at = $11, inclusions = $12,
 		  is_trial = $13, is_demo = $14, is_active = $15, is_public = $16,
-		  sort_order = $17, updated_at = now()
+		  sort_order = $17, trial_days = $18, updated_at = now()
 		where id = $1`,
 		id, in.DisplayName, in.Description, in.LockInMonths,
 		in.RegularMonthlyAmount, in.RegularTotalAmount,
 		in.PromoMonthlyAmount, in.PromoTotalAmount, in.PromoLabel,
 		in.PromoStartsAt, in.PromoEndsAt, incl,
-		in.IsTrial, in.IsDemo, in.IsActive, in.IsPublic, in.SortOrder,
+		in.IsTrial, in.IsDemo, in.IsActive, in.IsPublic, in.SortOrder, in.TrialDays,
 	)
 	if err != nil {
 		return err
