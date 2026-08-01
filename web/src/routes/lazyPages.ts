@@ -260,6 +260,7 @@ export const ApAgingReportPage = lazy(() => import("../modules/finance/reports/A
 export const ArApStatusReportPage = lazy(() => import("../modules/finance/reports/ArApStatusReportPage"));
 export const ReceivableStatusReportPage = lazy(() => import("../modules/selling/reports/ReceivableStatusReportPage"));
 export const CollectionsHubPage = lazy(() => import("../modules/finance/collections/CollectionsHubPage"));
+export const BookkeepingHubPage = lazy(() => import("../modules/finance/bookkeeping/BookkeepingHubPage"));
 export const DisbursementsHubPage = lazy(() => import("../modules/finance/collections/DisbursementsHubPage"));
 export const ExpensesPage = lazy(() => import("../modules/buying/expenses/ExpensesPage"));
 export const RecurringExpensesPage = lazy(() => import("../modules/buying/recurring-expenses/RecurringExpensesPage"));

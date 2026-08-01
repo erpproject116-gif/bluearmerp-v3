@@ -13,7 +13,7 @@ import {
 export default function StockLedgerReportPage() {
   const [searchParams] = useSearchParams();
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<StockLedgerFilters>(defaults);
@@ -82,7 +82,7 @@ export default function StockLedgerReportPage() {
       onSearch={search}
       onReset={() => {
         setFilters(defaults);
-        setSubmitted(false);
+        setSubmitted(true);
         setPage(1);
       }}
       onExportCsv={() => void downloadReportCsv(stockLedgerExportUrl(filters()), "stock-ledger.csv")}

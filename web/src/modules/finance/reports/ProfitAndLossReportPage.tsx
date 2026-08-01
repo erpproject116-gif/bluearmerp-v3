@@ -12,7 +12,7 @@ import { formatMoney } from "../../../shared/money";
 
 export default function ProfitAndLossReportPage() {
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
@@ -64,7 +64,7 @@ export default function ProfitAndLossReportPage() {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() => void downloadReportCsv(profitAndLossExportUrl(filters()), "profit-and-loss.csv")}

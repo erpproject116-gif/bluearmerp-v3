@@ -4,7 +4,7 @@ import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { stockAgeingExportUrl, useStockAgeingReport } from "../../../shared/reports/useModuleReports";
 
 export default function StockAgeingReportPage() {
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;
@@ -50,7 +50,7 @@ export default function StockAgeingReportPage() {
       onPageChange={setPage}
       onSearch={search}
       onReset={() => {
-        setSubmitted(false);
+        setSubmitted(true);
         setPage(1);
       }}
       onExportCsv={() => void downloadReportCsv(stockAgeingExportUrl(), "stock-ageing.csv")}

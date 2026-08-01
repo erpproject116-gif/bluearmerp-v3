@@ -11,7 +11,7 @@ import { MoneyCell } from "../../../shared/MoneyCell";
 
 export default function TrialBalanceReportPage() {
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
@@ -63,7 +63,7 @@ export default function TrialBalanceReportPage() {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() => void downloadReportCsv(trialBalanceExportUrl(filters()), "trial-balance.csv")}

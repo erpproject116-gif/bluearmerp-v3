@@ -94,6 +94,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/finance/official-receipts/new": "finance.official_receipts_new",
   "/app/finance/official-receipts": "finance.official_receipts",
   "/app/finance/collections": "finance.reports_ar_by_customer",
+  "/app/finance/bookkeeping": "finance.journal_entries",
   "/app/finance/disbursements": "finance.reports_ap_by_vendor",
   "/app/purchases/expenses": "finance.expenses",
   "/app/buying/expenses": "finance.expenses",

@@ -11,7 +11,7 @@ import { CrmLayout } from "../CrmLayout";
 
 export default function ExpiredQuotationsReportPage() {
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<ExpiredQuotationsFilters>(defaults);
@@ -63,7 +63,7 @@ export default function ExpiredQuotationsReportPage() {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() => void downloadReportCsv(expiredQuotationsExportUrl(filters()), "expired-quotations.csv")}

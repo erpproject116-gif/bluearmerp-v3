@@ -285,21 +285,25 @@ export function SidebarNav() {
     if (area.id === "accounting") {
       return p === "/app/finance" || p === "/app/finance/";
     }
+    if (area.id === "bookkeeping") {
+      return pathStarts(p, ["/app/finance/bookkeeping", "/app/finance/acct-i"]);
+    }
     if (area.id === "ledger") {
       return pathStarts(p, [
-        "/app/finance/acct-i",
         "/app/finance/journal",
         "/app/finance/official-receipts",
         "/app/finance/reports",
       ]);
     }
     if (area.id === "cash") {
+      return pathStarts(p, ["/app/finance/collections"]);
+    }
+    if (area.id === "disbursements") {
       return (
         pathStarts(p, [
-          "/app/finance/acct-ii",
-          "/app/finance/collections",
           "/app/finance/disbursements",
           "/app/finance/payment-vouchers",
+          "/app/finance/acct-ii",
         ]) || p.startsWith("/app/purchases/expenses")
       ) && !p.startsWith("/app/finance/banking");
     }

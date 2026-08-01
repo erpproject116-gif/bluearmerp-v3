@@ -5,6 +5,7 @@ import { getAccessToken } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { GridExportButtons } from "../../../shared/gridExport";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import type { PartnerBookType } from "./partnerBookFilters";
 import { defaultPartnerBookFilters, formatDisplayDate, partnerBookExportUrl } from "./partnerBookFilters";
 import { usePartnerBookReport } from "../../../shared/usePartnerBookReport";
@@ -53,8 +54,9 @@ export default function CustomerVendorBookPage(props: Props) {
   });
 
   const reset = () => {
-    setDraftFilters(defaultPartnerBookFilters(props.bookType));
-    setSubmittedFilters(null);
+    const next = defaultPartnerBookFilters(props.bookType);
+    setDraftFilters(next);
+    setSubmittedFilters(next);
     setPage(1);
   };
 
@@ -87,24 +89,54 @@ export default function CustomerVendorBookPage(props: Props) {
 
   return (
     <FinanceLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">{title()}</h2>
-        <p class="mt-1 text-sm text-text-secondary">
-          {props.bookType === "ar"
-            ? "Customer ledger from Sales (debit) and Official Receipt applications (credit). Defaults to the last 90 days — adjust and Search (F8) if needed."
-            : "Vendor ledger from Purchases / supplier invoices (credit) and Payment Voucher applications (debit). Defaults to the last 90 days — adjust and Search (F8) if needed."}
-        </p>
-        <div class="mt-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+      <CollapsibleFilterPanel
+        title={title()}
+        description={
+          props.bookType === "ar"
+            ? "Customer ledger from Sales (debit) and Official Receipt applications (credit). Defaults to the last 90 days — expand filters to adjust, then Search (F8)."
+            : "Vendor ledger from Purchases / supplier invoices (credit) and Payment Voucher applications (debit). Defaults to the last 90 days — expand filters to adjust, then Search (F8)."
+        }
+        actions={
+          <>
+            <button type="button" class="rounded bg-brand-600 px-4 py-2 text-sm text-white" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded border border-stroke px-4 py-2 text-sm" onClick={reset}>
+              Reset
+            </button>
+            <Show when={submittedFilters()}>
+              <GridExportButtons
+                title={title()}
+                filename={`customer-vendor-book-${props.bookType}`}
+                columns={[
+                  { key: "txn_date", header: "Date", value: (r) => String(r.txn_date ?? "") },
+                  { key: "slip_type", header: "Slip Type", value: (r) => String(r.slip_type ?? "") },
+                  { key: "slip_no", header: "Slip No", value: (r) => String(r.date_no_display || r.slip_no || "") },
+                  { key: "partner_name", header: "Partner", value: (r) => String(r.partner_name ?? "") },
+                  { key: "description", header: "Description", value: (r) => String(r.description ?? "") },
+                  { key: "debit", header: "Debit", value: (r) => Number(r.debit ?? 0) },
+                  { key: "credit", header: "Credit", value: (r) => Number(r.credit ?? 0) },
+                  { key: "balance", header: "Balance", value: (r) => Number(r.balance ?? 0) },
+                ]}
+                rows={() => rowsWithBalance() as unknown as Record<string, unknown>[]}
+              />
+              <button type="button" class="rounded border border-stroke px-4 py-2 text-sm" onClick={() => void downloadCsv()}>
+                API CSV
+              </button>
+            </Show>
+          </>
+        }
+      >
+        <div class="rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
           {props.bookType === "ar" ? (
             <p>
-              Rows come from <span class="font-medium">Sales</span> (Selling → Sales) and applied{" "}
-              <span class="font-medium">Official Receipts</span>. Accounting invoice mapping is optional for this book;
-              open balances also appear under Finance → A/R Aging after Search.
+              Rows come from <span class="font-medium">Sales</span> and applied{" "}
+              <span class="font-medium">Official Receipts</span>.
             </p>
           ) : (
             <p>
-              Rows come from <span class="font-medium">Purchases</span> (supplier invoices) and applied{" "}
-              <span class="font-medium">Payment Vouchers</span>. Open balances also appear under Finance → A/P Aging.
+              Rows come from <span class="font-medium">Purchases</span> and applied{" "}
+              <span class="font-medium">Payment Vouchers</span>.
             </p>
           )}
         </div>
@@ -127,35 +159,7 @@ export default function CustomerVendorBookPage(props: Props) {
             />
           </Field>
         </div>
-        <div class="mt-4 flex flex-wrap items-center gap-2">
-          <button type="button" class="rounded bg-brand-600 px-4 py-2 text-sm text-white" onClick={search}>
-            Search (F8)
-          </button>
-          <button type="button" class="rounded border border-stroke px-4 py-2 text-sm" onClick={reset}>
-            Reset
-          </button>
-          <Show when={submittedFilters()}>
-            <GridExportButtons
-              title={title()}
-              filename={`customer-vendor-book-${props.bookType}`}
-              columns={[
-                { key: "txn_date", header: "Date", value: (r) => String(r.txn_date ?? "") },
-                { key: "slip_type", header: "Slip Type", value: (r) => String(r.slip_type ?? "") },
-                { key: "slip_no", header: "Slip No", value: (r) => String(r.date_no_display || r.slip_no || "") },
-                { key: "partner_name", header: "Partner", value: (r) => String(r.partner_name ?? "") },
-                { key: "description", header: "Description", value: (r) => String(r.description ?? "") },
-                { key: "debit", header: "Debit", value: (r) => Number(r.debit ?? 0) },
-                { key: "credit", header: "Credit", value: (r) => Number(r.credit ?? 0) },
-                { key: "balance", header: "Balance", value: (r) => Number(r.balance ?? 0) },
-              ]}
-              rows={() => rowsWithBalance() as unknown as Record<string, unknown>[]}
-            />
-            <button type="button" class="rounded border border-stroke px-4 py-2 text-sm" onClick={() => void downloadCsv()}>
-              API CSV
-            </button>
-          </Show>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
       <Show when={submittedFilters()}>
         <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">

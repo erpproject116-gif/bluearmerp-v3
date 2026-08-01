@@ -11,7 +11,7 @@ import { PurchaseRequestLayout } from "../../purchase-request/PurchaseRequestLay
 
 export default function POAnalysisReportPage() {
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
@@ -63,7 +63,7 @@ export default function POAnalysisReportPage() {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() => void downloadReportCsv(poAnalysisExportUrl(filters()), "po-analysis.csv")}

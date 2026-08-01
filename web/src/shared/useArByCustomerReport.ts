@@ -56,15 +56,31 @@ export function arByCustomerExportUrl(filters: ArByCustomerFilters): string {
 export function useArByCustomerReport(params: () => ArByCustomerParams) {
   return createQuery(() => {
     const p = params();
-    const qs = arFiltersToSearchParams(p.filters, {
+    const f = p.filters;
+    const qs = arFiltersToSearchParams(f, {
       page: p.page,
       pageSize: p.pageSize,
       sort: p.sort,
       order: p.order,
     });
     return {
-      queryKey: ["ar-by-customer", p],
+      queryKey: [
+        "ar-by-customer",
+        p.page,
+        p.pageSize,
+        p.sort,
+        p.order,
+        f.date_from ?? "",
+        f.date_to ?? "",
+        f.partner_id ?? 0,
+        f.location_id ?? 0,
+        f.department_id ?? 0,
+        f.project_id ?? 0,
+        f.pic_user_id ?? 0,
+      ],
       enabled: p.enabled,
+      refetchOnWindowFocus: false,
+      staleTime: 60_000,
       queryFn: async () => {
         const res = await apiFetch<ArByCustomerRow[]>(`/api/v1/finance/ar-by-customer?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load A/R report");
@@ -75,7 +91,6 @@ export function useArByCustomerReport(params: () => ArByCustomerParams) {
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 15_000,
     };
   });
 }

@@ -44,7 +44,7 @@ export default function BudgetVsActualReportPage() {
     return id ? String(id) : "";
   };
 
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [budgetId, setBudgetId] = createSignal(initialBudget());
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
 
@@ -128,7 +128,7 @@ export default function BudgetVsActualReportPage() {
             class="rounded-lg border border-stroke px-4 py-2 text-sm"
             onClick={() => {
               setBudgetId("");
-              setSubmitted(false);
+              setSubmitted(true);
             }}
           >
             Reset

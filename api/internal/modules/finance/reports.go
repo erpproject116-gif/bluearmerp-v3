@@ -26,6 +26,7 @@ type arByCustomerRow struct {
 	TotalSales    float64 `json:"total_sales"`
 	TotalReceived float64 `json:"total_received"`
 	Balance       float64 `json:"balance"`
+	LastTxnDate   *string `json:"last_txn_date,omitempty"`
 }
 
 type receiptStatusRow struct {
@@ -144,7 +145,8 @@ func arByCustomerBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID,
 		with inv_sales as (
 		  select s.partner_id,
 		    coalesce(sum(s.grand_total), 0)::float8 as inv_sales,
-		    coalesce(sum(recv.received), 0)::float8 as total_received
+		    coalesce(sum(recv.received), 0)::float8 as total_received,
+		    max(s.order_date) as last_txn_date
 		  from public.sa_sales s
 		  `+saleAppliedLateralSQL("s")+`
 		  where s.tenant_id = $1 and s.deleted_at is null%s%s
@@ -173,7 +175,8 @@ func arByCustomerBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID,
 		  coalesce(a.acct_sales, 0)::float8,
 		  coalesce(i.inv_sales, 0)::float8 + coalesce(a.acct_sales, 0)::float8,
 		  coalesce(i.total_received, 0)::float8,
-		  coalesce(i.inv_sales, 0)::float8 + coalesce(a.acct_sales, 0)::float8 - coalesce(i.total_received, 0)::float8
+		  coalesce(i.inv_sales, 0)::float8 + coalesce(a.acct_sales, 0)::float8 - coalesce(i.total_received, 0)::float8,
+		  i.last_txn_date
 		from partners p
 		left join inv_sales i on i.partner_id = p.partner_id
 		left join acct_sales a on a.partner_id = p.partner_id
@@ -188,6 +191,7 @@ func listArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 		"total_sales":    "total_sales",
 		"total_received": "total_received",
 		"balance":        "balance",
+		"last_txn_date":  "last_txn_date",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -196,7 +200,10 @@ func listArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, dateErrs)
 			return
 		}
-		p := httputil.ParseListParams(r, "customer_name", allowed)
+		p := httputil.ParseListParams(r, "last_txn_date", allowed)
+		if strings.TrimSpace(r.URL.Query().Get("sort")) == "" {
+			p.Order = "desc"
+		}
 		offset := httputil.Offset(p)
 		partnerID, _ := optionalInt64Query(r, "partner_id")
 		locationID, _ := optionalInt64Query(r, "location_id")
@@ -205,7 +212,7 @@ func listArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 		picUserID, _ := optionalInt64Query(r, "pic_user_id")
 
 		base, args := arByCustomerBaseSQL(tu.TenantID, dateFrom, dateTo, partnerID, locationID, departmentID, projectID, picUserID)
-		q := fmt.Sprintf(`select * from (%s) ar order by %s %s limit $%d offset $%d`,
+		q := fmt.Sprintf(`select * from (%s) ar order by %s %s nulls last limit $%d offset $%d`,
 			base, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
 
 		countQ := fmt.Sprintf(`select count(*) from (%s) ar`, base)
@@ -226,9 +233,14 @@ func listArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 		var out []arByCustomerRow
 		for rows.Next() {
 			var row arByCustomerRow
-			if err := rows.Scan(&row.PartnerID, &row.CustomerName, &row.InvSales, &row.AcctSales, &row.TotalSales, &row.TotalReceived, &row.Balance); err != nil {
+			var lastTxn *time.Time
+			if err := rows.Scan(&row.PartnerID, &row.CustomerName, &row.InvSales, &row.AcctSales, &row.TotalSales, &row.TotalReceived, &row.Balance, &lastTxn); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read A/R report.", "ERR_INTERNAL")
 				return
+			}
+			if lastTxn != nil {
+				s := lastTxn.Format("2006-01-02")
+				row.LastTxnDate = &s
 			}
 			out = append(out, row)
 		}
@@ -268,7 +280,8 @@ func exportArByCustomer(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = cw.Write([]string{"Customer", "Inv. Sales", "Acct. Sales", "Total Sales", "Total Received", "Balance"})
 		for rows.Next() {
 			var row arByCustomerRow
-			if err := rows.Scan(&row.PartnerID, &row.CustomerName, &row.InvSales, &row.AcctSales, &row.TotalSales, &row.TotalReceived, &row.Balance); err != nil {
+			var lastTxn *time.Time
+			if err := rows.Scan(&row.PartnerID, &row.CustomerName, &row.InvSales, &row.AcctSales, &row.TotalSales, &row.TotalReceived, &row.Balance, &lastTxn); err != nil {
 				return
 			}
 			_ = cw.Write([]string{

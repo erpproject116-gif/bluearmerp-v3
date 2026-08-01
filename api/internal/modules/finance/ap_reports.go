@@ -79,7 +79,8 @@ func apByVendorBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID, l
 		with inv_purchases as (
 		  select si.partner_id,
 		    coalesce(sum(si.grand_total), 0)::float8 as inv_purchases,
-		    coalesce(sum(paid.paid), 0)::float8 as total_paid
+		    coalesce(sum(paid.paid), 0)::float8 as total_paid,
+		    max(si.invoice_date) as last_txn_date
 		  from public.fin_supplier_invoices si
 		  left join lateral (
 		    select coalesce(sum(a.applied_amount), 0)::float8 as paid
@@ -106,14 +107,15 @@ func apByVendorBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID, l
 		partners as (
 		  select p.id as partner_id, p.company_name as vendor_name
 		  from public.inv_partners p
-		  where p.tenant_id = $1 and p.partner_kind in ('supplier', 'both')
+		  where p.tenant_id = $1 and p.partner_kind in ('supplier', 'vendor', 'both')
 		)
 		select p.partner_id, p.vendor_name,
 		  coalesce(i.inv_purchases, 0)::float8,
 		  coalesce(a.acct_purchases, 0)::float8,
 		  coalesce(i.inv_purchases, 0)::float8 + coalesce(a.acct_purchases, 0)::float8,
 		  coalesce(i.total_paid, 0)::float8,
-		  coalesce(i.inv_purchases, 0)::float8 + coalesce(a.acct_purchases, 0)::float8 - coalesce(i.total_paid, 0)::float8
+		  coalesce(i.inv_purchases, 0)::float8 + coalesce(a.acct_purchases, 0)::float8 - coalesce(i.total_paid, 0)::float8,
+		  i.last_txn_date
 		from partners p
 		left join inv_purchases i on i.partner_id = p.partner_id
 		left join acct_purchases a on a.partner_id = p.partner_id
@@ -134,19 +136,23 @@ func listApByVendor(pool *pgxpool.Pool) http.HandlerFunc {
 		locationID, _ := optionalInt64Query(r, "location_id")
 		projectID, _ := optionalInt64Query(r, "project_id")
 		picUserID, _ := optionalInt64Query(r, "pic_user_id")
-		p := httputil.ParseListParams(r, "vendor_name", map[string]string{
-			"vendor_name":  "p.company_name",
-			"total_billed": "total_billed",
-			"total_paid":   "total_paid",
-			"balance":      "balance",
+		p := httputil.ParseListParams(r, "last_txn_date", map[string]string{
+			"vendor_name":   "vendor_name",
+			"total_billed":  "total_billed",
+			"total_paid":    "total_paid",
+			"balance":       "balance",
+			"last_txn_date": "last_txn_date",
 		})
+		if strings.TrimSpace(r.URL.Query().Get("sort")) == "" {
+			p.Order = "desc"
+		}
 		offset := httputil.Offset(p)
 
 		base, args := apByVendorBaseSQL(tu.TenantID, from, to, partnerID, locationID, projectID, picUserID)
 		q := fmt.Sprintf(`
 			select partner_id, vendor_name, inv_purchases, acct_purchases, total_billed, total_paid, balance, count(*) over()
 			from (%s) sub
-			order by %s %s
+			order by %s %s nulls last
 			limit $%d offset $%d`, base, p.Sort, orderSQL(p.Order), len(args)+1, len(args)+2)
 		args = append(args, p.PageSize, offset)
 
