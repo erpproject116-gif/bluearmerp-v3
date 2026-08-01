@@ -11,7 +11,7 @@ import { MoneyCell } from "../../../shared/MoneyCell";
 
 export default function BalanceSheetReportPage() {
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
@@ -63,7 +63,7 @@ export default function BalanceSheetReportPage() {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() => void downloadReportCsv(balanceSheetExportUrl(filters()), "balance-sheet.csv")}

@@ -24,7 +24,7 @@ export default function CashBookReportPage(props: Props) {
   const title = () => props.title ?? "Cash Book";
   const apiPath = () => props.apiPath ?? "/api/v1/finance/reports/cash-book";
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
@@ -87,7 +87,7 @@ export default function CashBookReportPage(props: Props) {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() => void downloadReportCsv(exportUrl(), props.exportName ?? "cash-book.csv")}

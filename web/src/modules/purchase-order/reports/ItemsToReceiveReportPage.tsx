@@ -10,7 +10,7 @@ import { PurchaseRequestLayout } from "../../purchase-request/PurchaseRequestLay
 
 export default function ItemsToReceiveReportPage() {
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
@@ -62,7 +62,7 @@ export default function ItemsToReceiveReportPage() {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() => void downloadReportCsv(itemsToReceiveExportUrl(filters()), "items-to-receive.csv")}

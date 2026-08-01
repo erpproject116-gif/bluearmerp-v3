@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal } from "solid-js";
 import { useArByCustomerReport } from "../../../shared/useArByCustomerReport";
 import { FinanceLayout } from "../FinanceLayout";
 import { ArByCustomerFilter } from "./ArByCustomerFilter";
@@ -7,18 +7,18 @@ import { defaultArFilters, type ArByCustomerFilters } from "./arByCustomerFilter
 
 export default function ArByCustomerPage() {
   const [draftFilters, setDraftFilters] = createSignal<ArByCustomerFilters>(defaultArFilters());
-  const [submittedFilters, setSubmittedFilters] = createSignal<ArByCustomerFilters | null>(null);
+  const [submittedFilters, setSubmittedFilters] = createSignal<ArByCustomerFilters>(defaultArFilters());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;
 
   const report = useArByCustomerReport(() => ({
-    filters: submittedFilters() ?? defaultArFilters(),
+    filters: submittedFilters(),
     page: page(),
     pageSize,
-    sort: "customer_name",
-    order: "asc",
-    enabled: submittedFilters() !== null,
+    sort: "last_txn_date",
+    order: "desc",
+    enabled: true,
   }));
 
   const search = () => {
@@ -28,26 +28,26 @@ export default function ArByCustomerPage() {
   };
 
   const reset = () => {
-    setDraftFilters(defaultArFilters());
-    setSubmittedFilters(null);
+    const next = defaultArFilters();
+    setDraftFilters(next);
+    setSubmittedFilters(next);
     setPage(1);
+    setGeneratedAt(new Date());
   };
 
   return (
     <FinanceLayout>
       <ArByCustomerFilter value={draftFilters} onChange={setDraftFilters} onSearch={search} onReset={reset} />
-      <Show when={submittedFilters()}>
-        <ArByCustomerReport
-          filters={submittedFilters()!}
-          rows={report.data?.rows ?? []}
-          totalRows={report.data?.total ?? 0}
-          page={page()}
-          pageSize={pageSize}
-          loading={report.isFetching}
-          generatedAt={generatedAt}
-          onPageChange={setPage}
-        />
-      </Show>
+      <ArByCustomerReport
+        filters={submittedFilters()}
+        rows={report.data?.rows ?? []}
+        totalRows={report.data?.total ?? 0}
+        page={page()}
+        pageSize={pageSize}
+        loading={report.isFetching && !report.data}
+        generatedAt={generatedAt}
+        onPageChange={setPage}
+      />
     </FinanceLayout>
   );
 }

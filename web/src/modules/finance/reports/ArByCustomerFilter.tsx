@@ -3,6 +3,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field } from "../../../shared/SpreadsheetGrid";
 import { apiFetch } from "../../../shared/api";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import type { ArByCustomerFilters } from "./arByCustomerFilters";
 
 type Props = {
@@ -68,11 +69,20 @@ export function ArByCustomerFilter(props: Props) {
   });
 
   return (
-    <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-      <div class="mb-4">
-        <h2 class="text-lg font-semibold text-text-primary">A/R by Customer</h2>
-        <p class="text-sm text-text-secondary">Outstanding balances per customer — Search (F8).</p>
-      </div>
+    <CollapsibleFilterPanel
+      title="A/R by Customer"
+      description="Outstanding balances per customer — first 50 load automatically. Expand filters to narrow, then Search (F8)."
+      actions={
+        <>
+          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => props.onSearch()}>
+            Search (F8)
+          </button>
+          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={() => props.onReset()}>
+            Reset
+          </button>
+        </>
+      }
+    >
       <div class="grid gap-4 md:grid-cols-2">
         <Field label="Date from (optional)">
           <DateInput
@@ -106,14 +116,6 @@ export function ArByCustomerFilter(props: Props) {
         <LookupCombo label="Project" value={projectLabel} selectedId={() => props.value().project_id ?? null} onInput={setProjectLabel} onSelect={(o) => { patch({ project_id: o.id }); setProjectLabel(o.label); }} onClear={() => { patch({ project_id: null }); setProjectLabel(""); }} fetchOptions={fetchProjects} />
         <LookupCombo label="PIC" value={picLabel} selectedId={() => props.value().pic_user_id ?? null} onInput={setPicLabel} onSelect={(o) => { patch({ pic_user_id: o.id }); setPicLabel(o.label); }} onClear={() => { patch({ pic_user_id: null }); setPicLabel(""); }} fetchOptions={fetchUsers} />
       </div>
-      <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
-        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => props.onSearch()}>
-          Search (F8)
-        </button>
-        <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={() => props.onReset()}>
-          Reset
-        </button>
-      </div>
-    </section>
+    </CollapsibleFilterPanel>
   );
 }

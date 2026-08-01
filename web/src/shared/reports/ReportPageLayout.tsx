@@ -3,6 +3,7 @@ import { useAuth } from "../auth-context";
 import { PrintBrandingFooter } from "../branding/PrintBrandingFooter";
 import { PrintBrandingHeader } from "../branding/PrintBrandingHeader";
 import { uiLabel } from "../branding/uiLabel";
+import { CollapsibleFilterPanel } from "../CollapsibleFilterPanel";
 import { GridExportButtons } from "../gridExport";
 
 export type ReportPageLayoutProps = {
@@ -27,6 +28,8 @@ export type ReportPageLayoutProps = {
   children: JSX.Element;
   /** Filename stem for client-side exports from the on-screen table. */
   exportFilename?: string;
+  /** When true, filter panel starts expanded. Default false (closed). */
+  filtersOpenByDefault?: boolean;
 };
 
 export function ReportPageLayout(props: ReportPageLayoutProps) {
@@ -40,13 +43,27 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
 
   return (
     <>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
-        <Show when={props.description}>
-          <p class="text-sm text-text-secondary">{props.description}</p>
-        </Show>
+      <CollapsibleFilterPanel
+        title={props.title}
+        description={props.description}
+        defaultOpen={props.filtersOpenByDefault === true}
+        actions={
+          <>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white"
+              onClick={() => props.onSearch()}
+            >
+              {uiLabel("reports.search_button", "Run Report")}
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => props.onReset()}>
+              {uiLabel("reports.reset_button")}
+            </button>
+          </>
+        }
+      >
         <Show when={showDates() || props.filterExtra}>
-          <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-text-secondary">Filters</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Filters</p>
         </Show>
         <Show when={showDates()}>
           <div class="mt-2 flex flex-wrap items-end gap-3">
@@ -71,19 +88,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
           </div>
         </Show>
         <Show when={props.filterExtra}>{props.filterExtra}</Show>
-        <div class="mt-4 flex gap-2">
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white"
-            onClick={() => props.onSearch()}
-          >
-            {uiLabel("reports.search_button", "Run Report")}
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => props.onReset()}>
-            {uiLabel("reports.reset_button")}
-          </button>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
       <Show when={props.submitted}>
         <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">

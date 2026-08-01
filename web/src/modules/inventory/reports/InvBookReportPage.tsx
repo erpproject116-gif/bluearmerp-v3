@@ -8,7 +8,7 @@ import { formatPeso } from "../../../shared/money";
 export default function InvBookReportPage() {
   const defaults = defaultReportDateRange();
   const [filters, setFilters] = createSignal<InvBookFilters>(defaults);
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const pageSize = 50;
 
@@ -58,7 +58,7 @@ export default function InvBookReportPage() {
       onSearch={search}
       onReset={() => {
         setFilters(defaults);
-        setSubmitted(false);
+        setSubmitted(true);
         setPage(1);
       }}
       onExportCsv={() => void downloadReportCsv(invBookExportUrl(filters()), "inv-book.csv")}

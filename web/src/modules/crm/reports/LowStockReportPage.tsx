@@ -5,7 +5,7 @@ import { lowStockExportUrl, useLowStockReport, type LowStockFilters } from "../.
 import { CrmLayout } from "../CrmLayout";
 
 export default function LowStockReportPage() {
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;

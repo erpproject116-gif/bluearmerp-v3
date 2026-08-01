@@ -11,7 +11,7 @@ function todayIso() {
 }
 
 export default function ArAgingReportPage() {
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<AgingFilters>({ as_of: todayIso() });
@@ -65,7 +65,7 @@ export default function ArAgingReportPage() {
         onSearch={search}
         onReset={() => {
           setFilters({ as_of: todayIso() });
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() => void downloadReportCsv(arAgingExportUrl(filters()), "ar-aging.csv")}

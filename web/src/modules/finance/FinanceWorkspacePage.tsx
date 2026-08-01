@@ -46,9 +46,10 @@ export default function FinanceWorkspacePage() {
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-2 text-sm text-text-secondary">
           BluearmERP accounting lives under <strong class="font-medium text-text-primary">Accounting</strong> in the
-          sidebar: <strong class="font-medium text-text-primary">Ledger</strong> for GL and vouchers;{" "}
-          <strong class="font-medium text-text-primary">Cash &amp; AR/AP</strong> for checks, withholding,
-          budgets, import cost, contracts, and notes.
+          sidebar: <strong class="font-medium text-text-primary">Bookkeeping</strong> for GL and journals;{" "}
+          <strong class="font-medium text-text-primary">Collections</strong> for customer receipts;{" "}
+          <strong class="font-medium text-text-primary">Disbursements</strong> for vendor payments; Banking for cash
+          accounts.
         </p>
       </section>
 

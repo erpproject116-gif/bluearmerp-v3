@@ -20,7 +20,7 @@ type Props = { bookType: "ar" | "ap" };
 
 export default function CustomerVendorBookIIPage(props: Props) {
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
@@ -84,7 +84,7 @@ export default function CustomerVendorBookIIPage(props: Props) {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
           setPage(1);
         }}
         onExportCsv={() =>

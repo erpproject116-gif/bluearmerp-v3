@@ -18,7 +18,7 @@ type CashFlowPayload = {
 
 export default function CashFlowStatementPage() {
   const defaults = defaultReportDateRange();
-  const [submitted, setSubmitted] = createSignal(false);
+  const [submitted, setSubmitted] = createSignal(true);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
 
@@ -76,7 +76,7 @@ export default function CashFlowStatementPage() {
         onSearch={search}
         onReset={() => {
           setFilters(defaults);
-          setSubmitted(false);
+          setSubmitted(true);
         }}
         onExportCsv={() => void downloadReportCsv(exportUrl(), "cash-flow-statement.csv")}
       >

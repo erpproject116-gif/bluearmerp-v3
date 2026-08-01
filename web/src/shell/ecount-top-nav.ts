@@ -50,8 +50,8 @@ export const ECOUNT_TOP_MODULES: EcountTopModule[] = [
   {
     id: "acct2",
     label: "Cash & AR/AP",
-    hint: "Collections, disbursements, checks",
-    href: "/app/finance/collections",
+    hint: "Collections, disbursements, bookkeeping",
+    href: "/app/finance/bookkeeping",
     navGroupIds: ["accounting_dept"],
   },
   {
@@ -112,6 +112,8 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
   if (
     pathname.startsWith("/app/finance/acct-ii") ||
     pathname.startsWith("/app/finance/collections") ||
+    pathname.startsWith("/app/finance/bookkeeping") ||
+    pathname.startsWith("/app/finance/disbursements") ||
     pathname.startsWith("/app/finance/disbursements") ||
     pathname.startsWith("/app/finance/payment-vouchers") ||
     pathname.startsWith("/app/finance/banking") ||
@@ -189,7 +191,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   {
     id: "stocks",
     label: "Stocks",
-    href: "/app/inventory",
+    href: "/app/inventory/items",
     iconId: "inventory",
     topId: "inv1",
     expandGroupId: "stocks_management",
@@ -198,7 +200,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "inventory",
         label: "Inventory",
-        href: "/app/inventory",
+        href: "/app/inventory/items",
         iconId: "inventory",
         topId: "inv1",
         expandGroupId: "stocks_management",
@@ -232,7 +234,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   {
     id: "sell",
     label: "Sales",
-    href: "/app/quotation/quotations",
+    href: "/app/sales/sales",
     iconId: "selling",
     topId: "inv1",
     expandGroupId: "sales_process",
@@ -318,21 +320,12 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         expandGroupId: "sales_process",
         moduleId: "sales",
       },
-      {
-        id: "selling",
-        label: "Sale overview",
-        href: "/app/selling",
-        iconId: "selling",
-        topId: "inv1",
-        expandGroupId: "sales_process",
-        moduleId: "selling",
-      },
     ],
   },
   {
     id: "buy",
     label: "Purchase",
-    href: "/app/purchase-request/purchase-requests",
+    href: "/app/purchases/purchases",
     iconId: "buying",
     topId: "inv1",
     expandGroupId: "procurement_process",
@@ -409,15 +402,6 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         expandGroupId: "procurement_process",
         moduleId: "purchases",
       },
-      {
-        id: "buying",
-        label: "Purchase overview",
-        href: "/app/buying",
-        iconId: "buying",
-        topId: "inv1",
-        expandGroupId: "procurement_process",
-        moduleId: "buying",
-      },
     ],
   },
   {
@@ -429,6 +413,15 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     expandGroupId: "accounting_dept",
     children: [
       {
+        id: "bookkeeping",
+        label: "Bookkeeping",
+        href: "/app/finance/bookkeeping",
+        iconId: "sub_general_ledger",
+        topId: "acct1",
+        expandGroupId: "accounting_dept",
+        moduleId: "finance",
+      },
+      {
         id: "ledger",
         label: "Ledger",
         href: "/app/finance/acct-i/journal-entries",
@@ -438,11 +431,20 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "cash",
-        label: "Cash & AR/AP",
+        label: "Collections",
         href: "/app/finance/collections",
         iconId: "sub_ar_ap",
         topId: "acct2",
         expandGroupId: "accounting_dept",
+      },
+      {
+        id: "disbursements",
+        label: "Disbursements",
+        href: "/app/finance/disbursements",
+        iconId: "sub_ar_ap",
+        topId: "acct2",
+        expandGroupId: "accounting_dept",
+        moduleId: "finance",
       },
       {
         id: "banking",

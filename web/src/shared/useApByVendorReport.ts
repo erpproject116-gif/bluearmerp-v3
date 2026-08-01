@@ -54,15 +54,30 @@ export function apByVendorExportUrl(filters: ApByVendorFilters): string {
 export function useApByVendorReport(params: () => ApByVendorParams) {
   return createQuery(() => {
     const p = params();
-    const qs = apFiltersToSearchParams(p.filters, {
+    const f = p.filters;
+    const qs = apFiltersToSearchParams(f, {
       page: p.page,
       pageSize: p.pageSize,
       sort: p.sort,
       order: p.order,
     });
     return {
-      queryKey: ["ap-by-vendor", p],
+      queryKey: [
+        "ap-by-vendor",
+        p.page,
+        p.pageSize,
+        p.sort,
+        p.order,
+        f.date_from ?? "",
+        f.date_to ?? "",
+        f.partner_id ?? 0,
+        f.location_id ?? 0,
+        f.project_id ?? 0,
+        f.pic_user_id ?? 0,
+      ],
       enabled: p.enabled,
+      refetchOnWindowFocus: false,
+      staleTime: 60_000,
       queryFn: async () => {
         const res = await apiFetch<ApByVendorRow[]>(`/api/v1/finance/ap-by-vendor?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load A/P report");
@@ -73,7 +88,6 @@ export function useApByVendorReport(params: () => ApByVendorParams) {
           perPage: res.meta?.per_page ?? p.pageSize,
         };
       },
-      staleTime: 15_000,
     };
   });
 }
