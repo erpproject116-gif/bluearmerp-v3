@@ -857,19 +857,6 @@ func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenan
 			if linePartnerID != partnerID {
 				errs[key+".purchase_order_line_id"] = "Vendor does not match purchase order."
 			}
-			// Serial/lot items must be received first; block PO-only billing while qty is still open to receive.
-			var ordered, received float64
-			var trackSerial, trackLot bool
-			_ = tx.QueryRow(ctx, `
-				select pol.qty::float8, coalesce(pol.received_qty, 0)::float8,
-				  coalesce(i.track_serial, false), coalesce(i.track_lot, false)
-				from public.po_purchase_order_lines pol
-				left join public.inv_items i on i.id = pol.item_id
-				where pol.id = $1`, *ln.PurchaseOrderLineID).Scan(&ordered, &received, &trackSerial, &trackLot)
-			if (trackSerial || trackLot) && ordered-received > 0.0001 {
-				errs[key+".purchase_order_line_id"] = "Serial/lot items require Goods Receipt (Receiving) before purchase. Use Load Slip → Goods Receipt."
-				continue
-			}
 			if ln.Qty > balance+0.0001 {
 				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds PO balance (%.4f).", balance)
 			}
@@ -1161,27 +1148,24 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 
 // ensureLegacyReceiveForInvoice posts a Goods Receipt for unreceived PO qty when invoicing
 // from Load Slip → Purchase Order without a prior GR (flexible mode; GR-before-SI policy off).
-// Serial/lot items still require an explicit Goods Receipt. Returns nil when the PO line is
-// already fully received (bill-only path).
+// Returns nil when the PO line is already fully received (bill-only path).
 func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, userID, locationID, purchaseOrderLineID int64, invoiceQty float64) (*int64, error) {
 	var poID int64
 	var ordered, received float64
 	var itemID *int64
 	var unitID *int64
-	var trackInventory, trackSerial, trackLot bool
+	var trackInventory bool
 	err := tx.QueryRow(ctx, `
 		select po.id, pol.qty::float8, coalesce(pol.received_qty, 0)::float8,
 		  pol.item_id, pol.unit_id,
-		  coalesce(i.track_inventory_qty, false),
-		  coalesce(i.track_serial, false),
-		  coalesce(i.track_lot, false)
+		  coalesce(i.track_inventory_qty, false)
 		from public.po_purchase_order_lines pol
 		join public.po_purchase_orders po on po.id = pol.purchase_order_id
 		left join public.inv_items i on i.id = pol.item_id
 		where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null
 		  and po.status in ('draft', 'confirmed', 'partially_received', 'received')`,
 		purchaseOrderLineID, tenantID,
-	).Scan(&poID, &ordered, &received, &itemID, &unitID, &trackInventory, &trackSerial, &trackLot)
+	).Scan(&poID, &ordered, &received, &itemID, &unitID, &trackInventory)
 	if err != nil {
 		return nil, errors.New("purchase order line not found")
 	}
@@ -1190,9 +1174,6 @@ func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 	if openReceive <= 0.0001 {
 		// Already received — allow PO-only billing without inventing another GR.
 		return nil, nil
-	}
-	if trackSerial || trackLot {
-		return nil, errors.New("serial/lot-tracked items require Goods Receipt (Receiving) before purchase invoice")
 	}
 	if invoiceQty > openReceive+0.0001 {
 		return nil, fmt.Errorf("exceeds unreceived PO quantity (%.4f available). Use Load Slip → Goods Receipt for already received qty, or lower invoice qty", openReceive)
