@@ -41,9 +41,9 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
   const [logoMissing, setLogoMissing] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
 
-  const loadLogoPreview = async (settings: BrandingSettings) => {
+  const loadLogoPreview = async (settings: BrandingSettings, missing: boolean) => {
     const id = settings.receipt.logo_asset_id;
-    if (!id) {
+    if (!id || missing) {
       setLogoPreviewUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return undefined;
@@ -51,17 +51,23 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
       return;
     }
     const blobUrl = await fetchBrandingLogoBlob(id);
+    if (!blobUrl) {
+      // Asset row/file gone (e.g. ephemeral disk) — stop retrying on every auth refresh.
+      markBrandingAssetMissing(id);
+      setLogoMissing(true);
+    }
     setLogoPreviewUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return blobUrl ?? undefined;
     });
   };
 
-  const apply = (s: BrandingSettings) => {
+  const apply = (s: BrandingSettings, missing = false) => {
     setSettings(s);
     setBrandingSnapshot(s);
     applyBrandingTheme(s);
-    void loadLogoPreview(s);
+    setLogoMissing(missing);
+    void loadLogoPreview(s, missing);
   };
 
   const refresh = async () => {
@@ -70,9 +76,13 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
     try {
       const res = await apiFetch<BrandingPayload>("/api/v1/branding", {}, { silent: true });
       if (res.success && res.data) {
-        apply(mergeSettings(res.data.settings));
+        const merged = mergeSettings(res.data.settings);
+        const missing =
+          Boolean(res.data.logo_missing) ||
+          (merged.receipt.logo_asset_id != null &&
+            isBrandingAssetMissing(merged.receipt.logo_asset_id));
         setCanManage(Boolean(res.data.can_manage));
-        setLogoMissing(Boolean(res.data.logo_missing));
+        apply(merged, missing);
       }
     } finally {
       setLoading(false);
@@ -107,7 +117,11 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
       body: JSON.stringify(body),
     });
     if (res.success && res.data?.settings) {
-      apply(mergeSettings(res.data.settings));
+      const merged = mergeSettings(res.data.settings);
+      const missing =
+        logoMissing() ||
+        (merged.receipt.logo_asset_id != null && isBrandingAssetMissing(merged.receipt.logo_asset_id));
+      apply(merged, missing);
       return true;
     }
     return false;
@@ -134,6 +148,8 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
       return false;
     }
     getGlobalToast()?.success(body.message ?? "Logo uploaded.");
+    // Fresh upload — allow the new (or restored) asset id to be fetched again.
+    missingBrandingAssets.clear();
     await refresh();
     setLogoMissing(false);
     return true;
@@ -177,11 +193,31 @@ export function useBranding() {
   return ctx;
 }
 
+const missingBrandingAssets = new Set<number>();
+
+export function markBrandingAssetMissing(assetId: number) {
+  if (assetId > 0) missingBrandingAssets.add(assetId);
+}
+
+export function clearBrandingAssetMissing(assetId: number) {
+  missingBrandingAssets.delete(assetId);
+}
+
+export function isBrandingAssetMissing(assetId: number): boolean {
+  return missingBrandingAssets.has(assetId);
+}
+
 export async function fetchBrandingLogoBlob(assetId: number): Promise<string | null> {
+  if (!assetId || missingBrandingAssets.has(assetId)) return null;
   const token = await getAccessToken();
+  if (!token) return null;
   const res = await fetch(apiAbsoluteUrl(`/api/v1/branding/assets/${assetId}?inline=1`), {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Authorization: `Bearer ${token}` },
   });
+  if (res.status === 404 || res.status === 410) {
+    missingBrandingAssets.add(assetId);
+    return null;
+  }
   if (!res.ok) return null;
   const blob = await res.blob();
   return URL.createObjectURL(blob);

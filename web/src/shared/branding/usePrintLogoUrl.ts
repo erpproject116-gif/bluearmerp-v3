@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import { fetchBrandingLogoBlob } from "./BrandingProvider";
+import { fetchBrandingLogoBlob, isBrandingAssetMissing } from "./BrandingProvider";
 import { fetchReportLogoBlob } from "../reportTemplates/useReportTemplates";
 
 export type PrintLogoRef =
@@ -12,7 +12,7 @@ export function usePrintLogoUrl(logoRef: () => PrintLogoRef) {
 
   createEffect(() => {
     const ref = logoRef();
-    if (!ref?.id) {
+    if (!ref?.id || (ref.source === "branding" && isBrandingAssetMissing(ref.id))) {
       setUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;

@@ -1098,7 +1098,7 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		offset := (p.Page - 1) * pageSize
 
 		where := `so.tenant_id = $1 and so.deleted_at is null
-			and so.progress_status in ('in_progress', 'completed')
+			and so.progress_status in ('unconfirmed', 'e_approval', 'in_progress', 'completed')
 			and (ln.qty - coalesce(req.requested, 0)) > 0.0001`
 		args := []any{tu.TenantID}
 		argN := 2
