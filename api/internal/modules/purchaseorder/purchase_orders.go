@@ -1138,7 +1138,7 @@ func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if v := processpolicy.ValidatePurchaseOrderConfirm(r.Context(), pool, policy, id); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmart(w, v)
 			return
 		}
 		if policy.PurchaseRequirePOApproval {

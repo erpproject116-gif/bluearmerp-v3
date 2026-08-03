@@ -72,7 +72,53 @@ export function policyRequiresAttachment(
 }
 
 export const attachmentRequiredMessage =
-  "At least one attachment is required before confirming. Add a file in Attachments, then save.";
+  "At least one attachment is required before confirming. Add a file in Attachments, then save — or turn off “Require file” under Form settings / Setup.";
+
+/** Where to adjust attachment requirement for each document kind. */
+export function attachmentSettingsHref(kind: AttachmentDocKind): string {
+  switch (kind) {
+    case "quotation":
+      return "/app/quotation/quotations/settings";
+    case "sales_order":
+      return "/app/sales-order/sales-orders/settings";
+    case "sales":
+      return "/app/sales/sales/settings";
+    case "purchase_order":
+      return "/app/purchase-order/purchase-orders/settings";
+    case "supplier_invoice":
+      return "/app/purchases/purchases/settings";
+    default:
+      return "/app/user-management/process-policies";
+  }
+}
+
+/** Client-side gate toast with a link to Form settings (attachment toggles). */
+export function toastAttachmentRequired(
+  toast: {
+    warning: (message: string) => void;
+    action?: (input: {
+      type?: "success" | "error" | "warning";
+      title: string;
+      message?: string;
+      actionLabel?: string;
+      href?: string;
+    }) => void;
+  },
+  kind: AttachmentDocKind,
+  message = attachmentRequiredMessage,
+) {
+  if (toast.action) {
+    toast.action({
+      type: "warning",
+      title: message,
+      message: "Upload a file on this document, or turn off “Require file” in Form settings.",
+      actionLabel: "Open Form settings",
+      href: attachmentSettingsHref(kind),
+    });
+    return;
+  }
+  toast.warning(message);
+}
 
 export function validateAttachmentBeforeConfirm(
   policy: ProcessPolicy | undefined,

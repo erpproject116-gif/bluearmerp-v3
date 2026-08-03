@@ -17,6 +17,8 @@ import {
   useColumnLabelSettings,
 } from "./useColumnLabelSettings";
 import { uiLabel } from "./branding/uiLabel";
+import { ProcessRulesPanel } from "./ProcessRulesPanel";
+import { ENTITY_PROCESS_SETUP } from "./processPolicyFieldMeta";
 
 type Props = {
   entityType: string;
@@ -68,6 +70,7 @@ export function EntityFormSettingsPage(props: Props) {
   const [adding, setAdding] = createSignal(false);
 
   const canEdit = () => canManageFormSettings(auth.me);
+  const processSetup = () => ENTITY_PROCESS_SETUP[props.entityType] ?? null;
 
   createEffect(() => {
     if (!dirty()) {
@@ -257,6 +260,25 @@ export function EntityFormSettingsPage(props: Props) {
         <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Only store admins, owners, and superadmins can change form settings.
         </p>
+      </Show>
+
+      <Show when={processSetup()}>
+        {(setup) => (
+          <div class="mb-6">
+            <ProcessRulesPanel
+              scopeId={setup().scopeId}
+              title={setup().title}
+              compact
+            />
+            <p class="mt-2 text-xs text-text-secondary">
+              Prefer the full{" "}
+              <A href={setup().setupHref} class="text-brand-600 hover:underline">
+                module Setup tab
+              </A>{" "}
+              for the same rules in context.
+            </p>
+          </div>
+        )}
       </Show>
 
       <div class="overflow-x-auto rounded-xl border border-stroke bg-white shadow-sm">

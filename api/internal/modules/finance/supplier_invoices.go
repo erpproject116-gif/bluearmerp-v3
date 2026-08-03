@@ -133,6 +133,7 @@ type openPOLineRow struct {
 	PurchaseOrderID     int64   `json:"purchase_order_id"`
 	PurchaseOrderNo     string  `json:"purchase_order_no"`
 	Status              string  `json:"status"`
+	ProgressStatus      string  `json:"progress_status"`
 	PartnerID           int64   `json:"partner_id"`
 	PartnerName         string  `json:"partner_name"`
 	ItemID              int64   `json:"item_id"`
@@ -180,7 +181,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 		where, args, argN = f.Apply(where, args, argN, "", "po.order_date", "po.purchase_order_no")
 
 		q := fmt.Sprintf(`
-			select pol.id, po.id, po.purchase_order_no, po.status,
+			select pol.id, po.id, po.purchase_order_no, po.status, coalesce(po.progress_status, 'unconfirmed'),
 			  po.partner_id, coalesce(p.company_name, ''),
 			  pol.item_id, pol.item_code, pol.item_name,
 			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
@@ -206,7 +207,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row openPOLineRow
 			if err := rows.Scan(
-				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo, &row.Status,
+				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo, &row.Status, &row.ProgressStatus,
 				&row.PartnerID, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
@@ -850,7 +851,18 @@ func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenan
 			seenPO[*ln.PurchaseOrderLineID] = true
 			balance, poID, linePartnerID, err := poLineBalanceExcluding(ctx, tx, tenantID, *ln.PurchaseOrderLineID, excludeInvoiceID)
 			if err != nil {
-				errs[key+".purchase_order_line_id"] = "Purchase order line not found or not confirmed."
+				var poStatus string
+				_ = tx.QueryRow(ctx, `
+					select po.status from public.po_purchase_order_lines pol
+					join public.po_purchase_orders po on po.id = pol.purchase_order_id
+					where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null`,
+					*ln.PurchaseOrderLineID, tenantID).Scan(&poStatus)
+				if poStatus == "draft" {
+					errs[key+".purchase_order_line_id"] =
+						"Purchase order is still Unconfirmed (draft). Open Purchase Orders and click Confirm before billing."
+				} else {
+					errs[key+".purchase_order_line_id"] = "Purchase order line not found or not confirmed."
+				}
 				continue
 			}
 			if linePartnerID != partnerID {

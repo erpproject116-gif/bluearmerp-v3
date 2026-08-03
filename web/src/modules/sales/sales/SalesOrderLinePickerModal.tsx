@@ -139,7 +139,7 @@ export function SalesOrderLinePickerModal(props: Props) {
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
       onApply={confirm}
-      emptyHint="No open Sales Order lines. Clear Search/Doc No or dates if filtered. Fully invoiced lines are hidden. Serial-tracked items may still need Pick List release when you Save. Check that your user data scope includes that customer."
+      emptyHint="No open Sales Order lines. Clear Search/Doc No or dates if filtered. Fully invoiced lines are hidden. Unconfirmed orders are listed — confirm/progress them if Save still blocks. Serial-tracked items may need Pick List release on Save. Check your user data scope includes that customer."
       columns={[
         { key: "date_no", header: "Date-No.", cell: (r) => String(r.date_no_display ?? "") },
         { key: "so", header: "SO No.", cell: (r) => String(r.sales_order_no ?? "") },

@@ -93,8 +93,10 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
     void refresh();
   });
 
+  // Refresh branding only when the signed-in user id changes — not on every auth.me object tick.
   createEffect(() => {
-    if (auth.me) void refresh();
+    const userId = auth.me?.user?.id;
+    if (userId) void refresh();
   });
 
   const save = async (patch: Partial<BrandingSettings>) => {
@@ -150,8 +152,25 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
     getGlobalToast()?.success(body.message ?? "Logo uploaded.");
     // Fresh upload — allow the new (or restored) asset id to be fetched again.
     missingBrandingAssets.clear();
+    fetchFailCounts.clear();
     await refresh();
     setLogoMissing(false);
+    // Verify the asset is actually readable; otherwise surface missing immediately.
+    const id = settings().receipt.logo_asset_id;
+    if (id) {
+      const blobUrl = await fetchBrandingLogoBlob(id);
+      if (!blobUrl) {
+        setLogoMissing(true);
+        getGlobalToast()?.warning(
+          "Logo was saved in settings, but the file could not be loaded from the server. Re-upload, or ask ops to mount a durable branding-assets volume.",
+        );
+      } else {
+        setLogoPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return blobUrl;
+        });
+      }
+    }
     return true;
   };
 
@@ -194,6 +213,7 @@ export function useBranding() {
 }
 
 const missingBrandingAssets = new Set<number>();
+const fetchFailCounts = new Map<number, number>();
 
 export function markBrandingAssetMissing(assetId: number) {
   if (assetId > 0) missingBrandingAssets.add(assetId);
@@ -214,11 +234,18 @@ export async function fetchBrandingLogoBlob(assetId: number): Promise<string | n
   const res = await fetch(apiAbsoluteUrl(`/api/v1/branding/assets/${assetId}?inline=1`), {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (res.status === 404 || res.status === 410) {
+  if (res.status === 404 || res.status === 410 || res.status === 403) {
     missingBrandingAssets.add(assetId);
     return null;
   }
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // Treat repeated hard failures like missing so the UI stops flickering.
+    const fails = (fetchFailCounts.get(assetId) ?? 0) + 1;
+    fetchFailCounts.set(assetId, fails);
+    if (fails >= 3) missingBrandingAssets.add(assetId);
+    return null;
+  }
+  fetchFailCounts.delete(assetId);
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }

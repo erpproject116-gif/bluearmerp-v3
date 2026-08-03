@@ -88,6 +88,7 @@ export type OpenPOLine = {
   purchase_order_id: number;
   purchase_order_no: string;
   status?: string;
+  progress_status?: string;
   partner_id?: number;
   partner_name?: string;
   item_id: number;

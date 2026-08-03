@@ -8,7 +8,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 )
 
-const attachmentRequiredMsg = "At least one attachment is required before confirming this document. Save as Unconfirmed, upload a file, then confirm."
+const attachmentRequiredMsg = "At least one attachment is required before confirming this document. Save as Unconfirmed, upload a file, then confirm — or turn off “Require file” under Form settings / module Setup."
 
 // DocKind identifies a document type that supports attachments.
 type DocKind string

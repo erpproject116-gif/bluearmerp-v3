@@ -112,7 +112,14 @@ export function OpenPOLinePickerModal(props: Props) {
         {
           key: "status",
           header: "Status",
-          cell: (r) => openSlipDocStatusLabel(String(r.status ?? "")),
+          cell: (r) => {
+            const status = String(r.status ?? "");
+            const progress = String(r.progress_status ?? "");
+            if (status === "draft" || progress === "unconfirmed") {
+              return "Unconfirmed — Confirm PO before Save";
+            }
+            return openSlipDocStatusLabel(status || progress);
+          },
         },
         {
           key: "partner",
@@ -145,7 +152,7 @@ export function OpenPOLinePickerModal(props: Props) {
       ]}
       onApply={apply}
       applyLabel={props.mapOnly ? "Map selected lines" : undefined}
-      emptyHint="No Purchase Order lines with open billed qty. Clear Search/Doc No or dates if filtered. Serial/lot items and GR-before-invoice policy still require Load Slip → Goods Receipt at Save time."
+      emptyHint="No open Purchase Order lines. Confirm Unconfirmed POs first (Progress → Confirm), clear Search/Doc No/dates, then retry. Serial/lot and GR-before-invoice still need Goods Receipt at Save when those policies are on."
     />
   );
 }

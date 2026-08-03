@@ -21,7 +21,7 @@ import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
-import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
@@ -531,7 +531,7 @@ export function SalesOrderModal(props: Props) {
       effectiveEditing()?.id,
     );
     if (attachmentErr) {
-      toast.warning(attachmentErr);
+      toastAttachmentRequired(toast, "sales_order", attachmentErr);
       return;
     }
 

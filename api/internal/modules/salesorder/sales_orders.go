@@ -615,14 +615,29 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Load Slip → Save: copy quotation attachments onto the new sales order.
+		// Load Slip → Save: copy quotation attachments (header and/or lines).
+		quoIDs := map[int64]struct{}{}
 		if body.SourceQuotationID != nil && *body.SourceQuotationID > 0 {
+			quoIDs[*body.SourceQuotationID] = struct{}{}
+		}
+		for _, ln := range body.Lines {
+			if ln.SourceQuotationLineID == nil || *ln.SourceQuotationLineID <= 0 {
+				continue
+			}
+			var qid int64
+			if err := pool.QueryRow(r.Context(),
+				`select quotation_id from public.quo_quotation_lines where id = $1`,
+				*ln.SourceQuotationLineID).Scan(&qid); err == nil && qid > 0 {
+				quoIDs[qid] = struct{}{}
+			}
+		}
+		for qid := range quoIDs {
 			_ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
 				SrcBaseDir: attachmentx.Dir("quotation"),
 				DstBaseDir: attachmentx.Dir("sales_order"),
 				SrcTable:   "public.quo_quotation_attachments",
 				SrcFKCol:   "quotation_id",
-				SrcID:      *body.SourceQuotationID,
+				SrcID:      qid,
 				DstTable:   "public.so_sales_order_attachments",
 				DstFKCol:   "sales_order_id",
 				DstID:      id,
