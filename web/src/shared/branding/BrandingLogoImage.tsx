@@ -10,6 +10,7 @@ type Props = {
 export function BrandingLogoImage(props: Props) {
   const branding = useBranding();
   const logoRef = () => {
+    if (branding.logoMissing()) return null;
     const id = branding.settings().receipt.logo_asset_id;
     return id ? { id, source: "branding" as const } : null;
   };

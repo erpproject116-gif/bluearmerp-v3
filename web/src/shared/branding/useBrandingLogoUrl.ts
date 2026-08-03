@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import { fetchBrandingLogoBlob } from "./BrandingProvider";
+import { fetchBrandingLogoBlob, isBrandingAssetMissing } from "./BrandingProvider";
 
 /** Loads a tenant branding logo via authenticated fetch (img src cannot send Bearer tokens). */
 export function useBrandingLogoUrl(logoAssetId: () => number | null | undefined) {
@@ -7,7 +7,7 @@ export function useBrandingLogoUrl(logoAssetId: () => number | null | undefined)
 
   createEffect(() => {
     const id = logoAssetId();
-    if (!id) {
+    if (!id || isBrandingAssetMissing(id)) {
       setUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;

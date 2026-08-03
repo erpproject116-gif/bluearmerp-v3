@@ -61,9 +61,8 @@ type openSalesOrderLineRow struct {
 func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		// Load Slip always lists every confirmed SO line with open residual qty
-		// (ordered − already invoiced). Delivery-receipt gating must not hide lines
-		// from the picker — process policy still applies on Save when required.
+		// Load Slip lists every open SO residual (including Unconfirmed), matching
+		// Quotation Load Slip. Delivery / Pick List rules still apply on Save.
 		p := httputil.ParseListParams(r, "order_date", map[string]string{
 			"order_date":     "so.order_date",
 			"sales_order_no": "so.sales_order_no",
@@ -73,14 +72,11 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		pageSize := openlines.PageSize(r, p.PageSize)
 		offset := (p.Page - 1) * pageSize
 
-		// Open residual for Load Slip: normal items = ordered − sold; serial = released − sold.
+		// Open residual for Load Slip listing = ordered − already invoiced
+		// (serial release is enforced on Save, not used to hide rows here).
 		where := `so.tenant_id = $1 and so.deleted_at is null
-			and so.progress_status in ('in_progress', 'completed')
-			and (
-				(coalesce(i.track_serial, false) = false and (ln.qty - coalesce(slip.sold, 0)) > 0.0001)
-				or (coalesce(i.track_serial, false) = true
-					and coalesce(rel.released, 0) - coalesce(slip.sold, 0) > 0.0001)
-			)`
+			and so.progress_status in ('unconfirmed', 'e_approval', 'in_progress', 'completed')
+			and (ln.qty - coalesce(slip.sold, 0)) > 0.0001`
 		args := []any{tu.TenantID}
 		argN := 2
 
@@ -116,7 +112,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  coalesce(rel.released, 0)::float8,
 			  coalesce(dr.delivered, 0)::float8,
-			  (%s)::float8,
+			  (ln.qty - coalesce(slip.sold, 0))::float8,
 			  ln.unit_id, ln.unit_code,
 			  ln.unit_vat_inc::float8, ln.remark,
 			  coalesce(i.track_serial, false),
@@ -145,7 +141,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			) slip on slip.sales_order_line_id = ln.id
 			where %s
 			order by so.order_date desc, ln.line_no asc
-			limit $%d offset $%d`, balanceExpr(false), where, argN, argN+1)
+			limit $%d offset $%d`, where, argN, argN+1)
 		args = append(args, pageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
@@ -411,11 +407,11 @@ func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 		  group by sales_order_line_id
 		) slip on slip.sales_order_line_id = ln.id
 		where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null
-		  and so.progress_status in ('in_progress', 'completed')`,
+		  and so.progress_status in ('unconfirmed', 'e_approval', 'in_progress', 'completed')`,
 		salesOrderLineID, tenantID,
 	).Scan(&locationID, &itemID, &released, &sold, &trackInventory, &trackSerial)
 	if err != nil {
-		return errors.New("sales order line not found or not confirmed")
+		return errors.New("sales order line not found or not open")
 	}
 
 	availableReleased := released - sold

@@ -43,7 +43,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "stocks_management",
     label: "Stocks",
-    iconId: "inventory",
+    iconId: "stocks",
     defaultExpanded: true,
     entries: [
       { kind: "module", moduleId: "inventory" },

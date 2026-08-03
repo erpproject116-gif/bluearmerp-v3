@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, Show, type JSX } from "solid-js";
-import { apiFetch } from "./api";
+import { apiFetch, getAccessToken } from "./api";
 
 /**
  * useDocumentDraft — autosaves in-progress form input and recovers it after a refresh,
@@ -156,6 +156,11 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
       setDirty(false);
       return;
     }
+    const token = await getAccessToken();
+    if (!token) {
+      setDirty(false);
+      return;
+    }
     const res = await apiFetch<{ saved_at: string }>(
       `/api/v1/drafts/${encodeURIComponent(entityType)}`,
       {
@@ -186,9 +191,15 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
   const loadForKey = async (entityType: string, draftKey: string) => {
     let recovered: { payload: T; saved_at: string } | null = null;
     if (!options.localOnly) {
-      const res = await apiFetch<DraftEnvelope<T>>(draftPath(entityType, draftKey), undefined, { silent: true });
-      if (res.data?.draft?.payload != null) {
-        recovered = { payload: res.data.draft.payload, saved_at: res.data.draft.saved_at };
+      // Skip server call when session is not ready — avoids 401 noise during auth boot.
+      const token = await getAccessToken();
+      if (token) {
+        const res = await apiFetch<DraftEnvelope<T>>(draftPath(entityType, draftKey), undefined, {
+          silent: true,
+        });
+        if (res.data?.draft?.payload != null) {
+          recovered = { payload: res.data.draft.payload, saved_at: res.data.draft.saved_at };
+        }
       }
     }
     if (!recovered) {
@@ -250,6 +261,14 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
 
     currentEntityType = entityType;
     currentDraftKey = draftKey;
+    // Providers that mount while the form is closed (e.g. CRM task modal) must not
+    // hit /drafts until the form is actually open — avoids boot-time 401s.
+    if (!isEnabled()) {
+      setLoading(false);
+      setAutosavePaused(true);
+      lastSerialized = JSON.stringify(options.getPayload());
+      return;
+    }
     setLoading(true);
     setAutosavePaused(true);
     void loadForKey(entityType, draftKey);
