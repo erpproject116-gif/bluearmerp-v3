@@ -474,8 +474,8 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order not found."})
 			return
 		}
-		if poStatus != "confirmed" && poStatus != "partially_received" {
-			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order must be confirmed or partially received."})
+		if poStatus != "draft" && poStatus != "confirmed" && poStatus != "partially_received" {
+			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order must be open for receiving (Unconfirmed/draft, confirmed, or partially received)."})
 			return
 		}
 		if v := validatePOApprovalForReceipt(r.Context(), tx, tu.TenantID, body.PurchaseOrderID); v != nil {
@@ -939,7 +939,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Purchase order not found.", "ERR_INTERNAL")
 			return
 		}
-		if poStatus != "confirmed" && poStatus != "partially_received" {
+		if poStatus != "draft" && poStatus != "confirmed" && poStatus != "partially_received" {
 			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order is not open for receiving."})
 			return
 		}

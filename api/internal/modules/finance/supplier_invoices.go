@@ -734,7 +734,7 @@ func poLineBalanceExcluding(ctx context.Context, tx pgx.Tx, tenantID, poLineID, 
 		from public.po_purchase_order_lines pol
 		join public.po_purchase_orders po on po.id = pol.purchase_order_id
 		where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null
-		  and po.status in ('confirmed', 'partially_received', 'received')`,
+		  and po.status in ('draft', 'confirmed', 'partially_received', 'received')`,
 		poLineID, tenantID, excludeInvoiceID).Scan(&orderedQty, &billedQty, &poID, &partnerID)
 	if err != nil {
 		return 0, 0, 0, err
@@ -851,18 +851,7 @@ func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenan
 			seenPO[*ln.PurchaseOrderLineID] = true
 			balance, poID, linePartnerID, err := poLineBalanceExcluding(ctx, tx, tenantID, *ln.PurchaseOrderLineID, excludeInvoiceID)
 			if err != nil {
-				var poStatus string
-				_ = tx.QueryRow(ctx, `
-					select po.status from public.po_purchase_order_lines pol
-					join public.po_purchase_orders po on po.id = pol.purchase_order_id
-					where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null`,
-					*ln.PurchaseOrderLineID, tenantID).Scan(&poStatus)
-				if poStatus == "draft" {
-					errs[key+".purchase_order_line_id"] =
-						"Purchase order is still Unconfirmed (draft). Open Purchase Orders and click Confirm before billing."
-				} else {
-					errs[key+".purchase_order_line_id"] = "Purchase order line not found or not confirmed."
-				}
+				errs[key+".purchase_order_line_id"] = "Purchase order line not found."
 				continue
 			}
 			if linePartnerID != partnerID {
@@ -1190,11 +1179,11 @@ func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 		join public.po_purchase_orders po on po.id = pol.purchase_order_id
 		left join public.inv_items i on i.id = pol.item_id
 		where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null
-		  and po.status in ('confirmed', 'partially_received', 'received')`,
+		  and po.status in ('draft', 'confirmed', 'partially_received', 'received')`,
 		purchaseOrderLineID, tenantID,
 	).Scan(&poID, &ordered, &received, &itemID, &unitID, &trackInventory, &trackSerial, &trackLot)
 	if err != nil {
-		return nil, errors.New("purchase order line not found or not confirmed")
+		return nil, errors.New("purchase order line not found")
 	}
 
 	openReceive := ordered - received
