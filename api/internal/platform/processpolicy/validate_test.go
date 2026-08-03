@@ -40,11 +40,12 @@ func TestValidatePurchaseOrderCreate(t *testing.T) {
 func TestValidatePurchaseRequestForPO(t *testing.T) {
 	p := Policy{PurchaseRequirePRApproval: true}
 	now := time.Now()
-	if errs := ValidatePurchaseRequestForPO(p, "e_approval", nil); errs == nil {
-		t.Fatal("expected error for unapproved PR")
+	// Relaxed: Unconfirmed / unapproved PRs may become POs.
+	if errs := ValidatePurchaseRequestForPO(p, "e_approval", nil); errs != nil {
+		t.Fatalf("unexpected error for unapproved PR: %v", errs)
 	}
-	if errs := ValidatePurchaseRequestForPO(p, "confirmed", nil); errs == nil {
-		t.Fatal("expected error for confirmed without approved_at")
+	if errs := ValidatePurchaseRequestForPO(p, "unconfirmed", nil); errs != nil {
+		t.Fatalf("unexpected error for unconfirmed PR: %v", errs)
 	}
 	if errs := ValidatePurchaseRequestForPO(p, "confirmed", &now); errs != nil {
 		t.Fatalf("unexpected error: %v", errs)
@@ -70,14 +71,15 @@ func TestValidateSalesOrderApproval(t *testing.T) {
 	on := Policy{SalesRequireSOApproval: true}
 	off := Policy{SalesRequireSOApproval: false}
 
-	if errs := ValidateSalesOrderApproval(on, false, ""); errs == nil {
-		t.Fatal("expected error: missing approval request must block when policy on")
+	// Relaxed: Sales / release may proceed without SO approval.
+	if errs := ValidateSalesOrderApproval(on, false, ""); errs != nil {
+		t.Fatalf("unexpected error when policy on: %v", errs)
 	}
-	if errs := ValidateSalesOrderApproval(on, true, "e_approval"); errs == nil {
-		t.Fatal("expected error: pending approval must block when policy on")
+	if errs := ValidateSalesOrderApproval(on, true, "e_approval"); errs != nil {
+		t.Fatalf("unexpected error for pending approval: %v", errs)
 	}
-	if errs := ValidateSalesOrderApproval(on, true, "unconfirmed"); errs == nil {
-		t.Fatal("expected error: rejected/unconfirmed approval must block when policy on")
+	if errs := ValidateSalesOrderApproval(on, true, "unconfirmed"); errs != nil {
+		t.Fatalf("unexpected error for unconfirmed approval: %v", errs)
 	}
 	if errs := ValidateSalesOrderApproval(on, true, "confirmed"); errs != nil {
 		t.Fatalf("unexpected error for approved SO: %v", errs)
@@ -91,11 +93,12 @@ func TestValidatePurchaseOrderApproval(t *testing.T) {
 	on := Policy{PurchaseRequirePOApproval: true}
 	off := Policy{PurchaseRequirePOApproval: false}
 
-	if errs := ValidatePurchaseOrderApproval(on, false, ""); errs == nil {
-		t.Fatal("expected error: missing approval request must block when policy on")
+	// Relaxed: Purchases / GR may proceed without PO approval.
+	if errs := ValidatePurchaseOrderApproval(on, false, ""); errs != nil {
+		t.Fatalf("unexpected error when policy on: %v", errs)
 	}
-	if errs := ValidatePurchaseOrderApproval(on, true, "e_approval"); errs == nil {
-		t.Fatal("expected error: pending approval must block when policy on")
+	if errs := ValidatePurchaseOrderApproval(on, true, "e_approval"); errs != nil {
+		t.Fatalf("unexpected error for pending approval: %v", errs)
 	}
 	if errs := ValidatePurchaseOrderApproval(on, true, "confirmed"); errs != nil {
 		t.Fatalf("unexpected error for approved PO: %v", errs)

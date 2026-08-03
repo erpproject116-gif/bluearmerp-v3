@@ -44,17 +44,14 @@ func ValidatePurchaseOrderCreate(p Policy, purchaseRequestID *int64) map[string]
 	}
 }
 
-// ValidatePurchaseRequestForPO blocks PO conversion when PR approval is required.
+// ValidatePurchaseRequestForPO previously required an approved PR when the
+// PR-approval policy was on. Relaxed: Purchase Orders may be created from
+// Unconfirmed / pending PRs (same flexibility as billing Unconfirmed POs).
 func ValidatePurchaseRequestForPO(p Policy, progressStatus string, approvedAt *time.Time) map[string]string {
-	if !p.PurchaseRequirePRApproval {
-		return nil
-	}
-	if strings.EqualFold(strings.TrimSpace(progressStatus), "confirmed") && approvedAt != nil {
-		return nil
-	}
-	return map[string]string{
-		"purchase_request_id": "This purchase request must be approved first. Next: open Approvals queue and confirm the PR.",
-	}
+	_ = p
+	_ = progressStatus
+	_ = approvedAt
+	return nil
 }
 
 // ValidateSupplierInvoiceLineSource requires a posted goods receipt line on every
@@ -73,28 +70,23 @@ func approvalConfirmed(hasRequest bool, requestStatus string) bool {
 	return hasRequest && strings.EqualFold(strings.TrimSpace(requestStatus), "confirmed")
 }
 
-// ValidateSalesOrderApproval blocks SO fulfillment (release, conversion to sale)
-// when the SO approval policy is on and the order has no confirmed approval request.
-// A missing approval request counts as not approved.
+// ValidateSalesOrderApproval previously blocked release/invoice until the SO was
+// approved. Relaxed: Sales (and pick/release) may proceed from Unconfirmed SOs.
 func ValidateSalesOrderApproval(p Policy, hasRequest bool, requestStatus string) map[string]string {
-	if !p.SalesRequireSOApproval || approvalConfirmed(hasRequest, requestStatus) {
-		return nil
-	}
-	return map[string]string{
-		"sales_order_id": "Sales order must be approved before release/invoice. Next: open Approvals queue and confirm this SO.",
-	}
+	_ = p
+	_ = hasRequest
+	_ = requestStatus
+	return nil
 }
 
-// ValidatePurchaseOrderApproval blocks PO confirm, goods receipt and PO-linked
-// supplier invoicing when the PO approval policy is on and the order has no
-// confirmed approval request. A missing approval request counts as not approved.
+// ValidatePurchaseOrderApproval previously blocked PO confirm, GR, and PO-linked
+// supplier invoicing until the PO was approved. Relaxed: Purchases/GR may proceed
+// from Unconfirmed (draft) POs.
 func ValidatePurchaseOrderApproval(p Policy, hasRequest bool, requestStatus string) map[string]string {
-	if !p.PurchaseRequirePOApproval || approvalConfirmed(hasRequest, requestStatus) {
-		return nil
-	}
-	return map[string]string{
-		"purchase_order_id": "Purchase order must be approved before this step. Next: open Approvals queue and confirm this PO.",
-	}
+	_ = p
+	_ = hasRequest
+	_ = requestStatus
+	return nil
 }
 
 // AllowJournalAutoPost reports whether an automatic journal posting may skip the
