@@ -10,6 +10,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
 )
@@ -25,6 +26,7 @@ type openPurchaseRequestSlipLine struct {
 	PurchaseRequestLineID int64   `json:"purchase_request_line_id"`
 	DateNoDisplay         string  `json:"date_no_display"`
 	ReferenceNo           string  `json:"reference_no"`
+	ProgressStatus        string  `json:"progress_status"`
 	LocationID            int64   `json:"location_id"`
 	LocationName          string  `json:"location_name"`
 	TaxTypeID             int64   `json:"tax_type_id"`
@@ -61,8 +63,10 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			"reference_no": "pr.purchase_request_no",
 			"item_code":    "ln.item_code",
 		})
-		offset := httputil.Offset(p)
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 
+		// Load Slip lists every open PR residual by default (no vendor/date filter).
 		where := `pr.tenant_id = $1 and pr.deleted_at is null
 			and ln.item_id is not null
 			and (ln.qty - coalesce(sl.slipped, 0)) > 0.0001`
@@ -87,7 +91,7 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		where += dsScope
 
 		q := fmt.Sprintf(`
-			select pr.id, ln.id, pr.request_date, pr.date_seq, pr.purchase_request_no,
+			select pr.id, ln.id, pr.request_date, pr.date_seq, pr.purchase_request_no, pr.progress_status,
 			  pr.location_id, l.location_name, pr.tax_type_id, pr.currency_id, pr.pic_name,
 			  ln.partner_id, ln.partner_code, ln.partner_name,
 			  ln.item_id, ln.item_code, ln.item_name, ln.spec_name, ln.description,
@@ -111,7 +115,7 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			where %s
 			order by pr.request_date desc, ln.line_no asc
 			limit $%d offset $%d`, where, argN, argN+1)
-		args = append(args, p.PageSize, offset)
+		args = append(args, pageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -127,7 +131,7 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var requestDate time.Time
 			var dateSeq int
 			if err := rows.Scan(
-				&row.PurchaseRequestID, &row.PurchaseRequestLineID, &requestDate, &dateSeq, &row.ReferenceNo,
+				&row.PurchaseRequestID, &row.PurchaseRequestLineID, &requestDate, &dateSeq, &row.ReferenceNo, &row.ProgressStatus,
 				&row.LocationID, &row.LocationName, &row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.PartnerID, &row.PartnerCode, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Description,
@@ -144,6 +148,6 @@ func listOpenPurchaseRequestSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			row.DateNoDisplay = formatDateNoDisplay(requestDate, dateSeq)
 			out = append(out, row)
 		}
-		response.OKList(w, out, p.Page, p.PageSize, total)
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }

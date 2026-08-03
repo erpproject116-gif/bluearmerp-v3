@@ -16,7 +16,7 @@ type Props = {
   mapOnly?: boolean;
 };
 
-const pageSize = 100;
+const pageSize = 500;
 
 export function OpenGRLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({

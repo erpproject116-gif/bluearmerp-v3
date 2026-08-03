@@ -3,15 +3,18 @@ import { apiFetch } from "../../shared/api";
 import { inputClass } from "../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../shared/Modal";
 import { LoadingText } from "../../shared/LoadingText";
+import { openSlipDocStatusLabel } from "../../shared/openSlipDocStatusLabel";
 
 export type OpenShippingSlipLineRow = {
   shipping_order_id: number;
   shipping_no: string;
   shipping_date: string;
+  status?: string;
   sales_order_id: number;
   sales_order_line_id: number;
   date_no_display: string;
   sales_order_no: string;
+  sales_order_status?: string;
   customer_name: string;
   location_id: number;
   location_name: string;
@@ -40,10 +43,10 @@ type Props = {
   onConfirm: (lines: PickedShippingSlipLine[]) => void;
 };
 
-async function fetchOpenLines(q: string, page: number, partnerId: number | null | undefined, pageSize: number) {
+async function fetchOpenLines(q: string, page: number, pageSize: number) {
   const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize), sort: "shipping_date", order: "desc" });
   if (q) qs.set("q", q);
-  if (partnerId) qs.set("partner_id", String(partnerId));
+  // Default: all partners' open shipping lines (form partner is optional filter only via search).
   const res = await apiFetch<OpenShippingSlipLineRow[]>(`/api/v1/shipping/orders/open-sales-lines?${qs}`);
   if (!res.success) throw new Error(res.message ?? "Failed to load shipping order lines");
   return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
@@ -53,11 +56,11 @@ export function ShippingOrderLinePickerModal(props: Props) {
   const [q, setQ] = createSignal("");
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
-  const pageSize = 50;
+  const pageSize = 500;
 
   const [data] = createResource(
-    () => (props.open ? { q: q(), page: page(), partnerId: props.partnerId } : null),
-    async (p) => fetchOpenLines(p!.q, p!.page, p!.partnerId, pageSize),
+    () => (props.open ? { q: q(), page: page() } : null),
+    async (p) => fetchOpenLines(p!.q, p!.page, pageSize),
   );
 
   const toggleRow = (lineId: number) => {
@@ -120,7 +123,9 @@ export function ShippingOrderLinePickerModal(props: Props) {
                       <tr class="border-b border-stroke text-left text-xs uppercase text-text-secondary">
                         <th class="w-10 py-2 pr-2" />
                         <th class="py-2 pr-4">Shipping</th>
+                        <th class="py-2 pr-4">Ship status</th>
                         <th class="py-2 pr-4">Sales Order</th>
+                        <th class="py-2 pr-4">SO status</th>
                         <th class="py-2 pr-4">Customer</th>
                         <th class="py-2 pr-4">Item</th>
                         <th class="py-2 text-right">Balance</th>
@@ -141,7 +146,9 @@ export function ShippingOrderLinePickerModal(props: Props) {
                               />
                             </td>
                             <td class="py-2 pr-4">{row.shipping_no}</td>
+                            <td class="py-2 pr-4">{openSlipDocStatusLabel(row.status)}</td>
                             <td class="py-2 pr-4">{row.sales_order_no}</td>
+                            <td class="py-2 pr-4">{openSlipDocStatusLabel(row.sales_order_status)}</td>
                             <td class="py-2 pr-4">{row.customer_name}</td>
                             <td class="py-2 pr-4">
                               {row.item_code} — {row.item_name}

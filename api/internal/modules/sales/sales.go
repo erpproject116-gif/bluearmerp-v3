@@ -672,7 +672,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := writeSalesOrderSlipsForSales(r.Context(), tx, tu.TenantID, id, tu.AppUserID, salesNo, dateNoDisplay, computed, !policy.LegacyCombinedSORelease); err != nil {
+		if err := writeSalesOrderSlipsForSales(r.Context(), tx, tu.TenantID, id, tu.AppUserID, salesNo, dateNoDisplay, computed, salesUsesDeliveryBalance(policy)); err != nil {
 			response.Validation(w, map[string]string{"conversion": err.Error()})
 			return
 		}

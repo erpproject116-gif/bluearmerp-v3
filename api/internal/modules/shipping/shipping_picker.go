@@ -10,7 +10,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -18,10 +18,12 @@ type openShippingSlipLine struct {
 	ShippingOrderID      int64   `json:"shipping_order_id"`
 	ShippingNo           string  `json:"shipping_no"`
 	ShippingDate         string  `json:"shipping_date"`
+	Status               string  `json:"status"`
 	SalesOrderID         int64   `json:"sales_order_id"`
 	SalesOrderLineID     int64   `json:"sales_order_line_id"`
 	DateNoDisplay        string  `json:"date_no_display"`
 	SalesOrderNo         string  `json:"sales_order_no"`
+	SalesOrderStatus     string  `json:"sales_order_status"`
 	CustomerName         string  `json:"customer_name"`
 	LocationID           int64   `json:"location_id"`
 	LocationName         string  `json:"location_name"`
@@ -42,12 +44,6 @@ type openShippingSlipLine struct {
 func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
-			return
-		}
-		useDelivery := !policy.LegacyCombinedSORelease
 
 		p := httputil.ParseListParams(r, "shipping_date", map[string]string{
 			"shipping_date":  "sh.shipping_date",
@@ -56,13 +52,15 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			"customer_name":  "p.company_name",
 			"item_code":      "ln.item_code",
 		})
-		offset := httputil.Offset(p)
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 
-		balanceExpr := `greatest(0, coalesce(rel.released, 0) - coalesce(slip.sold, 0))`
-		if useDelivery {
-			balanceExpr = `greatest(0, coalesce(dr.delivered, 0) - coalesce(slip.sold, 0))`
-		}
-		shippingBalance := fmt.Sprintf(`greatest(0, least(shl.qty::float8, (%s)::float8) - coalesce(slip.sold, 0))`, balanceExpr)
+		// Load Slip lists shipping-linked SO residual without requiring DR first.
+		// Cap by shipping line qty vs ordered residual (release for serial is enforced on Save).
+		balanceExpr := `greatest(0, case when coalesce(i.track_serial, false)
+			then coalesce(rel.released, 0) - coalesce(slip.sold, 0)
+			else ln.qty - coalesce(slip.sold, 0) end)`
+		shippingBalance := fmt.Sprintf(`greatest(0, least(shl.qty::float8, (%s)::float8))`, balanceExpr)
 
 		where := `sh.tenant_id = $1 and sh.sales_order_id is not null
 			and coalesce(sh.status, 'draft') not in ('cancelled')
@@ -98,8 +96,8 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := fmt.Sprintf(`
 			select distinct on (sh.id, ln.id)
-			  sh.id, sh.shipping_no, sh.shipping_date, so.id, ln.id,
-			  so.order_date, so.date_seq, so.sales_order_no,
+			  sh.id, sh.shipping_no, sh.shipping_date, coalesce(sh.status, 'draft'), so.id, ln.id,
+			  so.order_date, so.date_seq, so.sales_order_no, so.progress_status,
 			  p.company_name, so.location_id, l.location_name, so.partner_id,
 			  so.tax_type_id, so.currency_id, so.pic_name,
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
@@ -120,12 +118,6 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  group by sales_order_line_id
 			) rel on rel.sales_order_line_id = ln.id
 			left join (
-			  select sales_order_line_id, sum(qty) as delivered
-			  from public.so_sales_order_slip_lines
-			  where slip_type = 'delivery_receipt'
-			  group by sales_order_line_id
-			) dr on dr.sales_order_line_id = ln.id
-			left join (
 			  select sales_order_line_id, sum(qty) as sold
 			  from public.so_sales_order_slip_lines
 			  where slip_type = 'sales'
@@ -134,7 +126,7 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			where %s
 			order by sh.id, ln.id, sh.shipping_date desc
 			limit $%d offset $%d`, shippingBalance, where, argN, argN+1)
-		args = append(args, p.PageSize, offset)
+		args = append(args, pageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -150,8 +142,8 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var shipDate, orderDate time.Time
 			var dateSeq int
 			if err := rows.Scan(
-				&row.ShippingOrderID, &row.ShippingNo, &shipDate, &row.SalesOrderID, &row.SalesOrderLineID,
-				&orderDate, &dateSeq, &row.SalesOrderNo,
+				&row.ShippingOrderID, &row.ShippingNo, &shipDate, &row.Status, &row.SalesOrderID, &row.SalesOrderLineID,
+				&orderDate, &dateSeq, &row.SalesOrderNo, &row.SalesOrderStatus,
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
@@ -164,7 +156,7 @@ func listOpenShippingSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
 			out = append(out, row)
 		}
-		response.OKList(w, out, p.Page, p.PageSize, total)
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }
 

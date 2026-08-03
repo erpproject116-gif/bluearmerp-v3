@@ -132,6 +132,7 @@ type openPOLineRow struct {
 	PurchaseOrderLineID int64   `json:"purchase_order_line_id"`
 	PurchaseOrderID     int64   `json:"purchase_order_id"`
 	PurchaseOrderNo     string  `json:"purchase_order_no"`
+	Status              string  `json:"status"`
 	PartnerID           int64   `json:"partner_id"`
 	PartnerName         string  `json:"partner_name"`
 	ItemID              int64   `json:"item_id"`
@@ -148,8 +149,10 @@ type openPOLineRow struct {
 func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		// Load Slip lists all open PO billed residuals (draft + confirmed family).
+		// Cancelled POs stay excluded. No partner/date filter unless the client sends one.
 		where := `po.tenant_id = $1 and po.deleted_at is null
-			and po.status in ('confirmed', 'partially_received', 'received')`
+			and po.status in ('draft', 'confirmed', 'partially_received', 'received')`
 		args := []any{tu.TenantID}
 		argN := 2
 		if pid, ok := optionalInt64Query(r, "partner_id"); ok {
@@ -177,7 +180,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 		where, args, argN = f.Apply(where, args, argN, "", "po.order_date", "po.purchase_order_no")
 
 		q := fmt.Sprintf(`
-			select pol.id, po.id, po.purchase_order_no,
+			select pol.id, po.id, po.purchase_order_no, po.status,
 			  po.partner_id, coalesce(p.company_name, ''),
 			  pol.item_id, pol.item_code, pol.item_name,
 			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
@@ -203,7 +206,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row openPOLineRow
 			if err := rows.Scan(
-				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo,
+				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo, &row.Status,
 				&row.PartnerID, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
@@ -225,9 +228,11 @@ type openSupplierQuotationInvoiceLineRow struct {
 	PurchaseOrderLineID     int64   `json:"purchase_order_line_id"`
 	PurchaseOrderID         int64   `json:"purchase_order_id"`
 	PurchaseOrderNo         string  `json:"purchase_order_no"`
+	POStatus                string  `json:"po_status"`
 	SupplierQuotationID     int64   `json:"supplier_quotation_id"`
 	SupplierQuotationLineID int64   `json:"supplier_quotation_line_id"`
 	QuoteNo                 string  `json:"quote_no"`
+	QuoteStatus             string  `json:"quote_status"`
 	RFQID                   int64   `json:"rfq_id"`
 	ItemID                  int64   `json:"item_id"`
 	ItemCode                string  `json:"item_code"`
@@ -244,7 +249,7 @@ func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc 
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		where := `po.tenant_id = $1 and po.deleted_at is null
-			and po.status in ('confirmed', 'partially_received', 'received')
+			and po.status in ('draft', 'confirmed', 'partially_received', 'received')
 			and pol.supplier_quotation_line_id is not null`
 		args := []any{tu.TenantID}
 		argN := 2
@@ -255,8 +260,8 @@ func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc 
 		}
 
 		q := fmt.Sprintf(`
-			select pol.id, po.id, po.purchase_order_no,
-			  sq.id, ln.id, sq.quote_no, sq.rfq_id,
+			select pol.id, po.id, po.purchase_order_no, po.status,
+			  sq.id, ln.id, sq.quote_no, sq.status, sq.rfq_id,
 			  pol.item_id, pol.item_code, pol.item_name,
 			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
 			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
@@ -282,8 +287,8 @@ func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc 
 		for rows.Next() {
 			var row openSupplierQuotationInvoiceLineRow
 			if err := rows.Scan(
-				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo,
-				&row.SupplierQuotationID, &row.SupplierQuotationLineID, &row.QuoteNo, &row.RFQID,
+				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo, &row.POStatus,
+				&row.SupplierQuotationID, &row.SupplierQuotationLineID, &row.QuoteNo, &row.QuoteStatus, &row.RFQID,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
 				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial,

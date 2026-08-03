@@ -3,7 +3,34 @@ package sales
 import (
 	"strings"
 	"testing"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 )
+
+func TestSalesUsesDeliveryBalance(t *testing.T) {
+	cases := []struct {
+		name    string
+		legacy  bool
+		require bool
+		want    bool
+	}{
+		{name: "legacy combined", legacy: true, require: false, want: false},
+		{name: "split without DR gate", legacy: false, require: false, want: false},
+		{name: "split with DR gate", legacy: false, require: true, want: true},
+		{name: "legacy ignores DR gate", legacy: true, require: true, want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := salesUsesDeliveryBalance(processpolicy.Policy{
+				LegacyCombinedSORelease:     tc.legacy,
+				SalesRequireDeliveryReceipt: tc.require,
+			})
+			if got != tc.want {
+				t.Fatalf("got %v want %v", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestBalanceExpr_releaseMode(t *testing.T) {
 	got := balanceExpr(false)

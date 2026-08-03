@@ -87,6 +87,7 @@ export type OpenPOLine = {
   purchase_order_line_id: number;
   purchase_order_id: number;
   purchase_order_no: string;
+  status?: string;
   partner_id?: number;
   partner_name?: string;
   item_id: number;
@@ -104,6 +105,8 @@ export type OpenSupplierQuotationInvoiceLine = OpenPOLine & {
   supplier_quotation_id: number;
   supplier_quotation_line_id: number;
   quote_no: string;
+  quote_status?: string;
+  po_status?: string;
   rfq_id: number;
 };
 
