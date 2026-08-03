@@ -20,6 +20,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/taxcalc"
 )
@@ -1060,6 +1061,7 @@ type openSalesOrderSlipLine struct {
 	SalesOrderLineID int64    `json:"sales_order_line_id"`
 	DateNoDisplay    string   `json:"date_no_display"`
 	ReferenceNo      string   `json:"reference_no"`
+	ProgressStatus   string   `json:"progress_status"`
 	CustomerName     string   `json:"customer_name"`
 	LocationID       int64    `json:"location_id"`
 	LocationName     string   `json:"location_name"`
@@ -1092,7 +1094,8 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			"customer_name": "pt.company_name",
 			"item_code":     "ln.item_code",
 		})
-		offset := httputil.Offset(p)
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 
 		where := `so.tenant_id = $1 and so.deleted_at is null
 			and so.progress_status in ('in_progress', 'completed')
@@ -1119,7 +1122,7 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		where += dsScope
 
 		q := fmt.Sprintf(`
-			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no,
+			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no, so.progress_status,
 			  pt.company_name, so.location_id, l.location_name, so.partner_id,
 			  so.tax_type_id, so.currency_id, so.pic_name,
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
@@ -1143,7 +1146,7 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			where %s
 			order by so.order_date desc, ln.line_no asc
 			limit $%d offset $%d`, where, argN, argN+1)
-		args = append(args, p.PageSize, offset)
+		args = append(args, pageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -1159,7 +1162,7 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var orderDate time.Time
 			var dateSeq int
 			if err := rows.Scan(
-				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.ReferenceNo,
+				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.ReferenceNo, &row.ProgressStatus,
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
@@ -1171,7 +1174,7 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
 			out = append(out, row)
 		}
-		response.OKList(w, out, p.Page, p.PageSize, total)
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }
 

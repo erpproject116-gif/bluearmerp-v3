@@ -108,7 +108,7 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 			return 0, docflowValidation(v)
 		}
 	}
-	useDelivery := !policy.LegacyCombinedSORelease
+	useDelivery := salesUsesDeliveryBalance(policy)
 
 	var taxTypeID, currencyID, partnerID, locationID int64
 	var picUserID, projectID *int64
@@ -142,6 +142,7 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		  (%s)::float8
 		from public.so_sales_order_lines ln
 		join public.so_sales_orders so on so.id = ln.sales_order_id
+		left join public.inv_items i on i.id = ln.item_id
 		left join (
 		  select sales_order_line_id, sum(release_qty) as released
 		  from public.so_sales_order_release_lines
@@ -210,7 +211,7 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		lineBodies = append(lineBodies, body)
 	}
 	if len(lineBodies) == 0 {
-		msg := "No released balance available on this sales order."
+		msg := "No open sales order quantity available on this sales order."
 		if useDelivery {
 			msg = "No delivered balance available on this sales order."
 		}

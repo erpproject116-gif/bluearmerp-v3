@@ -4,12 +4,14 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
 import { formatMoney } from "../../../shared/money";
 import { LoadingText } from "../../../shared/LoadingText";
+import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 
 export type OpenPurchaseRequestLineRow = {
   purchase_request_id: number;
   purchase_request_line_id: number;
   date_no_display: string;
   reference_no: string;
+  progress_status?: string;
   location_id: number;
   location_name: string;
   tax_type_id: number;
@@ -58,7 +60,7 @@ export function PurchaseRequestLinePickerModal(props: Props) {
   const [q, setQ] = createSignal("");
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
-  const pageSize = 50;
+  const pageSize = 500;
 
   const [data] = createResource(
     () => (props.open ? { q: q(), page: page() } : null),
@@ -143,6 +145,7 @@ export function PurchaseRequestLinePickerModal(props: Props) {
                         </th>
                         <th class="py-2 pr-4">Date-No</th>
                         <th class="py-2 pr-4">Reference</th>
+                        <th class="py-2 pr-4">Status</th>
                         <th class="py-2 pr-4">Vendor</th>
                         <th class="py-2 pr-4">Item</th>
                         <th class="py-2 text-right">Balance</th>
@@ -165,6 +168,7 @@ export function PurchaseRequestLinePickerModal(props: Props) {
                             </td>
                             <td class="py-2 pr-4">{row.date_no_display}</td>
                             <td class="py-2 pr-4">{row.reference_no}</td>
+                            <td class="py-2 pr-4">{openSlipDocStatusLabel(row.progress_status)}</td>
                             <td class="py-2 pr-4">{row.partner_name}</td>
                             <td class="py-2 pr-4">
                               {row.item_code} — {row.item_name}

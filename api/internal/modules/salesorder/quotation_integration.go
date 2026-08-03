@@ -22,6 +22,7 @@ type openQuotationLineRow struct {
 	QuotationLineID int64  `json:"quotation_line_id"`
 	DateNoDisplay  string  `json:"date_no_display"`
 	ReferenceNo    string  `json:"reference_no"`
+	ProgressStatus string  `json:"progress_status"`
 	CustomerName   string  `json:"customer_name"`
 	LocationID     int64   `json:"location_id"`
 	LocationName   string  `json:"location_name"`
@@ -50,8 +51,11 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			"customer_name": "p.company_name",
 			"item_code":     "ln.item_code",
 		})
-		offset := httputil.Offset(p)
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 
+		// Load Slip lists every open quotation residual by default (no partner/date).
+		// Free-text lines still need an inventory item_id for conversion.
 		where := `q.tenant_id = $1 and q.deleted_at is null
 			and ln.item_id is not null
 			and (ln.qty - coalesce(slip.qty_fulfilled, 0)) > 0.0001`
@@ -82,7 +86,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 		where += dsScope
 
 		q := fmt.Sprintf(`
-			select q.id, ln.id, q.order_date, q.date_seq, q.reference_no,
+			select q.id, ln.id, q.order_date, q.date_seq, q.reference_no, q.progress_status,
 			  p.company_name, q.location_id, l.location_name, q.partner_id,
 			  q.tax_type_id, q.currency_id, q.pic_name,
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
@@ -103,7 +107,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			where %s
 			order by q.order_date desc, ln.line_no asc
 			limit $%d offset $%d`, where, argN, argN+1)
-		args = append(args, p.PageSize, offset)
+		args = append(args, pageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -119,7 +123,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var orderDate time.Time
 			var dateSeq int
 			if err := rows.Scan(
-				&row.QuotationID, &row.QuotationLineID, &orderDate, &dateSeq, &row.ReferenceNo,
+				&row.QuotationID, &row.QuotationLineID, &orderDate, &dateSeq, &row.ReferenceNo, &row.ProgressStatus,
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
@@ -134,7 +138,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 		if out == nil {
 			out = []openQuotationLineRow{}
 		}
-		response.OKList(w, out, p.Page, p.PageSize, total)
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }
 

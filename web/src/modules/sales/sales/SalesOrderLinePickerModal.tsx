@@ -5,12 +5,14 @@ import {
   buildOpenLineQuery,
   type OpenMonitorFilters,
 } from "../../../shared/OpenTransactionMonitor";
+import { openSlipSalesOrderStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 
 export type OpenSalesOrderLineRow = {
   sales_order_id: number;
   sales_order_line_id: number;
   date_no_display: string;
   sales_order_no: string;
+  progress_status?: string;
   customer_name: string;
   location_id: number;
   location_name: string;
@@ -27,6 +29,7 @@ export type OpenSalesOrderLineRow = {
   item_name: string;
   description?: string | null;
   released_qty: number;
+  delivered_qty?: number;
   balance_qty: number;
   unit_id?: number | null;
   unit_code?: string | null;
@@ -47,7 +50,7 @@ type Props = {
   partnerLabel?: string;
 };
 
-const pageSize = 100;
+const pageSize = 500;
 
 export function SalesOrderLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -136,10 +139,19 @@ export function SalesOrderLinePickerModal(props: Props) {
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
       onApply={confirm}
-      emptyHint="No confirmed Sales Order lines with open qty. Confirm the SO (progress Confirmed/Complete). If your store requires Delivery Receipt before invoice, post a DR first. Clear Search/Doc No, use Clear dates, or check that your user data scope includes that customer. Serial-tracked items need Pick List release first."
+      emptyHint="No confirmed Sales Order lines with open qty. Confirm the SO (progress Confirmed/Complete). Clear Search/Doc No or dates if filtered. Serial-tracked items need Pick List release first. Check that your user data scope includes that customer."
       columns={[
         { key: "date_no", header: "Date-No.", cell: (r) => String(r.date_no_display ?? "") },
         { key: "so", header: "SO No.", cell: (r) => String(r.sales_order_no ?? "") },
+        {
+          key: "status",
+          header: "Status",
+          cell: (r) =>
+            openSlipSalesOrderStatusLabel(
+              String(r.progress_status ?? ""),
+              Number(r.delivered_qty ?? 0),
+            ),
+        },
         { key: "customer", header: "Customer", cell: (r) => String(r.customer_name ?? "") },
         { key: "item", header: "Item", cell: (r) => `${r.item_code ?? ""} ${r.item_name ?? ""}` },
         { key: "bal", header: "Balance", class: "text-right", cell: (r) => Number(r.balance_qty ?? 0) },

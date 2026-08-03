@@ -20,11 +20,19 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
+// salesUsesDeliveryBalance is true only when split fulfillment is on AND the
+// tenant requires a Delivery Receipt before invoicing. Otherwise Sales can draw
+// against ordered residual (Load Slip / Convert from SO).
+func salesUsesDeliveryBalance(p processpolicy.Policy) bool {
+	return !p.LegacyCombinedSORelease && p.SalesRequireDeliveryReceipt
+}
+
 type openSalesOrderLineRow struct {
 	SalesOrderID         int64   `json:"sales_order_id"`
 	SalesOrderLineID     int64   `json:"sales_order_line_id"`
 	DateNoDisplay        string  `json:"date_no_display"`
 	SalesOrderNo         string  `json:"sales_order_no"`
+	ProgressStatus       string  `json:"progress_status"`
 	CustomerName         string  `json:"customer_name"`
 	LocationID           int64   `json:"location_id"`
 	LocationName         string  `json:"location_name"`
@@ -53,35 +61,26 @@ type openSalesOrderLineRow struct {
 func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
-			return
-		}
-		useDelivery := !policy.LegacyCombinedSORelease
-
+		// Load Slip always lists every confirmed SO line with open residual qty
+		// (ordered − already invoiced). Delivery-receipt gating must not hide lines
+		// from the picker — process policy still applies on Save when required.
 		p := httputil.ParseListParams(r, "order_date", map[string]string{
 			"order_date":     "so.order_date",
 			"sales_order_no": "so.sales_order_no",
 			"customer_name":  "p.company_name",
 			"item_code":      "ln.item_code",
 		})
-		offset := httputil.Offset(p)
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 
+		// Open residual for Load Slip: normal items = ordered − sold; serial = released − sold.
 		where := `so.tenant_id = $1 and so.deleted_at is null
-			and so.progress_status in ('in_progress', 'completed')`
-		if useDelivery {
-			where += ` and coalesce(dr.delivered, 0) > 0.0001
-				and (coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)) > 0.0001`
-		} else {
-			// Legacy combined mode: invoiceable = ordered − sold for normal items.
-			// Serial-tracked items still require Pick List release first.
-			where += ` and (
+			and so.progress_status in ('in_progress', 'completed')
+			and (
 				(coalesce(i.track_serial, false) = false and (ln.qty - coalesce(slip.sold, 0)) > 0.0001)
 				or (coalesce(i.track_serial, false) = true
 					and coalesce(rel.released, 0) - coalesce(slip.sold, 0) > 0.0001)
 			)`
-		}
 		args := []any{tu.TenantID}
 		argN := 2
 
@@ -109,7 +108,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		where += dsScope
 
 		q := fmt.Sprintf(`
-			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no,
+			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no, so.progress_status,
 			  p.company_name, so.location_id, l.location_name, so.partner_id,
 			  so.tax_type_id, so.currency_id, so.pic_name,
 			  so.project_id, coalesce(so.project_name, ''),
@@ -146,8 +145,8 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			) slip on slip.sales_order_line_id = ln.id
 			where %s
 			order by so.order_date desc, ln.line_no asc
-			limit $%d offset $%d`, balanceExpr(useDelivery), where, argN, argN+1)
-		args = append(args, p.PageSize, offset)
+			limit $%d offset $%d`, balanceExpr(false), where, argN, argN+1)
+		args = append(args, pageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -163,7 +162,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var orderDate time.Time
 			var dateSeq int
 			if err := rows.Scan(
-				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.SalesOrderNo,
+				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.SalesOrderNo, &row.ProgressStatus,
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ProjectID, &row.ProjectName, &row.PaymentTerms, &row.Notes,
@@ -181,7 +180,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		if out == nil {
 			out = []openSalesOrderLineRow{}
 		}
-		response.OKList(w, out, p.Page, p.PageSize, total)
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }
 
@@ -274,7 +273,7 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 	if err != nil {
 		return map[string]string{"body": "Failed to load process policies."}
 	}
-	useDelivery := !policy.LegacyCombinedSORelease
+	useDelivery := salesUsesDeliveryBalance(policy)
 	errs := map[string]string{}
 	for i, ln := range lines {
 		if ln.SourceSalesOrderLineID == nil {
@@ -318,7 +317,7 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 			errs[fmt.Sprintf("lines[%d].qty", i)] = msg
 			continue
 		}
-		if policy.SalesRequireDeliveryReceipt && useDelivery {
+		if useDelivery {
 			var delivered float64
 			_ = pool.QueryRow(ctx, `
 				select coalesce(delivered_qty, 0)::float8 from public.so_sales_order_lines where id = $1`,

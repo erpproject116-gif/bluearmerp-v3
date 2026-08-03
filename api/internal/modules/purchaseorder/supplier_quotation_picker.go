@@ -9,6 +9,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -19,6 +20,7 @@ type openSupplierQuotationSlipLine struct {
 	RFQRequestLineID        *int64  `json:"rfq_request_line_id,omitempty"`
 	QuoteNo                 string  `json:"quote_no"`
 	QuoteDate               string  `json:"quote_date"`
+	Status                  string  `json:"status"`
 	PartnerID               int64   `json:"partner_id"`
 	PartnerName             string  `json:"partner_name"`
 	TaxTypeID               *int64  `json:"tax_type_id,omitempty"`
@@ -45,10 +47,12 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			"partner_name": "p.company_name",
 			"item_code":    "coalesce(rl.item_code, '')",
 		})
-		offset := httputil.Offset(p)
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 
+		// Load Slip lists pending/open supplier quotes (exclude rejected). No vendor filter by default.
 		// Item code/name live on rfq_request_lines (supplier quotation lines only store item_id).
-		where := `sq.tenant_id = $1 and sq.status in ('accepted', 'received')
+		where := `sq.tenant_id = $1 and sq.status in ('draft', 'received', 'accepted')
 			and (ln.qty - coalesce(ord.ordered, 0)) > 0.0001
 			and coalesce(ln.item_id, rl.item_id) is not null`
 		args := []any{tu.TenantID}
@@ -70,7 +74,7 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := fmt.Sprintf(`
 			select sq.id, ln.id, sq.rfq_id, ln.rfq_request_line_id,
-			  sq.quote_no, sq.quote_date, sq.partner_id, p.company_name,
+			  sq.quote_no, sq.quote_date, sq.status, sq.partner_id, p.company_name,
 			  pr.tax_type_id, pr.currency_id, pr.location_id, coalesce(l.location_name, ''),
 			  coalesce(pr.pic_name, ''),
 			  coalesce(ln.item_id, rl.item_id),
@@ -98,7 +102,7 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			where %s
 			order by sq.quote_date desc, ln.line_no asc
 			limit $%d offset $%d`, where, argN, argN+1)
-		args = append(args, p.PageSize, offset)
+		args = append(args, pageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -114,7 +118,7 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var quoteDate time.Time
 			if err := rows.Scan(
 				&row.SupplierQuotationID, &row.SupplierQuotationLineID, &row.RFQID, &row.RFQRequestLineID,
-				&row.QuoteNo, &quoteDate, &row.PartnerID, &row.PartnerName,
+				&row.QuoteNo, &quoteDate, &row.Status, &row.PartnerID, &row.PartnerName,
 				&row.TaxTypeID, &row.CurrencyID, &row.LocationID, &row.LocationName, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitPrice, &total,
@@ -125,6 +129,6 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			row.QuoteDate = quoteDate.Format("2006-01-02")
 			out = append(out, row)
 		}
-		response.OKList(w, out, p.Page, p.PageSize, total)
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }

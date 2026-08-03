@@ -5,6 +5,7 @@ import {
   buildOpenLineQuery,
   type OpenMonitorFilters,
 } from "../../../shared/OpenTransactionMonitor";
+import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 import type { OpenPOLine } from "../../../shared/useSupplierInvoiceList";
 
 type Props = {
@@ -17,7 +18,7 @@ type Props = {
   mapOnly?: boolean;
 };
 
-const pageSize = 100;
+const pageSize = 500;
 
 export function OpenPOLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -109,6 +110,11 @@ export function OpenPOLinePickerModal(props: Props) {
           cell: (r) => String(r.purchase_order_no ?? ""),
         },
         {
+          key: "status",
+          header: "Status",
+          cell: (r) => openSlipDocStatusLabel(String(r.status ?? "")),
+        },
+        {
           key: "partner",
           header: "Vendor",
           cell: (r) => String(r.partner_name ?? ""),
@@ -139,7 +145,7 @@ export function OpenPOLinePickerModal(props: Props) {
       ]}
       onApply={apply}
       applyLabel={props.mapOnly ? "Map selected lines" : undefined}
-      emptyHint="No confirmed Purchase Order lines with open billed qty. Confirm the PO first, clear date/vendor filters, or use Load Slip → Goods Receipt for serial/lot items and when GR-before-invoice policy is on."
+      emptyHint="No Purchase Order lines with open billed qty. Clear Search/Doc No or dates if filtered. Serial/lot items and GR-before-invoice policy still require Load Slip → Goods Receipt at Save time."
     />
   );
 }

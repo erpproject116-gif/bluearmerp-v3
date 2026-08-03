@@ -3,12 +3,14 @@ import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
 import { LoadingText } from "../../../shared/LoadingText";
+import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 
 export type OpenSalesOrderLineRow = {
   sales_order_id: number;
   sales_order_line_id: number;
   date_no_display: string;
   reference_no: string;
+  progress_status?: string;
   customer_name: string;
   location_id: number;
   location_name: string;
@@ -50,7 +52,7 @@ export function SalesOrderLinePickerModal(props: Props) {
   const [q, setQ] = createSignal("");
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
-  const pageSize = 50;
+  const pageSize = 500;
 
   const [data] = createResource(
     () => (props.open ? { q: q(), page: page() } : null),
@@ -130,6 +132,7 @@ export function SalesOrderLinePickerModal(props: Props) {
                         </th>
                         <th class="py-2 pr-4">Date-No</th>
                         <th class="py-2 pr-4">Reference</th>
+                        <th class="py-2 pr-4">Status</th>
                         <th class="py-2 pr-4">Customer</th>
                         <th class="py-2 pr-4">Item</th>
                         <th class="py-2 text-right">Balance</th>
@@ -152,6 +155,7 @@ export function SalesOrderLinePickerModal(props: Props) {
                             </td>
                             <td class="py-2 pr-4">{row.date_no_display}</td>
                             <td class="py-2 pr-4">{row.reference_no}</td>
+                            <td class="py-2 pr-4">{openSlipDocStatusLabel(row.progress_status)}</td>
                             <td class="py-2 pr-4">{row.customer_name}</td>
                             <td class="py-2 pr-4">
                               {row.item_code} — {row.item_name}

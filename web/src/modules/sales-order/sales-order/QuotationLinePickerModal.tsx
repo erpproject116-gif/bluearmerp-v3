@@ -5,12 +5,14 @@ import {
   buildOpenLineQuery,
   type OpenMonitorFilters,
 } from "../../../shared/OpenTransactionMonitor";
+import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 
 export type OpenQuotationLineRow = {
   quotation_id: number;
   quotation_line_id: number;
   date_no_display: string;
   reference_no: string;
+  progress_status?: string;
   customer_name: string;
   location_id: number;
   location_name: string;
@@ -42,7 +44,7 @@ type Props = {
   partnerLabel?: string;
 };
 
-const pageSize = 100;
+const pageSize = 500;
 
 export function QuotationLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -133,10 +135,15 @@ export function QuotationLinePickerModal(props: Props) {
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
       onApply={confirm}
-      emptyHint="No open quotation lines with registered inventory items. Free-text quotation lines must be linked to Inventory items before Load Slip → Sales Order. Clear date/customer filters if needed."
+      emptyHint="No open quotation lines with registered inventory items. Free-text quotation lines must be linked to Inventory items before Load Slip. Clear Search/Doc No or dates if filtered."
       columns={[
         { key: "date_no", header: "Date-No.", cell: (r) => String(r.date_no_display ?? "") },
         { key: "ref", header: "Quotation", cell: (r) => String(r.reference_no ?? "") },
+        {
+          key: "status",
+          header: "Status",
+          cell: (r) => openSlipDocStatusLabel(String(r.progress_status ?? "")),
+        },
         { key: "customer", header: "Customer", cell: (r) => String(r.customer_name ?? "") },
         { key: "item", header: "Item", cell: (r) => `${r.item_code ?? ""} ${r.item_name ?? ""}` },
         { key: "bal", header: "Balance", class: "text-right", cell: (r) => Number(r.balance_qty ?? 0) },

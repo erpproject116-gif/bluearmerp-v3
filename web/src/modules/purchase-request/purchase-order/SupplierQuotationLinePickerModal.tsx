@@ -4,6 +4,7 @@ import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
 import { formatMoney } from "../../../shared/money";
 import { LoadingText } from "../../../shared/LoadingText";
+import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 
 export type OpenSupplierQuotationLineRow = {
   supplier_quotation_id: number;
@@ -12,6 +13,7 @@ export type OpenSupplierQuotationLineRow = {
   rfq_request_line_id?: number | null;
   quote_no: string;
   quote_date: string;
+  status?: string;
   partner_id: number;
   partner_name: string;
   tax_type_id?: number | null;
@@ -53,7 +55,7 @@ export function SupplierQuotationLinePickerModal(props: Props) {
   const [q, setQ] = createSignal("");
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
-  const pageSize = 50;
+  const pageSize = 500;
 
   const [data] = createResource(
     () => (props.open ? { q: q(), page: page() } : null),
@@ -123,7 +125,7 @@ export function SupplierQuotationLinePickerModal(props: Props) {
                 <>
                   <Show when={payload().rows.length === 0}>
                     <p class="mb-3 text-sm text-amber-800">
-                      No open RFQ / supplier quotation lines with registered inventory items. Register free-text RFQ products in Inventory, accept the supplier quote, then retry Load Slip.
+                      No open RFQ / supplier quotation lines with registered inventory items. Register free-text RFQ products in Inventory, then retry Load Slip (draft, received, and accepted quotes are listed).
                     </p>
                   </Show>
                   <table class="erp-grid min-w-full text-sm">
@@ -137,6 +139,7 @@ export function SupplierQuotationLinePickerModal(props: Props) {
                           />
                         </th>
                         <th class="py-2 pr-4">Quote</th>
+                        <th class="py-2 pr-4">Status</th>
                         <th class="py-2 pr-4">Vendor</th>
                         <th class="py-2 pr-4">Item</th>
                         <th class="py-2 text-right">Balance</th>
@@ -158,6 +161,7 @@ export function SupplierQuotationLinePickerModal(props: Props) {
                               />
                             </td>
                             <td class="py-2 pr-4">{row.quote_no}</td>
+                            <td class="py-2 pr-4">{openSlipDocStatusLabel(row.status)}</td>
                             <td class="py-2 pr-4">{row.partner_name}</td>
                             <td class="py-2 pr-4">
                               {row.item_code} — {row.item_name}

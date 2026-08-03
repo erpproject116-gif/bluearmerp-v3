@@ -2,6 +2,7 @@ import { createResource, createSignal, For, Show, createEffect } from "solid-js"
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
+import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 import type { OpenSupplierQuotationInvoiceLine } from "../../../shared/useSupplierInvoiceList";
 
 type Props = {
@@ -108,7 +109,9 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
                 <tr>
                   <th class="py-2 pr-2" />
                   <th class="py-2 pr-2">Quote</th>
+                  <th class="py-2 pr-2">Quote status</th>
                   <th class="py-2 pr-2">PO</th>
+                  <th class="py-2 pr-2">PO status</th>
                   <th class="py-2 pr-2">Item</th>
                   <th class="py-2 pr-2 text-right">Balance</th>
                   <th class="py-2 text-right">Unit (VAT inc.)</th>
@@ -126,7 +129,9 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
                         />
                       </td>
                       <td class="py-2 pr-2">{row.quote_no}</td>
+                      <td class="py-2 pr-2">{openSlipDocStatusLabel(row.quote_status)}</td>
                       <td class="py-2 pr-2">{row.purchase_order_no}</td>
+                      <td class="py-2 pr-2">{openSlipDocStatusLabel(row.po_status ?? row.status)}</td>
                       <td class="py-2 pr-2">
                         {row.item_code} — {row.item_name}
                       </td>
