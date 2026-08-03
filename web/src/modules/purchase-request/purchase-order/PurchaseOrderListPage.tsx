@@ -22,6 +22,7 @@ import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { toastAttachmentRequired } from "../../../shared/useProcessPolicy";
