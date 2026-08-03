@@ -22,6 +22,8 @@ const (
 	SASIExceedsDelivered  = "SA_SI_EXCEEDS_DELIVERED"
 	SAJEMustBalance       = "SA_JE_MUST_BALANCE"
 	SABackdatedPostBlocked = "SA_BACKDATED_POST_BLOCKED"
+	SAAttachmentRequired   = "SA_ATTACHMENT_REQUIRED"
+	SAPONotConfirmed       = "SA_PO_NOT_CONFIRMED"
 )
 
 const (
@@ -33,6 +35,9 @@ const (
 	hrefOfficialReceipts = "/app/finance/official-receipts"
 	hrefJournalEntries   = "/app/finance/acct-i/journal-entries"
 	hrefPurchaseOrders   = "/app/purchase-order/purchase-orders"
+	hrefProcessPolicies  = "/app/user-management/process-policies"
+	hrefSOFormSettings   = "/app/sales-order/sales-orders/settings"
+	hrefPOFormSettings   = "/app/purchase-order/purchase-orders/settings"
 )
 
 // ValidationSmart is Validation, attaching Assist when the error text matches a known SA rule.
@@ -188,6 +193,27 @@ func AssistFromMessage(field, msg string) *Assist {
 			Title:  "Journal entry must balance",
 			Detail: m,
 			Actions: []AssistAction{{Label: "Open Journal entries", Href: hrefJournalEntries}},
+		}
+	case strings.Contains(lower, "attachment is required"):
+		href := hrefSOFormSettings
+		if strings.Contains(lower, "purchase") {
+			href = hrefPOFormSettings
+		}
+		return &Assist{
+			Code: SAAttachmentRequired, Field: field,
+			Title:  "Attachment required before confirm",
+			Detail: m,
+			Actions: []AssistAction{
+				{Label: "Open Form settings", Href: href},
+				{Label: "All process policies", Href: hrefProcessPolicies},
+			},
+		}
+	case strings.Contains(lower, "still unconfirmed") || strings.Contains(lower, "not found or not confirmed") || strings.Contains(lower, "confirm the purchase order"):
+		return &Assist{
+			Code: SAPONotConfirmed, Field: field,
+			Title:  "Purchase order must be confirmed first",
+			Detail: m,
+			Actions: []AssistAction{{Label: "Open Purchase Orders", Href: hrefPurchaseOrders}},
 		}
 	default:
 		return nil

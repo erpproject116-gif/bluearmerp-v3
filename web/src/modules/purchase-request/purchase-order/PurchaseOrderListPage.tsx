@@ -22,7 +22,9 @@ import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
-import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
+import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
+import { toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 
 const OPERATIONAL_STATUS_TABS = [
   { value: "", label: "All statuses" },
@@ -325,10 +327,15 @@ export default function PurchaseOrderListPage() {
   const onConfirm = async (row: PurchaseOrderRow) => {
     const res = await confirmPurchaseOrder(row.id);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to confirm purchase order.");
+      const attachMsg = res.errors?.attachments;
+      if (attachMsg) {
+        toastAttachmentRequired(toast, "purchase_order", attachMsg);
+        return;
+      }
+      handleSaveResult(res, toast);
       return;
     }
-    toast.success("Purchase order confirmed.");
+    toast.success("Purchase order confirmed. Progress is now Completed — you can bill it from Purchases Load Slip.");
     invalidate();
   };
 
@@ -403,7 +410,24 @@ export default function PurchaseOrderListPage() {
             key: "progress_status",
             header: "Progress",
             sortable: false,
-            render: (r) => <span>{docProgressStatusLabel(r.progress_status)}</span>,
+            render: (r) => (
+              <Show
+                when={r.status === "draft"}
+                fallback={<span>{docProgressStatusLabel(r.progress_status)}</span>}
+              >
+                <button
+                  type="button"
+                  class="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                  title="Confirm this PO (requires attachment if Process / Form settings say so)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void onConfirm(r);
+                  }}
+                >
+                  Unconfirmed → Confirm
+                </button>
+              </Show>
+            ),
           },
           {
             key: "status",
@@ -464,6 +488,7 @@ export default function PurchaseOrderListPage() {
           setPoModalOpen(true);
         }}
         newLabel="New Purchase Order"
+        settingsHref={PURCHASE_REQUEST_SETTINGS_HREF.purchaseOrder}
         codeKey="purchase_order_no"
         nameKey="date_no_display"
         sortKey={sort()}

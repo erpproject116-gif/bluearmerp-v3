@@ -29,7 +29,7 @@ import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } 
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { fetchQuotationPrint } from "./quotationPrint";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
-import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
@@ -573,7 +573,7 @@ export function QuotationModal(props: Props) {
       effectiveEditing()?.id,
     );
     if (attachmentErr) {
-      toast.warning(attachmentErr);
+      toastAttachmentRequired(toast, "quotation", attachmentErr);
       return;
     }
 

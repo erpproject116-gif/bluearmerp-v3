@@ -697,14 +697,29 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Load Slip → Save: copy SO attachments onto the new sale (same as CreateFromSalesOrder).
+		// Load Slip → Save: copy originating SO attachments (header source and/or line sources).
+		soIDs := map[int64]struct{}{}
 		if body.SourceSalesOrderID != nil && *body.SourceSalesOrderID > 0 {
+			soIDs[*body.SourceSalesOrderID] = struct{}{}
+		}
+		for _, ln := range body.Lines {
+			if ln.SourceSalesOrderLineID == nil || *ln.SourceSalesOrderLineID <= 0 {
+				continue
+			}
+			var soID int64
+			if err := pool.QueryRow(r.Context(),
+				`select sales_order_id from public.so_sales_order_lines where id = $1`,
+				*ln.SourceSalesOrderLineID).Scan(&soID); err == nil && soID > 0 {
+				soIDs[soID] = struct{}{}
+			}
+		}
+		for soID := range soIDs {
 			_ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
 				SrcBaseDir: attachmentx.Dir("sales_order"),
 				DstBaseDir: attachmentx.Dir("sales"),
 				SrcTable:   "public.so_sales_order_attachments",
 				SrcFKCol:   "sales_order_id",
-				SrcID:      *body.SourceSalesOrderID,
+				SrcID:      soID,
 				DstTable:   "public.sa_sales_attachments",
 				DstFKCol:   "sales_id",
 				DstID:      id,

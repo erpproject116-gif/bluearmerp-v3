@@ -21,7 +21,7 @@ import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
-import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm } from "../../../shared/useProcessPolicy";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
@@ -573,7 +573,7 @@ export function SupplierInvoiceModal(props: Props) {
       effectiveEditing()?.id,
     );
     if (attachmentErr) {
-      toast.warning(attachmentErr);
+      toastAttachmentRequired(toast, "supplier_invoice", attachmentErr);
       return;
     }
 

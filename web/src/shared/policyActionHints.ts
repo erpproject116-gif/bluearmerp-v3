@@ -15,9 +15,23 @@ const FIELD_HINTS: Record<string, PolicyActionHint> = {
   goods_receipt_line_id: { href: "/app/purchase-order/goods-receipt", label: "Open Goods Receipts" },
   sales_order_id: { href: "/app/dashboard/approvals", label: "Open Approvals" },
   purchase_order_id: { href: "/app/dashboard/approvals", label: "Open Approvals" },
+  attachments: { href: "/app/sales-order/setup", label: "Adjust attachment settings" },
+  purchase_order_line_id: { href: "/app/purchase-order/purchase-orders", label: "Confirm Purchase Order" },
 };
 
 const MESSAGE_HINTS: Array<{ match: RegExp; hint: PolicyActionHint }> = [
+  {
+    match: /attachment is required/i,
+    hint: { href: "/app/user-management/process-policies", label: "Turn off attachment requirement" },
+  },
+  {
+    match: /not found or not confirmed/i,
+    hint: { href: "/app/purchase-order/purchase-orders", label: "Confirm Purchase Order first" },
+  },
+  {
+    match: /confirm the purchase order/i,
+    hint: { href: "/app/purchase-order/purchase-orders", label: "Open Purchase Orders" },
+  },
   { match: /goods receipt/i, hint: { href: "/app/purchase-order/goods-receipt", label: "Open Goods Receipts" } },
   { match: /sales order/i, hint: { href: "/app/sales-order/sales-orders", label: "Open Sales Orders" } },
   { match: /quotation/i, hint: { href: "/app/quotation/quotations", label: "Open Quotations" } },
