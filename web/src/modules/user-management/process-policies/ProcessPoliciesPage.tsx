@@ -21,7 +21,7 @@ type ProcessPolicy = {
   accounts_auto_post_pv: boolean;
   accounts_auto_post_sales: boolean;
   accounts_auto_post_purchase: boolean;
-  inventory_gl_hybrid_enabled?: boolean;
+  inventory_gl_hybrid_enabled: boolean;
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
