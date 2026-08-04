@@ -26,8 +26,8 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
     help: "On = cannot invoice if the customer is over their credit limit.",
   },
   sales_require_so_approval: {
-    label: "Require approval on sales orders",
-    help: "On = manager must approve before release or invoice.",
+    label: "Require approval on sales orders (advisory)",
+    help: "Shown for process design. Fulfillment and invoicing currently proceed without blocking on SO approval.",
   },
   quotation_require_attachment: {
     label: "Require file on quotation",
@@ -46,16 +46,16 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
     help: "Off = buyers can create a purchase order directly.",
   },
   purchase_require_pr_approval: {
-    label: "Require approved purchase request",
-    help: "On = PR must be approved before it becomes a PO.",
+    label: "Require approved purchase request (advisory)",
+    help: "Shown for process design. POs may currently be created from Unconfirmed PRs.",
   },
   purchase_require_po_approval: {
-    label: "Require approval on purchase orders",
-    help: "On = PO must be approved before receive or bill.",
+    label: "Require approval on purchase orders (advisory)",
+    help: "Shown for process design. Receiving and Purchases currently proceed without blocking on PO approval.",
   },
   purchase_require_gr_before_supplier_invoice: {
     label: "Require goods receipt before supplier invoice",
-    help: "Off = you can bill the supplier without posting a receipt first.",
+    help: "On = bill only after Receiving. Off (default) = Purchases can auto-receive stock when you save.",
   },
   purchase_order_require_attachment: {
     label: "Require file on purchase order",
@@ -84,6 +84,10 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
   finance_require_je_approval: {
     label: "Require approval before posting journals",
     help: "On = journal entries must be approved before they post.",
+  },
+  inventory_gl_hybrid_enabled: {
+    label: "Hybrid inventory GL (qty-tracked items)",
+    help: "On = Receiving/Sales of qty-tracked items post Inventory / GRNI / COGS. Map Inventory, GRNI, and COGS under Chart of Accounts defaults first. Existing tenants should set opening inventory before enabling.",
   },
 };
 

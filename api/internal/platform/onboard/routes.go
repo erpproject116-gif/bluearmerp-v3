@@ -336,6 +336,24 @@ func (s *service) createTrialTenant(ctx context.Context, a trialArgs) (int64, er
 		return 0, err
 	}
 
+	// New workspaces: post sales/purchase/OR/PV journals by default and enable hybrid inventory GL.
+	if _, err := tx.Exec(ctx, `
+		insert into public.tenant_process_policies (
+		  tenant_id,
+		  accounts_auto_post_or, accounts_auto_post_pv,
+		  accounts_auto_post_sales, accounts_auto_post_purchase,
+		  inventory_gl_hybrid_enabled
+		) values ($1, true, true, true, true, true)
+		on conflict (tenant_id) do update set
+		  accounts_auto_post_or = true,
+		  accounts_auto_post_pv = true,
+		  accounts_auto_post_sales = true,
+		  accounts_auto_post_purchase = true,
+		  inventory_gl_hybrid_enabled = true,
+		  updated_at = now()`, tenantID); err != nil {
+		return 0, err
+	}
+
 	if _, err := tx.Exec(ctx, `
 		insert into public.user_active_tenant (auth_user_id, tenant_id)
 		values ($1::uuid, $2)

@@ -3,10 +3,12 @@ package sales
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inventorygl"
 )
 
 // validateSaleLotRequirements enforces lot_batch_id per item lot_policy before save.
@@ -64,10 +66,14 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 		return err
 	}
 
+	var glLines []inventorygl.Line
 	for _, p := range pending {
 		lineID, itemID := p.lineID, p.itemID
 		var trackInventory bool
-		if err := tx.QueryRow(ctx, `select track_inventory_qty from public.inv_items where id = $1`, itemID).Scan(&trackInventory); err != nil || !trackInventory {
+		var unitCost float64
+		if err := tx.QueryRow(ctx, `
+			select track_inventory_qty, coalesce(purchase_price, 0)::float8
+			from public.inv_items where id = $1`, itemID).Scan(&trackInventory, &unitCost); err != nil || !trackInventory {
 			continue
 		}
 		qty, err := inventory.BaseQtyForLine(ctx, tx, tenantID, itemID, p.unitID, p.lineQty)
@@ -103,6 +109,27 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 			tenantID, itemID, locationID, -qty, lineID, userID)
 		if err != nil {
 			return err
+		}
+		glLines = append(glLines, inventorygl.Line{
+			ItemID:         itemID,
+			Qty:            qty,
+			UnitCost:       unitCost,
+			TrackInventory: true,
+		})
+	}
+
+	if len(glLines) > 0 {
+		var orderDate time.Time
+		if err := tx.QueryRow(ctx, `
+			select order_date from public.sa_sales where id = $1 and tenant_id = $2`,
+			salesID, tenantID).Scan(&orderDate); err != nil {
+			return fmt.Errorf("sale not found for inventory GL: %w", err)
+		}
+		if _, err := inventorygl.PostIssueTx(
+			ctx, tx, tenantID, userID, orderDate,
+			"sa_sales", salesID, "Sales stock issue", glLines,
+		); err != nil {
+			return fmt.Errorf("inventory GL issue: %w", err)
 		}
 	}
 	return nil

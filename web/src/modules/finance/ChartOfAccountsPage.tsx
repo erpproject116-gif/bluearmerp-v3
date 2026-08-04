@@ -31,6 +31,9 @@ type FinanceDefaults = {
   payable_account_id?: number | null;
   sales_account_id?: number | null;
   purchase_account_id?: number | null;
+  inventory_account_id?: number | null;
+  grni_account_id?: number | null;
+  cogs_account_id?: number | null;
   input_vat_account_id?: number | null;
   output_vat_account_id?: number | null;
   commission_expense_account_id?: number | null;
@@ -87,7 +90,10 @@ const DEFAULT_SLOTS: DefaultSlot[] = [
   { key: "receivable_account_id", label: "Accounts receivable", hint: "Sales on credit, POS A/R", types: ["asset"] },
   { key: "payable_account_id", label: "Accounts payable", hint: "Supplier invoices on credit", types: ["liability"] },
   { key: "sales_account_id", label: "Sales revenue", hint: "Sales invoices and POS", types: ["income"] },
-  { key: "purchase_account_id", label: "Purchases / COGS", hint: "Supplier invoices, inventory cost", types: ["expense"] },
+  { key: "purchase_account_id", label: "Purchases (non-stock expense)", hint: "Services / non-qty items on supplier invoices", types: ["expense"] },
+  { key: "inventory_account_id", label: "Inventory asset", hint: "Qty-tracked stock on hand (e.g. 1200)", types: ["asset"] },
+  { key: "grni_account_id", label: "GRNI clearing", hint: "Goods received not invoiced (e.g. 2115)", types: ["liability"] },
+  { key: "cogs_account_id", label: "COGS (stock issues)", hint: "Debited when qty-tracked items are sold", types: ["expense"] },
   { key: "input_vat_account_id", label: "Input VAT", hint: "VAT paid to vendors (BIR)", types: ["asset"] },
   { key: "output_vat_account_id", label: "Output VAT", hint: "VAT collected on sales (BIR)", types: ["liability"] },
   { key: "commission_expense_account_id", label: "Sales commissions (expense)", hint: "Debit when commissions accrue", types: ["expense"] },
@@ -104,6 +110,9 @@ const emptyDefaults = (): FinanceDefaults => ({
   payable_account_id: null,
   sales_account_id: null,
   purchase_account_id: null,
+  inventory_account_id: null,
+  grni_account_id: null,
+  cogs_account_id: null,
   input_vat_account_id: null,
   output_vat_account_id: null,
   commission_expense_account_id: null,
@@ -280,10 +289,17 @@ export default function ChartOfAccountsPage() {
       payable_account_id: d.payable_account_id ?? null,
       sales_account_id: d.sales_account_id ?? null,
       purchase_account_id: d.purchase_account_id ?? null,
+      inventory_account_id: d.inventory_account_id ?? null,
+      grni_account_id: d.grni_account_id ?? null,
+      cogs_account_id: d.cogs_account_id ?? null,
       input_vat_account_id: d.input_vat_account_id ?? null,
       output_vat_account_id: d.output_vat_account_id ?? null,
       commission_expense_account_id: d.commission_expense_account_id ?? null,
       commission_payable_account_id: d.commission_payable_account_id ?? null,
+      ewt_payable_account_id: d.ewt_payable_account_id ?? null,
+      fwt_payable_account_id: d.fwt_payable_account_id ?? null,
+      compensation_wht_payable_account_id: d.compensation_wht_payable_account_id ?? null,
+      ewt_receivable_account_id: d.ewt_receivable_account_id ?? null,
       disabled_account_types: d.disabled_account_types ?? [],
     });
   });

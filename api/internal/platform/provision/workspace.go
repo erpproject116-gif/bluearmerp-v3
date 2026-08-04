@@ -182,6 +182,23 @@ func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArg
 		return TenantResult{}, err
 	}
 
+	if _, err := tx.Exec(ctx, `
+		insert into public.tenant_process_policies (
+		  tenant_id,
+		  accounts_auto_post_or, accounts_auto_post_pv,
+		  accounts_auto_post_sales, accounts_auto_post_purchase,
+		  inventory_gl_hybrid_enabled
+		) values ($1, true, true, true, true, true)
+		on conflict (tenant_id) do update set
+		  accounts_auto_post_or = true,
+		  accounts_auto_post_pv = true,
+		  accounts_auto_post_sales = true,
+		  accounts_auto_post_purchase = true,
+		  inventory_gl_hybrid_enabled = true,
+		  updated_at = now()`, tenantID); err != nil {
+		return TenantResult{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return TenantResult{}, err
 	}

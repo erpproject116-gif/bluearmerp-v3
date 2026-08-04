@@ -8,18 +8,19 @@ export const helpScenarioArticles: KbArticle[] = [
   // ─── MyPage / Ecount navigation ─────────────────────────────────────────
   {
     id: "mypage-flow-chart",
-    title: "Where do I start? MyPage Flow Chart",
+    title: "Where do I start? MyPage how work flows",
     scenario:
       "You do not know which screen to open for sales, purchases, cash in/out, or stock — or you opened the wrong menu and filed a ticket.",
     intro:
-      "Open Home. Use Learn to use BluearmERP for common lists and vouchers, or the Flow Chart to walk Quotation→Sales→Receipt and PR→PO→GR→Purchase→Pay. Sidebar: Stocks (Warehouse), Sell, Buy, Accounting (Ledger, Cash & AR/AP).",
+      "Open Home. Use Learn for common lists, or How work flows for Sell (New Sales → Get paid) and Buy (PO → New Purchase → Pay). Dashed steps are optional. Load Slip is a button inside New Sales / New Purchase / PO — not a separate menu. Sidebar: Stocks, Sell, Buy, Accounting.",
     blocks: [
       {
         type: "steps",
         items: [
           "Go to /app/dashboard (Home / MyPage).",
-          "Click the Flow Chart node for the step you need — do not invent a parallel screen.",
-          "After Sales save, choose Cash In; after Purchase save, choose Cash Payment — same as Ecount prompts.",
+          "Set masters once if needed: Partners, Items (qty tracking on for stock), Locations, Tax, Accounting setup.",
+          "Click a solid pill in How work flows for the screen you need — dashed pills are optional.",
+          "On New Sales / New Purchase, use Load Slip only when pulling lines from an earlier document (SO, PO, Receiving).",
           "Use Site Map (/app/dashboard/site-map) to search menu names.",
         ],
       },

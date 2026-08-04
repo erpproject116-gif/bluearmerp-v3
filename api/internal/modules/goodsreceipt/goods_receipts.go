@@ -23,6 +23,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inventorygl"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -952,6 +953,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			select grl.id, grl.purchase_order_line_id, grl.received_qty::float8,
 			  pol.qty::float8, pol.received_qty::float8,
 			  pol.item_id, pol.partner_id, pol.item_code, pol.item_name, pol.unit_id,
+			  coalesce(pol.unit_non_vat, 0)::float8,
 			  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
 			  coalesce(i.serial_policy, 'required'), coalesce(i.lot_policy, 'required'),
 			  coalesce(i.track_inventory_qty, false),
@@ -978,6 +980,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			ItemCode            string
 			ItemName            string
 			UnitID              *int64
+			UnitCost            float64
 			BaseQty             float64
 			TrackSerial         bool
 			TrackLot            bool
@@ -994,6 +997,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				&ln.ID, &ln.PurchaseOrderLineID, &ln.ReceivedQty,
 				&ln.POQty, &ln.POReceivedQty,
 				&ln.ItemID, &ln.PartnerID, &ln.ItemCode, &ln.ItemName, &ln.UnitID,
+				&ln.UnitCost,
 				&ln.TrackSerial, &ln.TrackLot, &ln.SerialPolicy, &ln.LotPolicy, &ln.TrackInventory, &ln.WarrantyMonths,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read lines.", "ERR_INTERNAL")
@@ -1239,6 +1243,26 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Validation(w, map[string]string{"received_qty": "Failed to update purchase order line quantity."})
 				return
 			}
+		}
+
+		var glLines []inventorygl.Line
+		for _, ln := range lines {
+			if ln.ItemID == nil || !ln.TrackInventory || ln.BaseQty <= 0 {
+				continue
+			}
+			glLines = append(glLines, inventorygl.Line{
+				ItemID:         *ln.ItemID,
+				Qty:            ln.BaseQty,
+				UnitCost:       ln.UnitCost,
+				TrackInventory: true,
+			})
+		}
+		if _, err := inventorygl.PostReceiptTx(
+			r.Context(), tx, tu.TenantID, userID, receiptDate,
+			"goods_receipt", grID, "Goods receipt post", glLines,
+		); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to post inventory GL for goods receipt.", "ERR_INTERNAL")
+			return
 		}
 
 		if err := crm.SyncWarrantyAssetsFromGoodsReceipt(r.Context(), tx, tu.TenantID, grID); err != nil {

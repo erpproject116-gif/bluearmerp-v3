@@ -114,8 +114,8 @@ func createCustomerRefundPVInTx(
 		return 0, "", err
 	}
 
-	ev := buildCustomerRefundPostingEvent(tenantID, pvID, partnerID, amount, pm)
-	if err := postWithJournalPoster(ctx, tx, tenantID, ev); err != nil {
+	ev := withEntryDate(buildCustomerRefundPostingEvent(tenantID, pvID, partnerID, amount, pm), paymentDate)
+	if _, err := postWithJournalPoster(ctx, tx, tenantID, ev); err != nil {
 		return 0, "", err
 	}
 	return pvID, paymentNo, nil

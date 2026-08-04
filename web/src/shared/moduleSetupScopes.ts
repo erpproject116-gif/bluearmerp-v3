@@ -124,6 +124,7 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
       "accounts_auto_post_sales",
       "accounts_auto_post_purchase",
       "finance_require_je_approval",
+      "inventory_gl_hybrid_enabled",
     ],
     showBudgetControl: true,
     modulesHref: "/app/user-management/tenant-modules",

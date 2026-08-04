@@ -20,6 +20,7 @@ export default function JournalEntriesPage() {
   const toast = useToast();
   const client = useQueryClient();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [statusFilter, setStatusFilter] = createSignal<"all" | "draft" | "posted">("all");
   const [modalOpen, setModalOpen] = createSignal(false);
   const [remarks, setRemarks] = createSignal("");
   const [lines, setLines] = createSignal<JournalLine[]>([
@@ -30,9 +31,11 @@ export default function JournalEntriesPage() {
   const [posting, setPosting] = createSignal(false);
 
   const list = createQuery(() => ({
-    queryKey: ["journal-entries"],
+    queryKey: ["journal-entries", statusFilter()],
     queryFn: async () => {
-      const res = await apiFetch<JournalEntryRow[]>("/api/v1/finance/journal-entries?pageSize=50");
+      const qs = new URLSearchParams({ pageSize: "50" });
+      if (statusFilter() !== "all") qs.set("status", statusFilter());
+      const res = await apiFetch<JournalEntryRow[]>(`/api/v1/finance/journal-entries?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load");
       return res.data ?? [];
     },
@@ -136,7 +139,19 @@ export default function JournalEntriesPage() {
     <div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h1 class="text-xl font-semibold text-slate-900">Journal Entry</h1>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="flex items-center gap-2 text-sm text-text-secondary">
+            Status
+            <select
+              class="rounded-lg border border-stroke px-2 py-1.5 text-sm text-text-primary"
+              value={statusFilter()}
+              onChange={(e) => setStatusFilter(e.currentTarget.value as "all" | "draft" | "posted")}
+            >
+              <option value="all">All</option>
+              <option value="draft">Drafts only</option>
+              <option value="posted">Posted only</option>
+            </select>
+          </label>
           <button
             type="button"
             class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"

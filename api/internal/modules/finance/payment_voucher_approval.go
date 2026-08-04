@@ -88,8 +88,9 @@ func postPaymentVoucherJournal(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		whtTotal := sumPVWithholdingTax(pv.WithholdingLines)
-		ev := buildPVPostingEvent(tu.TenantID, id, pv.PartnerID, pv.AmountTotal, whtTotal, pv.PaymentMethod, mustEWTPayableCode(r.Context(), tx, tu.TenantID))
-		if err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
+		paymentDate, _ := parseDate(pv.PaymentDate)
+		ev := withEntryDate(buildPVPostingEvent(tu.TenantID, id, pv.PartnerID, pv.AmountTotal, whtTotal, pv.PaymentMethod, mustEWTPayableCode(r.Context(), tx, tu.TenantID)), paymentDate)
+		if _, err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
 			return
 		}

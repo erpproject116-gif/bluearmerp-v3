@@ -641,18 +641,42 @@ export function SupplierInvoiceModal(props: Props) {
     await draft.clearOnSave();
     props.onSaved();
     if (props.editing) {
-      // Refresh accounting voucher when line totals change and defaults are mapped.
       void tryAutoSavePurchaseInvoice(props.editing.id);
       props.onClose();
       return;
     }
     setCreatedInvoice(res.data);
-    const autoOk = await tryAutoSavePurchaseInvoice(res.data.id);
-    if (autoOk) {
-      toast.success("Accounting invoice prepared from CoA defaults.");
+    const autoSave = await tryAutoSavePurchaseInvoice(res.data.id);
+    const hasPOLines = body.lines.some(
+      (ln: { purchase_order_line_id?: number | null }) =>
+        ln.purchase_order_line_id != null && Number(ln.purchase_order_line_id) > 0,
+    );
+    const hasGRLines = body.lines.some(
+      (ln: { goods_receipt_line_id?: number | null }) =>
+        ln.goods_receipt_line_id != null && Number(ln.goods_receipt_line_id) > 0,
+    );
+    let stockMsg =
+      "Purchases do not change BOM recipes — only on-hand qty for qty-tracked items.";
+    if (hasPOLines && !hasGRLines) {
+      stockMsg =
+        "Stock updated at the purchase location when items track inventory (auto-receive). BOM recipes are unchanged.";
+    } else if (hasGRLines) {
+      stockMsg = "Already received earlier — this save is billing only. Check Find Stock / Stock Movements for qty.";
     }
-    // Saving is terminal for this transaction window. Payment and printing
-    // remain available after reopening the saved purchase from the list.
+    stockMsg = `${stockMsg} ${autoSave.message}`;
+    if (toast.action) {
+      toast.action({
+        type: autoSave.ok ? "success" : "warning",
+        title: autoSave.ok ? "Purchase created — accounting ready." : "Purchase created.",
+        message: stockMsg,
+        actionLabel: "Find Stock",
+        href: "/app/inventory/find-stock",
+      });
+    } else if (autoSave.ok) {
+      toast.success(stockMsg);
+    } else {
+      toast.warning(stockMsg);
+    }
     props.onClose();
   };
 

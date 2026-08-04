@@ -585,11 +585,7 @@ export function SalesOrderModal(props: Props) {
     toast.success(props.editing ? "Sales order updated." : "Sales order created.");
     await draft.clearOnSave();
     props.onSaved();
-    if (props.editing) {
-      props.onClose();
-      return;
-    }
-    setCreatedSalesOrder(res.data);
+    props.onClose();
   };
 
   return (

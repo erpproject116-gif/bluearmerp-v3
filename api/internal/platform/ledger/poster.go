@@ -24,7 +24,10 @@ type PostingEvent struct {
 	TenantID   int64         `json:"tenant_id"`
 	SourceType string        `json:"source_type"`
 	SourceID   int64         `json:"source_id"`
-	Lines      []PostingLine `json:"lines"`
+	// EntryDate is the document date for the journal entry (OR receipt date, PV
+	// payment date, etc.). When nil/zero, Post falls back to UTC today.
+	EntryDate *time.Time     `json:"entry_date,omitempty"`
+	Lines     []PostingLine  `json:"lines"`
 }
 
 // Poster writes posting events (audit log now; journal when enabled).
@@ -80,6 +83,9 @@ func (jp JournalPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) er
 		status = "draft"
 	}
 	entryDate := time.Now().UTC().Truncate(24 * time.Hour)
+	if ev.EntryDate != nil && !ev.EntryDate.IsZero() {
+		entryDate = ev.EntryDate.UTC().Truncate(24 * time.Hour)
+	}
 	if status == "posted" {
 		if err := fiscalyear.ErrIfClosed(ctx, tx, ev.TenantID, entryDate); err != nil {
 			return err

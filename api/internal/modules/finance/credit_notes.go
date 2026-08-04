@@ -798,44 +798,38 @@ func updateCreditNote(pool *pgxpool.Pool) http.HandlerFunc {
 
 
 func postCreditNote(pool *pgxpool.Pool) http.HandlerFunc {
-
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		tu, _ := auth.FromContext(r.Context())
-
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-
 		if err != nil {
-
 			response.Validation(w, map[string]string{"id": "Invalid id."})
-
 			return
-
 		}
-
-		tag, err := pool.Exec(r.Context(), `
-
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to post credit note.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		tag, err := tx.Exec(r.Context(), `
 			update public.fin_credit_notes
-
 			set status = 'open', remaining_amount = amount_total, updated_at = now()
-
 			where id = $1 and tenant_id = $2 and deleted_at is null and status = 'draft'`, id, tu.TenantID)
-
 		if err != nil || tag.RowsAffected() == 0 {
-
 			response.Err(w, http.StatusBadRequest, "Only draft credit notes can be posted.", "ERR_BAD_REQUEST")
-
 			return
-
 		}
-
+		if err := postCustomerCreditNoteJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Credit note opened but journal failed: "+err.Error(), "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+			return
+		}
 		response.OK(w, nil, "Credit note opened.")
-
 	}
-
 }
-
-
 
 func applyCreditNote(pool *pgxpool.Pool) http.HandlerFunc {
 

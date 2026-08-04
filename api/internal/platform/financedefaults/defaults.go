@@ -26,6 +26,9 @@ const (
 	RoleFWTPayable                Role = "fwt_payable"
 	RoleCompensationWHTPayable    Role = "compensation_wht_payable"
 	RoleEWTReceivable             Role = "ewt_receivable"
+	RoleInventory                 Role = "inventory"
+	RoleGRNI                      Role = "grni"
+	RoleCOGS                      Role = "cogs"
 )
 
 // Defaults holds tenant finance default account ids.
@@ -54,6 +57,9 @@ type Defaults struct {
 	CASFileURL                         *string  `json:"cas_file_url,omitempty"`
 	ATPFileURL                         *string  `json:"atp_file_url,omitempty"`
 	RetainedEarningsAccountID          *int64   `json:"retained_earnings_account_id,omitempty"`
+	InventoryAccountID                 *int64   `json:"inventory_account_id,omitempty"`
+	GRNIAccountID                      *int64   `json:"grni_account_id,omitempty"`
+	COGSAccountID                      *int64   `json:"cogs_account_id,omitempty"`
 }
 
 var fallbackCodes = map[Role]string{
@@ -70,6 +76,9 @@ var fallbackCodes = map[Role]string{
 	RoleFWTPayable:             "2360",
 	RoleCompensationWHTPayable: "2051",
 	RoleEWTReceivable:          "1140",
+	RoleInventory:              "1469",
+	RoleGRNI:                   "2519",
+	RoleCOGS:                   "310",
 }
 
 var phCodes = map[Role]string{
@@ -86,6 +95,9 @@ var phCodes = map[Role]string{
 	RoleFWTPayable:             "2040",
 	RoleCompensationWHTPayable: "2051",
 	RoleEWTReceivable:          "1315",
+	RoleInventory:              "1200",
+	RoleGRNI:                   "2115",
+	RoleCOGS:                   "5010",
 }
 
 func roleID(d Defaults, role Role) *int64 {
@@ -116,6 +128,12 @@ func roleID(d Defaults, role Role) *int64 {
 		return d.CompensationWHTPayableAccountID
 	case RoleEWTReceivable:
 		return d.EWTReceivableAccountID
+	case RoleInventory:
+		return d.InventoryAccountID
+	case RoleGRNI:
+		return d.GRNIAccountID
+	case RoleCOGS:
+		return d.COGSAccountID
 	default:
 		return nil
 	}
@@ -137,7 +155,8 @@ func Load(ctx context.Context, q querier, tenantID int64) (Defaults, error) {
 		  coalesce(auto_post_commission_journal, false),
 		  coalesce(disabled_account_types, '{}'),
 		  rdo_code, tax_regime, registration_date::text, line_of_business, cor_file_url,
-		  cas_file_url, atp_file_url, retained_earnings_account_id
+		  cas_file_url, atp_file_url, retained_earnings_account_id,
+		  inventory_account_id, grni_account_id, cogs_account_id
 		from public.tenant_finance_defaults
 		where tenant_id = $1`, tenantID).Scan(
 		&d.CashAccountID, &d.ReceivableAccountID, &d.PayableAccountID,
@@ -147,7 +166,29 @@ func Load(ctx context.Context, q querier, tenantID int64) (Defaults, error) {
 		&d.AutoPostCommissionJournal, &d.DisabledAccountTypes,
 		&d.RDOCode, &d.TaxRegime, &d.RegistrationDate, &d.LineOfBusiness, &d.CORFileURL,
 		&d.CASFileURL, &d.ATPFileURL, &d.RetainedEarningsAccountID,
+		&d.InventoryAccountID, &d.GRNIAccountID, &d.COGSAccountID,
 	)
+	if err != nil && strings.Contains(err.Error(), "inventory_account_id") {
+		err = q.QueryRow(ctx, `
+			select cash_account_id, receivable_account_id, payable_account_id,
+			  sales_account_id, purchase_account_id, input_vat_account_id, output_vat_account_id,
+			  commission_expense_account_id, commission_payable_account_id,
+			  ewt_payable_account_id, fwt_payable_account_id, compensation_wht_payable_account_id, ewt_receivable_account_id,
+			  coalesce(auto_post_commission_journal, false),
+			  coalesce(disabled_account_types, '{}'),
+			  rdo_code, tax_regime, registration_date::text, line_of_business, cor_file_url,
+			  cas_file_url, atp_file_url, retained_earnings_account_id
+			from public.tenant_finance_defaults
+			where tenant_id = $1`, tenantID).Scan(
+			&d.CashAccountID, &d.ReceivableAccountID, &d.PayableAccountID,
+			&d.SalesAccountID, &d.PurchaseAccountID, &d.InputVATAccountID, &d.OutputVATAccountID,
+			&d.CommissionExpenseAccountID, &d.CommissionPayableAccountID,
+			&d.EWTPayableAccountID, &d.FWTPayableAccountID, &d.CompensationWHTPayableAccountID, &d.EWTReceivableAccountID,
+			&d.AutoPostCommissionJournal, &d.DisabledAccountTypes,
+			&d.RDOCode, &d.TaxRegime, &d.RegistrationDate, &d.LineOfBusiness, &d.CORFileURL,
+			&d.CASFileURL, &d.ATPFileURL, &d.RetainedEarningsAccountID,
+		)
+	}
 	if err != nil {
 		// Migration 224 not applied — load without BIR statutory columns.
 		if strings.Contains(err.Error(), "ewt_payable_account_id") ||
@@ -205,8 +246,9 @@ func Save(ctx context.Context, pool *pgxpool.Pool, tenantID int64, d Defaults) e
 		  ewt_payable_account_id, fwt_payable_account_id, compensation_wht_payable_account_id, ewt_receivable_account_id,
 		  auto_post_commission_journal, disabled_account_types,
 		  rdo_code, tax_regime, registration_date, line_of_business, cor_file_url,
-		  cas_file_url, atp_file_url, retained_earnings_account_id
-		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+		  cas_file_url, atp_file_url, retained_earnings_account_id,
+		  inventory_account_id, grni_account_id, cogs_account_id
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
 		on conflict (tenant_id) do update set
 		  cash_account_id = excluded.cash_account_id,
 		  receivable_account_id = excluded.receivable_account_id,
@@ -231,6 +273,9 @@ func Save(ctx context.Context, pool *pgxpool.Pool, tenantID int64, d Defaults) e
 		  cas_file_url = excluded.cas_file_url,
 		  atp_file_url = excluded.atp_file_url,
 		  retained_earnings_account_id = excluded.retained_earnings_account_id,
+		  inventory_account_id = excluded.inventory_account_id,
+		  grni_account_id = excluded.grni_account_id,
+		  cogs_account_id = excluded.cogs_account_id,
 		  updated_at = now()`,
 		tenantID, d.CashAccountID, d.ReceivableAccountID, d.PayableAccountID,
 		d.SalesAccountID, d.PurchaseAccountID, d.InputVATAccountID, d.OutputVATAccountID,
@@ -239,6 +284,7 @@ func Save(ctx context.Context, pool *pgxpool.Pool, tenantID int64, d Defaults) e
 		d.AutoPostCommissionJournal, types,
 		d.RDOCode, d.TaxRegime, d.RegistrationDate, d.LineOfBusiness, d.CORFileURL,
 		d.CASFileURL, d.ATPFileURL, d.RetainedEarningsAccountID,
+		d.InventoryAccountID, d.GRNIAccountID, d.COGSAccountID,
 	)
 	return err
 }

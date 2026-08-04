@@ -15,6 +15,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inventorygl"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -182,6 +183,8 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 		var releasedCount int
 		soIDs := map[int64]struct{}{}
 		soApprovalChecked := map[int64]bool{}
+		var issueGLLines []inventorygl.Line
+		var issueSourceID int64
 
 		for i, item := range body.Lines {
 			if item.SalesOrderLineID <= 0 {
@@ -299,6 +302,19 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 						response.Err(w, http.StatusInternalServerError, "Failed to record stock movement.", "ERR_INTERNAL")
 						return
 					}
+					var unitCost float64
+					_ = tx.QueryRow(r.Context(), `
+						select coalesce(purchase_price, 0)::float8 from public.inv_items where id = $1`,
+						*itemID).Scan(&unitCost)
+					issueGLLines = append(issueGLLines, inventorygl.Line{
+						ItemID:         *itemID,
+						Qty:            item.ReleaseQty,
+						UnitCost:       unitCost,
+						TrackInventory: true,
+					})
+					if issueSourceID == 0 {
+						issueSourceID = releaseLineID
+					}
 				}
 				// Split mode: stock reserved on SO save; release line records fulfillment intent only.
 			}
@@ -333,6 +349,16 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 
 			releasedCount++
 			soIDs[salesOrderID] = struct{}{}
+		}
+
+		if len(issueGLLines) > 0 && issueSourceID > 0 {
+			if _, err := inventorygl.PostIssueTx(
+				r.Context(), tx, tu.TenantID, tu.AppUserID, releaseDate,
+				"so_release", issueSourceID, "SO release stock issue", issueGLLines,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to post inventory GL for release.", "ERR_INTERNAL")
+				return
+			}
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {

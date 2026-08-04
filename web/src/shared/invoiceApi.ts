@@ -39,6 +39,14 @@ export type PurchaseInvoice = {
   journal_status: string;
 };
 
+/** Result of auto-saving the accounting invoice voucher after Sales/Purchase create. */
+export type InvoiceAutoSaveResult = {
+  ok: boolean;
+  /** posted | draft | already | skipped_defaults | failed */
+  status: "posted" | "draft" | "already" | "skipped_defaults" | "failed";
+  message: string;
+};
+
 export function getSalesInvoice(id: number): Promise<ApiResult<SalesInvoice>> {
   return apiFetch<SalesInvoice>(`/api/v1/sales/${id}/invoice`, {}, { silent: true });
 }
@@ -68,53 +76,108 @@ type FinanceAccountDefaults = {
   payable_account_id?: number | null;
 };
 
+const COA_HREF = "/app/finance/acct-i/chart-of-accounts#default-account-mappings";
+
 /**
  * When CoA defaults are mapped, save the purchase accounting voucher
  * (Purchases/COGS + A/P) so AP posts without a manual Invoice-tab save.
- * Mirrors sales invoice defaults behavior for the purchases side.
  */
-export async function tryAutoSavePurchaseInvoice(supplierInvoiceId: number): Promise<boolean> {
+export async function tryAutoSavePurchaseInvoice(supplierInvoiceId: number): Promise<InvoiceAutoSaveResult> {
   const existing = await getPurchaseInvoice(supplierInvoiceId);
   if (existing.success && existing.data?.purchase_account_id && existing.data?.withdrawal_account_id) {
-    return true;
+    const st = (existing.data.journal_status || "").toLowerCase();
+    if (existing.data.journal_entry_id && st === "posted") {
+      return { ok: true, status: "posted", message: "Accounting journal already posted." };
+    }
+    if (existing.data.journal_entry_id) {
+      return {
+        ok: true,
+        status: "draft",
+        message: "Accounting journal is draft — post it under Journal Entries for Trial Balance.",
+      };
+    }
+    return { ok: true, status: "already", message: "Purchase accounts already mapped." };
   }
   const defaults = await apiFetch<FinanceAccountDefaults>("/api/v1/finance/accounts/defaults", {}, { silent: true });
   const purchaseId = defaults.data?.purchase_account_id;
   const payableId = defaults.data?.payable_account_id;
-  if (!purchaseId || !payableId) return false;
+  if (!purchaseId || !payableId) {
+    return {
+      ok: false,
+      status: "skipped_defaults",
+      message: `Map Purchases and A/P under Chart of Accounts defaults (${COA_HREF}) so this purchase hits the books.`,
+    };
+  }
   const res = await savePurchaseInvoice(supplierInvoiceId, {
     purchase_account_id: purchaseId,
     withdrawal_account_id: payableId,
     fees: existing.data?.fees ?? 0,
     remark: existing.data?.remark ?? "",
   });
-  return Boolean(res.success);
+  if (!res.success) {
+    return { ok: false, status: "failed", message: res.message ?? "Failed to save purchase accounting voucher." };
+  }
+  const after = await getPurchaseInvoice(supplierInvoiceId);
+  const st = (after.data?.journal_status || "").toLowerCase();
+  if (st === "posted") {
+    return { ok: true, status: "posted", message: "Purchase journal posted to the general ledger." };
+  }
+  return {
+    ok: true,
+    status: "draft",
+    message: "Purchase journal created as draft — enable purchase auto-post or post under Journal Entries.",
+  };
 }
 
 /**
  * When CoA defaults are mapped, save the sales accounting voucher
  * (Sales revenue + A/R) without a manual Invoice-tab save.
  */
-export async function tryAutoSaveSalesInvoice(salesId: number): Promise<boolean> {
+export async function tryAutoSaveSalesInvoice(salesId: number): Promise<InvoiceAutoSaveResult> {
   const existing = await getSalesInvoice(salesId);
-  // Already mapped with a journal — nothing to do.
   if (
     existing.success &&
     existing.data?.sales_account_id &&
     existing.data?.deposit_account_id &&
     existing.data?.journal_entry_id
   ) {
-    return true;
+    const st = (existing.data.journal_status || "").toLowerCase();
+    if (st === "posted") {
+      return { ok: true, status: "posted", message: "Accounting journal already posted." };
+    }
+    return {
+      ok: true,
+      status: "draft",
+      message: "Accounting journal is draft — post it under Journal Entries for Trial Balance.",
+    };
   }
   const defaults = await apiFetch<FinanceAccountDefaults>("/api/v1/finance/accounts/defaults", {}, { silent: true });
   const salesAcct = defaults.data?.sales_account_id ?? existing.data?.sales_account_id ?? null;
   const arAcct = defaults.data?.receivable_account_id ?? existing.data?.deposit_account_id ?? null;
-  if (!salesAcct || !arAcct) return false;
+  if (!salesAcct || !arAcct) {
+    return {
+      ok: false,
+      status: "skipped_defaults",
+      message: `Map Sales and A/R under Chart of Accounts defaults (${COA_HREF}) so this sale hits the books.`,
+    };
+  }
   const res = await saveSalesInvoice(salesId, {
     sales_account_id: salesAcct,
     deposit_account_id: arAcct,
     fees: existing.data?.fees ?? 0,
     remark: existing.data?.remark ?? "",
   });
-  return Boolean(res.success);
+  if (!res.success) {
+    return { ok: false, status: "failed", message: res.message ?? "Failed to save sales accounting voucher." };
+  }
+  const after = await getSalesInvoice(salesId);
+  const st = (after.data?.journal_status || "").toLowerCase();
+  if (st === "posted") {
+    return { ok: true, status: "posted", message: "Sales journal posted to the general ledger." };
+  }
+  return {
+    ok: true,
+    status: "draft",
+    message: "Sales journal created as draft — enable sales auto-post or post under Journal Entries.",
+  };
 }

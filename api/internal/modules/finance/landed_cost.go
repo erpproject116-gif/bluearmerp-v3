@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inventorygl"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -133,24 +135,29 @@ func postLandedCost(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		rows, err := tx.Query(r.Context(), `
-			select id, received_qty::float8
-			from public.gr_goods_receipt_lines
-			where goods_receipt_id = $1 and received_qty > 0
-			order by line_no`, grID)
+			select grl.id, grl.received_qty::float8, pol.item_id,
+			  coalesce(i.track_inventory_qty, false)
+			from public.gr_goods_receipt_lines grl
+			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+			left join public.inv_items i on i.id = pol.item_id
+			where grl.goods_receipt_id = $1 and grl.received_qty > 0
+			order by grl.line_no`, grID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load GR lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
 		type grLine struct {
-			id  int64
-			qty float64
+			id             int64
+			qty            float64
+			itemID         *int64
+			trackInventory bool
 		}
 		var lines []grLine
 		var qtySum float64
 		for rows.Next() {
 			var ln grLine
-			if err := rows.Scan(&ln.id, &ln.qty); err != nil {
+			if err := rows.Scan(&ln.id, &ln.qty, &ln.itemID, &ln.trackInventory); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read GR lines.", "ERR_INTERNAL")
 				return
 			}
@@ -163,6 +170,7 @@ func postLandedCost(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		_, _ = tx.Exec(r.Context(), `delete from public.fin_landed_cost_lines where header_id = $1`, id)
+		var glLines []inventorygl.Line
 		for _, ln := range lines {
 			share := ln.qty / qtySum
 			lineAmount := totalAmount * share
@@ -184,6 +192,22 @@ func postLandedCost(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to update GR unit cost.", "ERR_INTERNAL")
 				return
 			}
+			if ln.itemID != nil && ln.trackInventory && lineAmount > 0 {
+				glLines = append(glLines, inventorygl.Line{
+					ItemID:         *ln.itemID,
+					Qty:            1,
+					UnitCost:       lineAmount,
+					TrackInventory: true,
+				})
+			}
+		}
+
+		if _, err := inventorygl.PostLandedCostTx(
+			r.Context(), tx, tu.TenantID, tu.AppUserID, time.Now(),
+			id, "Landed cost allocation", glLines,
+		); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to post inventory GL for landed cost.", "ERR_INTERNAL")
+			return
 		}
 
 		_, err = tx.Exec(r.Context(), `

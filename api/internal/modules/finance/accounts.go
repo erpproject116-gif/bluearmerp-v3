@@ -623,6 +623,9 @@ func validateFinanceDefaults(r *http.Request, pool *pgxpool.Pool, tenantID int64
 		{"fwt_payable_account_id", body.FWTPayableAccountID, []string{"liability"}},
 		{"compensation_wht_payable_account_id", body.CompensationWHTPayableAccountID, []string{"liability"}},
 		{"ewt_receivable_account_id", body.EWTReceivableAccountID, []string{"asset"}},
+		{"inventory_account_id", body.InventoryAccountID, []string{"asset"}},
+		{"grni_account_id", body.GRNIAccountID, []string{"liability"}},
+		{"cogs_account_id", body.COGSAccountID, []string{"expense"}},
 	}
 	for _, c := range checks {
 		if c.id == nil || *c.id <= 0 {

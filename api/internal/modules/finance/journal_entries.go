@@ -2,8 +2,10 @@ package finance
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -32,12 +34,22 @@ func registerJournalEntryRoutes(r chi.Router, pool *pgxpool.Pool) {
 func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		p := httputil.ParseListParams(r, "entry_date", map[string]string{"entry_no": "entry_no"})
+		p := httputil.ParseListParams(r, "entry_date", map[string]string{"entry_no": "entry_no", "entry_date": "entry_date"})
 		offset := httputil.Offset(p)
-		rows, err := pool.Query(r.Context(), `
+		statusFilter := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("status")))
+		args := []any{tu.TenantID}
+		where := "tenant_id = $1"
+		if statusFilter == "draft" || statusFilter == "posted" || statusFilter == "cancelled" {
+			args = append(args, statusFilter)
+			where += fmt.Sprintf(" and status = $%d", len(args))
+		}
+		args = append(args, p.PageSize, offset)
+		limIdx, offIdx := len(args)-1, len(args)
+		q := fmt.Sprintf(`
 			select id, entry_no, status, coalesce(remarks, ''), count(*) over()
-			from public.fin_journal_entries where tenant_id = $1
-			order by entry_date desc, id desc limit $2 offset $3`, tu.TenantID, p.PageSize, offset)
+			from public.fin_journal_entries where %s
+			order by entry_date desc, id desc limit $%d offset $%d`, where, limIdx, offIdx)
+		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list journal entries.", "ERR_INTERNAL")
 			return

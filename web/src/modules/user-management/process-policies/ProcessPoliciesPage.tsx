@@ -21,6 +21,7 @@ type ProcessPolicy = {
   accounts_auto_post_pv: boolean;
   accounts_auto_post_sales: boolean;
   accounts_auto_post_purchase: boolean;
+  inventory_gl_hybrid_enabled: boolean;
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
@@ -185,6 +186,11 @@ const SECTIONS: PolicySection[] = [
         key: "accounts_auto_post_purchase",
         label: "Auto-post purchase invoice journal",
         help: "When on, saving the purchase Invoice tab posts the A/P journal entry immediately.",
+      },
+      {
+        key: "inventory_gl_hybrid_enabled",
+        label: "Hybrid inventory GL (qty-tracked items)",
+        help: "When on, Receiving and Sales of qty-tracked items post Inventory / GRNI / COGS. Map those accounts under CoA defaults first. Existing tenants need opening inventory before enabling.",
       },
     ],
   },
