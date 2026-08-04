@@ -622,11 +622,7 @@ export function QuotationModal(props: Props) {
     toast.success(props.editing ? "Quotation updated." : "Quotation created.");
     await draft.clearOnSave();
     props.onSaved();
-    if (props.editing) {
-      props.onClose();
-      return;
-    }
-    setCreatedQuotation(res.data);
+    props.onClose();
   };
 
   const openEmail = async () => {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,6 +15,16 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
+
+// withEntryDate attaches a document date to a posting event for the journal entry_date.
+func withEntryDate(ev ledger.PostingEvent, d time.Time) ledger.PostingEvent {
+	if d.IsZero() {
+		return ev
+	}
+	dd := d.UTC().Truncate(24 * time.Hour)
+	ev.EntryDate = &dd
+	return ev
+}
 
 func buildORPostingEvent(tenantID, receiptID int64, lines []journalLineBody) ledger.PostingEvent {
 	ev := ledger.PostingEvent{
@@ -128,17 +139,40 @@ func blockIfPosted(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, t
 	return false
 }
 
-func postWithJournalPoster(ctx context.Context, tx pgx.Tx, tenantID int64, ev ledger.PostingEvent) error {
+func postWithJournalPoster(ctx context.Context, tx pgx.Tx, tenantID int64, ev ledger.PostingEvent) (glStatus string, err error) {
 	policy, err := processpolicy.LoadTx(ctx, tx, tenantID)
 	if err != nil {
-		return fmt.Errorf("load process policy: %w", err)
+		return "", fmt.Errorf("load process policy: %w", err)
 	}
 	poster := ledger.JournalPoster{
 		AutoOR:            policy.AccountsAutoPostOR,
 		AutoPV:            policy.AccountsAutoPostPV,
 		RequireJEApproval: policy.FinanceRequireJEApproval,
 	}
-	return PostLedgerEventTx(ctx, tx, poster, ev)
+	already, err := sourceJournalPosted(ctx, tx, ev.TenantID, ev.SourceType, ev.SourceID)
+	if err != nil {
+		return "", err
+	}
+	if already {
+		return "posted", nil
+	}
+	willCreate := true
+	if ev.SourceType == "official_receipt" && !poster.AutoOR {
+		willCreate = false
+	}
+	if ev.SourceType == "payment_voucher" && !poster.AutoPV {
+		willCreate = false
+	}
+	if err := poster.Post(ctx, tx, ev); err != nil {
+		return "", err
+	}
+	if !willCreate || len(ev.Lines) == 0 {
+		return "audit_only", nil
+	}
+	if poster.RequireJEApproval {
+		return "draft", nil
+	}
+	return "posted", nil
 }
 
 // PostLedgerEventTx posts a sub-ledger event using the supplied poster within tx.

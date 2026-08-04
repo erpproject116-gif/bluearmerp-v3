@@ -137,7 +137,7 @@ export default function InventoryStatusReportPage() {
   return (
     <ReportPageLayout
       title="Find Stock"
-      description="Cross-branch inquiry: qty, price, and company total. Balances update from stock movements — Search (F8)."
+      description="Cross-branch inquiry: on-hand qty by item and location. Balances appear after Purchases (auto-receive), Receiving, Stock Entry, or Sales — not from item master alone. Search (F8)."
       showDateFilters={false}
       submitted={submitted() !== null}
       loading={report.isFetching}
@@ -148,8 +148,10 @@ export default function InventoryStatusReportPage() {
       onSearch={search}
       onReset={() => {
         setDraft(defaultFilters());
-        setSubmitted(null);
         setPage(1);
+        // Re-run immediately so Reset does not leave a blank results panel.
+        setSubmitted({});
+        setGeneratedAt(new Date());
       }}
       onExportCsv={() => void downloadReportCsv(inventoryStatusExportUrl(filters()), "find-stock.csv")}
       filterExtra={
@@ -209,7 +211,26 @@ export default function InventoryStatusReportPage() {
       }
     >
       <Show when={(report.data?.rows.length ?? 0) === 0 && submitted() !== null && !report.isFetching}>
-        <ReportEmptyMessage message="No stock matches — try All branches or clear filters." />
+        <ReportEmptyMessage
+          message={
+            Object.keys(normalizeFilters(filters())).length === 0
+              ? "No stock balances yet. Create qty-tracked items, then Purchase (auto-receive), Receiving, or Stock Entry. Purchases do not edit BOM recipes — only on-hand qty."
+              : "No stock matches these filters — try All branches or clear filters, then Search."
+          }
+        />
+        <p class="mt-3 text-center text-sm">
+          <A href="/app/purchases/purchases" class="text-brand-600 hover:underline">
+            Purchases
+          </A>
+          {" · "}
+          <A href="/app/purchase-order/goods-receipt" class="text-brand-600 hover:underline">
+            Receiving
+          </A>
+          {" · "}
+          <A href="/app/inventory/stock-movements" class="text-brand-600 hover:underline">
+            Stock Movements
+          </A>
+        </p>
       </Show>
       <Show when={(report.data?.rows.length ?? 0) > 0}>
         <div class="overflow-x-auto">

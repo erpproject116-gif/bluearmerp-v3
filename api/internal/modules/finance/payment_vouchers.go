@@ -485,14 +485,17 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		ev := buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod, mustEWTPayableCode(r.Context(), tx, tu.TenantID))
+		ev := withEntryDate(buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod, mustEWTPayableCode(r.Context(), tx, tu.TenantID)), paymentDate)
 		deferredApproval, _, err := ensureAmountApproval(r.Context(), tx, tu, "payment_voucher", id, amountTotal)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to check approval policy.", "ERR_INTERNAL")
 			return
 		}
+		glStatus := ""
 		if !deferredApproval {
-			if err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
+			var postErr error
+			glStatus, postErr = postWithJournalPoster(r.Context(), tx, tu.TenantID, ev)
+			if postErr != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
 				return
 			}
@@ -508,6 +511,15 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 		msg := "Created."
 		if deferredApproval {
 			msg = "Created. Amount exceeds approval threshold — journal posting deferred until approved."
+		} else {
+			switch glStatus {
+			case "audit_only":
+				msg = "Created. Not on Trial Balance yet — enable Payment Voucher auto-post under Finance setup, or post the journal manually."
+			case "draft":
+				msg = "Created. Journal entry is draft — post it under Journal Entries for Trial Balance."
+			case "posted":
+				msg = "Created. Journal posted to the general ledger."
+			}
 		}
 		response.OK(w, pv, msg)
 	}

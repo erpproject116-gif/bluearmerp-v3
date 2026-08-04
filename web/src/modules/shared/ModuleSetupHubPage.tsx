@@ -24,6 +24,7 @@ type ProcessPolicy = {
   accounts_auto_post_pv: boolean;
   accounts_auto_post_sales: boolean;
   accounts_auto_post_purchase: boolean;
+  inventory_gl_hybrid_enabled?: boolean;
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
@@ -63,8 +64,8 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
     help: "On = cannot invoice if the customer is over their credit limit.",
   },
   sales_require_so_approval: {
-    label: "Require approval on sales orders",
-    help: "On = manager must approve before release or invoice.",
+    label: "Require approval on sales orders (advisory)",
+    help: "Recorded for process design; conversion gates are currently relaxed in the API.",
   },
   quotation_require_attachment: {
     label: "Require file on quotation",
@@ -83,16 +84,16 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
     help: "Off = buyers can create a purchase order directly.",
   },
   purchase_require_pr_approval: {
-    label: "Require approved purchase request",
-    help: "On = PR must be approved before it becomes a PO.",
+    label: "Require approved purchase request (advisory)",
+    help: "Recorded for process design; PR→PO conversion gates are currently relaxed in the API.",
   },
   purchase_require_po_approval: {
-    label: "Require approval on purchase orders",
-    help: "On = PO must be approved before receive or bill.",
+    label: "Require approval on purchase orders (advisory)",
+    help: "Recorded for process design; PO conversion gates are currently relaxed in the API.",
   },
   purchase_require_gr_before_supplier_invoice: {
     label: "Require goods receipt before supplier invoice",
-    help: "Off = you can bill the supplier without posting a receipt first.",
+    help: "On = bill only after Receiving. Off (default) = Purchases can auto-receive stock when you save.",
   },
   purchase_order_require_attachment: {
     label: "Require file on purchase order",
@@ -117,6 +118,10 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
   accounts_auto_post_purchase: {
     label: "Auto-post purchase invoices to journal",
     help: "On = purchase invoices post A/P journal entries when saved on the Invoice tab.",
+  },
+  inventory_gl_hybrid_enabled: {
+    label: "Hybrid inventory GL (qty-tracked items)",
+    help: "On = Receiving/Sales of qty-tracked items post Inventory / GRNI / COGS. Map those accounts under CoA defaults first.",
   },
   finance_require_je_approval: {
     label: "Require approval before posting journals",
@@ -168,6 +173,19 @@ export default function ModuleSetupHubPage() {
     const p = policy();
     if (!p || !canManage()) return;
     setPolicy({ ...p, budget_control_mode: mode });
+  };
+
+  const enableGoLivePosting = () => {
+    const p = policy();
+    if (!p || !canManage()) return;
+    setPolicy({
+      ...p,
+      accounts_auto_post_or: true,
+      accounts_auto_post_pv: true,
+      accounts_auto_post_sales: true,
+      accounts_auto_post_purchase: true,
+    });
+    toast.success("Auto-post toggles turned on — click Save to apply. Map CoA defaults first if Trial Balance stays empty.");
   };
 
   const save = async () => {
@@ -263,6 +281,16 @@ export default function ModuleSetupHubPage() {
                 </Show>
 
                 <div class="flex flex-wrap items-center gap-2 pt-2">
+                  <Show when={sc().id === "finance" && canManage()}>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                      disabled={saving()}
+                      onClick={() => enableGoLivePosting()}
+                    >
+                      Go-live posting (turn on all auto-post)
+                    </button>
+                  </Show>
                   <button
                     type="button"
                     class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
@@ -275,6 +303,13 @@ export default function ModuleSetupHubPage() {
                     <span class="text-xs text-text-secondary">Ask an administrator to change these rules.</span>
                   </Show>
                 </div>
+                <Show when={sc().id === "finance"}>
+                  <p class="pt-2 text-xs text-text-secondary">
+                    Hybrid inventory GL posts Inventory/GRNI/COGS only for qty-tracked items. Existing tenants with stock
+                    already on hand should post an opening Inventory journal and clear historical GRNI before enabling
+                    hybrid — do not rewrite old purchase expense journals.
+                  </p>
+                </Show>
               </section>
             </Show>
 

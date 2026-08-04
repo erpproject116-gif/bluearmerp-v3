@@ -634,13 +634,7 @@ export function PurchaseOrderModal(props: Props) {
     await draft.clearOnSave();
     applyDetail(res.data);
     props.onSaved();
-    if (props.purchaseOrderId) {
-      props.onClose();
-      return;
-    }
-    if (!savedPoId()) {
-      setSavedPoId(res.data.id);
-    }
+    props.onClose();
   };
 
   const po = () => detail();

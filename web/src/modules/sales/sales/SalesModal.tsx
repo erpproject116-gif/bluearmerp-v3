@@ -899,27 +899,23 @@ export function SalesModal(props: Props) {
     }
     await draft.clearOnSave();
     props.onSaved();
-    const autoOk = await tryAutoSaveSalesInvoice(res.data.id);
-    if (autoOk) {
-      toast.success(
-        ed && props.editing
-          ? "Accounting invoice ready — open balance shows in A/R Aging & Customer Book (AR) after Search."
-          : "Accounting invoice prepared — receivable is open for Official Receipts / A/R reports.",
-      );
+    const autoSave = await tryAutoSaveSalesInvoice(res.data.id);
+    const stockNote = `${autoSave.message} Stock updates when the item tracks inventory quantity.`;
+    if (toast.action) {
+      toast.action({
+        type: autoSave.ok ? "success" : "warning",
+        title: ed ? "Sales updated." : "Sales created.",
+        message: stockNote,
+        actionLabel: "Open sale",
+        href: `/app/sales/sales?openId=${res.data.id}`,
+      });
+    } else if (autoSave.ok) {
+      toast.success(stockNote);
     } else {
-      toast.warning(
-        ed
-          ? "Map Sales + Receivable accounts under Chart of Accounts defaults to post the A/R invoice."
-          : "Sale saved. Map CoA defaults (Sales + Receivable) to auto-prepare the accounting invoice.",
-      );
+      toast.warning(stockNote);
     }
-    setCreatedSale(res.data);
-    setSalesNo(res.data.sales_no);
-    setDateNoDisplay(res.data.date_no_display);
-    setProgressStatus(res.data.progress_status);
-    // Keep window open with Invoice tab (Load Slip → Save → Invoice).
-    setActiveTab("invoice");
-    if (!props.editing) setPostSaveOpen(true);
+    // Saving is terminal — reopen from the list (or toast action) for payment / invoice tab.
+    props.onClose();
   };
 
   const finishPostSave = () => {

@@ -72,9 +72,9 @@ export const emptyItemForm = (): ItemFormState => ({
   reorder_level: null,
   track_serial: false,
   track_lot: false,
-  serial_policy: "required",
-  lot_policy: "required",
-  track_inventory_qty: false,
+  serial_policy: "optional",
+  lot_policy: "optional",
+  track_inventory_qty: true,
   status: "active",
 });
 
@@ -278,16 +278,117 @@ export function ItemMasterModal(props: Props) {
             />
           )}
         </ModalField>
-        <Field label="Inventory quantity">
-          <label class="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={props.form().track_inventory_qty}
-              onChange={(e) => setForm((f) => ({ ...f, track_inventory_qty: e.currentTarget.checked }))}
-            />
-            Track inventory quantity
-          </label>
-        </Field>
+
+        <div class="col-span-full space-y-3 rounded-xl border border-stroke bg-slate-50/80 p-4">
+          <div>
+            <p class="text-sm font-semibold text-text-primary">Tracking</p>
+            <p class="mt-0.5 text-xs text-text-secondary">
+              Quantity tracking drives Find Stock and Stock Movements. Serial/Lot is for unit identity on Receiving
+              and Sales — quantity tracking should stay on when you use them.
+            </p>
+          </div>
+          <Field label="Inventory quantity">
+            <label class="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={props.form().track_inventory_qty}
+                onChange={(e) => setForm((f) => ({ ...f, track_inventory_qty: e.currentTarget.checked }))}
+              />
+              Track inventory quantity (Find Stock &amp; movements)
+            </label>
+            <p class="mt-1 text-xs text-text-secondary">
+              On for merchandise by default. Turn off for services / non-stock. Purchases and Sales change on-hand
+              qty when this is on — they do not edit BOM recipes.
+            </p>
+          </Field>
+          <Field label="Unit identity">
+            <div class="flex flex-wrap gap-4 text-sm">
+              <label class="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="item-unit-identity"
+                  checked={!props.form().track_serial && !props.form().track_lot}
+                  onChange={() => setForm((f) => ({ ...f, track_serial: false, track_lot: false }))}
+                />
+                None
+              </label>
+              <label class="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="item-unit-identity"
+                  checked={props.form().track_serial}
+                  onChange={() =>
+                    setForm((f) => ({
+                      ...f,
+                      track_serial: true,
+                      track_lot: false,
+                      serial_policy: f.serial_policy || "optional",
+                      track_inventory_qty: true,
+                    }))
+                  }
+                />
+                Serial
+              </label>
+              <label class="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="item-unit-identity"
+                  checked={props.form().track_lot}
+                  onChange={() =>
+                    setForm((f) => ({
+                      ...f,
+                      track_lot: true,
+                      track_serial: false,
+                      lot_policy: f.lot_policy || "optional",
+                      track_inventory_qty: true,
+                    }))
+                  }
+                />
+                Lot
+              </label>
+            </div>
+          </Field>
+          <Show when={props.form().track_serial}>
+            <Field label="Serial capture">
+              <select
+                class={inputClass}
+                value={props.form().serial_policy}
+                onChange={(e) => setForm((f) => ({ ...f, serial_policy: e.currentTarget.value }))}
+              >
+                <For each={TRACKING_POLICY_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
+              </select>
+              <p class="mt-1 text-xs text-text-secondary">Optional = capture when available. Required = block save without serials.</p>
+            </Field>
+          </Show>
+          <Show when={props.form().track_lot}>
+            <Field label="Lot capture">
+              <select
+                class={inputClass}
+                value={props.form().lot_policy}
+                onChange={(e) => setForm((f) => ({ ...f, lot_policy: e.currentTarget.value }))}
+              >
+                <For each={TRACKING_POLICY_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
+              </select>
+              <p class="mt-1 text-xs text-text-secondary">Optional = capture when available. Required = block save without lots.</p>
+            </Field>
+          </Show>
+          <Show when={props.form().track_serial || props.form().track_lot}>
+            <p class="text-xs text-text-secondary">
+              <A href="/app/inventory/serial-lot/registry" class="text-brand-600 hover:underline">
+                Serial registry
+              </A>
+              {" · "}
+              <A href="/app/inventory/serial-lot/lots" class="text-brand-600 hover:underline">
+                Lot batches
+              </A>
+              {" · "}
+              <A href="/app/purchase-order/goods-receipt" class="text-brand-600 hover:underline">
+                Receiving
+              </A>
+            </p>
+          </Show>
+        </div>
+
         <p class="col-span-full mt-2 text-sm font-medium text-text-primary">Safety stock by document type</p>
         <For each={SAFETY_DOC_TYPES}>
           {(doc) => (
@@ -408,61 +509,8 @@ export function ItemMasterModal(props: Props) {
             />
           )}
         </ModalField>
-        <Field label="Tracking mode">
-          <div class="flex flex-wrap gap-6 text-sm">
-            <label class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={props.form().track_serial}
-                onChange={(e) => {
-                  const checked = e.currentTarget.checked;
-                  setForm((f) => ({ ...f, track_serial: checked, track_lot: checked ? false : f.track_lot }));
-                }}
-              />
-              Track serial numbers
-            </label>
-            <label class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={props.form().track_lot}
-                onChange={(e) => {
-                  const checked = e.currentTarget.checked;
-                  setForm((f) => ({ ...f, track_lot: checked, track_serial: checked ? false : f.track_serial }));
-                }}
-              />
-              Track lot numbers
-            </label>
-          </div>
-        </Field>
-        <Show when={props.form().track_serial}>
-          <Field label="Serial capture policy">
-            <select
-              class={inputClass}
-              value={props.form().serial_policy}
-              onChange={(e) => setForm((f) => ({ ...f, serial_policy: e.currentTarget.value }))}
-            >
-              <For each={TRACKING_POLICY_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
-            </select>
-          </Field>
-        </Show>
-        <Show when={props.form().track_lot}>
-          <Field label="Lot capture policy">
-            <select
-              class={inputClass}
-              value={props.form().lot_policy}
-              onChange={(e) => setForm((f) => ({ ...f, lot_policy: e.currentTarget.value }))}
-            >
-              <For each={TRACKING_POLICY_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
-            </select>
-          </Field>
-        </Show>
         <p class="col-span-full text-xs text-text-secondary">
-          <A href="/app/inventory/serial-lot/registry" class="text-brand-600 hover:underline">Serial registry</A>
-          {" · "}
-          <A href="/app/inventory/serial-lot/lots" class="text-brand-600 hover:underline">Lot batches</A>
-          {" · "}
-          Auto serial format: company prefix + MMDDYY + 6-digit sequence (e.g. BA072726000001). Use{" "}
-          <span class="font-medium text-text-primary">Generate serials</span> on the item list or serial registry.
+          Serial / lot tracking lives on the <span class="font-medium text-text-primary">Qty</span> tab under Tracking.
         </p>
       </Show>
     </EntityModal>

@@ -393,9 +393,16 @@ func saveReceiptJournal(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		glStatus := ""
 		if len(body.JournalLines) > 0 {
-			ev := buildORPostingEvent(tu.TenantID, id, body.JournalLines)
-			if err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
+			var receiptDate time.Time
+			_ = tx.QueryRow(r.Context(), `
+				select receipt_date from public.fin_official_receipts
+				where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID).Scan(&receiptDate)
+			ev := withEntryDate(buildORPostingEvent(tu.TenantID, id, body.JournalLines), receiptDate)
+			var postErr error
+			glStatus, postErr = postWithJournalPoster(r.Context(), tx, tu.TenantID, ev)
+			if postErr != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
 				return
 			}
@@ -408,7 +415,16 @@ func saveReceiptJournal(pool *pgxpool.Pool) http.HandlerFunc {
 
 		rec, _ := loadReceiptJournal(r.Context(), pool, tu.TenantID, id)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.receipt.journal.update", "fin_official_receipt", &id, before, rec)
-		response.OK(w, rec, "Updated.")
+		msg := "Updated."
+		switch glStatus {
+		case "audit_only":
+			msg = "Updated. Not on Trial Balance yet — enable Official Receipt auto-post under Finance setup, or post the journal manually."
+		case "draft":
+			msg = "Updated. Journal entry created as draft — post it under Journal Entries for Trial Balance."
+		case "posted":
+			msg = "Updated. Journal posted to the general ledger."
+		}
+		response.OK(w, rec, msg)
 	}
 }
 

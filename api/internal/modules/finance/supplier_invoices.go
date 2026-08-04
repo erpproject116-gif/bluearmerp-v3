@@ -22,10 +22,11 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inventorygl"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/invoicejournal"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/openlines"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -1154,10 +1155,11 @@ func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 	var ordered, received float64
 	var itemID *int64
 	var unitID *int64
+	var unitCost float64
 	var trackInventory bool
 	err := tx.QueryRow(ctx, `
 		select po.id, pol.qty::float8, coalesce(pol.received_qty, 0)::float8,
-		  pol.item_id, pol.unit_id,
+		  pol.item_id, pol.unit_id, coalesce(pol.unit_non_vat, 0)::float8,
 		  coalesce(i.track_inventory_qty, false)
 		from public.po_purchase_order_lines pol
 		join public.po_purchase_orders po on po.id = pol.purchase_order_id
@@ -1165,7 +1167,7 @@ func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 		where pol.id = $1 and po.tenant_id = $2 and po.deleted_at is null
 		  and po.status in ('draft', 'confirmed', 'partially_received', 'received')`,
 		purchaseOrderLineID, tenantID,
-	).Scan(&poID, &ordered, &received, &itemID, &unitID, &trackInventory)
+	).Scan(&poID, &ordered, &received, &itemID, &unitID, &unitCost, &trackInventory)
 	if err != nil {
 		return nil, errors.New("purchase order line not found")
 	}
@@ -1187,16 +1189,17 @@ func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 	}
 
 	var grID int64
+	var receiptDate time.Time
 	err = tx.QueryRow(ctx, `
 		insert into public.gr_goods_receipts (
 		  tenant_id, purchase_order_id, receipt_date, location_id, status,
 		  reference, notes, created_by_user_id
 		) values ($1, $2, current_date, $3, 'posted', $4, $5, $6)
-		returning id`,
+		returning id, receipt_date`,
 		tenantID, poID, locationID,
 		"Auto-receive on purchase invoice", "Created automatically when invoicing open PO qty without a prior GR.",
 		userID,
-	).Scan(&grID)
+	).Scan(&grID, &receiptDate)
 	if err != nil {
 		return nil, errors.New("failed to auto-create goods receipt")
 	}
@@ -1204,10 +1207,11 @@ func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 	var grLineID int64
 	err = tx.QueryRow(ctx, `
 		insert into public.gr_goods_receipt_lines (
-		  goods_receipt_id, purchase_order_line_id, line_no, expected_qty, received_qty
-		) values ($1, $2, 1, $3, $3)
+		  goods_receipt_id, purchase_order_line_id, line_no, expected_qty, received_qty,
+		  base_unit_cost, unit_cost
+		) values ($1, $2, 1, $3, $3, $4, $4)
 		returning id`,
-		grID, purchaseOrderLineID, invoiceQty,
+		grID, purchaseOrderLineID, invoiceQty, unitCost,
 	).Scan(&grLineID)
 	if err != nil {
 		return nil, errors.New("failed to auto-create goods receipt line")
@@ -1239,6 +1243,18 @@ func ensureLegacyReceiveForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 			tenantID, *itemID, locationID, baseQty, grID, userID)
 		if err != nil {
 			return nil, errors.New("failed to record stock movement for auto-receive")
+		}
+		if _, err := inventorygl.PostReceiptTx(
+			ctx, tx, tenantID, userID, receiptDate,
+			"goods_receipt", grID, "Auto-receive on purchase invoice",
+			[]inventorygl.Line{{
+				ItemID:         *itemID,
+				Qty:            baseQty,
+				UnitCost:       unitCost,
+				TrackInventory: true,
+			}},
+		); err != nil {
+			return nil, fmt.Errorf("failed to post inventory GL for auto-receive: %w", err)
 		}
 	}
 

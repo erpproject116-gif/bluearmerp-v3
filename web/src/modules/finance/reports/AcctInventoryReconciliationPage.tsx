@@ -43,7 +43,7 @@ export default function AcctInventoryReconciliationPage() {
     <FinanceLayout>
       <ReportPageLayout
         title="Accounting vs Inventory Reconciliation"
-        description="Compare posted inventory GL balances to operational stock valuation (item purchase price). Search (F8)."
+        description="Compare posted inventory GL (incl. PH 1200 / mapped Inventory default) to stock × purchase_price. Hybrid GL: enable under Finance setup after opening balances for existing stock. Gaps often mean draft journals, unmapped defaults, or hybrid off."
         dateFrom={() => filters().date_from ?? ""}
         dateTo={() => filters().date_to ?? ""}
         onDateFromChange={(v) => setFilters((f) => ({ ...f, date_from: v }))}

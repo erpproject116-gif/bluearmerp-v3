@@ -173,7 +173,7 @@ export function ReceiptJournalModal(props: Props) {
         body: JSON.stringify(body),
       });
       if (!res.success) throw new Error(res.message ?? "Failed to save journal");
-      toast.success("Receipt journal saved.");
+      toast.success(res.message ?? "Receipt journal saved.");
       props.onSaved();
     } catch (e) {
       toast.error(String(e));

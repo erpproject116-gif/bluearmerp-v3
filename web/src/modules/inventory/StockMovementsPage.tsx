@@ -1,4 +1,4 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
@@ -32,6 +32,14 @@ function formatWhen(iso: string) {
   }
 }
 
+function defaultDateRange(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - 90);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { from: iso(from), to: iso(to) };
+}
+
 export default function StockMovementsPage() {
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -42,8 +50,9 @@ export default function StockMovementsPage() {
   const [entryType, setEntryType] = createSignal<StockEntryType>("transfer");
   const [entryReason, setEntryReason] = createSignal<StockEntryReasonPreset>("");
   const [movementType, setMovementType] = createSignal("");
-  const [dateFrom, setDateFrom] = createSignal("");
-  const [dateTo, setDateTo] = createSignal("");
+  const initialDates = defaultDateRange();
+  const [dateFrom, setDateFrom] = createSignal(initialDates.from);
+  const [dateTo, setDateTo] = createSignal(initialDates.to);
 
   onMount(() => {
     const urlQ = searchParams.q;
@@ -83,6 +92,10 @@ export default function StockMovementsPage() {
   return (
     <>
       <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+        <p class="w-full text-xs text-text-secondary">
+          Showing the last 90 days by default. Clear dates to see all history. Movements appear after Purchases
+          (auto-receive), Receiving, Stock Entry, Sales, or adjustments.
+        </p>
         <label class="text-sm">
           <span class="mb-1 block text-text-secondary">From</span>
           <DateInput class="rounded border border-stroke px-2 py-1.5 text-sm" value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
@@ -97,6 +110,8 @@ export default function StockMovementsPage() {
             <option value="">All</option>
             <option value="adjustment">Adjustment</option>
             <option value="so_release">SO Release</option>
+            <option value="sales">Sales</option>
+            <option value="goods_receipt">Goods receipt</option>
             <option value="transfer_in">Transfer in</option>
             <option value="transfer_out">Transfer out</option>
             <option value="issue">Issue</option>
@@ -106,7 +121,21 @@ export default function StockMovementsPage() {
           </select>
         </label>
         <button type="button" class="rounded-lg bg-brand px-4 py-2 text-sm text-white" onClick={invalidate}>
-          Apply filters
+          Refresh
+        </button>
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+          onClick={() => {
+            const d = defaultDateRange();
+            setDateFrom(d.from);
+            setDateTo(d.to);
+            setMovementType("");
+            setQ("");
+            setPage(1);
+          }}
+        >
+          Reset to 90 days
         </button>
         <div class="ml-auto flex flex-wrap gap-2">
           <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => openEntry("transfer")}>
@@ -156,10 +185,18 @@ export default function StockMovementsPage() {
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}
-        onSearchChange={setQ}
-        searchPlaceholder="Search not applied to movements — use filters"
+        onSearchChange={(v) => {
+          setQ(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search item, location, type, reason…"
         onRefresh={invalidate}
       />
+      <Show when={!list.isFetching && (list.data?.total ?? 0) === 0}>
+        <p class="mt-3 text-center text-sm text-text-secondary">
+          No movements in this period — try Stock Entry, Purchases, Receiving, or Sales. Widen or clear the date range.
+        </p>
+      </Show>
 
       <StockAdjustmentModal open={adjustOpen()} onClose={() => setAdjustOpen(false)} onSaved={invalidate} />
       <StockEntryModal

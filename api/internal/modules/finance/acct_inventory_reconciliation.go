@@ -15,7 +15,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
-var inventoryAssetCodes = []string{"1469", "1509", "1539", "1689", "1699"}
+var inventoryAssetCodes = []string{"1200", "1469", "1509", "1539", "1689", "1699"}
 
 type acctInvReconSummary struct {
 	AcctClosingBalance  float64 `json:"acct_closing_balance"`
@@ -104,7 +104,25 @@ func acctInvAccountRowsSQL() string {
 
 func loadAcctInventoryReconciliation(ctx context.Context, pool *pgxpool.Pool, tenantID int64, dateFrom, dateTo time.Time) (acctInvReconPayload, error) {
 	var out acctInvReconPayload
-	codes := inventoryAssetCodes
+	codes := append([]string{}, inventoryAssetCodes...)
+	var mappedCode string
+	_ = pool.QueryRow(ctx, `
+		select a.account_code
+		from public.tenant_finance_defaults d
+		join public.fin_accounts a on a.id = d.inventory_account_id and a.tenant_id = d.tenant_id
+		where d.tenant_id = $1 and a.deleted_at is null`, tenantID).Scan(&mappedCode)
+	if mappedCode != "" {
+		found := false
+		for _, c := range codes {
+			if c == mappedCode {
+				found = true
+				break
+			}
+		}
+		if !found {
+			codes = append(codes, mappedCode)
+		}
+	}
 
 	if err := pool.QueryRow(ctx, acctInvClosingBalanceSQL(), tenantID, codes, dateTo).Scan(&out.Summary.AcctClosingBalance); err != nil {
 		return out, err

@@ -13,7 +13,9 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/invoicejournal"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -181,8 +183,51 @@ func putPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		lines := []invoicejournal.Line{
-			{AccountID: body.PurchaseAccountID, Debit: subtotal, Remark: "Purchase - " + invoiceNo},
+		var stockPretax float64
+		err = pool.QueryRow(r.Context(), `
+			select coalesce(sum(sil.non_vat_total), 0)::float8
+			from public.fin_supplier_invoice_lines sil
+			left join public.inv_items i on i.id = sil.item_id
+			where sil.supplier_invoice_id = $1
+			  and coalesce(i.track_inventory_qty, false)`, id).Scan(&stockPretax)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load invoice lines.", "ERR_INTERNAL")
+			return
+		}
+		expensePretax := subtotal - stockPretax
+		if expensePretax < 0 {
+			expensePretax = 0
+		}
+
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+
+		var lines []invoicejournal.Line
+		if policy.InventoryGLHybridEnabled {
+			if stockPretax > 0.0001 {
+				grniID, err := financedefaults.ResolveByRole(r.Context(), pool, tu.TenantID, financedefaults.RoleGRNI)
+				if err != nil {
+					response.Validation(w, map[string]string{
+						"grni_account_id": "Map GRNI under Chart of Accounts defaults before posting purchases with inventory items.",
+					})
+					return
+				}
+				lines = append(lines, invoicejournal.Line{
+					AccountID: grniID, Debit: stockPretax, Remark: "GRNI - " + invoiceNo,
+				})
+			}
+			if expensePretax > 0.0001 {
+				lines = append(lines, invoicejournal.Line{
+					AccountID: body.PurchaseAccountID, Debit: expensePretax, Remark: "Purchase - " + invoiceNo,
+				})
+			}
+		} else {
+			lines = append(lines, invoicejournal.Line{
+				AccountID: body.PurchaseAccountID, Debit: subtotal, Remark: "Purchase - " + invoiceNo,
+			})
 		}
 		if taxTotal > 0 {
 			if taxAcct, e := invoicejournal.ResolveAccountID(r.Context(), pool, tu.TenantID, inputVatCode); e == nil {

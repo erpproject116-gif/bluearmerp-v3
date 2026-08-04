@@ -201,8 +201,8 @@ func payExpenseInTx(ctx context.Context, tx pgx.Tx, tenantID, userID, expenseID 
 	}
 
 	expenseAcct, _ := resolveExpenseAccountCode(ctx, tx, tenantID)
-	ev := buildExpensePaymentPostingEvent(tenantID, newPVID, *partnerID, total, pm, expenseAcct)
-	if err := postWithJournalPoster(ctx, tx, tenantID, ev); err != nil {
+	ev := withEntryDate(buildExpensePaymentPostingEvent(tenantID, newPVID, *partnerID, total, pm, expenseAcct), paymentDate)
+	if _, err := postWithJournalPoster(ctx, tx, tenantID, ev); err != nil {
 		return 0, err
 	}
 

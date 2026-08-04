@@ -350,9 +350,12 @@ export default function PurchaseOrderListPage() {
   return (
     <PurchaseRequestLayout>
       <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
-        After goods are received and posted, select a PO and use{" "}
-        <span class="font-medium">Generate slip → Purchase</span> to create the AP invoice (or post a GR — Purchase is
-        created automatically).
+        <p class="font-medium text-slate-800">Simple path: Purchase Order → Purchases</p>
+        <p class="mt-1">
+          Saving a Purchase from PO lines updates stock automatically (auto-receive) when items track inventory.
+          Use <span class="font-medium">Receiving</span> only when you need serials/lots first, or when
+          “Require goods receipt before invoice” is on in Setup.
+        </p>
       </div>
       <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
         <button
@@ -371,15 +374,16 @@ export default function PurchaseOrderListPage() {
         </button>
         <A
           href="/app/purchase-order/goods-receipt"
-          class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+          class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
-          Goods receipts
+          Receiving
         </A>
         <A
           href="/app/inventory/serial-lot/receive"
-          class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+          class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+          title="Wizard for serial/lot capture — same Goods Receipt underneath"
         >
-          Receive goods
+          Serial receive wizard
         </A>
       </div>
 

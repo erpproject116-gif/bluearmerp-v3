@@ -95,6 +95,14 @@ func listStockMovements(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, mt)
 			argN++
 		}
+		if p.Q != "" {
+			where += fmt.Sprintf(` and (
+				i.item_code ilike $%d or i.item_name ilike $%d or
+				l.location_name ilike $%d or sm.movement_type ilike $%d or
+				coalesce(sm.reason, '') ilike $%d)`, argN, argN, argN, argN, argN)
+			args = append(args, "%"+p.Q+"%")
+			argN++
+		}
 
 		order := orderSQL(p.Order)
 		q := fmt.Sprintf(`

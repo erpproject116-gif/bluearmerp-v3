@@ -26,8 +26,8 @@ export const SERIAL_SLIP_TYPE_OPTIONS = [
 ];
 
 export const TRACKING_POLICY_OPTIONS = [
-  { value: "required", label: "Required on transactions" },
   { value: "optional", label: "Optional on transactions" },
+  { value: "required", label: "Required on transactions" },
 ] as const;
 
 export const ITEM_CATEGORY_OPTIONS = [
