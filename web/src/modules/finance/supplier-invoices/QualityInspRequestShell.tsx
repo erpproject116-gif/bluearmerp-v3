@@ -59,18 +59,18 @@ export function QualityInspRequestShell() {
     <div class="rounded-xl border border-stroke bg-white p-6 shadow-sm">
       <h2 class="text-lg font-semibold text-text-primary">New Quality Insp. Request</h2>
       <p class="mt-2 max-w-xl text-sm text-text-secondary">
-        Quality inspection requests are tied to Goods Receipt in Bluearm (same as Ecount’s GR-based QC path).
+        Quality inspection requests are tied to Purchase Receive in Bluearm (same as Ecount’s GR-based QC path).
         Pick a receipt below or open the full QC list.
       </p>
 
       <div class="mt-4 grid max-w-lg gap-3">
-        <Field label="Goods receipt">
+        <Field label="Purchase Receive">
           <select class={inputClass} value={grId()} onChange={(e) => setGrId(e.currentTarget.value)}>
             <option value="">Select…</option>
             <For each={draftGr.data ?? []}>
               {(r) => (
                 <option value={r.id}>
-                  GR #{r.id}
+                  Receive #{r.id}
                   {r.purchase_order_no ? ` · PO ${r.purchase_order_no}` : ""}
                   {r.receipt_date ? ` · ${r.receipt_date}` : ""}
                 </option>
@@ -103,7 +103,7 @@ export function QualityInspRequestShell() {
             href="/app/purchase-order/goods-receipt"
             class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50"
           >
-            Goods Receipt
+            Purchase Receive
           </A>
         </div>
       </div>

@@ -7,14 +7,14 @@ export const SAFETY_DOC_TYPES = [
   { key: "sales_order", label: "Sales Order" },
   { key: "shipping_order", label: "Shipping Order" },
   { key: "sales", label: "Sales" },
-  { key: "goods_receipt", label: "Goods Receipt" },
+  { key: "goods_receipt", label: "Purchase Receive" },
   { key: "purchase_order", label: "Purchase Order" },
-  { key: "purchase", label: "Purchase" },
+  { key: "purchase", label: "Bill" },
 ] as const;
 
 export const SERIAL_SLIP_TYPE_OPTIONS = [
   { value: "", label: "All slip types" },
-  { value: "goods_receipt", label: "Goods Receipt" },
+  { value: "goods_receipt", label: "Purchase Receive" },
   { value: "sales", label: "Sales" },
   { value: "sales_order", label: "Sales Order" },
   { value: "shipping_order", label: "Shipping Order" },

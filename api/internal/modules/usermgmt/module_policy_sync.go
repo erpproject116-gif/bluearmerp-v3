@@ -204,7 +204,7 @@ func policyDeltaList(p processpolicy.Patch) []policyDeltaMsg {
 	add("sales_require_delivery_receipt", p.SalesRequireDeliveryReceipt, "Delivery receipt before invoice is no longer required.")
 	add("purchase_require_pr", p.PurchaseRequirePR, "Purchase orders can start without a purchase request.")
 	add("purchase_require_pr_approval", p.PurchaseRequirePRApproval, "Purchase request approval is no longer required.")
-	add("purchase_require_gr_before_supplier_invoice", p.PurchaseRequireGRBeforeSupplierInv, "Supplier invoices can be entered without a goods receipt first.")
+	add("purchase_require_gr_before_supplier_invoice", p.PurchaseRequireGRBeforeSupplierInv, "Bills can be entered without Purchase Receive first (simple bill+receive).")
 	// Fix messages for true values (full process)
 	for i := range out {
 		if out[i].Value {

@@ -38,14 +38,15 @@ const FLOWS: FlowRow[] = [
     ],
   },
   {
-    title: "Buy (simple)",
-    blurb: "Happy path: Purchase Order → New Purchase (stock in on save). Use Receiving only for serials/lots or GR-before-invoice.",
+    title: "Buy (recommended)",
+    blurb:
+      "Purchase Order → Purchase Receive (stock + delivery proof) → Bill (amount owed) → Payment Made. Purchase Request is optional.",
     nodes: [
       { label: "Purchase Request", href: "/app/purchase-request/purchase-requests", sub: "Optional", optional: true },
       { label: "Purchase Order", href: "/app/purchase-order/purchase-orders", sub: "Commit to vendor" },
-      { label: "Receiving", href: "/app/purchase-order/goods-receipt", sub: "Advanced", optional: true },
-      { label: "New Purchase", href: "/app/purchases/purchases", sub: "Bill + stock in" },
-      { label: "Pay vendor", href: "/app/finance/payment-vouchers", sub: "Payment Voucher", accent: true },
+      { label: "Purchase Receive", href: "/app/purchase-order/goods-receipt", sub: "Stock + proof" },
+      { label: "Bill", href: "/app/purchases/purchases", sub: "Amount owed" },
+      { label: "Payment Made", href: "/app/finance/disbursements", sub: "Pay vendor", accent: true },
     ],
   },
 ];
@@ -75,9 +76,8 @@ export function MyPageFlowChart() {
     <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
       <h2 class="mb-1 text-sm font-semibold text-text-primary">How work flows</h2>
       <p class="mb-4 text-xs text-text-secondary">
-        Click a step to open that screen. Solid pills are the usual path; dashed pills are optional. Accounting
-        (journals, stock GL) runs in the background when Chart of Accounts defaults and auto-post are set — you do
-        not add extra steps on New Sales or New Purchase.
+        Click a step to open that screen. Solid pills are the usual path; dashed pills are optional. Stock and
+        accounting journals update in the background when Chart of Accounts defaults and auto-post are set.
       </p>
 
       <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Start here (masters)</p>
@@ -108,13 +108,32 @@ export function MyPageFlowChart() {
         )}
       </For>
 
-      <div class="mt-1 rounded-lg border border-dashed border-stroke bg-slate-50/90 px-3 py-2.5">
-        <p class="text-xs font-semibold text-text-primary">Load Slip (inside the form)</p>
-        <p class="mt-1 text-[11px] leading-snug text-text-secondary">
-          Load Slip is not its own menu page — it is a button on New Sales / New Purchase / PO that pulls open lines
-          from an earlier document (e.g. Sales ← Sales Order, Purchase ← PO or Receiving). Use it when you already
-          have an upstream doc; skip it for a walk-in sale or a simple bill.
-        </p>
+      <div class="mt-1 space-y-2">
+        <div class="rounded-lg border border-dashed border-stroke bg-slate-50/90 px-3 py-2.5">
+          <p class="text-xs font-semibold text-text-primary">What each buy step means</p>
+          <ul class="mt-1 list-disc space-y-0.5 pl-4 text-[11px] leading-snug text-text-secondary">
+            <li>
+              <span class="font-medium text-text-primary">Purchase Receive</span> — document stock in from the
+              supplier (attachments = delivery proof). Same screen formerly called Receiving / Goods Receipt.
+            </li>
+            <li>
+              <span class="font-medium text-text-primary">Bill</span> — declare the amount owed (supplier invoice).
+              Prefer Load Slip from Purchase Receive so you do not receive twice.
+            </li>
+            <li>
+              <span class="font-medium text-text-primary">Payment Made</span> — pay the vendor (Payment Voucher /
+              Disbursements).
+            </li>
+          </ul>
+        </div>
+        <div class="rounded-lg border border-dashed border-stroke bg-slate-50/90 px-3 py-2.5">
+          <p class="text-xs font-semibold text-text-primary">Load Slip (inside the form)</p>
+          <p class="mt-1 text-[11px] leading-snug text-text-secondary">
+            Not a menu page — a button on PO / Purchase Receive / Bill that pulls open lines from an earlier
+            document. Example: Bill ← Purchase Receive, or Bill ← Purchase Order when simple bill+receive is
+            allowed in Setup.
+          </p>
+        </div>
       </div>
     </section>
   );

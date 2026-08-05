@@ -51,19 +51,19 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
   },
   purchase_require_po_approval: {
     label: "Require approval on purchase orders (advisory)",
-    help: "Shown for process design. Receiving and Purchases currently proceed without blocking on PO approval.",
+    help: "Shown for process design. Purchase Receive and Bills currently proceed without blocking on PO approval.",
   },
   purchase_require_gr_before_supplier_invoice: {
-    label: "Require goods receipt before supplier invoice",
-    help: "On = bill only after Receiving. Off (default) = Purchases can auto-receive stock when you save.",
+    label: "Require Purchase Receive before Bill",
+    help: "On (recommended) = receive stock/proof first, then Bill. Off = simple bill+receive — saving a Bill from PO lines can also receive stock.",
   },
   purchase_order_require_attachment: {
     label: "Require file on purchase order",
     help: "On = PO needs an uploaded file before Confirm.",
   },
   supplier_invoice_require_attachment: {
-    label: "Require file on purchase invoice",
-    help: "On = supplier invoice needs an uploaded file before completion.",
+    label: "Require file on Bill",
+    help: "On = Bill needs an uploaded file before completion.",
   },
   accounts_auto_post_or: {
     label: "Auto-post official receipts to journal",
@@ -87,7 +87,7 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
   },
   inventory_gl_hybrid_enabled: {
     label: "Hybrid inventory GL (qty-tracked items)",
-    help: "On = Receiving/Sales of qty-tracked items post Inventory / GRNI / COGS. Map Inventory, GRNI, and COGS under Chart of Accounts defaults first. Existing tenants should set opening inventory before enabling.",
+    help: "On = Purchase Receive/Sales of qty-tracked items post Inventory / GRNI / COGS. Map Inventory, GRNI, and COGS under Chart of Accounts defaults first. Existing tenants should set opening inventory before enabling.",
   },
 };
 

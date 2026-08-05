@@ -21,7 +21,7 @@ export const LEARN_GROUPS: LearnGroup[] = [
     links: [
       { label: "Sales list", href: "/app/sales/sales", ready: true },
       { label: "Purchase List", href: "/app/purchases/purchases", ready: true },
-      { label: "Goods Receipt List", href: "/app/purchase-order/goods-receipt", ready: true },
+      { label: "Purchase Receive", href: "/app/purchase-order/goods-receipt", ready: true },
     ],
   },
   {

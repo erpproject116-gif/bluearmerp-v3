@@ -127,12 +127,12 @@ export const MODAL_FORM_GUIDES: Record<string, ModalFormGuideDef> = {
   },
   goods_receipt: {
     id: "goods_receipt",
-    title: "Recording a goods receipt",
-    summary: "A goods receipt records stock that arrived from a supplier against a purchase order.",
+    title: "Recording a Purchase Receive",
+    summary: "Purchase Receive records stock that arrived from a supplier against a purchase order, with optional delivery proof attachments.",
     steps: [
       "Choose the purchase order or lines you received.",
-      "Confirm quantities and the receiving location.",
-      "Save so inventory on-hand updates.",
+      "Confirm quantities and the receiving location; attach delivery proof if needed.",
+      "Save so inventory on-hand updates — then create a Bill.",
     ],
     docHref: "/docs/buying",
   },

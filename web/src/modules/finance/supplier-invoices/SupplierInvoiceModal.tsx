@@ -689,7 +689,7 @@ export function SupplierInvoiceModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={effectiveEditing() ? (props.readOnly ? "View Purchase Invoice (deleted)" : "Edit Purchase Invoice") : "New Purchase Invoice"}
+        title={effectiveEditing() ? (props.readOnly ? "View Bill (deleted)" : "Edit Bill") : "New Bill"}
         onClose={props.onClose}
         onSave={activeTab() === "details" ? () => void save() : undefined}
         readOnly={props.readOnly}
@@ -1013,9 +1013,9 @@ export function SupplierInvoiceModal(props: Props) {
             <p class="text-xs text-text-secondary">
               <Show
                 when={processPolicy.data?.purchase_require_gr_before_supplier_invoice}
-                fallback="Load Slip → Purchase Order bills confirmed PO residual and auto-receives stock when needed (like Sales Invoice → SO). Serial/lot items still need Goods Receipt first."
+                fallback="Load Slip → Purchase Order creates a Bill from confirmed PO residual and can auto-receive stock (simple bill+receive). Serial/lot items still need Purchase Receive first."
               >
-                Process policy requires Goods Receipt before purchase invoice — use Load Slip → Goods Receipt (Receiving). Turn the gate off under Process policies for PO→invoice flexibility.
+                Process policy requires Purchase Receive before Bill — use Load Slip → Purchase Receive. Turn the gate off under Process policies for simple bill+receive.
               </Show>
             </p>
           </div>

@@ -137,7 +137,7 @@ export default function InventoryStatusReportPage() {
   return (
     <ReportPageLayout
       title="Find Stock"
-      description="Cross-branch inquiry: on-hand qty by item and location. Balances appear after Purchases (auto-receive), Receiving, Stock Entry, or Sales — not from item master alone. Search (F8)."
+      description="Cross-branch inquiry: on-hand qty by item and location. Balances appear after Bill (auto-receive), Purchase Receive, Stock Entry, or Sales — not from item master alone. Search (F8)."
       showDateFilters={false}
       submitted={submitted() !== null}
       loading={report.isFetching}
@@ -214,17 +214,17 @@ export default function InventoryStatusReportPage() {
         <ReportEmptyMessage
           message={
             Object.keys(normalizeFilters(filters())).length === 0
-              ? "No stock balances yet. Create qty-tracked items, then Purchase (auto-receive), Receiving, or Stock Entry. Purchases do not edit BOM recipes — only on-hand qty."
+              ? "No stock balances yet. Create qty-tracked items, then Bill (auto-receive), Purchase Receive, or Stock Entry. Bills do not edit BOM recipes — only on-hand qty."
               : "No stock matches these filters — try All branches or clear filters, then Search."
           }
         />
         <p class="mt-3 text-center text-sm">
           <A href="/app/purchases/purchases" class="text-brand-600 hover:underline">
-            Purchases
+            Bills
           </A>
           {" · "}
           <A href="/app/purchase-order/goods-receipt" class="text-brand-600 hover:underline">
-            Receiving
+            Purchase Receive
           </A>
           {" · "}
           <A href="/app/inventory/stock-movements" class="text-brand-600 hover:underline">

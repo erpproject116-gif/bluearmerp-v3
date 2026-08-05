@@ -7,7 +7,7 @@ export default function GoodsReceiptSettingsPage() {
     <PurchaseRequestLayout>
       <EntityFormSettingsPage
         entityType={PURCHASE_REQUEST_ENTITY.goodsReceipt}
-        featureLabel="Goods Receipt"
+        featureLabel="Purchase Receive"
         listHref="/app/purchase-order/goods-receipt"
       />
     </PurchaseRequestLayout>

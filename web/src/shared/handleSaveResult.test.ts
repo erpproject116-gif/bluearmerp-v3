@@ -29,7 +29,7 @@ describe("handleSaveResult", () => {
           code: "SA_SI_QTY_EXCEEDS_PO_BALANCE",
           title: "Quantity exceeds open PO balance",
           detail: "Only 1.0000 remains on this PO line.",
-          actions: [{ label: "Open Goods Receipts", href: "/app/purchase-order/goods-receipt" }],
+          actions: [{ label: "Open Purchase Receive", href: "/app/purchase-order/goods-receipt" }],
         },
       }),
       toast,
@@ -39,7 +39,7 @@ describe("handleSaveResult", () => {
       expect.objectContaining({
         title: "Quantity exceeds open PO balance",
         message: "Only 1.0000 remains on this PO line.",
-        actionLabel: "Open Goods Receipts",
+        actionLabel: "Open Purchase Receive",
         href: "/app/purchase-order/goods-receipt",
       }),
     );

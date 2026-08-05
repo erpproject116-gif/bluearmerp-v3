@@ -144,7 +144,7 @@ export const SELLING_LOAD_SLIP_SOURCES: LoadSlipOption[] = [
 export const BUYING_LOAD_SLIP_SOURCES: LoadSlipOption[] = [
   { id: "pr", label: "Purchase Request", group: "Buying", hint: "Open PR lines with balance qty" },
   { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines with residual qty" },
-  { id: "gr", label: "Goods Receipt (Receiving)", group: "Buying", hint: "Posted GR lines not yet invoiced" },
+  { id: "gr", label: "Purchase Receive", group: "Buying", hint: "Posted receive lines not yet billed" },
   { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "Accepted vendor quotes / PO lines from RFQ" },
 ];
 
@@ -155,7 +155,7 @@ export const SALES_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "shipping", label: "Shipping Order", group: "Selling", hint: "SO lines linked to a shipping order" },
   { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
   { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
-  { id: "gr", label: "Goods Receipt", group: "Buying", hint: MAP_HINT },
+  { id: "gr", label: "Purchase Receive", group: "Buying", hint: MAP_HINT },
 ];
 
 /** New Sales Order — Quotation fulfill + Buying map. */
@@ -188,10 +188,10 @@ export const PURCHASE_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
   { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },
 ];
 
-/** New Purchases / supplier invoice — Buying fulfill + Selling map. */
+/** New Bill / supplier invoice — Buying fulfill + Selling map. */
 export const PURCHASE_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "po", label: "Purchase Order", group: "Buying", hint: "Confirmed PO lines with open billed qty (auto-receives stock when GR policy is off)" },
-  { id: "gr", label: "Goods Receipt (Receiving)", group: "Buying", hint: "Posted GR lines not yet invoiced" },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines — may auto-receive if Setup allows simple bill+receive" },
+  { id: "gr", label: "Purchase Receive", group: "Buying", hint: "Posted receive lines not yet billed (preferred)" },
   { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "PO lines sourced from accepted vendor quotes" },
   { id: "so", label: "Sales Order", group: "Selling", hint: MAP_HINT },
   { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },
