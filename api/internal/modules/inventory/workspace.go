@@ -15,6 +15,7 @@ import (
 type inventoryWorkspaceSummary struct {
 	ActiveItems       int64 `json:"active_items"`
 	ActiveLocations   int64 `json:"active_locations"`
+	ItemsWithStock    int64 `json:"items_with_stock"`
 	LowStockSkus      int64 `json:"low_stock_skus"`
 	NegativeStockSkus int64 `json:"negative_stock_skus"`
 	OpenStockEntries  int64 `json:"open_stock_entries"`
@@ -51,6 +52,11 @@ func inventoryWorkspaceHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			select count(*)
 			from public.inv_locations
 			where tenant_id = $1 and deleted_at is null and status = 'active'`, tu.TenantID).Scan(&out.ActiveLocations)
+
+		_ = pool.QueryRow(ctx, `
+			select count(distinct bal.item_id)
+			from public.inv_item_location_balances bal
+			where bal.tenant_id = $1 and bal.qty_on_hand > 0.0001`, tu.TenantID).Scan(&out.ItemsWithStock)
 
 		_ = pool.QueryRow(ctx, `
 			select count(distinct bal.item_id)

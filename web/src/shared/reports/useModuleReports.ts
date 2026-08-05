@@ -796,6 +796,7 @@ export function useApAgingReport(params: () => ReportParams<AgingFilters>) {
 export type InventoryWorkspaceSummary = {
   active_items: number;
   active_locations: number;
+  items_with_stock: number;
   low_stock_skus: number;
   negative_stock_skus: number;
   open_stock_entries: number;
