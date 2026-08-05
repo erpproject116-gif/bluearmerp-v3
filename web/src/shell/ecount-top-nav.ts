@@ -183,6 +183,8 @@ export type HomeSidebarArea = {
   defaultExpanded?: boolean;
   /** Tenant module id for enablement gating (sidebar children). */
   moduleId?: string;
+  /** Optional short tooltip / secondary label for buy-path clarity. */
+  hint?: string;
 };
 
 export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
