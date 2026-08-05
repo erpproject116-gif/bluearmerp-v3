@@ -4,6 +4,7 @@ import { useAuth } from "../../shared/auth-context";
 import { useInventoryWorkspace, useLowStockAlerts } from "../../shared/reports/useModuleReports";
 import { ReconciliationBanner } from "../../shared/ReconciliationBanner";
 import { StocksHowItFits } from "./StocksHowItFits";
+import { StocksDay1Setup } from "./StocksDay1Setup";
 
 type KpiTile = {
   label: string;
@@ -41,11 +42,15 @@ export default function StockWorkspacePage() {
   return (
     <div class="space-y-6">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
+        <h1 class="text-lg font-semibold text-text-primary">Stocks</h1>
+        <p class="mt-1 text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-1 text-sm text-text-secondary">
-          Quick links to items, locations, movement reports, and stock reconciliation.
+          Set up places and products first. See what’s on the shelf in Find Stock after you enter opening counts or
+          receive a delivery.
         </p>
       </section>
+
+      <StocksDay1Setup summary={workspace.data} loading={workspace.isLoading} />
 
       <ReconciliationBanner />
 
