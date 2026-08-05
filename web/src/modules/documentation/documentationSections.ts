@@ -397,11 +397,11 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Purchasing starts with a Purchase Request—a internal list of what you want to buy. After approval, you create a Purchase Order to send to the supplier. When goods arrive, you record a Goods Receipt so stock increases.",
+        text: "Purchasing starts with a Purchase Request—an internal list of what you want to buy. After approval, you create a Purchase Order to send to the supplier. When goods arrive, you record a Purchase Receive so stock increases, then a Bill for the amount owed, then Payment Made.",
       },
       {
         type: "flow",
-        items: ["Purchase Request", "Purchase Order", "Goods Receipt", "Stock updated"],
+        items: ["Purchase Request", "Purchase Order", "Purchase Receive", "Bill", "Payment Made"],
       },
       {
         type: "steps",
@@ -410,17 +410,17 @@ export const documentationSections: DocSection[] = [
           "Submit for approval when your store requires it; approvers confirm the request before PO creation.",
           "Create a Purchase Order — use Load Slip from Purchase Request or Supplier Quotation (RFQ).",
           "Confirm the purchase order.",
-          "When shipment arrives, open Goods Receipt List or Serial & Lot → Receive / Scan to receive against the order.",
+          "When shipment arrives, open Purchase Receive or Serial & Lot → Receive / Scan to receive against the order.",
           "If Quality is enabled, set inspection to Released on draft receipts before posting; Held receipts block stock posting until released.",
         ],
       },
       {
         type: "paragraph",
-        text: "Buying workspace lists Purchase Status, Pre-Invoicing (Purchases), and Payable Status reports. RFQ under Purchase Order lets you collect vendor quotes before ordering.",
+        text: "Buying workspace lists Purchase Status, Pre-Invoicing (Bills), and Payable Status reports. RFQ under Purchase Order lets you collect vendor quotes before ordering.",
       },
       {
         type: "tip",
-        text: "Purchase Order List and Goods Receipt List are under Purchase Request in the sidebar.",
+        text: "Purchase Order List and Purchase Receive are under Buy in the sidebar.",
       },
     ],
   },

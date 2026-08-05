@@ -350,11 +350,12 @@ export default function PurchaseOrderListPage() {
   return (
     <PurchaseRequestLayout>
       <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
-        <p class="font-medium text-slate-800">Simple path: Purchase Order → Purchases</p>
+        <p class="font-medium text-slate-800">Buy path: Purchase Order → Purchase Receive → Bill → Payment Made</p>
         <p class="mt-1">
-          Saving a Purchase from PO lines updates stock automatically (auto-receive) when items track inventory.
-          Use <span class="font-medium">Receiving</span> only when you need serials/lots first, or when
-          “Require goods receipt before invoice” is on in Setup.
+          After the PO, open <span class="font-medium">Purchase Receive</span> to record stock and attach delivery
+          proof. Then create a <span class="font-medium">Bill</span> (amount owed). Pay from Disbursements / Payment
+          Voucher. If Setup allows “simple bill+receive,” a Bill from PO lines can still auto-receive — prefer
+          Purchase Receive first for serials/lots and clear stock history.
         </p>
       </div>
       <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
@@ -376,12 +377,18 @@ export default function PurchaseOrderListPage() {
           href="/app/purchase-order/goods-receipt"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
-          Receiving
+          Purchase Receive
+        </A>
+        <A
+          href="/app/purchases/purchases"
+          class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+        >
+          Bills
         </A>
         <A
           href="/app/inventory/serial-lot/receive"
           class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-          title="Wizard for serial/lot capture — same Goods Receipt underneath"
+          title="Serial/lot wizard — posts as Purchase Receive underneath"
         >
           Serial receive wizard
         </A>

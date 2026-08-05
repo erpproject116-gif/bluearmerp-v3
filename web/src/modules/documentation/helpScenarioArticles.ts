@@ -12,7 +12,7 @@ export const helpScenarioArticles: KbArticle[] = [
     scenario:
       "You do not know which screen to open for sales, purchases, cash in/out, or stock — or you opened the wrong menu and filed a ticket.",
     intro:
-      "Open Home. Use Learn for common lists, or How work flows for Sell (New Sales → Get paid) and Buy (PO → New Purchase → Pay). Dashed steps are optional. Load Slip is a button inside New Sales / New Purchase / PO — not a separate menu. Sidebar: Stocks, Sell, Buy, Accounting.",
+      "Open Home. Use Learn for common lists, or How work flows for Sell (New Sales → Get paid) and Buy (PO → Purchase Receive → Bill → Payment Made). Dashed steps are optional. Load Slip is a button inside New Sales / New Bill / PO — not a separate menu. Sidebar: Stocks, Sell, Buy, Accounting.",
     blocks: [
       {
         type: "steps",
@@ -20,7 +20,7 @@ export const helpScenarioArticles: KbArticle[] = [
           "Go to /app/dashboard (Home / MyPage).",
           "Set masters once if needed: Partners, Items (qty tracking on for stock), Locations, Tax, Accounting setup.",
           "Click a solid pill in How work flows for the screen you need — dashed pills are optional.",
-          "On New Sales / New Purchase, use Load Slip only when pulling lines from an earlier document (SO, PO, Receiving).",
+          "On New Sales / New Bill, use Load Slip only when pulling lines from an earlier document (SO, PO, Purchase Receive).",
           "Use Site Map (/app/dashboard/site-map) to search menu names.",
         ],
       },
@@ -108,25 +108,25 @@ export const helpScenarioArticles: KbArticle[] = [
   },
   {
     id: "process-policy-gates-explained",
-    title: "Process policy gates (quotation, SO, GR before supplier invoice)",
+    title: "Process policy gates (quotation, SO, Purchase Receive before Bill)",
     scenario:
-      "Process policies block the next step — sales require quotation or SO, or goods receipt before supplier invoice — and you need plain-language gates.",
+      "Process policies block the next step — sales require quotation or SO, or Purchase Receive before Bill — and you need plain-language gates.",
     intro:
-      "Process policies enforce commercial flow: quotation before SO, SO before sales invoice, PR approval before PO, and goods receipt before supplier invoice. Admins set gates during setup; members see blocks when a required prior document is missing.",
+      "Process policies enforce commercial flow: quotation before SO, SO before sales invoice, PR approval before PO, and Purchase Receive before Bill. Admins set gates during setup; members see blocks when a required prior document is missing.",
     blocks: [
       {
         type: "steps",
         items: [
           "Open User Management → Process policies (admin).",
           "Review selling gates: require quotation before SO, require SO before sales invoice, SO release mode (legacy vs delivery receipt).",
-          "Review buying gates: require PR approval before PO, require goods receipt before supplier invoice (GR before SI).",
+          "Review buying gates: require PR approval before PO, require Purchase Receive before Bill.",
           "Review attachment rules per document type — ON means Confirm needs a file.",
           "Confirm policies during /app/setup/process-policies before first live transactions.",
         ],
       },
       {
         type: "tip",
-        text: "Policy gate “goods receipt before supplier invoice” means you must post a GR (or use a policy that allows SI from PO only). This is not the same as Load Slip from GR — fix the policy or post the GR first. Pre-Invoicing Status shows unbilled receipts.",
+        text: "Policy gate “Purchase Receive before Bill” means you must post a receive (or turn the gate off for simple bill+receive from PO). Pre-Invoicing Status shows unbilled receipts.",
       },
     ],
     primaryHref: "/app/user-management/process-policies",
@@ -271,28 +271,28 @@ export const helpScenarioArticles: KbArticle[] = [
   },
   {
     id: "payment-voucher-after-purchase",
-    title: "Payment voucher after supplier invoice",
-    scenario: "You posted a purchase (supplier invoice) and need to pay the vendor.",
+    title: "Payment Made after Bill",
+    scenario: "You posted a Bill and need to pay the vendor.",
     intro:
-      "Payment vouchers (Cash Payment) clear AP. Start from the purchase after save or from Finance → Vouchers.",
+      "Payment Made (Payment Voucher / Disbursements) clears AP. Start from the Bill after save or from Accounting → Payment Made.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Save the supplier invoice / purchase document.",
-          "Use Cash Payment on the document or open Finance → Payment Vouchers → New.",
-          "Select the vendor and allocate to open purchase balances.",
+          "Save the Bill.",
+          "Use Cash Payment on the document or open Accounting → Payment Made → New Payment Made.",
+          "Select the vendor and allocate to open Bill balances.",
           "Choose payment method and cash/bank account, then save.",
           "Check Payable Status or Vendor Book for the updated balance.",
         ],
       },
       {
         type: "tip",
-        text: "If GR-before-SI policy is on, ensure goods were received and the purchase was created via Load Slip from GR or an allowed PO path before paying.",
+        text: "If Purchase Receive before Bill is on, ensure stock was received and the Bill used Load Slip from Purchase Receive (or an allowed PO path) before paying.",
       },
     ],
-    primaryHref: "/app/finance/payment-vouchers",
-    primaryLabel: "Payment vouchers",
+    primaryHref: "/app/finance/disbursements",
+    primaryLabel: "Payment Made",
     relatedGuideIds: ["purchase-cash-payment-after-save", "receivable-payable-status", "goods-receipt-load-slip"],
   },
   {
@@ -540,19 +540,19 @@ export const helpScenarioArticles: KbArticle[] = [
   },
   {
     id: "goods-receipt-serial-receive",
-    title: "Goods receipt with serial numbers",
-    scenario: "Vendor delivery includes serial-tracked items and you must post GR with serials into stock.",
+    title: "Purchase Receive with serial numbers",
+    scenario: "Vendor delivery includes serial-tracked items and you must post Purchase Receive with serials into stock.",
     intro:
-      "Post the goods receipt against the PO, then scan serials on Track serial lines until count matches qty. Serials become available in the registry.",
+      "Post Purchase Receive against the PO, then scan serials on Track serial lines until count matches qty. Serials become available in the registry.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Goods Receipt and Load Slip from the purchase order (or create GR linked to PO).",
+          "Open Purchase Receive and Load Slip from the purchase order (or create receive linked to PO).",
           "Set received quantities for each line.",
           "On Track serial lines, scan each unit until accepted count equals received qty.",
-          "Post / confirm the goods receipt.",
-          "Optionally create the supplier invoice via Load Slip → Goods Receipt.",
+          "Post / confirm the Purchase Receive.",
+          "Optionally create the Bill via Load Slip → Purchase Receive.",
         ],
       },
       {
@@ -561,7 +561,7 @@ export const helpScenarioArticles: KbArticle[] = [
       },
     ],
     primaryHref: "/app/purchase-order/goods-receipt",
-    primaryLabel: "Goods receipts",
+    primaryLabel: "Purchase Receive",
     relatedGuideIds: ["serial-count-mismatch", "serial-barcode-scanning", "goods-receipt-load-slip"],
   },
   {
@@ -603,7 +603,7 @@ export const helpScenarioArticles: KbArticle[] = [
           "Fill the PO, add attachments if required, and Save in the modal so the PO gets a number.",
           "Close the modal and open Purchase Order list.",
           "Select the draft PO and use Confirm (list action).",
-          "After confirm, receive with Goods Receipt and/or bill with supplier invoice Load Slip.",
+          "After confirm, receive with Purchase Receive and/or bill with Bill Load Slip.",
         ],
       },
       {

@@ -12,7 +12,7 @@ export const SERIAL_SLIP_TYPES: SerialSlipType[] = [
   { value: "shipping", label: "Shipping" },
   { value: "purchase_order", label: "Purchase Order" },
   { value: "purchases", label: "Purchases" },
-  { value: "goods_receipt", label: "Goods Receipt" },
+  { value: "goods_receipt", label: "Purchase Receive" },
   { value: "consumed", label: "Consumed" },
   { value: "repair_order", label: "Repair Order" },
   { value: "repair", label: "Repair" },

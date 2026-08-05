@@ -286,22 +286,22 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "purchase-request-to-ap-flow",
-    title: "Purchase Request → PO → GR → Supplier Invoice",
+    title: "Purchase Request → PO → Purchase Receive → Bill → Payment Made",
     scenario: "You buy stock from a vendor and need payables tracked.",
-    intro: "The buy-side chain mirrors selling: request, order, receive, then supplier invoice and payment voucher.",
+    intro: "The buy-side chain: request (optional), order, Purchase Receive, Bill, then Payment Made.",
     blocks: [
       {
         type: "flow",
-        items: ["Purchase Request", "Purchase Order", "Goods Receipt", "Supplier Invoice", "Payment Voucher"],
+        items: ["Purchase Request", "Purchase Order", "Purchase Receive", "Bill", "Payment Made"],
       },
       {
         type: "steps",
         items: [
           "Create a purchase request (optional Load Slip from sales order demand).",
           "Request vendor quotes (RFQ) or create a purchase order with Load Slip (from Purchase Request or Supplier Quotation).",
-          "Receive goods: create a GR from the PO, scan serials on the GR list or Serial Receive page, then post.",
-          "Create a supplier invoice under Buying → Supplier Invoices. Use Load Slip (from Goods Receipt) to pull open GR lines, or PO / RFQ when GR is not required.",
-          "Pay the vendor with a payment voucher under Accounts.",
+          "Purchase Receive: create from the PO, scan serials on the list or Serial Receive page, then post. Attach delivery proof.",
+          "Create a Bill under Buy → Bills. Use Load Slip → Purchase Receive to pull open receive lines (recommended), or PO when simple bill+receive is allowed.",
+          "Pay the vendor with Payment Made under Accounting → Payment Made.",
         ],
       },
       {
@@ -315,47 +315,47 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "goods-receipt-load-slip",
-    title: "Load Slip: supplier invoice from goods receipt",
-    scenario: "You posted goods receipts and need to bill the vendor.",
-    intro: "Open GR lines with remaining billable quantity appear on the supplier invoice Load Slip picker.",
+    title: "Load Slip: Bill from Purchase Receive",
+    scenario: "You posted Purchase Receive and need to bill the vendor.",
+    intro: "Open Purchase Receive lines with remaining billable quantity appear on the Bill Load Slip picker.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Accounts → Supplier Invoices → New (or Buying → Supplier Invoices).",
-          "Select the vendor — only their open GR lines are offered.",
-          "Click Load Slip (from Goods Receipt), tick lines, and confirm.",
-          "Adjust quantities if you are billing partially, then save the invoice.",
+          "Open Buy → Bills → New Bill.",
+          "Select the vendor — only their open Purchase Receive lines are offered.",
+          "Click Load Slip → Purchase Receive, tick lines, and confirm.",
+          "Adjust quantities if you are billing partially, then save the Bill.",
         ],
       },
       {
         type: "tip",
-        text: "Process policies can require a posted GR before supplier invoices are allowed.",
+        text: "Process policies can require a posted Purchase Receive before Bills are allowed (on for new tenants).",
       },
     ],
     primaryHref: "/app/purchases/purchases/new",
-    primaryLabel: "New supplier invoice",
+    primaryLabel: "New Bill",
   },
   {
     id: "purchasing-load-slip-po",
-    title: "Load Slip: supplier invoice from purchase order",
-    scenario: "You want to bill open PO lines without posting a goods receipt first.",
+    title: "Load Slip: Bill from purchase order (simple bill+receive)",
+    scenario: "You want to bill open PO lines without posting Purchase Receive first.",
     intro:
-      "When process policy allows (GR-before-invoice off — default), confirmed PO lines with open billed qty can be pulled onto a supplier invoice. Saving auto-receives unreceived stock for normal items (same idea as Sales Invoice auto-release from SO).",
+      "When process policy allows (Purchase Receive before Bill off), confirmed PO lines with open billed qty can be pulled onto a Bill. Saving may auto-receive unreceived stock for normal items.",
     blocks: [
       {
         type: "steps",
         items: [
           "Confirm the Purchase Order (status Confirmed — drafts never appear).",
-          "Open Buying → New Purchase and optionally select the vendor.",
+          "Open Buy → New Bill and optionally select the vendor.",
           "Choose Load Slip → Purchase Order, tick lines, and apply residual qty.",
-          "Save the supplier invoice — billed qty updates; unreceived qty is auto-received and stock increases for inventory items.",
-          "Serial/lot items: post Goods Receipt first, then Load Slip → Goods Receipt.",
+          "Save the Bill — billed qty updates; unreceived qty may auto-receive for inventory items.",
+          "Serial/lot items: post Purchase Receive first, then Load Slip → Purchase Receive.",
         ],
       },
       {
         type: "tip",
-        text: "If your policy requires GR before supplier invoice, use Load Slip → Goods Receipt instead, or turn the gate off under Process policies.",
+        text: "If your policy requires Purchase Receive before Bill, use Load Slip → Purchase Receive instead, or turn the gate off under Process policies.",
       },
     ],
     primaryHref: "/app/purchases/purchases/new",

@@ -73,8 +73,8 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
   },
   purchase_order: {
     id: "purchase_order",
-    title: "Purchase order & receiving setup",
-    blurb: "Rules from request → PO → goods receipt.",
+    title: "Purchase order & receive setup",
+    blurb: "Rules from request → PO → Purchase Receive.",
     policyKeys: [
       "purchase_require_pr",
       "purchase_require_pr_approval",
@@ -86,8 +86,8 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
   },
   purchases: {
     id: "purchases",
-    title: "Purchase invoice setup",
-    blurb: "Supplier billing rules and goods receipt requirements.",
+    title: "Bill setup",
+    blurb: "Bill rules and Purchase Receive requirements.",
     policyKeys: [
       "purchase_require_gr_before_supplier_invoice",
       "supplier_invoice_require_attachment",
@@ -98,7 +98,7 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
   buying: {
     id: "buying",
     title: "Buying process setup",
-    blurb: "Whole buy journey — request, order, receive, invoice.",
+    blurb: "Whole buy journey — request, order, Purchase Receive, Bill, Payment Made.",
     policyKeys: [
       "purchase_require_pr",
       "purchase_require_pr_approval",

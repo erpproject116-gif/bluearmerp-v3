@@ -81,7 +81,7 @@ const COMMANDS: MentionCatalogItem[] = [
     kind: "command",
     badge: "command",
     label: "Create purchase / supplier invoice",
-    hint: "Open New Purchase",
+    hint: "Open New Bill",
     insert: "Create supplier invoice for ",
   },
   {

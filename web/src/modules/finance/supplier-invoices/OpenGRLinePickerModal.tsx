@@ -85,7 +85,7 @@ export function OpenGRLinePickerModal(props: Props) {
 
   return (
     <OpenTransactionMonitor
-      title={props.mapOnly ? "Map from Goods Receipt — open lines" : "Load Slip (from Goods Receipt) — open lines"}
+      title={props.mapOnly ? "Map from Purchase Receive — open lines" : "Load Slip (from Purchase Receive) — open lines"}
       open={props.open}
       onClose={props.onClose}
       filters={filters()}

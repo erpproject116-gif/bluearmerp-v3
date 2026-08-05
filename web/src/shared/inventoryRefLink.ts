@@ -6,7 +6,7 @@ export function inventoryRefLink(
   if (!refType) return { label: "—" };
   const suffix = refId ? ` #${refId}` : "";
   const typeLabels: Record<string, string> = {
-    goods_receipt: "Goods Receipt",
+    goods_receipt: "Purchase Receive",
     sales: "Sales",
     sa_sales_line: "Sales",
     sales_order: "Sales Order",

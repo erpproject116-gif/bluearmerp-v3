@@ -129,22 +129,24 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   return (
     <PurchasesLayout>
       <div class="mb-4 rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-slate-700">
-        <p class="font-medium text-slate-800">Stock when you save</p>
+        <p class="font-medium text-slate-800">Bill = amount owed (after Purchase Receive)</p>
         <p class="mt-1 text-xs">
-          Load Slip from Purchase Order → Save increases stock at the purchase location when items track inventory
-          (auto-receive). If you already posted Receiving, this save is billing only. Purchases do not edit BOM
-          recipes — only on-hand qty. Prefer{" "}
-          <A href="/app/purchase-order/goods-receipt" class="font-medium text-brand-700 hover:underline">
-            Receiving
-          </A>{" "}
-          when you need serials/lots first.
+          Recommended: Load Slip → <span class="font-medium">Purchase Receive</span> lines, then Save — billing only
+          (stock already moved). If you Load Slip from Purchase Order and Setup allows simple bill+receive, Save may
+          also receive stock. Attachments on Purchase Receive are delivery proof; attach the supplier invoice PDF on
+          the Bill. Bills do not edit BOM recipes.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
-          Pay via Cash Payment or Payment Voucher. Use{" "}
-          <A href="/app/purchases/purchases/pre-invoicing" class="text-brand-600 hover:underline">
-            Pre-invoicing
+          Next:{" "}
+          <A href="/app/finance/disbursements" class="text-brand-600 hover:underline">
+            Payment Made (Disbursements)
           </A>{" "}
-          for received lines not yet invoiced, or filter{" "}
+          or Payment Voucher. Prefer{" "}
+          <A href="/app/purchase-order/goods-receipt" class="font-medium text-brand-700 hover:underline">
+            Purchase Receive
+          </A>{" "}
+          before billing when items track qty or use serials/lots. Pre-invoicing lists received lines not yet billed —
+          filter{" "}
           <button type="button" class="text-brand-600 hover:underline" onClick={() => setPaymentFilter("unpaid")}>
             Unpaid
           </button>
@@ -205,7 +207,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
-        newLabel="New Purchases"
+        newLabel="New Bill"
         codeKey="invoice_no"
         nameKey="date_no_display"
         sortKey={sort()}

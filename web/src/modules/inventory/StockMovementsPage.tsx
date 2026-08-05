@@ -94,7 +94,7 @@ export default function StockMovementsPage() {
       <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <p class="w-full text-xs text-text-secondary">
           Showing the last 90 days by default. Clear dates to see all history. Movements appear after Purchases
-          (auto-receive), Receiving, Stock Entry, Sales, or adjustments.
+          (auto-receive), Purchase Receive, Stock Entry, Sales, or adjustments.
         </p>
         <label class="text-sm">
           <span class="mb-1 block text-text-secondary">From</span>
@@ -111,7 +111,7 @@ export default function StockMovementsPage() {
             <option value="adjustment">Adjustment</option>
             <option value="so_release">SO Release</option>
             <option value="sales">Sales</option>
-            <option value="goods_receipt">Goods receipt</option>
+            <option value="goods_receipt">Purchase Receive</option>
             <option value="transfer_in">Transfer in</option>
             <option value="transfer_out">Transfer out</option>
             <option value="issue">Issue</option>
@@ -194,7 +194,7 @@ export default function StockMovementsPage() {
       />
       <Show when={!list.isFetching && (list.data?.total ?? 0) === 0}>
         <p class="mt-3 text-center text-sm text-text-secondary">
-          No movements in this period — try Stock Entry, Purchases, Receiving, or Sales. Widen or clear the date range.
+          No movements in this period — try Stock Entry, Bills, Purchase Receive, or Sales. Widen or clear the date range.
         </p>
       </Show>
 

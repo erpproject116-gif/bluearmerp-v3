@@ -89,7 +89,7 @@ const SECTIONS: PolicySection[] = [
   {
     id: "purchase",
     title: "Purchase flow",
-    blurb: "Control PR → PO → goods receipt → supplier invoice gates.",
+    blurb: "Control PR → PO → Purchase Receive → Bill gates.",
     fields: [
       {
         key: "purchase_require_pr",
@@ -103,8 +103,8 @@ const SECTIONS: PolicySection[] = [
       },
       {
         key: "purchase_require_gr_before_supplier_invoice",
-        label: "Require goods receipt before supplier invoice",
-        help: "Off by default. When on, supplier invoices must link to posted goods receipt lines.",
+        label: "Require Purchase Receive before Bill",
+        help: "On (recommended) = Bill must use posted Purchase Receive lines. Off = simple bill+receive from PO is allowed.",
       },
     ],
   },
@@ -121,7 +121,7 @@ const SECTIONS: PolicySection[] = [
       {
         key: "purchase_require_po_approval",
         label: "Require purchase order approval",
-        help: "When on, purchase orders must be approved before goods receipt or invoicing.",
+        help: "When on, purchase orders must be approved before Purchase Receive or Bill.",
       },
       {
         key: "finance_require_je_approval",
@@ -157,8 +157,8 @@ const SECTIONS: PolicySection[] = [
       },
       {
         key: "supplier_invoice_require_attachment",
-        label: "Require attachment on purchase (supplier invoice) confirm",
-        help: "When on, purchases need a file before Completed or approval submit.",
+        label: "Require attachment on Bill confirm",
+        help: "When on, Bills need a file before Completed or approval submit.",
       },
     ],
   },
@@ -190,7 +190,7 @@ const SECTIONS: PolicySection[] = [
       {
         key: "inventory_gl_hybrid_enabled",
         label: "Hybrid inventory GL (qty-tracked items)",
-        help: "When on, Receiving and Sales of qty-tracked items post Inventory / GRNI / COGS. Map those accounts under CoA defaults first. Existing tenants need opening inventory before enabling.",
+        help: "When on, Purchase Receive and Sales of qty-tracked items post Inventory / GRNI / COGS. Map those accounts under CoA defaults first. Existing tenants need opening inventory before enabling.",
       },
     ],
   },

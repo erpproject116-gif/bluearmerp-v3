@@ -283,7 +283,7 @@ export function ItemMasterModal(props: Props) {
           <div>
             <p class="text-sm font-semibold text-text-primary">Tracking</p>
             <p class="mt-0.5 text-xs text-text-secondary">
-              Quantity tracking drives Find Stock and Stock Movements. Serial/Lot is for unit identity on Receiving
+              Quantity tracking drives Find Stock and Stock Movements. Serial/Lot is for unit identity on Purchase Receive
               and Sales — quantity tracking should stay on when you use them.
             </p>
           </div>
@@ -383,7 +383,7 @@ export function ItemMasterModal(props: Props) {
               </A>
               {" · "}
               <A href="/app/purchase-order/goods-receipt" class="text-brand-600 hover:underline">
-                Receiving
+                Purchase Receive
               </A>
             </p>
           </Show>

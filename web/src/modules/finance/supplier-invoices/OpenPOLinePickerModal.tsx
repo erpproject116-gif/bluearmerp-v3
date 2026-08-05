@@ -152,7 +152,7 @@ export function OpenPOLinePickerModal(props: Props) {
       ]}
       onApply={apply}
       applyLabel={props.mapOnly ? "Map selected lines" : undefined}
-      emptyHint="No open Purchase Order lines. Clear Search/Doc No/dates if filtered, then retry. If GR-before-invoice policy is on, use Load Slip → Goods Receipt at Save."
+      emptyHint="No open Purchase Order lines. Clear Search/Doc No/dates if filtered, then retry. If Purchase Receive before Bill is on, use Load Slip → Purchase Receive at Save."
     />
   );
 }
