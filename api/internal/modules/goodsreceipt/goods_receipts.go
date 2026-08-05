@@ -516,38 +516,50 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load purchase order lines.", "ERR_INTERNAL")
 			return
 		}
-		defer poLineRows.Close()
 
-		lineCount := 0
-		grLineNo := 0
+		type openPOLine struct {
+			poLineID               int64
+			lineNo                 int
+			openQty                float64
+			trackSerial, trackLot  bool
+		}
+		var openLines []openPOLine
 		for poLineRows.Next() {
-			var poLineID int64
-			var lineNo int
-			var openQty float64
-			var trackSerial, trackLot bool
-			if err := poLineRows.Scan(&poLineID, &lineNo, &openQty, &trackSerial, &trackLot); err != nil {
+			var line openPOLine
+			if err := poLineRows.Scan(&line.poLineID, &line.lineNo, &line.openQty, &line.trackSerial, &line.trackLot); err != nil {
+				poLineRows.Close()
 				response.Err(w, http.StatusInternalServerError, "Failed to read purchase order lines.", "ERR_INTERNAL")
 				return
 			}
-			grLineNo++
-			receivedQty := openQty
-			if trackSerial || trackLot {
+			openLines = append(openLines, line)
+		}
+		if err := poLineRows.Err(); err != nil {
+			poLineRows.Close()
+			response.Err(w, http.StatusInternalServerError, "Failed to read purchase order lines.", "ERR_INTERNAL")
+			return
+		}
+		poLineRows.Close()
+
+		if len(openLines) == 0 {
+			response.Validation(w, map[string]string{"purchase_order_id": "No open lines on purchase order."})
+			return
+		}
+
+		for i, line := range openLines {
+			receivedQty := line.openQty
+			if line.trackSerial || line.trackLot {
 				receivedQty = 0
 			}
 			_, err = tx.Exec(r.Context(), `
 				insert into public.gr_goods_receipt_lines (
 				  goods_receipt_id, purchase_order_line_id, line_no, expected_qty, received_qty
 				) values ($1, $2, $3, $4, $5)`,
-				grID, poLineID, grLineNo, openQty, receivedQty)
+				grID, line.poLineID, i+1, line.openQty, receivedQty)
 			if err != nil {
+				log.Printf("goods_receipt create lines: %v", err)
 				response.Err(w, http.StatusInternalServerError, "Failed to create goods receipt lines.", "ERR_INTERNAL")
 				return
 			}
-			lineCount++
-		}
-		if lineCount == 0 {
-			response.Validation(w, map[string]string{"purchase_order_id": "No open lines on purchase order."})
-			return
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
