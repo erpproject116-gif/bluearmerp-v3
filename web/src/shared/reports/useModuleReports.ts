@@ -371,6 +371,9 @@ export type InventoryStatusRow = {
   reorder_level?: number;
   stock_status: string;
   track_serial?: boolean;
+  track_lot?: boolean;
+  serial_unit_count?: number;
+  lot_batch_count?: number;
   last_sold_at?: string | null;
   last_sold_by: string;
   last_sold_ref_type: string;

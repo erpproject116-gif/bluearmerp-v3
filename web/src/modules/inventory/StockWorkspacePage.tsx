@@ -3,6 +3,7 @@ import { For, Show } from "solid-js";
 import { useAuth } from "../../shared/auth-context";
 import { useInventoryWorkspace, useLowStockAlerts } from "../../shared/reports/useModuleReports";
 import { ReconciliationBanner } from "../../shared/ReconciliationBanner";
+import { StocksHowItFits } from "./StocksHowItFits";
 
 type KpiTile = {
   label: string;
@@ -47,6 +48,8 @@ export default function StockWorkspacePage() {
       </section>
 
       <ReconciliationBanner />
+
+      <StocksHowItFits />
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <For each={tiles}>

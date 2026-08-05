@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
@@ -365,7 +365,9 @@ export default function SerialReceivePage() {
     const gr = goodsReceipt();
     if (!gr) return;
     if (serialPostBlocked()) {
-      toast.warning("Complete all serial lines before posting.");
+      toast.warning(
+        "Scan or paste the serial numbers printed on the delivered units (count must match qty). Registry shows stock already received — not the serials for this delivery.",
+      );
       return;
     }
 
@@ -488,6 +490,44 @@ export default function SerialReceivePage() {
                 </p>
               </div>
 
+              <Show when={lotLines().length > 0 && serialLines().length === 0}>
+                <div class="rounded-lg border border-brand-100 bg-brand-50/70 px-4 py-3 text-sm text-slate-700">
+                  <p class="font-medium text-slate-800">Where do lot numbers come from?</p>
+                  <p class="mt-1 text-xs leading-snug">
+                    Enter the lot / batch numbers from the supplier delivery (and qty per lot) until Received matches
+                    Expected.{" "}
+                    <A href="/app/inventory/serial-lot/lots" class="font-medium text-brand-700 hover:underline">
+                      Lot batches
+                    </A>{" "}
+                    lists lots already in stock after you post.
+                  </p>
+                </div>
+              </Show>
+
+              <Show when={serialLines().length > 0}>
+                <div class="rounded-lg border border-brand-100 bg-brand-50/70 px-4 py-3 text-sm text-slate-700">
+                  <p class="font-medium text-slate-800">Where do the serials come from?</p>
+                  <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs leading-snug">
+                    <li>
+                      On <span class="font-medium">Purchase Receive</span>, type or scan the serials printed on the
+                      physical units / packing list for <span class="font-medium">this delivery</span>. They are not
+                      chosen from existing stock.
+                    </li>
+                    <li>
+                      Scan or paste until Serials = Expected qty for each line (Gap = OK), then Post.
+                    </li>
+                    <li>
+                      Use{" "}
+                      <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-700 hover:underline">
+                        Serial registry
+                      </A>{" "}
+                      only to check whether a number is already in stock (duplicate) — open Find Stock → Serials count
+                      for an item if you need that list.
+                    </li>
+                  </ul>
+                </div>
+              </Show>
+
               <Show when={grGaps().length > 0}>
                 <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                   <p class="font-medium">Serial count mismatch on draft receipt</p>
@@ -496,7 +536,18 @@ export default function SerialReceivePage() {
                       {(g) => (
                         <li>
                           Line {g.line_no} {g.item_code}: received {g.received_qty}, serials {g.serial_count} (gap{" "}
-                          {g.gap_qty})
+                          {g.gap_qty}) — scan {g.gap_qty} more from the delivery label
+                          {g.item_code ? (
+                            <>
+                              {" · "}
+                              <A
+                                href={`/app/inventory/serial-lot/registry?q=${encodeURIComponent(g.item_code)}`}
+                                class="underline hover:no-underline"
+                              >
+                                Check registry for {g.item_code}
+                              </A>
+                            </>
+                          ) : null}
                         </li>
                       )}
                     </For>

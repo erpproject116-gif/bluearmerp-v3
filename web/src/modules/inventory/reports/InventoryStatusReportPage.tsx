@@ -12,6 +12,7 @@ import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ReportEmptyMessage } from "../../../shared/reports/ReportTableStates";
 import { apiFetch } from "../../../shared/api";
 import { formatMoney } from "../../../shared/money";
+import { StocksHowItFits } from "../StocksHowItFits";
 
 type CategoryOpt = { id: number; name: string };
 type LocationOpt = { id: number; location_name: string };
@@ -45,6 +46,24 @@ function itemHref(r: InventoryStatusRow) {
   return `/app/inventory/items?q=${encodeURIComponent(r.item_code)}`;
 }
 
+function serialRegistryHref(r: InventoryStatusRow) {
+  const qs = new URLSearchParams({
+    q: r.item_code,
+    item_id: String(r.item_id),
+    location_id: String(r.location_id),
+  });
+  return `/app/inventory/serial-lot/registry?${qs}`;
+}
+
+function lotBatchesHref(r: InventoryStatusRow) {
+  const qs = new URLSearchParams({
+    q: r.item_code,
+    item_id: String(r.item_id),
+    location_id: String(r.location_id),
+  });
+  return `/app/inventory/serial-lot/lots?${qs}`;
+}
+
 function normalizeFilters(raw: InventoryStatusFilters): InventoryStatusFilters {
   const next: InventoryStatusFilters = { ...raw };
   if (!next.q) delete next.q;
@@ -76,6 +95,11 @@ function filtersFromSearchParams(params: Record<string, string | string[] | unde
 
 function fmtQty(n: number) {
   return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "—";
+}
+
+function fmtCount(n: number | undefined) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
 export default function InventoryStatusReportPage() {
@@ -137,7 +161,7 @@ export default function InventoryStatusReportPage() {
   return (
     <ReportPageLayout
       title="Find Stock"
-      description="Cross-branch inquiry: on-hand qty by item and location. Balances appear after Bill (auto-receive), Purchase Receive, Stock Entry, or Sales — not from item master alone. Search (F8)."
+      description="Cross-branch inquiry: on-hand qty by item and location, plus serial/lot counts when tracked. Balances appear after Bill (auto-receive), Purchase Receive, Stock Entry, or Sales — not from item master alone. Search (F8)."
       showDateFilters={false}
       submitted={submitted() !== null}
       loading={report.isFetching}
@@ -210,6 +234,7 @@ export default function InventoryStatusReportPage() {
         </div>
       }
     >
+      <StocksHowItFits class="mb-4" />
       <Show when={(report.data?.rows.length ?? 0) === 0 && submitted() !== null && !report.isFetching}>
         <ReportEmptyMessage
           message={
@@ -243,6 +268,8 @@ export default function InventoryStatusReportPage() {
                 <th class="px-3 py-2 text-right">On hand</th>
                 <th class="px-3 py-2 text-right">Reserved</th>
                 <th class="px-3 py-2 text-right">Available</th>
+                <th class="px-3 py-2 text-right">Serials</th>
+                <th class="px-3 py-2 text-right">Lots</th>
                 <th class="px-3 py-2 text-right">Sales price</th>
                 <th class="px-3 py-2 text-right">Company avail.</th>
                 <th class="px-3 py-2">Status</th>
@@ -273,6 +300,20 @@ export default function InventoryStatusReportPage() {
                           <div class="text-[11px] text-amber-700">Other branches</div>
                         </Show>
                       </td>
+                      <td class="px-3 py-2 text-right tabular-nums">
+                        <Show when={r.track_serial} fallback={<span class="text-text-secondary">—</span>}>
+                          <A href={serialRegistryHref(r)} class="text-brand-600 hover:underline">
+                            {fmtCount(r.serial_unit_count)}
+                          </A>
+                        </Show>
+                      </td>
+                      <td class="px-3 py-2 text-right tabular-nums">
+                        <Show when={r.track_lot} fallback={<span class="text-text-secondary">—</span>}>
+                          <A href={lotBatchesHref(r)} class="text-brand-600 hover:underline">
+                            {fmtCount(r.lot_batch_count)}
+                          </A>
+                        </Show>
+                      </td>
                       <td class="px-3 py-2 text-right tabular-nums">{formatMoney(r.sales_price)}</td>
                       <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.company_available_qty)}</td>
                       <td class="px-3 py-2">{statusLabel(r.stock_status)}</td>
@@ -285,11 +326,13 @@ export default function InventoryStatusReportPage() {
                             Movements
                           </A>
                           <Show when={r.track_serial}>
-                            <A
-                              href={`/app/inventory/serial-lot/registry?q=${encodeURIComponent(r.item_code)}`}
-                              class="text-brand-600 hover:underline"
-                            >
-                              Serials
+                            <A href={serialRegistryHref(r)} class="text-brand-600 hover:underline">
+                              View serials
+                            </A>
+                          </Show>
+                          <Show when={r.track_lot}>
+                            <A href={lotBatchesHref(r)} class="text-brand-600 hover:underline">
+                              View lots
                             </A>
                           </Show>
                         </div>

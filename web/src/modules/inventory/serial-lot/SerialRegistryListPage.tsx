@@ -1,4 +1,5 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, Show, onMount } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import {
@@ -18,6 +19,7 @@ import { SerialRegistryListFilter } from "./SerialRegistryListFilter";
 
 export default function SerialRegistryListPage() {
   const invalidate = useInvalidateSerialLotLists();
+  const [searchParams] = useSearchParams();
 
   const [draftFilters, setDraftFilters] = createSignal<SerialRegistryFilters>(defaultSerialRegistryFilters());
   const [submittedFilters, setSubmittedFilters] = createSignal<SerialRegistryFilters | null>(null);
@@ -53,6 +55,27 @@ export default function SerialRegistryListPage() {
     setPage(1);
     invalidate();
   };
+
+  onMount(() => {
+    const one = (key: string) => {
+      const v = searchParams[key];
+      return typeof v === "string" ? v.trim() : "";
+    };
+    const q = one("q");
+    const itemId = Number(one("item_id"));
+    const locationId = Number(one("location_id"));
+    const status = one("status");
+    if (!q && !(itemId > 0) && !(locationId > 0) && !status) return;
+    const next: SerialRegistryFilters = {
+      ...defaultSerialRegistryFilters(),
+      q: q || "",
+      item_id: itemId > 0 ? itemId : null,
+      location_id: locationId > 0 ? locationId : null,
+      status: status || "",
+    };
+    setDraftFilters(next);
+    setSubmittedFilters(next);
+  });
 
   const reset = () => {
     setDraftFilters(defaultSerialRegistryFilters());

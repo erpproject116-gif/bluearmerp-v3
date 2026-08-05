@@ -1,4 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -44,6 +45,7 @@ async function fetchItems(q: string): Promise<LookupOption[]> {
 export default function LotBatchesListPage() {
   const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
+  const [searchParams] = useSearchParams();
 
   const [registerOpen, setRegisterOpen] = createSignal(false);
   const [regLotNo, setRegLotNo] = createSignal("");
@@ -104,6 +106,23 @@ export default function LotBatchesListPage() {
   };
 
   onMount(() => {
+    const one = (key: string) => {
+      const v = searchParams[key];
+      return typeof v === "string" ? v.trim() : "";
+    };
+    const q = one("q");
+    const itemId = Number(one("item_id"));
+    const locationId = Number(one("location_id"));
+    if (q || itemId > 0 || locationId > 0) {
+      const next: LotFilters = {
+        q: q || "",
+        item_id: itemId > 0 ? itemId : null,
+        location_id: locationId > 0 ? locationId : null,
+      };
+      setDraftFilters(next);
+      setSubmittedFilters(next);
+      if (q) setItemLabel(q);
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
         e.preventDefault();
