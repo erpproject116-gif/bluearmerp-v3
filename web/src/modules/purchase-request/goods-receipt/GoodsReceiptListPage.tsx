@@ -113,14 +113,15 @@ export default function GoodsReceiptListPage() {
     <PurchaseRequestLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-text-secondary">
-          {uiLabel("goods_receipt.list_description")} Select a posted GR, then{" "}
-          <span class="font-medium">Generate slip → Purchase</span> to create the AP invoice. Track open GR lines on{" "}
+          {uiLabel("goods_receipt.list_description")} Click a row (or PO no.) to open that receive. Use{" "}
+          <span class="font-medium">New</span> to create from a confirmed PO. After posting, Generate slip → Bill, or
+          open{" "}
           <A href="/app/purchases/purchases/pre-invoicing" class="text-brand-600 hover:underline">
-            Purchases → Pre-invoicing
+            Pre-invoicing
           </A>
-          , then pay unpaid purchases from{" "}
+          , then{" "}
           <A href="/app/purchases/purchases?payment=unpaid" class="text-brand-600 hover:underline">
-            Purchases → Unpaid
+            unpaid Bills
           </A>
           .
         </p>
@@ -132,7 +133,7 @@ export default function GoodsReceiptListPage() {
             {uiLabel("goods_receipt.receive_goods")}
           </A>
           <A
-            href="/app/purchase-request/purchase-orders"
+            href="/app/purchase-order/purchase-orders"
             class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
           >
             Purchase orders
@@ -234,8 +235,12 @@ export default function GoodsReceiptListPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onNew={() => {}}
-        onEdit={() => {}}
+        onNew={() => navigate("/app/inventory/serial-lot/receive")}
+        onEdit={(row) => {
+          setSelectedId(row.id);
+          navigate(`/app/inventory/serial-lot/receive?gr_id=${row.id}`);
+        }}
+        newLabel={uiLabel("goods_receipt.receive_goods")}
         settingsHref={PURCHASE_REQUEST_SETTINGS_HREF.goodsReceipt}
         codeKey="purchase_order_no"
         nameKey="receipt_date"
@@ -257,7 +262,7 @@ export default function GoodsReceiptListPage() {
         toolbarExtra={
           <GenerateOtherSlipsMenu
             sourceEntity="goods_receipt"
-            targets={[{ label: "Purchase (supplier invoice)", targetEntity: "supplier_invoice" }]}
+            targets={[{ label: "Bill", targetEntity: "supplier_invoice" }]}
             selectedIds={selectedIds}
             onSuccess={(result) => {
               invalidate();
