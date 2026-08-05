@@ -29,7 +29,7 @@ export const ECOUNT_TOP_MODULES: EcountTopModule[] = [
     id: "inv1",
     label: "Operations",
     hint: "Stock, sell, and buy documents",
-    href: "/app/inventory/items",
+    href: "/app/inventory",
     navGroupIds: ["stocks_management", "sales_process", "procurement_process"],
   },
   {
@@ -193,7 +193,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   {
     id: "stocks",
     label: "Stocks",
-    href: "/app/inventory/items",
+    href: "/app/inventory",
     iconId: "stocks",
     topId: "inv1",
     expandGroupId: "stocks_management",
@@ -202,7 +202,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "inventory",
         label: "Inventory",
-        href: "/app/inventory/items",
+        href: "/app/inventory",
         iconId: "inventory",
         topId: "inv1",
         expandGroupId: "stocks_management",

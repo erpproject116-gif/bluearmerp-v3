@@ -66,10 +66,10 @@ export const appModules: AppModule[] = [
   {
     id: "inventory",
     label: "Stock",
-    href: "/app/inventory/items",
+    href: "/app/inventory",
     basePath: "/app/inventory",
     features: [
-      { label: "Workspace", href: "/app/inventory/items", settingsHref: "/app/inventory", headerPriority: "primary" },
+      { label: "Workspace", href: "/app/inventory", settingsHref: "/app/inventory", headerPriority: "primary" },
       { label: "Partners", href: "/app/inventory/partners", settingsHref: "/app/inventory/partners/settings", headerPriority: "primary" },
       { label: "Locations", href: "/app/inventory/locations", settingsHref: "/app/inventory/locations/settings" },
       { label: "Units", href: "/app/inventory/units", settingsHref: "/app/inventory/units" },
