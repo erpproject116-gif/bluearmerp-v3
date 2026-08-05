@@ -44,6 +44,9 @@ type inventoryStatusRow struct {
 	ReorderLevel        *float64 `json:"reorder_level,omitempty"`
 	StockStatus         string   `json:"stock_status"`
 	TrackSerial         bool     `json:"track_serial"`
+	TrackLot            bool     `json:"track_lot"`
+	SerialUnitCount     float64  `json:"serial_unit_count"`
+	LotBatchCount       float64  `json:"lot_batch_count"`
 	LastSoldAt          *string  `json:"last_sold_at,omitempty"`
 	LastSoldBy          string   `json:"last_sold_by"`
 	LastSoldRefType     string   `json:"last_sold_ref_type"`
@@ -77,6 +80,9 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 		    else 'in_stock'
 		  end as stock_status,
 		  coalesce(i.track_serial, false) as track_serial,
+		  coalesce(i.track_lot, false) as track_lot,
+		  coalesce(sc.cnt, 0)::float8 as serial_unit_count,
+		  coalesce(lc.cnt, 0)::float8 as lot_batch_count,
 		  last_sale.sold_at::text as last_sold_at,
 		  coalesce(last_sale.sold_by, '') as last_sold_by,
 		  coalesce(last_sale.ref_type, '') as last_sold_ref_type,
@@ -89,6 +95,18 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 		  and coalesce(l.is_rma, false) = false
 		left join public.inv_units bu on bu.id = i.base_unit_id
 		left join public.inv_item_categories c on c.id = i.item_category_id
+		left join (
+		  select item_id, location_id, count(*)::float8 as cnt
+		  from public.inv_serial_units
+		  where tenant_id = $1 and status in ('in_stock', 'reserved')
+		  group by item_id, location_id
+		) sc on sc.item_id = bal.item_id and sc.location_id = bal.location_id
+		left join (
+		  select item_id, location_id, count(*)::float8 as cnt
+		  from public.inv_lot_batches
+		  where tenant_id = $1 and qty_on_hand > 0.0001
+		  group by item_id, location_id
+		) lc on lc.item_id = bal.item_id and lc.location_id = bal.location_id
 		left join lateral (
 		  select coalesce(sum(b.qty_on_hand - b.qty_reserved), 0) as company_available_qty
 		  from public.inv_item_location_balances b
@@ -207,6 +225,7 @@ func scanInventoryStatusRow(rows interface {
 		&row.QtyOnHand, &row.QtyReserved, &row.AvailableQty,
 		&row.SalesPrice, &row.CompanyAvailableQty,
 		&reorder, &row.StockStatus, &row.TrackSerial,
+		&row.TrackLot, &row.SerialUnitCount, &row.LotBatchCount,
 		&row.LastSoldAt, &row.LastSoldBy, &row.LastSoldRefType, &row.LastSoldRefID,
 		&row.LastMovementAt, &row.LastMovementType,
 	)
@@ -284,7 +303,7 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = cw.Write([]string{
 			"Item Code", "Item Name", "Unit", "Item Status", "Category", "Branch/Location",
 			"Qty On Hand", "Qty Reserved", "Available", "Sales Price", "Company Available",
-			"Reorder Level", "Stock Status",
+			"Reorder Level", "Stock Status", "Track Serial", "Track Lot", "Serials In Stock", "Lot Batches",
 			"Last Sold At", "Last Sold By", "Last Sold Ref", "Last Movement At", "Last Movement Type",
 		})
 		for rows.Next() {
@@ -314,6 +333,8 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 				fmt.Sprintf("%.4f", row.QtyOnHand), fmt.Sprintf("%.4f", row.QtyReserved), fmt.Sprintf("%.4f", row.AvailableQty),
 				fmt.Sprintf("%.4f", row.SalesPrice), fmt.Sprintf("%.4f", row.CompanyAvailableQty),
 				reorder, row.StockStatus,
+				fmt.Sprintf("%t", row.TrackSerial), fmt.Sprintf("%t", row.TrackLot),
+				fmt.Sprintf("%.0f", row.SerialUnitCount), fmt.Sprintf("%.0f", row.LotBatchCount),
 				soldAt, row.LastSoldBy, soldRef, movedAt, row.LastMovementType,
 			})
 		}
