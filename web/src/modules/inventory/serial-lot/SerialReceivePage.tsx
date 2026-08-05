@@ -229,6 +229,10 @@ export default function SerialReceivePage() {
       toast.warning("Select a purchase order.");
       return;
     }
+    if (!po.location_id || po.location_id <= 0) {
+      toast.warning("This purchase order has no receive location. Edit the PO and set a location, then try again.");
+      return;
+    }
     setCreating(true);
     const res = await apiFetch<GoodsReceipt>(
       "/api/v1/goods-receipt/goods-receipts",
@@ -244,7 +248,10 @@ export default function SerialReceivePage() {
     );
     setCreating(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to create goods receipt.");
+      const detail = res.errors
+        ? Object.values(res.errors).filter(Boolean).join(" ")
+        : undefined;
+      toast.warning(detail || res.message || "Failed to create goods receipt.");
       return;
     }
     appliedScanIds.clear();
