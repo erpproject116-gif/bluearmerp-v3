@@ -6,6 +6,7 @@ const NAV = [
   { href: "/app/platform-command", label: "Overview", exact: true },
   { href: "/app/platform-command/analytics", label: "Analytics" },
   { href: "/app/platform-command/customers", label: "Customers" },
+  { href: "/app/platform-command/day1-payments", label: "Day 1 payments" },
   { href: "/app/platform-command/tickets", label: "Tickets" },
   { href: "/app/platform-command/onboarding", label: "Onboarding" },
   { href: "/app/platform-command/follow-ups", label: "Follow-ups" },

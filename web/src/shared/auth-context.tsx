@@ -60,6 +60,13 @@ export type MeData = {
     write_blocked?: boolean;
     message?: string;
   };
+  commercial?: {
+    status?: string;
+    day1_completed_at?: string;
+    amount_centavos?: number;
+    write_blocked?: boolean;
+    payment_requested_at?: string;
+  };
 };
 
 /** @deprecated Prefer server-returned can_access_platform_command / platform_permissions. */

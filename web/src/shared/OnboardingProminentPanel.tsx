@@ -78,12 +78,21 @@ export function OnboardingProminentPanel() {
     if (showSetupChecklist() || foundationIncomplete()) {
       return setup.data?.next_step?.href ?? onboarding.data?.next_step?.href ?? "/app/setup";
     }
+    const commercial = auth.me?.commercial?.status;
+    if (commercial && commercial !== "unlocked" && !auth.me?.tenant?.is_demo) {
+      return "/app/inventory";
+    }
     return onboarding.data?.next_extended_step?.href ?? "/app/onboarding";
   };
 
   const nextLabel = () => {
     if (showSetupChecklist() || foundationIncomplete()) {
       return setup.data?.next_step?.label ?? onboarding.data?.next_step?.label ?? "Continue setup";
+    }
+    const commercial = auth.me?.commercial?.status;
+    if (commercial === "awaiting_payment") return "Complete Day 1 payment";
+    if (commercial && commercial !== "unlocked" && !auth.me?.tenant?.is_demo) {
+      return "Day 1: Stocks setup";
     }
     const ext = onboarding.data?.next_extended_step;
     if (ext) return `${ext.track_title}: ${ext.label}`;

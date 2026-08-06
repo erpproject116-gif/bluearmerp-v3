@@ -186,6 +186,8 @@ import {
   PlatformAccessCommandPage,
   PlatformAnalyticsCommandPage,
   PlatformCustomerAnalyticsCommandPage,
+  PlatformDay1PaymentsPage,
+  ThankYouActivatedPage,
   LowStockReportPage,
   ExpiredQuotationsReportPage,
   LeadsPage,
@@ -443,6 +445,7 @@ export default function App() {
           <Route path="/tickets" component={PlatformTicketsCommandPage} />
           <Route path="/tickets/:id" component={PlatformTicketDetailCommandPage} />
           <Route path="/onboarding" component={PlatformOnboardingCommandPage} />
+          <Route path="/day1-payments" component={PlatformDay1PaymentsPage} />
           <Route path="/follow-ups" component={PlatformFollowUpsCommandPage} />
           <Route path="/history" component={PlatformHistoryCommandPage} />
           <Route path="/change-logs" component={PlatformChangeLogsCommandPage} />
@@ -452,6 +455,7 @@ export default function App() {
         </Route>
         <Route path="/app" component={AppLayout}>
           <Route path="/dashboard" component={DashboardPage} />
+          <Route path="/thank-you-activated" component={ThankYouActivatedPage} />
           <Route path="/dashboard/approvals" component={ApprovalsQueuePage} />
           <Route path="/dashboard/site-map" component={SiteMapPage} />
           <Route path="/reports/saved-views" component={SavedViewsPage} />

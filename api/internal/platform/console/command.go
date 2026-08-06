@@ -16,6 +16,7 @@ func (s *service) commandOverview(w http.ResponseWriter, r *http.Request) {
 
 	var openTickets, trialEnding, inactiveTrials, openFollowUps, pendingInvites int
 	var overdueFollowUps, productGapTickets, noDocsTrials, churnRisk, pendingApprovals int
+	var awaitingDay1Payment int
 	_ = s.pool.QueryRow(ctx, `
 		select count(*) from public.sup_support_tickets
 		where status in ('open','in_progress','waiting')`).Scan(&openTickets)
@@ -43,6 +44,8 @@ func (s *service) commandOverview(w http.ResponseWriter, r *http.Request) {
 		where accepted_at is null and revoked_at is null and expires_at > now()`).Scan(&pendingInvites)
 	_ = s.pool.QueryRow(ctx, `
 		select count(*) from public.tenants where status = 'pending_approval'`).Scan(&pendingApprovals)
+	_ = s.pool.QueryRow(ctx, `
+		select count(*) from public.platform_customers where commercial_status = 'awaiting_payment'`).Scan(&awaitingDay1Payment)
 	_ = s.pool.QueryRow(ctx, `
 		select count(*) from public.sup_support_tickets
 		where status in ('open','in_progress','waiting') and coalesce(product_gap_tag,'') <> ''`).Scan(&productGapTickets)
@@ -179,6 +182,34 @@ func (s *service) commandOverview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	drows, err := s.pool.Query(ctx, `
+		select pc.id, coalesce(pc.company_name, pc.full_name, pc.email), pc.day1_completed_at
+		from public.platform_customers pc
+		where pc.commercial_status = 'awaiting_payment'
+		order by coalesce(pc.day1_completed_at, pc.updated_at) desc nulls last
+		limit 8`)
+	if err == nil {
+		defer drows.Close()
+		for drows.Next() {
+			var cid int64
+			var name string
+			var completed *time.Time
+			if drows.Scan(&cid, &name, &completed) == nil {
+				var dueStr *string
+				if completed != nil {
+					ds := completed.UTC().Format(time.RFC3339)
+					dueStr = &ds
+				}
+				cidCopy := cid
+				queue = append(queue, queueRow{
+					Kind: "day1_payment", Title: "Day 1 payment — " + name,
+					CustomerID: &cidCopy, DueAt: dueStr, Severity: "high",
+					Href: "/app/platform-command/day1-payments",
+				})
+			}
+		}
+	}
+
 	frows, err := s.pool.Query(ctx, `
 		select id, title, platform_customer_id, tenant_id, due_at
 		from public.platform_follow_up_tasks
@@ -221,16 +252,17 @@ func (s *service) commandOverview(w http.ResponseWriter, r *http.Request) {
 			"platform_role": tu.PlatformRole, "platform_user_id": tu.PlatformUserID,
 		},
 		"counts": map[string]any{
-			"open_tickets":        openTickets,
-			"trial_ending":        trialEnding,
-			"inactive_trials":     inactiveTrials,
-			"open_follow_ups":     openFollowUps,
-			"overdue_follow_ups":  overdueFollowUps,
-			"pending_invites":     pendingInvites,
-			"pending_approvals":   pendingApprovals,
-			"product_gap_tickets": productGapTickets,
-			"no_docs_trials":      noDocsTrials,
-			"churn_risk":          churnRisk,
+			"open_tickets":           openTickets,
+			"trial_ending":           trialEnding,
+			"inactive_trials":        inactiveTrials,
+			"open_follow_ups":        openFollowUps,
+			"overdue_follow_ups":     overdueFollowUps,
+			"pending_invites":        pendingInvites,
+			"pending_approvals":      pendingApprovals,
+			"awaiting_day1_payment":  awaitingDay1Payment,
+			"product_gap_tickets":    productGapTickets,
+			"no_docs_trials":         noDocsTrials,
+			"churn_risk":             churnRisk,
 		},
 		"queue": queue,
 	}, "OK")

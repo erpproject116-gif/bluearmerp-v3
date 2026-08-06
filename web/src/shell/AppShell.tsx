@@ -43,6 +43,7 @@ import { SidebarNav } from "./SidebarNav";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { DemoTenantBanner } from "../shared/DemoTenantBanner";
 import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBar";
+import { CommercialPaywallHost } from "../shared/CommercialPaywall";
 import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
 import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
@@ -428,6 +429,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             </div>
           </div>
           <SetupReminderBar />
+          <CommercialPaywallHost />
           <Show when={featureNavModule()}>
             {(mod) => (
               <HeaderFeatureTabs

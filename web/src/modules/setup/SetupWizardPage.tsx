@@ -60,9 +60,9 @@ const STEP_COPY: Record<string, { title: string; why: string; action: string; li
   },
   ready: {
     title: "You are ready",
-    why: "Foundation setup is complete. Choose how to start.",
-    action: "Open dashboard",
-    link: "/app/dashboard",
+    why: "Foundation setup is complete. Next: Day 1 on Stocks — places, products, and opening stock — then pay to unlock buying and selling.",
+    action: "Open Day 1 Stocks setup",
+    link: "/app/inventory",
   },
 };
 
@@ -232,21 +232,21 @@ export default function SetupWizardPage() {
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-6">
           <h2 class="text-lg font-semibold text-emerald-900">Foundation complete</h2>
           <p class="mt-2 text-sm text-emerald-800">
-            You can start selling, buying, or retail POS. Open the full onboarding playbook for every module —
-            quotation through accounts, serial scanning, POS shifts, CRM, and more.
+            Next: finish Day 1 on Stocks (places, products, opening stock). Buying and selling unlock after GCash
+            payment is confirmed by Bluearm. The onboarding playbook covers every module after that.
           </p>
           <div class="mt-4 flex flex-wrap gap-3">
             <A
-              href="/app/onboarding"
+              href="/app/inventory"
               class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
             >
-              Open onboarding playbook
+              Day 1: open Stocks
             </A>
             <A
-              href="/app/quotation/quotations/new"
+              href="/app/onboarding"
               class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
             >
-              Create quotation
+              Open onboarding playbook
             </A>
             <A
               href="/app/pos/manage"
