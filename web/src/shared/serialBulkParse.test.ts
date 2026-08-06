@@ -14,8 +14,8 @@ describe("serialBulkParse", () => {
     expect(dedupeSerials(["abc", "ABC", "AbC", "def"])).toEqual(["abc", "def"]);
   });
 
-  it("formats as comma-separated list", () => {
-    expect(formatSerialBulkList(["A", "B"])).toBe("A, B");
+  it("formats as one serial per line", () => {
+    expect(formatSerialBulkList(["A", "B"])).toBe("A\nB");
   });
 
   it("parseAndDedupe combines both", () => {

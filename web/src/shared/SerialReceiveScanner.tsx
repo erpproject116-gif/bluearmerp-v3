@@ -1,7 +1,10 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { apiFetch } from "./api";
 import { Field, inputClass } from "./SpreadsheetGrid";
 import { useToast } from "./toast";
+
+/** Pause after last keystroke before auto-submitting a scan (gun usually finishes in &lt;50ms). */
+const SCAN_AUTO_COMMIT_MS = 180;
 
 export type ScanContextLine = {
   line_id: number;
@@ -144,10 +147,22 @@ export function SerialReceiveScanner(props: {
     if (props.grId) void loadContext();
   });
 
+  let autoCommitTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const clearAutoCommit = () => {
+    if (autoCommitTimer != null) {
+      clearTimeout(autoCommitTimer);
+      autoCommitTimer = undefined;
+    }
+  };
+
+  onCleanup(() => clearAutoCommit());
+
   const submitScan = async () => {
     const value = scanInput().trim();
     if (!value || props.status !== "draft" || scanning()) return;
 
+    clearAutoCommit();
     setScanning(true);
     const res = await apiFetch<UnifiedScanResponse>(
       `/api/v1/goods-receipt/goods-receipts/${props.grId}/scan`,
@@ -205,6 +220,18 @@ export function SerialReceiveScanner(props: {
     }
   };
 
+  const scheduleAutoCommit = (raw: string) => {
+    clearAutoCommit();
+    if (props.status !== "draft" || scanning()) return;
+    const value = raw.trim();
+    if (!value) return;
+    autoCommitTimer = setTimeout(() => {
+      autoCommitTimer = undefined;
+      if (!scanInput().trim() || props.status !== "draft" || scanning()) return;
+      void submitScan();
+    }, SCAN_AUTO_COMMIT_MS);
+  };
+
   return (
     <div class="space-y-3 rounded-lg border border-stroke bg-slate-50 p-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -222,7 +249,8 @@ export function SerialReceiveScanner(props: {
       </div>
 
       <p class="text-xs text-text-secondary">
-        Scan <strong>item code</strong> to select a line, then scan each <strong>serial number</strong>.
+        Scan <strong>item code</strong> to select a line, then scan each <strong>serial number</strong> — adds
+        automatically after a short pause (Enter still works).
       </p>
 
       <Field label="Scan">
@@ -231,12 +259,18 @@ export function SerialReceiveScanner(props: {
           class={inputClass}
           value={scanInput()}
           disabled={props.status !== "draft" || scanning()}
-          placeholder="Item code or serial…"
+          placeholder="Scan item or serial — adds automatically"
+          title="Serial is submitted after a short pause (or press Enter)."
           autofocus
-          onInput={(e) => setScanInput(e.currentTarget.value)}
+          onInput={(e) => {
+            const v = e.currentTarget.value;
+            setScanInput(v);
+            scheduleAutoCommit(v);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
+              clearAutoCommit();
               void submitScan();
             }
           }}

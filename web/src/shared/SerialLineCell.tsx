@@ -650,7 +650,8 @@ function ReceiveSerialCell(props: ReceiveProps) {
         disabled={props.disabled}
         readOnly={readOnly()}
         busy={scanQueue.flushing()}
-        placeholder="Scan serial, or paste comma-separated"
+        entryMode="scan-next"
+        placeholder="Scan serial — adds automatically"
         onCommit={async (next) => {
           if (next.length < serialNos().length) {
             toast.warning("To remove serials, open ⋯ and use Remove last.");

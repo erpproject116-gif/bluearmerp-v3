@@ -19,7 +19,13 @@ export function dedupeSerials(serials: string[]): string[] {
   return out;
 }
 
+/** Prefer one serial per line for paste/copy (Purchase Receive). */
 export function formatSerialBulkList(serials: string[]): string {
+  return serials.join("\n");
+}
+
+/** Legacy comma list for compact display only. */
+export function formatSerialBulkCommaList(serials: string[]): string {
   return serials.join(", ");
 }
 

@@ -144,12 +144,13 @@ export function SerialGenerateModal(props: Props) {
       <ModalFormGuide
         guideId="serial_generate"
         spanFull
-        title="Unique serial labels"
-        summary="Format: company prefix + date (MMDDYY) + sequence — e.g. BA072726000001. Prefix is customizable."
+        title="Generate puts serials into stock"
+        summary="Generated numbers are registered as already on hand. Do not paste them into Purchase Receive (duplicates are rejected). Use Generate for labels of stock you already own. For supplier deliveries, scan the serials on the boxes in Purchase Receive."
         steps={[
           "Pick a serial-tracked item and stock location.",
           "Set company prefix (default BA) and quantity (1–200).",
           "Generate, then Print labels (Code128).",
+          "Receiving a delivery? Open Purchase Receive and scan physical labels instead.",
         ]}
       />
       <Field label="Date *">
@@ -210,6 +211,9 @@ export function SerialGenerateModal(props: Props) {
           <button type="button" class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white" onClick={printLabels}>
             Print labels
           </button>
+          <p class="mt-2 text-[11px] text-text-secondary">
+            These serials are already in stock — use them for labels, not for Purchase Receive paste.
+          </p>
         </div>
       </Show>
     </EntityModal>
