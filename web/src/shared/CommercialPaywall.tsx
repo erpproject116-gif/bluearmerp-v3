@@ -41,9 +41,9 @@ export function CommercialPaywallHost() {
   createEffect(() => {
     if (status() !== "awaiting_payment") return;
     const id = window.setInterval(() => {
-      void auth.refresh(true);
+      void auth.refresh({ background: true });
     }, 30000);
-    const onFocus = () => void auth.refresh(true);
+    const onFocus = () => void auth.refresh({ background: true });
     window.addEventListener("focus", onFocus);
     onCleanup(() => {
       window.clearInterval(id);
@@ -56,7 +56,7 @@ export function CommercialPaywallHost() {
       const detail = (e as CustomEvent<{ code?: string }>).detail;
       if (detail?.code === "ERR_COMMERCIAL_LOCKED") {
         setForceOpen(true);
-        void auth.refresh(true);
+        void auth.refresh({ background: true });
       }
     };
     window.addEventListener("bluearm:commercial-locked", handler);
@@ -87,7 +87,7 @@ export function CommercialPaywallHost() {
             <button
               type="button"
               class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
-              onClick={() => void auth.refresh(true)}
+              onClick={() => void auth.refresh({ background: true })}
             >
               I already paid — check status
             </button>
