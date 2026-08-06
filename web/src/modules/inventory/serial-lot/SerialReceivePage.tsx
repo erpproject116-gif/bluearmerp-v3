@@ -18,6 +18,7 @@ import { SerialLotLayout } from "./SerialLotLayout";
 import { SerialReceiveScanner } from "../../../shared/SerialReceiveScanner";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { uiLabel } from "../../../shared/branding/uiLabel";
+import { parseAndDedupeSerialBulkInput } from "../../../shared/serialBulkParse";
 
 type PurchaseOrderRow = {
   id: number;
@@ -137,11 +138,27 @@ export default function SerialReceivePage() {
   const serialPostBlocked = createMemo(() => {
     const lines = serialLines();
     if (lines.length === 0) return false;
+    // Partial receive is allowed: only require serial count to match this receive qty.
+    // Do not require received_qty === expected_qty (PO open qty).
     return lines.some((l) => {
       const serialCount = l.serials?.length ?? 0;
-      const gap = Math.abs(l.received_qty - serialCount);
-      return gap > 0.0001 || l.received_qty + 0.0001 < l.expected_qty;
+      return Math.abs(l.received_qty - serialCount) > 0.0001;
     });
+  });
+
+  const canPostPartial = createMemo(() => {
+    const gr = goodsReceipt();
+    if (!gr || gr.status !== "draft") return false;
+    const lines = gr.lines ?? [];
+    const anyReceived = lines.some((l) => l.received_qty > 0.0001);
+    if (!anyReceived) return false;
+    if (serialPostBlocked()) return false;
+    return true;
+  });
+
+  const isPartialReceive = createMemo(() => {
+    const lines = goodsReceipt()?.lines ?? [];
+    return lines.some((l) => l.received_qty > 0.0001 && l.received_qty + 0.0001 < l.expected_qty);
   });
 
   const updateLineSerials = (lineId: number, serials: { id: number; serial_no: string }[], receivedQty: number) => {
@@ -305,12 +322,9 @@ export default function SerialReceivePage() {
       toast.warning("Select a scan line first.");
       return;
     }
-    const lines = pasteText()
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const lines = parseAndDedupeSerialBulkInput(pasteText());
     if (lines.length === 0) {
-      toast.warning("Paste at least one serial number.");
+      toast.warning("Paste at least one serial (one per line, or comma-separated).");
       return;
     }
     setPasteBusy(true);
@@ -321,7 +335,7 @@ export default function SerialReceivePage() {
     setPasteBusy(false);
     setPasteText("");
     setPasteOpen(false);
-    toast.success(`Queued ${lines.length} serial(s).`);
+    toast.success(`Queued ${lines.length} serial(s). If some were rejected as “already exists”, they were registered earlier (Generate) — scan the physical labels for this delivery instead.`);
   };
 
   const addLot = async () => {
@@ -366,8 +380,12 @@ export default function SerialReceivePage() {
     if (!gr) return;
     if (serialPostBlocked()) {
       toast.warning(
-        "Scan or paste the serial numbers printed on the delivered units (count must match qty). Registry shows stock already received — not the serials for this delivery.",
+        "Each serial line needs matching scans (serial count = this receive qty). Scan or paste serials from the delivery labels — do not use Generate from the registry (those are already in stock).",
       );
+      return;
+    }
+    if (!canPostPartial()) {
+      toast.warning("Receive at least one unit (scan a serial, add a lot, or set qty) before posting.");
       return;
     }
 
@@ -383,7 +401,11 @@ export default function SerialReceivePage() {
       toast.warning(res.message ?? "Failed to post goods receipt.");
       return;
     }
-    toast.success("Goods receipt posted.");
+    toast.success(
+      isPartialReceive()
+        ? "Purchase Receive posted (partial). Remaining qty stays open on the purchase order."
+        : "Goods receipt posted.",
+    );
     invalidate();
     appliedScanIds.clear();
     scanQueue.resetQueue();
@@ -463,7 +485,8 @@ export default function SerialReceivePage() {
         <div class="mb-4">
           <h2 class="text-lg font-semibold text-text-primary">{uiLabel("goods_receipt.receive_page_title")}</h2>
           <p class="text-sm text-text-secondary">
-            Select a confirmed purchase order, create a goods receipt, scan serial numbers or enter lots, then post.
+            Start from a purchase order, then receive what actually arrived. Scan each unit’s serial — it adds 1
+            automatically (or press Enter). You can post a partial delivery — remaining qty stays open on the PO.
           </p>
         </div>
 
@@ -509,20 +532,19 @@ export default function SerialReceivePage() {
                   <p class="font-medium text-slate-800">Where do the serials come from?</p>
                   <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs leading-snug">
                     <li>
-                      On <span class="font-medium">Purchase Receive</span>, type or scan the serials printed on the
-                      physical units / packing list for <span class="font-medium">this delivery</span>. They are not
-                      chosen from existing stock.
+                      Scan or type the serial printed on the <span class="font-medium">physical unit</span>. It adds
+                      automatically after a short pause (or press Enter). Each one adds 1 to quantity.
                     </li>
                     <li>
-                      Scan or paste until Serials = Expected qty for each line (Gap = OK), then Post.
+                      Partial is OK — e.g. PO ordered 5, only 2 arrived → scan 2 and Post. The other 3 stay open on the
+                      PO for a later receive.
                     </li>
                     <li>
-                      Use{" "}
+                      Do <span class="font-medium">not</span> paste serials from{" "}
                       <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-700 hover:underline">
-                        Serial registry
+                        Generate
                       </A>{" "}
-                      only to check whether a number is already in stock (duplicate) — open Find Stock → Serials count
-                      for an item if you need that list.
+                      in the registry — Generate already puts them in stock, so receive will reject them as duplicates.
                     </li>
                   </ul>
                 </div>
@@ -563,17 +585,18 @@ export default function SerialReceivePage() {
                       <tr>
                         <th class="py-1 pr-3">Line</th>
                         <th class="py-1 pr-3">Item</th>
-                        <th class="py-1 pr-3">Expected</th>
-                        <th class="py-1 pr-3">Received</th>
+                        <th class="py-1 pr-3">PO open</th>
+                        <th class="py-1 pr-3">This receive</th>
                         <th class="py-1 pr-3">Serials</th>
-                        <th class="py-1">Gap</th>
+                        <th class="py-1">Still open</th>
                       </tr>
                     </thead>
                     <tbody>
                       <For each={serialLines()}>
                         {(line) => {
                           const serialCount = () => line.serials?.length ?? 0;
-                          const gap = () => line.expected_qty - serialCount();
+                          const serialMismatch = () => Math.abs(line.received_qty - serialCount()) > 0.0001;
+                          const stillOpen = () => Math.max(0, line.expected_qty - line.received_qty);
                           return (
                             <tr class="border-t border-stroke/60">
                               <td class="py-1 pr-3">{line.line_no}</td>
@@ -597,8 +620,20 @@ export default function SerialReceivePage() {
                                   onAfterScan={() => void loadGrGaps(goodsReceipt()!.id)}
                                 />
                               </td>
-                              <td class={`py-1 ${gap() > 0.0001 ? "font-medium text-red-600" : "text-green-700"}`}>
-                                {gap() > 0.0001 ? gap().toFixed(0) : "OK"}
+                              <td
+                                class={`py-1 ${
+                                  serialMismatch()
+                                    ? "font-medium text-red-600"
+                                    : stillOpen() > 0.0001
+                                      ? "text-amber-700"
+                                      : "text-green-700"
+                                }`}
+                              >
+                                {serialMismatch()
+                                  ? "Fix serial count"
+                                  : stillOpen() > 0.0001
+                                    ? stillOpen().toFixed(0)
+                                    : "OK"}
                               </td>
                             </tr>
                           );
@@ -755,10 +790,10 @@ export default function SerialReceivePage() {
                     <thead class="bg-slate-50 text-left text-text-secondary">
                       <tr>
                         <th class="px-3 py-2">Line</th>
-                        <th class="px-3 py-2">Item</th>
-                        <th class="px-3 py-2">Expected</th>
-                        <th class="px-3 py-2">Received</th>
-                        <th class="px-3 py-2">Serials</th>
+                        <th class="px-3 py-2">Product</th>
+                        <th class="px-3 py-2">PO open</th>
+                        <th class="px-3 py-2">This receive</th>
+                        <th class="px-3 py-2">Scan serials (auto-add)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -798,14 +833,25 @@ export default function SerialReceivePage() {
                 <p class="text-sm text-text-secondary">No serial or lot-tracked lines on this goods receipt.</p>
               </Show>
 
+              <Show when={isPartialReceive()}>
+                <p class="text-xs text-amber-800">
+                  Partial receive: you will post less than the PO open qty. Remaining stays on the purchase order for a
+                  later delivery.
+                </p>
+              </Show>
+
               <div class="flex flex-wrap gap-2 border-t border-stroke pt-4">
                 <button
                   type="button"
                   class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-                  disabled={posting() || goodsReceipt()!.status !== "draft" || serialPostBlocked()}
+                  disabled={posting() || goodsReceipt()!.status !== "draft" || !canPostPartial()}
                   onClick={() => void postReceipt()}
                 >
-                  {posting() ? "Posting…" : "Post goods receipt"}
+                  {posting()
+                    ? "Posting…"
+                    : isPartialReceive()
+                      ? "Post partial receive"
+                      : "Post goods receipt"}
                 </button>
                 <button
                   type="button"

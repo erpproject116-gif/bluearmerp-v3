@@ -494,8 +494,8 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		err = tx.QueryRow(r.Context(), `
 			insert into public.gr_goods_receipts (
 			  tenant_id, purchase_order_id, receipt_date, location_id, status,
-			  reference, notes, created_by_user_id
-			) values ($1, $2, $3::date, $4, 'draft', $5, $6, $7)
+			  inspection_status, reference, notes, created_by_user_id
+			) values ($1, $2, $3::date, $4, 'draft', 'released', $5, $6, $7)
 			returning id`,
 			tu.TenantID, body.PurchaseOrderID, receiptDate, body.LocationID,
 			body.Reference, body.Notes, tu.AppUserID).Scan(&grID)
