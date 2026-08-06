@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/entitlement"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -27,13 +28,14 @@ type Membership struct {
 }
 
 type MePayload struct {
-	User               map[string]any `json:"user"`
-	Tenant             map[string]any `json:"tenant"`
-	ActiveTenantID     int64          `json:"active_tenant_id"`
-	Memberships        []Membership   `json:"memberships"`
-	EnabledModuleCodes []string       `json:"enabled_module_codes"`
-	Modules            []ModuleRow    `json:"modules"`
+	User               map[string]any        `json:"user"`
+	Tenant             map[string]any        `json:"tenant"`
+	ActiveTenantID     int64                 `json:"active_tenant_id"`
+	Memberships        []Membership          `json:"memberships"`
+	EnabledModuleCodes []string              `json:"enabled_module_codes"`
+	Modules            []ModuleRow           `json:"modules"`
 	Entitlement        *entitlement.Snapshot `json:"entitlement,omitempty"`
+	Commercial         *day1commercial.Commercial `json:"commercial,omitempty"`
 }
 
 func fullModuleAccess(tu TenantUser) bool {
@@ -173,6 +175,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 	}
 
 	ent, _ := entitlement.LoadForTenant(ctx, pool, tu.TenantID, tu.IsPlatformSuperadmin, cfg.EntitlementGraceDays)
+	commercial, _ := day1commercial.LoadForTenant(ctx, pool, tu.TenantID, tu.IsPlatformSuperadmin)
 
 	return MePayload{
 		User: user,
@@ -189,6 +192,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 		EnabledModuleCodes: enabled,
 		Modules:            modules,
 		Entitlement:        ent,
+		Commercial:         commercial,
 	}, nil
 }
 

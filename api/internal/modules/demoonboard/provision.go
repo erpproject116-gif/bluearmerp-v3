@@ -11,6 +11,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demodata"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/provision"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -142,6 +143,7 @@ func (s *service) postProvision(w http.ResponseWriter, r *http.Request) {
 	}
 	if hasCust {
 		_ = customerregistry.LinkTenant(ctx, s.pool, custID, tenantID, authUserID)
+		_ = day1commercial.EnsureDemoUnlocked(ctx, s.pool, custID, tenantID)
 		var demoPlanID *int64
 		if dp, err := plans.GetByCode(ctx, s.pool, customerregistry.PlanDemo); err == nil {
 			demoPlanID = &dp.ID

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640" role="img" aria-label="GCash Day 1 payment">
+  <rect width="480" height="640" fill="#007DFE"/>
+  <text x="40" y="56" fill="#fff" font-family="Arial,sans-serif" font-size="28" font-weight="700">GCash</text>
+  <rect x="40" y="90" width="400" height="500" rx="24" fill="#fff"/>
+  <rect x="100" y="140" width="280" height="280" fill="#E8F1FF" stroke="#007DFE" stroke-width="2"/>
+  <text x="240" y="270" text-anchor="middle" fill="#007DFE" font-family="Arial,sans-serif" font-size="16" font-weight="600">Replace with your</text>
+  <text x="240" y="295" text-anchor="middle" fill="#007DFE" font-family="Arial,sans-serif" font-size="16" font-weight="600">GCash QR PNG</text>
+  <text x="240" y="320" text-anchor="middle" fill="#64748B" font-family="Arial,sans-serif" font-size="12">web/public/billing/gcash-day1-qr.png</text>
+  <text x="240" y="450" text-anchor="middle" fill="#64748B" font-family="Arial,sans-serif" font-size="13">Transfer fees may apply.</text>
+  <text x="240" y="520" text-anchor="middle" fill="#007DFE" font-family="Arial,sans-serif" font-size="36" font-weight="700">± 4,500.00</text>
+  <text x="240" y="555" text-anchor="middle" fill="#64748B" font-family="Arial,sans-serif" font-size="12">BluearmERP Day 1 activation</text>
+</svg>

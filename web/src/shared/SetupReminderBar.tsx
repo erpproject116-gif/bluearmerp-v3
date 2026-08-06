@@ -54,6 +54,37 @@ export function SetupReminderBar() {
         </div>
       </Show>
 
+      <Show
+        when={
+          canManage() &&
+          data()?.required_complete &&
+          auth.me?.commercial?.status &&
+          auth.me.commercial.status !== "unlocked" &&
+          !auth.me.tenant?.is_demo
+        }
+      >
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm text-slate-800">
+          <div class="min-w-0">
+            <p class="font-medium">
+              {auth.me?.commercial?.status === "awaiting_payment"
+                ? "Day 1 payment pending"
+                : "Finish Day 1 to unlock trading"}
+            </p>
+            <p class="text-xs text-slate-600">
+              {auth.me?.commercial?.status === "awaiting_payment"
+                ? "Pay via GCash and wait for Bluearm to confirm before buying or selling."
+                : "Open Stocks — add places, products, and opening stock."}
+            </p>
+          </div>
+          <A
+            href="/app/inventory"
+            class="shrink-0 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+          >
+            Open Stocks Day 1
+          </A>
+        </div>
+      </Show>
+
       <Show when={!canManage() && data() && !data()!.required_complete}>
         <div class="mt-3 rounded-lg border border-stroke bg-slate-50 px-4 py-2 text-xs text-text-secondary">
           Workspace setup is still in progress. Your administrator is finishing the initial configuration.

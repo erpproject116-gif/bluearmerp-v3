@@ -17,6 +17,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/provision"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -248,12 +249,13 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = customerregistry.LinkTenant(ctx, s.pool, res.CustomerID, tenantID, claims.Sub)
+	_ = day1commercial.SetCommercialSetup(ctx, s.pool, res.CustomerID, tenantID)
 	_, _ = customerregistry.CreateSubscription(ctx, s.pool, res.CustomerID, tenantID,
 		customerregistry.PlanTrial90d, trialPlanID, startsAt, &endsAt, 0, 0, 0,
 		strconv.Itoa(trialDays)+"-day free trial")
 
 	customerregistry.AppendCRMLeadNote(ctx, s.pool, res.CustomerID,
-		"[trial] Email confirmed; trial workspace #"+strconv.FormatInt(tenantID, 10)+" provisioned.")
+		"[trial] Email confirmed; trial workspace #"+strconv.FormatInt(tenantID, 10)+" provisioned (commercial setup lock until Day 1 + payment).")
 	_, _ = s.pool.Exec(ctx, `
 		update public.crm_leads
 		set status = case when status = 'new' then 'qualified' else status end,
@@ -268,8 +270,9 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 		"company_code":     companyCode,
 		"trial_ends_at":    endsAt,
 		"customer_id":      res.CustomerID,
-		"pending_approval": true,
-	}, "Trial workspace submitted for product owner approval.")
+		"pending_approval": false,
+		"commercial_status": day1commercial.StatusSetup,
+	}, "Trial workspace ready. Complete Day 1 setup, then pay to unlock buying and selling.")
 }
 
 type trialArgs struct {
@@ -292,7 +295,7 @@ func (s *service) createTrialTenant(ctx context.Context, a trialArgs) (int64, er
 		insert into public.tenants
 		  (company_name, company_code, industry_type, country, currency, status,
 		   is_demo, auto_enable_all_modules)
-		values ($1, $2, 'general', 'PH', 'PHP', 'pending_approval', false, true)
+		values ($1, $2, 'general', 'PH', 'PHP', 'active', false, true)
 		returning id`,
 		a.company, a.companyCode).Scan(&tenantID); err != nil {
 		return 0, err

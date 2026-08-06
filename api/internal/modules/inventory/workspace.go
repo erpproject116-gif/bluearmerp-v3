@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -75,6 +76,8 @@ func inventoryWorkspaceHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			select count(*)
 			from public.inv_stock_entries
 			where tenant_id = $1 and deleted_at is null and coalesce(status, 'draft') in ('draft', 'submitted')`, tu.TenantID).Scan(&out.OpenStockEntries)
+
+		_, _, _ = day1commercial.EvaluateAndTransition(ctx, pool, tu.TenantID)
 
 		response.OK(w, out, "OK")
 	}

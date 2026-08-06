@@ -1,6 +1,7 @@
 import { A } from "@solidjs/router";
 import { createSignal, For, Show } from "solid-js";
 import type { InventoryWorkspaceSummary } from "../../shared/reports/useModuleReports";
+import { useAuth } from "../../shared/auth-context";
 
 const DISMISS_KEY = "stocks-day1-setup-dismissed";
 
@@ -47,12 +48,11 @@ const STEPS: Step[] = [
     href: "/app/inventory/stock-entries",
     cta: "Open stock entries",
     done: (s) => (s?.items_with_stock ?? 0) > 0,
-    optional: true,
   },
   {
     id: "check",
     title: "5. Check Find Stock",
-    why: "This is your shelf view — how much you have by place. It fills after step 4, or after you receive a delivery.",
+    why: "This is your shelf view — how much you have by place. It fills after step 4, or after you receive a delivery (once trading is unlocked).",
     href: "/app/inventory/find-stock",
     cta: "Open Find Stock",
     done: (s) => (s?.items_with_stock ?? 0) > 0,
@@ -82,15 +82,19 @@ type Props = {
 
 /** Plain-language first-run checklist for Stocks home. */
 export function StocksDay1Setup(props: Props) {
+  const auth = useAuth();
   const [dismissed, setDismissed] = createSignal(readDismissed());
   const [showAnyway, setShowAnyway] = createSignal(false);
 
-  const readyToTrade = () => {
+  const day1CriteriaMet = () => {
     const s = props.summary;
-    return (s?.active_locations ?? 0) > 0 && (s?.active_items ?? 0) > 0;
+    return (s?.active_locations ?? 0) > 0 && (s?.active_items ?? 0) > 0 && (s?.items_with_stock ?? 0) > 0;
   };
 
-  const hidden = () => dismissed() && !showAnyway();
+  const commercialStatus = () => auth.me?.commercial?.status ?? "unlocked";
+  const tradeUnlocked = () => commercialStatus() === "unlocked" || auth.me?.tenant?.is_demo === true;
+
+  const hidden = () => dismissed() && !showAnyway() && tradeUnlocked();
 
   return (
     <Show
@@ -110,25 +114,44 @@ export function StocksDay1Setup(props: Props) {
           <div>
             <h2 class="text-base font-semibold text-text-primary">Day 1 setup — before you buy or sell</h2>
             <p class="mt-1 text-sm text-text-secondary">
-              Places and products first. Put starting stock on the shelf if you already have goods. Then you can receive
-              deliveries, sell, and use Find Stock.
+              Places, products, and stock on the shelf first. Buying and selling unlock after Day 1 and payment
+              confirmation by Bluearm.
             </p>
             <p class="mt-1 text-xs text-text-secondary">
-              Order: places → people → products → opening stock (if needed) → Find Stock → then buy / sell.
+              Order: places → people (optional) → products → opening stock → Find Stock → pay → then buy / sell.
             </p>
           </div>
-          <button
-            type="button"
-            class="shrink-0 rounded-lg border border-stroke bg-white px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-slate-50"
-            onClick={() => {
-              writeDismissed(true);
-              setDismissed(true);
-              setShowAnyway(false);
-            }}
-          >
-            Hide for now
-          </button>
+          <Show when={tradeUnlocked()}>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-stroke bg-white px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => {
+                writeDismissed(true);
+                setDismissed(true);
+                setShowAnyway(false);
+              }}
+            >
+              Hide for now
+            </button>
+          </Show>
         </div>
+
+        <Show when={commercialStatus() === "setup"}>
+          <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            Buy &amp; sell stay locked until Day 1 is complete (places + products + stock) and Bluearm confirms your
+            GCash payment.
+          </div>
+        </Show>
+        <Show when={commercialStatus() === "awaiting_payment"}>
+          <div class="mt-3 rounded-lg border border-brand-200 bg-white px-3 py-2 text-xs text-slate-700">
+            Day 1 complete — pay via GCash. Waiting for Bluearm to confirm. The paywall stays open until then.
+          </div>
+        </Show>
+        <Show when={tradeUnlocked() && day1CriteriaMet()}>
+          <div class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            Trading is unlocked. You can buy and sell.
+          </div>
+        </Show>
 
         <ol class="mt-4 space-y-3">
           <For each={STEPS}>
@@ -142,7 +165,7 @@ export function StocksDay1Setup(props: Props) {
                     }`}
                     aria-hidden="true"
                   >
-                    {isDone() ? "✓" : step.id === "people" || step.id === "opening" ? "·" : "○"}
+                    {isDone() ? "✓" : step.optional ? "·" : "○"}
                   </span>
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
@@ -174,8 +197,12 @@ export function StocksDay1Setup(props: Props) {
           <p class="text-sm font-medium text-text-primary">After setup — live work</p>
           <p class="mt-1 text-xs text-text-secondary">
             <Show
-              when={readyToTrade()}
-              fallback="Finish places and products first. Opening stock is only required if you already have goods in the store."
+              when={tradeUnlocked()}
+              fallback={
+                day1CriteriaMet()
+                  ? "Finish GCash payment and wait for Bluearm confirmation to unlock purchase orders, receive, sales, and POS."
+                  : "Finish places, products, and opening stock first. Trading unlocks after payment confirmation."
+              }
             >
               You’re ready to trade. Buying: order → receive when the delivery arrives → bill → pay. Selling: sale → get
               paid. Find Stock updates when goods come in or go out.

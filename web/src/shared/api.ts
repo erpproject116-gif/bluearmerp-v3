@@ -159,6 +159,9 @@ export async function apiFetch<T>(
     }
     return result;
   }
+  if (body.code === "ERR_COMMERCIAL_LOCKED") {
+    window.dispatchEvent(new CustomEvent("bluearm:commercial-locked", { detail: { code: body.code } }));
+  }
   if (body.success && shouldAutoSuccessToast(path, init.method, options)) {
     getGlobalToast()?.success(
       defaultSuccessMessage(init.method, body.message, options?.successMessage),

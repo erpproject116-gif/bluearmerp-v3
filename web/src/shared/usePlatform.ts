@@ -287,6 +287,7 @@ export function usePlatformCommandOverview() {
           overdue_follow_ups?: number;
           pending_invites: number;
           pending_approvals?: number;
+          awaiting_day1_payment?: number;
           product_gap_tickets?: number;
           no_docs_trials?: number;
           churn_risk?: number;

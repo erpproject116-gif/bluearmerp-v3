@@ -184,6 +184,8 @@ export const PlatformChangeLogsCommandPage = lazy(() => import("../modules/platf
 export const PlatformAccessCommandPage = lazy(() => import("../modules/platform/PlatformAccessPage"));
 export const PlatformAnalyticsCommandPage = lazy(() => import("../modules/platform/PlatformAnalyticsPage"));
 export const PlatformCustomerAnalyticsCommandPage = lazy(() => import("../modules/platform/PlatformCustomerAnalyticsPage"));
+export const PlatformDay1PaymentsPage = lazy(() => import("../modules/platform/PlatformDay1PaymentsPage"));
+export const ThankYouActivatedPage = lazy(() => import("../modules/auth/ThankYouActivatedPage"));
 export const LowStockReportPage = lazy(() => import("../modules/crm/reports/LowStockReportPage"));
 export const ExpiredQuotationsReportPage = lazy(() => import("../modules/crm/reports/ExpiredQuotationsReportPage"));
 export const LeadsPage = lazy(() => import("../modules/crm/LeadsPage"));
