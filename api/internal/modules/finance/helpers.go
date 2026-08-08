@@ -40,7 +40,7 @@ func parseOptionalDate(s *string) (*time.Time, error) {
 
 func defaultSupplierInvoiceProgress(s string) string {
 	switch strings.TrimSpace(s) {
-	case "e_approval", "completed":
+	case "e_approval", "completed", "in_progress":
 		return strings.TrimSpace(s)
 	default:
 		return "unconfirmed"

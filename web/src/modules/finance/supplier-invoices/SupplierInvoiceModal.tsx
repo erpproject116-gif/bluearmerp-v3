@@ -31,7 +31,6 @@ import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { getActiveBranchCurrent } from "../../../shared/activeContext";
-import { ProgressStatusMenu } from "../../sales/sales/ProgressStatusMenu";
 import type { OpenGRLine, OpenPOLine, OpenSupplierQuotationInvoiceLine, SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
 import { OpenGRLinePickerModal } from "./OpenGRLinePickerModal";
 import { OpenPOLinePickerModal } from "./OpenPOLinePickerModal";
@@ -601,7 +600,8 @@ export function SupplierInvoiceModal(props: Props) {
       vendor_invoice_no: vendorInvoiceNo() || null,
       reference: reference() || null,
       notes: notes() || null,
-      progress_status: progressStatus(),
+      // New docs always start unconfirmed; progress is changed on the list.
+      progress_status: effectiveEditing() ? progressStatus() : "unconfirmed",
       lines: lines()
         .filter((ln) => ln.item_id || ln.item_code || ln.goods_receipt_line_id || ln.purchase_order_line_id)
         .map((ln, i) => ({
@@ -907,12 +907,27 @@ export function SupplierInvoiceModal(props: Props) {
             />
             <ModalField settings={byKey} fieldKey="progress_status" fallbackLabel="Progress status">
               {(m) => (
-                <ProgressStatusMenu
-                  value={progressStatus()}
-                  disabled={m.disabled || progressStatus() === "e_approval"}
-                  excludeValues={["e_approval"]}
-                  onChange={setProgressStatus}
-                />
+                <Show
+                  when={Boolean(effectiveEditing())}
+                  fallback={
+                    <p class="rounded-lg border border-dashed border-stroke bg-slate-50 px-3 py-2 text-xs text-text-secondary">
+                      Starts as Unconfirmed. Set Progress Status on the list after save to Complete and post stock.
+                    </p>
+                  }
+                >
+                  <p class="rounded-lg border border-stroke bg-slate-50 px-3 py-2 text-sm text-text-secondary">
+                    {progressStatus() === "completed"
+                      ? "Completed"
+                      : progressStatus() === "e_approval"
+                        ? "E-Approval"
+                        : progressStatus() === "in_progress"
+                          ? "In progress"
+                          : "Unconfirmed"}{" "}
+                    — change on the list (Progress Status column).
+                  </p>
+                  {/* Keep field settings wiring; control is list-only. */}
+                  <span class="sr-only">{m.label}</span>
+                </Show>
               )}
             </ModalField>
             <ModalField settings={byKey} fieldKey="vendor_invoice_no" fallbackLabel="Vendor invoice no.">

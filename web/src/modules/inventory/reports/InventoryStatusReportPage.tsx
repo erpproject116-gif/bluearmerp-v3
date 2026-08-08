@@ -13,6 +13,7 @@ import { ReportEmptyMessage } from "../../../shared/reports/ReportTableStates";
 import { apiFetch } from "../../../shared/api";
 import { formatMoney } from "../../../shared/money";
 import { StocksHowItFits } from "../StocksHowItFits";
+import { FindStockUnitsModal, type FindStockUnitsTarget } from "./FindStockUnitsModal";
 
 type CategoryOpt = { id: number; name: string };
 type LocationOpt = { id: number; location_name: string };
@@ -46,22 +47,15 @@ function itemHref(r: InventoryStatusRow) {
   return `/app/inventory/items?q=${encodeURIComponent(r.item_code)}`;
 }
 
-function serialRegistryHref(r: InventoryStatusRow) {
-  const qs = new URLSearchParams({
-    q: r.item_code,
-    item_id: String(r.item_id),
-    location_id: String(r.location_id),
-  });
-  return `/app/inventory/serial-lot/registry?${qs}`;
-}
-
-function lotBatchesHref(r: InventoryStatusRow) {
-  const qs = new URLSearchParams({
-    q: r.item_code,
-    item_id: String(r.item_id),
-    location_id: String(r.location_id),
-  });
-  return `/app/inventory/serial-lot/lots?${qs}`;
+function unitsTarget(r: InventoryStatusRow, kind: "serials" | "lots"): FindStockUnitsTarget {
+  return {
+    kind,
+    item_id: r.item_id,
+    item_code: r.item_code,
+    item_name: r.item_name,
+    location_id: r.location_id,
+    branch_name: r.branch_name,
+  };
 }
 
 function normalizeFilters(raw: InventoryStatusFilters): InventoryStatusFilters {
@@ -108,6 +102,7 @@ export default function InventoryStatusReportPage() {
   const [submitted, setSubmitted] = createSignal<InventoryStatusFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
+  const [unitsTargetRow, setUnitsTargetRow] = createSignal<FindStockUnitsTarget | null>(null);
   const pageSize = 50;
 
   const [categories] = createResource(async () => {
@@ -235,6 +230,7 @@ export default function InventoryStatusReportPage() {
       }
     >
       <StocksHowItFits class="mb-4" />
+      <FindStockUnitsModal target={unitsTargetRow()} onClose={() => setUnitsTargetRow(null)} />
       <Show when={(report.data?.rows.length ?? 0) === 0 && !report.isFetching}>
         <ReportEmptyMessage
           message={
@@ -302,16 +298,24 @@ export default function InventoryStatusReportPage() {
                       </td>
                       <td class="px-3 py-2 text-right tabular-nums">
                         <Show when={r.track_serial} fallback={<span class="text-text-secondary">—</span>}>
-                          <A href={serialRegistryHref(r)} class="text-brand-600 hover:underline">
+                          <button
+                            type="button"
+                            class="text-brand-600 hover:underline"
+                            onClick={() => setUnitsTargetRow(unitsTarget(r, "serials"))}
+                          >
                             {fmtCount(r.serial_unit_count)}
-                          </A>
+                          </button>
                         </Show>
                       </td>
                       <td class="px-3 py-2 text-right tabular-nums">
                         <Show when={r.track_lot} fallback={<span class="text-text-secondary">—</span>}>
-                          <A href={lotBatchesHref(r)} class="text-brand-600 hover:underline">
+                          <button
+                            type="button"
+                            class="text-brand-600 hover:underline"
+                            onClick={() => setUnitsTargetRow(unitsTarget(r, "lots"))}
+                          >
                             {fmtCount(r.lot_batch_count)}
-                          </A>
+                          </button>
                         </Show>
                       </td>
                       <td class="px-3 py-2 text-right tabular-nums">{formatMoney(r.sales_price)}</td>
@@ -326,14 +330,22 @@ export default function InventoryStatusReportPage() {
                             Movements
                           </A>
                           <Show when={r.track_serial}>
-                            <A href={serialRegistryHref(r)} class="text-brand-600 hover:underline">
+                            <button
+                              type="button"
+                              class="text-left text-brand-600 hover:underline"
+                              onClick={() => setUnitsTargetRow(unitsTarget(r, "serials"))}
+                            >
                               View serials
-                            </A>
+                            </button>
                           </Show>
                           <Show when={r.track_lot}>
-                            <A href={lotBatchesHref(r)} class="text-brand-600 hover:underline">
+                            <button
+                              type="button"
+                              class="text-left text-brand-600 hover:underline"
+                              onClick={() => setUnitsTargetRow(unitsTarget(r, "lots"))}
+                            >
                               View lots
-                            </A>
+                            </button>
                           </Show>
                         </div>
                       </td>

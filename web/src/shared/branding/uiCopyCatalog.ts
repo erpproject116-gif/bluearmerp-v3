@@ -92,19 +92,46 @@ export const UI_COPY_GROUPS: UiCopyGroup[] = [
     title: "Form settings",
     entries: [
       { key: "form_settings.breadcrumb_suffix", label: "Breadcrumb suffix", fallback: "Form settings" },
-      { key: "form_settings.page_title_suffix", label: "Page title suffix", fallback: "form fields" },
+      { key: "form_settings.page_title_suffix", label: "Page title suffix", fallback: "settings" },
       {
         key: "form_settings.description",
         label: "Page description",
-        fallback: "Configure labels, visibility, required rules, and custom fields for the new-row form.",
+        fallback:
+          "Form fields control the create/edit modal. List columns control the data table. Line columns control the modal line grid.",
       },
       { key: "form_settings.save_fields", label: "Save form fields button", fallback: "Save form fields" },
       { key: "form_settings.save_line_columns", label: "Save line columns button", fallback: "Save line columns" },
-      { key: "form_settings.line_column_heading", label: "Line column section", fallback: "Line item column labels" },
+      { key: "form_settings.save_list_columns", label: "Save list columns button", fallback: "Save list columns" },
+      {
+        key: "form_settings.form_fields_heading",
+        label: "Form fields section",
+        fallback: "Form fields (create/edit modal)",
+      },
+      {
+        key: "form_settings.form_fields_description",
+        label: "Form fields section description",
+        fallback: "Visibility here hides fields on the new/edit form only — not on the list table.",
+      },
+      {
+        key: "form_settings.line_column_heading",
+        label: "Line column section",
+        fallback: "Line grid columns (modal lines)",
+      },
       {
         key: "form_settings.line_column_description",
         label: "Line column section description",
-        fallback: "Customize headers shown in the line items grid for this feature.",
+        fallback: "Customize headers shown in the line items grid inside the create/edit modal.",
+      },
+      {
+        key: "form_settings.list_column_heading",
+        label: "List column section",
+        fallback: "List columns (data table)",
+      },
+      {
+        key: "form_settings.list_column_description",
+        label: "List column section description",
+        fallback:
+          "Labels and default visibility for the list/data table. Users can further hide columns with the Columns picker on the list.",
       },
       { key: "form_settings.add_custom_field", label: "Add custom field section", fallback: "Add custom field" },
     ],
