@@ -360,11 +360,19 @@ export function SupplierInvoiceModal(props: Props) {
     }
   });
 
+  let appliedNewDefaults = false;
   createEffect(() => {
-    if (!props.open || effectiveEditing()) return;
+    if (!props.open) {
+      appliedNewDefaults = false;
+      return;
+    }
+    if (effectiveEditing()) return;
     const tt = taxTypes();
     const cc = currencies();
     if (!tt.length || !cc.length) return;
+    // Apply defaults once per open — do not re-fill after the user Clears a combo.
+    if (appliedNewDefaults) return;
+    appliedNewDefaults = true;
     if (!taxTypeId()) {
       const first = tt[0];
       setTaxTypeId(first.id);

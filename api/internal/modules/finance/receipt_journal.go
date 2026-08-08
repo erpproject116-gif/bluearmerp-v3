@@ -114,8 +114,8 @@ func loadReceiptJournal(ctx context.Context, pool *pgxpool.Pool, tenantID, id in
 	var locName, deptName, picName, updatedByName *string
 	err = pool.QueryRow(ctx, `
 		select r.accounting_slip_no, r.comment_details, r.remark,
-		  r.location_id, loc.name, r.department_id, dept.name,
-		  r.project_id, proj.name, r.pic_user_id, pic.full_name,
+		  r.location_id, loc.location_name, r.department_id, dept.department_name,
+		  r.project_id, proj.project_name, r.pic_user_id, pic.full_name,
 		  r.updated_by_user_id, upd.full_name, r.receipt_date
 		from public.fin_official_receipts r
 		left join public.inv_locations loc on loc.id = r.location_id

@@ -75,7 +75,9 @@ describe("LookupCombo", () => {
       );
     }
     render(() => <Harness />);
-    await fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    const clearBtn = screen.getByRole("button", { name: "Clear" });
+    await fireEvent.mouseDown(clearBtn);
     expect(onClear).toHaveBeenCalled();
+    expect(screen.getByRole("textbox")).toHaveValue("");
   });
 });
