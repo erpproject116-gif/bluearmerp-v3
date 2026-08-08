@@ -137,7 +137,7 @@ export function OpenPOLinePickerModal(props: Props) {
                 }`}
                 onClick={() => {
                   setStatusChip(c.id);
-                  setSelected(new Set());
+                  setSelected(new Set<number>());
                 }}
               >
                 {c.label}
