@@ -41,7 +41,7 @@ const CASES: TxCase[] = [
   },
   {
     name: "purchase (supplier invoice)",
-    listPath: "/app/purchases/purchases",
+    listPath: "/app/purchases/purchase-receive",
     editHeading: /Edit Purchase \(actual purchase\)/i,
   },
   {

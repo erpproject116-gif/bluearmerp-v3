@@ -144,10 +144,10 @@
     "/app/purchase-request/purchase-requests/new",
     "/app/purchase-request/purchase-requests/settings",
     "/app/purchase-request/purchase-requests/status",
-    "/app/purchases/purchases/new",
-    "/app/purchases/purchases/pre-invoicing",
-    "/app/purchases/purchases/settings",
-    "/app/purchases/purchases/status",
+    "/app/purchases/purchase-receive/new",
+    "/app/purchases/purchase-receive/pre-invoicing",
+    "/app/purchases/purchase-receive/settings",
+    "/app/purchases/purchase-receive/status",
     "/app/quality/capa",
     "/app/quality/ncrs",
     "/app/quality/qc-requests",
@@ -962,39 +962,39 @@
       "kind": "print_or_doc"
     },
     {
-      "path": "/app/purchases/purchases",
+      "path": "/app/purchases/purchase-receive",
       "kind": "redirect"
     },
     {
-      "path": "/app/purchases/purchases/:id/print",
+      "path": "/app/purchases/purchase-receive/:id/print",
       "kind": "parametrized"
     },
     {
-      "path": "/app/purchases/purchases/:purchaseId/print-doc",
+      "path": "/app/purchases/purchase-receive/:purchaseId/print-doc",
       "kind": "parametrized"
     },
     {
-      "path": "/app/purchases/purchases/ap-by-vendor",
+      "path": "/app/purchases/purchase-receive/ap-by-vendor",
       "kind": "redirect"
     },
     {
-      "path": "/app/purchases/purchases/new",
+      "path": "/app/purchases/purchase-receive/new",
       "kind": "app_static"
     },
     {
-      "path": "/app/purchases/purchases/payment-status",
+      "path": "/app/purchases/purchase-receive/payment-status",
       "kind": "redirect"
     },
     {
-      "path": "/app/purchases/purchases/pre-invoicing",
+      "path": "/app/purchases/purchase-receive/pre-invoicing",
       "kind": "app_static"
     },
     {
-      "path": "/app/purchases/purchases/settings",
+      "path": "/app/purchases/purchase-receive/settings",
       "kind": "app_static"
     },
     {
-      "path": "/app/purchases/purchases/status",
+      "path": "/app/purchases/purchase-receive/status",
       "kind": "app_static"
     },
     {

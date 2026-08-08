@@ -13,7 +13,7 @@ export async function fetchSupplierInvoicePrint(id: number) {
 }
 
 export function openSupplierInvoicePrint(id: number) {
-  window.open(`/app/purchases/purchases/${id}/print`, "_blank", "noopener,noreferrer");
+  window.open(`/app/purchases/purchase-receive/${id}/print`, "_blank", "noopener,noreferrer");
 }
 
 export { formatMoney, formatPrintDate, partyContact };

@@ -55,7 +55,7 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
   },
   purchase_require_gr_before_supplier_invoice: {
     label: "Require Purchase Receive before Bill (legacy)",
-    help: "Off by default = New Bill is primary — scan arrived serials and confirm to post stock + AP. On = legacy: Purchase Receive first, then Bill.",
+    help: "Off by default = Purchase Receive is primary — scan arrived serials and confirm to post stock + AP. On = legacy: Receive history first, then bill from that history.",
   },
   purchase_order_require_attachment: {
     label: "Require file on purchase order",

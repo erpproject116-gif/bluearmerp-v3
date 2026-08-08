@@ -33,7 +33,7 @@ const PAYMENT_STATUS_OPTIONS = [
 ];
 
 function listBasePath(pathname: string) {
-  return pathname.startsWith("/app/purchases") ? "/app/purchases/purchases" : "/app/finance/supplier-invoices";
+  return pathname.startsWith("/app/purchases") ? "/app/purchases/purchase-receive" : "/app/finance/supplier-invoices";
 }
 
 export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
@@ -123,11 +123,11 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   return (
     <PurchasesLayout>
       <div class="mb-4 rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-slate-700">
-        <p class="font-medium text-slate-800">New Bill = New Purchase (stock + AP on confirm)</p>
+        <p class="font-medium text-slate-800">Purchase Receive = New Purchase (stock + AP on confirm)</p>
         <p class="mt-1 text-xs">
           Preferred: Load Slip → <span class="font-medium">Purchase Order</span> (or blank item), set qty, scan
-          serials, attach DR / vendor SI, then confirm — stock and AP post together. Load Slip → Purchase Receive is
-          legacy bill-only when goods were already received. Bills do not edit BOM recipes.
+          serials, attach DR / vendor SI, then confirm — stock and AP post together. Load Slip → Receive history is
+          legacy when goods were already received separately. This screen does not edit BOM recipes.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Next:{" "}
@@ -279,7 +279,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
-        newLabel="New Bill"
+        newLabel="New Purchase Receive"
         codeKey="invoice_no"
         nameKey="date_no_display"
         sortKey={sort()}

@@ -45,7 +45,7 @@ const FLOWS: FlowRow[] = [
       { label: "Purchase Request", href: "/app/purchase-request/purchase-requests", sub: "Optional", optional: true },
       { label: "Purchase Order", href: "/app/purchase-order/purchase-orders", sub: "Commit to vendor" },
       { label: "Purchase Receive", href: "/app/purchase-order/goods-receipt", sub: "Stock + proof" },
-      { label: "Bill", href: "/app/purchases/purchases", sub: "Amount owed" },
+      { label: "Purchase Receive", href: "/app/purchases/purchase-receive", sub: "Stock + amount owed" },
       { label: "Payment Made", href: "/app/finance/disbursements", sub: "Pay vendor", accent: true },
     ],
   },

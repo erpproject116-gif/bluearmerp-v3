@@ -416,10 +416,12 @@ export default function App() {
         <Route path="/app/purchase-order/purchase-orders/:purchaseOrderId/print" component={PurchaseOrderPrintPage} />
         <Route path="/app/purchase-order/rfq/:rfqId/print" component={RfqPrintPage} />
         <Route path="/app/purchase-order/supplier-quotations/:sqId/print" component={SupplierQuotationPrintPage} />
+        <Route path="/app/purchases/purchase-receive/:purchaseId/print-doc" component={SupplierInvoiceDocPrintPage} />
         <Route path="/app/purchases/purchases/:purchaseId/print-doc" component={SupplierInvoiceDocPrintPage} />
         <Route path="/app/sales/sales/:id/print" component={PackingSlipPrintPage} />
         <Route path="/app/sales/sales/:id/invoice/print" component={SalesInvoicePrintPage} />
         <Route path="/app/finance/supplier-invoices/:id/print" component={PurchaseInvoicePrintPage} />
+        <Route path="/app/purchases/purchase-receive/:id/print" component={PurchaseInvoicePrintPage} />
         <Route path="/app/purchases/purchases/:id/print" component={PurchaseInvoicePrintPage} />
         <Route path="/app/sales/credit-notes/:id/print" component={CreditNotePrintPage} />
         <Route path="/app/purchases/vendor-credits/:id/print" component={VendorCreditPrintPage} />
@@ -654,16 +656,26 @@ export default function App() {
           <Route path="/finance/acct-i/chart-of-accounts" component={ChartOfAccountsPage} />
           <Route path="/finance/acct-i/journal-entries" component={JournalEntriesPage} />
           <Route path="/purchases/setup" component={ModuleSetupHubPage} />
-          <Route path="/purchases/purchases/new" component={SupplierInvoiceNewPage} />
-          <Route path="/purchases/purchases/settings" component={SupplierInvoiceSettingsPage} />
-          <Route path="/purchases/purchases/status" component={PurchaseStatusPage} />
-          <Route path="/purchases/purchases/pre-invoicing" component={PurchasePreInvoicingPage} />
-          <Route path="/purchases/purchases/payment-status" component={SupplierPaymentStatusPage} />
-          <Route path="/purchases/purchases/ap-by-vendor" component={ApByVendorPage} />
-          <Route path="/purchases/purchases" component={SupplierInvoiceListPage} />
-          <Route path="/finance/supplier-invoices/new" component={() => <Navigate href="/app/purchases/purchases/new" />} />
-          <Route path="/finance/supplier-invoices/settings" component={() => <Navigate href="/app/purchases/purchases/settings" />} />
-          <Route path="/finance/supplier-invoices" component={() => <Navigate href="/app/purchases/purchases" />} />
+          <Route path="/purchases/purchase-receive/new" component={SupplierInvoiceNewPage} />
+          <Route path="/purchases/purchase-receive/settings" component={SupplierInvoiceSettingsPage} />
+          <Route path="/purchases/purchase-receive/status" component={PurchaseStatusPage} />
+          <Route path="/purchases/purchase-receive/pre-invoicing" component={PurchasePreInvoicingPage} />
+          <Route path="/purchases/purchase-receive/payment-status" component={SupplierPaymentStatusPage} />
+          <Route path="/purchases/purchase-receive/ap-by-vendor" component={ApByVendorPage} />
+          <Route path="/purchases/purchase-receive" component={SupplierInvoiceListPage} />
+          {/* Legacy Bills slug — keep bookmarks and emails working */}
+          <Route path="/purchases/purchases/new" component={() => <Navigate href="/app/purchases/purchase-receive/new" />} />
+          <Route path="/purchases/purchases/settings" component={() => <Navigate href="/app/purchases/purchase-receive/settings" />} />
+          <Route path="/purchases/purchases/status" component={() => <Navigate href="/app/purchases/purchase-receive/status" />} />
+          <Route path="/purchases/purchases/pre-invoicing" component={() => <Navigate href="/app/purchases/purchase-receive/pre-invoicing" />} />
+          <Route path="/purchases/purchases/payment-status" component={() => <Navigate href="/app/purchases/purchase-receive/payment-status" />} />
+          <Route path="/purchases/purchases/ap-by-vendor" component={() => <Navigate href="/app/purchases/purchase-receive/ap-by-vendor" />} />
+          <Route path="/purchases/purchases/:id/print" component={PurchaseInvoicePrintPage} />
+          <Route path="/purchases/purchases/:purchaseId/print-doc" component={SupplierInvoiceDocPrintPage} />
+          <Route path="/purchases/purchases" component={() => <Navigate href="/app/purchases/purchase-receive" />} />
+          <Route path="/finance/supplier-invoices/new" component={() => <Navigate href="/app/purchases/purchase-receive/new" />} />
+          <Route path="/finance/supplier-invoices/settings" component={() => <Navigate href="/app/purchases/purchase-receive/settings" />} />
+          <Route path="/finance/supplier-invoices" component={() => <Navigate href="/app/purchases/purchase-receive" />} />
           <Route path="/finance/payment-vouchers/new" component={PaymentVoucherNewPage} />
           <Route path="/finance/payment-vouchers" component={PaymentVoucherListPage} />
           <Route path="/finance/chart-of-accounts" component={() => <Navigate href="/app/finance/acct-i/chart-of-accounts" />} />

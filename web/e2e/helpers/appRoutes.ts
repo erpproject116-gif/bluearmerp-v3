@@ -31,7 +31,7 @@ export const CORE_APP_ROUTES: string[] = [
   "/app/purchase-order/purchase-orders",
   "/app/purchase-order/rfq",
   "/app/purchase-order/goods-receipt",
-  "/app/purchases/purchases",
+  "/app/purchases/purchase-receive",
   "/app/finance/official-receipts",
   "/app/finance/payment-vouchers",
   "/app/finance/acct-i/chart-of-accounts",

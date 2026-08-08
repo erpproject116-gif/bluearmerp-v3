@@ -159,5 +159,5 @@ export function openSalesInvoicePrint(id: number) {
 }
 
 export function openPurchaseInvoicePrint(id: number) {
-  window.open(`/app/purchases/purchases/${id}/print`, "_blank", "noopener,noreferrer");
+  window.open(`/app/purchases/purchase-receive/${id}/print`, "_blank", "noopener,noreferrer");
 }

@@ -86,7 +86,7 @@ export function attachmentSettingsHref(kind: AttachmentDocKind): string {
     case "purchase_order":
       return "/app/purchase-order/purchase-orders/settings";
     case "supplier_invoice":
-      return "/app/purchases/purchases/settings";
+      return "/app/purchases/purchase-receive/settings";
     default:
       return "/app/user-management/process-policies";
   }

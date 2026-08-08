@@ -429,7 +429,7 @@ func docHref(docType string, docID int64) string {
 	case "gr_goods_receipt":
 		return "/app/purchase-order/goods-receipt"
 	case "fin_supplier_invoice":
-		return "/app/purchases/purchases"
+		return "/app/purchases/purchase-receive"
 	case "fin_official_receipt":
 		return "/app/finance/official-receipts"
 	case "job_cost_project":

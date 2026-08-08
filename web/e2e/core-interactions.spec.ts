@@ -44,7 +44,7 @@ const CORE_DOCUMENTS: CoreDocumentCase[] = [
   },
   {
     name: "purchase invoice",
-    path: "/app/purchases/purchases",
+    path: "/app/purchases/purchase-receive",
     heading: /New Purchase Invoice/i,
     expectedLabel: /Supplier|Vendor/i,
   },

@@ -104,7 +104,7 @@ const SECTIONS: PolicySection[] = [
       {
         key: "purchase_require_gr_before_supplier_invoice",
         label: "Require Purchase Receive before Bill (legacy)",
-        help: "Off by default = New Bill posts stock + serials on confirm. Leave off unless you still use separate Purchase Receive.",
+        help: "Off by default = Purchase Receive posts stock + serials on confirm. Leave off unless you still use separate Receive history.",
       },
     ],
   },

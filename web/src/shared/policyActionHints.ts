@@ -9,14 +9,15 @@ export type PolicyActionHint = {
 };
 
 const FIELD_HINTS: Record<string, PolicyActionHint> = {
-  lines: { href: "/app/sales-order/sales-orders", label: "Open Sales Orders" },
+  // Do not map bare "lines" — many docs use that key for line-item errors that are not SO-related.
   source_quotation_id: { href: "/app/quotation/quotations", label: "Open Quotations" },
   purchase_request_id: { href: "/app/purchase-request/purchase-requests", label: "Open Purchase Requests" },
-  goods_receipt_line_id: { href: "/app/purchase-order/goods-receipt", label: "Open Purchase Receive" },
+  goods_receipt_line_id: { href: "/app/purchase-order/goods-receipt", label: "Open Receive history" },
   sales_order_id: { href: "/app/dashboard/approvals", label: "Open Approvals" },
   purchase_order_id: { href: "/app/dashboard/approvals", label: "Open Approvals" },
   attachments: { href: "/app/sales-order/setup", label: "Adjust attachment settings" },
   purchase_order_line_id: { href: "/app/purchase-order/purchase-orders", label: "Confirm Purchase Order" },
+  source_sales_order_id: { href: "/app/sales-order/sales-orders", label: "Open Sales Orders" },
 };
 
 const MESSAGE_HINTS: Array<{ match: RegExp; hint: PolicyActionHint }> = [

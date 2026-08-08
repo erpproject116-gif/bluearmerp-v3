@@ -368,20 +368,28 @@ func applyStockAndTracking(
 		if err != nil {
 			return errors.New("failed to create serial units")
 		}
-		locID := locationID
-		uid := userID
+		// Collect ids first — pgx forbids another query on the same tx while rows are open ("conn busy").
+		var unitIDs []int64
 		for unitRows.Next() {
 			var unitIDRow int64
 			if err := unitRows.Scan(&unitIDRow); err != nil {
 				unitRows.Close()
 				return err
 			}
+			unitIDs = append(unitIDs, unitIDRow)
+		}
+		if err := unitRows.Err(); err != nil {
+			unitRows.Close()
+			return err
+		}
+		unitRows.Close()
+		locID := locationID
+		uid := userID
+		for _, unitIDRow := range unitIDs {
 			if err := inventory.InsertSerialEvent(ctx, tx, tenantID, unitIDRow, "received", nil, &locID, "goods_receipt", grID, &uid); err != nil {
-				unitRows.Close()
 				return err
 			}
 		}
-		unitRows.Close()
 	}
 
 	if trackLot {

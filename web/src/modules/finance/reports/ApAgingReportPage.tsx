@@ -97,12 +97,12 @@ export default function ApAgingReportPage() {
                 <tr
                   class="border-t border-stroke/60 hover:bg-brand-50/40 cursor-pointer"
                   onClick={() => {
-                    window.location.href = `/app/purchases/purchases?openId=${row.supplier_invoice_id}`;
+                    window.location.href = `/app/purchases/purchase-receive?openId=${row.supplier_invoice_id}`;
                   }}
                 >
                   <td class="px-3 py-2">
                     <A
-                      href={`/app/purchases/purchases?openId=${row.supplier_invoice_id}`}
+                      href={`/app/purchases/purchase-receive?openId=${row.supplier_invoice_id}`}
                       class="font-medium text-brand-600 underline-offset-2 hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >

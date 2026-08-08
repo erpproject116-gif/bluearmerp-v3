@@ -139,7 +139,7 @@ export const workflowGuides: WorkflowGuide[] = [
         short: "Bill",
         title: "Declare amount owed (Bill)",
         what: "Create the Bill — inside New Bill, click Load Slip → Purchase Receive to pull in received lines (recommended). This records exactly what you owe the supplier.",
-        href: "/app/purchases/purchases",
+        href: "/app/purchases/purchase-receive",
         routePrefixes: ["/app/purchases"],
         moduleCode: "purchases",
       },

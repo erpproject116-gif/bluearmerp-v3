@@ -19,7 +19,7 @@ export function crmNotificationHref(n: CrmNotification): string {
     case "sa_sales_order":
       return "/app/sales-order/sales-orders";
     case "fin_supplier_invoice":
-      return id ? `/app/purchases/purchases?openId=${id}` : "/app/purchases/purchases";
+      return id ? `/app/purchases/purchase-receive?openId=${id}` : "/app/purchases/purchase-receive";
     case "po_purchase_order":
       return "/app/purchase-request/purchase-orders";
     case "support_ticket":

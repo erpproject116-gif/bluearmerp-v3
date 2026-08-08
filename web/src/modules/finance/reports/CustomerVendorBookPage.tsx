@@ -19,7 +19,7 @@ function slipHref(docKind?: string, docId?: number): string | null {
     case "sales":
       return `/app/sales/sales?openId=${docId}`;
     case "supplier_invoice":
-      return `/app/purchases/purchases?openId=${docId}`;
+      return `/app/purchases/purchase-receive?openId=${docId}`;
     case "official_receipt":
       return `/app/finance/official-receipts?openId=${docId}`;
     case "payment_voucher":
