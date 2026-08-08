@@ -1,9 +1,10 @@
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createSignal, For, onMount } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { arApStatusExportUrl, useArApStatusReport, type ArApStatusFilters } from "../../../shared/reports/useModuleReports";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { GridExportButtons } from "../../../shared/gridExport";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { FinanceLayout } from "../FinanceLayout";
 
 const TYPE_TABS = [
@@ -18,17 +19,17 @@ function defaultFilters(): ArApStatusFilters {
 
 export default function ArApStatusReportPage() {
   const [draft, setDraft] = createSignal<ArApStatusFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<ArApStatusFilters | null>(null);
+  const [submitted, setSubmitted] = createSignal<ArApStatusFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const pageSize = 50;
 
   const report = useArApStatusReport(() => ({
-    filters: submitted() ?? defaultFilters(),
+    filters: submitted(),
     page: page(),
     pageSize,
     sort: "partner_name",
     order: "asc",
-    enabled: submitted() !== null,
+    enabled: true,
   }));
 
   onMount(() => {
@@ -47,15 +48,33 @@ export default function ArApStatusReportPage() {
     setPage(1);
   };
 
+  const reset = () => {
+    const next = defaultFilters();
+    setDraft(next);
+    setSubmitted(next);
+    setPage(1);
+  };
+
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
   let reportBodyEl: HTMLDivElement | undefined;
 
   return (
     <FinanceLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">AR/AP Status</h2>
-        <p class="text-sm text-text-secondary">Combined receivable and payable position as-of a single date.</p>
-        <div class="mt-4 flex flex-wrap gap-2">
+      <CollapsibleFilterPanel
+        title="AR/AP Status"
+        description="Combined receivable and payable position as-of a single date — defaults to today, then Search (F8)."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={reset}>
+              Reset
+            </button>
+          </>
+        }
+      >
+        <div class="flex flex-wrap gap-2">
           <For each={TYPE_TABS}>
             {(tab) => (
               <button
@@ -73,59 +92,53 @@ export default function ArApStatusReportPage() {
             <input type="date" class={inputClass} value={draft().as_of} onInput={(e) => setDraft((prev) => ({ ...prev, as_of: e.currentTarget.value }))} />
           </Field>
         </div>
-        <div class="mt-4 flex gap-2">
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white" onClick={search}>Search (F8)</button>
-          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => { setDraft(defaultFilters()); setSubmitted(null); }}>Reset</button>
+      </CollapsibleFilterPanel>
+
+      <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
+        <div class="flex flex-wrap items-center justify-end gap-2 border-b border-stroke px-5 py-3">
+          <GridExportButtons
+            title="AR/AP Status"
+            filename="ar-ap-status"
+            columns={[]}
+            rows={() => []}
+            scrapeRoot={() => reportBodyEl}
+          />
+        </div>
+        <div class="overflow-x-auto" ref={(el) => (reportBodyEl = el)}>
+          <table class="erp-grid min-w-full text-left text-sm">
+            <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+              <tr>
+                <th class="px-3 py-2">Partner</th>
+                <th class="px-3 py-2">Kind</th>
+                <th class="px-3 py-2 text-right">A/R Balance</th>
+                <th class="px-3 py-2 text-right">A/P Balance</th>
+                <th class="px-3 py-2 text-right">Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={report.data?.rows ?? []}>
+                {(row) => (
+                  <tr class="border-t border-stroke/60">
+                    <td class="px-3 py-2">{row.partner_name}</td>
+                    <td class="px-3 py-2">{row.partner_kind}</td>
+                    <td class="px-3 py-2 text-right">{formatPeso(row.ar_balance)}</td>
+                    <td class="px-3 py-2 text-right">{formatPeso(row.ap_balance)}</td>
+                    <td class="px-3 py-2 text-right">{formatPeso(row.net_balance)}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
+          <span>Page {page()} / {totalPages()}</span>
+          <div class="flex gap-2">
+            <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
+            <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() >= totalPages()} onClick={() => setPage((p) => p + 1)}>Next</button>
+            <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => void downloadReportCsv(arApStatusExportUrl(submitted()), "ar-ap-status.csv")}>Export CSV</button>
+          </div>
         </div>
       </section>
-
-      <Show when={submitted()}>
-        <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
-          <div class="flex flex-wrap items-center justify-end gap-2 border-b border-stroke px-5 py-3">
-            <GridExportButtons
-              title="AR/AP Status"
-              filename="ar-ap-status"
-              columns={[]}
-              rows={() => []}
-              scrapeRoot={() => reportBodyEl}
-            />
-          </div>
-          <div class="overflow-x-auto" ref={(el) => (reportBodyEl = el)}>
-            <table class="erp-grid min-w-full text-left text-sm">
-              <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
-                <tr>
-                  <th class="px-3 py-2">Partner</th>
-                  <th class="px-3 py-2">Kind</th>
-                  <th class="px-3 py-2 text-right">A/R Balance</th>
-                  <th class="px-3 py-2 text-right">A/P Balance</th>
-                  <th class="px-3 py-2 text-right">Net</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={report.data?.rows ?? []}>
-                  {(row) => (
-                    <tr class="border-t border-stroke/60">
-                      <td class="px-3 py-2">{row.partner_name}</td>
-                      <td class="px-3 py-2">{row.partner_kind}</td>
-                      <td class="px-3 py-2 text-right">{formatPeso(row.ar_balance)}</td>
-                      <td class="px-3 py-2 text-right">{formatPeso(row.ap_balance)}</td>
-                      <td class="px-3 py-2 text-right">{formatPeso(row.net_balance)}</td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </div>
-          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
-            <span>Page {page()} / {totalPages()}</span>
-            <div class="flex gap-2">
-              <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
-              <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() >= totalPages()} onClick={() => setPage((p) => p + 1)}>Next</button>
-              <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => submitted() && void downloadReportCsv(arApStatusExportUrl(submitted()!), "ar-ap-status.csv")}>Export CSV</button>
-            </div>
-          </div>
-        </section>
-      </Show>
     </FinanceLayout>
   );
 }

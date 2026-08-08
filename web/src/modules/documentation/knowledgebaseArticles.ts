@@ -417,10 +417,10 @@ export const knowledgebaseArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Create a draft goods receipt from a purchase order.",
-          "Open the scan panel on the GR list or Serial Receive page.",
+          "Prefer New Bill: enter serials on bill lines and confirm — stock and serials post together.",
+          "Legacy path: create a draft goods receipt from a PO, then use Serial Receive or the GR scan panel.",
           "Scan item code, then scan each serial until the line is complete.",
-          "Post the goods receipt to move serials to in_stock.",
+          "On confirm/post, serials move to in_stock.",
         ],
       },
       {
@@ -436,8 +436,8 @@ export const knowledgebaseArticles: KbArticle[] = [
         ],
       },
     ],
-    primaryHref: "/app/inventory/serial-lot/receive",
-    primaryLabel: "Open serial receive",
+    primaryHref: "/app/purchases/purchases/new",
+    primaryLabel: "Open New Bill",
     relatedGuideIds: ["inventory", "sales", "activity-logs-audit", "serial-lot-registry"],
   },
   ...moduleKbArticles,

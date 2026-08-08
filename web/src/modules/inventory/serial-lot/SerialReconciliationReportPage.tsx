@@ -1,4 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import {
@@ -19,7 +20,7 @@ function withRowIds<T extends object>(rows: T[], page: number, pageSize: number)
 
 export default function SerialReconciliationReportPage() {
   const [draft, setDraft] = createSignal<SerialReconciliationFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<SerialReconciliationFilters | null>(null);
+  const [submitted, setSubmitted] = createSignal<SerialReconciliationFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const [sort, setSort] = createSignal("variance");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
@@ -33,8 +34,8 @@ export default function SerialReconciliationReportPage() {
       pageSize,
       sort: sort(),
       order: order(),
-      filters: f ?? defaultFilters(),
-      enabled: f != null,
+      filters: f,
+      enabled: true,
     };
   });
 
@@ -46,8 +47,9 @@ export default function SerialReconciliationReportPage() {
   };
 
   const reset = () => {
-    setDraft(defaultFilters());
-    setSubmitted(null);
+    const defaults = defaultFilters();
+    setDraft(defaults);
+    setSubmitted(defaults);
     setPage(1);
   };
 
@@ -74,11 +76,27 @@ export default function SerialReconciliationReportPage() {
 
   return (
     <SerialLotLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold text-text-primary">Item vs Serial Balance</h2>
-          <p class="text-sm text-text-secondary">Compare item on-hand qty vs in-stock serial unit count — Search (F8).</p>
-        </div>
+      <CollapsibleFilterPanel
+        title="Item vs Serial Balance"
+        description="Compare item on-hand qty vs in-stock serial unit count — Search (F8)."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
+              Reset
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+              onClick={() => void downloadReportCsv(serialReconciliationExportUrl(submitted()), "serial-reconciliation.csv")}
+            >
+              Export CSV
+            </button>
+          </>
+        }
+      >
         <div class="mb-4 flex flex-wrap gap-2">
           <button
             type="button"
@@ -106,61 +124,15 @@ export default function SerialReconciliationReportPage() {
             </label>
           </Field>
         </div>
-        <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
-            Search (F8)
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
-            Reset
-          </button>
-          <Show when={submitted()}>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-              onClick={() => void downloadReportCsv(serialReconciliationExportUrl(submitted()!), "serial-reconciliation.csv")}
-            >
-              Export CSV
-            </button>
-          </Show>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
-      <Show when={submitted()}>
-        <div class="mt-6">
-          <Show
-            when={isByItem()}
-            fallback={
-              <SpreadsheetGrid<SerialReconciliationRow & { id: number }>
-                columns={[
-                  { key: "serial_no", header: "Serial no.", render: (r) => r.serial_no ?? "—", clickable: true },
-                  { key: "item_code", header: "Item code" },
-                  { key: "item_name", header: "Item name" },
-                  { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
-                  { key: "item_qty_on_hand", header: "Item qty", render: (r) => String(r.item_qty_on_hand) },
-                  { key: "serial_unit_count", header: "Serial count", render: (r) => String(r.serial_unit_count) },
-                  { key: "variance", header: "Variance", render: (r) => String(r.variance) },
-                ]}
-                rows={withRowIds(report.data?.rows ?? [], page(), pageSize)}
-                loading={report.isFetching}
-                selectedId={selectedId()}
-                onSelect={setSelectedId}
-                codeKey="serial_no"
-                nameKey="item_name"
-                sortKey={sort()}
-                sortOrder={order()}
-                onSort={toggleSort}
-                page={page()}
-                pageSize={pageSize}
-                total={report.data?.total ?? 0}
-                onPageChange={setPage}
-                onRefresh={search}
-                onNew={() => {}}
-                onEdit={() => {}}
-              />
-            }
-          >
+      <div class="mt-6">
+        <Show
+          when={isByItem()}
+          fallback={
             <SpreadsheetGrid<SerialReconciliationRow & { id: number }>
               columns={[
+                { key: "serial_no", header: "Serial no.", render: (r) => r.serial_no ?? "—", clickable: true },
                 { key: "item_code", header: "Item code" },
                 { key: "item_name", header: "Item name" },
                 { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
@@ -172,7 +144,7 @@ export default function SerialReconciliationReportPage() {
               loading={report.isFetching}
               selectedId={selectedId()}
               onSelect={setSelectedId}
-              codeKey="item_code"
+              codeKey="serial_no"
               nameKey="item_name"
               sortKey={sort()}
               sortOrder={order()}
@@ -185,9 +157,36 @@ export default function SerialReconciliationReportPage() {
               onNew={() => {}}
               onEdit={() => {}}
             />
-          </Show>
-        </div>
-      </Show>
+          }
+        >
+          <SpreadsheetGrid<SerialReconciliationRow & { id: number }>
+            columns={[
+              { key: "item_code", header: "Item code" },
+              { key: "item_name", header: "Item name" },
+              { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
+              { key: "item_qty_on_hand", header: "Item qty", render: (r) => String(r.item_qty_on_hand) },
+              { key: "serial_unit_count", header: "Serial count", render: (r) => String(r.serial_unit_count) },
+              { key: "variance", header: "Variance", render: (r) => String(r.variance) },
+            ]}
+            rows={withRowIds(report.data?.rows ?? [], page(), pageSize)}
+            loading={report.isFetching}
+            selectedId={selectedId()}
+            onSelect={setSelectedId}
+            codeKey="item_code"
+            nameKey="item_name"
+            sortKey={sort()}
+            sortOrder={order()}
+            onSort={toggleSort}
+            page={page()}
+            pageSize={pageSize}
+            total={report.data?.total ?? 0}
+            onPageChange={setPage}
+            onRefresh={search}
+            onNew={() => {}}
+            onEdit={() => {}}
+          />
+        </Show>
+      </div>
     </SerialLotLayout>
   );
 }

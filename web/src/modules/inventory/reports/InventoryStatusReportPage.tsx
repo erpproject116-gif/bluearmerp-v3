@@ -105,7 +105,7 @@ function fmtCount(n: number | undefined) {
 export default function InventoryStatusReportPage() {
   const [searchParams] = useSearchParams();
   const [draft, setDraft] = createSignal<InventoryStatusFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<InventoryStatusFilters | null>(null);
+  const [submitted, setSubmitted] = createSignal<InventoryStatusFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;
@@ -120,12 +120,12 @@ export default function InventoryStatusReportPage() {
   });
 
   const report = useInventoryStatusReport(() => ({
-    filters: submitted() ?? defaultFilters(),
+    filters: submitted(),
     page: page(),
     pageSize,
     sort: "item_code",
     order: "asc",
-    enabled: submitted() !== null,
+    enabled: true,
   }));
 
   const search = () => {
@@ -156,14 +156,14 @@ export default function InventoryStatusReportPage() {
 
   const patch = (p: Partial<InventoryStatusFilters>) => setDraft((prev) => ({ ...prev, ...p }));
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
-  const filters = () => submitted() ?? draft();
+  const filters = () => submitted();
 
   return (
     <ReportPageLayout
       title="Find Stock"
       description="Cross-branch inquiry: on-hand qty by item and location, plus serial/lot counts when tracked. Balances appear after Bill (auto-receive), Purchase Receive, Stock Entry, or Sales — not from item master alone. Search (F8)."
       showDateFilters={false}
-      submitted={submitted() !== null}
+      submitted={true}
       loading={report.isFetching}
       generatedAt={generatedAt()}
       page={page()}
@@ -235,7 +235,7 @@ export default function InventoryStatusReportPage() {
       }
     >
       <StocksHowItFits class="mb-4" />
-      <Show when={(report.data?.rows.length ?? 0) === 0 && submitted() !== null && !report.isFetching}>
+      <Show when={(report.data?.rows.length ?? 0) === 0 && !report.isFetching}>
         <ReportEmptyMessage
           message={
             Object.keys(normalizeFilters(filters())).length === 0

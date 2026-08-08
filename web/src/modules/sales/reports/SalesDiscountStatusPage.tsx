@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal } from "solid-js";
 import { useSalesDiscountStatusReport } from "../../../shared/useSalesDiscountStatusReport";
 import { SalesLayout } from "../SalesLayout";
 import { SalesDiscountStatusFilter } from "./SalesDiscountStatusFilter";
@@ -15,22 +15,22 @@ const SUBTOTAL_PAGE_SIZE = 5000;
 
 export default function SalesDiscountStatusPage() {
   const [draftFilters, setDraftFilters] = createSignal<SalesDiscountStatusFilters>(defaultDiscountStatusFilters());
-  const [submittedFilters, setSubmittedFilters] = createSignal<SalesDiscountStatusFilters | null>(null);
+  const [submittedFilters, setSubmittedFilters] = createSignal<SalesDiscountStatusFilters>(defaultDiscountStatusFilters());
   const [template, setTemplate] = createSignal<SalesDiscountStatusTemplate>(loadDiscountStatusTemplate());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;
 
-  const useSubtotalMode = () => (submittedFilters() ? template().subtotalBy !== "none" : false);
+  const useSubtotalMode = () => template().subtotalBy !== "none";
   const effectivePageSize = () => (useSubtotalMode() ? SUBTOTAL_PAGE_SIZE : pageSize);
   const effectivePage = () => (useSubtotalMode() ? 1 : page());
 
   const report = useSalesDiscountStatusReport(() => ({
-    filters: submittedFilters() ?? defaultDiscountStatusFilters(),
+    filters: submittedFilters(),
     template: template(),
     page: effectivePage(),
     pageSize: effectivePageSize(),
-    enabled: submittedFilters() !== null,
+    enabled: true,
   }));
 
   const toggleSort = (field: DiscountSortField) => {
@@ -55,11 +55,10 @@ export default function SalesDiscountStatusPage() {
         template={template}
         onTemplateChange={setTemplate}
         onSearch={() => { setSubmittedFilters({ ...draftFilters() }); setPage(1); setGeneratedAt(new Date()); }}
-        onReset={() => { setDraftFilters(defaultDiscountStatusFilters()); setSubmittedFilters(null); setPage(1); }}
+        onReset={() => { const next = defaultDiscountStatusFilters(); setDraftFilters(next); setSubmittedFilters(next); setPage(1); }}
       />
-      <Show when={submittedFilters()}>
-        <SalesDiscountStatusReport
-          filters={submittedFilters()!}
+      <SalesDiscountStatusReport
+        filters={submittedFilters()}
           template={template()}
           rows={report.data?.rows ?? []}
           totalSales={report.data?.summary.total_sales_amount ?? 0}
@@ -74,7 +73,6 @@ export default function SalesDiscountStatusPage() {
           onPageChange={setPage}
           onSort={toggleSort}
         />
-      </Show>
     </SalesLayout>
   );
 }
