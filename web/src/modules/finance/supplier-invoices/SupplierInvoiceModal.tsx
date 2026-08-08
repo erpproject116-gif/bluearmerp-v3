@@ -716,7 +716,7 @@ export function SupplierInvoiceModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={effectiveEditing() ? (props.readOnly ? "View Bill (deleted)" : "Edit Bill") : "New Bill"}
+        title={effectiveEditing() ? (props.readOnly ? "View Purchase Receive (deleted)" : "Edit Purchase Receive") : "New Purchase Receive"}
         onClose={props.onClose}
         onSave={activeTab() === "details" ? () => void save() : undefined}
         readOnly={props.readOnly}

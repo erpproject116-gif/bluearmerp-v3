@@ -115,29 +115,29 @@ export default function GoodsReceiptListPage() {
         <div class="space-y-2 text-sm text-text-secondary">
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
             <span class="font-medium">Receive history (legacy).</span> For new stock-in with serials, use{" "}
-            <A href="/app/purchases/purchases/new" class="font-medium text-brand-700 hover:underline">
-              New Bill
+            <A href="/app/purchases/purchase-receive/new" class="font-medium text-brand-700 hover:underline">
+              New Purchase Receive
             </A>
             — confirm posts inventory and AP. This list keeps posted/draft receives for reverse and audit.
           </p>
           <p>
             {uiLabel("goods_receipt.list_description")} Click a row (or PO no.) to open that receive. Pre-invoicing:{" "}
-            <A href="/app/purchases/purchases/pre-invoicing" class="text-brand-600 hover:underline">
+            <A href="/app/purchases/purchase-receive/pre-invoicing" class="text-brand-600 hover:underline">
               open GR not yet billed
             </A>
-            ; unpaid Bills:{" "}
-            <A href="/app/purchases/purchases?payment=unpaid" class="text-brand-600 hover:underline">
-              Bills
+            ; unpaid Purchase Receive:{" "}
+            <A href="/app/purchases/purchase-receive?payment=unpaid" class="text-brand-600 hover:underline">
+              Unpaid
             </A>
             .
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <A
-            href="/app/purchases/purchases/new"
+            href="/app/purchases/purchase-receive/new"
             class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
-            New Bill
+            New Purchase Receive
           </A>
           <A
             href="/app/inventory/serial-lot/receive"
@@ -275,12 +275,12 @@ export default function GoodsReceiptListPage() {
         toolbarExtra={
           <GenerateOtherSlipsMenu
             sourceEntity="goods_receipt"
-            targets={[{ label: "Bill", targetEntity: "supplier_invoice" }]}
+            targets={[{ label: "Purchase Receive", targetEntity: "supplier_invoice" }]}
             selectedIds={selectedIds}
             onSuccess={(result) => {
               invalidate();
               const id = result.target_ids[0];
-              if (id) navigate(`/app/purchases/purchases?openId=${id}`);
+              if (id) navigate(`/app/purchases/purchase-receive?openId=${id}`);
             }}
           />
         }

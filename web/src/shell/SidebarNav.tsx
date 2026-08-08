@@ -268,13 +268,13 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/purchases/vendor-credits", "/app/buying/vendor-credits"]);
     }
     if (area.id === "accounts_payable") {
-      return p === "/app/purchases/purchases/ap-by-vendor" || p.startsWith("/app/purchases/purchases/ap-by-vendor/");
+      return p === "/app/purchases/purchase-receive/ap-by-vendor" || p.startsWith("/app/purchases/purchase-receive/ap-by-vendor/");
     }
     if (area.id === "purchases") {
       if (p.startsWith("/app/purchases/expenses")) return false;
       if (p.startsWith("/app/purchases/recurring-expenses")) return false;
       if (p.startsWith("/app/purchases/vendor-credits")) return false;
-      if (p === "/app/purchases/purchases/ap-by-vendor" || p.startsWith("/app/purchases/purchases/ap-by-vendor/")) {
+      if (p === "/app/purchases/purchase-receive/ap-by-vendor" || p.startsWith("/app/purchases/purchase-receive/ap-by-vendor/")) {
         return false;
       }
       return pathStarts(p, ["/app/purchases"]);

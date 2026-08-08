@@ -98,16 +98,16 @@ export default function SerialRegistryListPage() {
   return (
     <SerialLotLayout>
       <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        <p class="font-medium">Prefer New Bill for inbound serials</p>
+        <p class="font-medium">Prefer Purchase Receive for inbound serials</p>
         <p class="mt-1 text-amber-900/90">
-          Confirming a Bill posts stock and serials. Use Registry to find and manage units — Generate is for allocating
+          Confirming a Purchase Receive posts stock and serials. Use Registry to find and manage units — Generate is for allocating
           numbers only, not receiving goods.
         </p>
         <A
-          href="/app/purchases/purchases/new"
+          href="/app/purchases/purchase-receive/new"
           class="mt-2 inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
         >
-          Use New Bill
+          Use Purchase Receive
         </A>
       </div>
       <div class="mb-3 flex flex-wrap items-center justify-end gap-2">

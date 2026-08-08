@@ -20,7 +20,7 @@ export const LEARN_GROUPS: LearnGroup[] = [
     title: "Enter / view inventory slips",
     links: [
       { label: "Sales list", href: "/app/sales/sales", ready: true },
-      { label: "Purchase List", href: "/app/purchases/purchases", ready: true },
+      { label: "Purchase List", href: "/app/purchases/purchase-receive", ready: true },
       { label: "Purchase Receive", href: "/app/purchase-order/goods-receipt", ready: true },
     ],
   },
@@ -28,7 +28,7 @@ export const LEARN_GROUPS: LearnGroup[] = [
     title: "Enter accounting vouchers",
     links: [
       { label: "New sales", href: "/app/sales/sales/new", ready: true },
-      { label: "Purchase Invoice", href: "/app/purchases/purchases/new", ready: true },
+      { label: "Purchase Invoice", href: "/app/purchases/purchase-receive/new", ready: true },
       { label: "Cash In — From Customer", href: "/app/finance/official-receipts", ready: true },
       { label: "Cash Out — To Vendor", href: "/app/finance/payment-vouchers", ready: true },
     ],

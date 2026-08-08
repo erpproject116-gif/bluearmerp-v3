@@ -77,7 +77,7 @@ export function DayJobsPanel() {
         id: "bill-vendor",
         title: "Bill a supplier",
         blurb: "Create a purchase invoice after receiving.",
-        href: "/app/purchases/purchases/new",
+        href: "/app/purchases/purchase-receive/new",
         count: flagCount("gr_without_supplier_invoice"),
       });
     }
@@ -155,7 +155,7 @@ export function DayJobsPanel() {
     so_release_gap: "/app/sales-order/sales-orders/release",
     reserve_without_dr: "/app/sales-order/delivery-receipts/new",
     dr_without_invoice: "/app/sales/sales/new",
-    gr_without_supplier_invoice: "/app/purchases/purchases/new",
+    gr_without_supplier_invoice: "/app/purchases/purchase-receive/new",
     ap_over_application: "/app/finance/payment-vouchers",
     budget_overrun: "/app/finance/reports/budget-vs-actual",
   };

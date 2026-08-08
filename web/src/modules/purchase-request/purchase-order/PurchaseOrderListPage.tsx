@@ -350,11 +350,11 @@ export default function PurchaseOrderListPage() {
   return (
     <PurchaseRequestLayout>
       <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
-        <p class="font-medium text-slate-800">Buy path: Purchase Order → New Bill → Payment Made</p>
+        <p class="font-medium text-slate-800">Buy path: Purchase Order → Purchase Receive → Payment Made</p>
         <p class="mt-1">
-          After the PO, open <span class="font-medium">New Bill</span> (Load Slip → Purchase Order), set qty, scan
+          After the PO, open <span class="font-medium">Purchase Receive</span> (Load Slip → Purchase Order), set qty, scan
           serials, attach DR / vendor SI, and confirm — stock and AP post together. Pay from Disbursements / Payment
-          Voucher. Separate Purchase Receive is legacy history only.
+          Voucher. Separate Receive history is legacy only.
         </p>
       </div>
       <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
@@ -373,15 +373,15 @@ export default function PurchaseOrderListPage() {
           From supplier quotation
         </button>
         <A
-          href="/app/purchases/purchases/new"
+          href="/app/purchases/purchase-receive/new"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
-          New Bill
+          New Purchase Receive
         </A>
         <A
           href="/app/purchase-order/goods-receipt"
           class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-          title="Legacy receive history — prefer New Bill for stock + serials"
+          title="Legacy receive history — prefer Purchase Receive for stock + serials"
         >
           Receive history
         </A>
@@ -519,7 +519,7 @@ export default function PurchaseOrderListPage() {
               onSuccess={(result) => {
                 invalidate();
                 const id = result.target_ids[0];
-                if (id) navigate(`/app/purchases/purchases?openId=${id}`);
+                if (id) navigate(`/app/purchases/purchase-receive?openId=${id}`);
               }}
             />
             <label class="shrink-0">

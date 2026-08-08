@@ -93,7 +93,7 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
   },
   purchase_require_gr_before_supplier_invoice: {
     label: "Require Purchase Receive before Bill (legacy)",
-    help: "Off by default = New Bill is primary (scan serials / post stock on confirm). On = legacy Receive-then-Bill only.",
+    help: "Off by default = Purchase Receive is primary (scan serials / post stock on confirm). On = legacy Receive-history-first only.",
   },
   purchase_order_require_attachment: {
     label: "Require file on purchase order",

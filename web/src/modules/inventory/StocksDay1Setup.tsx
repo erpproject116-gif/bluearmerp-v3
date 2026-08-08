@@ -216,7 +216,7 @@ export function StocksDay1Setup(props: Props) {
               Purchase orders
             </A>
             <A
-              href="/app/purchases/purchases/new"
+              href="/app/purchases/purchase-receive/new"
               class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
             >
               New Bill

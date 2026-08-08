@@ -236,7 +236,7 @@ export function HomeFinanceOverview() {
           current={apSummary()?.current ?? 0}
           overdue={apOverdue()}
           href="/app/finance/reports/ap-aging"
-          newHref="/app/purchases/purchases/new"
+          newHref="/app/purchases/purchase-receive/new"
           newLabel="New"
         />
         <CashFlowCard />

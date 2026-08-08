@@ -27,7 +27,7 @@ export default function DisbursementsHubPage() {
             Payment list
           </A>
           <A
-            href="/app/purchases/purchases"
+            href="/app/purchases/purchase-receive"
             class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
           >
             Bills

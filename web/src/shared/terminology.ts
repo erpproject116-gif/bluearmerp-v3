@@ -23,11 +23,11 @@ export const TERMS = {
   purchase_request: { label: "Purchase Request", hint: "An internal request to buy something. Not an order yet." },
   purchase_order: { label: "Purchase Order", hint: "The order you send to a supplier. A commitment, not an expense yet." },
   goods_receipt: {
-    label: "Purchase Receive",
-    hint: "Legacy stock-in document. Prefer New Bill to post stock and serials on confirm.",
+    label: "Receive history",
+    hint: "Legacy stock-in document. Prefer Purchase Receive to post stock and serials on confirm.",
   },
   supplier_invoice: {
-    label: "Bill",
+    label: "Purchase Receive",
     hint: "New Purchase: amount owed, stock, and serials when you confirm (Load Slip from PO or blank).",
   },
   payment_voucher: { label: "Payment Made", hint: "Pay the vendor and clear accounts payable." },

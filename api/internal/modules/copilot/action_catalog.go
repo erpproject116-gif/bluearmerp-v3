@@ -63,7 +63,7 @@ var openDocumentCatalog = []openDocSpec{
 	},
 	{
 		Kind: "purchases", DraftType: "open_purchases", Label: "Supplier invoice / Purchase",
-		UI: "/app/purchases/purchases/new", API: "/api/v1/finance/supplier-invoices",
+		UI: "/app/purchases/purchase-receive/new", API: "/api/v1/finance/supplier-invoices",
 		PartnerAs: "vendor",
 		Hint:      "Create the supplier invoice in Purchases — Baiko does not auto-post.",
 	},

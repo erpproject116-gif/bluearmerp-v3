@@ -2,7 +2,7 @@ import { defineDocCrudSpec } from "./helpers/docCrud";
 
 defineDocCrudSpec({
   name: "purchase",
-  listPath: "/app/purchases/purchases",
+  listPath: "/app/purchases/purchase-receive",
   newHeading: /New Purchase \(actual purchase\)/i,
   editHeading: /Edit Purchase \(actual purchase\)/i,
   partnerLabel: /Vendor/i,

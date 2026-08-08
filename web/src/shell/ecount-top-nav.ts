@@ -327,7 +327,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   {
     id: "buy",
     label: "Purchase",
-    href: "/app/purchases/purchases",
+    href: "/app/purchases/purchase-receive",
     iconId: "buying",
     topId: "inv1",
     expandGroupId: "procurement_process",
@@ -361,8 +361,8 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "purchases",
-        label: "Bills",
-        href: "/app/purchases/purchases",
+        label: "Purchase Receive",
+        href: "/app/purchases/purchase-receive",
         iconId: "purchases",
         topId: "inv1",
         expandGroupId: "procurement_process",
@@ -377,7 +377,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         topId: "inv1",
         expandGroupId: "procurement_process",
         moduleId: "purchase_order",
-        hint: "Legacy receive history — prefer New Bill",
+        hint: "Legacy receive history — prefer Purchase Receive",
       },
       {
         id: "expenses",
@@ -409,7 +409,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "accounts_payable",
         label: "Accounts Payable",
-        href: "/app/purchases/purchases/ap-by-vendor",
+        href: "/app/purchases/purchase-receive/ap-by-vendor",
         iconId: "accounts_payable",
         topId: "inv1",
         expandGroupId: "procurement_process",

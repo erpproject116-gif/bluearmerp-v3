@@ -53,17 +53,22 @@ export const PURCHASE_REQUEST_SETTINGS_HREF = {
   purchaseRequest: "/app/purchase-request/purchase-requests/settings",
   purchaseOrder: "/app/purchase-order/purchase-orders/settings",
   goodsReceipt: "/app/purchase-order/goods-receipt/settings",
-  supplierInvoice: "/app/purchases/purchases/settings",
+  supplierInvoice: "/app/purchases/purchase-receive/settings",
 } as const;
 
 export type PurchaseRequestFeature = keyof typeof PURCHASE_REQUEST_ENTITY;
+
+/** Primary buy document UI (supplier invoice). Canonical app path — keep redirects from legacy `/app/purchases/purchases`. */
+export const PURCHASE_RECEIVE_PATH = "/app/purchases/purchase-receive";
+/** @deprecated Prefer PURCHASE_RECEIVE_PATH; kept for redirect targets and migrations. */
+export const PURCHASE_RECEIVE_LEGACY_PATH = "/app/purchases/purchases";
 
 export const PURCHASES_ENTITY = {
   purchases: "fin_supplier_invoice",
 } as const;
 
 export const PURCHASES_SETTINGS_HREF = {
-  purchases: "/app/purchases/purchases/settings",
+  purchases: `${PURCHASE_RECEIVE_PATH}/settings`,
 } as const;
 
 export type PurchasesFeature = keyof typeof PURCHASES_ENTITY;

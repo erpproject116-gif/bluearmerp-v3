@@ -6,7 +6,7 @@ export default function SupplierInvoiceSettingsPage() {
     <EntityFormSettingsPage
       entityType={PURCHASES_ENTITY.purchases}
       featureLabel="Purchases"
-      listHref="/app/purchases/purchases"
+      listHref="/app/purchases/purchase-receive"
     />
   );
 }

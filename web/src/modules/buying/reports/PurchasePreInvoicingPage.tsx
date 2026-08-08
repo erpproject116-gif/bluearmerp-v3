@@ -90,7 +90,7 @@ export default function PurchasePreInvoicingPage() {
       >
         <p class="text-sm text-text-secondary">
           With Bill-first New Bill, stock lands on confirm so this report stays empty for those paths — use{" "}
-          <a href="/app/purchases/purchases" class="text-brand-600 hover:underline">
+          <a href="/app/purchases/purchase-receive" class="text-brand-600 hover:underline">
             Bills
           </a>{" "}
           and Open POs for outstanding buy work.
