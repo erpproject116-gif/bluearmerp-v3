@@ -1034,7 +1034,7 @@ export function SupplierInvoiceModal(props: Props) {
                 when={processPolicy.data?.purchase_require_gr_before_supplier_invoice}
                 fallback="Load Slip → Purchase Order (or blank Bill) posts stock + serials when you confirm. Attach DR / vendor SI before Completed."
               >
-                Process policy requires Purchase Receive before Bill — use Load Slip → Purchase Receive. Turn the gate off under Process policies for Bill-first (default for new businesses).
+                Process policy requires Purchase Receive before Bill — use Load Slip → Purchase Receive, or turn the gate off under Process policies (Bill-first is the default).
               </Show>
             </p>
           </div>

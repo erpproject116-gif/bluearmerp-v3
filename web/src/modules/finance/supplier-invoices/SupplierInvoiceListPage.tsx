@@ -129,21 +129,20 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   return (
     <PurchasesLayout>
       <div class="mb-4 rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-slate-700">
-        <p class="font-medium text-slate-800">Bill = amount owed (after Purchase Receive)</p>
+        <p class="font-medium text-slate-800">New Bill = New Purchase (stock + AP on confirm)</p>
         <p class="mt-1 text-xs">
-          Recommended: Load Slip → <span class="font-medium">Purchase Receive</span> lines, then Save — billing only
-          (stock already moved). If you Load Slip from Purchase Order and Setup allows simple bill+receive, Save may
-          also receive stock. Attachments on Purchase Receive are delivery proof; attach the supplier invoice PDF on
-          the Bill. Bills do not edit BOM recipes.
+          Preferred: Load Slip → <span class="font-medium">Purchase Order</span> (or blank item), set qty, scan
+          serials, attach DR / vendor SI, then confirm — stock and AP post together. Load Slip → Purchase Receive is
+          legacy bill-only when goods were already received. Bills do not edit BOM recipes.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Next:{" "}
           <A href="/app/finance/disbursements" class="text-brand-600 hover:underline">
             Payment Made (Disbursements)
           </A>{" "}
-          or Payment Voucher. Prefer{" "}
+          or Payment Voucher. Optional history:{" "}
           <A href="/app/purchase-order/goods-receipt" class="font-medium text-brand-700 hover:underline">
-            Purchase Receive
+            Receive history
           </A>{" "}
           before billing when items track qty or use serials/lots. Pre-invoicing lists received lines not yet billed —
           filter{" "}

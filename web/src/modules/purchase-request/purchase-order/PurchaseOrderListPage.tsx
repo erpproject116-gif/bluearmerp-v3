@@ -350,12 +350,11 @@ export default function PurchaseOrderListPage() {
   return (
     <PurchaseRequestLayout>
       <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
-        <p class="font-medium text-slate-800">Buy path: Purchase Order → Purchase Receive → Bill → Payment Made</p>
+        <p class="font-medium text-slate-800">Buy path: Purchase Order → New Bill → Payment Made</p>
         <p class="mt-1">
-          After the PO, open <span class="font-medium">Purchase Receive</span> to record stock and attach delivery
-          proof. Then create a <span class="font-medium">Bill</span> (amount owed). Pay from Disbursements / Payment
-          Voucher. If Setup allows “simple bill+receive,” a Bill from PO lines can still auto-receive — prefer
-          Purchase Receive first for serials/lots and clear stock history.
+          After the PO, open <span class="font-medium">New Bill</span> (Load Slip → Purchase Order), set qty, scan
+          serials, attach DR / vendor SI, and confirm — stock and AP post together. Pay from Disbursements / Payment
+          Voucher. Separate Purchase Receive is legacy history only.
         </p>
       </div>
       <div class="mb-4 flex flex-wrap items-center justify-end gap-2">

@@ -126,7 +126,7 @@ export const helpScenarioArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Policy gate “Purchase Receive before Bill” means you must post a receive (or turn the gate off for simple bill+receive from PO). Pre-Invoicing Status shows unbilled receipts.",
+        text: "“Require Purchase Receive before Bill” is off by default (Bill-first). Turn it on only for legacy Receive-then-Bill. Pre-Invoicing shows unbilled legacy receives.",
       },
     ],
     primaryHref: "/app/user-management/process-policies",

@@ -62,7 +62,7 @@ func ValidateSupplierInvoiceLineSource(p Policy, hasGRLine bool) map[string]stri
 		return nil
 	}
 	return map[string]string{
-		"goods_receipt_line_id": "Receive the goods first (process policy). Next: open Goods Receipt, post it, then Load Slip → Goods Receipt on the purchase invoice.",
+		"goods_receipt_line_id": "This workspace still requires Purchase Receive before Bill (legacy policy). Prefer Setup → Process policies → turn off “Require Purchase Receive before Bill”, then use New Bill to scan serials and post stock on confirm. Or Load Slip → Purchase Receive if you keep the gate on.",
 	}
 }
 
