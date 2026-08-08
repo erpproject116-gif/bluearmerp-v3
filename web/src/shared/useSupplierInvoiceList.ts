@@ -16,6 +16,13 @@ export type SupplierInvoiceRow = {
   payment_status?: string;
   progress_status: string;
   created_by_name?: string;
+  pic_name?: string;
+  tax_type_name?: string;
+  payment_terms?: string | null;
+  notes?: string | null;
+  item_name_summary?: string;
+  po_numbers?: string;
+  invoicing_status?: boolean;
 };
 
 export type SupplierInvoiceLine = {
