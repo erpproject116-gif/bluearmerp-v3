@@ -70,6 +70,8 @@ type Props = {
   onApply: () => void;
   applyLabel?: string;
   emptyHint?: string;
+  /** Optional chips / filters under the title. */
+  toolbar?: JSX.Element;
 };
 
 /** Open-transaction Load Slip monitor: search, date range, doc no, multi-select. */
@@ -93,6 +95,10 @@ export function OpenTransactionMonitor(props: Props) {
               Close
             </button>
           </div>
+
+          <Show when={props.toolbar}>
+            <div class="border-b border-stroke px-5 py-2">{props.toolbar}</div>
+          </Show>
 
           <div class="flex flex-wrap items-end gap-2 border-b border-stroke px-5 py-3">
             <label class="text-xs text-text-secondary">

@@ -286,21 +286,22 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "purchase-request-to-ap-flow",
-    title: "Purchase Request → PO → Purchase Receive → Bill → Payment Made",
-    scenario: "You buy stock from a vendor and need payables tracked.",
-    intro: "The buy-side chain: request (optional), order, Purchase Receive, Bill, then Payment Made.",
+    title: "Purchase Request → PO → New Bill → Payment Made",
+    scenario: "You buy stock from a vendor and need inventory and payables tracked.",
+    intro:
+      "Primary buy path: request (optional), order, New Bill (stock + serials + AP on confirm), then Payment Made. Separate Purchase Receive is legacy.",
     blocks: [
       {
         type: "flow",
-        items: ["Purchase Request", "Purchase Order", "Purchase Receive", "Bill", "Payment Made"],
+        items: ["Purchase Request", "Purchase Order", "New Bill", "Payment Made"],
       },
       {
         type: "steps",
         items: [
           "Create a purchase request (optional Load Slip from sales order demand).",
           "Request vendor quotes (RFQ) or create a purchase order with Load Slip (from Purchase Request or Supplier Quotation).",
-          "Purchase Receive: create from the PO, scan serials on the list or Serial Receive page, then post. Attach delivery proof.",
-          "Create a Bill under Buy → Bills. Use Load Slip → Purchase Receive to pull open receive lines (recommended), or PO when simple bill+receive is allowed.",
+          "Open Buy → Bills → New Bill. Load Slip from PO (or blank: double-click item), set qty, scan serials until count matches qty, attach DR/vendor SI, confirm.",
+          "Confirm posts stock/serials under the hood and syncs the purchase invoice JE / AP.",
           "Pay the vendor with Payment Made under Accounting → Payment Made.",
         ],
       },
@@ -309,15 +310,15 @@ export const moduleKbArticles: KbArticle[] = [
         text: "On buying screens, open Guide in the header to see the request → pay path and jump to the next step.",
       },
     ],
-    primaryHref: "/app/purchase-request/purchase-requests/new",
-    primaryLabel: "New purchase request",
-    relatedGuideIds: ["serial-barcode-scanning", "load-slip-overview", "rfq-workflow"],
+    primaryHref: "/app/purchases/purchases/new",
+    primaryLabel: "New Bill",
+    relatedGuideIds: ["serial-barcode-scanning", "load-slip-overview", "rfq-workflow", "purchasing-load-slip-po"],
   },
   {
     id: "goods-receipt-load-slip",
-    title: "Load Slip: Bill from Purchase Receive",
-    scenario: "You posted Purchase Receive and need to bill the vendor.",
-    intro: "Open Purchase Receive lines with remaining billable quantity appear on the Bill Load Slip picker.",
+    title: "Load Slip: Bill from Purchase Receive (legacy)",
+    scenario: "You already posted Purchase Receive and need to bill the vendor.",
+    intro: "Open Purchase Receive lines with remaining billable quantity appear on the Bill Load Slip picker (bill-only; no double stock).",
     blocks: [
       {
         type: "steps",
@@ -330,7 +331,7 @@ export const moduleKbArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Process policies can require a posted Purchase Receive before Bills are allowed (on for new tenants).",
+        text: "New businesses default to Bill-first (no Receive required). Turn on “Require Purchase Receive before Bill” only for legacy split UX.",
       },
     ],
     primaryHref: "/app/purchases/purchases/new",
@@ -338,28 +339,28 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "purchasing-load-slip-po",
-    title: "Load Slip: Bill from purchase order (simple bill+receive)",
-    scenario: "You want to bill open PO lines without posting Purchase Receive first.",
+    title: "Load Slip: Bill from purchase order (Bill-first)",
+    scenario: "You want to bill open PO lines and land stock + serials on confirm.",
     intro:
-      "When process policy allows (Purchase Receive before Bill off), confirmed PO lines with open billed qty can be pulled onto a Bill. Saving may auto-receive unreceived stock for normal items.",
+      "Default for new businesses: Load Slip → Purchase Order (In Progress or Finished with unbilled qty). Confirming the Bill auto-receives stock and serials.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Confirm the Purchase Order (status Confirmed — drafts never appear).",
+          "Confirm the Purchase Order (or leave draft if your process allows open lines).",
           "Open Buy → New Bill and optionally select the vendor.",
-          "Choose Load Slip → Purchase Order, tick lines, and apply residual qty.",
-          "Save the Bill — billed qty updates; unreceived qty may auto-receive for inventory items.",
-          "Serial/lot items: post Purchase Receive first, then Load Slip → Purchase Receive.",
+          "Choose Load Slip → Purchase Order — use All / In Progress / Finished chips; Finished stays listed when unbilled qty remains.",
+          "Set qty first, scan serials until count matches, attach files, then confirm (Completed).",
+          "Stock, serial registry, and purchase invoice JE / AP update together.",
         ],
       },
       {
         type: "tip",
-        text: "If your policy requires Purchase Receive before Bill, use Load Slip → Purchase Receive instead, or turn the gate off under Process policies.",
+        text: "If your policy still requires Purchase Receive before Bill, use Load Slip → Purchase Receive, or turn the gate off under Process policies.",
       },
     ],
     primaryHref: "/app/purchases/purchases/new",
-    primaryLabel: "New supplier invoice",
+    primaryLabel: "New Bill",
     relatedGuideIds: ["goods-receipt-load-slip", "purchase-request-to-ap-flow"],
   },
   {
@@ -549,14 +550,14 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Pre-Invoicing Status (Purchases)",
     scenario: "Goods were received but not yet on a supplier invoice.",
     intro:
-      "This report lists posted goods receipt lines with balance quantity and amount not yet billed — the buy-side mirror of Sales → Pre-Invoicing Status.",
+      "Lists posted Purchase Receive lines not yet billed. Bill-first New Bills leave little or no GR residual — use Open POs and Bills for day-to-day outstanding.",
     blocks: [
       {
         type: "steps",
         items: [
           "Open Buying → Pre-Invoicing (Purchases) or Buying workspace → Reports.",
           "Set a date range or as-of date, then Search (F8).",
-          "Create supplier invoices from open lines using Load Slip → Goods Receipt.",
+          "For legacy unbilled receives, create Bills with Load Slip → Purchase Receive. Prefer New Bill ← PO for new work.",
         ],
       },
     ],

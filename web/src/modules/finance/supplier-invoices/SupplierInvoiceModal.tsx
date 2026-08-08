@@ -116,7 +116,7 @@ function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseReques
     goods_receipt_line_id: ln.goods_receipt_line_id ?? null,
     purchase_order_line_id: ln.purchase_order_line_id ?? null,
     track_serial: Boolean(ln.track_serial),
-    planned_serial_nos: [],
+    planned_serial_nos: ln.serial_nos ?? [],
   }));
 }
 
@@ -615,6 +615,7 @@ export function SupplierInvoiceModal(props: Props) {
           unit_vat_inc: ln.unit_vat_inc === "" ? 0 : Number(ln.unit_vat_inc),
           line_total: ln.line_total === "" ? 0 : Number(ln.line_total),
           remark: ln.remark || null,
+          serial_nos: ln.planned_serial_nos ?? [],
         })),
       withholding_lines: withholdingLines()
         .filter((ln) => ln.tax_code_id && Number(ln.base_amount) > 0)
@@ -624,6 +625,24 @@ export function SupplierInvoiceModal(props: Props) {
     if (body.lines.length === 0) {
       toast.warning("Add at least one line item.");
       return;
+    }
+
+    const confirming =
+      progressStatus() === "completed" ||
+      progressStatus() === "confirm" ||
+      progressStatus() === "e_approval";
+    if (confirming) {
+      for (const ln of lines().filter((l) => l.item_id || l.item_code || l.goods_receipt_line_id || l.purchase_order_line_id)) {
+        if (!ln.track_serial) continue;
+        const need = Math.floor(Number(ln.qty) || 0);
+        const got = (ln.planned_serial_nos ?? []).length;
+        if (need > 0 && got !== need) {
+          toast.warning(
+            `Line ${ln.line_no}: serial count (${got}) must equal qty (${need}). Set qty first, then scan serials.`,
+          );
+          return;
+        }
+      }
     }
 
     setSaving(true);
@@ -932,7 +951,7 @@ export function SupplierInvoiceModal(props: Props) {
               scope="finance/supplier-invoices"
               formOpen={props.open}
               docId={effectiveEditing()?.id}
-              label={uiLabel("purchasing.attachments_invoice")}
+              label={`${uiLabel("purchasing.attachments_invoice")} (DR / vendor SI)`}
               required={policyRequiresAttachment(processPolicy.data, "supplier_invoice")}
               onCountChange={setAttachmentCount}
             />
@@ -1013,9 +1032,9 @@ export function SupplierInvoiceModal(props: Props) {
             <p class="text-xs text-text-secondary">
               <Show
                 when={processPolicy.data?.purchase_require_gr_before_supplier_invoice}
-                fallback="Load Slip → Purchase Order creates a Bill from confirmed PO residual and can auto-receive stock (simple bill+receive). Serial/lot items still need Purchase Receive first."
+                fallback="Load Slip → Purchase Order (or blank Bill) posts stock + serials when you confirm. Attach DR / vendor SI before Completed."
               >
-                Process policy requires Purchase Receive before Bill — use Load Slip → Purchase Receive. Turn the gate off under Process policies for simple bill+receive.
+                Process policy requires Purchase Receive before Bill — use Load Slip → Purchase Receive. Turn the gate off under Process policies for Bill-first (default for new businesses).
               </Show>
             </p>
           </div>
@@ -1026,6 +1045,7 @@ export function SupplierInvoiceModal(props: Props) {
             taxTypeMeta={selectedTaxType}
             locationId={() => locationId()}
             hidePartnerColumns
+            serialCaptureMode="bill"
             lineViewKey={`${PURCHASES_ENTITY.purchases}.lines`}
           />
           <Show when={!props.readOnly}>

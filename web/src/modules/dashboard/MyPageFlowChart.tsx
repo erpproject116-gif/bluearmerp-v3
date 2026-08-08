@@ -129,9 +129,8 @@ export function MyPageFlowChart() {
         <div class="rounded-lg border border-dashed border-stroke bg-slate-50/90 px-3 py-2.5">
           <p class="text-xs font-semibold text-text-primary">Load Slip (inside the form)</p>
           <p class="mt-1 text-[11px] leading-snug text-text-secondary">
-            Not a menu page — a button on PO / Purchase Receive / Bill that pulls open lines from an earlier
-            document. Example: Bill ← Purchase Receive, or Bill ← Purchase Order when simple bill+receive is
-            allowed in Setup.
+            Not a menu page — a button on PO / Bill that pulls open lines from an earlier document. Prefer Bill ←
+            Purchase Order (stock + serials on confirm). Bill ← Purchase Receive remains for legacy receives.
           </p>
         </div>
       </div>

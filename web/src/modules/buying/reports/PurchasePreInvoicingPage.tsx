@@ -72,7 +72,14 @@ export default function PurchasePreInvoicingPage() {
     <div class="space-y-6 p-4">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <h2 class="text-lg font-semibold">Pre-Invoicing Status (Purchases)</h2>
-        <p class="text-sm text-text-secondary">Posted goods receipts with balance not yet on a supplier invoice.</p>
+        <p class="text-sm text-text-secondary">
+          Unbilled posted Purchase Receive lines (GR − billed). With Bill-first New Bill, stock lands on confirm so this
+          report stays empty for those paths — use{" "}
+          <a href="/app/purchases/purchases" class="text-brand-600 hover:underline">
+            Bills
+          </a>{" "}
+          and Open POs for outstanding buy work.
+        </p>
         <div class="mt-4 grid gap-4 sm:grid-cols-3">
           <Field label="Date from">
             <DateInput value={draftFilters().date_from} onInput={(e) => setDraftFilters((f) => ({ ...f, date_from: e.currentTarget.value, as_of: "" }))} />

@@ -3,6 +3,7 @@ package finance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -272,6 +273,131 @@ func putPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase.invoice.update", "fin_supplier_invoice", &id, before, after)
 		response.OK(w, map[string]any{"journal_entry_id": jeID}, "Invoice saved.")
 	}
+}
+
+// syncPurchaseInvoiceJournalAfterBill ensures CoA defaults and syncs the purchase invoice JE
+// after a Bill is confirmed (completed / e_approval). Same posting rules as PUT …/invoice.
+func syncPurchaseInvoiceJournalAfterBill(ctx context.Context, pool *pgxpool.Pool, tenantID, userID, id int64) error {
+	var invoiceDate time.Time
+	var partnerID int64
+	var subtotal, taxTotal, grandTotal, fees float64
+	var invoiceNo, remark string
+	var existingJE *int64
+	var purchaseAccountID, withdrawalAccountID *int64
+	err := pool.QueryRow(ctx, `
+		select invoice_date, partner_id, subtotal::float8, tax_total::float8, grand_total::float8,
+		  invoice_no, invoice_fees::float8, coalesce(invoice_remark, ''),
+		  invoice_journal_entry_id, purchase_account_id, withdrawal_account_id
+		from public.fin_supplier_invoices
+		where id = $1 and tenant_id = $2 and deleted_at is null`,
+		id, tenantID).Scan(
+		&invoiceDate, &partnerID, &subtotal, &taxTotal, &grandTotal,
+		&invoiceNo, &fees, &remark, &existingJE, &purchaseAccountID, &withdrawalAccountID)
+	if err != nil {
+		return errors.New("bill not found for invoice journal sync")
+	}
+
+	jeStatus, err := invoicejournal.EntryStatus(ctx, pool, tenantID, existingJE)
+	if err != nil {
+		return errors.New("failed to load journal entry status")
+	}
+	if jeStatus == "posted" {
+		return nil
+	}
+
+	if purchaseAccountID == nil || *purchaseAccountID <= 0 {
+		aid, e := financedefaults.ResolveByRole(ctx, pool, tenantID, financedefaults.RolePurchase)
+		if e != nil {
+			return errors.New("map Purchase account under Chart of Accounts defaults before confirming a Bill")
+		}
+		purchaseAccountID = &aid
+	}
+	if withdrawalAccountID == nil || *withdrawalAccountID <= 0 {
+		aid, e := financedefaults.ResolveByRole(ctx, pool, tenantID, financedefaults.RolePayable)
+		if e != nil {
+			return errors.New("map Accounts Payable under Chart of Accounts defaults before confirming a Bill")
+		}
+		withdrawalAccountID = &aid
+	}
+	if !siAccountsExist(ctx, pool, tenantID, *purchaseAccountID, *withdrawalAccountID) {
+		return errors.New("invalid purchase or payable account for Bill invoice journal")
+	}
+
+	var stockPretax float64
+	if err := pool.QueryRow(ctx, `
+		select coalesce(sum(sil.non_vat_total), 0)::float8
+		from public.fin_supplier_invoice_lines sil
+		left join public.inv_items i on i.id = sil.item_id
+		where sil.supplier_invoice_id = $1
+		  and coalesce(i.track_inventory_qty, false)`, id).Scan(&stockPretax); err != nil {
+		return errors.New("failed to load invoice lines for journal")
+	}
+	expensePretax := subtotal - stockPretax
+	if expensePretax < 0 {
+		expensePretax = 0
+	}
+
+	policy, err := processpolicy.Load(ctx, pool, tenantID)
+	if err != nil {
+		return errors.New("failed to load process policies")
+	}
+
+	var lines []invoicejournal.Line
+	if policy.InventoryGLHybridEnabled {
+		if stockPretax > 0.0001 {
+			grniID, e := financedefaults.ResolveByRole(ctx, pool, tenantID, financedefaults.RoleGRNI)
+			if e != nil {
+				return errors.New("map GRNI under Chart of Accounts defaults before posting purchases with inventory items")
+			}
+			lines = append(lines, invoicejournal.Line{
+				AccountID: grniID, Debit: stockPretax, Remark: "GRNI - " + invoiceNo,
+			})
+		}
+		if expensePretax > 0.0001 {
+			lines = append(lines, invoicejournal.Line{
+				AccountID: *purchaseAccountID, Debit: expensePretax, Remark: "Purchase - " + invoiceNo,
+			})
+		}
+	} else {
+		lines = append(lines, invoicejournal.Line{
+			AccountID: *purchaseAccountID, Debit: subtotal, Remark: "Purchase - " + invoiceNo,
+		})
+	}
+	if taxTotal > 0 {
+		if taxAcct, e := invoicejournal.ResolveAccountID(ctx, pool, tenantID, inputVatCode); e == nil {
+			lines = append(lines, invoicejournal.Line{AccountID: taxAcct, Debit: taxTotal, Remark: "Input VAT - " + invoiceNo})
+		}
+	}
+	whtTotal, err := sumWithholdingTaxAmounts(ctx, pool, tenantID, "supplier_invoice", id)
+	if err != nil {
+		return errors.New("failed to load withholding lines")
+	}
+	apCredit := grandTotal - whtTotal
+	if apCredit < 0 {
+		apCredit = 0
+	}
+	lines = append(lines, invoicejournal.Line{AccountID: *withdrawalAccountID, Credit: apCredit, PartyID: &partnerID, Remark: "A/P - " + invoiceNo})
+	if whtTotal > 0.0001 {
+		if whtAcct, e := invoicejournal.ResolveAccountID(ctx, pool, tenantID, ewtPayableCode); e == nil {
+			lines = append(lines, invoicejournal.Line{AccountID: whtAcct, Credit: whtTotal, PartyID: &partnerID, Remark: "EWT payable - " + invoiceNo})
+		}
+	}
+
+	autoPost := siReadAutoPost(ctx, pool, tenantID, "accounts_auto_post_purchase")
+	jeID, err := invoicejournal.Sync(ctx, pool, tenantID, userID, invoiceDate, "Purchase "+invoiceNo, existingJE, lines, autoPost)
+	if err != nil {
+		return errors.New("failed to build purchase invoice journal entry")
+	}
+
+	if _, err := pool.Exec(ctx, `
+		update public.fin_supplier_invoices
+		set purchase_account_id = $2, withdrawal_account_id = $3,
+		    invoice_journal_entry_id = $4, updated_at = now()
+		where id = $1 and tenant_id = $5`,
+		id, *purchaseAccountID, *withdrawalAccountID, jeID, tenantID); err != nil {
+		return errors.New("failed to save invoice journal link")
+	}
+	return nil
 }
 
 func siAccountsExist(ctx context.Context, pool *pgxpool.Pool, tenantID int64, ids ...int64) bool {

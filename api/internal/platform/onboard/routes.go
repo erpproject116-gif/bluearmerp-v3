@@ -347,14 +347,13 @@ func (s *service) createTrialTenant(ctx context.Context, a trialArgs) (int64, er
 		  accounts_auto_post_sales, accounts_auto_post_purchase,
 		  inventory_gl_hybrid_enabled,
 		  purchase_require_gr_before_supplier_invoice
-		) values ($1, true, true, true, true, true, true)
+		) values ($1, true, true, true, true, true, false)
 		on conflict (tenant_id) do update set
 		  accounts_auto_post_or = true,
 		  accounts_auto_post_pv = true,
 		  accounts_auto_post_sales = true,
 		  accounts_auto_post_purchase = true,
 		  inventory_gl_hybrid_enabled = true,
-		  purchase_require_gr_before_supplier_invoice = true,
 		  updated_at = now()`, tenantID); err != nil {
 		return 0, err
 	}

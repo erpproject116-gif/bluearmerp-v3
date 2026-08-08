@@ -22,7 +22,8 @@ const ENTITY_PAIRS = [
   { source: "sales_order", target: "delivery_receipt", label: "Sales Order → Delivery Receipt" },
   { source: "sales_order", target: "release", label: "Sales Order → Release" },
   { source: "purchase_request", target: "purchase_order", label: "Purchase Request → PO" },
-  { source: "goods_receipt", target: "supplier_invoice", label: "Purchase Receive → Bill" },
+  { source: "purchase_order", target: "supplier_invoice", label: "Bill ← Purchase Order (preferred)" },
+  { source: "goods_receipt", target: "supplier_invoice", label: "Bill ← Purchase Receive (legacy)" },
 ];
 
 function pairLabel(source: string, target: string): string {

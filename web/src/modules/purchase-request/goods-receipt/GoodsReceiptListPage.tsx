@@ -112,25 +112,38 @@ export default function GoodsReceiptListPage() {
   return (
     <PurchaseRequestLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-text-secondary">
-          {uiLabel("goods_receipt.list_description")} Click a row (or PO no.) to open that receive. Use{" "}
-          <span class="font-medium">New</span> to create from a confirmed PO. After posting, Generate slip → Bill, or
-          open{" "}
-          <A href="/app/purchases/purchases/pre-invoicing" class="text-brand-600 hover:underline">
-            Pre-invoicing
-          </A>
-          , then{" "}
-          <A href="/app/purchases/purchases?payment=unpaid" class="text-brand-600 hover:underline">
-            unpaid Bills
-          </A>
-          .
-        </p>
+        <div class="space-y-2 text-sm text-text-secondary">
+          <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
+            <span class="font-medium">Receive history (legacy).</span> For new stock-in with serials, use{" "}
+            <A href="/app/purchases/purchases/new" class="font-medium text-brand-700 hover:underline">
+              New Bill
+            </A>
+            — confirm posts inventory and AP. This list keeps posted/draft receives for reverse and audit.
+          </p>
+          <p>
+            {uiLabel("goods_receipt.list_description")} Click a row (or PO no.) to open that receive. Pre-invoicing:{" "}
+            <A href="/app/purchases/purchases/pre-invoicing" class="text-brand-600 hover:underline">
+              open GR not yet billed
+            </A>
+            ; unpaid Bills:{" "}
+            <A href="/app/purchases/purchases?payment=unpaid" class="text-brand-600 hover:underline">
+              Bills
+            </A>
+            .
+          </p>
+        </div>
         <div class="flex flex-wrap gap-2">
           <A
-            href="/app/inventory/serial-lot/receive"
+            href="/app/purchases/purchases/new"
             class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
-            {uiLabel("goods_receipt.receive_goods")}
+            New Bill
+          </A>
+          <A
+            href="/app/inventory/serial-lot/receive"
+            class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
+          >
+            Legacy receive
           </A>
           <A
             href="/app/purchase-order/purchase-orders"
