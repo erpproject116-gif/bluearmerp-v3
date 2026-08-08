@@ -1,4 +1,4 @@
-package finance
+﻿package finance
 
 import (
 	"context"
@@ -902,7 +902,7 @@ func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenan
 				errs[key+".goods_receipt_line_id"] = "Goods receipt line not found or not posted."
 				continue
 			}
-			// Blank Bill auto-receive has no PO — skip PO vendor/approval checks.
+			// Blank Bill auto-receive has no PO â€” skip PO vendor/approval checks.
 			if poID > 0 {
 				if linePartnerID != partnerID {
 					errs[key+".goods_receipt_line_id"] = "Vendor does not match purchase order."
@@ -1061,7 +1061,7 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		// Load Slip → Save: copy originating PO attachments when lines reference PO lines.
+		// Load Slip â†’ Save: copy originating PO attachments when lines reference PO lines.
 		poIDs := map[int64]struct{}{}
 		for _, ln := range body.Lines {
 			if ln.PurchaseOrderLineID == nil || *ln.PurchaseOrderLineID <= 0 {
@@ -1075,7 +1075,7 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 		for poID := range poIDs {
-			_ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
+			_, _ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
 				SrcBaseDir: attachmentx.Dir("purchase_order"),
 				DstBaseDir: attachmentx.Dir("supplier_invoice"),
 				SrcTable:   "public.po_purchase_order_attachments",
@@ -1132,7 +1132,7 @@ func resolveSupplierInvoiceLineItem(ctx context.Context, tx pgx.Tx, tenantID int
 			ref.UnitID, ref.UnitCode = preferUnit(ref.UnitID, ref.UnitCode, poUnitID, poUnitCode)
 			return ref, nil
 		}
-		// Blank Bill auto-receive: GR without PO — use line item fields.
+		// Blank Bill auto-receive: GR without PO â€” use line item fields.
 		ref.ItemID = ln.ItemID
 		ref.ItemCode = strings.TrimSpace(ln.ItemCode)
 		ref.ItemName = strings.TrimSpace(ln.ItemName)

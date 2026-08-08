@@ -172,7 +172,7 @@ func listSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := fmt.Sprintf(`
 			select su.id, su.serial_no, su.item_id, i.item_code, i.item_name, su.status,
-			  su.location_id, coalesce(loc.name, ''),
+			  su.location_id, coalesce(loc.location_name, ''),
 			  su.partner_id, coalesce(p.company_name, ''),
 			  su.warranty_start, su.warranty_end, su.received_at,
 			  po.purchase_order_no, su.sales_line_id,
@@ -242,7 +242,7 @@ func listAvailableSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *locationID)
 		}
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
-			select su.id, su.serial_no, su.status, su.location_id, coalesce(loc.name, ''),
+			select su.id, su.serial_no, su.status, su.location_id, coalesce(loc.location_name, ''),
 			  su.warranty_end
 			from public.inv_serial_units su
 			left join public.inv_locations loc on loc.id = su.location_id
@@ -294,7 +294,7 @@ func traceSerialUnit(pool *pgxpool.Pool) http.HandlerFunc {
 		var createdAt time.Time
 		err := pool.QueryRow(r.Context(), `
 			select su.id, su.serial_no, su.item_id, i.item_code, i.item_name, su.status,
-			  su.location_id, coalesce(loc.name, ''),
+			  su.location_id, coalesce(loc.location_name, ''),
 			  su.partner_id, coalesce(p.company_name, ''),
 			  su.warranty_start, su.warranty_end, su.received_at,
 			  po.purchase_order_no, su.sales_line_id, su.created_at
@@ -320,7 +320,7 @@ func traceSerialUnit(pool *pgxpool.Pool) http.HandlerFunc {
 		unit.CreatedAt = createdAt.Format(time.RFC3339)
 
 		eventRows, err := pool.Query(r.Context(), `
-			select e.id, e.event_type, coalesce(fl.name, ''), coalesce(tl.name, ''),
+			select e.id, e.event_type, coalesce(fl.location_name, ''), coalesce(tl.location_name, ''),
 			  e.ref_type, e.ref_id, e.notes, coalesce(u.full_name, ''), e.created_at
 			from public.inv_serial_events e
 			left join public.inv_locations fl on fl.id = e.from_location_id
@@ -430,7 +430,7 @@ func listSerialEvents(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := fmt.Sprintf(`
 			select e.id, e.serial_unit_id, su.serial_no, i.item_code, i.item_name,
-			  e.event_type, coalesce(fl.name, ''), coalesce(tl.name, ''),
+			  e.event_type, coalesce(fl.location_name, ''), coalesce(tl.location_name, ''),
 			  e.ref_type, e.ref_id, e.notes, coalesce(u.full_name, ''), e.created_at,
 			  count(*) over()
 			from public.inv_serial_events e
@@ -521,7 +521,7 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := fmt.Sprintf(`
 			select lb.id, lb.item_id, i.item_code, i.item_name, lb.lot_no,
-			  lb.location_id, loc.name, lb.qty_on_hand::float8, lb.expiry_date, lb.updated_at,
+			  lb.location_id, loc.location_name, lb.qty_on_hand::float8, lb.expiry_date, lb.updated_at,
 			  count(*) over()
 			from public.inv_lot_batches lb
 			join public.inv_items i on i.id = lb.item_id
