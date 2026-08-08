@@ -471,6 +471,7 @@ export default function App() {
           <Route path="/pos/setup" component={ModuleSetupHubPage} />
           <Route path="/pos/manage" component={PosSettingsPage} />
           <Route path="/inventory" component={StockWorkspacePage} />
+          <Route path="/inventory/setup" component={ModuleSetupHubPage} />
           <Route path="/inventory/partners" component={PartnersPage} />
           <Route path="/inventory/partners/settings" component={PartnersSettingsPage} />
           <Route path="/inventory/locations" component={LocationsPage} />

@@ -47,13 +47,13 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "overflow",
   },
   {
-    label: "Adjustment",
+    label: "Qty fix (serials)",
     href: "/app/inventory/serial-lot/adjustment",
     permissionCode: "inventory.serial_adjustment",
     headerPriority: "overflow",
   },
   {
-    label: "Lot adjustment",
+    label: "Qty fix (lots)",
     href: "/app/inventory/serial-lot/lot-adjustment",
     permissionCode: "inventory.serial_adjustment",
     headerPriority: "overflow",

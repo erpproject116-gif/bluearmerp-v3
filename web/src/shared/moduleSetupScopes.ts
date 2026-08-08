@@ -125,8 +125,19 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
       "accounts_auto_post_purchase",
       "finance_require_je_approval",
       "inventory_gl_hybrid_enabled",
+      "inventory_require_serial_adjustment_approval",
     ],
     showBudgetControl: true,
+    modulesHref: "/app/user-management/tenant-modules",
+  },
+  inventory: {
+    id: "inventory",
+    title: "Stocks / Serial setup",
+    blurb: "Optional gates for serial qty fixes and inventory GL.",
+    policyKeys: [
+      "inventory_require_serial_adjustment_approval",
+      "inventory_gl_hybrid_enabled",
+    ],
     modulesHref: "/app/user-management/tenant-modules",
   },
 };
@@ -144,6 +155,7 @@ export function setupScopeFromPath(pathname: string): string | null {
     ["/app/buying/", "buying"],
     ["/app/pos/", "pos"],
     ["/app/finance/", "finance"],
+    ["/app/inventory/", "inventory"],
   ];
   for (const [prefix, id] of pairs) {
     if (pathname.startsWith(prefix) || pathname === prefix.slice(0, -1)) return id;

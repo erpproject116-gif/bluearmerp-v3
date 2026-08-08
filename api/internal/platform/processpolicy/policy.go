@@ -36,6 +36,7 @@ type Policy struct {
 	PurchaseOrderRequireAttachment      bool   `json:"purchase_order_require_attachment"`
 	SupplierInvoiceRequireAttachment    bool   `json:"supplier_invoice_require_attachment"`
 	InventoryGLHybridEnabled            bool   `json:"inventory_gl_hybrid_enabled"`
+	InventoryRequireSerialAdjustmentApproval bool `json:"inventory_require_serial_adjustment_approval"`
 }
 
 // Patch is the writable subset for PATCH/PUT requests.
@@ -63,6 +64,7 @@ type Patch struct {
 	PurchaseOrderRequireAttachment     *bool   `json:"purchase_order_require_attachment,omitempty"`
 	SupplierInvoiceRequireAttachment   *bool   `json:"supplier_invoice_require_attachment,omitempty"`
 	InventoryGLHybridEnabled           *bool   `json:"inventory_gl_hybrid_enabled,omitempty"`
+	InventoryRequireSerialAdjustmentApproval *bool `json:"inventory_require_serial_adjustment_approval,omitempty"`
 }
 
 var ErrNotFound = errors.New("process policy not found")
@@ -91,7 +93,8 @@ const selectCols = `
   coalesce(sales_require_attachment, true),
   coalesce(purchase_order_require_attachment, true),
   coalesce(supplier_invoice_require_attachment, true),
-  coalesce(inventory_gl_hybrid_enabled, false)
+  coalesce(inventory_gl_hybrid_enabled, false),
+  coalesce(inventory_require_serial_adjustment_approval, false)
 `
 
 // LoadStored returns the tenant policy as stored (for admin UI), inserting defaults when missing.
@@ -133,6 +136,7 @@ func LoadStored(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy
 		&p.PurchaseOrderRequireAttachment,
 		&p.SupplierInvoiceRequireAttachment,
 		&p.InventoryGLHybridEnabled,
+		&p.InventoryRequireSerialAdjustmentApproval,
 	)
 	return p, err
 }
@@ -276,6 +280,9 @@ func ApplyPatch(current Policy, patch Patch) Policy {
 	if patch.InventoryGLHybridEnabled != nil {
 		next.InventoryGLHybridEnabled = *patch.InventoryGLHybridEnabled
 	}
+	if patch.InventoryRequireSerialAdjustmentApproval != nil {
+		next.InventoryRequireSerialAdjustmentApproval = *patch.InventoryRequireSerialAdjustmentApproval
+	}
 	return next
 }
 
@@ -305,6 +312,7 @@ func writePolicyArgs(tenantID, userID int64, next Policy) []any {
 		next.PurchaseOrderRequireAttachment,
 		next.SupplierInvoiceRequireAttachment,
 		next.InventoryGLHybridEnabled,
+		next.InventoryRequireSerialAdjustmentApproval,
 		userID,
 	}
 }
@@ -334,7 +342,8 @@ const updatePolicySQL = `
 		  purchase_order_require_attachment = $22,
 		  supplier_invoice_require_attachment = $23,
 		  inventory_gl_hybrid_enabled = $24,
-		  updated_by_user_id = $25,
+		  inventory_require_serial_adjustment_approval = $25,
+		  updated_by_user_id = $26,
 		  updated_at = now()
 		where tenant_id = $1`
 
@@ -414,6 +423,7 @@ func loadStoredTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error
 		&p.PurchaseOrderRequireAttachment,
 		&p.SupplierInvoiceRequireAttachment,
 		&p.InventoryGLHybridEnabled,
+		&p.InventoryRequireSerialAdjustmentApproval,
 	)
 	return p, err
 }

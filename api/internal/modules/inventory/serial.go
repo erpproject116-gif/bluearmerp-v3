@@ -84,6 +84,8 @@ func registerSerialRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/serial-units/allocate-numbers", allocateSerialNumbers(pool))
 	r.Get("/serial-units/adjustment-candidates", listSerialAdjustmentCandidates(pool))
 	r.Post("/serial-units/adjustments", applySerialAdjustments(pool))
+	r.Post("/serial-units/adjustment-requests/{id}/approve", approveSerialAdjustmentRequest(pool))
+	r.Post("/serial-units/adjustment-requests/{id}/reject", rejectSerialAdjustmentRequest(pool))
 	r.Get("/serial-events", listSerialEvents(pool))
 	r.Get("/lot-batches", listLotBatches(pool))
 	r.Get("/lot-batches/adjustment-candidates", listLotAdjustmentCandidates(pool))

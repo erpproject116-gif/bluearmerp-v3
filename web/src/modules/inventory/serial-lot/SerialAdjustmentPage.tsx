@@ -4,7 +4,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
-import { submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import {
   applySerialAdjustments,
@@ -152,16 +152,36 @@ export default function SerialAdjustmentPage() {
       return;
     }
     setSaving(true);
-    const ok = await submitEntity(
-      () => applySerialAdjustments({ reason: reason().trim(), lines }),
-      toast,
-      "Serials adjusted.",
-    );
-    setSaving(false);
-    if (!ok) return;
-    setEditableRows([]);
-    invalidate();
-    search();
+    try {
+      const res = await applySerialAdjustments({ reason: reason().trim(), lines });
+      setSaving(false);
+      if (!res.success) {
+        handleSaveResult(res, toast, "Serials adjusted.");
+        return;
+      }
+      if (res.data?.pending_approval) {
+        if (toast.action) {
+          toast.action({
+            type: "success",
+            title: "Submitted for approval",
+            message: "No stock change until an approver confirms in the Approvals queue.",
+            actionLabel: "Open Approvals",
+            href: "/app/dashboard/approvals",
+          });
+        } else {
+          toast.success(res.message ?? "Submitted for approval.");
+        }
+      } else {
+        toast.success(res.message ?? "Serials adjusted.");
+      }
+      setEditableRows([]);
+      setReason("");
+      invalidate();
+      search();
+    } catch {
+      setSaving(false);
+      toast.error("Could not reach the API. Check your connection and try again.");
+    }
   };
 
   onMount(() => {
@@ -180,8 +200,15 @@ export default function SerialAdjustmentPage() {
 
   return (
     <SerialLotLayout>
+      <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <p class="font-medium">Corrections only</p>
+        <p class="mt-1 text-amber-900/90">
+          After Purchase Receive is Completed, find units in Registry. This screen lists candidates so you can fix quantity
+          exceptions — it is not the post-receive destination.
+        </p>
+      </div>
       <CollapsibleFilterPanel
-        title="Inventory adj. by serial / lot"
+        title="Qty fix (serials)"
         description="Search serial units, enter qty changes, then Save (Shift+F8)."
         actions={
           <>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -57,6 +58,7 @@ type SaleLine struct {
 	SerialPolicy           string           `json:"serial_policy,omitempty"`
 	LotPolicy              string           `json:"lot_policy,omitempty"`
 	SourceSalesOrderLineID *int64           `json:"source_sales_order_line_id,omitempty"`
+	SourceQuotationLineID  *int64           `json:"source_quotation_line_id,omitempty"`
 }
 
 type SaleSerialUnit struct {
@@ -119,6 +121,7 @@ type saleLineBody struct {
 	SerialUnitIDs          []int64 `json:"serial_unit_ids,omitempty"`
 	LotBatchID             *int64  `json:"lot_batch_id"`
 	SourceSalesOrderLineID *int64  `json:"source_sales_order_line_id"`
+	SourceQuotationLineID  *int64  `json:"source_quotation_line_id"`
 }
 
 type saleBody struct {
@@ -161,6 +164,7 @@ type computedLine struct {
 	SerialLotNo            *string
 	LotBatchID             *int64
 	SourceSalesOrderLineID *int64
+	SourceQuotationLineID  *int64
 }
 
 func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -453,7 +457,7 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 		  sl.unit_non_vat::float8, sl.non_vat_total::float8, sl.tax_amount::float8,
 		  sl.unit_vat_inc::float8, sl.line_total::float8,
 		  sl.discount_amount::float8, sl.discounted_unit_non_vat::float8, sl.discounted_unit_vat_inc::float8,
-		  sl.remark, sl.serial_lot_no, sl.lot_batch_id, sl.source_sales_order_line_id,
+		  sl.remark, sl.serial_lot_no, sl.lot_batch_id, sl.source_sales_order_line_id, sl.source_quotation_line_id,
 		  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
 		  coalesce(i.serial_policy, 'required'), coalesce(i.lot_policy, 'required'),
 		  coalesce((
@@ -488,7 +492,7 @@ func loadSaleLines(ctx context.Context, pool *pgxpool.Pool, salesID int64) ([]Sa
 			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
 			&ln.UnitVatInc, &ln.LineTotal,
 			&ln.DiscountAmount, &ln.DiscountedUnitNonVat, &ln.DiscountedUnitVatInc,
-			&ln.Remark, &ln.SerialLotNo, &ln.LotBatchID, &ln.SourceSalesOrderLineID,
+			&ln.Remark, &ln.SerialLotNo, &ln.LotBatchID, &ln.SourceSalesOrderLineID, &ln.SourceQuotationLineID,
 			&ln.TrackSerial, &ln.TrackLot, &ln.SerialPolicy, &ln.LotPolicy, &ln.SerialUnitIDs,
 			&serialUnitsJSON, &ln.LotNo); err != nil {
 			return nil, err
@@ -697,24 +701,32 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Load Slip → Save: copy originating SO attachments (header source and/or line sources).
+		// Load Slip → Save: copy originating SO / Quotation attachments.
 		soIDs := map[int64]struct{}{}
+		quoIDs := map[int64]struct{}{}
 		if body.SourceSalesOrderID != nil && *body.SourceSalesOrderID > 0 {
 			soIDs[*body.SourceSalesOrderID] = struct{}{}
 		}
 		for _, ln := range body.Lines {
-			if ln.SourceSalesOrderLineID == nil || *ln.SourceSalesOrderLineID <= 0 {
-				continue
+			if ln.SourceSalesOrderLineID != nil && *ln.SourceSalesOrderLineID > 0 {
+				var soID int64
+				if err := pool.QueryRow(r.Context(),
+					`select sales_order_id from public.so_sales_order_lines where id = $1`,
+					*ln.SourceSalesOrderLineID).Scan(&soID); err == nil && soID > 0 {
+					soIDs[soID] = struct{}{}
+				}
 			}
-			var soID int64
-			if err := pool.QueryRow(r.Context(),
-				`select sales_order_id from public.so_sales_order_lines where id = $1`,
-				*ln.SourceSalesOrderLineID).Scan(&soID); err == nil && soID > 0 {
-				soIDs[soID] = struct{}{}
+			if ln.SourceQuotationLineID != nil && *ln.SourceQuotationLineID > 0 {
+				var quoID int64
+				if err := pool.QueryRow(r.Context(),
+					`select quotation_id from public.quo_quotation_lines where id = $1`,
+					*ln.SourceQuotationLineID).Scan(&quoID); err == nil && quoID > 0 {
+					quoIDs[quoID] = struct{}{}
+				}
 			}
 		}
 		for soID := range soIDs {
-			_ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
+			if err := attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
 				SrcBaseDir: attachmentx.Dir("sales_order"),
 				DstBaseDir: attachmentx.Dir("sales"),
 				SrcTable:   "public.so_sales_order_attachments",
@@ -724,7 +736,24 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 				DstFKCol:   "sales_id",
 				DstID:      id,
 				TenantID:   tu.TenantID,
-			})
+			}); err != nil {
+				log.Printf("sales.create: copy SO %d attachments to sale %d: %v", soID, id, err)
+			}
+		}
+		for quoID := range quoIDs {
+			if err := attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
+				SrcBaseDir: attachmentx.Dir("quotation"),
+				DstBaseDir: attachmentx.Dir("sales"),
+				SrcTable:   "public.quo_quotation_attachments",
+				SrcFKCol:   "quotation_id",
+				SrcID:      quoID,
+				DstTable:   "public.sa_sales_attachments",
+				DstFKCol:   "sales_id",
+				DstID:      id,
+				TenantID:   tu.TenantID,
+			}); err != nil {
+				log.Printf("sales.create: copy quotation %d attachments to sale %d: %v", quoID, id, err)
+			}
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.create", "sa_sales", &id, nil, body)
@@ -947,13 +976,13 @@ func insertSaleLines(ctx context.Context, tx pgx.Tx, salesID int64, lines []comp
 			  sales_id, line_no, item_id, item_code, item_name, description,
 			  qty, unit_id, unit_code, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total,
 			  discount_amount, discounted_unit_non_vat, discounted_unit_vat_inc,
-			  remark, serial_lot_no, lot_batch_id, source_sales_order_line_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+			  remark, serial_lot_no, lot_batch_id, source_sales_order_line_id, source_quotation_line_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
 			salesID, lineNo, ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.Description,
 			ln.Qty, ln.UnitID, ln.UnitCode, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
 			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal,
 			ln.DiscountAmount, ln.DiscountedUnitNonVat, ln.DiscountedUnitVatInc,
-			ln.Remark, ln.SerialLotNo, ln.LotBatchID, ln.SourceSalesOrderLineID)
+			ln.Remark, ln.SerialLotNo, ln.LotBatchID, ln.SourceSalesOrderLineID, ln.SourceQuotationLineID)
 		if err != nil {
 			return err
 		}
@@ -1025,6 +1054,7 @@ func computeSaleLines(tt taxcalc.TaxType, templateCode string, lines []saleLineB
 			SerialLotNo:            ln.SerialLotNo,
 			LotBatchID:             ln.LotBatchID,
 			SourceSalesOrderLineID: ln.SourceSalesOrderLineID,
+			SourceQuotationLineID:  ln.SourceQuotationLineID,
 		})
 	}
 	if len(errs) > 0 {

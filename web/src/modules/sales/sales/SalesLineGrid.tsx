@@ -51,6 +51,7 @@ export type SalesLineRow = {
   lot_batch_id?: number | null;
   lot_no?: string;
   source_sales_order_line_id?: number | null;
+  source_quotation_line_id?: number | null;
 };
 
 export function hasDiscountTemplate(templateCode: SalesTemplateCode): boolean {
@@ -82,6 +83,7 @@ export function emptySalesLine(
     remark: "",
     serial_lot_no: "",
     source_sales_order_line_id: null,
+    source_quotation_line_id: null,
   };
 }
 

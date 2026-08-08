@@ -5,6 +5,7 @@ import { PrintBrandingHeader } from "../branding/PrintBrandingHeader";
 import { uiLabel } from "../branding/uiLabel";
 import { CollapsibleFilterPanel } from "../CollapsibleFilterPanel";
 import { GridExportButtons } from "../gridExport";
+import { PageJumpControl } from "../PageJumpControl";
 
 export type ReportPageLayoutProps = {
   title: string;
@@ -133,9 +134,12 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                   >
                     {uiLabel("reports.prev_page")}
                   </button>
-                  <span>
-                    Page {props.page} / {props.totalPages}
-                  </span>
+                  <PageJumpControl
+                    page={props.page!}
+                    totalPages={props.totalPages!}
+                    onPageChange={(p) => props.onPageChange!(p)}
+                    compact
+                  />
                   <button
                     type="button"
                     class="rounded border border-stroke px-3 py-1 disabled:opacity-50"

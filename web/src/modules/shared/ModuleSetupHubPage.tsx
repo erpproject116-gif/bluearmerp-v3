@@ -25,6 +25,7 @@ type ProcessPolicy = {
   accounts_auto_post_sales: boolean;
   accounts_auto_post_purchase: boolean;
   inventory_gl_hybrid_enabled: boolean;
+  inventory_require_serial_adjustment_approval: boolean;
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
@@ -122,6 +123,10 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
   inventory_gl_hybrid_enabled: {
     label: "Hybrid inventory GL (qty-tracked items)",
     help: "On = Purchase Receive/Sales of qty-tracked items post Inventory / GRNI / COGS. Map those accounts under CoA defaults first.",
+  },
+  inventory_require_serial_adjustment_approval: {
+    label: "Require approval for serial qty fixes (threshold)",
+    help: "Off by default. On = Qty fix (serials) needs Approvals Queue when lines ≥ 5 or any positive qty delta.",
   },
   finance_require_je_approval: {
     label: "Require approval before posting journals",

@@ -22,6 +22,7 @@ type ProcessPolicy = {
   accounts_auto_post_sales: boolean;
   accounts_auto_post_purchase: boolean;
   inventory_gl_hybrid_enabled: boolean;
+  inventory_require_serial_adjustment_approval: boolean;
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
@@ -192,6 +193,11 @@ const SECTIONS: PolicySection[] = [
         label: "Hybrid inventory GL (qty-tracked items)",
         help: "When on, Purchase Receive and Sales of qty-tracked items post Inventory / GRNI / COGS. Map those accounts under CoA defaults first. Existing tenants need opening inventory before enabling.",
       },
+      {
+        key: "inventory_require_serial_adjustment_approval",
+        label: "Require approval for serial qty fixes (threshold)",
+        help: "Off by default. When on, Apply on Qty fix (serials) goes to Approvals Queue if there are 5+ lines or any positive qty change. Small negative-only fixes still post immediately.",
+      },
     ],
   },
 ];
@@ -223,6 +229,7 @@ const PRESETS: { id: PresetId; label: string; help: string; apply: (p: ProcessPo
       sales_require_so_approval: false,
       purchase_require_po_approval: false,
       finance_require_je_approval: false,
+      inventory_require_serial_adjustment_approval: false,
       quotation_require_attachment: false,
       sales_order_require_attachment: false,
       sales_require_attachment: false,

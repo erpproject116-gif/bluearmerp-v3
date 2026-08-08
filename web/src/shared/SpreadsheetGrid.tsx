@@ -12,6 +12,7 @@ import { brandingPlaceholder } from "./branding/brandingStore";
 import { uiLabel } from "./branding/uiLabel";
 import { GridExportButtons, type GridExportColumn } from "./gridExport";
 import { useGridColumnPrefs } from "./useGridColumnPrefs";
+import { PageJumpControl } from "./PageJumpControl";
 
 export type Column<T> = {
   key: string;
@@ -649,9 +650,18 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               >
                 {uiLabel("common.previous")}
               </button>
-              <span class="text-sm text-text-secondary">
-                Page {props.page} of {totalPages()}
-              </span>
+              <Show when={props.onPageChange}>
+                <PageJumpControl
+                  page={props.page ?? 1}
+                  totalPages={totalPages()}
+                  onPageChange={(p) => props.onPageChange?.(p)}
+                />
+              </Show>
+              <Show when={!props.onPageChange}>
+                <span class="text-sm text-text-secondary">
+                  Page {props.page} of {totalPages()}
+                </span>
+              </Show>
               <button
                 type="button"
                 class="rounded-lg border border-stroke px-3 py-1.5 text-sm disabled:opacity-40"
