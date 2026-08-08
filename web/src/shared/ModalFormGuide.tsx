@@ -1,5 +1,6 @@
 import { For, Show, createSignal } from "solid-js";
 import { getModalFormGuide, type ModalFormGuideDef } from "./modalFormGuides";
+import { useInlineGuides } from "./inlineGuides";
 
 function expandedKey(guideId: string): string {
   return `modal-form-guide-expanded:${guideId}`;
@@ -52,6 +53,7 @@ function resolveGuide(props: ModalFormGuideProps): ModalFormGuideDef {
  * Persistence key: modal-form-guide-expanded:{guideId}
  */
 export function ModalFormGuide(props: ModalFormGuideProps) {
+  const guides = useInlineGuides();
   const guide = () => resolveGuide(props);
   const [expandedMap, setExpandedMap] = createSignal<Record<string, boolean>>({});
 
@@ -106,5 +108,9 @@ export function ModalFormGuide(props: ModalFormGuideProps) {
     </section>
   );
 
-  return props.spanFull ? <div class="col-span-full">{body}</div> : body;
+  return (
+    <Show when={guides.enabled()}>
+      {props.spanFull ? <div class="col-span-full">{body}</div> : body}
+    </Show>
+  );
 }

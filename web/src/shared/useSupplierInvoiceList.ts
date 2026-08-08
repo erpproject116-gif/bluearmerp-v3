@@ -153,3 +153,10 @@ export function useInvalidateSupplierInvoices() {
   const client = useQueryClient();
   return () => void client.invalidateQueries({ queryKey: ["supplier-invoices"] });
 }
+
+export async function patchSupplierInvoiceProgress(invoiceId: number, progressStatus: string) {
+  return apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${invoiceId}/progress-status`, {
+    method: "PATCH",
+    body: JSON.stringify({ progress_status: progressStatus }),
+  });
+}

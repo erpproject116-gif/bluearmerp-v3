@@ -344,6 +344,7 @@ func registerSupplierInvoiceRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/supplier-invoices/{id}/pdf", getSupplierInvoicePDF(pool))
 	r.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/supplier-invoices/{id}/send-email", postSupplierInvoiceSendEmail(pool))
 	r.Patch("/supplier-invoices/{id}", updateSupplierInvoice(pool))
+	r.Patch("/supplier-invoices/{id}/progress-status", patchSupplierInvoiceProgressStatus(pool))
 	r.Delete("/supplier-invoices/{id}", deleteSupplierInvoice(pool))
 	registerSupplierInvoiceApprovalRoutes(r, pool)
 }
@@ -998,7 +999,8 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"progress_status": "Save as Unconfirmed, then use Submit for approval."})
 			return
 		}
-		progress := defaultSupplierInvoiceProgress(body.ProgressStatus)
+		// New Purchase Receive always starts unconfirmed; confirm via list progress-status.
+		progress := "unconfirmed"
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, progress, 0); v != nil {
 			response.Validation(w, v)
 			return
@@ -1380,11 +1382,12 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		subtotal, taxTotal, grandTotal := sumSupplierInvoiceTotals(body.Lines)
-		if strings.TrimSpace(body.ProgressStatus) == "e_approval" {
+		if strings.TrimSpace(body.ProgressStatus) == "e_approval" && before.ProgressStatus != "e_approval" {
 			response.Validation(w, map[string]string{"progress_status": "Use Submit for approval instead of changing the status directly."})
 			return
 		}
-		progress := defaultSupplierInvoiceProgress(body.ProgressStatus)
+		// Progress status is list-only (PATCH .../progress-status); keep existing on edit save.
+		progress := before.ProgressStatus
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, progress, id); v != nil {
 			response.Validation(w, v)
 			return
@@ -1441,6 +1444,164 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.supplier_invoice.update", "fin_supplier_invoice", &id, before, body)
 		inv, _ := loadSupplierInvoice(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, inv, "Updated.")
+	}
+}
+
+func confirmOpenReceivesOnSupplierInvoiceTx(ctx context.Context, tx pgx.Tx, tenantID, userID int64, inv SupplierInvoice) error {
+	if inv.LocationID == nil || *inv.LocationID <= 0 {
+		return fmt.Errorf("location is required to confirm stock receive")
+	}
+	locationID := *inv.LocationID
+	for _, ln := range inv.Lines {
+		if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
+			continue
+		}
+		body := supplierInvoiceLineBody{
+			LineNo:              ln.LineNo,
+			GoodsReceiptLineID:  ln.GoodsReceiptLineID,
+			PurchaseOrderLineID: ln.PurchaseOrderLineID,
+			ItemID:              ln.ItemID,
+			ItemCode:            ln.ItemCode,
+			ItemName:            ln.ItemName,
+			Description:         ln.Description,
+			Qty:                 ln.Qty,
+			UnitID:              ln.UnitID,
+			UnitCode:            ln.UnitCode,
+			UnitPrice:           ln.UnitNonVat,
+			UnitNonVat:          ln.UnitNonVat,
+			NonVatTotal:         ln.NonVatTotal,
+			TaxAmount:           ln.TaxAmount,
+			UnitVatInc:          ln.UnitVatInc,
+			LineTotal:           ln.LineTotal,
+			Remark:              ln.Remark,
+			SerialNos:           ln.SerialNos,
+			LotLines:            ln.LotLines,
+		}
+		autoGR, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, inv.PartnerID, body, true)
+		if err != nil {
+			return fmt.Errorf("line %d: %w", ln.LineNo, err)
+		}
+		if autoGR == nil || ln.ID <= 0 {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+			update public.fin_supplier_invoice_lines
+			set goods_receipt_line_id = $1
+			where id = $2 and supplier_invoice_id = $3`,
+			*autoGR, ln.ID, inv.ID); err != nil {
+			return err
+		}
+		var slipCount int
+		_ = tx.QueryRow(ctx, `
+			select count(*) from public.gr_goods_receipt_slip_lines
+			where goods_receipt_line_id = $1 and supplier_invoice_id = $2`,
+			*autoGR, inv.ID).Scan(&slipCount)
+		if slipCount == 0 {
+			if _, err := tx.Exec(ctx, `
+				insert into public.gr_goods_receipt_slip_lines (
+				  goods_receipt_line_id, slip_type, slip_ref, slip_date_no, qty, supplier_invoice_id
+				) values ($1, 'supplier_invoice', $2, $3, $4, $5)`,
+				*autoGR, inv.InvoiceNo, inv.DateNoDisplay, ln.Qty, inv.ID); err != nil {
+				return err
+			}
+		}
+		if ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
+			if err := fulfillment.SyncPOLineBilledQty(ctx, tx, *ln.PurchaseOrderLineID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func patchSupplierInvoiceProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body struct {
+			ProgressStatus string `json:"progress_status"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if strings.TrimSpace(body.ProgressStatus) == "e_approval" {
+			response.Validation(w, map[string]string{"progress_status": "Use Submit for approval instead."})
+			return
+		}
+		status := defaultSupplierInvoiceProgress(body.ProgressStatus)
+
+		before, err := loadSupplierInvoice(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Supplier invoice not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if before.ProgressStatus == "e_approval" {
+			response.Validation(w, map[string]string{"progress_status": "Cannot change status while pending approval."})
+			return
+		}
+		if confirmingBillProgress(before.ProgressStatus) && !confirmingBillProgress(status) {
+			response.Validation(w, map[string]string{"progress_status": "Cannot move a confirmed Purchase Receive back to Unconfirmed."})
+			return
+		}
+
+		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
+			return
+		}
+		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, status, id); v != nil {
+			response.Validation(w, v)
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		newlyConfirming := confirmingBillProgress(status) && !confirmingBillProgress(before.ProgressStatus)
+		if newlyConfirming {
+			if err := confirmOpenReceivesOnSupplierInvoiceTx(r.Context(), tx, tu.TenantID, tu.AppUserID, before); err != nil {
+				response.ValidationSmart(w, map[string]string{"progress_status": err.Error()})
+				return
+			}
+		}
+
+		tag, err := tx.Exec(r.Context(), `
+			update public.fin_supplier_invoices
+			set progress_status = $1, updated_at = now()
+			where id = $2 and tenant_id = $3 and deleted_at is null`,
+			status, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Supplier invoice not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+			return
+		}
+
+		if newlyConfirming {
+			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), pool, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.ValidationSmart(w, map[string]string{"invoice": err.Error()})
+				return
+			}
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.supplier_invoice.progress_status", "fin_supplier_invoice", &id, before.ProgressStatus, body)
+		inv, err := loadSupplierInvoice(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load.", "ERR_INTERNAL")
+			return
+		}
 		response.OK(w, inv, "Updated.")
 	}
 }

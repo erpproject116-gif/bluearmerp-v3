@@ -11,6 +11,7 @@ import { useToast } from "./toast";
 import { brandingPlaceholder } from "./branding/brandingStore";
 import { uiLabel } from "./branding/uiLabel";
 import { GridExportButtons, type GridExportColumn } from "./gridExport";
+import { useGridColumnPrefs } from "./useGridColumnPrefs";
 
 export type Column<T> = {
   key: string;
@@ -24,6 +25,8 @@ export type Column<T> = {
   minWidth?: number;
   maxWidth?: number;
   resizable?: boolean;
+  /** When false, column cannot be hidden via Columns picker. Default true. */
+  hideable?: boolean;
 };
 
 type Props<T extends { id: number }> = {
@@ -69,6 +72,12 @@ type Props<T extends { id: number }> = {
   exportTitle?: string;
   /** Force-hide export controls (overrides default). */
   hideExport?: boolean;
+  /**
+   * When set, shows a Columns picker and persists personal hide prefs under
+   * bluearm:grid.columns:{columnPrefsKey}. Tenant-hidden columns should already
+   * be filtered from `columns` by the page.
+   */
+  columnPrefsKey?: string;
 };
 
 function selectionSet(ids?: Set<number> | number[]): Set<number> {
@@ -79,8 +88,21 @@ function selectionSet(ids?: Set<number> | number[]): Set<number> {
 export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const [focusIdx, setFocusIdx] = createSignal(0);
   const [importing, setImporting] = createSignal(false);
+  const [columnsMenuOpen, setColumnsMenuOpen] = createSignal(false);
   const toast = useToast();
   let fileInputEl: HTMLInputElement | undefined;
+  let columnsMenuEl: HTMLDivElement | undefined;
+
+  const columnPrefs = useGridColumnPrefs(
+    () => props.columnPrefsKey,
+    () => props.columns.map((c) => ({ key: c.key, header: c.header, hideable: c.hideable })),
+  );
+
+  const activeColumns = createMemo(() => {
+    if (!columnPrefs.enabled()) return props.columns;
+    const visibleKeys = new Set(columnPrefs.visibleColumns().map((c) => c.key));
+    return props.columns.filter((c) => visibleKeys.has(c.key));
+  });
 
   // Local draft so typing stays responsive; only the committed query (props.search / onSearchChange)
   // refetches the table after debounce — not a full page reload.
@@ -153,7 +175,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const isRefreshing = () => !!props.loading && displayRows().length > 0;
 
   const columnDefs = () =>
-    props.columns.map((c) => ({
+    activeColumns().map((c) => ({
       key: c.key,
       width: c.width,
       minWidth: c.minWidth,
@@ -291,9 +313,20 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           props.onEdit(row);
         }
       }
+      if (e.key === "Escape") setColumnsMenuOpen(false);
+    };
+    const onDocClick = (e: MouseEvent) => {
+      if (!columnsMenuOpen()) return;
+      const t = e.target;
+      if (t instanceof Node && columnsMenuEl?.contains(t)) return;
+      setColumnsMenuOpen(false);
     };
     window.addEventListener("keydown", onKey);
-    onCleanup(() => window.removeEventListener("keydown", onKey));
+    document.addEventListener("mousedown", onDocClick);
+    onCleanup(() => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDocClick);
+    });
   });
 
   return (
@@ -354,7 +387,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               <GridExportButtons
                 title={props.exportTitle ?? String(props.exportFilename || "Export")}
                 filename={typeof props.exportFilename === "string" && props.exportFilename ? props.exportFilename : "data-export"}
-                columns={props.columns
+                columns={activeColumns()
                   .filter((c) => c.key !== "actions" && c.key !== "id" && c.header !== "")
                   .map(
                     (c): GridExportColumn => ({
@@ -372,6 +405,50 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                   )}
                 rows={() => displayRows() as unknown as Record<string, unknown>[]}
               />
+            </Show>
+            <Show when={columnPrefs.enabled()}>
+              <div class="relative" ref={(el) => (columnsMenuEl = el)}>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                  aria-expanded={columnsMenuOpen()}
+                  aria-haspopup="true"
+                  onClick={() => setColumnsMenuOpen((o) => !o)}
+                >
+                  Columns
+                </button>
+                <Show when={columnsMenuOpen()}>
+                  <div class="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-stroke bg-white p-3 shadow-lg">
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                      <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Show columns</p>
+                      <button
+                        type="button"
+                        class="text-xs font-medium text-brand-600 hover:underline"
+                        onClick={() => columnPrefs.showAll()}
+                      >
+                        Show all
+                      </button>
+                    </div>
+                    <ul class="max-h-64 space-y-1.5 overflow-y-auto">
+                      <For each={columnPrefs.hideableColumns()}>
+                        {(c) => (
+                          <li>
+                            <label class="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
+                              <input
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-stroke"
+                                checked={!columnPrefs.isHidden(c.key)}
+                                onChange={(e) => columnPrefs.setColumnVisible(c.key, e.currentTarget.checked)}
+                              />
+                              <span class="truncate">{c.header || c.key}</span>
+                            </label>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </div>
+                </Show>
+              </div>
             </Show>
             {props.toolbarExtra}
             <Show when={props.itemsCsvImport}>
@@ -470,7 +547,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                     />
                   </th>
                 </Show>
-                {props.columns.map((c) => {
+                {activeColumns().map((c) => {
                   const sortable = c.sortable !== false && Boolean(props.onSort);
                   const active = props.sortKey === c.key;
                   return (
@@ -517,7 +594,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                       />
                     </td>
                   </Show>
-                  {props.columns.map((c) => {
+                  {activeColumns().map((c) => {
                     const val = (row as Record<string, unknown>)[c.key];
                     const clickable = c.clickable ?? (c.key === props.codeKey || c.key === props.nameKey);
                     const cellContent = c.render ? c.render(row) : String(val ?? "");

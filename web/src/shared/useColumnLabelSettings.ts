@@ -6,10 +6,16 @@ export type ColumnLabelSetting = {
   column_key: string;
   label: string;
   sort_order: number;
+  /** Tenant default visibility for list views; line grids ignore this in UI. */
+  is_visible?: boolean;
 };
 
 export function lineViewKey(entityType: string) {
   return `${entityType}.lines`;
+}
+
+export function listViewKey(entityType: string) {
+  return `${entityType}.list`;
 }
 
 export function applyColumnLabels<T extends { key: string; header: string }>(
@@ -29,8 +35,15 @@ export const LINE_LABEL_ENTITY_TYPES = new Set([
   "fin_supplier_invoice",
 ]);
 
+/** Entity types with a registered `*.list` view for data-table column settings. */
+export const LIST_COLUMN_ENTITY_TYPES = new Set(["fin_supplier_invoice"]);
+
 export function hasLineColumnLabels(entityType: string) {
   return LINE_LABEL_ENTITY_TYPES.has(entityType);
+}
+
+export function hasListColumnSettings(entityType: string) {
+  return LIST_COLUMN_ENTITY_TYPES.has(entityType);
 }
 
 export function columnLabelsQueryKey(viewKey: string) {
@@ -65,6 +78,12 @@ export function useColumnLabelSettings(viewKey: string) {
     return label || fallback;
   };
 
+  const isColumnVisible = (key: string, fallback = true) => {
+    const row = byKey()[key];
+    if (!row || row.is_visible === undefined) return fallback;
+    return row.is_visible;
+  };
+
   const reload = async () => {
     await client.invalidateQueries({ queryKey: columnLabelsQueryKey(viewKey) });
     return client.fetchQuery({
@@ -78,9 +97,9 @@ export function useColumnLabelSettings(viewKey: string) {
     const res = await apiFetch<{ columns: ColumnLabelSetting[] }>(
       `/api/v1/column-label-settings?view_key=${encodeURIComponent(viewKey)}`,
       { method: "PATCH", body: JSON.stringify({ columns }) },
-      { successMessage: "Column labels saved." },
+      { successMessage: "Column settings saved." },
     );
-    if (!res.success) throw new Error(res.message ?? "Failed to save column labels");
+    if (!res.success) throw new Error(res.message ?? "Failed to save column settings");
     await reload();
     return res.data?.columns ?? [];
   };
@@ -90,6 +109,7 @@ export function useColumnLabelSettings(viewKey: string) {
     columns: () => query.data?.columns ?? [],
     byKey,
     columnLabel,
+    isColumnVisible,
     canManage: () => Boolean(query.data?.can_manage),
     reload,
     save,

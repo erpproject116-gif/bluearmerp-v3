@@ -1,10 +1,11 @@
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { A, useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { formatPeso } from "../../../shared/money";
-import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
-import { PURCHASES_SETTINGS_HREF } from "../../../shared/entityTypes";
+import { SpreadsheetGrid, type Column } from "../../../shared/SpreadsheetGrid";
+import { PURCHASES_ENTITY, PURCHASES_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
 import {
+  patchSupplierInvoiceProgress,
   useInvalidateSupplierInvoices,
   useSupplierInvoiceList,
   type SupplierInvoiceDetail,
@@ -17,11 +18,17 @@ import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
-import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
+import { DOC_PROGRESS_STATUS_TABS } from "../../../shared/docProgressStatusTabs";
+import { ProgressStatusMenu } from "../../sales/sales/ProgressStatusMenu";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
+import {
+  applyColumnLabels,
+  listViewKey,
+  useColumnLabelSettings,
+} from "../../../shared/useColumnLabelSettings";
 
 type PageOptions = { openNewOnMount?: boolean };
 
@@ -75,6 +82,143 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
     lifecycle: lifecycle.filter(),
   }));
 
+  const listCols = useColumnLabelSettings(listViewKey(PURCHASES_ENTITY.purchases));
+
+  const onProgressChange = async (row: SupplierInvoiceRow, status: string) => {
+    const res = await patchSupplierInvoiceProgress(row.id, status);
+    if (!res.success) {
+      toast.error(res.message ?? "Could not update progress status.");
+      return;
+    }
+    invalidate();
+  };
+
+  const gridColumns = createMemo((): Column<SupplierInvoiceRow>[] => {
+    const base: Column<SupplierInvoiceRow>[] = [
+      { key: "date_no_display", header: "Date-No.", clickable: true, hideable: false },
+      {
+        key: "vendor_invoice_no",
+        header: "SI/DR No. (Tracking No.)",
+        sortable: false,
+        render: (r) => r.vendor_invoice_no ?? "",
+      },
+      {
+        key: "po_numbers",
+        header: "PO Number",
+        sortable: false,
+        render: (r) => r.po_numbers ?? "",
+      },
+      {
+        key: "notes",
+        header: "Notes",
+        sortable: false,
+        render: (r) => r.notes ?? "",
+      },
+      {
+        key: "payment_terms",
+        header: "Payment Terms",
+        sortable: false,
+        render: (r) => r.payment_terms ?? "",
+      },
+      {
+        key: "tax_type_name",
+        header: "Transaction Type Name",
+        sortable: false,
+        render: (r) => r.tax_type_name ?? "",
+      },
+      { key: "vendor_name", header: "Customer/Vendor Name" },
+      {
+        key: "item_name_summary",
+        header: "Item Name (Summary)",
+        sortable: false,
+        render: (r) => r.item_name_summary ?? "",
+      },
+      {
+        key: "grand_total",
+        header: "Total Amount",
+        render: (r) => formatPeso(r.grand_total),
+      },
+      {
+        key: "progress_status",
+        header: "Progress Status",
+        sortable: false,
+        render: (r) => (
+          <ProgressStatusMenu
+            class="rounded border border-stroke bg-white px-2 py-1 text-sm text-brand-600"
+            value={r.progress_status}
+            disabled={r.progress_status === "e_approval"}
+            excludeValues={["e_approval"]}
+            onChange={(status) => void onProgressChange(r, status)}
+          />
+        ),
+      },
+      {
+        key: "invoicing_status",
+        header: "Invoicing Status",
+        sortable: false,
+        render: (r) => (
+          <span
+            class={r.invoicing_status ? "text-lg leading-none text-emerald-600" : "text-lg leading-none text-slate-300"}
+            title={r.invoicing_status ? "Purchase invoice JE linked" : "No purchase invoice JE yet"}
+          >
+            {r.invoicing_status ? "✓" : "—"}
+          </span>
+        ),
+      },
+      {
+        key: "print",
+        header: "Print",
+        sortable: false,
+        render: (r) => (
+          <button
+            type="button"
+            class="text-brand-600 hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              openPurchaseInvoicePrint(r.id);
+            }}
+          >
+            Print
+          </button>
+        ),
+      },
+      {
+        key: "created_by_name",
+        header: "Creator",
+        sortable: false,
+        render: (r) => r.created_by_name ?? "",
+      },
+      {
+        key: "pic_name",
+        header: "PIC Name",
+        sortable: false,
+        render: (r) => r.pic_name ?? "",
+      },
+      {
+        key: "history",
+        header: "History",
+        sortable: false,
+        render: (r) => (
+          <ActivityHistoryLink
+            module={loc.pathname.startsWith("/app/purchases") ? "purchases" : "finance"}
+            targetType="fin_supplier_invoice"
+            targetId={r.id}
+            title={`History — ${r.invoice_no}`}
+          />
+        ),
+      },
+      {
+        key: "lifecycle",
+        header: "Manage",
+        sortable: false,
+        hideable: false,
+        render: (r) => <lifecycle.RowAction id={r.id} label={r.invoice_no || r.date_no_display} />,
+      },
+    ];
+    const labeled = applyColumnLabels(base, listCols.columnLabel);
+    return labeled.filter((c) => listCols.isColumnVisible(c.key, true));
+  });
+
   const openNew = () => {
     setEditing(null);
     setViewingDeleted(false);
@@ -126,8 +270,9 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         <p class="font-medium text-slate-800">Purchase Receive = New Purchase (stock + AP on confirm)</p>
         <p class="mt-1 text-xs">
           Preferred: Load Slip → <span class="font-medium">Purchase Order</span> (or blank item), set qty, scan
-          serials, attach DR / vendor SI, then confirm — stock and AP post together. Load Slip → Receive history is
-          legacy when goods were already received separately. This screen does not edit BOM recipes.
+          serials, attach DR / vendor SI, save as Unconfirmed, then set Progress Status to{" "}
+          <span class="font-medium">Completed</span> on this list — stock and AP post together. Load Slip → Receive
+          history is legacy when goods were already received separately. This screen does not edit BOM recipes.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Next:{" "}
@@ -147,129 +292,8 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         </p>
       </div>
       <SpreadsheetGrid<SupplierInvoiceRow>
-        columns={[
-          { key: "date_no_display", header: "Date-No.", clickable: true },
-          {
-            key: "vendor_invoice_no",
-            header: "SI/DR No. (Tracking No.)",
-            sortable: false,
-            render: (r) => r.vendor_invoice_no ?? "",
-          },
-          {
-            key: "po_numbers",
-            header: "PO Number",
-            sortable: false,
-            render: (r) => r.po_numbers ?? "",
-          },
-          {
-            key: "notes",
-            header: "Notes",
-            sortable: false,
-            render: (r) => r.notes ?? "",
-          },
-          {
-            key: "payment_terms",
-            header: "Payment Terms",
-            sortable: false,
-            render: (r) => r.payment_terms ?? "",
-          },
-          {
-            key: "tax_type_name",
-            header: "Transaction Type Name",
-            sortable: false,
-            render: (r) => r.tax_type_name ?? "",
-          },
-          { key: "vendor_name", header: "Customer/Vendor Name" },
-          {
-            key: "item_name_summary",
-            header: "Item Name (Summary)",
-            sortable: false,
-            render: (r) => r.item_name_summary ?? "",
-          },
-          {
-            key: "grand_total",
-            header: "Total Amount",
-            render: (r) => formatPeso(r.grand_total),
-          },
-          {
-            key: "progress_status",
-            header: "Progress Status",
-            sortable: false,
-            render: (r) => (
-              <button
-                type="button"
-                class="text-brand-600 hover:underline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void openEdit(r);
-                }}
-              >
-                {docProgressStatusLabel(r.progress_status)}
-              </button>
-            ),
-          },
-          {
-            key: "invoicing_status",
-            header: "Invoicing Status",
-            sortable: false,
-            render: (r) => (
-              <span
-                class={r.invoicing_status ? "text-lg leading-none text-emerald-600" : "text-lg leading-none text-slate-300"}
-                title={r.invoicing_status ? "Purchase invoice JE linked" : "No purchase invoice JE yet"}
-              >
-                {r.invoicing_status ? "✓" : "—"}
-              </span>
-            ),
-          },
-          {
-            key: "print",
-            header: "Print",
-            sortable: false,
-            render: (r) => (
-              <button
-                type="button"
-                class="text-brand-600 hover:underline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openPurchaseInvoicePrint(r.id);
-                }}
-              >
-                Print
-              </button>
-            ),
-          },
-          {
-            key: "created_by_name",
-            header: "Creator",
-            sortable: false,
-            render: (r) => r.created_by_name ?? "",
-          },
-          {
-            key: "pic_name",
-            header: "PIC Name",
-            sortable: false,
-            render: (r) => r.pic_name ?? "",
-          },
-          {
-            key: "history",
-            header: "History",
-            sortable: false,
-            render: (r) => (
-              <ActivityHistoryLink
-                module={loc.pathname.startsWith("/app/purchases") ? "purchases" : "finance"}
-                targetType="fin_supplier_invoice"
-                targetId={r.id}
-                title={`History — ${r.invoice_no}`}
-              />
-            ),
-          },
-          {
-            key: "lifecycle",
-            header: "Manage",
-            sortable: false,
-            render: (r) => <lifecycle.RowAction id={r.id} label={r.invoice_no || r.date_no_display} />,
-          },
-        ]}
+        columns={gridColumns()}
+        columnPrefsKey={listViewKey(PURCHASES_ENTITY.purchases)}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
         selectedId={selectedId()}

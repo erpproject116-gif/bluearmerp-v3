@@ -12,7 +12,9 @@ import {
 } from "./useFormFieldSettings";
 import {
   hasLineColumnLabels,
+  hasListColumnSettings,
   lineViewKey,
+  listViewKey,
   type ColumnLabelSetting,
   useColumnLabelSettings,
 } from "./useColumnLabelSettings";
@@ -54,12 +56,18 @@ export function EntityFormSettingsPage(props: Props) {
   const toast = useToast();
   const { query, fields, reload, upsertCustomField } = useFormFieldSettings(props.entityType);
   const lineLabels = useColumnLabelSettings(lineViewKey(props.entityType));
+  const listLabels = useColumnLabelSettings(
+    hasListColumnSettings(props.entityType) ? listViewKey(props.entityType) : "",
+  );
   const showLineColumns = () => hasLineColumnLabels(props.entityType);
+  const showListColumns = () => hasListColumnSettings(props.entityType);
 
   const [draft, setDraft] = createSignal<FormFieldSetting[]>([]);
   const [columnDraft, setColumnDraft] = createSignal<ColumnLabelSetting[]>([]);
+  const [listColumnDraft, setListColumnDraft] = createSignal<ColumnLabelSetting[]>([]);
   const [dirty, setDirty] = createSignal(false);
   const [columnDirty, setColumnDirty] = createSignal(false);
+  const [listColumnDirty, setListColumnDirty] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
 
   const [newLabel, setNewLabel] = createSignal("");
@@ -84,12 +92,31 @@ export function EntityFormSettingsPage(props: Props) {
     }
   });
 
+  createEffect(() => {
+    if (!listColumnDirty()) {
+      setListColumnDraft(
+        listLabels.columns().map((c) => ({
+          ...c,
+          is_visible: c.is_visible !== false,
+        })),
+      );
+    }
+  });
+
   const sortedRows = createMemo(() => [...draft()].sort((a, b) => a.sort_order - b.sort_order));
   const sortedColumnRows = createMemo(() => [...columnDraft()].sort((a, b) => a.sort_order - b.sort_order));
+  const sortedListColumnRows = createMemo(() =>
+    [...listColumnDraft()].sort((a, b) => a.sort_order - b.sort_order),
+  );
 
   const updateColumnRow = (columnKey: string, label: string) => {
     setColumnDirty(true);
     setColumnDraft((list) => list.map((r) => (r.column_key === columnKey ? { ...r, label } : r)));
+  };
+
+  const updateListColumnRow = (columnKey: string, patch: Partial<ColumnLabelSetting>) => {
+    setListColumnDirty(true);
+    setListColumnDraft((list) => list.map((r) => (r.column_key === columnKey ? { ...r, ...patch } : r)));
   };
 
   const saveColumnLabels = async () => {
@@ -100,6 +127,24 @@ export function EntityFormSettingsPage(props: Props) {
       setColumnDirty(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save column labels.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveListColumns = async () => {
+    if (!canEdit() || !showListColumns()) return;
+    setSaving(true);
+    try {
+      await listLabels.save(
+        sortedListColumnRows().map((c) => ({
+          ...c,
+          is_visible: c.is_visible !== false,
+        })),
+      );
+      setListColumnDirty(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save list columns.");
     } finally {
       setSaving(false);
     }
@@ -252,6 +297,16 @@ export function EntityFormSettingsPage(props: Props) {
                 {uiLabel("form_settings.save_line_columns")}
               </button>
             </Show>
+            <Show when={showListColumns()}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-primary hover:bg-slate-50 disabled:opacity-50"
+                disabled={saving() || !listColumnDirty()}
+                onClick={() => void saveListColumns()}
+              >
+                {uiLabel("form_settings.save_list_columns")}
+              </button>
+            </Show>
           </div>
         </Show>
       </div>
@@ -282,6 +337,10 @@ export function EntityFormSettingsPage(props: Props) {
       </Show>
 
       <div class="overflow-x-auto rounded-xl border border-stroke bg-white shadow-sm">
+        <div class="border-b border-stroke px-4 py-3">
+          <h3 class="text-sm font-semibold text-text-primary">{uiLabel("form_settings.form_fields_heading")}</h3>
+          <p class="mt-1 text-xs text-text-secondary">{uiLabel("form_settings.form_fields_description")}</p>
+        </div>
         <table class="erp-grid min-w-[56rem] w-full text-left text-sm">
           <thead class="text-xs uppercase tracking-wide text-text-secondary">
             <tr>
@@ -412,6 +471,56 @@ export function EntityFormSettingsPage(props: Props) {
                         value={row().label}
                         disabled={!canEdit()}
                         onInput={(e) => updateColumnRow(row().column_key, e.currentTarget.value)}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </Index>
+            </tbody>
+          </table>
+        </div>
+      </Show>
+
+      <Show when={showListColumns()}>
+        <div class="mt-10 overflow-x-auto rounded-xl border border-stroke bg-white shadow-sm">
+          <div class="border-b border-stroke px-4 py-3">
+            <h3 class="text-sm font-semibold text-text-primary">{uiLabel("form_settings.list_column_heading")}</h3>
+            <p class="mt-1 text-xs text-text-secondary">
+              {uiLabel("form_settings.list_column_description")}{" "}
+              <A href={props.listHref} class="text-brand-600 hover:underline">
+                Open list
+              </A>
+            </p>
+          </div>
+          <table class="erp-grid w-full text-left text-sm">
+            <thead class="text-xs uppercase tracking-wide text-text-secondary">
+              <tr>
+                <th class="px-4 py-3 font-semibold">Column</th>
+                <th class="px-4 py-3 font-semibold">Header label</th>
+                <th class="px-4 py-3 font-semibold">Visible</th>
+              </tr>
+            </thead>
+            <tbody>
+              <Index each={sortedListColumnRows()}>
+                {(row) => (
+                  <tr>
+                    <td class="px-4 py-3 font-medium text-text-primary">{row().column_key}</td>
+                    <td class="px-4 py-3">
+                      <input
+                        class={inputClass}
+                        value={row().label}
+                        disabled={!canEdit()}
+                        onInput={(e) => updateListColumnRow(row().column_key, { label: e.currentTarget.value })}
+                      />
+                    </td>
+                    <td class="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={row().is_visible !== false}
+                        disabled={!canEdit()}
+                        onChange={(e) =>
+                          updateListColumnRow(row().column_key, { is_visible: e.currentTarget.checked })
+                        }
                       />
                     </td>
                   </tr>

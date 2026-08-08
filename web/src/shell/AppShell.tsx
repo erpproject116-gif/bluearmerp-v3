@@ -49,6 +49,7 @@ import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantCo
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
 import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
+import { InlineGuidesProvider, useInlineGuides } from "../shared/inlineGuides";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
 import { ThemeSwitcher } from "../shared/ThemeSwitcher";
 
@@ -404,6 +405,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             <div class="flex shrink-0 items-center gap-2">
               <PresenceHeartbeat />
               <IdleLogoutGuard />
+              <InlineGuidesHeaderToggle />
               <WorkflowGuideHeaderControl />
               <A
                 href="/app/documentation"
@@ -468,6 +470,29 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
 export const AppShell: ParentComponent = (props) => (
   <ShellProvider>
-    <AppShellInner>{props.children}</AppShellInner>
+    <InlineGuidesProvider>
+      <AppShellInner>{props.children}</AppShellInner>
+    </InlineGuidesProvider>
   </ShellProvider>
 );
+
+/** Tips on/off for ModalFormGuide / StocksHowItFits — separate from workflow step n of n. */
+function InlineGuidesHeaderToggle() {
+  const guides = useInlineGuides();
+  return (
+    <button
+      type="button"
+      class={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium transition ${
+        guides.enabled()
+          ? "border-stroke text-brand-700 hover:bg-brand-50"
+          : "border-stroke bg-slate-50 text-text-secondary hover:bg-slate-100"
+      }`}
+      title={guides.enabled() ? "Hide in-panel tips" : "Show in-panel tips"}
+      aria-pressed={guides.enabled()}
+      onClick={() => guides.toggle()}
+    >
+      <span class="hidden sm:inline">Tips {guides.enabled() ? "on" : "off"}</span>
+      <span class="sm:hidden">Tips</span>
+    </button>
+  );
+}

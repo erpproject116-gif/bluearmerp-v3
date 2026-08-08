@@ -6,7 +6,7 @@ type StandardColumn struct {
 	SortOrder int    `json:"sort_order"`
 }
 
-// view_key → default column headers for line grids.
+// view_key → default column headers for line grids and list tables.
 var standardRegistry = map[string][]StandardColumn{
 	"quo_quotation.lines": {
 		{ColumnKey: "line_no", Label: "#", SortOrder: 10},
@@ -95,6 +95,24 @@ var standardRegistry = map[string][]StandardColumn{
 		{ColumnKey: "unit_vat_inc", Label: "Unit (VAT inc.)", SortOrder: 100},
 		{ColumnKey: "line_total", Label: "Line Total", SortOrder: 110},
 		{ColumnKey: "remark", Label: "Remark", SortOrder: 120},
+	},
+	"fin_supplier_invoice.list": {
+		{ColumnKey: "date_no_display", Label: "Date-No.", SortOrder: 10},
+		{ColumnKey: "vendor_invoice_no", Label: "SI/DR No. (Tracking No.)", SortOrder: 20},
+		{ColumnKey: "po_numbers", Label: "PO Number", SortOrder: 30},
+		{ColumnKey: "notes", Label: "Notes", SortOrder: 40},
+		{ColumnKey: "payment_terms", Label: "Payment Terms", SortOrder: 50},
+		{ColumnKey: "tax_type_name", Label: "Transaction Type Name", SortOrder: 60},
+		{ColumnKey: "vendor_name", Label: "Customer/Vendor Name", SortOrder: 70},
+		{ColumnKey: "item_name_summary", Label: "Item Name (Summary)", SortOrder: 80},
+		{ColumnKey: "grand_total", Label: "Total Amount", SortOrder: 90},
+		{ColumnKey: "progress_status", Label: "Progress Status", SortOrder: 100},
+		{ColumnKey: "invoicing_status", Label: "Invoicing Status", SortOrder: 110},
+		{ColumnKey: "print", Label: "Print", SortOrder: 120},
+		{ColumnKey: "created_by_name", Label: "Creator", SortOrder: 130},
+		{ColumnKey: "pic_name", Label: "PIC Name", SortOrder: 140},
+		{ColumnKey: "history", Label: "History", SortOrder: 150},
+		{ColumnKey: "lifecycle", Label: "Manage", SortOrder: 160},
 	},
 }
 

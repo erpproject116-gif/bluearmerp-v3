@@ -18,10 +18,24 @@ type ColumnSetting struct {
 	ColumnKey string `json:"column_key"`
 	Label     string `json:"label"`
 	SortOrder int    `json:"sort_order"`
+	IsVisible bool   `json:"is_visible"`
 }
 
 type patchBody struct {
-	Columns []ColumnSetting `json:"columns"`
+	Columns []patchColumn `json:"columns"`
+}
+
+type patchColumn struct {
+	ColumnKey string `json:"column_key"`
+	Label     string `json:"label"`
+	SortOrder int    `json:"sort_order"`
+	// Nil = leave existing visibility (or default true) so line-label-only saves stay safe.
+	IsVisible *bool `json:"is_visible"`
+}
+
+type columnOverride struct {
+	Label     *string
+	IsVisible *bool
 }
 
 func listHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -82,42 +96,53 @@ func LoadMerged(ctx context.Context, pool *pgxpool.Pool, tenantID int64, viewKey
 	var out []ColumnSetting
 	for _, sc := range StandardColumns(viewKey) {
 		label := sc.Label
-		if o, ok := overrides[sc.ColumnKey]; ok && strings.TrimSpace(o) != "" {
-			label = o
+		visible := true
+		if o, ok := overrides[sc.ColumnKey]; ok {
+			if o.Label != nil && strings.TrimSpace(*o.Label) != "" {
+				label = *o.Label
+			}
+			if o.IsVisible != nil {
+				visible = *o.IsVisible
+			}
 		}
 		out = append(out, ColumnSetting{
 			ColumnKey: sc.ColumnKey,
 			Label:     label,
 			SortOrder: sc.SortOrder,
+			IsVisible: visible,
 		})
 	}
 	return out, nil
 }
 
-func loadOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID int64, viewKey string) (map[string]string, error) {
+func loadOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID int64, viewKey string) (map[string]columnOverride, error) {
 	rows, err := pool.Query(ctx, `
-		select column_key, label_override
+		select column_key, label_override, is_visible
 		from public.tenant_column_label_settings
 		where tenant_id = $1 and view_key = $2`, tenantID, viewKey)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[string]string{}
+	out := map[string]columnOverride{}
 	for rows.Next() {
 		var key string
 		var label *string
-		if err := rows.Scan(&key, &label); err != nil {
+		var visible bool
+		if err := rows.Scan(&key, &label, &visible); err != nil {
 			return nil, err
 		}
-		if label != nil {
-			out[key] = *label
-		}
+		v := visible
+		out[key] = columnOverride{Label: label, IsVisible: &v}
 	}
 	return out, nil
 }
 
-func SaveOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID int64, viewKey string, cols []ColumnSetting) error {
+func SaveOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID int64, viewKey string, cols []patchColumn) error {
+	existing, err := loadOverrides(ctx, pool, tenantID, viewKey)
+	if err != nil {
+		return err
+	}
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -131,13 +156,22 @@ func SaveOverrides(ctx context.Context, pool *pgxpool.Pool, tenantID int64, view
 		if !allowed[c.ColumnKey] {
 			continue
 		}
+		visible := true
+		if c.IsVisible != nil {
+			visible = *c.IsVisible
+		} else if o, ok := existing[c.ColumnKey]; ok && o.IsVisible != nil {
+			visible = *o.IsVisible
+		}
 		_, err := tx.Exec(ctx, `
 			insert into public.tenant_column_label_settings
-			  (tenant_id, view_key, column_key, label_override, updated_at)
-			values ($1, $2, $3, $4, now())
+			  (tenant_id, view_key, column_key, label_override, is_visible, updated_at)
+			values ($1, $2, $3, $4, $5, now())
 			on conflict (tenant_id, view_key, column_key)
-			do update set label_override = excluded.label_override, updated_at = now()`,
-			tenantID, viewKey, c.ColumnKey, nullIfEmpty(c.Label))
+			do update set
+			  label_override = excluded.label_override,
+			  is_visible = excluded.is_visible,
+			  updated_at = now()`,
+			tenantID, viewKey, c.ColumnKey, nullIfEmpty(c.Label), visible)
 		if err != nil {
 			return err
 		}
