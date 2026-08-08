@@ -373,23 +373,17 @@ export default function PurchaseOrderListPage() {
           From supplier quotation
         </button>
         <A
-          href="/app/purchase-order/goods-receipt"
+          href="/app/purchases/purchases/new"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
-          Purchase Receive
+          New Bill
         </A>
         <A
-          href="/app/purchases/purchases"
-          class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
-        >
-          Bills
-        </A>
-        <A
-          href="/app/inventory/serial-lot/receive"
+          href="/app/purchase-order/goods-receipt"
           class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-          title="Serial/lot wizard — posts as Purchase Receive underneath"
+          title="Legacy receive history — prefer New Bill for stock + serials"
         >
-          Serial receive wizard
+          Receive history
         </A>
       </div>
 
