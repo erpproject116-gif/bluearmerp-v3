@@ -1,6 +1,6 @@
 import { createSignal, onMount } from "solid-js";
 import { formatPeso } from "../../../shared/money";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { FINANCE_SETTINGS_HREF } from "../../../shared/entityTypes";
@@ -13,6 +13,7 @@ import {
 import { FinanceLayout } from "../FinanceLayout";
 import { OfficialReceiptModal, type OfficialReceiptDetail } from "./OfficialReceiptModal";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { useToast } from "../../../shared/toast";
 
 
 
@@ -26,8 +27,10 @@ function paymentLabel(m: string) {
 type PageOptions = { openNewOnMount?: boolean };
 
 export function OfficialReceiptListPageInner(props: PageOptions = {}) {
+  const toast = useToast();
   const loc = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const invalidate = useInvalidateOfficialReceipts();
 
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -53,9 +56,12 @@ export function OfficialReceiptListPageInner(props: PageOptions = {}) {
     setModalOpen(true);
   };
 
-  const openEdit = async (row: OfficialReceiptRow) => {
+  const openEdit = async (row: OfficialReceiptRow | { id: number }) => {
     const res = await apiFetch<OfficialReceiptDetail>(`/api/v1/finance/official-receipts/${row.id}`);
-    if (!res.success || !res.data) return;
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Could not open that official receipt.");
+      return;
+    }
     setEditing(res.data);
     setModalOpen(true);
   };
@@ -69,6 +75,13 @@ export function OfficialReceiptListPageInner(props: PageOptions = {}) {
 
   onMount(() => {
     if (props.openNewOnMount || loc.pathname.endsWith("/new")) openNew();
+    const openId = Number(searchParams.openId ?? "");
+    if (openId > 0) {
+      void (async () => {
+        await openEdit({ id: openId });
+        setSearchParams({ openId: undefined }, { replace: true });
+      })();
+    }
   });
 
   return (

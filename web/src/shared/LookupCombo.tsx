@@ -38,19 +38,32 @@ export function LookupCombo(props: Props) {
     }, 250);
   };
 
+  const clearSelection = () => {
+    // Clear text here so callers that only null the id still wipe the visible value.
+    props.onInput("");
+    props.onClear();
+    setOpen(false);
+    setOptions([]);
+  };
+
+  const showClear = () =>
+    !props.disabled && (props.selectedId() != null || props.value().trim().length > 0);
+
   onMount(() => {
     void search("");
   });
 
   return (
-    <label class="block">
-      <span class="mb-1 block text-sm font-medium text-text-primary">
-        {props.label}
-        {props.required ? " *" : ""}
-      </span>
+    <div class="block">
+      <Show when={props.label}>
+        <span class="mb-1 block text-sm font-medium text-text-primary">
+          {props.label}
+          {props.required ? " *" : ""}
+        </span>
+      </Show>
       <div class="relative">
         <input
-          class={inputClass}
+          class={`${inputClass}${showClear() ? " pr-14" : ""}`}
           value={props.value()}
           placeholder={props.placeholder ?? "Search…"}
           disabled={props.disabled}
@@ -67,12 +80,22 @@ export function LookupCombo(props: Props) {
           }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
         />
-        <Show when={props.selectedId() && !props.disabled}>
+        <Show when={showClear()}>
           <button
             type="button"
-            class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-secondary hover:text-red-600"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => props.onClear()}
+            class="absolute right-2 top-1/2 z-10 -translate-y-1/2 text-xs text-text-secondary hover:text-red-600"
+            tabIndex={-1}
+            aria-label="Clear"
+            onMouseDown={(e) => {
+              // mousedown (not click): avoids label/focus races and Show-unmount dropping click.
+              e.preventDefault();
+              e.stopPropagation();
+              clearSelection();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
           >
             Clear
           </button>
@@ -125,6 +148,6 @@ export function LookupCombo(props: Props) {
           </ul>
         </Show>
       </div>
-    </label>
+    </div>
   );
 }

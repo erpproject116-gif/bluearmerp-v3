@@ -566,11 +566,18 @@ export function SalesModal(props: Props) {
     }
   });
 
+  let appliedNewDefaults = false;
   createEffect(() => {
-    if (!props.open || props.editing) return;
+    if (!props.open) {
+      appliedNewDefaults = false;
+      return;
+    }
+    if (props.editing) return;
     const tt = taxTypes();
     const cc = currencies();
     if (!tt.length || !cc.length) return;
+    if (appliedNewDefaults) return;
+    appliedNewDefaults = true;
     if (!taxTypeId()) {
       const first = tt[0];
       setTaxTypeId(first.id);
