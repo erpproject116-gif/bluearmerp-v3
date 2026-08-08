@@ -1,4 +1,4 @@
-package salesorder
+﻿package salesorder
 
 import (
 	"context"
@@ -210,7 +210,7 @@ func CreateFromQuotation(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenant
 	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "sales_order.create_from_quotation", "so_sales_order", &id, nil, map[string]any{"quotation_id": quotationID})
 
 	// Carry the quotation's attachments along to the sales order (best-effort).
-	_ = attachmentx.Copy(ctx, pool, attachmentx.CopyParams{
+	_, _ = attachmentx.Copy(ctx, pool, attachmentx.CopyParams{
 		SrcBaseDir: attachmentx.Dir("quotation"),
 		DstBaseDir: attachmentx.Dir("sales_order"),
 		SrcTable:   "public.quo_quotation_attachments",

@@ -19,6 +19,13 @@ import { ModuleIcon } from "../../../shell/ModuleIcon";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import {
+  downloadAttachment,
+  formatFileSize,
+  listAttachments,
+  type Attachment,
+  type AttachmentScope,
+} from "../../../shared/attachments";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
@@ -207,6 +214,15 @@ export function SalesModal(props: Props) {
   const auth = useAuth();
   const processPolicy = useProcessPolicy(() => props.open);
   const [attachmentCount, setAttachmentCount] = createSignal(0);
+  type SourceAttachPreview = {
+    scope: AttachmentScope;
+    docId: number;
+    label: string;
+    files: Attachment[];
+  };
+  const [sourceAttachPreview, setSourceAttachPreview] = createSignal<SourceAttachPreview | null>(null);
+  const effectiveAttachmentCount = () =>
+    attachmentCount() + (sourceAttachPreview()?.files.length ?? 0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
@@ -515,20 +531,26 @@ export function SalesModal(props: Props) {
   };
 
   let seededNewLines = false;
+  let newFormSeededForOpen = false;
 
   createEffect(() => {
     if (!props.open) {
+      newFormSeededForOpen = false;
       setCreatedSale(null);
       setPostSaveOpen(false);
       setCashInOpen(false);
       setActiveTab("details");
+      setSourceAttachPreview(null);
       return;
     }
     const ed = props.editing;
     if (ed) {
       hydrateFromDetail(ed);
       setActiveTab("details");
+      setSourceAttachPreview(null);
     } else if (!createdSale()) {
+      if (newFormSeededForOpen) return;
+      newFormSeededForOpen = true;
       const seed = takeDocSeed("sales");
       const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
         ...emptySalesLine(index + 1),
@@ -553,6 +575,7 @@ export function SalesModal(props: Props) {
       setProgressStatus("unconfirmed");
       setSalesCategory("");
       setSourceSalesOrderId(null);
+      setSourceAttachPreview(null);
       seededNewLines = seedLines.length > 0;
       if (seededNewLines) {
         setLines(seedLines);
@@ -567,6 +590,30 @@ export function SalesModal(props: Props) {
       void loadPreview(todayISO());
     }
   });
+
+  createEffect(() => {
+    const saleId = createdSale()?.id;
+    if (saleId && sourceAttachPreview()) {
+      setSourceAttachPreview(null);
+    }
+  });
+
+  const loadSourceAttachPreview = async (
+    scope: AttachmentScope,
+    docId: number,
+    label: string,
+  ) => {
+    if (!docId || docId <= 0) {
+      setSourceAttachPreview(null);
+      return;
+    }
+    const res = await listAttachments(scope, docId);
+    if (res.success && (res.data?.length ?? 0) > 0) {
+      setSourceAttachPreview({ scope, docId, label, files: res.data! });
+    } else {
+      setSourceAttachPreview(null);
+    }
+  };
 
   let appliedNewDefaults = false;
   createEffect(() => {
@@ -648,6 +695,11 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
+    await loadSourceAttachPreview(
+      "sales-order/sales-orders",
+      first.sales_order_id,
+      "From Sales Order (copies when you Save)",
+    );
     toast.success("Sales Order lines loaded. Attachments copy when you Save. Click Save to create the sales invoice.");
   };
 
@@ -684,6 +736,11 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
+    await loadSourceAttachPreview(
+      "quotation/quotations",
+      first.quotation_id,
+      "From Quotation (copies when you Save)",
+    );
     toast.success("Quotation lines loaded. Attachments copy when you Save. Click Save to create the sales invoice.");
   };
 
@@ -719,6 +776,15 @@ export function SalesModal(props: Props) {
       setLines(recalc);
     } else {
       setLines(newLines);
+    }
+    if (first.sales_order_id) {
+      await loadSourceAttachPreview(
+        "sales-order/sales-orders",
+        first.sales_order_id,
+        "From Sales Order via Shipping (copies when you Save)",
+      );
+    } else {
+      setSourceAttachPreview(null);
     }
     toast.success("Shipping Order lines loaded. Click Save to create the sales invoice — the Invoice tab opens after save.");
   };
@@ -833,7 +899,7 @@ export function SalesModal(props: Props) {
       processPolicy.data,
       "sales",
       status,
-      attachmentCount(),
+      effectiveAttachmentCount(),
       props.editing?.id ?? createdSale()?.id,
     );
     if (attachmentErr) {
@@ -929,8 +995,12 @@ export function SalesModal(props: Props) {
     } else {
       toast.warning(stockNote);
     }
-    // Allow pending uploads to flush via AttachmentsField's docId effect, then close.
-    const delayMs = !ed && attachmentCount() > 0 ? 600 : 0;
+    // Allow pending uploads / server Copy to surface on AttachmentsField, then close.
+    const sourced =
+      !!sourceSalesOrderId() ||
+      !!sourceAttachPreview() ||
+      lines().some((ln) => !!ln.source_sales_order_line_id || !!ln.source_quotation_line_id);
+    const delayMs = !ed && (attachmentCount() > 0 || sourced) ? 600 : 0;
     window.setTimeout(() => props.onClose(), delayMs);
   };
 
@@ -1181,6 +1251,39 @@ export function SalesModal(props: Props) {
             />
           )}
         </ModalField>
+        <Show when={sourceAttachPreview()}>
+          {(preview) => (
+            <div class="col-span-full rounded-lg border border-stroke bg-slate-50 px-3 py-2">
+              <p class="text-sm font-medium text-text-primary">{preview().label}</p>
+              <p class="mt-0.5 text-xs text-text-secondary">
+                Read-only preview from the source document. Files copy onto this sale when you Save.
+              </p>
+              <ul class="mt-2 space-y-1">
+                <For each={preview().files}>
+                  {(file) => (
+                    <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span class="truncate text-text-primary">
+                        {file.file_name}
+                        <span class="ml-2 text-xs text-text-secondary">{formatFileSize(file.size_bytes)}</span>
+                      </span>
+                      <button
+                        type="button"
+                        class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
+                        onClick={() =>
+                          void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
+                            if (!ok) toast.warning("Download failed.");
+                          })
+                        }
+                      >
+                        Download
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </div>
+          )}
+        </Show>
         <AttachmentsField
           scope="sales"
           formOpen={props.open}

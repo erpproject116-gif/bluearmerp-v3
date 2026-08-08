@@ -61,16 +61,17 @@ type CopyParams struct {
 // document to the destination document. It is best-effort: a per-file failure is
 // skipped rather than aborting the whole copy, and the caller should treat a
 // returned error as non-fatal (attachments are secondary to the conversion).
-func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
+// The int return is how many destination rows were inserted.
+func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) (int, error) {
 	if p.SrcID <= 0 || p.DstID <= 0 {
-		return nil
+		return 0, nil
 	}
 	q := fmt.Sprintf(
 		`select file_name, coalesce(mime_type, ''), size_bytes, storage_path, uploaded_by_user_id, file_bytes
 		 from %s where %s = $1 order by created_at`, p.SrcTable, p.SrcFKCol)
 	rows, err := pool.Query(ctx, q, p.SrcID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	type srcRow struct {
 		fileName    string
@@ -85,13 +86,13 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 		var s srcRow
 		if err := rows.Scan(&s.fileName, &s.mimeType, &s.sizeBytes, &s.storagePath, &s.uploader, &s.fileBytes); err != nil {
 			rows.Close()
-			return err
+			return 0, err
 		}
 		items = append(items, s)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return err
+		return 0, err
 	}
 
 	relDir := filepath.Join(strconv.FormatInt(p.TenantID, 10), strconv.FormatInt(p.DstID, 10))
@@ -101,6 +102,7 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 		`insert into %s (%s, file_name, mime_type, size_bytes, storage_path, uploaded_by_user_id, file_bytes)
 		 values ($1,$2,$3,$4,$5,$6,$7)`, p.DstTable, p.DstFKCol)
 
+	copied := 0
 	var firstErr error
 	for i, it := range items {
 		storedName := fmt.Sprintf("%d_%d_%s", time.Now().UnixNano(), i, filepath.Base(it.fileName))
@@ -116,7 +118,9 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 				if firstErr == nil {
 					firstErr = err
 				}
+				continue
 			}
+			copied++
 			continue
 		}
 
@@ -131,7 +135,7 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 		dstAbs := filepath.Join(absDir, storedName)
 		if err := copyFile(srcAbs, dstAbs); err != nil {
 			if firstErr == nil {
-				firstErr = err
+				firstErr = fmt.Errorf("copy file %q: %w", srcAbs, err)
 			}
 			continue
 		}
@@ -142,8 +146,9 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) error {
 			}
 			continue
 		}
+		copied++
 	}
-	return firstErr
+	return copied, firstErr
 }
 
 func copyFile(src, dst string) error {

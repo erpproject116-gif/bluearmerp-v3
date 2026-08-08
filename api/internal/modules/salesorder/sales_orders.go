@@ -1,4 +1,4 @@
-package salesorder
+﻿package salesorder
 
 import (
 	"context"
@@ -615,7 +615,7 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Load Slip → Save: copy quotation attachments (header and/or lines).
+		// Load Slip â†’ Save: copy quotation attachments (header and/or lines).
 		quoIDs := map[int64]struct{}{}
 		if body.SourceQuotationID != nil && *body.SourceQuotationID > 0 {
 			quoIDs[*body.SourceQuotationID] = struct{}{}
@@ -632,7 +632,7 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 		for qid := range quoIDs {
-			_ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
+			_, _ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
 				SrcBaseDir: attachmentx.Dir("quotation"),
 				DstBaseDir: attachmentx.Dir("sales_order"),
 				SrcTable:   "public.quo_quotation_attachments",

@@ -1,4 +1,4 @@
-package finance
+﻿package finance
 
 import (
 	"context"
@@ -242,7 +242,7 @@ func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Po
 	if err := pool.QueryRow(ctx,
 		`select purchase_order_id from public.gr_goods_receipts where id = $1 and tenant_id = $2`,
 		grID, tu.TenantID).Scan(&poID); err == nil && poID > 0 {
-		_ = attachmentx.Copy(ctx, pool, attachmentx.CopyParams{
+		_, _ = attachmentx.Copy(ctx, pool, attachmentx.CopyParams{
 			SrcBaseDir: attachmentx.Dir("purchase_order"),
 			DstBaseDir: attachmentx.Dir("supplier_invoice"),
 			SrcTable:   "public.po_purchase_order_attachments",

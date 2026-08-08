@@ -1,5 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
-import { A, useSearchParams } from "@solidjs/router";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import {
@@ -19,6 +19,7 @@ import { SerialRegistryListFilter } from "./SerialRegistryListFilter";
 
 export default function SerialRegistryListPage() {
   const invalidate = useInvalidateSerialLotLists();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const [draftFilters, setDraftFilters] = createSignal<SerialRegistryFilters>(defaultSerialRegistryFilters());
@@ -29,6 +30,7 @@ export default function SerialRegistryListPage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [registerOpen, setRegisterOpen] = createSignal(false);
   const [generateOpen, setGenerateOpen] = createSignal(false);
+  const [urlFilterActive, setUrlFilterActive] = createSignal(false);
   const pageSize = 25;
 
   const list = useSerialUnitList(() => {
@@ -75,6 +77,7 @@ export default function SerialRegistryListPage() {
     };
     setDraftFilters(next);
     setSubmittedFilters(next);
+    setUrlFilterActive(true);
   });
 
   const reset = () => {
@@ -82,7 +85,19 @@ export default function SerialRegistryListPage() {
     setDraftFilters(defaults);
     setSubmittedFilters(defaults);
     setPage(1);
+    setUrlFilterActive(false);
+    navigate("/app/inventory/serial-lot/registry", { replace: true });
     invalidate();
+  };
+
+  const filterBannerText = () => {
+    const f = submittedFilters();
+    const parts: string[] = [];
+    if (f.q) parts.push(f.q);
+    if (f.item_id) parts.push(`item #${f.item_id}`);
+    if (f.location_id) parts.push(`location #${f.location_id}`);
+    if (f.status) parts.push(serialStatusLabel(f.status));
+    return parts.length ? parts.join(" · ") : "";
   };
 
   const toggleSort = (key: string) => {
@@ -110,6 +125,20 @@ export default function SerialRegistryListPage() {
           Use Purchase Receive
         </A>
       </div>
+      <Show when={urlFilterActive() && filterBannerText()}>
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-950">
+          <p>
+            <span class="font-medium">Filtered:</span> {filterBannerText()}
+          </p>
+          <button
+            type="button"
+            class="rounded-lg border border-brand-300 bg-white px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
+            onClick={reset}
+          >
+            Clear filters
+          </button>
+        </div>
+      </Show>
       <div class="mb-3 flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"

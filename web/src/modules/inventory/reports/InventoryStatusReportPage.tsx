@@ -329,24 +329,6 @@ export default function InventoryStatusReportPage() {
                           <A href={ledgerHref(r)} class="text-brand-600 hover:underline">
                             Movements
                           </A>
-                          <Show when={r.track_serial}>
-                            <button
-                              type="button"
-                              class="text-left text-brand-600 hover:underline"
-                              onClick={() => setUnitsTargetRow(unitsTarget(r, "serials"))}
-                            >
-                              View serials
-                            </button>
-                          </Show>
-                          <Show when={r.track_lot}>
-                            <button
-                              type="button"
-                              class="text-left text-brand-600 hover:underline"
-                              onClick={() => setUnitsTargetRow(unitsTarget(r, "lots"))}
-                            >
-                              View lots
-                            </button>
-                          </Show>
                         </div>
                       </td>
                     </tr>

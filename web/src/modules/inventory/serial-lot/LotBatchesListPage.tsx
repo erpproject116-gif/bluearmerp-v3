@@ -1,5 +1,5 @@
-import { createSignal, onMount } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
+import { createSignal, onMount, Show } from "solid-js";
+import { useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -46,6 +46,7 @@ async function fetchItems(q: string): Promise<LookupOption[]> {
 export default function LotBatchesListPage() {
   const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const [registerOpen, setRegisterOpen] = createSignal(false);
@@ -66,6 +67,7 @@ export default function LotBatchesListPage() {
   const [sort, setSort] = createSignal("updated_at");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [urlFilterActive, setUrlFilterActive] = createSignal(false);
   const pageSize = 25;
 
   const list = useLotBatchList(() => {
@@ -96,7 +98,18 @@ export default function LotBatchesListPage() {
     setLocationLabel("");
     setItemLabel("");
     setPage(1);
+    setUrlFilterActive(false);
+    navigate("/app/inventory/serial-lot/lots", { replace: true });
     invalidate();
+  };
+
+  const filterBannerText = () => {
+    const f = submittedFilters();
+    const parts: string[] = [];
+    if (f.q) parts.push(f.q);
+    if (f.item_id) parts.push(`item #${f.item_id}`);
+    if (f.location_id) parts.push(`location #${f.location_id}`);
+    return parts.length ? parts.join(" · ") : "";
   };
 
   const toggleSort = (key: string) => {
@@ -123,6 +136,7 @@ export default function LotBatchesListPage() {
       };
       setDraftFilters(next);
       setSubmittedFilters(next);
+      setUrlFilterActive(true);
       if (q) setItemLabel(q);
     }
     const onKey = (e: KeyboardEvent) => {
@@ -174,6 +188,20 @@ export default function LotBatchesListPage() {
 
   return (
     <SerialLotLayout>
+      <Show when={urlFilterActive() && filterBannerText()}>
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-950">
+          <p>
+            <span class="font-medium">Filtered:</span> {filterBannerText()}
+          </p>
+          <button
+            type="button"
+            class="rounded-lg border border-brand-300 bg-white px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
+            onClick={reset}
+          >
+            Clear filters
+          </button>
+        </div>
+      </Show>
       <CollapsibleFilterPanel
         title="Lots"
         description="Refine results, then Search (F8). Grid loads with defaults on open."

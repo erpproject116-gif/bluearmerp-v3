@@ -1,10 +1,9 @@
-package sales
+﻿package sales
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,7 +15,6 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
@@ -701,64 +699,12 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Load Slip → Save: copy originating SO / Quotation attachments.
-		soIDs := map[int64]struct{}{}
-		quoIDs := map[int64]struct{}{}
-		if body.SourceSalesOrderID != nil && *body.SourceSalesOrderID > 0 {
-			soIDs[*body.SourceSalesOrderID] = struct{}{}
-		}
-		for _, ln := range body.Lines {
-			if ln.SourceSalesOrderLineID != nil && *ln.SourceSalesOrderLineID > 0 {
-				var soID int64
-				if err := pool.QueryRow(r.Context(),
-					`select sales_order_id from public.so_sales_order_lines where id = $1`,
-					*ln.SourceSalesOrderLineID).Scan(&soID); err == nil && soID > 0 {
-					soIDs[soID] = struct{}{}
-				}
-			}
-			if ln.SourceQuotationLineID != nil && *ln.SourceQuotationLineID > 0 {
-				var quoID int64
-				if err := pool.QueryRow(r.Context(),
-					`select quotation_id from public.quo_quotation_lines where id = $1`,
-					*ln.SourceQuotationLineID).Scan(&quoID); err == nil && quoID > 0 {
-					quoIDs[quoID] = struct{}{}
-				}
-			}
-		}
-		for soID := range soIDs {
-			if err := attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
-				SrcBaseDir: attachmentx.Dir("sales_order"),
-				DstBaseDir: attachmentx.Dir("sales"),
-				SrcTable:   "public.so_sales_order_attachments",
-				SrcFKCol:   "sales_order_id",
-				SrcID:      soID,
-				DstTable:   "public.sa_sales_attachments",
-				DstFKCol:   "sales_id",
-				DstID:      id,
-				TenantID:   tu.TenantID,
-			}); err != nil {
-				log.Printf("sales.create: copy SO %d attachments to sale %d: %v", soID, id, err)
-			}
-		}
-		for quoID := range quoIDs {
-			if err := attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
-				SrcBaseDir: attachmentx.Dir("quotation"),
-				DstBaseDir: attachmentx.Dir("sales"),
-				SrcTable:   "public.quo_quotation_attachments",
-				SrcFKCol:   "quotation_id",
-				SrcID:      quoID,
-				DstTable:   "public.sa_sales_attachments",
-				DstFKCol:   "sales_id",
-				DstID:      id,
-				TenantID:   tu.TenantID,
-			}); err != nil {
-				log.Printf("sales.create: copy quotation %d attachments to sale %d: %v", quoID, id, err)
-			}
-		}
+		// Load Slip → Save: copy originating SO / Quotation attachments (body + persisted lines).
+		copied := copySaleSourceAttachments(r.Context(), pool, tu.TenantID, id, body)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.create", "sa_sales", &id, nil, body)
 		sale, _ := loadSale(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, sale, "Created.")
+		response.OK(w, sale, saleCreateMessage(copied))
 	}
 }
 
