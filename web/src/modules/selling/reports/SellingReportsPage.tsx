@@ -1,5 +1,5 @@
 import { A } from "@solidjs/router";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import {
@@ -32,7 +32,7 @@ export default function SellingReportsPage() {
   const toast = useToast();
   const invalidate = useInvalidateSalesStatusReport();
   const [draftFilters, setDraftFilters] = createSignal<SalesStatusFilters>(defaultStatusFilters());
-  const [submittedFilters, setSubmittedFilters] = createSignal<SalesStatusFilters | null>(null);
+  const [submittedFilters, setSubmittedFilters] = createSignal<SalesStatusFilters>(defaultStatusFilters());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;
@@ -40,12 +40,12 @@ export default function SellingReportsPage() {
   const [editing, setEditing] = createSignal<SalesDetail | null>(null);
 
   const report = useSalesStatusReport(() => ({
-    filters: submittedFilters() ?? defaultStatusFilters(),
+    filters: submittedFilters(),
     page: page(),
     pageSize,
     sort: "order_date",
     order: "desc",
-    enabled: submittedFilters() !== null,
+    enabled: true,
   }));
 
   const search = () => {
@@ -55,8 +55,9 @@ export default function SellingReportsPage() {
   };
 
   const reset = () => {
-    setDraftFilters(defaultStatusFilters());
-    setSubmittedFilters(null);
+    const next = defaultStatusFilters();
+    setDraftFilters(next);
+    setSubmittedFilters(next);
     setPage(1);
   };
 
@@ -103,9 +104,8 @@ export default function SellingReportsPage() {
         onChange={(t: ReportType) => patch({ report_type: t })}
       />
 
-      <Show when={submittedFilters()}>
-        <SalesStatusReport
-          filters={submittedFilters()!}
+      <SalesStatusReport
+        filters={submittedFilters()}
           rows={report.data?.rows ?? []}
           totalQty={report.data?.summary.total_qty ?? 0}
           totalAmount={report.data?.summary.total_amount ?? 0}
@@ -122,7 +122,6 @@ export default function SellingReportsPage() {
             else invalidate();
           }}
         />
-      </Show>
 
       <SalesModal
         open={modalOpen()}

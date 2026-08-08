@@ -1,5 +1,6 @@
-import { A } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { createSignal, onMount, Show } from "solid-js";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { inventoryRefLink } from "../../../shared/inventoryRefLink";
 import { useSerialTrace } from "../../../shared/useSerialLotList";
@@ -7,6 +8,7 @@ import { SerialLotLayout } from "./SerialLotLayout";
 import { serialStatusLabel } from "./serialRegistryFilters";
 
 export default function SerialTracePage() {
+  const [searchParams] = useSearchParams();
   const [draftSerialNo, setDraftSerialNo] = createSignal("");
   const [submittedSerialNo, setSubmittedSerialNo] = createSignal<string | null>(null);
 
@@ -24,6 +26,12 @@ export default function SerialTracePage() {
   };
 
   onMount(() => {
+    const raw = searchParams.serial_no;
+    const fromUrl = typeof raw === "string" ? raw.trim() : Array.isArray(raw) ? String(raw[0] ?? "").trim() : "";
+    if (fromUrl) {
+      setDraftSerialNo(fromUrl);
+      setSubmittedSerialNo(fromUrl);
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
         e.preventDefault();
@@ -38,11 +46,28 @@ export default function SerialTracePage() {
 
   return (
     <SerialLotLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold text-text-primary">Serial Trace</h2>
-          <p class="text-sm text-text-secondary">Enter a serial number, then Search (F8).</p>
-        </div>
+      <CollapsibleFilterPanel
+        title="Lookup serial"
+        description="Enter a serial number, then Search (F8). Or open Trace from Registry."
+        actions={
+          <>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              onClick={search}
+            >
+              Search (F8)
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+              onClick={reset}
+            >
+              Reset
+            </button>
+          </>
+        }
+      >
         <div class="max-w-md">
           <Field label="Serial no.">
             <input
@@ -54,25 +79,20 @@ export default function SerialTracePage() {
             />
           </Field>
         </div>
-        <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={search}
-          >
-            Search (F8)
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-            onClick={reset}
-          >
-            Reset
-          </button>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
-      <Show when={submittedSerialNo()}>
+      <Show
+        when={submittedSerialNo()}
+        fallback={
+          <div class="mt-6 rounded-xl border border-stroke bg-white p-8 text-center text-sm text-text-secondary shadow-sm">
+            <p class="font-medium text-text-primary">No serial selected</p>
+            <p class="mt-2">Enter a serial or open Trace from Registry.</p>
+            <A href="/app/inventory/serial-lot/registry" class="mt-3 inline-block text-brand-600 hover:underline">
+              Go to Registry
+            </A>
+          </div>
+        }
+      >
         <Show
           when={!trace.isError}
           fallback={
@@ -132,14 +152,20 @@ export default function SerialTracePage() {
                     { key: "event_type", header: "Event" },
                     { key: "from_location_name", header: "From", render: (r) => r.from_location_name || "—" },
                     { key: "to_location_name", header: "To", render: (r) => r.to_location_name || "—" },
-                    { key: "ref_type", header: "Reference", render: (r) => {
-                      const link = inventoryRefLink(r.ref_type, r.ref_id);
-                      return link.href ? (
-                        <A href={link.href} class="text-brand-600 hover:underline">{link.label}</A>
-                      ) : (
-                        link.label
-                      );
-                    }},
+                    {
+                      key: "ref_type",
+                      header: "Reference",
+                      render: (r) => {
+                        const link = inventoryRefLink(r.ref_type, r.ref_id);
+                        return link.href ? (
+                          <A href={link.href} class="text-brand-600 hover:underline">
+                            {link.label}
+                          </A>
+                        ) : (
+                          link.label
+                        );
+                      },
+                    },
                     { key: "created_by_name", header: "By", render: (r) => r.created_by_name || "—" },
                     { key: "notes", header: "Notes", render: (r) => r.notes ?? "—" },
                   ]}

@@ -1,5 +1,6 @@
-import { createEffect, createSignal, For, on, onMount, Show, untrack } from "solid-js";
+import { createEffect, createSignal, For, on, onMount, untrack } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
@@ -44,7 +45,7 @@ export default function LotAdjustmentPage() {
   const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
   const [draft, setDraft] = createSignal<LotAdjustmentFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<LotAdjustmentFilters | null>(null);
+  const [submitted, setSubmitted] = createSignal<LotAdjustmentFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const [editableRows, setEditableRows] = createSignal<EditableRow[]>([]);
   const [reason, setReason] = createSignal("");
@@ -63,11 +64,11 @@ export default function LotAdjustmentPage() {
       sort: "lot_no",
       order: "asc" as const,
       filters: {
-        ...(f ?? defaultFilters()),
-        item_id: f?.item_id ?? itemId() ?? undefined,
-        location_id: f?.location_id ?? locationId() ?? undefined,
+        ...f,
+        item_id: f.item_id ?? itemId() ?? undefined,
+        location_id: f.location_id ?? locationId() ?? undefined,
       },
-      enabled: f != null,
+      enabled: true,
     };
   });
 
@@ -97,7 +98,7 @@ export default function LotAdjustmentPage() {
 
   const reset = () => {
     setDraft(defaultFilters());
-    setSubmitted(null);
+    setSubmitted(defaultFilters());
     setPage(1);
     setEditableRows([]);
     setReason("");
@@ -105,6 +106,7 @@ export default function LotAdjustmentPage() {
     setItemLabel("");
     setLocationId(null);
     setLocationLabel("");
+    invalidate();
   };
 
   const updateDelta = (id: number, value: string) => {
@@ -151,10 +153,21 @@ export default function LotAdjustmentPage() {
 
   return (
     <SerialLotLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-text-primary">Inventory adjustment by lot</h2>
-        <p class="text-sm text-text-secondary">Search lot batches, enter qty delta (+/−), then apply.</p>
-        <div class="mt-4 grid gap-4 md:grid-cols-2">
+      <CollapsibleFilterPanel
+        title="Inventory adjustment by lot"
+        description="Search lot batches, enter qty delta (+/−), then apply."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={reset}>
+              Reset
+            </button>
+          </>
+        }
+      >
+        <div class="grid gap-4 md:grid-cols-2">
           <Field label="Keyword">
             <input
               class={inputClass}
@@ -194,18 +207,9 @@ export default function LotAdjustmentPage() {
             fetchOptions={fetchLocations}
           />
         </div>
-        <div class="mt-4 flex gap-2">
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white" onClick={search}>
-            Search (F8)
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={reset}>
-            Reset
-          </button>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
-      <Show when={submitted()}>
-        <section class="mt-6 rounded-xl border border-stroke bg-white p-5 shadow-sm">
+      <section class="mt-6 rounded-xl border border-stroke bg-white p-5 shadow-sm">
           <Field label="Reason (required)">
             <input class={inputClass} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} />
           </Field>
@@ -253,8 +257,7 @@ export default function LotAdjustmentPage() {
               {saving() ? "Saving…" : "Apply adjustments"}
             </button>
           </div>
-        </section>
-      </Show>
+      </section>
     </SerialLotLayout>
   );
 }

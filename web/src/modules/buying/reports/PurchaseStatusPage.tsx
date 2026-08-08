@@ -12,15 +12,15 @@ import { PurchaseStatusFilter } from "./PurchaseStatusFilter";
 
 export default function PurchaseStatusPage() {
   const [draftFilters, setDraftFilters] = createSignal<PurchaseStatusFilters>(defaultPurchaseStatusFilters());
-  const [submittedFilters, setSubmittedFilters] = createSignal<PurchaseStatusFilters | null>(null);
+  const [submittedFilters, setSubmittedFilters] = createSignal<PurchaseStatusFilters>(defaultPurchaseStatusFilters());
   const [page, setPage] = createSignal(1);
   const pageSize = 50;
 
   const report = usePurchaseStatusReport(() => ({
-    filters: submittedFilters() ?? defaultPurchaseStatusFilters(),
+    filters: submittedFilters(),
     page: page(),
     pageSize,
-    enabled: submittedFilters() !== null,
+    enabled: true,
   }));
 
   onMount(() => {
@@ -40,8 +40,9 @@ export default function PurchaseStatusPage() {
   };
 
   const reset = () => {
-    setDraftFilters(defaultPurchaseStatusFilters());
-    setSubmittedFilters(null);
+    const next = defaultPurchaseStatusFilters();
+    setDraftFilters(next);
+    setSubmittedFilters(next);
     setPage(1);
   };
 
@@ -62,8 +63,7 @@ export default function PurchaseStatusPage() {
         onChange={(t) => patch({ report_type: t as ReportType })}
         labels={{ details: "Date" }}
       />
-      <Show when={submittedFilters()}>
-        <section class="rounded-xl border border-stroke bg-white shadow-sm">
+      <section class="rounded-xl border border-stroke bg-white shadow-sm">
           <div class="border-b border-stroke px-5 py-4 text-center">
             <h2 class="text-xl font-bold text-text-primary">Purchase Status</h2>
           </div>
@@ -114,11 +114,10 @@ export default function PurchaseStatusPage() {
             <div class="flex gap-2">
               <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
               <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() >= totalPages()} onClick={() => setPage((p) => p + 1)}>Next</button>
-              <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => void downloadReportCsv(purchaseStatusExportUrl(submittedFilters()!), "purchase-status.csv")}>Export CSV</button>
+              <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => void downloadReportCsv(purchaseStatusExportUrl(submittedFilters()), "purchase-status.csv")}>Export CSV</button>
             </div>
           </div>
         </section>
-      </Show>
     </div>
   );
 }

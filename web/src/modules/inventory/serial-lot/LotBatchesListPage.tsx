@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onMount } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
@@ -7,6 +7,7 @@ import { Modal } from "../../../shared/Modal";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { parseNum } from "../../../shared/money";
 import { useToast } from "../../../shared/toast";
@@ -58,7 +59,7 @@ export default function LotBatchesListPage() {
   const [regSaving, setRegSaving] = createSignal(false);
 
   const [draftFilters, setDraftFilters] = createSignal<LotFilters>(defaultLotFilters());
-  const [submittedFilters, setSubmittedFilters] = createSignal<LotFilters | null>(null);
+  const [submittedFilters, setSubmittedFilters] = createSignal<LotFilters>(defaultLotFilters());
   const [locationLabel, setLocationLabel] = createSignal("");
   const [itemLabel, setItemLabel] = createSignal("");
   const [page, setPage] = createSignal(1);
@@ -74,10 +75,10 @@ export default function LotBatchesListPage() {
       pageSize,
       sort: sort(),
       order: order(),
-      q: f?.q || undefined,
-      item_id: f?.item_id ?? undefined,
-      location_id: f?.location_id ?? undefined,
-      enabled: f != null,
+      q: f.q || undefined,
+      item_id: f.item_id ?? undefined,
+      location_id: f.location_id ?? undefined,
+      enabled: true,
     };
   });
 
@@ -91,10 +92,11 @@ export default function LotBatchesListPage() {
 
   const reset = () => {
     setDraftFilters(defaultLotFilters());
-    setSubmittedFilters(null);
+    setSubmittedFilters(defaultLotFilters());
     setLocationLabel("");
     setItemLabel("");
     setPage(1);
+    invalidate();
   };
 
   const toggleSort = (key: string) => {
@@ -172,10 +174,35 @@ export default function LotBatchesListPage() {
 
   return (
     <SerialLotLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <div class="mb-4">
-          <p class="text-sm text-text-secondary">Set filters, then Search (F8).</p>
-        </div>
+      <CollapsibleFilterPanel
+        title="Lots"
+        description="Refine results, then Search (F8). Grid loads with defaults on open."
+        actions={
+          <>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              onClick={search}
+            >
+              Search (F8)
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+              onClick={reset}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
+              onClick={() => setRegisterOpen(true)}
+            >
+              Register lot (F2)
+            </button>
+          </>
+        }
+      >
         <div class="grid gap-4 md:grid-cols-2">
           <Field label="Keyword">
             <input
@@ -216,74 +243,49 @@ export default function LotBatchesListPage() {
             fetchOptions={fetchLocations}
           />
         </div>
-        <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={search}
-          >
-            Search (F8)
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-            onClick={reset}
-          >
-            Reset
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
-            onClick={() => setRegisterOpen(true)}
-          >
-            Register lot (F2)
-          </button>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
-      <Show when={submittedFilters()}>
-        <div class="mt-6">
-          <SpreadsheetGrid<LotBatchRow>
-            columns={[
-              { key: "lot_no", header: "Lot no.", clickable: true },
-              { key: "item_code", header: "Item code" },
-              { key: "item_name", header: "Item name" },
-              { key: "location_name", header: "Location" },
-              {
-                key: "qty_on_hand",
-                header: "Qty on hand",
-                render: (r) => r.qty_on_hand.toLocaleString("en-PH", { maximumFractionDigits: 4 }),
-              },
-              { key: "expiry_date", header: "Expiry", render: (r) => r.expiry_date?.slice(0, 10) ?? "—" },
-              { key: "updated_at", header: "Updated", render: (r) => r.updated_at.slice(0, 10) },
-              {
-                key: "history",
-                header: "History",
-                sortable: false,
-                render: (r) => (
-                  <ActivityHistoryLink module="serial-lot" targetType="inv_lot_batch" targetId={r.id} title={`History — ${r.lot_no}`} />
-                ),
-              },
-            ]}
-            rows={list.data?.rows ?? []}
-            loading={list.isFetching}
-            selectedId={selectedId()}
-            onSelect={setSelectedId}
-            codeKey="lot_no"
-            nameKey="item_name"
-            sortKey={sort()}
-            sortOrder={order()}
-            onSort={toggleSort}
-            page={page()}
-            pageSize={pageSize}
-            total={list.data?.total ?? 0}
-            onPageChange={setPage}
-            onRefresh={invalidate}
-            onNew={() => {}}
-            onEdit={() => {}}
-          />
-        </div>
-      </Show>
+      <div class="mt-6">
+        <SpreadsheetGrid<LotBatchRow>
+          columns={[
+            { key: "lot_no", header: "Lot no.", clickable: true },
+            { key: "item_code", header: "Item code" },
+            { key: "item_name", header: "Item name" },
+            { key: "location_name", header: "Location" },
+            {
+              key: "qty_on_hand",
+              header: "Qty on hand",
+              render: (r) => r.qty_on_hand.toLocaleString("en-PH", { maximumFractionDigits: 4 }),
+            },
+            { key: "expiry_date", header: "Expiry", render: (r) => r.expiry_date?.slice(0, 10) ?? "—" },
+            { key: "updated_at", header: "Updated", render: (r) => r.updated_at.slice(0, 10) },
+            {
+              key: "history",
+              header: "History",
+              sortable: false,
+              render: (r) => (
+                <ActivityHistoryLink module="serial-lot" targetType="inv_lot_batch" targetId={r.id} title={`History — ${r.lot_no}`} />
+              ),
+            },
+          ]}
+          rows={list.data?.rows ?? []}
+          loading={list.isFetching}
+          selectedId={selectedId()}
+          onSelect={setSelectedId}
+          codeKey="lot_no"
+          nameKey="item_name"
+          sortKey={sort()}
+          sortOrder={order()}
+          onSort={toggleSort}
+          page={page()}
+          pageSize={pageSize}
+          total={list.data?.total ?? 0}
+          onPageChange={setPage}
+          onRefresh={invalidate}
+          onNew={() => {}}
+          onEdit={() => {}}
+        />
+      </div>
 
       <Modal open={registerOpen()} title="Register lot batch" onClose={() => setRegisterOpen(false)}>
         <div class="grid gap-4">

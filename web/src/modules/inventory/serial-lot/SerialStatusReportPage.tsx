@@ -1,4 +1,5 @@
 import { createSignal, For, onMount, Show } from "solid-js";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { DateInput } from "../../../shared/DateInput";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -33,7 +34,7 @@ function withRowIds<T extends object>(rows: T[], page: number, pageSize: number)
 
 export default function SerialStatusReportPage() {
   const [draft, setDraft] = createSignal<SerialStatusFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<SerialStatusFilters | null>(null);
+  const [submitted, setSubmitted] = createSignal<SerialStatusFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const [sort, setSort] = createSignal("serial_no");
   const [order, setOrder] = createSignal<"asc" | "desc">("asc");
@@ -47,8 +48,8 @@ export default function SerialStatusReportPage() {
       pageSize,
       sort: sort(),
       order: order(),
-      filters: f ?? defaultFilters(),
-      enabled: f != null,
+      filters: f,
+      enabled: true,
     };
   });
 
@@ -60,8 +61,9 @@ export default function SerialStatusReportPage() {
   };
 
   const reset = () => {
-    setDraft(defaultFilters());
-    setSubmitted(null);
+    const defaults = defaultFilters();
+    setDraft(defaults);
+    setSubmitted(defaults);
     setPage(1);
   };
 
@@ -89,11 +91,27 @@ export default function SerialStatusReportPage() {
 
   return (
     <SerialLotLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold text-text-primary">Serial Status</h2>
-          <p class="text-sm text-text-secondary">Status and event activity by serial — Search (F8).</p>
-        </div>
+      <CollapsibleFilterPanel
+        title="Serial Status"
+        description="Status and event activity by serial — Search (F8)."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
+              Reset
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+              onClick={() => void downloadReportCsv(serialStatusExportUrl(submitted()), "serial-status.csv")}
+            >
+              Export CSV
+            </button>
+          </>
+        }
+      >
         <div class="mb-4 flex flex-wrap gap-2">
           <button
             type="button"
@@ -163,74 +181,29 @@ export default function SerialStatusReportPage() {
             <DateInput value={draft().validity_to ?? ""} onInput={(e) => patch({ validity_to: e.currentTarget.value })} />
           </Field>
         </div>
-        <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
-            Search (F8)
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
-            Reset
-          </button>
-          <Show when={submitted()}>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-              onClick={() => void downloadReportCsv(serialStatusExportUrl(submitted()!), "serial-status.csv")}
-            >
-              Export CSV
-            </button>
-          </Show>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
-      <Show when={submitted()}>
-        <div class="mt-6">
-          <Show
-            when={isSummary()}
-            fallback={
-              <SpreadsheetGrid<SerialStatusDetailRow>
-                columns={[
-                  { key: "serial_no", header: "Serial no.", clickable: true },
-                  { key: "item_code", header: "Item code" },
-                  { key: "item_name", header: "Item name" },
-                  { key: "status", header: "Status", render: (r) => serialStatusLabel(r.status) },
-                  { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
-                  { key: "warranty_end", header: "Warranty end", render: (r) => fmtDate(r.warranty_end) },
-                  { key: "last_event_type", header: "Last event", render: (r) => r.last_event_type ?? "—" },
-                  { key: "last_event_at", header: "Last event at", render: (r) => (r.last_event_at ? r.last_event_at.slice(0, 19).replace("T", " ") : "—") },
-                  { key: "event_count", header: "Events in period" },
-                ]}
-                rows={(report.data?.rows ?? []) as SerialStatusDetailRow[]}
-                loading={report.isFetching}
-                selectedId={selectedId()}
-                onSelect={setSelectedId}
-                codeKey="serial_no"
-                nameKey="item_name"
-                sortKey={sort()}
-                sortOrder={order()}
-                onSort={toggleSort}
-                page={page()}
-                pageSize={pageSize}
-                total={report.data?.total ?? 0}
-                onPageChange={setPage}
-                onRefresh={search}
-                onNew={() => {}}
-                onEdit={() => {}}
-              />
-            }
-          >
-            <SpreadsheetGrid<SerialStatusSummaryRow & { id: number }>
+      <div class="mt-6">
+        <Show
+          when={isSummary()}
+          fallback={
+            <SpreadsheetGrid<SerialStatusDetailRow>
               columns={[
+                { key: "serial_no", header: "Serial no.", clickable: true },
                 { key: "item_code", header: "Item code" },
                 { key: "item_name", header: "Item name" },
                 { key: "status", header: "Status", render: (r) => serialStatusLabel(r.status) },
                 { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
-                { key: "unit_count", header: "Units" },
+                { key: "warranty_end", header: "Warranty end", render: (r) => fmtDate(r.warranty_end) },
+                { key: "last_event_type", header: "Last event", render: (r) => r.last_event_type ?? "—" },
+                { key: "last_event_at", header: "Last event at", render: (r) => (r.last_event_at ? r.last_event_at.slice(0, 19).replace("T", " ") : "—") },
+                { key: "event_count", header: "Events in period" },
               ]}
-              rows={withRowIds((report.data?.rows ?? []) as SerialStatusSummaryRow[], page(), pageSize)}
+              rows={(report.data?.rows ?? []) as SerialStatusDetailRow[]}
               loading={report.isFetching}
               selectedId={selectedId()}
               onSelect={setSelectedId}
-              codeKey="item_code"
+              codeKey="serial_no"
               nameKey="item_name"
               sortKey={sort()}
               sortOrder={order()}
@@ -243,9 +216,35 @@ export default function SerialStatusReportPage() {
               onNew={() => {}}
               onEdit={() => {}}
             />
-          </Show>
-        </div>
-      </Show>
+          }
+        >
+          <SpreadsheetGrid<SerialStatusSummaryRow & { id: number }>
+            columns={[
+              { key: "item_code", header: "Item code" },
+              { key: "item_name", header: "Item name" },
+              { key: "status", header: "Status", render: (r) => serialStatusLabel(r.status) },
+              { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
+              { key: "unit_count", header: "Units" },
+            ]}
+            rows={withRowIds((report.data?.rows ?? []) as SerialStatusSummaryRow[], page(), pageSize)}
+            loading={report.isFetching}
+            selectedId={selectedId()}
+            onSelect={setSelectedId}
+            codeKey="item_code"
+            nameKey="item_name"
+            sortKey={sort()}
+            sortOrder={order()}
+            onSort={toggleSort}
+            page={page()}
+            pageSize={pageSize}
+            total={report.data?.total ?? 0}
+            onPageChange={setPage}
+            onRefresh={search}
+            onNew={() => {}}
+            onEdit={() => {}}
+          />
+        </Show>
+      </div>
     </SerialLotLayout>
   );
 }

@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, on, onMount, Show, untrack } from "solid-js";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
@@ -63,7 +64,7 @@ export default function SerialAdjustmentPage() {
   const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
   const [draft, setDraft] = createSignal<SerialAdjustmentFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<SerialAdjustmentFilters | null>(null);
+  const [submitted, setSubmitted] = createSignal<SerialAdjustmentFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const sort = () => "serial_no" as const;
   const order = () => "asc" as const;
@@ -84,11 +85,11 @@ export default function SerialAdjustmentPage() {
       sort: sort(),
       order: order(),
       filters: {
-        ...(f ?? defaultFilters()),
-        item_id: f?.item_id ?? itemId() ?? undefined,
-        location_id: f?.location_id ?? locationId() ?? undefined,
+        ...f,
+        item_id: f.item_id ?? itemId() ?? undefined,
+        location_id: f.location_id ?? locationId() ?? undefined,
       },
-      enabled: f != null,
+      enabled: true,
     };
   });
 
@@ -118,7 +119,7 @@ export default function SerialAdjustmentPage() {
 
   const reset = () => {
     setDraft(defaultFilters());
-    setSubmitted(null);
+    setSubmitted(defaultFilters());
     setPage(1);
     setEditableRows([]);
     setReason("");
@@ -126,6 +127,7 @@ export default function SerialAdjustmentPage() {
     setItemLabel("");
     setLocationId(null);
     setLocationLabel("");
+    invalidate();
   };
 
   const updateQtyDelta = (id: number, value: string) => {
@@ -178,11 +180,20 @@ export default function SerialAdjustmentPage() {
 
   return (
     <SerialLotLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold text-text-primary">Inventory adj. by serial / lot</h2>
-          <p class="text-sm text-text-secondary">Search serial units, enter qty changes, then Save (Shift+F8).</p>
-        </div>
+      <CollapsibleFilterPanel
+        title="Inventory adj. by serial / lot"
+        description="Search serial units, enter qty changes, then Save (Shift+F8)."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
+              Reset
+            </button>
+          </>
+        }
+      >
         <div class="grid gap-4 md:grid-cols-2">
           <Field label="Terms of validity — from">
             <DateInput value={draft().validity_from ?? ""} onInput={(e) => patch({ validity_from: e.currentTarget.value })} />
@@ -248,18 +259,9 @@ export default function SerialAdjustmentPage() {
             </label>
           </Field>
         </div>
-        <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
-            Search (F8)
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
-            Reset
-          </button>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
-      <Show when={submitted()}>
-        <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
+      <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
           <div class="border-b border-stroke px-4 py-3">
             <Field label="Adjustment reason *">
               <input class={inputClass} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} placeholder="Cycle count, correction…" />
@@ -351,8 +353,7 @@ export default function SerialAdjustmentPage() {
               </button>
             </div>
           </div>
-        </section>
-      </Show>
+      </section>
     </SerialLotLayout>
   );
 }

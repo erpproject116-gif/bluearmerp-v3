@@ -32,15 +32,15 @@ function slipHref(docKind?: string, docId?: number): string | null {
 export default function CustomerVendorBookPage(props: Props) {
   const title = () => (props.bookType === "ar" ? "Customer/Vendor Book I (AR)" : "Customer/Vendor Book I (AP)");
   const [draftFilters, setDraftFilters] = createSignal(defaultPartnerBookFilters(props.bookType));
-  const [submittedFilters, setSubmittedFilters] = createSignal<ReturnType<typeof defaultPartnerBookFilters> | null>(null);
+  const [submittedFilters, setSubmittedFilters] = createSignal(defaultPartnerBookFilters(props.bookType));
   const [page, setPage] = createSignal(1);
   const pageSize = 50;
 
   const report = usePartnerBookReport(() => ({
-    filters: submittedFilters() ?? defaultPartnerBookFilters(props.bookType),
+    filters: submittedFilters(),
     page: page(),
     pageSize,
-    enabled: submittedFilters() !== null,
+    enabled: true,
   }));
 
   const search = () => {
@@ -49,8 +49,14 @@ export default function CustomerVendorBookPage(props: Props) {
   };
 
   onMount(() => {
-    // Auto-load last 90 days so the book is usable without hunting for Search.
-    search();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F8") {
+        e.preventDefault();
+        search();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   });
 
   const reset = () => {
@@ -62,7 +68,6 @@ export default function CustomerVendorBookPage(props: Props) {
 
   const downloadCsv = async () => {
     const f = submittedFilters();
-    if (!f) return;
     const token = await getAccessToken();
     const res = await fetch(partnerBookExportUrl(f), {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -104,8 +109,7 @@ export default function CustomerVendorBookPage(props: Props) {
             <button type="button" class="rounded border border-stroke px-4 py-2 text-sm" onClick={reset}>
               Reset
             </button>
-            <Show when={submittedFilters()}>
-              <GridExportButtons
+            <GridExportButtons
                 title={title()}
                 filename={`customer-vendor-book-${props.bookType}`}
                 columns={[
@@ -120,10 +124,9 @@ export default function CustomerVendorBookPage(props: Props) {
                 ]}
                 rows={() => rowsWithBalance() as unknown as Record<string, unknown>[]}
               />
-              <button type="button" class="rounded border border-stroke px-4 py-2 text-sm" onClick={() => void downloadCsv()}>
-                API CSV
-              </button>
-            </Show>
+            <button type="button" class="rounded border border-stroke px-4 py-2 text-sm" onClick={() => void downloadCsv()}>
+              API CSV
+            </button>
           </>
         }
       >
@@ -161,12 +164,11 @@ export default function CustomerVendorBookPage(props: Props) {
         </div>
       </CollapsibleFilterPanel>
 
-      <Show when={submittedFilters()}>
-        <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
+      <section class="mt-6 rounded-xl border border-stroke bg-white shadow-sm">
           <div class="border-b border-stroke px-5 py-4 text-center">
             <h3 class="text-xl font-bold">{title()}</h3>
             <p class="text-sm text-text-secondary">
-              {formatDisplayDate(submittedFilters()!.date_from)} ~ {formatDisplayDate(submittedFilters()!.date_to)}
+              {formatDisplayDate(submittedFilters().date_from)} ~ {formatDisplayDate(submittedFilters().date_to)}
             </p>
           </div>
           <div class="overflow-x-auto">
@@ -243,7 +245,6 @@ export default function CustomerVendorBookPage(props: Props) {
             </div>
           </div>
         </section>
-      </Show>
     </FinanceLayout>
   );
 }

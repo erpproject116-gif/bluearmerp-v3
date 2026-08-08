@@ -1,4 +1,5 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onMount } from "solid-js";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { DateInput } from "../../../shared/DateInput";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -40,7 +41,7 @@ function withRowIds<T extends object>(rows: T[], page: number, pageSize: number)
 
 export default function SerialBalanceReportPage() {
   const [draft, setDraft] = createSignal<SerialBalanceFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<SerialBalanceFilters | null>(null);
+  const [submitted, setSubmitted] = createSignal<SerialBalanceFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const [sort, setSort] = createSignal("serial_no");
   const [order, setOrder] = createSignal<"asc" | "desc">("asc");
@@ -54,8 +55,8 @@ export default function SerialBalanceReportPage() {
       pageSize,
       sort: sort(),
       order: order(),
-      filters: f ?? defaultFilters(),
-      enabled: f != null,
+      filters: f,
+      enabled: true,
     };
   });
 
@@ -67,8 +68,9 @@ export default function SerialBalanceReportPage() {
   };
 
   const reset = () => {
-    setDraft(defaultFilters());
-    setSubmitted(null);
+    const defaults = defaultFilters();
+    setDraft(defaults);
+    setSubmitted(defaults);
     setPage(1);
   };
 
@@ -95,11 +97,27 @@ export default function SerialBalanceReportPage() {
 
   return (
     <SerialLotLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold text-text-primary">Serial Inv. Balance</h2>
-          <p class="text-sm text-text-secondary">As-of quantity by serial — Search (F8).</p>
-        </div>
+      <CollapsibleFilterPanel
+        title="Serial Inv. Balance"
+        description="As-of quantity by serial — Search (F8)."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
+              Reset
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+              onClick={() => void downloadReportCsv(serialBalanceExportUrl(submitted()), "serial-inv-balance.csv")}
+            >
+              Export CSV
+            </button>
+          </>
+        }
+      >
         <div class="mb-4 flex flex-wrap gap-2">
           <button
             type="button"
@@ -147,55 +165,36 @@ export default function SerialBalanceReportPage() {
             </label>
           </Field>
         </div>
-        <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
-            Search (F8)
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
-            Reset
-          </button>
-          <Show when={submitted()}>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-              onClick={() => void downloadReportCsv(serialBalanceExportUrl(submitted()!), "serial-inv-balance.csv")}
-            >
-              Export CSV
-            </button>
-          </Show>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
-      <Show when={submitted()}>
-        <div class="mt-6">
-          <SpreadsheetGrid<SerialBalanceRow & { id: number }>
-            columns={[
-              { key: "serial_no", header: "Serial no.", clickable: true },
-              { key: "item_code", header: "Item code" },
-              { key: "item_name", header: "Item name" },
-              { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
-              { key: "qty_on_hand", header: "Qty on hand", render: (r) => String(r.qty_on_hand) },
-              { key: "status", header: "Status", render: (r) => serialStatusLabel(r.status) },
-            ]}
-            rows={withIds(report.data?.rows ?? [])}
-            loading={report.isFetching}
-            selectedId={selectedId()}
-            onSelect={setSelectedId}
-            codeKey="serial_no"
-            nameKey="item_name"
-            sortKey={sort()}
-            sortOrder={order()}
-            onSort={toggleSort}
-            page={page()}
-            pageSize={pageSize}
-            total={report.data?.total ?? 0}
-            onPageChange={setPage}
-            onRefresh={search}
-            onNew={() => {}}
-            onEdit={() => {}}
-          />
-        </div>
-      </Show>
+      <div class="mt-6">
+        <SpreadsheetGrid<SerialBalanceRow & { id: number }>
+          columns={[
+            { key: "serial_no", header: "Serial no.", clickable: true },
+            { key: "item_code", header: "Item code" },
+            { key: "item_name", header: "Item name" },
+            { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
+            { key: "qty_on_hand", header: "Qty on hand", render: (r) => String(r.qty_on_hand) },
+            { key: "status", header: "Status", render: (r) => serialStatusLabel(r.status) },
+          ]}
+          rows={withIds(report.data?.rows ?? [])}
+          loading={report.isFetching}
+          selectedId={selectedId()}
+          onSelect={setSelectedId}
+          codeKey="serial_no"
+          nameKey="item_name"
+          sortKey={sort()}
+          sortOrder={order()}
+          onSort={toggleSort}
+          page={page()}
+          pageSize={pageSize}
+          total={report.data?.total ?? 0}
+          onPageChange={setPage}
+          onRefresh={search}
+          onNew={() => {}}
+          onEdit={() => {}}
+        />
+      </div>
     </SerialLotLayout>
   );
 }

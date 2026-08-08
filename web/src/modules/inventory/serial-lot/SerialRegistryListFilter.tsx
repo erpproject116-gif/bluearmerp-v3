@@ -3,8 +3,8 @@ import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import {
-  defaultSerialRegistryFilters,
   SERIAL_STATUS_OPTIONS,
   SERIAL_ORIGIN_OPTIONS,
   type SerialRegistryFilters,
@@ -50,12 +50,32 @@ export function SerialRegistryListFilter(props: Props) {
   });
 
   return (
-    <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-      <div class="mb-4">
-        <h2 class="text-lg font-semibold text-text-primary">{props.title ?? "Serial Registry"}</h2>
-        <p class="text-sm text-text-secondary">Set filters, then Search (F8).</p>
-      </div>
-
+    <CollapsibleFilterPanel
+      title={props.title ?? "Serial Registry"}
+      description="Refine results, then Search (F8). Grid loads with defaults on open."
+      actions={
+        <>
+          <button
+            type="button"
+            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+            onClick={() => props.onSearch()}
+          >
+            Search (F8)
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+            onClick={() => {
+              props.onReset();
+              setLocationLabel("");
+              setItemLabel("");
+            }}
+          >
+            Reset
+          </button>
+        </>
+      }
+    >
       <div class="grid gap-4 md:grid-cols-2">
         <Field label="Keyword">
           <input
@@ -137,29 +157,6 @@ export function SerialRegistryListFilter(props: Props) {
           />
         </Field>
       </div>
-
-      <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-stroke pt-4">
-        <button
-          type="button"
-          class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          onClick={() => props.onSearch()}
-        >
-          Search (F8)
-        </button>
-        <button
-          type="button"
-          class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-          onClick={() => {
-            props.onReset();
-            setLocationLabel("");
-            setItemLabel("");
-          }}
-        >
-          Reset
-        </button>
-      </div>
-    </section>
+    </CollapsibleFilterPanel>
   );
 }
-
-export { defaultSerialRegistryFilters };

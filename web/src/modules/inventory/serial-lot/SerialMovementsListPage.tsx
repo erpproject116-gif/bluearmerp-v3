@@ -1,5 +1,6 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onMount } from "solid-js";
 import { DateInput } from "../../../shared/DateInput";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import {
   useInvalidateSerialLotLists,
@@ -16,7 +17,15 @@ type MovementFilters = {
 };
 
 function defaultMovementFilters(): MovementFilters {
-  return { q: "", event_type: "", date_from: "", date_to: "" };
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - 30);
+  return {
+    q: "",
+    event_type: "",
+    date_from: from.toISOString().slice(0, 10),
+    date_to: to.toISOString().slice(0, 10),
+  };
 }
 
 const EVENT_TYPE_OPTIONS = [
@@ -36,7 +45,7 @@ export default function SerialMovementsListPage() {
   const invalidate = useInvalidateSerialLotLists();
 
   const [draftFilters, setDraftFilters] = createSignal<MovementFilters>(defaultMovementFilters());
-  const [submittedFilters, setSubmittedFilters] = createSignal<MovementFilters | null>(null);
+  const [submittedFilters, setSubmittedFilters] = createSignal<MovementFilters>(defaultMovementFilters());
   const [page, setPage] = createSignal(1);
   const [sort, setSort] = createSignal("created_at");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
@@ -50,11 +59,11 @@ export default function SerialMovementsListPage() {
       pageSize,
       sort: sort(),
       order: order(),
-      q: f?.q || undefined,
-      event_type: f?.event_type || undefined,
-      date_from: f?.date_from || undefined,
-      date_to: f?.date_to || undefined,
-      enabled: f != null,
+      q: f.q || undefined,
+      event_type: f.event_type || undefined,
+      date_from: f.date_from || undefined,
+      date_to: f.date_to || undefined,
+      enabled: true,
     };
   });
 
@@ -67,9 +76,11 @@ export default function SerialMovementsListPage() {
   };
 
   const reset = () => {
-    setDraftFilters(defaultMovementFilters());
-    setSubmittedFilters(null);
+    const defaults = defaultMovementFilters();
+    setDraftFilters(defaults);
+    setSubmittedFilters(defaults);
     setPage(1);
+    invalidate();
   };
 
   const toggleSort = (key: string) => {
@@ -93,10 +104,28 @@ export default function SerialMovementsListPage() {
 
   return (
     <SerialLotLayout>
-      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <div class="mb-4">
-          <p class="text-sm text-text-secondary">Set filters, then Search (F8).</p>
-        </div>
+      <CollapsibleFilterPanel
+        title="Movements"
+        description="Default range is the last 30 days. Refine, then Search (F8)."
+        actions={
+          <>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              onClick={search}
+            >
+              Search (F8)
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+              onClick={reset}
+            >
+              Reset
+            </button>
+          </>
+        }
+      >
         <div class="grid gap-4 md:grid-cols-2">
           <Field label="Keyword">
             <input
@@ -124,57 +153,39 @@ export default function SerialMovementsListPage() {
             <DateInput value={draftFilters().date_to ?? ""} onInput={(e) => patch({ date_to: e.currentTarget.value })} />
           </Field>
         </div>
-        <div class="mt-4 flex flex-wrap gap-2 border-t border-stroke pt-4">
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={search}
-          >
-            Search (F8)
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
-            onClick={reset}
-          >
-            Reset
-          </button>
-        </div>
-      </section>
+      </CollapsibleFilterPanel>
 
-      <Show when={submittedFilters()}>
-        <div class="mt-6">
-          <SpreadsheetGrid<SerialEventRow>
-            columns={[
-              { key: "created_at", header: "When", render: (r) => r.created_at.slice(0, 19).replace("T", " ") },
-              { key: "event_type", header: "Event", render: (r) => eventTypeLabel(r.event_type) },
-              { key: "serial_no", header: "Serial no.", clickable: true },
-              { key: "item_code", header: "Item code" },
-              { key: "item_name", header: "Item name" },
-              { key: "from_location_name", header: "From", render: (r) => r.from_location_name ?? "—" },
-              { key: "to_location_name", header: "To", render: (r) => r.to_location_name ?? "—" },
-              { key: "created_by_name", header: "By", render: (r) => r.created_by_name || "—" },
-              { key: "notes", header: "Notes", render: (r) => r.notes ?? "—" },
-            ]}
-            rows={list.data?.rows ?? []}
-            loading={list.isFetching}
-            selectedId={selectedId()}
-            onSelect={setSelectedId}
-            codeKey="serial_no"
-            nameKey="event_type"
-            sortKey={sort()}
-            sortOrder={order()}
-            onSort={toggleSort}
-            page={page()}
-            pageSize={pageSize}
-            total={list.data?.total ?? 0}
-            onPageChange={setPage}
-            onRefresh={invalidate}
-            onNew={() => {}}
-            onEdit={() => {}}
-          />
-        </div>
-      </Show>
+      <div class="mt-6">
+        <SpreadsheetGrid<SerialEventRow>
+          columns={[
+            { key: "created_at", header: "When", render: (r) => r.created_at.slice(0, 19).replace("T", " ") },
+            { key: "event_type", header: "Event", render: (r) => eventTypeLabel(r.event_type) },
+            { key: "serial_no", header: "Serial no.", clickable: true },
+            { key: "item_code", header: "Item code" },
+            { key: "item_name", header: "Item name" },
+            { key: "from_location_name", header: "From", render: (r) => r.from_location_name ?? "—" },
+            { key: "to_location_name", header: "To", render: (r) => r.to_location_name ?? "—" },
+            { key: "created_by_name", header: "By", render: (r) => r.created_by_name || "—" },
+            { key: "notes", header: "Notes", render: (r) => r.notes ?? "—" },
+          ]}
+          rows={list.data?.rows ?? []}
+          loading={list.isFetching}
+          selectedId={selectedId()}
+          onSelect={setSelectedId}
+          codeKey="serial_no"
+          nameKey="event_type"
+          sortKey={sort()}
+          sortOrder={order()}
+          onSort={toggleSort}
+          page={page()}
+          pageSize={pageSize}
+          total={list.data?.total ?? 0}
+          onPageChange={setPage}
+          onRefresh={invalidate}
+          onNew={() => {}}
+          onEdit={() => {}}
+        />
+      </div>
     </SerialLotLayout>
   );
 }

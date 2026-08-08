@@ -17,10 +17,10 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
-    label: "Receive (legacy)",
-    href: "/app/inventory/serial-lot/receive",
-    permissionCode: "inventory.serial_receive",
-    headerPriority: "overflow",
+    label: "Lots",
+    href: "/app/inventory/serial-lot/lots",
+    permissionCode: "inventory.serial_registry",
+    headerPriority: "primary",
   },
   {
     label: "Trace",
@@ -29,22 +29,22 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
-    label: "Lots",
-    href: "/app/inventory/serial-lot/lots",
-    permissionCode: "inventory.serial_registry",
+    label: "Settings",
+    href: "/app/inventory/serial-lot/settings",
+    permissionCode: "inventory.serial_settings",
     headerPriority: "primary",
+  },
+  {
+    label: "Receive (legacy)",
+    href: "/app/inventory/serial-lot/receive",
+    permissionCode: "inventory.serial_receive",
+    headerPriority: "overflow",
   },
   {
     label: "Movements",
     href: "/app/inventory/serial-lot/movements",
     permissionCode: "inventory.serial_movements",
-    headerPriority: "primary",
-  },
-  {
-    label: "Settings",
-    href: "/app/inventory/serial-lot/settings",
-    permissionCode: "inventory.serial_settings",
-    headerPriority: "primary",
+    headerPriority: "overflow",
   },
   {
     label: "Adjustment",
@@ -80,18 +80,6 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     label: "Reconciliation",
     href: "/app/inventory/serial-lot/reports/reconciliation",
     permissionCode: "inventory.serial_registry",
-    headerPriority: "overflow",
-  },
-  {
-    label: "Bills of Material",
-    href: "/app/inventory/serial-lot/manufacturing/boms",
-    permissionCode: "manufacturing.boms",
-    headerPriority: "overflow",
-  },
-  {
-    label: "Work Orders",
-    href: "/app/inventory/serial-lot/manufacturing/work-orders",
-    permissionCode: "manufacturing.work_orders",
     headerPriority: "overflow",
   },
 ];
