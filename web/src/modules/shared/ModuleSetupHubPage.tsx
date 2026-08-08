@@ -92,8 +92,8 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
     help: "Recorded for process design; PO conversion gates are currently relaxed in the API.",
   },
   purchase_require_gr_before_supplier_invoice: {
-    label: "Require Purchase Receive before Bill",
-    help: "On (recommended) = receive stock/proof first, then Bill. Off = simple bill+receive — saving a Bill from PO lines can also receive stock.",
+    label: "Require Purchase Receive before Bill (legacy)",
+    help: "Off by default = New Bill is primary (scan serials / post stock on confirm). On = legacy Receive-then-Bill only.",
   },
   purchase_order_require_attachment: {
     label: "Require file on purchase order",

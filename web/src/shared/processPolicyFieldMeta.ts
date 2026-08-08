@@ -54,8 +54,8 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
     help: "Shown for process design. Purchase Receive and Bills currently proceed without blocking on PO approval.",
   },
   purchase_require_gr_before_supplier_invoice: {
-    label: "Require Purchase Receive before Bill",
-    help: "Off (default for new businesses) = New Bill is primary — confirm posts stock + serials and AP. On = legacy: Purchase Receive first, then Bill.",
+    label: "Require Purchase Receive before Bill (legacy)",
+    help: "Off by default = New Bill is primary — scan arrived serials and confirm to post stock + AP. On = legacy: Purchase Receive first, then Bill.",
   },
   purchase_order_require_attachment: {
     label: "Require file on purchase order",

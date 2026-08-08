@@ -190,8 +190,8 @@ export const PURCHASE_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
 
 /** New Bill / supplier invoice — Buying fulfill + Selling map. */
 export const PURCHASE_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines — may auto-receive if Setup allows simple bill+receive" },
-  { id: "gr", label: "Purchase Receive", group: "Buying", hint: "Posted receive lines not yet billed (preferred)" },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines — preferred; confirm Bill posts stock + serials" },
+  { id: "gr", label: "Purchase Receive", group: "Buying", hint: "Legacy unbilled receive lines (bill-only)" },
   { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "PO lines sourced from accepted vendor quotes" },
   { id: "so", label: "Sales Order", group: "Selling", hint: MAP_HINT },
   { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },

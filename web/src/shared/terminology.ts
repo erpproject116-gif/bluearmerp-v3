@@ -24,11 +24,11 @@ export const TERMS = {
   purchase_order: { label: "Purchase Order", hint: "The order you send to a supplier. A commitment, not an expense yet." },
   goods_receipt: {
     label: "Purchase Receive",
-    hint: "Record stock in from the supplier and attach delivery proof.",
+    hint: "Legacy stock-in document. Prefer New Bill to post stock and serials on confirm.",
   },
   supplier_invoice: {
     label: "Bill",
-    hint: "Declare the amount owed to the supplier after receive (or simple bill+receive).",
+    hint: "New Purchase: amount owed, stock, and serials when you confirm (Load Slip from PO or blank).",
   },
   payment_voucher: { label: "Payment Made", hint: "Pay the vendor and clear accounts payable." },
   rfq: { label: "Request for Quote", hint: "Ask suppliers for their prices before ordering." },
