@@ -47,6 +47,17 @@ func defaultSupplierInvoiceProgress(s string) string {
 	}
 }
 
+func formatItemNameSummary(first *string, lineCount int) string {
+	if first == nil || strings.TrimSpace(*first) == "" {
+		return ""
+	}
+	name := strings.TrimSpace(*first)
+	if lineCount <= 1 {
+		return name
+	}
+	return fmt.Sprintf("%s and %d more", name, lineCount-1)
+}
+
 func orderSQL(order string) string {
 	if order == "desc" {
 		return "desc"

@@ -83,6 +83,9 @@ type SupplierInvoice struct {
 	PaymentStatus   string                `json:"payment_status,omitempty"`
 	ProgressStatus  string                `json:"progress_status"`
 	CreatedByName   string                `json:"created_by_name,omitempty"`
+	ItemNameSummary string                `json:"item_name_summary,omitempty"`
+	PONumbers       string                `json:"po_numbers,omitempty"`
+	InvoicingStatus bool                  `json:"invoicing_status"`
 	Lines            []SupplierInvoiceLine     `json:"lines,omitempty"`
 	WithholdingLines []WithholdingLineResponse `json:"withholding_lines,omitempty"`
 }
@@ -532,10 +535,32 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 			  si.vendor_invoice_no, si.progress_status, si.grand_total::float8,
 			  coalesce(pay.applied, 0)::float8 as paid_amount,
 			  (si.grand_total - coalesce(pay.applied, 0))::float8 as balance,
+			  coalesce(tt.name, ''),
+			  coalesce(nullif(trim(si.payment_terms), ''), si.terms_of_payment),
+			  si.notes,
+			  coalesce(si.pic_name, ''),
+			  coalesce(u.full_name, ''),
+			  si.invoice_journal_entry_id is not null,
+			  (select sil.item_name from public.fin_supplier_invoice_lines sil
+			   where sil.supplier_invoice_id = si.id order by sil.line_no limit 1),
+			  (select count(*)::int from public.fin_supplier_invoice_lines sil
+			   where sil.supplier_invoice_id = si.id),
+			  coalesce((
+			    select string_agg(x.po_no, ', ')
+			    from (
+			      select distinct po.purchase_order_no as po_no
+			      from public.fin_supplier_invoice_lines sil
+			      join public.po_purchase_order_lines pol on pol.id = sil.purchase_order_line_id
+			      join public.po_purchase_orders po on po.id = pol.purchase_order_id
+			      where sil.supplier_invoice_id = si.id and sil.purchase_order_line_id is not null
+			    ) x
+			  ), ''),
 			  count(*) over()
 			from public.fin_supplier_invoices si
 			join public.inv_partners p on p.id = si.partner_id
-			join public.quo_currencies c on c.id = si.currency_id%s
+			join public.quo_currencies c on c.id = si.currency_id
+			left join public.quo_tax_types tt on tt.id = si.tax_type_id
+			left join public.users u on u.id = si.created_by_user_id%s
 			where %s
 			order by %s %s
 			limit $%d offset $%d`, paymentJoin, where, p.Sort, orderSQL(p.Order), argN, argN+1)
@@ -554,11 +579,17 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 			var row SupplierInvoice
 			var invoiceDate time.Time
 			var vendorInvNo *string
+			var paymentTerms *string
+			var notes *string
+			var firstItemName *string
+			var lineCount int
 			if err := rows.Scan(
 				&row.ID, &invoiceDate, &row.DateSeq, &row.InvoiceNo,
 				&row.PartnerID, &row.VendorName, &row.CurrencyID, &row.CurrencyCode,
 				&vendorInvNo, &row.ProgressStatus, &row.GrandTotal,
-				&row.PaidAmount, &row.Balance, &total,
+				&row.PaidAmount, &row.Balance,
+				&row.TaxTypeName, &paymentTerms, &notes, &row.PicName, &row.CreatedByName,
+				&row.InvoicingStatus, &firstItemName, &lineCount, &row.PONumbers, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read supplier invoices.", "ERR_INTERNAL")
 				return
@@ -566,6 +597,9 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 			row.InvoiceDate = dateToStr(invoiceDate)
 			row.DateNoDisplay = formatDateNoDisplay(invoiceDate, row.DateSeq)
 			row.VendorInvoiceNo = vendorInvNo
+			row.PaymentTerms = paymentTerms
+			row.Notes = notes
+			row.ItemNameSummary = formatItemNameSummary(firstItemName, lineCount)
 			switch {
 			case row.PaidAmount >= row.GrandTotal-0.0001:
 				row.PaymentStatus = "paid"

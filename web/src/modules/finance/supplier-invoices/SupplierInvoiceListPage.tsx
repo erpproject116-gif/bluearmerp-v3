@@ -32,12 +32,6 @@ const PAYMENT_STATUS_OPTIONS = [
   { value: "paid", label: "Paid" },
 ];
 
-function paymentStatusLabel(status?: string) {
-  if (status === "paid") return "Paid";
-  if (status === "partial") return "Partial";
-  return "Unpaid";
-}
-
 function listBasePath(pathname: string) {
   return pathname.startsWith("/app/purchases") ? "/app/purchases/purchases" : "/app/finance/supplier-invoices";
 }
@@ -154,28 +148,107 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
       </div>
       <SpreadsheetGrid<SupplierInvoiceRow>
         columns={[
-          { key: "date_no_display", header: "Date-no", clickable: true },
-          { key: "invoice_no", header: "Purchase No.", clickable: true },
-          { key: "vendor_name", header: "Vendor" },
-          { key: "vendor_invoice_no", header: "SI/DR No.", render: (r) => r.vendor_invoice_no ?? "" },
+          { key: "date_no_display", header: "Date-No.", clickable: true },
+          {
+            key: "vendor_invoice_no",
+            header: "SI/DR No. (Tracking No.)",
+            sortable: false,
+            render: (r) => r.vendor_invoice_no ?? "",
+          },
+          {
+            key: "po_numbers",
+            header: "PO Number",
+            sortable: false,
+            render: (r) => r.po_numbers ?? "",
+          },
+          {
+            key: "notes",
+            header: "Notes",
+            sortable: false,
+            render: (r) => r.notes ?? "",
+          },
+          {
+            key: "payment_terms",
+            header: "Payment Terms",
+            sortable: false,
+            render: (r) => r.payment_terms ?? "",
+          },
+          {
+            key: "tax_type_name",
+            header: "Transaction Type Name",
+            sortable: false,
+            render: (r) => r.tax_type_name ?? "",
+          },
+          { key: "vendor_name", header: "Customer/Vendor Name" },
+          {
+            key: "item_name_summary",
+            header: "Item Name (Summary)",
+            sortable: false,
+            render: (r) => r.item_name_summary ?? "",
+          },
+          {
+            key: "grand_total",
+            header: "Total Amount",
+            render: (r) => formatPeso(r.grand_total),
+          },
           {
             key: "progress_status",
-            header: "Progress",
+            header: "Progress Status",
             sortable: false,
-            render: (r) => <span>{docProgressStatusLabel(r.progress_status)}</span>,
+            render: (r) => (
+              <button
+                type="button"
+                class="text-brand-600 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void openEdit(r);
+                }}
+              >
+                {docProgressStatusLabel(r.progress_status)}
+              </button>
+            ),
           },
-          { key: "grand_total", header: "Amount", render: (r) => formatPeso(r.grand_total) },
           {
-            key: "balance",
-            header: "Balance",
+            key: "invoicing_status",
+            header: "Invoicing Status",
             sortable: false,
-            render: (r) => formatPeso(r.balance ?? r.grand_total),
+            render: (r) => (
+              <span
+                class={r.invoicing_status ? "text-lg leading-none text-emerald-600" : "text-lg leading-none text-slate-300"}
+                title={r.invoicing_status ? "Purchase invoice JE linked" : "No purchase invoice JE yet"}
+              >
+                {r.invoicing_status ? "✓" : "—"}
+              </span>
+            ),
           },
           {
-            key: "payment_status",
-            header: "Payment",
+            key: "print",
+            header: "Print",
             sortable: false,
-            render: (r) => paymentStatusLabel(r.payment_status),
+            render: (r) => (
+              <button
+                type="button"
+                class="text-brand-600 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPurchaseInvoicePrint(r.id);
+                }}
+              >
+                Print
+              </button>
+            ),
+          },
+          {
+            key: "created_by_name",
+            header: "Creator",
+            sortable: false,
+            render: (r) => r.created_by_name ?? "",
+          },
+          {
+            key: "pic_name",
+            header: "PIC Name",
+            sortable: false,
+            render: (r) => r.pic_name ?? "",
           },
           {
             key: "history",
