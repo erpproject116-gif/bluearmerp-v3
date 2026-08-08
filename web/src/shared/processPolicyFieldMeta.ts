@@ -89,6 +89,10 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
     label: "Hybrid inventory GL (qty-tracked items)",
     help: "On = Purchase Receive/Sales of qty-tracked items post Inventory / GRNI / COGS. Map Inventory, GRNI, and COGS under Chart of Accounts defaults first. Existing tenants should set opening inventory before enabling.",
   },
+  inventory_require_serial_adjustment_approval: {
+    label: "Require approval for serial qty fixes (threshold)",
+    help: "Off by default. On = Qty fix (serials) Apply needs Approvals Queue when lines ≥ 5 or any positive qty delta; small negative-only fixes still post immediately.",
+  },
 };
 
 /** Map form-settings entity types → module Setup hub. */

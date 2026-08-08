@@ -83,8 +83,11 @@ export function useSerialAdjustmentCandidates(params: () => {
 }
 
 export async function applySerialAdjustments(body: { reason: string; lines: SerialAdjustmentLine[] }) {
-  return apiFetch<{ adjusted_count: number }>("/api/v1/inventory/serial-units/adjustments", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return apiFetch<{ adjusted_count: number; pending_approval?: boolean; request_id?: number }>(
+    "/api/v1/inventory/serial-units/adjustments",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
 }

@@ -45,6 +45,12 @@ export function StocksHowItFits(props?: { class?: string }) {
             </A>{" "}
             — which units/batches are already in stock (use when selling, not when receiving new ones).
           </li>
+          <li>
+            <A href="/app/inventory/serial-lot/adjustment" class="font-medium text-brand-700 hover:underline">
+              Qty fix (serials)
+            </A>{" "}
+            — exception corrections only; not where Purchase Receive puts new serials (use Registry).
+          </li>
         </ul>
       </div>
     </Show>

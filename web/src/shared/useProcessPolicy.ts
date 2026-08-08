@@ -19,6 +19,8 @@ export type ProcessPolicy = {
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
+  inventory_gl_hybrid_enabled?: boolean;
+  inventory_require_serial_adjustment_approval?: boolean;
   budget_control_mode: string;
   quotation_require_attachment: boolean;
   sales_order_require_attachment: boolean;
@@ -164,6 +166,8 @@ export function useProcessPolicy(enabled: () => boolean = () => true) {
           sales_require_so_approval: false,
           purchase_require_po_approval: false,
           finance_require_je_approval: false,
+          inventory_gl_hybrid_enabled: false,
+          inventory_require_serial_adjustment_approval: false,
           budget_control_mode: "off",
           quotation_require_attachment: false,
           sales_order_require_attachment: false,

@@ -123,6 +123,7 @@ export type SalesDetail = {
     serial_unit_ids?: number[];
     track_serial?: boolean;
     source_sales_order_line_id?: number | null;
+    source_quotation_line_id?: number | null;
   }>;
   commissions?: Array<{
     id?: number;
@@ -196,6 +197,7 @@ function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
     lot_batch_id: (ln as { lot_batch_id?: number | null }).lot_batch_id ?? null,
     lot_no: (ln as { serial_lot_no?: string | null }).serial_lot_no ?? "",
     source_sales_order_line_id: ln.source_sales_order_line_id ?? null,
+    source_quotation_line_id: ln.source_quotation_line_id ?? null,
   }));
 }
 
@@ -646,7 +648,7 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
-    toast.success("Sales Order lines loaded. Attachments copy when you Save. Click Save to create the sales invoice — the Invoice tab opens after save.");
+    toast.success("Sales Order lines loaded. Attachments copy when you Save. Click Save to create the sales invoice.");
   };
 
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
@@ -674,6 +676,7 @@ export function SalesModal(props: Props) {
       unit_code: row.unit_code ?? "",
       unit_price: String(row.unit_vat_inc),
       remark: row.remark ?? "",
+      source_quotation_line_id: row.source_quotation_line_id,
     }));
     if (meta && first.tax_type_id) {
       const recalc = await recalculateSalesLines(newLines, first.tax_type_id, meta, templateCode());
@@ -681,7 +684,7 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
-    toast.success("Quotation lines loaded. Click Save to create the sales invoice — the Invoice tab opens after save.");
+    toast.success("Quotation lines loaded. Attachments copy when you Save. Click Save to create the sales invoice.");
   };
 
   const applyShippingLines = async (picked: PickedShippingSlipLine[]) => {
@@ -874,6 +877,7 @@ export function SalesModal(props: Props) {
         serial_unit_ids: ln.serial_unit_ids?.length ? ln.serial_unit_ids : undefined,
         lot_batch_id: ln.lot_batch_id ?? null,
         source_sales_order_line_id: ln.source_sales_order_line_id || null,
+        source_quotation_line_id: ln.source_quotation_line_id || null,
       })),
       commissions: commissions()
         .filter((c) => c.tic_name.trim() || (c.tic_user_id != null && c.tic_user_id > 0))
@@ -904,10 +908,14 @@ export function SalesModal(props: Props) {
     if (ed?.id) {
       invalidateRecordHistory(queryClient, "sa_sales", ed.id);
     }
+    // Keep modal open briefly so AttachmentsField can flush staged files to the new id.
+    if (!ed) {
+      setCreatedSale(res.data);
+    }
     await draft.clearOnSave();
     props.onSaved();
     const autoSave = await tryAutoSaveSalesInvoice(res.data.id);
-    const stockNote = `${autoSave.message} Stock updates when the item tracks inventory quantity.`;
+    const stockNote = `${autoSave.message} Stock updates when the item tracks inventory quantity. Reopen from the list for Invoice / payment.`;
     if (toast.action) {
       toast.action({
         type: autoSave.ok ? "success" : "warning",
@@ -921,8 +929,9 @@ export function SalesModal(props: Props) {
     } else {
       toast.warning(stockNote);
     }
-    // Saving is terminal — reopen from the list (or toast action) for payment / invoice tab.
-    props.onClose();
+    // Allow pending uploads to flush via AttachmentsField's docId effect, then close.
+    const delayMs = !ed && attachmentCount() > 0 ? 600 : 0;
+    window.setTimeout(() => props.onClose(), delayMs);
   };
 
   const finishPostSave = () => {
@@ -1175,7 +1184,7 @@ export function SalesModal(props: Props) {
         <AttachmentsField
           scope="sales"
           formOpen={props.open}
-          docId={props.editing?.id ?? createdSale()?.id}
+          docId={effectiveEditing()?.id}
           label={uiLabel("selling.attachments_sales")}
           required={policyRequiresAttachment(processPolicy.data, "sales")}
           onCountChange={setAttachmentCount}

@@ -136,7 +136,12 @@ func ListPending(ctx context.Context, pool *pgxpool.Pool, tenantID int64, limit 
 			return nil, err
 		}
 		r.SubmittedAt = submittedAt.Format(time.RFC3339)
-		r.EntityLabel = fmt.Sprintf("%s #%d", r.EntityType, r.EntityID)
+		switch r.EntityType {
+		case "inv_serial_adjustment_request":
+			r.EntityLabel = fmt.Sprintf("Serial qty fix #%d", r.EntityID)
+		default:
+			r.EntityLabel = fmt.Sprintf("%s #%d", r.EntityType, r.EntityID)
+		}
 		out = append(out, r)
 	}
 	return out, nil
@@ -177,6 +182,18 @@ func SyncEntityProgress(ctx context.Context, tx pgx.Tx, tenantID int64, entityTy
 		_, err := tx.Exec(ctx, `
 			update public.fin_supplier_invoices set progress_status = $1, updated_at = now()
 			where id = $2 and tenant_id = $3 and deleted_at is null`, ps, entityID, tenantID)
+		return err
+	case "inv_serial_adjustment_request":
+		ps := progressStatus
+		if ps == "confirmed" {
+			ps = "completed"
+		}
+		if ps == "unconfirmed" {
+			ps = "rejected"
+		}
+		_, err := tx.Exec(ctx, `
+			update public.inv_serial_adjustment_requests set status = $1, updated_at = now()
+			where id = $2 and tenant_id = $3`, ps, entityID, tenantID)
 		return err
 	default:
 		return nil

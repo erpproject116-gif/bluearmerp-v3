@@ -1,4 +1,4 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import { A, useSearchParams } from "@solidjs/router";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
@@ -126,6 +126,15 @@ export default function SerialRegistryListPage() {
         onReset={reset}
       />
 
+      <Show when={!list.isFetching && (list.data?.total ?? 0) === 0}>
+        <p class="mb-3 rounded-lg border border-dashed border-stroke bg-slate-50 px-4 py-3 text-sm text-text-secondary">
+          No serials match. For inbound stock, complete a{" "}
+          <A href="/app/purchases/purchase-receive" class="font-medium text-brand-700 hover:underline">
+            Purchase Receive
+          </A>{" "}
+          first — units appear here after confirm.
+        </p>
+      </Show>
       <div class="mt-6">
         <SpreadsheetGrid<SerialUnitRow>
           columns={[

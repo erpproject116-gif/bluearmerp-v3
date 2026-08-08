@@ -14,6 +14,7 @@ export function inventoryRefLink(
     purchase_order: "Purchase Order",
     quotation: "Quotation",
     serial_adjustment: "Serial Adjustment",
+    serial_register: "Serial Register",
     lot_adjustment: "Lot Adjustment",
     stock_entry: "Stock Entry",
   };
