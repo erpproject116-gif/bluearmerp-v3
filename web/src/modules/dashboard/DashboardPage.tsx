@@ -141,7 +141,8 @@ function RedFlagsTable(props: { categories: DashboardRedFlagCategory[]; total: n
 
 export default function DashboardPage() {
   const [params, setParams] = useSearchParams();
-  const tab = () => (params.tab === "overview" ? "overview" : "mypage");
+  // Business overview is the default landing tab; MyPage is opt-in via ?tab=mypage.
+  const tab = () => (params.tab === "mypage" ? "mypage" : "overview");
 
   const summary = useDashboardSummary();
   const salesTrend = useDashboardSalesTrend();
@@ -179,9 +180,13 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-lg font-semibold text-text-primary">MyPage</h2>
+          <h2 class="text-lg font-semibold text-text-primary">
+            {tab() === "overview" ? "Business overview" : "MyPage"}
+          </h2>
           <p class="text-sm text-text-secondary">
-            Guided home — learn links and process flow first; business KPIs on Overview.
+            {tab() === "overview"
+              ? "KPIs, trends, and financial health for this workspace."
+              : "Guided home — learn links and process flow."}
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -190,23 +195,23 @@ export default function DashboardPage() {
               type="button"
               class="rounded-md px-3 py-1.5 font-medium transition"
               classList={{
-                "bg-brand-600 text-white": tab() === "mypage",
-                "text-text-secondary hover:text-text-primary": tab() !== "mypage",
+                "bg-brand-600 text-white": tab() === "overview",
+                "text-text-secondary hover:text-text-primary": tab() !== "overview",
               }}
               onClick={() => setParams({ tab: undefined })}
             >
-              MyPage
+              Business overview
             </button>
             <button
               type="button"
               class="rounded-md px-3 py-1.5 font-medium transition"
               classList={{
-                "bg-brand-600 text-white": tab() === "overview",
-                "text-text-secondary hover:text-text-primary": tab() !== "overview",
+                "bg-brand-600 text-white": tab() === "mypage",
+                "text-text-secondary hover:text-text-primary": tab() !== "mypage",
               }}
-              onClick={() => setParams({ tab: "overview" })}
+              onClick={() => setParams({ tab: "mypage" })}
             >
-              Business overview
+              MyPage
             </button>
           </div>
           <A
