@@ -158,6 +158,11 @@ type Props = {
   lineViewKey?: string;
   /** Hide per-line partner columns (e.g. purchase order uses header vendor). */
   hidePartnerColumns?: boolean;
+  /**
+   * planned: PR-style optional serials (may sync qty from count).
+   * bill: New Bill — scan-next, qty-first (do not overwrite qty from serial length).
+   */
+  serialCaptureMode?: "planned" | "bill";
 };
 
 export function PurchaseRequestLineGrid(props: Props) {
@@ -566,25 +571,37 @@ export function PurchaseRequestLineGrid(props: Props) {
                       fallback={<SerialCellHint hasItem={Boolean(line().item_id)} />}
                     >
                       <div class="space-y-1">
-                        <Show when={line().item_id && line().track_serial}>
+                        <Show when={line().item_id && line().track_serial && props.serialCaptureMode !== "bill"}>
                           <p class="text-[10px] uppercase tracking-wide text-text-secondary">
                             Planned · optional on purchase request
                           </p>
                         </Show>
-                        <Show when={!line().item_id}>
+                        <Show when={!line().item_id && props.serialCaptureMode !== "bill"}>
                           <p class="text-[10px] uppercase tracking-wide text-text-secondary">Scan serial</p>
                         </Show>
                         <SerialLineCell
                           mode="planned"
                           qty={parseNum(line().qty) || 1}
                           plannedSerials={line().planned_serial_nos ?? []}
-                          onChange={(serials) =>
+                          entryMode={props.serialCaptureMode === "bill" ? "scan-next" : "bulk-edit"}
+                          hint={
+                            props.serialCaptureMode === "bill" && line().item_id && line().track_serial
+                              ? "Qty first · serial count must match"
+                              : undefined
+                          }
+                          onChange={(serials) => {
+                            if (props.serialCaptureMode === "bill") {
+                              void updateLine(idx, { planned_serial_nos: serials });
+                              return;
+                            }
                             void updateLine(idx, {
                               planned_serial_nos: serials,
                               qty: serials.length > 0 ? String(serials.length) : line().qty,
-                            })
+                            });
+                          }}
+                          onPopulateFromUnits={
+                            props.serialCaptureMode === "bill" ? undefined : (units) => applySerialUnits(units, idx)
                           }
-                          onPopulateFromUnits={(units) => applySerialUnits(units, idx)}
                         />
                       </div>
                     </Show>

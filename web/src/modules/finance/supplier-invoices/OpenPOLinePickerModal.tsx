@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
@@ -18,7 +18,16 @@ type Props = {
   mapOnly?: boolean;
 };
 
+type StatusChip = "all" | "in_progress" | "finished";
+
 const pageSize = 500;
+
+function poChip(status: string, progress: string): StatusChip {
+  const s = (status || "").toLowerCase();
+  if (s === "received") return "finished";
+  void progress;
+  return "in_progress";
+}
 
 export function OpenPOLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -32,14 +41,15 @@ export function OpenPOLinePickerModal(props: Props) {
   });
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal(new Set<number>());
+  const [statusChip, setStatusChip] = createSignal<StatusChip>("all");
 
   createEffect(() => {
     if (!props.open) return;
     setSelected(new Set<number>());
     setPage(1);
+    setStatusChip("all");
     setFilters({
       q: "",
-      // Default to all open PO lines (not last-30-days only).
       dateFrom: "",
       dateTo: "",
       docNo: "",
@@ -59,7 +69,14 @@ export function OpenPOLinePickerModal(props: Props) {
     },
   );
 
-  const rows = () => (data()?.rows ?? []) as unknown as Record<string, unknown>[];
+  const filteredRows = createMemo(() => {
+    const list = data()?.rows ?? [];
+    const chip = statusChip();
+    if (chip === "all") return list;
+    return list.filter((r) => poChip(String(r.status ?? ""), String(r.progress_status ?? "")) === chip);
+  });
+
+  const rows = () => filteredRows() as unknown as Record<string, unknown>[];
 
   const toggleRow = (id: number) => {
     setSelected((prev) => {
@@ -71,19 +88,25 @@ export function OpenPOLinePickerModal(props: Props) {
   };
 
   const toggleAll = () => {
-    const list = data()?.rows ?? [];
+    const list = filteredRows();
     if (selected().size === list.length) setSelected(new Set<number>());
     else setSelected(new Set(list.map((r) => r.purchase_order_line_id)));
   };
 
   const apply = () => {
-    const list = data()?.rows ?? [];
+    const list = filteredRows();
     const picked = list.filter((r) => selected().has(r.purchase_order_line_id));
     if (picked.length === 0) return;
     props.onConfirm(picked);
     props.onClose();
     setSelected(new Set<number>());
   };
+
+  const chips: { id: StatusChip; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "in_progress", label: "In Progress" },
+    { id: "finished", label: "Finished" },
+  ];
 
   return (
     <OpenTransactionMonitor
@@ -94,7 +117,7 @@ export function OpenPOLinePickerModal(props: Props) {
       onFiltersChange={setFilters}
       loading={data.loading}
       error={data.error}
-      total={data()?.total ?? 0}
+      total={filteredRows().length}
       page={page()}
       pageSize={pageSize}
       onPageChange={setPage}
@@ -103,6 +126,27 @@ export function OpenPOLinePickerModal(props: Props) {
       selected={selected()}
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
+      toolbar={
+        <div class="flex flex-wrap items-center gap-2">
+          <For each={chips}>
+            {(c) => (
+              <button
+                type="button"
+                class={`rounded px-2.5 py-1 text-xs font-medium ${
+                  statusChip() === c.id ? "bg-brand-600 text-white" : "border border-stroke text-text-secondary hover:bg-slate-50"
+                }`}
+                onClick={() => {
+                  setStatusChip(c.id);
+                  setSelected(new Set<number>());
+                }}
+              >
+                {c.label}
+              </button>
+            )}
+          </For>
+          <span class="text-[11px] text-text-secondary">Finished POs with unbilled qty remain available</span>
+        </div>
+      }
       columns={[
         {
           key: "po",
@@ -117,6 +161,9 @@ export function OpenPOLinePickerModal(props: Props) {
             const progress = String(r.progress_status ?? "");
             if (status === "draft" || progress === "unconfirmed") {
               return "Unconfirmed";
+            }
+            if (status === "received") {
+              return "Finished";
             }
             return openSlipDocStatusLabel(status || progress);
           },
@@ -152,7 +199,7 @@ export function OpenPOLinePickerModal(props: Props) {
       ]}
       onApply={apply}
       applyLabel={props.mapOnly ? "Map selected lines" : undefined}
-      emptyHint="No open Purchase Order lines. Clear Search/Doc No/dates if filtered, then retry. If Purchase Receive before Bill is on, use Load Slip → Purchase Receive at Save."
+      emptyHint="No open Purchase Order lines with unbilled qty. Finished POs appear when bill residual remains. Clear filters and try All."
     />
   );
 }

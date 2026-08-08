@@ -60,6 +60,13 @@ type PlannedProps = {
   onChange?: (serials: string[]) => void;
   /** Resolve registered serials and let parent fill the item line (purchase/PR). */
   onPopulateFromUnits?: (units: ResolvedSerialUnit[]) => void | Promise<void>;
+  /**
+   * scan-next: auto-commit each scan (New Bill).
+   * bulk-edit: keep list in the field (purchase request planned).
+   */
+  entryMode?: "scan-next" | "bulk-edit";
+  /** Hint above the field (Bill: qty-first then serials). */
+  hint?: string;
 };
 
 export type SerialLineCellProps = UnitsProps | ReceiveProps | PlannedProps;
@@ -493,14 +500,24 @@ function PlannedSerialCell(props: PlannedProps) {
     }
   };
 
+  const entryMode = () => props.entryMode ?? "bulk-edit";
+
   return (
     <>
+      <Show when={props.hint}>
+        <p class="mb-0.5 text-[10px] uppercase tracking-wide text-text-secondary">{props.hint}</p>
+      </Show>
       <InlineSerialBulkField
         serials={serials()}
         targetQty={targetQty()}
         disabled={props.disabled}
         busy={resolving()}
-        placeholder="Scan serial — fills item if registered"
+        entryMode={entryMode()}
+        placeholder={
+          entryMode() === "scan-next"
+            ? "Scan serial — adds automatically"
+            : "Scan serial — fills item if registered"
+        }
         onCommit={commitPlanned}
         onOpenAdvanced={() => setOpen(true)}
       />

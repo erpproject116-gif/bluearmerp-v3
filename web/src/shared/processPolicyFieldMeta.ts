@@ -55,7 +55,7 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
   },
   purchase_require_gr_before_supplier_invoice: {
     label: "Require Purchase Receive before Bill",
-    help: "On (recommended) = receive stock/proof first, then Bill. Off = simple bill+receive — saving a Bill from PO lines can also receive stock.",
+    help: "Off (default for new businesses) = New Bill is primary — confirm posts stock + serials and AP. On = legacy: Purchase Receive first, then Bill.",
   },
   purchase_order_require_attachment: {
     label: "Require file on purchase order",
@@ -63,7 +63,7 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
   },
   supplier_invoice_require_attachment: {
     label: "Require file on Bill",
-    help: "On = Bill needs an uploaded file before completion.",
+    help: "On = Bill needs an uploaded file (e.g. delivery receipt or vendor SI) before Completed.",
   },
   accounts_auto_post_or: {
     label: "Auto-post official receipts to journal",

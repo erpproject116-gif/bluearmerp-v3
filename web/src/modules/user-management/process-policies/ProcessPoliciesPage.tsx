@@ -103,8 +103,8 @@ const SECTIONS: PolicySection[] = [
       },
       {
         key: "purchase_require_gr_before_supplier_invoice",
-        label: "Require Purchase Receive before Bill",
-        help: "On (recommended) = Bill must use posted Purchase Receive lines. Off = simple bill+receive from PO is allowed.",
+        label: "Require Purchase Receive before Bill (legacy)",
+        help: "Off (default for new businesses) = New Bill posts stock on confirm. On = require posted Purchase Receive before Bill.",
       },
     ],
   },

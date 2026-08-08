@@ -37,6 +37,8 @@ export type SupplierInvoiceLine = {
   line_total: number;
   remark?: string | null;
   track_serial?: boolean;
+  serial_nos?: string[];
+  lot_lines?: { lot_no: string; qty: number }[];
 };
 
 export type SupplierInvoiceDetail = SupplierInvoiceRow & {

@@ -204,22 +204,22 @@ export function StocksDay1Setup(props: Props) {
                   : "Finish places, products, and opening stock first. Trading unlocks after payment confirmation."
               }
             >
-              You’re ready to trade. Buying: order → receive when the delivery arrives → bill → pay. Selling: sale → get
+              You’re ready to trade. Buying: order → New Bill (stock + serials + AP on confirm) → pay. Selling: sale → get
               paid. Find Stock updates when goods come in or go out.
             </Show>
           </p>
           <div class="mt-2 flex flex-wrap gap-2">
             <A
               href="/app/purchase-order/purchase-orders"
-              class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-slate-50"
             >
               Purchase orders
             </A>
             <A
-              href="/app/purchase-order/goods-receipt"
-              class="rounded-lg border border-stroke px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-slate-50"
+              href="/app/purchases/purchases/new"
+              class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
             >
-              Purchase Receive
+              New Bill
             </A>
             <A
               href="/app/sales"

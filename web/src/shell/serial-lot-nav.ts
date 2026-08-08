@@ -17,10 +17,10 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
-    label: "Receive",
+    label: "Receive (legacy)",
     href: "/app/inventory/serial-lot/receive",
     permissionCode: "inventory.serial_receive",
-    headerPriority: "primary",
+    headerPriority: "overflow",
   },
   {
     label: "Trace",

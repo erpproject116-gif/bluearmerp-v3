@@ -47,8 +47,10 @@ type SupplierInvoiceLine struct {
 	TaxAmount           float64 `json:"tax_amount"`
 	UnitVatInc          float64 `json:"unit_vat_inc"`
 	LineTotal           float64 `json:"line_total"`
-	Remark              *string `json:"remark,omitempty"`
-	TrackSerial         bool    `json:"track_serial,omitempty"`
+	Remark              *string  `json:"remark,omitempty"`
+	TrackSerial         bool     `json:"track_serial,omitempty"`
+	SerialNos           []string `json:"serial_nos,omitempty"`
+	LotLines            []billLotLine `json:"lot_lines,omitempty"`
 }
 
 type SupplierInvoice struct {
@@ -104,8 +106,10 @@ type supplierInvoiceLineBody struct {
 	NonVatTotal         float64 `json:"non_vat_total"`
 	TaxAmount           float64 `json:"tax_amount"`
 	UnitVatInc          float64 `json:"unit_vat_inc"`
-	LineTotal           float64 `json:"line_total"`
-	Remark              *string `json:"remark"`
+	LineTotal           float64       `json:"line_total"`
+	Remark              *string       `json:"remark"`
+	SerialNos           []string      `json:"serial_nos"`
+	LotLines            []billLotLine `json:"lot_lines"`
 }
 
 type supplierInvoiceBody struct {
@@ -650,7 +654,8 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		  sil.qty::float8, sil.unit_id, coalesce(sil.unit_code, ''),
 		  sil.unit_non_vat::float8, sil.non_vat_total::float8,
 		  sil.tax_amount::float8, sil.unit_vat_inc::float8, sil.line_total::float8, sil.remark,
-		  coalesce(i.track_serial, false)
+		  coalesce(i.track_serial, false),
+		  coalesce(sil.serial_nos, '[]'::jsonb), coalesce(sil.lot_lines, '[]'::jsonb)
 		from public.fin_supplier_invoice_lines sil
 		left join public.inv_items i on i.id = sil.item_id
 		where sil.supplier_invoice_id = $1
@@ -661,14 +666,38 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 	defer rows.Close()
 	for rows.Next() {
 		var ln SupplierInvoiceLine
+		var serialJSON, lotJSON []byte
 		if err := rows.Scan(
 			&ln.ID, &ln.LineNo, &ln.GoodsReceiptLineID, &ln.PurchaseOrderLineID,
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.UnitID, &ln.UnitCode,
 			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount, &ln.UnitVatInc, &ln.LineTotal, &ln.Remark,
-			&ln.TrackSerial,
+			&ln.TrackSerial, &serialJSON, &lotJSON,
 		); err != nil {
 			return SupplierInvoice{}, err
+		}
+		_ = json.Unmarshal(serialJSON, &ln.SerialNos)
+		_ = json.Unmarshal(lotJSON, &ln.LotLines)
+		if ln.SerialNos == nil {
+			ln.SerialNos = []string{}
+		}
+		if ln.LotLines == nil {
+			ln.LotLines = []billLotLine{}
+		}
+		// Prefer live GR serials when linked (source of truth after receive).
+		if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 && len(ln.SerialNos) == 0 {
+			srows, _ := pool.Query(ctx, `
+				select serial_no from public.gr_goods_receipt_serials
+				where goods_receipt_line_id = $1 order by id`, *ln.GoodsReceiptLineID)
+			if srows != nil {
+				for srows.Next() {
+					var sn string
+					if srows.Scan(&sn) == nil {
+						ln.SerialNos = append(ln.SerialNos, sn)
+					}
+				}
+				srows.Close()
+			}
 		}
 		inv.Lines = append(inv.Lines, ln)
 	}
@@ -688,16 +717,19 @@ func grLineBalance(ctx context.Context, tx pgx.Tx, tenantID, grLineID int64) (fl
 }
 
 // grLineBalanceExcluding returns open GR qty, optionally ignoring an invoice being updated.
+// Supports GR lines without a PO (blank Bill auto-receive): poLineID/poID are 0; partnerID unused.
 func grLineBalanceExcluding(ctx context.Context, tx pgx.Tx, tenantID, grLineID, excludeInvoiceID int64) (float64, int64, int64, int64, error) {
 	var receivedQty float64
-	var poLineID, poID int64
+	var poLineID *int64
+	var poID int64
 	var partnerID int64
 	err := tx.QueryRow(ctx, `
-		select grl.received_qty::float8, grl.purchase_order_line_id, po.id, po.partner_id
+		select grl.received_qty::float8, grl.purchase_order_line_id,
+		  coalesce(po.id, 0), coalesce(po.partner_id, 0)
 		from public.gr_goods_receipt_lines grl
 		join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
-		join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
-		join public.po_purchase_orders po on po.id = pol.purchase_order_id
+		left join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+		left join public.po_purchase_orders po on po.id = pol.purchase_order_id
 		where grl.id = $1 and gr.tenant_id = $2 and gr.status = 'posted'`,
 		grLineID, tenantID).Scan(&receivedQty, &poLineID, &poID, &partnerID)
 	if err != nil {
@@ -710,7 +742,11 @@ func grLineBalanceExcluding(ctx context.Context, tx pgx.Tx, tenantID, grLineID, 
 		where goods_receipt_line_id = $1 and slip_type = 'supplier_invoice'
 		  and ($2::bigint = 0 or supplier_invoice_id is distinct from $2)`,
 		grLineID, excludeInvoiceID).Scan(&billed)
-	return receivedQty - billed, poLineID, poID, partnerID, nil
+	pol := int64(0)
+	if poLineID != nil {
+		pol = *poLineID
+	}
+	return receivedQty - billed, pol, poID, partnerID, nil
 }
 
 func poLineBalance(ctx context.Context, tx pgx.Tx, tenantID, poLineID int64) (float64, int64, int64, error) {
@@ -833,14 +869,17 @@ func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenan
 				errs[key+".goods_receipt_line_id"] = "Goods receipt line not found or not posted."
 				continue
 			}
-			if linePartnerID != partnerID {
-				errs[key+".goods_receipt_line_id"] = "Vendor does not match purchase order."
+			// Blank Bill auto-receive has no PO — skip PO vendor/approval checks.
+			if poID > 0 {
+				if linePartnerID != partnerID {
+					errs[key+".goods_receipt_line_id"] = "Vendor does not match purchase order."
+				}
+				if msg := checkPOApproval(poID); msg != "" {
+					errs[key+".goods_receipt_line_id"] = msg
+				}
 			}
 			if ln.Qty > balance+0.0001 {
 				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds GR balance (%.4f).", balance)
-			}
-			if msg := checkPOApproval(poID); msg != "" {
-				errs[key+".goods_receipt_line_id"] = msg
 			}
 			continue
 		}
@@ -967,7 +1006,7 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		dateNoDisplay := formatDateNoDisplay(invoiceDate, dateSeq)
-		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, invoiceNo, dateNoDisplay, body.Lines); err != nil {
+		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, invoiceNo, dateNoDisplay, progress, body.Lines); err != nil {
 			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
@@ -979,6 +1018,13 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
+		}
+
+		if confirmingBillProgress(progress) {
+			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), pool, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.ValidationSmart(w, map[string]string{"invoice": err.Error()})
+				return
+			}
 		}
 
 		// Load Slip → Save: copy originating PO attachments when lines reference PO lines.
@@ -1030,18 +1076,41 @@ type supplierInvoiceLineRef struct {
 func resolveSupplierInvoiceLineItem(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody) (supplierInvoiceLineRef, error) {
 	ref := supplierInvoiceLineRef{UnitID: ln.UnitID, UnitCode: strings.TrimSpace(ln.UnitCode)}
 	if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
-		_, polID, _, _, grErr := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
-		if grErr != nil {
-			return supplierInvoiceLineRef{}, grErr
-		}
-		ref.POLineID = &polID
-		var poUnitID *int64
-		var poUnitCode string
+		var poLineID *int64
 		_ = tx.QueryRow(ctx, `
-			select pol.item_id, pol.item_code, pol.item_name, pol.unit_id, coalesce(pol.unit_code, '')
-			from public.po_purchase_order_lines pol where pol.id = $1`, polID).
-			Scan(&ref.ItemID, &ref.ItemCode, &ref.ItemName, &poUnitID, &poUnitCode)
-		ref.UnitID, ref.UnitCode = preferUnit(ref.UnitID, ref.UnitCode, poUnitID, poUnitCode)
+			select grl.purchase_order_line_id
+			from public.gr_goods_receipt_lines grl
+			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
+			where grl.id = $1 and gr.tenant_id = $2 and gr.status = 'posted'`,
+			*ln.GoodsReceiptLineID, tenantID).Scan(&poLineID)
+		if poLineID != nil && *poLineID > 0 {
+			_, polID, _, _, grErr := grLineBalance(ctx, tx, tenantID, *ln.GoodsReceiptLineID)
+			if grErr != nil {
+				return supplierInvoiceLineRef{}, grErr
+			}
+			ref.POLineID = &polID
+			var poUnitID *int64
+			var poUnitCode string
+			_ = tx.QueryRow(ctx, `
+				select pol.item_id, pol.item_code, pol.item_name, pol.unit_id, coalesce(pol.unit_code, '')
+				from public.po_purchase_order_lines pol where pol.id = $1`, polID).
+				Scan(&ref.ItemID, &ref.ItemCode, &ref.ItemName, &poUnitID, &poUnitCode)
+			ref.UnitID, ref.UnitCode = preferUnit(ref.UnitID, ref.UnitCode, poUnitID, poUnitCode)
+			return ref, nil
+		}
+		// Blank Bill auto-receive: GR without PO — use line item fields.
+		ref.ItemID = ln.ItemID
+		ref.ItemCode = strings.TrimSpace(ln.ItemCode)
+		ref.ItemName = strings.TrimSpace(ln.ItemName)
+		if (ref.ItemID == nil || *ref.ItemID <= 0) && ref.ItemCode != "" {
+			var found int64
+			if e := tx.QueryRow(ctx, `
+				select id from public.inv_items
+				where tenant_id = $1 and deleted_at is null and lower(item_code) = lower($2)
+				limit 1`, tenantID, ref.ItemCode).Scan(&found); e == nil {
+				ref.ItemID = &found
+			}
+		}
 		return ref, nil
 	}
 	if ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
@@ -1080,7 +1149,8 @@ func preferUnit(id *int64, code string, fallbackID *int64, fallbackCode string) 
 	return nil, fallbackCode
 }
 
-func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoiceID, partnerID, locationID, userID int64, invoiceNo, dateNoDisplay string, lines []supplierInvoiceLineBody) error {
+func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoiceID, partnerID, locationID, userID int64, invoiceNo, dateNoDisplay, progress string, lines []supplierInvoiceLineBody) error {
+	confirming := confirmingBillProgress(progress)
 	poLinesToSync := map[int64]bool{}
 	for i, ln := range lines {
 		lineNo := i + 1
@@ -1088,13 +1158,42 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 			lineNo = ln.LineNo
 		}
 		grLineID := ln.GoodsReceiptLineID
-		if (grLineID == nil || *grLineID <= 0) && ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
-			autoGR, err := ensureLegacyReceiveForInvoice(ctx, tx, tenantID, userID, locationID, *ln.PurchaseOrderLineID, ln.Qty)
+		if grLineID == nil || *grLineID <= 0 {
+			autoGR, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, partnerID, ln, confirming)
 			if err != nil {
 				return fmt.Errorf("line %d: %w", lineNo, err)
 			}
 			if autoGR != nil {
 				grLineID = autoGR
+			}
+		} else if confirming {
+			// GR-sourced: bill-only (stock already posted). Enforce serials via GR or client payload.
+			if len(normalizeSerialNos(ln.SerialNos)) > 0 {
+				if _, _, _, err := validateBillLineSerialLots(ctx, tx, tenantID, ln, confirming); err != nil {
+					return fmt.Errorf("line %d: %w", lineNo, err)
+				}
+			} else {
+				var trackSerial bool
+				if ln.ItemID != nil && *ln.ItemID > 0 {
+					_ = tx.QueryRow(ctx, `
+						select coalesce(track_serial, false) from public.inv_items where id = $1 and tenant_id = $2`,
+						*ln.ItemID, tenantID).Scan(&trackSerial)
+				} else {
+					_ = tx.QueryRow(ctx, `
+						select coalesce(i.track_serial, false)
+						from public.gr_goods_receipt_lines grl
+						left join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+						left join public.inv_items i on i.id = pol.item_id
+						where grl.id = $1`, *grLineID).Scan(&trackSerial)
+				}
+				if trackSerial {
+					var sc int
+					_ = tx.QueryRow(ctx, `select count(*) from public.gr_goods_receipt_serials where goods_receipt_line_id = $1`, *grLineID).Scan(&sc)
+					need := int(ln.Qty + 1e-9)
+					if sc < need {
+						return fmt.Errorf("line %d: Purchase Receive has %d serial(s); bill qty is %d", lineNo, sc, need)
+					}
+				}
 			}
 		}
 		ref, err := resolveSupplierInvoiceLineItem(ctx, tx, tenantID, supplierInvoiceLineBody{
@@ -1116,11 +1215,13 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 			insert into public.fin_supplier_invoice_lines (
 			  supplier_invoice_id, line_no, goods_receipt_line_id, purchase_order_line_id,
 			  item_id, item_code, item_name, description, qty, unit_id, unit_code,
-			  unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+			  unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
+			  serial_nos, lot_lines
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19::jsonb)`,
 			invoiceID, lineNo, grLineID, poLineID,
 			ref.ItemID, ref.ItemCode, ref.ItemName, ln.Description, ln.Qty, unitID, unitCode,
-			ln.UnitNonVat, ln.NonVatTotal, ln.TaxAmount, ln.UnitVatInc, ln.LineTotal, ln.Remark)
+			ln.UnitNonVat, ln.NonVatTotal, ln.TaxAmount, ln.UnitVatInc, ln.LineTotal, ln.Remark,
+			string(marshalSerialNos(ln.SerialNos)), string(marshalLotLines(ln.LotLines)))
 		if err != nil {
 			return err
 		}
@@ -1426,7 +1527,7 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 
 		parsedDate, _ := parseDate(body.InvoiceDate)
 		dateNoDisplay := formatDateNoDisplay(parsedDate, before.DateSeq)
-		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, before.InvoiceNo, dateNoDisplay, body.Lines); err != nil {
+		if err := insertSupplierInvoiceLines(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.LocationID, tu.AppUserID, before.InvoiceNo, dateNoDisplay, progress, body.Lines); err != nil {
 			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
@@ -1438,6 +1539,13 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
+		}
+
+		if confirmingBillProgress(progress) {
+			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), pool, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.ValidationSmart(w, map[string]string{"invoice": err.Error()})
+				return
+			}
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.supplier_invoice.update", "fin_supplier_invoice", &id, before, body)
