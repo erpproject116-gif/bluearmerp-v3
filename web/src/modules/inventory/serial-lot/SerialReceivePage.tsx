@@ -19,6 +19,7 @@ import { SerialReceiveScanner } from "../../../shared/SerialReceiveScanner";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { parseAndDedupeSerialBulkInput } from "../../../shared/serialBulkParse";
+import { InlineTip } from "../../../shared/inlineGuides";
 
 type PurchaseOrderRow = {
   id: number;
@@ -481,7 +482,7 @@ export default function SerialReceivePage() {
 
   return (
     <SerialLotLayout>
-      <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+      <InlineTip class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p class="font-medium">Prefer Purchase Receive for new purchases</p>
         <p class="mt-1 text-amber-900/90">
           Scan serials on Buy → Purchase Receive; confirming posts stock and AP. This page is for legacy draft
@@ -493,7 +494,7 @@ export default function SerialReceivePage() {
         >
           Use Purchase Receive
         </A>
-      </div>
+      </InlineTip>
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <div class="mb-4">
           <h2 class="text-lg font-semibold text-text-primary">{uiLabel("goods_receipt.receive_page_title")}</h2>

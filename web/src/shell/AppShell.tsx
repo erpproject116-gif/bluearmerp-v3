@@ -49,7 +49,7 @@ import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantCo
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
 import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
-import { InlineGuidesProvider, useInlineGuides } from "../shared/inlineGuides";
+import { useInlineGuides } from "../shared/inlineGuides";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
 import { ThemeSwitcher } from "../shared/ThemeSwitcher";
 
@@ -470,9 +470,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
 export const AppShell: ParentComponent = (props) => (
   <ShellProvider>
-    <InlineGuidesProvider>
-      <AppShellInner>{props.children}</AppShellInner>
-    </InlineGuidesProvider>
+    <AppShellInner>{props.children}</AppShellInner>
   </ShellProvider>
 );
 

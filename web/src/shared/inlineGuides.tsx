@@ -1,4 +1,12 @@
-import { createSignal, createContext, useContext, type ParentProps, type Accessor } from "solid-js";
+import {
+  createSignal,
+  createContext,
+  useContext,
+  type ParentProps,
+  type Accessor,
+  type JSX,
+  Show,
+} from "solid-js";
 
 const STORAGE_KEY = "bluearm:ui.inline_guides";
 
@@ -29,32 +37,60 @@ type InlineGuidesCtx = {
 
 const Ctx = createContext<InlineGuidesCtx>();
 
-/** Global Tips on/off for ModalFormGuide, StocksHowItFits, and similar in-panel copy — not workflow step n of n. */
+/**
+ * Module-level fallback so header Tips and tip consumers stay in sync even if a
+ * subtree misses InlineGuidesProvider (e.g. some Portal edge cases / tests).
+ */
+let sharedFallback: InlineGuidesCtx | undefined;
+
+function getSharedFallback(): InlineGuidesCtx {
+  if (sharedFallback) return sharedFallback;
+  const [enabled, setEnabledSignal] = createSignal(readEnabled());
+  const setEnabled = (value: boolean) => {
+    setEnabledSignal(value);
+    writeEnabled(value);
+  };
+  sharedFallback = {
+    enabled,
+    setEnabled,
+    toggle: () => setEnabled(!enabled()),
+  };
+  return sharedFallback;
+}
+
+/** Global Tips on/off for ModalFormGuide, InlineTip, StocksHowItFits — not workflow step n of n. */
 export function InlineGuidesProvider(props: ParentProps) {
   const [enabled, setEnabledSignal] = createSignal(readEnabled());
   const setEnabled = (value: boolean) => {
     setEnabledSignal(value);
     writeEnabled(value);
+    // Keep shared fallback aligned when both are used in one session.
+    getSharedFallback().setEnabled(value);
   };
   const toggle = () => setEnabled(!enabled());
   return <Ctx.Provider value={{ enabled, setEnabled, toggle }}>{props.children}</Ctx.Provider>;
 }
 
 export function useInlineGuides(): InlineGuidesCtx {
-  const ctx = useContext(Ctx);
-  if (ctx) return ctx;
-  // Fallback when provider missing (tests / isolated trees)
-  const [enabled, setEnabledSignal] = createSignal(readEnabled());
-  return {
-    enabled,
-    setEnabled: (v) => {
-      setEnabledSignal(v);
-      writeEnabled(v);
-    },
-    toggle: () => {
-      const next = !enabled();
-      setEnabledSignal(next);
-      writeEnabled(next);
-    },
-  };
+  return useContext(Ctx) ?? getSharedFallback();
+}
+
+/** Reset module fallback between unit tests (localStorage + in-memory signal). */
+export function resetInlineGuidesForTests() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* private mode */
+  }
+  sharedFallback = undefined;
+}
+
+/** Wrap in-panel tip / how-it-fits copy so header Tips off hides it. */
+export function InlineTip(props: { children: JSX.Element; class?: string }) {
+  const guides = useInlineGuides();
+  return (
+    <Show when={guides.enabled()}>
+      <div class={props.class}>{props.children}</div>
+    </Show>
+  );
 }

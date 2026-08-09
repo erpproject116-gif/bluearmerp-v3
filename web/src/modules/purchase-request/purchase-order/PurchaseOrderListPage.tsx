@@ -26,6 +26,7 @@ import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { toastAttachmentRequired } from "../../../shared/useProcessPolicy";
+import { InlineTip } from "../../../shared/inlineGuides";
 
 const OPERATIONAL_STATUS_TABS = [
   { value: "", label: "All statuses" },
@@ -349,14 +350,14 @@ export default function PurchaseOrderListPage() {
 
   return (
     <PurchaseRequestLayout>
-      <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+      <InlineTip class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
         <p class="font-medium text-slate-800">Buy path: Purchase Order → Purchase Receive → Payment Made</p>
         <p class="mt-1">
           After the PO, open <span class="font-medium">Purchase Receive</span> (Load Slip → Purchase Order), set qty, scan
           serials, attach DR / vendor SI, and confirm — stock and AP post together. Pay from Disbursements / Payment
           Voucher. Separate Receive history is legacy only.
         </p>
-      </div>
+      </InlineTip>
       <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"

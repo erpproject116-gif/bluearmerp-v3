@@ -4,6 +4,7 @@ import { Suspense } from "solid-js";
 import { AppShell } from "./shell/AppShell";
 import { AuthProvider } from "./shared/auth-context";
 import { ToastProvider } from "./shared/toast";
+import { InlineGuidesProvider } from "./shared/inlineGuides";
 import { AuthEntryRedirect } from "./shared/AuthRedirect";
 import { ProtectedRoute } from "./shared/ProtectedRoute";
 import { PageLoader } from "./shared/PageLoader";
@@ -381,6 +382,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
       <AuthProvider>
+        <InlineGuidesProvider>
         <BrandingProvider>
         <CrmTaskModalProvider>
         <Router root={(props) => (
@@ -965,6 +967,7 @@ export default function App() {
       </Router>
         </CrmTaskModalProvider>
         </BrandingProvider>
+        </InlineGuidesProvider>
       </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>

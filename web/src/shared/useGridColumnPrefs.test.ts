@@ -39,4 +39,20 @@ describe("useGridColumnPrefs", () => {
       dispose();
     });
   });
+
+  it("enables with route-style auto key", () => {
+    createRoot((dispose) => {
+      const prefs = useGridColumnPrefs(
+        () => "route:/app/sales/sales:sales_no|partner_name",
+        () => [
+          { key: "sales_no", header: "No." },
+          { key: "partner_name", header: "Customer" },
+        ],
+      );
+      expect(prefs.enabled()).toBe(true);
+      prefs.setColumnVisible("partner_name", false);
+      expect(prefs.visibleColumns().map((c) => c.key)).toEqual(["sales_no"]);
+      dispose();
+    });
+  });
 });

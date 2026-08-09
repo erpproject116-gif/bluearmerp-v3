@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import type { MeData } from "./auth-context";
 import { isTenantModuleEnabled } from "./moduleAccess";
+import { useInlineGuides } from "./inlineGuides";
 
 export type LoadSlipOption = {
   id: string;
@@ -27,6 +28,7 @@ function partnerHintText(kind: PartnerKind): string {
 }
 
 export function LoadSlipMenu(props: Props) {
+  const guides = useInlineGuides();
   const [open, setOpen] = createSignal(false);
   const [nudge, setNudge] = createSignal(false);
 
@@ -44,7 +46,7 @@ export function LoadSlipMenu(props: Props) {
   const needsPartner = () => Boolean(props.disabled && props.partnerLabel);
   const hardDisabled = () => empty() && !props.partnerLabel;
   const locked = () => Boolean(props.disabled) || empty();
-  const showGuide = () => needsPartner() || (nudge() && locked());
+  const showGuide = () => guides.enabled() && (needsPartner() || (nudge() && locked()));
 
   const guideText = () => {
     if (props.disabled && props.partnerLabel) return partnerHintText(props.partnerLabel);

@@ -16,6 +16,7 @@ import {
   type SerialRegistryFilters,
 } from "./serialRegistryFilters";
 import { SerialRegistryListFilter } from "./SerialRegistryListFilter";
+import { InlineTip } from "../../../shared/inlineGuides";
 
 export default function SerialRegistryListPage() {
   const invalidate = useInvalidateSerialLotLists();
@@ -112,7 +113,7 @@ export default function SerialRegistryListPage() {
 
   return (
     <SerialLotLayout>
-      <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+      <InlineTip class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p class="font-medium">Prefer Purchase Receive for inbound serials</p>
         <p class="mt-1 text-amber-900/90">
           Confirming a Purchase Receive posts stock and serials. Use Registry to find and manage units — Generate is for allocating
@@ -124,7 +125,7 @@ export default function SerialRegistryListPage() {
         >
           Use Purchase Receive
         </A>
-      </div>
+      </InlineTip>
       <Show when={urlFilterActive() && filterBannerText()}>
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-950">
           <p>
