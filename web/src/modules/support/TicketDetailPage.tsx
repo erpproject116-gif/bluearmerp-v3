@@ -201,7 +201,7 @@ export default function TicketDetailPage() {
                   </Show>
                   <Show when={t().warranty_asset_id}>
                     <A
-                      href={`/app/crm/warranty-assets?q=${encodeURIComponent(t().ticket_no)}`}
+                      href={`/app/after-sales/warranty?q=${encodeURIComponent(t().ticket_no)}`}
                       class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
                     >
                       View warranty coverage

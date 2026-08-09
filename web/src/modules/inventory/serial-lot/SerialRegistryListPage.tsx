@@ -187,7 +187,7 @@ export default function SerialRegistryListPage() {
             { key: "status", header: "Status", render: (r) => serialStatusLabel(r.status) },
             { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
             { key: "partner_name", header: "Partner", render: (r) => r.partner_name || "—" },
-            { key: "warranty_end", header: "Warranty end", render: (r) => fmtDate(r.warranty_end) },
+            { key: "warranty_end", header: "Unit warranty end", render: (r) => fmtDate(r.warranty_end) },
             { key: "purchase_order_no", header: "PO no.", render: (r) => r.purchase_order_no ?? "—" },
             { key: "received_at", header: "Received", render: (r) => fmtDate(r.received_at) },
             {

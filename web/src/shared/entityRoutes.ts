@@ -18,7 +18,7 @@ export function entityRecordHref(targetType: string, targetId: number): string |
     case "inv_item":
       return `/app/inventory/items?open=${targetId}`;
     case "crm_warranty_asset":
-      return `/app/crm/warranty-assets?open=${targetId}`;
+      return `/app/after-sales/warranty?open=${targetId}`;
     case "crm_follow_up_task":
       return `/app/crm/follow-up-tasks?task=${targetId}`;
     default:

@@ -144,13 +144,13 @@ export function SerialRegistryListFilter(props: Props) {
           }}
           fetchOptions={fetchLocations}
         />
-        <Field label="Warranty end from">
+        <Field label="Unit warranty end from">
           <DateInput
             value={props.value().warranty_end_from ?? ""}
             onInput={(e) => patch({ warranty_end_from: e.currentTarget.value })}
           />
         </Field>
-        <Field label="Warranty end to">
+        <Field label="Unit warranty end to">
           <DateInput
             value={props.value().warranty_end_to ?? ""}
             onInput={(e) => patch({ warranty_end_to: e.currentTarget.value })}

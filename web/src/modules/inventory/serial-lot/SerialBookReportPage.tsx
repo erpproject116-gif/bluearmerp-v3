@@ -1,4 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { DateInput } from "../../../shared/DateInput";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
@@ -12,6 +13,7 @@ import {
   type SerialBookSummaryRow,
 } from "../../../shared/useSerialReports";
 import { SerialLotLayout } from "./SerialLotLayout";
+import { openSerialTrace } from "./openSerialTrace";
 
 function defaultFilters(): SerialBookFilters {
   const range = defaultSerialBookDateRange();
@@ -23,6 +25,7 @@ function withRowIds<T extends object>(rows: T[], page: number, pageSize: number)
 }
 
 export default function SerialBookReportPage() {
+  const navigate = useNavigate();
   const [draft, setDraft] = createSignal<SerialBookFilters>(defaultFilters());
   const [submitted, setSubmitted] = createSignal<SerialBookFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
@@ -30,6 +33,8 @@ export default function SerialBookReportPage() {
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const pageSize = 25;
+
+  const goTrace = (row: { serial_no: string }) => openSerialTrace(navigate, row.serial_no);
 
   const report = useSerialBookReport(() => {
     const f = submitted();
@@ -163,7 +168,8 @@ export default function SerialBookReportPage() {
               onPageChange={setPage}
               onRefresh={search}
               onNew={() => {}}
-              onEdit={() => {}}
+              onEdit={goTrace}
+              showNew={false}
             />
           }
         >
@@ -192,7 +198,8 @@ export default function SerialBookReportPage() {
             onPageChange={setPage}
             onRefresh={search}
             onNew={() => {}}
-            onEdit={() => {}}
+            onEdit={goTrace}
+            showNew={false}
           />
         </Show>
       </div>

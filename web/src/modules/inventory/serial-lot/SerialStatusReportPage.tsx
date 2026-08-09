@@ -1,4 +1,5 @@
 import { createSignal, For, onMount, Show } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { DateInput } from "../../../shared/DateInput";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
@@ -13,6 +14,7 @@ import {
 import { SerialLotLayout } from "./SerialLotLayout";
 import { SERIAL_STATUS_OPTIONS, serialStatusLabel } from "./serialRegistryFilters";
 import { SERIAL_SLIP_TYPE_OPTIONS } from "../../../shared/itemMasterConstants";
+import { openSerialTrace } from "./openSerialTrace";
 
 const EVENT_TYPE_OPTIONS = [
   { value: "", label: "All" },
@@ -33,6 +35,7 @@ function withRowIds<T extends object>(rows: T[], page: number, pageSize: number)
 }
 
 export default function SerialStatusReportPage() {
+  const navigate = useNavigate();
   const [draft, setDraft] = createSignal<SerialStatusFilters>(defaultFilters());
   const [submitted, setSubmitted] = createSignal<SerialStatusFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
@@ -40,6 +43,8 @@ export default function SerialStatusReportPage() {
   const [order, setOrder] = createSignal<"asc" | "desc">("asc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const pageSize = 25;
+
+  const goTrace = (row: { serial_no: string }) => openSerialTrace(navigate, row.serial_no);
 
   const report = useSerialStatusReport(() => {
     const f = submitted();
@@ -194,7 +199,7 @@ export default function SerialStatusReportPage() {
                 { key: "item_name", header: "Item name" },
                 { key: "status", header: "Status", render: (r) => serialStatusLabel(r.status) },
                 { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
-                { key: "warranty_end", header: "Warranty end", render: (r) => fmtDate(r.warranty_end) },
+                { key: "warranty_end", header: "Unit warranty end", render: (r) => fmtDate(r.warranty_end) },
                 { key: "last_event_type", header: "Last event", render: (r) => r.last_event_type ?? "—" },
                 { key: "last_event_at", header: "Last event at", render: (r) => (r.last_event_at ? r.last_event_at.slice(0, 19).replace("T", " ") : "—") },
                 { key: "event_count", header: "Events in period" },
@@ -214,7 +219,8 @@ export default function SerialStatusReportPage() {
               onPageChange={setPage}
               onRefresh={search}
               onNew={() => {}}
-              onEdit={() => {}}
+              onEdit={goTrace}
+              showNew={false}
             />
           }
         >
@@ -242,6 +248,7 @@ export default function SerialStatusReportPage() {
             onRefresh={search}
             onNew={() => {}}
             onEdit={() => {}}
+            showNew={false}
           />
         </Show>
       </div>

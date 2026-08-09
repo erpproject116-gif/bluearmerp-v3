@@ -44,6 +44,7 @@
     "/app/crm/reports/low-stock",
     "/app/crm/settings/alert-rules",
     "/app/crm/warranty-assets",
+    "/app/after-sales/warranty",
     "/app/dashboard",
     "/app/dashboard/approvals",
     "/app/data-center/inbox",
@@ -339,6 +340,10 @@
     },
     {
       "path": "/app/crm/warranty-assets",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/after-sales/warranty",
       "kind": "app_static"
     },
     {

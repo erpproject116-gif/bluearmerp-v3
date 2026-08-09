@@ -12,6 +12,8 @@ export type WarrantyAsset = {
   item_name: string;
   serial_no: string;
   sales_id?: number | null;
+  serial_unit_id?: number | null;
+  warranty_origin?: string;
   warranty_start: string;
   warranty_end: string;
   status: WarrantyAssetStatus;
@@ -27,6 +29,10 @@ export type WarrantyAssetListParams = {
   partnerId?: number | null;
   expiryFrom?: string;
   expiryTo?: string;
+  /** Default sales/customer coverage. Pass "all" to include receipt-origin leftovers. */
+  coverage?: "sales" | "customer" | "all";
+  serialNo?: string;
+  serialNoExact?: boolean;
 };
 
 export function useWarrantyAssets(params: () => WarrantyAssetListParams) {
@@ -35,12 +41,17 @@ export function useWarrantyAssets(params: () => WarrantyAssetListParams) {
     const qs = new URLSearchParams({
       page: String(p.page),
       pageSize: String(p.pageSize),
+      coverage: p.coverage ?? "sales",
     });
     if (p.q) qs.set("q", p.q);
     if (p.status) qs.set("status", p.status);
     if (p.partnerId) qs.set("partner_id", String(p.partnerId));
     if (p.expiryFrom) qs.set("expiry_from", p.expiryFrom);
     if (p.expiryTo) qs.set("expiry_to", p.expiryTo);
+    if (p.serialNo) {
+      qs.set("serial_no", p.serialNo);
+      if (p.serialNoExact) qs.set("serial_no_exact", "1");
+    }
     return {
       queryKey: ["crm-warranty-assets", p],
       queryFn: async () => {
@@ -54,6 +65,25 @@ export function useWarrantyAssets(params: () => WarrantyAssetListParams) {
       staleTime: 30_000,
     };
   });
+}
+
+/** Exact serial lookup for Trace coverage panel (one page). */
+export async function fetchWarrantyBySerialExact(serialNo: string): Promise<WarrantyAsset | null> {
+  const sn = serialNo.trim();
+  if (!sn) return null;
+  const qs = new URLSearchParams({
+    page: "1",
+    pageSize: "5",
+    coverage: "all",
+    serial_no: sn,
+    serial_no_exact: "1",
+  });
+  const res = await apiFetch<WarrantyAsset[]>(`/api/v1/crm/warranty-assets?${qs}`, {}, { silent: true });
+  if (!res.success) return null;
+  const rows = res.data ?? [];
+  // Prefer sales-origin customer coverage when multiple exist.
+  const sales = rows.find((r) => r.warranty_origin === "sales" || r.sales_id);
+  return sales ?? rows[0] ?? null;
 }
 
 export async function patchWarrantyAsset(

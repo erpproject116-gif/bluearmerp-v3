@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
@@ -1277,10 +1276,9 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := crm.SyncWarrantyAssetsFromGoodsReceipt(r.Context(), tx, tu.TenantID, grID); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to sync warranty assets.", "ERR_INTERNAL")
-			return
-		}
+		// Customer warranty coverage is created on Sales (SyncWarrantyAssetsFromSale).
+		// Unit warranty dates are already stamped on inv_serial_units at receive.
+		// Do not create crm_warranty_assets here — receipt partner is typically the vendor.
 
 		var openLines int
 		if err := tx.QueryRow(r.Context(), `

@@ -139,6 +139,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/crm/opportunities": "crm.opportunities",
   "/app/crm/pipelines/quotations": "crm.pipelines_quotations",
   "/app/crm/warranty-assets": "crm.warranty_assets",
+  "/app/after-sales/warranty": "crm.warranty_assets",
   "/app/crm/reports/customer-quotations": "crm.reports_customer_quotations",
   "/app/crm/reports/item-demand": "crm.reports_item_demand",
   "/app/crm/reports/conversion": "crm.reports_conversion",

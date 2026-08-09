@@ -1,9 +1,13 @@
 import { A, useSearchParams } from "@solidjs/router";
-import { createSignal, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onMount, Show } from "solid-js";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { inventoryRefLink } from "../../../shared/inventoryRefLink";
 import { useSerialTrace } from "../../../shared/useSerialLotList";
+import {
+  fetchWarrantyBySerialExact,
+  type WarrantyAsset,
+} from "../../../shared/useWarrantyAssets";
 import { SerialLotLayout } from "./SerialLotLayout";
 import { serialStatusLabel } from "./serialRegistryFilters";
 
@@ -11,6 +15,7 @@ export default function SerialTracePage() {
   const [searchParams] = useSearchParams();
   const [draftSerialNo, setDraftSerialNo] = createSignal("");
   const [submittedSerialNo, setSubmittedSerialNo] = createSignal<string | null>(null);
+  const [coverage, setCoverage] = createSignal<WarrantyAsset | null | undefined>(undefined);
 
   const trace = useSerialTrace(() => submittedSerialNo());
 
@@ -23,7 +28,24 @@ export default function SerialTracePage() {
   const reset = () => {
     setDraftSerialNo("");
     setSubmittedSerialNo(null);
+    setCoverage(undefined);
   };
+
+  createEffect(() => {
+    const sn = submittedSerialNo();
+    if (!sn) {
+      setCoverage(undefined);
+      return;
+    }
+    setCoverage(undefined);
+    let cancelled = false;
+    void fetchWarrantyBySerialExact(sn).then((row) => {
+      if (!cancelled) setCoverage(row);
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
 
   onMount(() => {
     const raw = searchParams.serial_no;
@@ -43,6 +65,9 @@ export default function SerialTracePage() {
   });
 
   const fmtDate = (v?: string | null) => (v ? v.slice(0, 10) : "—");
+
+  const isCustomerCoverage = (row: WarrantyAsset) =>
+    row.warranty_origin === "sales" || row.sales_id != null;
 
   return (
     <SerialLotLayout>
@@ -138,12 +163,62 @@ export default function SerialTracePage() {
                       <dd class="font-medium">{data().links.purchase_request_no ?? "—"}</dd>
                     </div>
                     <div>
-                      <dt class="text-text-secondary">Warranty</dt>
+                      <dt class="text-text-secondary">Unit warranty dates</dt>
                       <dd class="font-medium">
                         {fmtDate(data().unit.warranty_start)} – {fmtDate(data().unit.warranty_end)}
                       </dd>
                     </div>
                   </dl>
+                </section>
+
+                <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+                  <h3 class="mb-3 text-base font-semibold text-text-primary">Customer coverage</h3>
+                  <Show
+                    when={coverage() !== undefined}
+                    fallback={<p class="text-sm text-text-secondary">Checking coverage…</p>}
+                  >
+                    <Show
+                      when={coverage() && isCustomerCoverage(coverage()!)}
+                      fallback={
+                        <p class="text-sm text-text-secondary">
+                          No customer coverage yet — created when this serial is sold.
+                        </p>
+                      }
+                    >
+                      <dl class="grid gap-2 text-sm md:grid-cols-2">
+                        <div>
+                          <dt class="text-text-secondary">Customer</dt>
+                          <dd class="font-medium">{coverage()!.partner_name || "—"}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-text-secondary">Status</dt>
+                          <dd class="font-medium">{coverage()!.status}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-text-secondary">Coverage start</dt>
+                          <dd class="font-medium">{fmtDate(coverage()!.warranty_start)}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-text-secondary">Coverage end</dt>
+                          <dd class="font-medium">{fmtDate(coverage()!.warranty_end)}</dd>
+                        </div>
+                      </dl>
+                      <div class="mt-3 flex flex-wrap gap-3 text-sm">
+                        <A
+                          href={`/app/after-sales/warranty?q=${encodeURIComponent(data().unit.serial_no)}&open=${coverage()!.id}`}
+                          class="font-medium text-brand-700 hover:underline"
+                        >
+                          Open Customer Warranty
+                        </A>
+                        <A
+                          href={`/app/after-sales/repair-orders?q=${encodeURIComponent(data().unit.serial_no)}`}
+                          class="font-medium text-brand-700 hover:underline"
+                        >
+                          Repair Orders
+                        </A>
+                      </div>
+                    </Show>
+                  </Show>
                 </section>
 
                 <SpreadsheetGrid
@@ -177,6 +252,7 @@ export default function SerialTracePage() {
                   onSelect={() => {}}
                   onNew={() => {}}
                   onEdit={() => {}}
+                  showNew={false}
                 />
               </div>
             )}

@@ -112,7 +112,7 @@ export const CRM_ENTITY = {
 export const CRM_SETTINGS_HREF = {
   alertRules: "/app/crm/settings/alert-rules",
   followUpTasks: "/app/crm/follow-up-tasks",
-  warrantyAssets: "/app/crm/warranty-assets",
+  warrantyAssets: "/app/after-sales/warranty",
 } as const;
 
 export type CrmFeature = keyof typeof CRM_ENTITY;
