@@ -192,7 +192,7 @@ export const UI_COPY_GROUPS: UiCopyGroup[] = [
       { key: "goods_receipt.scan_serials", label: "Scan serials panel title", fallback: "Scan serials" },
       { key: "goods_receipt.open_in_receive", label: "Open in receive link", fallback: "Open in Purchase Receive" },
       { key: "goods_receipt.draft_only_scans", label: "Draft-only scans message", fallback: "Only draft receipts accept serial scans." },
-      { key: "goods_receipt.receive_page_title", label: "Receive page title", fallback: "Purchase Receive / Scan Serials" },
+      { key: "goods_receipt.receive_page_title", label: "Receive page title", fallback: "Receive history / Scan (legacy)" },
       { key: "goods_receipt.lot_entry", label: "Lot entry section", fallback: "Lot entry" },
       { key: "goods_receipt.pre_post_review", label: "Pre-post review section", fallback: "Pre-post review (serials)" },
     ],

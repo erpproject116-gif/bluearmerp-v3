@@ -64,8 +64,8 @@ export function DayJobsPanel() {
       list.push({
         id: "receive",
         title: "Receive stock",
-        blurb: "Post a goods receipt against a purchase order.",
-        href: "/app/purchase-order/goods-receipt",
+        blurb: "Purchase Receive — post stock and serials from a PO.",
+        href: "/app/purchases/purchase-receive",
         count: flagCount("open_po") + (s?.open_po_lines ?? 0),
       });
     }
@@ -124,9 +124,22 @@ export function DayJobsPanel() {
       list.push({
         id: "stock",
         title: "Check stock",
-        blurb: "Low stock and serial registry.",
+        blurb: "Low stock and Serials.",
         href: "/app/crm/reports/low-stock",
         count: s?.low_stock_count ?? 0,
+      });
+    }
+    if (
+      isTenantModuleEnabled(m, "inventory") &&
+      (hasPermission(m, "crm.warranty_assets", "read") ||
+        hasPermission(m, "inventory", "read") ||
+        hasModuleAccess(m, "inventory"))
+    ) {
+      list.push({
+        id: "customer-warranty",
+        title: "Customer warranty list",
+        blurb: "Sold serials with customer coverage.",
+        href: "/app/after-sales/warranty",
       });
     }
 
@@ -138,7 +151,7 @@ export function DayJobsPanel() {
       href: "/app/dashboard/approvals",
     });
 
-    return list.slice(0, 8);
+    return list.slice(0, 9);
   });
 
   const needsAttention = createMemo(() => {

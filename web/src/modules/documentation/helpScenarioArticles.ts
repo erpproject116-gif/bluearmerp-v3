@@ -239,8 +239,8 @@ export const helpScenarioArticles: KbArticle[] = [
         text: "Partial receive: lower the line qty to match what you scanned, or finish scanning the remaining units. Do not leave qty higher than accepted serials.",
       },
     ],
-    primaryHref: "/app/inventory/serial-lot/receive",
-    primaryLabel: "Serial receive",
+    primaryHref: "/app/purchases/purchase-receive/new",
+    primaryLabel: "Purchase Receive",
     relatedGuideIds: ["serial-barcode-scanning", "goods-receipt-serial-receive", "pos-checkout-guide"],
   },
   {

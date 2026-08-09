@@ -351,7 +351,7 @@ export const moduleKbArticles: KbArticle[] = [
           "Open Buy → Purchase Receive and optionally select the vendor.",
           "Choose Load Slip → Purchase Order — use All / In Progress / Finished chips; Finished stays listed when unbilled qty remains.",
           "Set qty first, scan serials until count matches, attach files, then confirm (Completed).",
-          "Stock, serial registry, and purchase invoice JE / AP update together.",
+          "Stock, Serials, and purchase invoice JE / AP update together.",
         ],
       },
       {
@@ -1286,7 +1286,7 @@ export const moduleKbArticles: KbArticle[] = [
           "Switch to the Serial / Lot tab.",
           "Enable Track serial numbers or Track lot numbers — only one mode per item.",
           "Choose Required on transactions (default) or Optional to allow saving quotes, orders, sales, and GR without serial/lot when not yet known.",
-          "Save, then use the links to Serial registry or Lot batches for that SKU.",
+          "Save, then use the links to Serials or Lot batches for that SKU.",
         ],
       },
       {

@@ -50,4 +50,26 @@ describe("inlineGuides Tips toggle", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tips on" }));
     expect(screen.queryByText("Ungated tip copy")).not.toBeInTheDocument();
   });
+
+  it("dismisses a tip by tipId and keeps it hidden after remount", () => {
+    const view = render(() => (
+      <InlineGuidesProvider>
+        <InlineTip tipId="test-tip-a">
+          <p>Dismissable tip</p>
+        </InlineTip>
+      </InlineGuidesProvider>
+    ));
+    expect(screen.getByText("Dismissable tip")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Got it" }));
+    expect(screen.queryByText("Dismissable tip")).not.toBeInTheDocument();
+    view.unmount();
+    render(() => (
+      <InlineGuidesProvider>
+        <InlineTip tipId="test-tip-a">
+          <p>Dismissable tip</p>
+        </InlineTip>
+      </InlineGuidesProvider>
+    ));
+    expect(screen.queryByText("Dismissable tip")).not.toBeInTheDocument();
+  });
 });

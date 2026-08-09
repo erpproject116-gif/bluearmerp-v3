@@ -60,6 +60,8 @@ import { SupplierInvoiceApprovalPanel } from "./SupplierInvoiceApprovalPanel";
 import { SupplierInvoicePostSaveDialog } from "./SupplierInvoicePostSaveDialog";
 import { CashPaymentToVendorModal } from "./CashPaymentToVendorModal";
 import { tryAutoSavePurchaseInvoice } from "../../../shared/invoiceApi";
+import { TermHint } from "../../../shared/TermHint";
+import { A } from "@solidjs/router";
 
 export type { SupplierInvoiceDetail as PurchaseDetail };
 
@@ -707,7 +709,7 @@ export function SupplierInvoiceModal(props: Props) {
     } else {
       toast.warning(stockMsg);
     }
-    props.onClose();
+    setPostSaveOpen(true);
   };
 
   const finishPostSave = () => {
@@ -766,6 +768,40 @@ export function SupplierInvoiceModal(props: Props) {
       >
         <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
         <ModalFormGuide guideId="supplier_invoice" />
+        <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/50 px-3 py-2 text-xs text-slate-700">
+          <p class="font-medium text-text-primary">
+            <TermHint term="supplier_invoice" />
+          </p>
+          <Show
+            when={
+              progressStatus() === "completed" ||
+              progressStatus() === "confirm" ||
+              progressStatus() === "e_approval"
+            }
+            fallback={
+              <p class="mt-1">
+                Save the document, then set Progress to <span class="font-medium">Completed</span> to post stock
+                and AP. Next after that:{" "}
+                <A href="/app/finance/payment-vouchers" class="font-medium text-brand-700 hover:underline">
+                  Payment Made
+                </A>
+                .
+              </p>
+            }
+          >
+            <p class="mt-1">
+              Posted or confirming — next:{" "}
+              <A href="/app/finance/payment-vouchers" class="font-medium text-brand-700 hover:underline">
+                Payment Made
+              </A>{" "}
+              (pay the vendor). Serial units:{" "}
+              <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-700 hover:underline">
+                Serials
+              </A>
+              .
+            </p>
+          </Show>
+        </div>
         <draft.DraftBanner />
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
@@ -1078,7 +1114,9 @@ export function SupplierInvoiceModal(props: Props) {
           <Show when={!props.readOnly}>
             <div class="col-span-full space-y-2 border-t border-stroke pt-4">
               <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-text-primary">Withholding tax (2307)</p>
+                <p class="text-sm font-medium text-text-primary">
+                  <TermHint term="withholding_tax" /> (2307)
+                </p>
                 <button type="button" class="text-sm text-brand-600" onClick={addWhtLine}>
                   + Add withholding line
                 </button>
@@ -1226,6 +1264,9 @@ export function SupplierInvoiceModal(props: Props) {
         open={postSaveOpen()}
         invoiceNo={createdInvoice()?.invoice_no ?? ""}
         amount={createdInvoice()?.grand_total ?? 0}
+        hasSerials={lines().some(
+          (ln) => Boolean(ln.track_serial) && (ln.planned_serial_nos?.length ?? 0) > 0,
+        )}
         onCashPayment={() => {
           setPostSaveOpen(false);
           setCashPaymentOpen(true);

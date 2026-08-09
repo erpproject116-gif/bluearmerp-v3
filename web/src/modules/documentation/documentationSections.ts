@@ -167,15 +167,15 @@ export const documentationSections: DocSection[] = [
     title: "Serial and lot tracking",
     iconId: "inventory",
     intro: "Follow individual units from purchase through sale when items have serial numbers or lot batches.",
-    primaryHref: "/app/inventory/serial-lot/receive",
-    primaryLabel: "Open Receive / Scan",
+    primaryHref: "/app/purchases/purchase-receive/new",
+    primaryLabel: "New Purchase Receive",
     blocks: [
       {
         type: "flow",
         items: [
           "Purchase Request",
           "Purchase Order",
-          "Receive goods",
+          "Purchase Receive",
           "Sales Order",
           "Release",
           "Delivery receipt (optional)",
@@ -194,7 +194,7 @@ export const documentationSections: DocSection[] = [
         type: "steps",
         items: [
           "Create a Purchase Request, then convert it to a Purchase Order.",
-          "Open Serial & Lot → Receive / Scan to receive against the purchase order.",
+          "Open Purchases → Purchase Receive, load the PO, scan serials, and confirm to post stock.",
           "Create a Sales Order, then use Release Sales Order to allocate stock (and pick serials if needed).",
           "Post a Delivery Receipt when goods leave the warehouse (split release mode).",
           "Create a Sales invoice from released or delivered lines.",

@@ -4,7 +4,7 @@ import { InlineTip } from "../../shared/inlineGuides";
 /** Short map of Stocks screens — keeps Find Stock / Items / Serial-Lot from feeling like separate apps. */
 export function StocksHowItFits(props?: { class?: string }) {
   return (
-    <InlineTip class={`rounded-lg border border-dashed border-stroke bg-slate-50/90 px-3 py-2.5 ${props?.class ?? ""}`}>
+    <InlineTip tipId="stocks-how-it-fits" class={`rounded-lg border border-dashed border-stroke bg-slate-50/90 px-3 py-2.5 ${props?.class ?? ""}`}>
       <p class="text-xs font-semibold text-text-primary">How Stocks fits together</p>
       <p class="mt-0.5 text-[11px] text-text-secondary">
         New here? Start on{" "}
