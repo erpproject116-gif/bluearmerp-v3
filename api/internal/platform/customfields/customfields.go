@@ -113,13 +113,48 @@ func createDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		opts := mergeDefinitionOptions(body.Options, true)
+		label := strings.TrimSpace(body.Label)
+
+		// Soft-deleted rows still occupy the unique (tenant, entity, field_key) slot.
+		// Reactivate + update instead of failing with "already exists".
+		var existingID int64
+		var existingActive bool
+		findErr := pool.QueryRow(r.Context(), `
+			select id, is_active from public.tenant_custom_field_definitions
+			where tenant_id = $1 and btrim(entity_type) = btrim($2::text) and field_key = $3`,
+			tu.TenantID, entityType, body.FieldKey).Scan(&existingID, &existingActive)
+		if findErr == nil && existingID > 0 {
+			if existingActive {
+				response.Validation(w, map[string]string{"field_key": "Field key already exists for this entity."})
+				return
+			}
+			_, err := pool.Exec(r.Context(), `
+				update public.tenant_custom_field_definitions set
+				  label = $1, field_type = $2, options = $3, is_required = $4, sort_order = $5,
+				  is_active = true, updated_at = now()
+				where id = $6 and tenant_id = $7`,
+				label, body.FieldType, opts, body.IsRequired, body.SortOrder, existingID, tu.TenantID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to restore custom field.", "ERR_INTERNAL")
+				return
+			}
+			def, readErr := getDefinition(r.Context(), pool, tu.TenantID, existingID)
+			if readErr != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to restore custom field.", "ERR_INTERNAL")
+				return
+			}
+			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.custom_field.create", "tenant_custom_field", &def.ID, nil, def)
+			response.OK(w, def, "Restored.")
+			return
+		}
+
 		var def Definition
 		err := pool.QueryRow(r.Context(), `
 			insert into public.tenant_custom_field_definitions
 			  (tenant_id, entity_type, field_key, label, field_type, options, is_required, sort_order, is_active)
 			values ($1, $2, $3, $4, $5, $6, $7, $8, true)
 			returning id, entity_type, field_key, label, field_type, options, is_required, sort_order, is_active`,
-			tu.TenantID, entityType, body.FieldKey, strings.TrimSpace(body.Label),
+			tu.TenantID, entityType, body.FieldKey, label,
 			body.FieldType, opts, body.IsRequired, body.SortOrder).
 			Scan(&def.ID, &def.EntityType, &def.FieldKey, &def.Label, &def.FieldType, &def.Options,
 				&def.IsRequired, &def.SortOrder, &def.IsActive)
@@ -214,13 +249,21 @@ func deleteDefinitionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
-		before, _ := getDefinition(r.Context(), pool, tu.TenantID, id)
+		before, err := getDefinition(r.Context(), pool, tu.TenantID, id)
+		if err != nil || before.ID == 0 {
+			response.Err(w, http.StatusNotFound, "Custom field not found.", "ERR_NOT_FOUND")
+			return
+		}
+		// Hard delete so Remove clears the field from settings and frees the field_key.
+		_, _ = pool.Exec(r.Context(), `
+			delete from public.tenant_custom_field_values
+			where tenant_id = $1 and btrim(entity_type) = btrim($2::text) and field_key = $3`,
+			tu.TenantID, before.EntityType, before.FieldKey)
 		tag, err := pool.Exec(r.Context(), `
-			update public.tenant_custom_field_definitions
-			set is_active = false, updated_at = now()
+			delete from public.tenant_custom_field_definitions
 			where id = $1 and tenant_id = $2`, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
-			response.Err(w, http.StatusNotFound, "Custom field not found.", "ERR_NOT_FOUND")
+			response.Err(w, http.StatusInternalServerError, "Failed to remove custom field.", "ERR_INTERNAL")
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "settings.custom_field.delete", "tenant_custom_field", &id, before, nil)
@@ -324,6 +367,35 @@ func LoadValuesBatch(ctx context.Context, pool *pgxpool.Pool, tenantID int64, en
 	return out, nil
 }
 
+// IsPersonalBirthdayField reports whether a custom field is personal birthday/DOB
+// data (not part of selling documents such as Quotation).
+func IsPersonalBirthdayField(fieldKey, label string) bool {
+	key := strings.ToLower(strings.TrimSpace(fieldKey))
+	lbl := strings.ToLower(strings.TrimSpace(label))
+	hay := key + " " + lbl
+	switch lbl {
+	case "birthday", "birth day", "birthdate", "birth date", "date of birth", "dob":
+		return true
+	}
+	if strings.Contains(hay, "birthday") || strings.Contains(hay, "birth day") ||
+		strings.Contains(hay, "birthdate") || strings.Contains(hay, "birth date") ||
+		strings.Contains(hay, "date of birth") {
+		return true
+	}
+	if key == "dob" || strings.HasPrefix(key, "dob_") || strings.HasSuffix(key, "_dob") || strings.Contains(key, "_dob_") {
+		return true
+	}
+	return false
+}
+
+func skipRequiredOnEntity(entityType string, d Definition) bool {
+	// Quotation is a price offer — personal birthday/DOB must not gate save.
+	if strings.TrimSpace(entityType) == "quo_quotation" && IsPersonalBirthdayField(d.FieldKey, d.Label) {
+		return true
+	}
+	return false
+}
+
 func ValidateAndSave(ctx context.Context, conn pgx.Tx, tenantID int64, entityType string, entityID int64, values map[string]any) map[string]string {
 	defs, err := ListDefinitions(ctx, conn, tenantID, entityType, true)
 	if err != nil {
@@ -337,7 +409,7 @@ func ValidateAndSave(ctx context.Context, conn pgx.Tx, tenantID int64, entityTyp
 	for _, d := range defs {
 		defByKey[d.FieldKey] = d
 		val, ok := values[d.FieldKey]
-		if d.IsRequired && (!ok || isEmpty(val)) {
+		if d.IsRequired && (!ok || isEmpty(val)) && !skipRequiredOnEntity(entityType, d) {
 			errs["custom_values."+d.FieldKey] = fmt.Sprintf("%s is required.", d.Label)
 		}
 	}
