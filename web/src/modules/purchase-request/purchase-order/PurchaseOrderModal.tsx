@@ -129,6 +129,7 @@ export type PurchaseOrderDetail = {
     remark?: string | null;
     purchase_request_line_id?: number | null;
     planned_serial_nos?: string[];
+    warranty_duration_months?: number | null;
     track_serial?: boolean;
     serial_policy?: string;
   }>;
@@ -185,6 +186,7 @@ function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestL
     planned_serial_nos: ln.planned_serial_nos ?? [],
     track_serial: Boolean(ln.track_serial),
     serial_policy: ln.serial_policy ?? "required",
+    warranty_duration_months: ln.warranty_duration_months ?? 0,
   }));
 }
 
@@ -611,6 +613,7 @@ export function PurchaseOrderModal(props: Props) {
         input_basis: ln.input_basis,
         remark: ln.remark || null,
         planned_serial_nos: ln.planned_serial_nos ?? [],
+        warranty_duration_months: ln.warranty_duration_months ?? 0,
       })),
     };
 
@@ -985,6 +988,7 @@ export function PurchaseOrderModal(props: Props) {
                 }}
                 locationId={locationId}
                 hidePartnerColumns
+                showWarrantyColumns
                 lineViewKey={`${PURCHASE_REQUEST_ENTITY.purchaseOrder}.lines`}
               />
             </Show>

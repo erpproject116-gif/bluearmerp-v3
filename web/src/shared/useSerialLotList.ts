@@ -231,3 +231,13 @@ export function useInvalidateSerialLotLists() {
     void client.invalidateQueries({ queryKey: ["serial-trace"] });
   };
 }
+
+export async function patchSerialUnitWarranty(
+  id: number,
+  payload: { warranty_start?: string; warranty_end?: string },
+) {
+  return apiFetch<SerialUnitRow>(`/api/v1/inventory/serial-units/${id}/warranty`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }, { successMessage: "Unit warranty dates updated." });
+}

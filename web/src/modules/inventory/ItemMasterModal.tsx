@@ -375,7 +375,7 @@ export function ItemMasterModal(props: Props) {
           <Show when={props.form().track_serial || props.form().track_lot}>
             <p class="text-xs text-text-secondary">
               <A href="/app/inventory/serial-lot/registry" class="text-brand-600 hover:underline">
-                Serial registry
+                Serials
               </A>
               {" · "}
               <A href="/app/inventory/serial-lot/lots" class="text-brand-600 hover:underline">

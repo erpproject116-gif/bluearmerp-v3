@@ -43,6 +43,7 @@ export type SupplierInvoiceLine = {
   unit_vat_inc: number;
   line_total: number;
   remark?: string | null;
+  warranty_duration_months?: number | null;
   track_serial?: boolean;
   serial_nos?: string[];
   lot_lines?: { lot_no: string; qty: number }[];
@@ -109,6 +110,7 @@ export type OpenPOLine = {
   unit_non_vat: number;
   unit_vat_inc: number;
   track_serial?: boolean;
+  warranty_duration_months?: number | null;
 };
 
 export type OpenSupplierQuotationInvoiceLine = OpenPOLine & {

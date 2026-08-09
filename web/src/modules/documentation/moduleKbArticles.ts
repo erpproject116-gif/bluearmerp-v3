@@ -1247,29 +1247,29 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "serial-lot-registry",
-    title: "Serial & Lot: registry, trace, and manufacturing",
+    title: "Serial & Lot: Serials, detail, and manufacturing",
     scenario: "You need to look up a unit or manage lot batches and BOM production.",
     intro: "Serial & Lot is a Stock sub-branch for unit-level inventory, lot batches, movements, receive scanning, and single-level manufacturing.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Registry lists every serial unit and its status (in_stock, reserved, sold).",
+          "Serials lists every serial unit and its status (in_stock, reserved, sold), unit warranty end, and sold coverage flag.",
+          "Open a serial for detail: unit warranty dates, customer coverage after sale, and operational events.",
           "Use the Origin filter (Linked slip vs Manual) to separate receipt-linked units from manual registration.",
-          "Trace searches one serial number across receive, release, and sale events.",
-          "Lots tracks batch numbers when items use lot tracking instead of individual serials.",
+          "Lots tracks batch numbers when items use lot tracking instead of individual serials (expiry, not warranty).",
           "Receive (under Serial & Lot) is an alternate path to scan serials against open PO lines.",
           "Bills of Material and Work Orders build finished goods and backflush components on completion.",
-          "Open History on a registry or lot-batch row to see who registered, transferred, or adjusted that unit or lot (system audit).",
+          "Open History on a Serials or lot-batch row to see who registered, transferred, or adjusted that unit or lot (system audit).",
         ],
       },
       {
         type: "tip",
-        text: "Serial Trace shows operational events for one serial. History shows PIC and timestamps from Activity Logs for that unit. Use both when qty and serial counts disagree.",
+        text: "Serial detail shows operational events and warranty for one unit. History shows PIC and timestamps from Activity Logs. Use both when qty and serial counts disagree.",
       },
     ],
     primaryHref: "/app/inventory/serial-lot/registry",
-    primaryLabel: "Serial registry",
+    primaryLabel: "Serials",
     relatedGuideIds: ["serial-barcode-scanning", "item-serial-lot-tab", "sales-lot-batch-pick", "activity-logs-audit"],
   },
   {
@@ -1277,7 +1277,7 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Item master: Serial / Lot tab",
     scenario: "You are setting up an item for serial or lot tracking.",
     intro:
-      "Items → edit item → **Serial / Lot** tab. Choose serial or lot tracking (mutually exclusive). Set whether serial/lot capture is **Required** or **Optional** on transactions. After save, open Serial registry or Lot batches filtered by item.",
+      "Items → edit item → **Serial / Lot** tab. Choose serial or lot tracking (mutually exclusive). Set whether serial/lot capture is **Required** or **Optional** on transactions. After save, open Serials or Lot batches filtered by item.",
     blocks: [
       {
         type: "steps",
@@ -1540,13 +1540,13 @@ export const moduleKbArticles: KbArticle[] = [
         items: [
           "Open Activity Logs for a chronological tenant-wide audit trail (requires activity-log permission).",
           "Open Change Logs for before/after values on key documents (requires change-log permission).",
-          "On Selling, Buying, Finance, Inventory masters, Stock entries/movements, Price lists, After-Sales repairs, and Serial Registry / Lot Batches, click History on a row or the History button in an edit modal.",
+          "On Selling, Buying, Finance, Inventory masters, Stock entries/movements, Price lists, After-Sales repairs, and Serials / Lot Batches, click History on a row or the History button in an edit modal.",
           "Per-record History is available to users who can open the document—even without global Activity Log access.",
         ],
       },
       {
         type: "tip",
-        text: "Serial Trace (Serial & Lot) is operational unit history (receive → issue). History on the registry is the system audit of who registered or adjusted that serial. Use both when investigating stock vs serial mismatches.",
+        text: "Serial detail (Serial & Lot) is operational unit history (receive → issue) plus warranty. History on Serials is the system audit of who registered or adjusted that serial. Use both when investigating stock vs serial mismatches.",
       },
     ],
     primaryHref: "/app/activity-logs",

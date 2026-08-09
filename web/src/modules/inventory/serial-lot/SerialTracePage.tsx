@@ -1,13 +1,21 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { createEffect, createSignal, onMount, Show } from "solid-js";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
-import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
+import { DateInput } from "../../../shared/DateInput";
+import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { inventoryRefLink } from "../../../shared/inventoryRefLink";
-import { useSerialTrace } from "../../../shared/useSerialLotList";
+import {
+  patchSerialUnitWarranty,
+  useInvalidateSerialLotLists,
+  useSerialTrace,
+} from "../../../shared/useSerialLotList";
 import {
   fetchWarrantyBySerialExact,
+  patchWarrantyAsset,
   type WarrantyAsset,
+  type WarrantyAssetStatus,
 } from "../../../shared/useWarrantyAssets";
+import { useToast } from "../../../shared/toast";
 import { SerialLotLayout } from "./SerialLotLayout";
 import { serialStatusLabel } from "./serialRegistryFilters";
 
@@ -16,8 +24,22 @@ export default function SerialTracePage() {
   const [draftSerialNo, setDraftSerialNo] = createSignal("");
   const [submittedSerialNo, setSubmittedSerialNo] = createSignal<string | null>(null);
   const [coverage, setCoverage] = createSignal<WarrantyAsset | null | undefined>(undefined);
+  const [unitModalOpen, setUnitModalOpen] = createSignal(false);
+  const [coverModalOpen, setCoverModalOpen] = createSignal(false);
+  const [editUnitStart, setEditUnitStart] = createSignal("");
+  const [editUnitEnd, setEditUnitEnd] = createSignal("");
+  const [editCoverEnd, setEditCoverEnd] = createSignal("");
+  const [editCoverStatus, setEditCoverStatus] = createSignal<WarrantyAssetStatus>("active");
+  const [saving, setSaving] = createSignal(false);
+  const toast = useToast();
+  const invalidateSerial = useInvalidateSerialLotLists();
 
   const trace = useSerialTrace(() => submittedSerialNo());
+
+  const reloadCoverage = (sn: string) => {
+    setCoverage(undefined);
+    void fetchWarrantyBySerialExact(sn).then((row) => setCoverage(row));
+  };
 
   const search = () => {
     const sn = draftSerialNo().trim();
@@ -37,8 +59,8 @@ export default function SerialTracePage() {
       setCoverage(undefined);
       return;
     }
-    setCoverage(undefined);
     let cancelled = false;
+    setCoverage(undefined);
     void fetchWarrantyBySerialExact(sn).then((row) => {
       if (!cancelled) setCoverage(row);
     });
@@ -69,11 +91,62 @@ export default function SerialTracePage() {
   const isCustomerCoverage = (row: WarrantyAsset) =>
     row.warranty_origin === "sales" || row.sales_id != null;
 
+  const openUnitEdit = () => {
+    const u = trace.data?.unit;
+    if (!u) return;
+    setEditUnitStart(u.warranty_start?.slice(0, 10) ?? "");
+    setEditUnitEnd(u.warranty_end?.slice(0, 10) ?? "");
+    setUnitModalOpen(true);
+  };
+
+  const openCoverEdit = () => {
+    const row = coverage();
+    if (!row || !isCustomerCoverage(row)) return;
+    setEditCoverEnd(row.warranty_end?.slice(0, 10) ?? "");
+    setEditCoverStatus(row.status);
+    setCoverModalOpen(true);
+  };
+
+  const saveUnitDates = async () => {
+    const u = trace.data?.unit;
+    if (!u) return;
+    setSaving(true);
+    const res = await patchSerialUnitWarranty(u.id, {
+      warranty_start: editUnitStart().trim(),
+      warranty_end: editUnitEnd().trim(),
+    });
+    setSaving(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not update unit dates.");
+      return;
+    }
+    setUnitModalOpen(false);
+    invalidateSerial();
+  };
+
+  const saveCoverage = async () => {
+    const row = coverage();
+    if (!row) return;
+    setSaving(true);
+    const res = await patchWarrantyAsset(row.id, {
+      warranty_end: editCoverEnd(),
+      status: editCoverStatus(),
+    });
+    setSaving(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not update coverage.");
+      return;
+    }
+    setCoverModalOpen(false);
+    const sn = submittedSerialNo();
+    if (sn) reloadCoverage(sn);
+  };
+
   return (
     <SerialLotLayout>
       <CollapsibleFilterPanel
-        title="Lookup serial"
-        description="Enter a serial number, then Search (F8). Or open Trace from Registry."
+        title="Serial detail"
+        description="Look up a serial to manage unit warranty dates, customer coverage, and history. Or open a row from Serials."
         actions={
           <>
             <button
@@ -111,9 +184,9 @@ export default function SerialTracePage() {
         fallback={
           <div class="mt-6 rounded-xl border border-stroke bg-white p-8 text-center text-sm text-text-secondary shadow-sm">
             <p class="font-medium text-text-primary">No serial selected</p>
-            <p class="mt-2">Enter a serial or open Trace from Registry.</p>
+            <p class="mt-2">Enter a serial above, or open a unit from the Serials list.</p>
             <A href="/app/inventory/serial-lot/registry" class="mt-3 inline-block text-brand-600 hover:underline">
-              Go to Registry
+              Go to Serials
             </A>
           </div>
         }
@@ -130,7 +203,18 @@ export default function SerialTracePage() {
             {(data) => (
               <div class="mt-6 space-y-6">
                 <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-                  <h3 class="mb-3 text-base font-semibold text-text-primary">Unit</h3>
+                  <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="text-base font-semibold text-text-primary">Unit</h3>
+                    <Show when={data().unit.status !== "void"}>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-slate-50"
+                        onClick={openUnitEdit}
+                      >
+                        Adjust unit dates
+                      </button>
+                    </Show>
+                  </div>
                   <dl class="grid gap-2 text-sm md:grid-cols-2">
                     <div>
                       <dt class="text-text-secondary">Serial no.</dt>
@@ -172,7 +256,18 @@ export default function SerialTracePage() {
                 </section>
 
                 <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-                  <h3 class="mb-3 text-base font-semibold text-text-primary">Customer coverage</h3>
+                  <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="text-base font-semibold text-text-primary">Customer coverage</h3>
+                    <Show when={coverage() && isCustomerCoverage(coverage()!)}>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-slate-50"
+                        onClick={openCoverEdit}
+                      >
+                        Adjust coverage
+                      </button>
+                    </Show>
+                  </div>
                   <Show
                     when={coverage() !== undefined}
                     fallback={<p class="text-sm text-text-secondary">Checking coverage…</p>}
@@ -180,9 +275,12 @@ export default function SerialTracePage() {
                     <Show
                       when={coverage() && isCustomerCoverage(coverage()!)}
                       fallback={
-                        <p class="text-sm text-text-secondary">
-                          No customer coverage yet — created when this serial is sold.
-                        </p>
+                        <div class="space-y-2 text-sm text-text-secondary">
+                          <p>No customer coverage yet — created when this serial is sold.</p>
+                          <A href="/app/sales/sales" class="font-medium text-brand-700 hover:underline">
+                            Go to Sales
+                          </A>
+                        </div>
                       }
                     >
                       <dl class="grid gap-2 text-sm md:grid-cols-2">
@@ -223,13 +321,29 @@ export default function SerialTracePage() {
 
                 <SpreadsheetGrid
                   columns={[
-                    { key: "created_at", header: "When", render: (r) => r.created_at.slice(0, 19).replace("T", " ") },
-                    { key: "event_type", header: "Event" },
-                    { key: "from_location_name", header: "From", render: (r) => r.from_location_name || "—" },
-                    { key: "to_location_name", header: "To", render: (r) => r.to_location_name || "—" },
+                    {
+                      key: "created_at",
+                      header: "When",
+                      clickable: false,
+                      render: (r) => r.created_at.slice(0, 19).replace("T", " "),
+                    },
+                    { key: "event_type", header: "Event", clickable: false },
+                    {
+                      key: "from_location_name",
+                      header: "From",
+                      clickable: false,
+                      render: (r) => r.from_location_name || "—",
+                    },
+                    {
+                      key: "to_location_name",
+                      header: "To",
+                      clickable: false,
+                      render: (r) => r.to_location_name || "—",
+                    },
                     {
                       key: "ref_type",
                       header: "Reference",
+                      clickable: false,
                       render: (r) => {
                         const link = inventoryRefLink(r.ref_type, r.ref_id);
                         return link.href ? (
@@ -241,8 +355,13 @@ export default function SerialTracePage() {
                         );
                       },
                     },
-                    { key: "created_by_name", header: "By", render: (r) => r.created_by_name || "—" },
-                    { key: "notes", header: "Notes", render: (r) => r.notes ?? "—" },
+                    {
+                      key: "created_by_name",
+                      header: "By",
+                      clickable: false,
+                      render: (r) => r.created_by_name || "—",
+                    },
+                    { key: "notes", header: "Notes", clickable: false, render: (r) => r.notes ?? "—" },
                   ]}
                   rows={data().events}
                   loading={trace.isFetching}
@@ -259,6 +378,47 @@ export default function SerialTracePage() {
           </Show>
         </Show>
       </Show>
+
+      <EntityModal
+        open={unitModalOpen()}
+        title="Adjust unit warranty dates"
+        onClose={() => setUnitModalOpen(false)}
+        onSave={() => void saveUnitDates()}
+        saving={saving()}
+      >
+        <p class="mb-3 text-xs text-text-secondary">
+          These are the unit receive stamp dates. Changing them does not rewrite customer coverage.
+        </p>
+        <Field label="Unit warranty start">
+          <DateInput value={editUnitStart()} onInput={(e) => setEditUnitStart(e.currentTarget.value)} />
+        </Field>
+        <Field label="Unit warranty end">
+          <DateInput value={editUnitEnd()} onInput={(e) => setEditUnitEnd(e.currentTarget.value)} />
+        </Field>
+      </EntityModal>
+
+      <EntityModal
+        open={coverModalOpen()}
+        title="Adjust customer coverage"
+        onClose={() => setCoverModalOpen(false)}
+        onSave={() => void saveCoverage()}
+        saving={saving()}
+      >
+        <Field label="Coverage end">
+          <DateInput value={editCoverEnd()} onInput={(e) => setEditCoverEnd(e.currentTarget.value)} />
+        </Field>
+        <Field label="Status">
+          <select
+            class={inputClass}
+            value={editCoverStatus()}
+            onChange={(e) => setEditCoverStatus(e.currentTarget.value as WarrantyAssetStatus)}
+          >
+            <option value="active">Active</option>
+            <option value="expired">Expired</option>
+            <option value="void">Void</option>
+          </select>
+        </Field>
+      </EntityModal>
     </SerialLotLayout>
   );
 }

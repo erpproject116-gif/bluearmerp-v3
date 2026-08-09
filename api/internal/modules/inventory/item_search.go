@@ -51,8 +51,9 @@ type itemSearchResult struct {
 	LotPolicy           string   `json:"lot_policy"`
 	BaseUnitID          *int64   `json:"base_unit_id,omitempty"`
 	BaseUnitCode        string   `json:"base_unit_code,omitempty"`
-	DefaultLocationQty  *float64 `json:"default_location_qty,omitempty"`
-	TotalInvQty         *float64 `json:"total_inv_qty,omitempty"`
+	DefaultLocationQty     *float64 `json:"default_location_qty,omitempty"`
+	TotalInvQty            *float64 `json:"total_inv_qty,omitempty"`
+	WarrantyDurationMonths *int     `json:"warranty_duration_months,omitempty"`
 }
 
 var validItemCategories = map[string]bool{
@@ -247,6 +248,7 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 			       coalesce(bu.code, nullif(trim(i.unit), ''), '') as base_unit_code,
 			       def_bal.qty_on_hand::float8 as default_location_qty,
 			       coalesce(tot_bal.qty_on_hand, 0)::float8 as total_inv_qty,
+			       i.warranty_duration_months,
 			       count(*) over()
 			from public.inv_items i
 			left join public.inv_units bu on bu.id = i.base_unit_id
@@ -286,7 +288,7 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 			var defQty, totQty *float64
 			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.SalesPrice, &row.Status,
 				&row.TrackInventoryQty, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy,
-				&row.BaseUnitID, &row.BaseUnitCode, &defQty, &totQty, &total); err != nil {
+				&row.BaseUnitID, &row.BaseUnitCode, &defQty, &totQty, &row.WarrantyDurationMonths, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read items.", "ERR_INTERNAL")
 				return
 			}

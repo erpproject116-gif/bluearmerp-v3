@@ -558,7 +558,7 @@ export default function SerialReceivePage() {
                       <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-700 hover:underline">
                         Generate
                       </A>{" "}
-                      in the registry — Generate already puts them in stock, so receive will reject them as duplicates.
+                      on Serials — Generate already puts them in stock, so receive will reject them as duplicates.
                     </li>
                   </ul>
                 </div>
@@ -580,7 +580,7 @@ export default function SerialReceivePage() {
                                 href={`/app/inventory/serial-lot/registry?q=${encodeURIComponent(g.item_code)}`}
                                 class="underline hover:no-underline"
                               >
-                                Check registry for {g.item_code}
+                                Check Serials for {g.item_code}
                               </A>
                             </>
                           ) : null}

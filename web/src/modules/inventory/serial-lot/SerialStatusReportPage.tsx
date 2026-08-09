@@ -226,11 +226,16 @@ export default function SerialStatusReportPage() {
         >
           <SpreadsheetGrid<SerialStatusSummaryRow & { id: number }>
             columns={[
-              { key: "item_code", header: "Item code" },
-              { key: "item_name", header: "Item name" },
-              { key: "status", header: "Status", render: (r) => serialStatusLabel(r.status) },
-              { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
-              { key: "unit_count", header: "Units" },
+              { key: "item_code", header: "Item code", clickable: false },
+              { key: "item_name", header: "Item name", clickable: false },
+              { key: "status", header: "Status", clickable: false, render: (r) => serialStatusLabel(r.status) },
+              {
+                key: "location_name",
+                header: "Location",
+                clickable: false,
+                render: (r) => r.location_name || "—",
+              },
+              { key: "unit_count", header: "Units", clickable: false },
             ]}
             rows={withRowIds((report.data?.rows ?? []) as SerialStatusSummaryRow[], page(), pageSize)}
             loading={report.isFetching}

@@ -203,7 +203,7 @@ export default function SerialAdjustmentPage() {
       <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p class="font-medium">Corrections only</p>
         <p class="mt-1 text-amber-900/90">
-          After Purchase Receive is Completed, find units in Registry. This screen lists candidates so you can fix quantity
+          After Purchase Receive is Completed, find units in Serials. This screen lists candidates so you can fix quantity
           exceptions — it is not the post-receive destination.
         </p>
       </div>

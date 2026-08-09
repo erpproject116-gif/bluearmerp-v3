@@ -1,4 +1,5 @@
 import { createSignal, onMount } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { DateInput } from "../../../shared/DateInput";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -8,6 +9,7 @@ import {
   type SerialEventRow,
 } from "../../../shared/useSerialLotList";
 import { SerialLotLayout } from "./SerialLotLayout";
+import { openSerialTrace } from "./openSerialTrace";
 
 type MovementFilters = {
   q?: string;
@@ -43,6 +45,8 @@ function eventTypeLabel(t: string): string {
 
 export default function SerialMovementsListPage() {
   const invalidate = useInvalidateSerialLotLists();
+  const navigate = useNavigate();
+  const goTrace = (row: { serial_no: string }) => openSerialTrace(navigate, row.serial_no);
 
   const [draftFilters, setDraftFilters] = createSignal<MovementFilters>(defaultMovementFilters());
   const [submittedFilters, setSubmittedFilters] = createSignal<MovementFilters>(defaultMovementFilters());
@@ -183,7 +187,8 @@ export default function SerialMovementsListPage() {
           onPageChange={setPage}
           onRefresh={invalidate}
           onNew={() => {}}
-          onEdit={() => {}}
+          onEdit={goTrace}
+          showNew={false}
         />
       </div>
     </SerialLotLayout>

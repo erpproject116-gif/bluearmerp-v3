@@ -1,4 +1,4 @@
-/** Navigate to Serial Trace for a unit (shared by Inv. Book / Status reports). */
+/** Navigate to Serial detail (unit dates, customer coverage, history). */
 export function serialTraceHref(serialNo: string): string {
   const sn = serialNo.trim();
   return `/app/inventory/serial-lot/trace?serial_no=${encodeURIComponent(sn)}`;
