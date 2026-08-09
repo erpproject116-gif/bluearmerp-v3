@@ -1,6 +1,6 @@
 import { type JSX, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { Portal } from "solid-js/web";
-import { A } from "@solidjs/router";
+import { A, useLocation } from "@solidjs/router";
 import {
   downloadItemsImportTemplate,
   importItemsCsv,
@@ -13,6 +13,14 @@ import { uiLabel } from "./branding/uiLabel";
 import { GridExportButtons, type GridExportColumn } from "./gridExport";
 import { useGridColumnPrefs } from "./useGridColumnPrefs";
 import { PageJumpControl } from "./PageJumpControl";
+
+const NON_HIDEABLE_KEYS = new Set(["actions", "print", "history", "lifecycle", "date_no_display"]);
+
+function defaultColumnHideable(key: string, explicit?: boolean): boolean {
+  if (explicit === false) return false;
+  if (explicit === true) return true;
+  return !NON_HIDEABLE_KEYS.has(key);
+}
 
 export type Column<T> = {
   key: string;
@@ -74,11 +82,12 @@ type Props<T extends { id: number }> = {
   /** Force-hide export controls (overrides default). */
   hideExport?: boolean;
   /**
-   * When set, shows a Columns picker and persists personal hide prefs under
-   * bluearm:grid.columns:{columnPrefsKey}. Tenant-hidden columns should already
-   * be filtered from `columns` by the page.
+   * Personal Columns picker persistence key (`bluearm:grid.columns:{key}`).
+   * - omit / undefined: auto key from route + column keys (enabled on all lists)
+   * - string: explicit key (e.g. tenant list-view settings)
+   * - false: disable Columns picker for this grid
    */
-  columnPrefsKey?: string;
+  columnPrefsKey?: string | false;
 };
 
 function selectionSet(ids?: Set<number> | number[]): Set<number> {
@@ -87,6 +96,7 @@ function selectionSet(ids?: Set<number> | number[]): Set<number> {
 }
 
 export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
+  const location = useLocation();
   const [focusIdx, setFocusIdx] = createSignal(0);
   const [importing, setImporting] = createSignal(false);
   const [columnsMenuOpen, setColumnsMenuOpen] = createSignal(false);
@@ -94,9 +104,23 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   let fileInputEl: HTMLInputElement | undefined;
   let columnsMenuEl: HTMLDivElement | undefined;
 
+  const resolvedColumnPrefsKey = createMemo(() => {
+    if (props.columnPrefsKey === false) return undefined;
+    if (typeof props.columnPrefsKey === "string" && props.columnPrefsKey.trim()) {
+      return props.columnPrefsKey.trim();
+    }
+    const colKeys = props.columns.map((c) => c.key).join("|");
+    return `route:${location.pathname}:${colKeys}`;
+  });
+
   const columnPrefs = useGridColumnPrefs(
-    () => props.columnPrefsKey,
-    () => props.columns.map((c) => ({ key: c.key, header: c.header, hideable: c.hideable })),
+    () => resolvedColumnPrefsKey(),
+    () =>
+      props.columns.map((c) => ({
+        key: c.key,
+        header: c.header,
+        hideable: defaultColumnHideable(c.key, c.hideable),
+      })),
   );
 
   const activeColumns = createMemo(() => {

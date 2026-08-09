@@ -10,6 +10,7 @@ import type { PartnerBookType } from "./partnerBookFilters";
 import { defaultPartnerBookFilters, formatDisplayDate, partnerBookExportUrl } from "./partnerBookFilters";
 import { usePartnerBookReport } from "../../../shared/usePartnerBookReport";
 import { FinanceLayout } from "../FinanceLayout";
+import { InlineTip } from "../../../shared/inlineGuides";
 
 type Props = { bookType: PartnerBookType };
 
@@ -130,7 +131,7 @@ export default function CustomerVendorBookPage(props: Props) {
           </>
         }
       >
-        <div class="rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+        <InlineTip class="rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
           {props.bookType === "ar" ? (
             <p>
               Rows come from <span class="font-medium">Sales</span> and applied{" "}
@@ -142,7 +143,7 @@ export default function CustomerVendorBookPage(props: Props) {
               <span class="font-medium">Payment Vouchers</span>.
             </p>
           )}
-        </div>
+        </InlineTip>
         <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Date from">
             <DateInput value={draftFilters().date_from} onInput={(e) => setDraftFilters((f) => ({ ...f, date_from: e.currentTarget.value }))} />
