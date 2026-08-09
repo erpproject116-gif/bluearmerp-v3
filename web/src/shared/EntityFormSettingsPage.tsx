@@ -54,7 +54,7 @@ function formatApiErrors(message?: string, errors?: Record<string, string>) {
 export function EntityFormSettingsPage(props: Props) {
   const auth = useAuth();
   const toast = useToast();
-  const { query, fields, reload, upsertCustomField } = useFormFieldSettings(props.entityType);
+  const { query, fields, reload, upsertCustomField, removeCustomFieldLocal } = useFormFieldSettings(props.entityType);
   const lineLabels = useColumnLabelSettings(lineViewKey(props.entityType));
   const listLabels = useColumnLabelSettings(
     hasListColumnSettings(props.entityType) ? listViewKey(props.entityType) : "",
@@ -248,7 +248,7 @@ export function EntityFormSettingsPage(props: Props) {
       toast.error(`Cannot remove "${label}" — missing field id. Refresh the page and try again.`);
       return;
     }
-    if (!window.confirm(`Remove custom field "${label}"? It will be hidden from forms (soft delete).`)) {
+    if (!window.confirm(`Remove custom field "${label}"? It will be deleted from this form.`)) {
       return;
     }
     const res = await apiFetch(`/api/v1/custom-fields/${id}`, { method: "DELETE" }, {
@@ -258,6 +258,8 @@ export function EntityFormSettingsPage(props: Props) {
       toast.error(formatApiErrors(res.message, res.errors));
       return;
     }
+    removeCustomFieldLocal(id);
+    setDraft((list) => list.filter((r) => !(r.kind === "custom" && r.id === id)));
     setDirty(false);
     await reload();
   };

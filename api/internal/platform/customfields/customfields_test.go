@@ -20,6 +20,25 @@ func TestNormalizeFieldKey(t *testing.T) {
 	}
 }
 
+func TestIsPersonalBirthdayField(t *testing.T) {
+	cases := []struct {
+		key, label string
+		want       bool
+	}{
+		{"birthday", "Birthday", true},
+		{"birth_date", "Birth date", true},
+		{"dob", "DOB", true},
+		{"customer_dob", "Customer DOB", true},
+		{"payment_terms", "Payment terms", false},
+		{"notes", "Notes", false},
+	}
+	for _, tc := range cases {
+		if got := IsPersonalBirthdayField(tc.key, tc.label); got != tc.want {
+			t.Fatalf("IsPersonalBirthdayField(%q, %q) = %v, want %v", tc.key, tc.label, got, tc.want)
+		}
+	}
+}
+
 func TestValidateDefinitionInputEntityType(t *testing.T) {
 	errs := ValidateDefinitionInput("unknown_entity", "tax_id", "Tax ID", "text", true)
 	if errs["entity_type"] == "" {

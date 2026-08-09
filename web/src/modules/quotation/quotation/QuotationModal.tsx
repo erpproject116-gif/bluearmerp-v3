@@ -14,7 +14,11 @@ import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
-import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
+import {
+  CustomFieldsSection,
+  isPersonalBirthdayCustomField,
+  validateCustomFields,
+} from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ModuleIcon } from "../../../shell/ModuleIcon";
@@ -565,9 +569,10 @@ export function QuotationModal(props: Props) {
       project_id: projectId(),
       progress_status: status,
     });
+    const processCustomFields = activeCustomFields().filter((d) => !isPersonalBirthdayCustomField(d));
     const clientError =
       requireFields(formValues, checks) ??
-      validateCustomFields(customValues(), activeCustomFields());
+      validateCustomFields(customValues(), processCustomFields);
     if (clientError) {
       toast.warning(clientError);
       return;
@@ -981,6 +986,7 @@ export function QuotationModal(props: Props) {
         entityType={QUOTATION_ENTITY.quotation}
         values={customValues}
         onChange={setCustom}
+        excludeDef={isPersonalBirthdayCustomField}
       />
       </div>
       <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">

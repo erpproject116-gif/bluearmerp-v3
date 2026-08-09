@@ -72,13 +72,27 @@ export function upsertCustomFieldInCache(
   const row = definitionToFormField(def);
   client.setQueryData<SettingsResponse>(settingsQueryKey(entityType), (prev) => {
     const fields = prev?.fields ?? [];
-    const idx = fields.findIndex((f) => f.kind === "custom" && f.id === def.id);
+    const idx = fields.findIndex((f) => f.kind === "custom" && (f.id === def.id || f.field_key === def.field_key));
     if (idx >= 0) {
       const next = [...fields];
       next[idx] = { ...next[idx], ...row };
       return { ...prev, fields: next };
     }
     return { ...prev, fields: [...fields, row] };
+  });
+}
+
+export function removeCustomFieldFromCache(
+  client: ReturnType<typeof useQueryClient>,
+  entityType: string,
+  id: number,
+) {
+  client.setQueryData<SettingsResponse>(settingsQueryKey(entityType), (prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      fields: prev.fields.filter((f) => !(f.kind === "custom" && f.id === id)),
+    };
   });
 }
 
@@ -132,6 +146,7 @@ export function useFormFieldSettings(entityType: string) {
     invalidate,
     reload,
     upsertCustomField: (def: CustomFieldDefinition) => upsertCustomFieldInCache(client, entityType, def),
+    removeCustomFieldLocal: (id: number) => removeCustomFieldFromCache(client, entityType, id),
   };
 }
 
