@@ -350,7 +350,7 @@ export default function PurchaseOrderListPage() {
 
   return (
     <PurchaseRequestLayout>
-      <InlineTip class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
+      <InlineTip tipId="po-list-receive-tip" class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
         <p class="font-medium text-slate-800">Buy path: Purchase Order → Purchase Receive → Payment Made</p>
         <p class="mt-1">
           After the PO, open <span class="font-medium">Purchase Receive</span> (Load Slip → Purchase Order), set qty, scan

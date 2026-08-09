@@ -73,6 +73,8 @@ import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
 import { SalesHoldListModal, type SalesHoldPayload } from "./SalesHoldListModal";
 import { ReturnSaleLinesModal } from "./ReturnSaleLinesModal";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { TermHint } from "../../../shared/TermHint";
+import { A } from "@solidjs/router";
 import {
   SalesCommissionPanel,
   type SaleCommissionRow,
@@ -995,13 +997,16 @@ export function SalesModal(props: Props) {
     } else {
       toast.warning(stockNote);
     }
-    // Allow pending uploads / server Copy to surface on AttachmentsField, then close.
+    // Allow pending uploads / server Copy to surface on AttachmentsField, then open next-step dialog (create) or close (edit).
     const sourced =
       !!sourceSalesOrderId() ||
       !!sourceAttachPreview() ||
       lines().some((ln) => !!ln.source_sales_order_line_id || !!ln.source_quotation_line_id);
     const delayMs = !ed && (attachmentCount() > 0 || sourced) ? 600 : 0;
-    window.setTimeout(() => props.onClose(), delayMs);
+    window.setTimeout(() => {
+      if (!ed) setPostSaveOpen(true);
+      else props.onClose();
+    }, delayMs);
   };
 
   const finishPostSave = () => {
@@ -1070,6 +1075,40 @@ export function SalesModal(props: Props) {
       >
         <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
         <ModalFormGuide guideId="sales" />
+        <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/50 px-3 py-2 text-xs text-slate-700">
+          <p class="font-medium text-text-primary">
+            <TermHint term="sales" />
+          </p>
+          <Show
+            when={
+              progressStatus() === "completed" ||
+              progressStatus() === "confirm" ||
+              progressStatus() === "e_approval"
+            }
+            fallback={
+              <p class="mt-1">
+                Save the sale, then set Progress to <span class="font-medium">Completed</span> when ready. Next:{" "}
+                <A href="/app/finance/official-receipts" class="font-medium text-brand-700 hover:underline">
+                  Cash In / Official Receipt
+                </A>{" "}
+                when the customer pays.{" "}
+                <TermHint term="vat" class="text-slate-600" /> applies per transaction type.
+              </p>
+            }
+          >
+            <p class="mt-1">
+              Next:{" "}
+              <A href="/app/finance/official-receipts" class="font-medium text-brand-700 hover:underline">
+                Cash In
+              </A>{" "}
+              (record payment). Sold serials:{" "}
+              <A href="/app/after-sales/warranty" class="font-medium text-brand-700 hover:underline">
+                Customer Warranty
+              </A>
+              .
+            </p>
+          </Show>
+        </div>
         <draft.DraftBanner />
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
@@ -1428,6 +1467,11 @@ export function SalesModal(props: Props) {
         open={postSaveOpen()}
         salesNo={createdSale()?.sales_no ?? ""}
         amount={createdSale()?.grand_total ?? 0}
+        hasSerials={lines().some(
+          (ln) =>
+            Boolean(ln.track_serial) &&
+            ((ln.serial_unit_ids?.length ?? 0) > 0 || Boolean(ln.serial_lot_no?.trim())),
+        )}
         onCashIn={() => {
           setPostSaveOpen(false);
           setCashInOpen(true);

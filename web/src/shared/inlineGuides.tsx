@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 
 const STORAGE_KEY = "bluearm:ui.inline_guides";
+const DISMISSED_KEY = "bluearm:ui.inline_tips_dismissed";
 
 function readEnabled(): boolean {
   try {
@@ -29,10 +30,32 @@ function writeEnabled(value: boolean) {
   }
 }
 
+function readDismissed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((x): x is string => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDismissed(ids: Set<string>) {
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* private mode */
+  }
+}
+
 type InlineGuidesCtx = {
   enabled: Accessor<boolean>;
   setEnabled: (value: boolean) => void;
   toggle: () => void;
+  isTipDismissed: (tipId: string) => boolean;
+  dismissTip: (tipId: string) => void;
 };
 
 const Ctx = createContext<InlineGuidesCtx>();
@@ -43,32 +66,62 @@ const Ctx = createContext<InlineGuidesCtx>();
  */
 let sharedFallback: InlineGuidesCtx | undefined;
 
-function getSharedFallback(): InlineGuidesCtx {
-  if (sharedFallback) return sharedFallback;
-  const [enabled, setEnabledSignal] = createSignal(readEnabled());
+function buildCtx(
+  enabled: Accessor<boolean>,
+  setEnabledSignal: (v: boolean) => void,
+  dismissed: Accessor<Set<string>>,
+  setDismissed: (v: Set<string> | ((prev: Set<string>) => Set<string>)) => void,
+): InlineGuidesCtx {
   const setEnabled = (value: boolean) => {
     setEnabledSignal(value);
     writeEnabled(value);
   };
-  sharedFallback = {
+  return {
     enabled,
     setEnabled,
     toggle: () => setEnabled(!enabled()),
+    isTipDismissed: (tipId: string) => dismissed().has(tipId),
+    dismissTip: (tipId: string) => {
+      const id = tipId.trim();
+      if (!id) return;
+      setDismissed((prev) => {
+        if (prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.add(id);
+        writeDismissed(next);
+        return next;
+      });
+    },
   };
+}
+
+function getSharedFallback(): InlineGuidesCtx {
+  if (sharedFallback) return sharedFallback;
+  const [enabled, setEnabledSignal] = createSignal(readEnabled());
+  const [dismissed, setDismissed] = createSignal(readDismissed());
+  sharedFallback = buildCtx(enabled, setEnabledSignal, dismissed, setDismissed);
   return sharedFallback;
 }
 
 /** Global Tips on/off for ModalFormGuide, InlineTip, StocksHowItFits — not workflow step n of n. */
 export function InlineGuidesProvider(props: ParentProps) {
   const [enabled, setEnabledSignal] = createSignal(readEnabled());
-  const setEnabled = (value: boolean) => {
-    setEnabledSignal(value);
-    writeEnabled(value);
-    // Keep shared fallback aligned when both are used in one session.
-    getSharedFallback().setEnabled(value);
+  const [dismissed, setDismissed] = createSignal(readDismissed());
+  const value = buildCtx(enabled, setEnabledSignal, dismissed, setDismissed);
+  const setEnabled = (v: boolean) => {
+    value.setEnabled(v);
+    getSharedFallback().setEnabled(v);
   };
-  const toggle = () => setEnabled(!enabled());
-  return <Ctx.Provider value={{ enabled, setEnabled, toggle }}>{props.children}</Ctx.Provider>;
+  const ctx: InlineGuidesCtx = {
+    ...value,
+    setEnabled,
+    toggle: () => setEnabled(!enabled()),
+    dismissTip: (tipId: string) => {
+      value.dismissTip(tipId);
+      getSharedFallback().dismissTip(tipId);
+    },
+  };
+  return <Ctx.Provider value={ctx}>{props.children}</Ctx.Provider>;
 }
 
 export function useInlineGuides(): InlineGuidesCtx {
@@ -79,18 +132,34 @@ export function useInlineGuides(): InlineGuidesCtx {
 export function resetInlineGuidesForTests() {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(DISMISSED_KEY);
   } catch {
     /* private mode */
   }
   sharedFallback = undefined;
 }
 
-/** Wrap in-panel tip / how-it-fits copy so header Tips off hides it. */
-export function InlineTip(props: { children: JSX.Element; class?: string }) {
+/** Wrap in-panel tip / how-it-fits copy so header Tips off hides it. Optional tipId enables Got it dismiss. */
+export function InlineTip(props: { children: JSX.Element; class?: string; tipId?: string }) {
   const guides = useInlineGuides();
+  const visible = () =>
+    guides.enabled() && !(props.tipId && guides.isTipDismissed(props.tipId));
   return (
-    <Show when={guides.enabled()}>
-      <div class={props.class}>{props.children}</div>
+    <Show when={visible()}>
+      <div class={props.class}>
+        {props.children}
+        <Show when={props.tipId}>
+          <div class="mt-2">
+            <button
+              type="button"
+              class="rounded border border-stroke bg-white px-2 py-0.5 text-xs font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => guides.dismissTip(props.tipId!)}
+            >
+              Got it
+            </button>
+          </div>
+        </Show>
+      </div>
     </Show>
   );
 }

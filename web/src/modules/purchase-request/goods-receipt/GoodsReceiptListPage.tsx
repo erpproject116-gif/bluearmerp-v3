@@ -248,7 +248,7 @@ export default function GoodsReceiptListPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onNew={() => navigate("/app/inventory/serial-lot/receive")}
+        onNew={() => navigate("/app/purchases/purchase-receive/new")}
         onEdit={(row) => {
           setSelectedId(row.id);
           navigate(`/app/inventory/serial-lot/receive?gr_id=${row.id}`);

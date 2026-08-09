@@ -482,7 +482,7 @@ export default function SerialReceivePage() {
 
   return (
     <SerialLotLayout>
-      <InlineTip class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+      <InlineTip tipId="serial-receive-legacy" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p class="font-medium">Prefer Purchase Receive for new purchases</p>
         <p class="mt-1 text-amber-900/90">
           Scan serials on Buy → Purchase Receive; confirming posts stock and AP. This page is for legacy draft

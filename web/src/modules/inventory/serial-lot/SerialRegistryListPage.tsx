@@ -117,7 +117,7 @@ export default function SerialRegistryListPage() {
 
   return (
     <SerialLotLayout>
-      <InlineTip class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+      <InlineTip tipId="serials-list-warranty" class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
         <p class="font-medium text-text-primary">Serials list → open a unit to manage warranty</p>
         <p class="mt-1 text-slate-700/90">
           <span class="font-medium">Unit dates</span> come from purchase/receive.{" "}

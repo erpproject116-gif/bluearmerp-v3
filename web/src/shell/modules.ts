@@ -69,7 +69,7 @@ export const appModules: AppModule[] = [
     href: "/app/inventory",
     basePath: "/app/inventory",
     features: [
-      { label: "Workspace", href: "/app/inventory", settingsHref: "/app/inventory", headerPriority: "primary" },
+      { label: "Workspace", href: "/app/inventory", settingsHref: "/app/inventory", headerPriority: "overflow" },
       { label: "Partners", href: "/app/inventory/partners", settingsHref: "/app/inventory/partners/settings", headerPriority: "primary" },
       { label: "Locations", href: "/app/inventory/locations", settingsHref: "/app/inventory/locations/settings" },
       { label: "Units", href: "/app/inventory/units", settingsHref: "/app/inventory/units" },
@@ -77,9 +77,16 @@ export const appModules: AppModule[] = [
       { label: "Departments", href: "/app/inventory/departments", settingsHref: "/app/inventory/departments/settings" },
       { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings", headerPriority: "primary" },
       { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements", headerPriority: "primary" },
-      { label: "Stock Entries", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries", headerPriority: "primary" },
+      { label: "Stock Entries", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries", headerPriority: "overflow" },
       { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation" },
       { label: "Find Stock", href: "/app/inventory/find-stock", settingsHref: "/app/inventory/stock-movements", headerPriority: "primary" },
+      {
+        label: "Serials",
+        href: "/app/inventory/serial-lot/registry",
+        settingsHref: "/app/inventory/serial-lot/settings",
+        featureCode: "inventory.serial_lot",
+        headerPriority: "primary",
+      },
       { label: "Stock Balance", href: "/app/inventory/reports/stock-balance", settingsHref: "/app/inventory/stock-movements" },
       { label: "On Hand", href: "/app/inventory/reports/on-hand", settingsHref: "/app/inventory/stock-movements" },
       { label: "Inventory Status", href: "/app/inventory/reports/inventory-status", settingsHref: "/app/inventory/stock-movements" },
@@ -88,8 +95,8 @@ export const appModules: AppModule[] = [
       { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing", settingsHref: "/app/inventory/stock-movements" },
       { label: "Price List", href: "/app/inventory/price-lists", settingsHref: "/app/inventory/price-lists", featureCode: "inventory.price_lists" },
       { label: "Product Bundles", href: "/app/inventory/product-bundles", settingsHref: "/app/inventory/product-bundles" },
-      { label: "BOMs", href: "/app/inventory/serial-lot/manufacturing/boms", settingsHref: "/app/inventory/serial-lot/manufacturing/boms", featureCode: "manufacturing.boms", headerPriority: "primary" },
-      { label: "Work Orders", href: "/app/inventory/serial-lot/manufacturing/work-orders", settingsHref: "/app/inventory/serial-lot/manufacturing/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
+      { label: "BOMs", href: "/app/inventory/serial-lot/manufacturing/boms", settingsHref: "/app/inventory/serial-lot/manufacturing/boms", featureCode: "manufacturing.boms", headerPriority: "overflow" },
+      { label: "Work Orders", href: "/app/inventory/serial-lot/manufacturing/work-orders", settingsHref: "/app/inventory/serial-lot/manufacturing/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "overflow" },
     ],
     subBranches: [
       {
