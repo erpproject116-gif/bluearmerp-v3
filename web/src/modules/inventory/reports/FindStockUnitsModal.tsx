@@ -201,7 +201,7 @@ export function FindStockUnitsModal(props: Props) {
                 href={registryHref(cur())}
                 class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-brand-700 hover:bg-brand-50"
               >
-                Manage in {cur().kind === "lots" ? "Lots" : "Registry"}
+                Manage in {cur().kind === "lots" ? "Lots" : "Serials"}
               </A>
               <button
                 type="button"

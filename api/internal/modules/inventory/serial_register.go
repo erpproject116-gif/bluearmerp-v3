@@ -65,11 +65,13 @@ func registerSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var trackSerial bool
 		var trackQty bool
+		var warrantyMonths int
 		err = pool.QueryRow(r.Context(), `
-			select coalesce(track_serial, false), coalesce(track_inventory_qty, false)
+			select coalesce(track_serial, false), coalesce(track_inventory_qty, false),
+			  coalesce(warranty_duration_months, 0)
 			from public.inv_items
 			where id = $1 and tenant_id = $2 and deleted_at is null`,
-			body.ItemID, tu.TenantID).Scan(&trackSerial, &trackQty)
+			body.ItemID, tu.TenantID).Scan(&trackSerial, &trackQty, &warrantyMonths)
 		if err != nil || !trackSerial {
 			response.Validation(w, map[string]string{"item_id": "Item must exist and track serial numbers."})
 			return
@@ -106,14 +108,20 @@ func registerSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 
 		recvAt := registerDate
+		var wStart *time.Time
+		wEnd := warrantyEndFromMonths(registerDate, warrantyMonths)
+		if warrantyMonths > 0 {
+			wStart = &registerDate
+		}
 		var unitID int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.inv_serial_units (
 			  tenant_id, item_id, serial_no, status, location_id, project_id,
-			  received_at
-			) values ($1, $2, $3, 'in_stock', $4, $5, $6::timestamptz)
+			  warranty_start, warranty_end, received_at
+			) values ($1, $2, $3, 'in_stock', $4, $5, $6::date, $7::date, $8::timestamptz)
 			returning id`,
 			tu.TenantID, body.ItemID, serialNo, body.LocationID, body.ProjectID,
+			wStart, wEnd,
 			recvAt.Format("2006-01-02")+" 12:00:00+00").Scan(&unitID)
 		if err != nil {
 			response.Validation(w, map[string]string{"serial_no": "Serial number already exists."})
@@ -172,12 +180,12 @@ func registerSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.serial.register", "inv_serial_unit", &unitID, nil, body)
 
 		var row SerialUnitRow
-		var wStart, wEnd *time.Time
+		var outStart, outEnd *time.Time
 		var recv *time.Time
 		var createdAt time.Time
 		_ = pool.QueryRow(r.Context(), `
 			select su.id, su.serial_no, su.item_id, i.item_code, i.item_name, su.status,
-			  su.location_id, coalesce(loc.name, ''),
+			  su.location_id, coalesce(loc.location_name, ''),
 			  su.partner_id, coalesce(p.company_name, ''),
 			  su.warranty_start, su.warranty_end, su.received_at,
 			  po.purchase_order_no, su.sales_line_id, su.created_at
@@ -190,9 +198,9 @@ func registerSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			where su.id = $1`, unitID).Scan(
 			&row.ID, &row.SerialNo, &row.ItemID, &row.ItemCode, &row.ItemName, &row.Status,
 			&row.LocationID, &row.LocationName, &row.PartnerID, &row.PartnerName,
-			&wStart, &wEnd, &recv, &row.PurchaseOrderNo, &row.SalesID, &createdAt)
-		row.WarrantyStart = formatDatePtr(wStart)
-		row.WarrantyEnd = formatDatePtr(wEnd)
+			&outStart, &outEnd, &recv, &row.PurchaseOrderNo, &row.SalesID, &createdAt)
+		row.WarrantyStart = formatDatePtr(outStart)
+		row.WarrantyEnd = formatDatePtr(outEnd)
 		row.ReceivedAt = formatTimePtr(recv)
 		row.CreatedAt = createdAt.Format(time.RFC3339)
 

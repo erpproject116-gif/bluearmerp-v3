@@ -184,7 +184,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "When an item uses serial numbers, you scan or enter each unit when goods arrive. That unit appears in the Serial Registry as in stock. When you release a sales order, you pick which serial numbers go to the customer. With delivery receipts enabled, posting a DR issues stock; with legacy combined release, release deducts stock immediately and DR is documentary. When you invoice the sale, those units are marked as sold.",
+        text: "When an item uses serial numbers, you scan or enter each unit when goods arrive. That unit appears under Serial & Lot → Serials as in stock. When you release a sales order, you pick which serial numbers go to the customer. With delivery receipts enabled, posting a DR issues stock; with legacy combined release, release deducts stock immediately and DR is documentary. When you invoice the sale, those units are marked as sold.",
       },
       {
         type: "paragraph",
@@ -198,17 +198,17 @@ export const documentationSections: DocSection[] = [
           "Create a Sales Order, then use Release Sales Order to allocate stock (and pick serials if needed).",
           "Post a Delivery Receipt when goods leave the warehouse (split release mode).",
           "Create a Sales invoice from released or delivered lines.",
-          "Use Serial Trace to look up the full operational history of one serial number (receive, transfer, reserve, issue).",
-          "On Serial Registry and Lot Batches, use History for the audit trail of who registered or adjusted that unit or lot.",
+          "Open a serial from Serials (serial detail) for unit warranty dates, customer coverage after sale, and operational history.",
+          "On Serials and Lot Batches, use History for the audit trail of who registered or adjusted that unit or lot.",
         ],
       },
       {
         type: "tip",
-        text: "Serial Trace answers “what happened to this unit in stock?” History answers “who changed the record in the system?” Use both when investigating discrepancies.",
+        text: "Serial detail answers “what happened to this unit in stock?” and lets you adjust warranty. History answers “who changed the record in the system?”",
       },
       {
         type: "tip",
-        text: "Open Inventory → Serial & Lot for the registry, lot batches, movements, and trace lookup screens.",
+        text: "Open Inventory → Serial & Lot → Serials for the unit list; open a row for detail. Typed lookup is under More → Serial detail.",
       },
     ],
   },

@@ -11,7 +11,7 @@ export const SERIAL_LOT_PREFIX = "/app/inventory/serial-lot";
 
 export const serialLotNavLinks: SerialLotNavLink[] = [
   {
-    label: "Registry",
+    label: "Serials",
     href: "/app/inventory/serial-lot/registry",
     permissionCode: "inventory.serial_registry",
     headerPriority: "primary",
@@ -23,16 +23,17 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
-    label: "Trace",
-    href: "/app/inventory/serial-lot/trace",
-    permissionCode: "inventory.serial_trace",
-    headerPriority: "primary",
-  },
-  {
     label: "Settings",
     href: "/app/inventory/serial-lot/settings",
     permissionCode: "inventory.serial_settings",
     headerPriority: "primary",
+  },
+  {
+    /** Deep-link / typed lookup; open a row from Serials for day-to-day work. */
+    label: "Serial detail",
+    href: "/app/inventory/serial-lot/trace",
+    permissionCode: "inventory.serial_trace",
+    headerPriority: "overflow",
   },
   {
     label: "Receive (legacy)",

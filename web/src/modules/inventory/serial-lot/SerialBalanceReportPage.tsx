@@ -1,4 +1,5 @@
 import { createSignal, onMount } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { DateInput } from "../../../shared/DateInput";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
@@ -10,6 +11,7 @@ import {
   type SerialBalanceRow,
 } from "../../../shared/useSerialReports";
 import { SerialLotLayout } from "./SerialLotLayout";
+import { openSerialTrace } from "./openSerialTrace";
 import { SERIAL_STATUS_OPTIONS, serialStatusLabel } from "./serialRegistryFilters";
 
 const INVENTORY_QTY_OPTIONS = [
@@ -40,6 +42,8 @@ function withRowIds<T extends object>(rows: T[], page: number, pageSize: number)
 }
 
 export default function SerialBalanceReportPage() {
+  const navigate = useNavigate();
+  const goTrace = (row: { serial_no: string }) => openSerialTrace(navigate, row.serial_no);
   const [draft, setDraft] = createSignal<SerialBalanceFilters>(defaultFilters());
   const [submitted, setSubmitted] = createSignal<SerialBalanceFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
@@ -192,7 +196,8 @@ export default function SerialBalanceReportPage() {
           onPageChange={setPage}
           onRefresh={search}
           onNew={() => {}}
-          onEdit={() => {}}
+          onEdit={goTrace}
+          showNew={false}
         />
       </div>
     </SerialLotLayout>

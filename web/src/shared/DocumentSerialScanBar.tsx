@@ -128,7 +128,7 @@ export function DocumentSerialScanBar(props: Props) {
                 <li>
                   Check the serial in{" "}
                   <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-600 hover:underline">
-                    Inventory → Serial Registry
+                    Inventory → Serials
                   </A>{" "}
                   — it must exist and be in stock at this location.
                 </li>
@@ -143,7 +143,7 @@ export function DocumentSerialScanBar(props: Props) {
               <li>
                 Or pre-register it in{" "}
                 <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-600 hover:underline">
-                  Inventory → Serial Registry
+                  Inventory → Serials
                 </A>
                 , then scan again.
               </li>

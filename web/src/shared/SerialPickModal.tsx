@@ -94,7 +94,7 @@ export function SerialPickModal(props: Props) {
                 <th class="px-2 py-1 text-left">Serial no.</th>
                 <th class="px-2 py-1 text-left">Status</th>
                 <th class="px-2 py-1 text-left">Location</th>
-                <th class="px-2 py-1 text-left">Warranty end</th>
+                <th class="px-2 py-1 text-left">Unit warranty end</th>
               </tr>
             </thead>
             <tbody>

@@ -18,6 +18,13 @@ import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
 import { DocumentSerialScanBar } from "../../../shared/DocumentSerialScanBar";
 import type { ResolvedSerialUnit } from "../../../shared/serialScanTypes";
 import { useToast } from "../../../shared/toast";
+import {
+  WARRANTY_MONTH_OPTIONS,
+  WARRANTY_YEAR_OPTIONS,
+  warrantyFromParts,
+  warrantyMonthsPart,
+  warrantyYearsPart,
+} from "../../../shared/warrantyDurationParts";
 
 export type PurchaseRequestLineRow = {
   line_no: number;
@@ -40,6 +47,8 @@ export type PurchaseRequestLineRow = {
   unit_vat_inc: string;
   line_total: string;
   remark: string;
+  /** Total months (years×12 + months). Used on PO / Purchase Receive lines. */
+  warranty_duration_months?: number | null;
   source_sales_order_line_id?: number | null;
   purchase_request_line_id?: number | null;
   supplier_quotation_line_id?: number | null;
@@ -77,6 +86,7 @@ export function emptyPurchaseRequestLine(
     unit_vat_inc: "",
     line_total: "",
     remark: "",
+    warranty_duration_months: 0,
   };
 }
 
@@ -97,6 +107,7 @@ const LINE_COLUMNS = [
   { key: "tax", header: "Tax", width: 90 },
   { key: "unit_vat_inc", header: "Unit (VAT inc.)", width: 110 },
   { key: "line_total", header: "Line Total", width: 110 },
+  { key: "warranty", header: "Warranty", width: 140 },
   { key: "serials", header: "Serials", width: 180 },
   { key: "remark", header: "Remark", width: 100 },
   { key: "actions", header: "", width: 72 },
@@ -163,6 +174,8 @@ type Props = {
    * bill: New Bill — scan-next, qty-first (do not overwrite qty from serial length).
    */
   serialCaptureMode?: "planned" | "bill";
+  /** Year + month warranty duration on PO / Purchase Receive lines. */
+  showWarrantyColumns?: boolean;
 };
 
 export function PurchaseRequestLineGrid(props: Props) {
@@ -252,6 +265,7 @@ export function PurchaseRequestLineGrid(props: Props) {
             track_serial: Boolean(item.track_serial),
             serial_policy: item.serial_policy ?? "required",
             planned_serial_nos: [],
+            warranty_duration_months: item.warranty_duration_months ?? 0,
           }
         : ln,
     );
@@ -294,9 +308,12 @@ export function PurchaseRequestLineGrid(props: Props) {
   const columns = createMemo(() => {
     props.taxTypeId();
     const base = filterTaxLineColumns(LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
-    const filtered = !props.hidePartnerColumns
-      ? base
+    let filtered = !props.hidePartnerColumns
+      ? [...base]
       : base.filter((c) => c.key !== "partner_code" && c.key !== "partner_name");
+    if (!props.showWarrantyColumns) {
+      filtered = filtered.filter((c) => c.key !== "warranty");
+    }
     return applyColumnLabels(filtered, lineLabels.columnLabel);
   });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
@@ -565,6 +582,46 @@ export function PurchaseRequestLineGrid(props: Props) {
                     <ResizableTd width={widthFor("unit_vat_inc")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().unit_vat_inc))}</ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("line_total")} class="px-2 py-1 text-right">{formatAmount(parseNum(line().line_total))}</ResizableTd>
+                  <Show when={hasCol("warranty")}>
+                    <ResizableTd width={widthFor("warranty")} class="px-2 py-1">
+                      <div class="flex items-center gap-1" title="Unit warranty duration (years + months)">
+                        <select
+                          class={`${inputClass} w-[3.25rem] px-1`}
+                          aria-label="Warranty years"
+                          value={String(warrantyYearsPart(line().warranty_duration_months))}
+                          onChange={(e) =>
+                            void updateLine(idx, {
+                              warranty_duration_months: warrantyFromParts(
+                                Number(e.currentTarget.value),
+                                warrantyMonthsPart(line().warranty_duration_months),
+                              ),
+                            })
+                          }
+                        >
+                          {WARRANTY_YEAR_OPTIONS.map((y) => (
+                            <option value={y}>{y}y</option>
+                          ))}
+                        </select>
+                        <select
+                          class={`${inputClass} w-[3.25rem] px-1`}
+                          aria-label="Warranty months"
+                          value={String(warrantyMonthsPart(line().warranty_duration_months))}
+                          onChange={(e) =>
+                            void updateLine(idx, {
+                              warranty_duration_months: warrantyFromParts(
+                                warrantyYearsPart(line().warranty_duration_months),
+                                Number(e.currentTarget.value),
+                              ),
+                            })
+                          }
+                        >
+                          {WARRANTY_MONTH_OPTIONS.map((m) => (
+                            <option value={m}>{m}m</option>
+                          ))}
+                        </select>
+                      </div>
+                    </ResizableTd>
+                  </Show>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
                     <Show
                       when={!line().item_id || line().track_serial}
@@ -642,7 +699,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                 <td />
               </Show>
               <td class="px-2 py-2 text-right">{formatAmount(totals().grand)}</td>
-              <td colSpan={3} />
+              <td colSpan={hasCol("warranty") ? 4 : 3} />
             </tr>
           </tfoot>
         </table>

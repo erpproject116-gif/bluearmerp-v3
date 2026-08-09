@@ -45,10 +45,11 @@ type SupplierInvoiceLine struct {
 	TaxAmount           float64 `json:"tax_amount"`
 	UnitVatInc          float64 `json:"unit_vat_inc"`
 	LineTotal           float64 `json:"line_total"`
-	Remark              *string  `json:"remark,omitempty"`
-	TrackSerial         bool     `json:"track_serial,omitempty"`
-	SerialNos           []string `json:"serial_nos,omitempty"`
-	LotLines            []billLotLine `json:"lot_lines,omitempty"`
+	Remark                 *string      `json:"remark,omitempty"`
+	WarrantyDurationMonths *int         `json:"warranty_duration_months,omitempty"`
+	TrackSerial            bool         `json:"track_serial,omitempty"`
+	SerialNos              []string     `json:"serial_nos,omitempty"`
+	LotLines               []billLotLine `json:"lot_lines,omitempty"`
 }
 
 type SupplierInvoice struct {
@@ -108,9 +109,10 @@ type supplierInvoiceLineBody struct {
 	TaxAmount           float64 `json:"tax_amount"`
 	UnitVatInc          float64 `json:"unit_vat_inc"`
 	LineTotal           float64       `json:"line_total"`
-	Remark              *string       `json:"remark"`
-	SerialNos           []string      `json:"serial_nos"`
-	LotLines            []billLotLine `json:"lot_lines"`
+	Remark                 *string       `json:"remark"`
+	SerialNos              []string      `json:"serial_nos"`
+	LotLines               []billLotLine `json:"lot_lines"`
+	WarrantyDurationMonths *int          `json:"warranty_duration_months"`
 }
 
 type supplierInvoiceBody struct {
@@ -150,7 +152,8 @@ type openPOLineRow struct {
 	BalanceQty          float64 `json:"balance_qty"`
 	UnitNonVat          float64 `json:"unit_non_vat"`
 	UnitVatInc          float64 `json:"unit_vat_inc"`
-	TrackSerial         bool    `json:"track_serial,omitempty"`
+	TrackSerial            bool `json:"track_serial,omitempty"`
+	WarrantyDurationMonths *int `json:"warranty_duration_months,omitempty"`
 }
 
 func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
@@ -193,7 +196,8 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
 			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
 			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8,
-			  coalesce(i.track_serial, false)
+			  coalesce(i.track_serial, false),
+			  coalesce(pol.warranty_duration_months, i.warranty_duration_months)
 			from public.po_purchase_order_lines pol
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
 			left join public.inv_partners p on p.id = po.partner_id
@@ -217,7 +221,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.PartnerID, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
-				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial,
+				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial, &row.WarrantyDurationMonths,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read PO lines.", "ERR_INTERNAL")
 				return
@@ -687,6 +691,7 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		  sil.qty::float8, sil.unit_id, coalesce(sil.unit_code, ''),
 		  sil.unit_non_vat::float8, sil.non_vat_total::float8,
 		  sil.tax_amount::float8, sil.unit_vat_inc::float8, sil.line_total::float8, sil.remark,
+		  sil.warranty_duration_months,
 		  coalesce(i.track_serial, false),
 		  coalesce(sil.serial_nos, '[]'::jsonb), coalesce(sil.lot_lines, '[]'::jsonb)
 		from public.fin_supplier_invoice_lines sil
@@ -705,7 +710,7 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.UnitID, &ln.UnitCode,
 			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount, &ln.UnitVatInc, &ln.LineTotal, &ln.Remark,
-			&ln.TrackSerial, &serialJSON, &lotJSON,
+			&ln.WarrantyDurationMonths, &ln.TrackSerial, &serialJSON, &lotJSON,
 		); err != nil {
 			return SupplierInvoice{}, err
 		}
@@ -1250,12 +1255,12 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 			  supplier_invoice_id, line_no, goods_receipt_line_id, purchase_order_line_id,
 			  item_id, item_code, item_name, description, qty, unit_id, unit_code,
 			  unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
-			  serial_nos, lot_lines
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19::jsonb)`,
+			  serial_nos, lot_lines, warranty_duration_months
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19::jsonb,$20)`,
 			invoiceID, lineNo, grLineID, poLineID,
 			ref.ItemID, ref.ItemCode, ref.ItemName, ln.Description, ln.Qty, unitID, unitCode,
 			ln.UnitNonVat, ln.NonVatTotal, ln.TaxAmount, ln.UnitVatInc, ln.LineTotal, ln.Remark,
-			string(marshalSerialNos(ln.SerialNos)), string(marshalLotLines(ln.LotLines)))
+			string(marshalSerialNos(ln.SerialNos)), string(marshalLotLines(ln.LotLines)), ln.WarrantyDurationMonths)
 		if err != nil {
 			return err
 		}

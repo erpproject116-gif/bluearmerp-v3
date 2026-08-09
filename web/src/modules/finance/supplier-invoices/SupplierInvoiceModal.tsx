@@ -116,6 +116,7 @@ function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseReques
     purchase_order_line_id: ln.purchase_order_line_id ?? null,
     track_serial: Boolean(ln.track_serial),
     planned_serial_nos: ln.serial_nos ?? [],
+    warranty_duration_months: ln.warranty_duration_months ?? 0,
   }));
 }
 
@@ -493,6 +494,7 @@ export function SupplierInvoiceModal(props: Props) {
       unit_price: String(row.unit_vat_inc),
       purchase_order_line_id: row.purchase_order_line_id,
       track_serial: row.track_serial,
+      warranty_duration_months: row.warranty_duration_months ?? 0,
     }));
     const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...newLines].map((ln, i) => ({ ...ln, line_no: i + 1 }));
     if (meta && taxTypeId()) {
@@ -624,6 +626,7 @@ export function SupplierInvoiceModal(props: Props) {
           line_total: ln.line_total === "" ? 0 : Number(ln.line_total),
           remark: ln.remark || null,
           serial_nos: ln.planned_serial_nos ?? [],
+          warranty_duration_months: ln.warranty_duration_months ?? 0,
         })),
       withholding_lines: withholdingLines()
         .filter((ln) => ln.tax_code_id && Number(ln.base_amount) > 0)
@@ -1068,6 +1071,7 @@ export function SupplierInvoiceModal(props: Props) {
             taxTypeMeta={selectedTaxType}
             locationId={() => locationId()}
             hidePartnerColumns
+            showWarrantyColumns
             serialCaptureMode="bill"
             lineViewKey={`${PURCHASES_ENTITY.purchases}.lines`}
           />

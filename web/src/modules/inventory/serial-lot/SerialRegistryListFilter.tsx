@@ -51,8 +51,8 @@ export function SerialRegistryListFilter(props: Props) {
 
   return (
     <CollapsibleFilterPanel
-      title={props.title ?? "Serial Registry"}
-      description="Refine results, then Search (F8). Grid loads with defaults on open."
+      title={props.title ?? "Serials"}
+      description="Find units, then open a row for warranty dates and history. Search (F8)."
       actions={
         <>
           <button

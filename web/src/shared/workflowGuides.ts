@@ -189,9 +189,9 @@ export const workflowGuides: WorkflowGuide[] = [
       },
       {
         id: "registry",
-        short: "Registry",
-        title: "Check any unit's history (Serial & Lot registry)",
-        what: "The registry shows where every unit is and everything that happened to it — received, sold, returned, or adjusted. Use the reports here to reconcile counts.",
+        short: "Serials",
+        title: "Find units and manage warranty (Serials)",
+        what: "The Serials list shows where every unit is. Open a serial for unit warranty dates, customer coverage after sale, and history. Use reports under More to reconcile counts.",
         href: "/app/inventory/serial-lot/registry",
         routePrefixes: ["/app/inventory/serial-lot"],
         moduleCode: "inventory",

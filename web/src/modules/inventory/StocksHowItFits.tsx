@@ -34,19 +34,19 @@ export function StocksHowItFits(props?: { class?: string }) {
         </li>
         <li>
           <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-700 hover:underline">
-            Serial registry
+            Serials
           </A>{" "}
           /{" "}
           <A href="/app/inventory/serial-lot/lots" class="font-medium text-brand-700 hover:underline">
             Lot batches
           </A>{" "}
-          — which units/batches are already in stock (use when selling, not when receiving new ones).
+          — which units/batches are already in stock (open a serial to manage warranty; use when selling, not when receiving new ones).
         </li>
         <li>
           <A href="/app/inventory/serial-lot/adjustment" class="font-medium text-brand-700 hover:underline">
             Qty fix (serials)
           </A>{" "}
-          — exception corrections only; not where Purchase Receive puts new serials (use Registry).
+          — exception corrections only; not where Purchase Receive puts new serials (use Serials).
         </li>
       </ul>
     </InlineTip>

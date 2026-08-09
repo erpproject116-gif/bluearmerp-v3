@@ -139,7 +139,7 @@ func receiveForSupplierInvoiceLineTx(
 	}
 
 	if ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
-		return receiveFromPOLine(ctx, tx, tenantID, userID, locationID, partnerID, *ln.PurchaseOrderLineID, ln.Qty, serials, ln.LotLines, trackSerial, trackLot)
+		return receiveFromPOLine(ctx, tx, tenantID, userID, locationID, partnerID, *ln.PurchaseOrderLineID, ln.Qty, serials, ln.LotLines, trackSerial, trackLot, ln.WarrantyDurationMonths)
 	}
 
 	// Blank bill line — receive without PO only when confirming (ECOUNT Bill-first).
@@ -156,7 +156,7 @@ func receiveFromPOLine(
 	ctx context.Context, tx pgx.Tx,
 	tenantID, userID, locationID, partnerID, purchaseOrderLineID int64,
 	invoiceQty float64, serials []string, lots []billLotLine,
-	trackSerial, trackLot bool,
+	trackSerial, trackLot bool, invoiceWarrantyMonths *int,
 ) (*int64, error) {
 	var poID int64
 	var ordered, received float64
@@ -168,7 +168,8 @@ func receiveFromPOLine(
 	err := tx.QueryRow(ctx, `
 		select po.id, pol.qty::float8, coalesce(pol.received_qty, 0)::float8,
 		  pol.item_id, pol.unit_id, coalesce(pol.unit_non_vat, 0)::float8,
-		  coalesce(i.track_inventory_qty, false), i.warranty_duration_months
+		  coalesce(i.track_inventory_qty, false),
+		  coalesce(pol.warranty_duration_months, i.warranty_duration_months)
 		from public.po_purchase_order_lines pol
 		join public.po_purchase_orders po on po.id = pol.purchase_order_id
 		left join public.inv_items i on i.id = pol.item_id
@@ -178,6 +179,9 @@ func receiveFromPOLine(
 	).Scan(&poID, &ordered, &received, &itemID, &unitID, &unitCost, &trackInventory, &warrantyMonths)
 	if err != nil {
 		return nil, errors.New("purchase order line not found")
+	}
+	if invoiceWarrantyMonths != nil {
+		warrantyMonths = invoiceWarrantyMonths
 	}
 
 	openReceive := ordered - received
@@ -231,11 +235,15 @@ func receiveBlankItem(
 	trackSerial, trackLot bool,
 ) (*int64, error) {
 	var trackInventory bool
-	var warrantyMonths *int
+	var itemWarrantyMonths *int
 	_ = tx.QueryRow(ctx, `
 		select coalesce(track_inventory_qty, false), warranty_duration_months
 		from public.inv_items where id = $1 and tenant_id = $2`, itemID, tenantID).
-		Scan(&trackInventory, &warrantyMonths)
+		Scan(&trackInventory, &itemWarrantyMonths)
+	warrantyMonths := ln.WarrantyDurationMonths
+	if warrantyMonths == nil {
+		warrantyMonths = itemWarrantyMonths
+	}
 
 	unitCost := ln.UnitNonVat
 	if unitCost <= 0 {

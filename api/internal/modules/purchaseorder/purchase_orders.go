@@ -52,6 +52,7 @@ type PurchaseOrderLine struct {
 	LineTotal               float64  `json:"line_total"`
 	Remark                  *string  `json:"remark,omitempty"`
 	PlannedSerialNos        []string `json:"planned_serial_nos,omitempty"`
+	WarrantyDurationMonths  *int     `json:"warranty_duration_months,omitempty"`
 	TrackSerial             bool     `json:"track_serial,omitempty"`
 	SerialPolicy            string   `json:"serial_policy,omitempty"`
 }
@@ -108,8 +109,9 @@ type purchaseOrderLineBody struct {
 	UnitCode              string   `json:"unit_code"`
 	UnitPrice             float64  `json:"unit_price"`
 	InputBasis            string   `json:"input_basis"`
-	Remark                *string  `json:"remark"`
-	PlannedSerialNos      []string `json:"planned_serial_nos"`
+	Remark                 *string  `json:"remark"`
+	PlannedSerialNos       []string `json:"planned_serial_nos"`
+	WarrantyDurationMonths *int     `json:"warranty_duration_months"`
 }
 
 type purchaseOrderBody struct {
@@ -163,6 +165,7 @@ type computedLine struct {
 	Amounts                 taxcalc.LineAmounts
 	Remark                  *string
 	PlannedSerialNos        []string
+	WarrantyDurationMonths  *int
 }
 
 const hybridPartnerLateral = `
@@ -527,6 +530,7 @@ func loadPurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, purchaseOrd
 		  ln.unit_non_vat::float8, ln.non_vat_total::float8, ln.tax_amount::float8,
 		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark,
 		  coalesce(ln.planned_serial_nos, '{}'),
+		  ln.warranty_duration_months,
 		  coalesce(i.track_serial, false),
 		  coalesce(i.serial_policy, 'required')
 		from public.po_purchase_order_lines ln
@@ -546,7 +550,8 @@ func loadPurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, purchaseOrd
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.SpecName, &ln.Description,
 			&ln.Qty, &ln.ReceivedQty, &ln.BilledQty, &ln.UnitID, &ln.UnitCode,
 			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.TrackSerial, &ln.SerialPolicy); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.PlannedSerialNos, &ln.WarrantyDurationMonths,
+			&ln.TrackSerial, &ln.SerialPolicy); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -1280,14 +1285,14 @@ func insertPurchaseOrderLines(ctx context.Context, tx pgx.Tx, purchaseOrderID in
 			  partner_id, partner_code, partner_name,
 			  item_id, item_code, item_name, spec_name, description,
 			  qty, unit_id, unit_code, input_basis, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total, remark,
-			  planned_serial_nos
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+			  planned_serial_nos, warranty_duration_months
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
 			returning id`,
 			purchaseOrderID, ln.PurchaseRequestLineID, ln.RFQRequestLineID, ln.SupplierQuotationLineID, lineNo,
 			ln.PartnerID, strings.TrimSpace(ln.PartnerCode), strings.TrimSpace(ln.PartnerName),
 			ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.SpecName, ln.Description,
 			ln.Qty, ln.UnitID, ln.UnitCode, ln.InputBasis, ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
-			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark, ln.PlannedSerialNos).Scan(&id)
+			ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark, ln.PlannedSerialNos, ln.WarrantyDurationMonths).Scan(&id)
 		if err != nil {
 			return nil, err
 		}
@@ -1337,6 +1342,10 @@ func computePurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID
 			errs[fmt.Sprintf("lines[%d].planned_serial_nos", i)] = err.Error()
 			continue
 		}
+		if ln.WarrantyDurationMonths != nil && *ln.WarrantyDurationMonths < 0 {
+			errs[fmt.Sprintf("lines[%d].warranty_duration_months", i)] = "Must be zero or greater."
+			continue
+		}
 		inputBasis := ln.InputBasis
 		if inputBasis == "" {
 			inputBasis = taxcalc.InputVatIncUnit
@@ -1348,23 +1357,24 @@ func computePurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID
 		amounts := taxcalc.ComputeLine(tt, ln.UnitPrice, ln.Qty, inputBasis)
 		unitID, unitCode := inventory.ResolveLineUnit(ctx, pool, tenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
 		out = append(out, computedLine{
-			LineNo:                ln.LineNo,
-			PurchaseRequestLineID: ln.PurchaseRequestLineID,
-			PartnerID:             ln.PartnerID,
-			PartnerCode:           ln.PartnerCode,
-			PartnerName:           ln.PartnerName,
-			ItemID:                ln.ItemID,
-			ItemCode:              ln.ItemCode,
-			ItemName:              ln.ItemName,
-			SpecName:              ln.SpecName,
-			Description:           ln.Description,
-			Qty:                   ln.Qty,
-			UnitID:                unitID,
-			UnitCode:              unitCode,
-			InputBasis:            inputBasis,
-			Amounts:               amounts,
-			Remark:                ln.Remark,
-			PlannedSerialNos:      planned,
+			LineNo:                 ln.LineNo,
+			PurchaseRequestLineID:  ln.PurchaseRequestLineID,
+			PartnerID:              ln.PartnerID,
+			PartnerCode:            ln.PartnerCode,
+			PartnerName:            ln.PartnerName,
+			ItemID:                 ln.ItemID,
+			ItemCode:               ln.ItemCode,
+			ItemName:               ln.ItemName,
+			SpecName:               ln.SpecName,
+			Description:            ln.Description,
+			Qty:                    ln.Qty,
+			UnitID:                 unitID,
+			UnitCode:               unitCode,
+			InputBasis:             inputBasis,
+			Amounts:                amounts,
+			Remark:                 ln.Remark,
+			PlannedSerialNos:       planned,
+			WarrantyDurationMonths: ln.WarrantyDurationMonths,
 		})
 	}
 	if len(errs) > 0 {

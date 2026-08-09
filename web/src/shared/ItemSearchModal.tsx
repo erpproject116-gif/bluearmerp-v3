@@ -27,6 +27,7 @@ export type ItemSearchRow = {
   total_inv_qty?: number | null;
   base_unit_id?: number | null;
   base_unit_code?: string | null;
+  warranty_duration_months?: number | null;
 };
 
 const ITEM_CATEGORIES = [

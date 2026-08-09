@@ -15,6 +15,7 @@ import { useToast } from "../../../shared/toast";
 import { CrmTaskCell } from "../../../shared/CrmTaskCell";
 import { useCrmTaskSummaries } from "../../../shared/useCrmTaskSummaries";
 import { apiFetch } from "../../../shared/api";
+import { serialTraceHref } from "../serial-lot/openSerialTrace";
 import { AfterSalesLayout } from "./AfterSalesLayout";
 
 function paramStr(raw: string | string[] | undefined): string {
@@ -69,6 +70,13 @@ export default function CustomerWarrantyPage() {
   const warrantyIds = createMemo(() => (list.data?.rows ?? []).map((r) => r.id));
   const taskSummaries = useCrmTaskSummaries(() => ({ warrantyIds: warrantyIds() }));
 
+  const emptyGuided = createMemo(() => {
+    const total = list.data?.total ?? 0;
+    if (list.isFetching || total > 0) return null;
+    if (q().trim() || statusFilter()) return "search" as const;
+    return "empty" as const;
+  });
+
   const save = async () => {
     const row = selected();
     if (!row) return;
@@ -104,11 +112,12 @@ export default function CustomerWarrantyPage() {
   return (
     <AfterSalesLayout>
       <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
-        Sold serials with customer coverage. Unit history →{" "}
-        <A href="/app/inventory/serial-lot/trace" class="font-medium text-brand-700 hover:underline">
-          Serial Trace
+        Sold serials with customer coverage. Unit dates and history →{" "}
+        <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-700 hover:underline">
+          Inventory → Serials
         </A>
-        . Lots are stock expiry only — not warranty. For repair jobs, use{" "}
+        {" "}
+        (open a unit). Lots are stock expiry only — not warranty. For repair jobs, use{" "}
         <A href="/app/after-sales/repair-orders" class="font-medium text-brand-700 hover:underline">
           Repair Orders
         </A>
@@ -144,6 +153,32 @@ export default function CustomerWarrantyPage() {
         </div>
       </details>
 
+      <Show when={emptyGuided() === "empty"}>
+        <div class="mb-4 rounded-xl border border-stroke bg-white p-6 text-sm text-text-secondary shadow-sm">
+          <p class="font-medium text-text-primary">No customer coverage yet</p>
+          <p class="mt-2">
+            Coverage appears after you sell a serial. Set warranty months on the item first, receive or register the
+            serial, then sell it.
+          </p>
+          <div class="mt-3 flex flex-wrap gap-3">
+            <A href="/app/inventory/items" class="font-medium text-brand-700 hover:underline">
+              Items
+            </A>
+            <A href="/app/sales/sales" class="font-medium text-brand-700 hover:underline">
+              Sales
+            </A>
+            <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-700 hover:underline">
+              Serials
+            </A>
+          </div>
+        </div>
+      </Show>
+      <Show when={emptyGuided() === "search"}>
+        <div class="mb-4 rounded-xl border border-stroke bg-white p-4 text-sm text-text-secondary shadow-sm">
+          No matching sold coverage.
+        </div>
+      </Show>
+
       <SpreadsheetGrid
         columns={[
           { key: "serial_no", header: "Serial", clickable: true },
@@ -154,6 +189,32 @@ export default function CustomerWarrantyPage() {
           { key: "warranty_end", header: "End" },
           { key: "status", header: "Status" },
           { key: "pic_name", header: "PIC" },
+          {
+            key: "actions",
+            header: "Actions",
+            sortable: false,
+            render: (r) => (
+              <div class="flex flex-wrap gap-2 text-sm">
+                <button
+                  type="button"
+                  class="font-medium text-brand-700 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEdit(r);
+                  }}
+                >
+                  Edit
+                </button>
+                <A
+                  href={serialTraceHref(r.serial_no)}
+                  class="font-medium text-brand-700 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Detail
+                </A>
+              </div>
+            ),
+          },
           {
             key: "crm_task",
             header: "Task",
@@ -235,10 +296,10 @@ export default function CustomerWarrantyPage() {
               </Field>
               <p class="text-xs text-text-secondary">
                 <A
-                  href={`/app/inventory/serial-lot/trace?serial_no=${encodeURIComponent(row().serial_no)}`}
+                  href={serialTraceHref(row().serial_no)}
                   class="font-medium text-brand-700 hover:underline"
                 >
-                  Open Serial Trace
+                  Open serial detail
                 </A>
               </p>
             </>

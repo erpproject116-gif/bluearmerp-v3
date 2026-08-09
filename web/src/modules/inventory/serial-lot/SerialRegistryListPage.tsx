@@ -17,10 +17,12 @@ import {
 } from "./serialRegistryFilters";
 import { SerialRegistryListFilter } from "./SerialRegistryListFilter";
 import { InlineTip } from "../../../shared/inlineGuides";
+import { openSerialTrace } from "./openSerialTrace";
 
 export default function SerialRegistryListPage() {
   const invalidate = useInvalidateSerialLotLists();
   const navigate = useNavigate();
+  const goTrace = (row: { serial_no: string }) => openSerialTrace(navigate, row.serial_no);
   const [searchParams] = useSearchParams();
 
   const [draftFilters, setDraftFilters] = createSignal<SerialRegistryFilters>(defaultSerialRegistryFilters());
@@ -111,20 +113,25 @@ export default function SerialRegistryListPage() {
 
   const fmtDate = (v?: string | null) => (v ? v.slice(0, 10) : "—");
 
+  const coverageLabel = (r: SerialUnitRow) => (r.status === "sold" ? "Sold" : "Not sold");
+
   return (
     <SerialLotLayout>
-      <InlineTip class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        <p class="font-medium">Prefer Purchase Receive for inbound serials</p>
-        <p class="mt-1 text-amber-900/90">
-          Confirming a Purchase Receive posts stock and serials. Use Registry to find and manage units — Generate is for allocating
-          numbers only, not receiving goods.
+      <InlineTip class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+        <p class="font-medium text-text-primary">Serials list → open a unit to manage warranty</p>
+        <p class="mt-1 text-slate-700/90">
+          <span class="font-medium">Unit dates</span> come from purchase/receive.{" "}
+          <span class="font-medium">Customer coverage</span> appears after sale — edit both on the serial detail.
+          Sold coverage across customers:{" "}
+          <A href="/app/after-sales/warranty" class="font-medium text-brand-700 hover:underline">
+            Customer Warranty
+          </A>
+          . Inbound stock: confirm{" "}
+          <A href="/app/purchases/purchase-receive/new" class="font-medium text-brand-700 hover:underline">
+            Purchase Receive
+          </A>
+          ; Generate allocates numbers only.
         </p>
-        <A
-          href="/app/purchases/purchase-receive/new"
-          class="mt-2 inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
-        >
-          Use Purchase Receive
-        </A>
       </InlineTip>
       <Show when={urlFilterActive() && filterBannerText()}>
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-950">
@@ -188,11 +195,17 @@ export default function SerialRegistryListPage() {
             { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
             { key: "partner_name", header: "Partner", render: (r) => r.partner_name || "—" },
             { key: "warranty_end", header: "Unit warranty end", render: (r) => fmtDate(r.warranty_end) },
+            {
+              key: "coverage",
+              header: "Coverage",
+              sortable: false,
+              render: (r) => coverageLabel(r),
+            },
             { key: "purchase_order_no", header: "PO no.", render: (r) => r.purchase_order_no ?? "—" },
             { key: "received_at", header: "Received", render: (r) => fmtDate(r.received_at) },
             {
-              key: "trace",
-              header: "Trace",
+              key: "open",
+              header: "Open",
               sortable: false,
               render: (r) => (
                 <A
@@ -200,7 +213,7 @@ export default function SerialRegistryListPage() {
                   class="text-brand-600 hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  Trace
+                  Detail
                 </A>
               ),
             },
@@ -228,7 +241,7 @@ export default function SerialRegistryListPage() {
           onPageChange={setPage}
           onRefresh={invalidate}
           onNew={() => setRegisterOpen(true)}
-          onEdit={() => {}}
+          onEdit={goTrace}
         />
       </div>
 

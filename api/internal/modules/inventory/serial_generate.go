@@ -77,11 +77,13 @@ func generateSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var trackSerial bool
 		var trackQty bool
+		var warrantyMonths int
 		err = pool.QueryRow(r.Context(), `
-			select coalesce(track_serial, false), coalesce(track_inventory_qty, false)
+			select coalesce(track_serial, false), coalesce(track_inventory_qty, false),
+			  coalesce(warranty_duration_months, 0)
 			from public.inv_items
 			where id = $1 and tenant_id = $2 and deleted_at is null`,
-			body.ItemID, tu.TenantID).Scan(&trackSerial, &trackQty)
+			body.ItemID, tu.TenantID).Scan(&trackSerial, &trackQty, &warrantyMonths)
 		if err != nil || !trackSerial {
 			response.Validation(w, map[string]string{"item_id": "Item must exist and track serial numbers."})
 			return
@@ -123,6 +125,11 @@ func generateSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 		out := make([]generatedSerial, 0, qty)
 		recvAt := registerDate.Format("2006-01-02") + " 12:00:00+00"
 		datePart := registerDate.Format("010206") // MMDDYY — e.g. 072726
+		var wStart *time.Time
+		wEnd := warrantyEndFromMonths(registerDate, warrantyMonths)
+		if warrantyMonths > 0 {
+			wStart = &registerDate
+		}
 		remark := strings.TrimSpace(body.Remark)
 		var notes *string
 		if remark != "" {
@@ -140,10 +147,11 @@ func generateSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 				cursor++
 				err = tx.QueryRow(r.Context(), `
 					insert into public.inv_serial_units (
-					  tenant_id, item_id, serial_no, status, location_id, project_id, received_at
-					) values ($1, $2, $3, 'in_stock', $4, $5, $6::timestamptz)
+					  tenant_id, item_id, serial_no, status, location_id, project_id,
+					  warranty_start, warranty_end, received_at
+					) values ($1, $2, $3, 'in_stock', $4, $5, $6::date, $7::date, $8::timestamptz)
 					returning id`,
-					tu.TenantID, body.ItemID, serialNo, body.LocationID, body.ProjectID, recvAt,
+					tu.TenantID, body.ItemID, serialNo, body.LocationID, body.ProjectID, wStart, wEnd, recvAt,
 				).Scan(&unitID)
 				if err == nil {
 					created = true

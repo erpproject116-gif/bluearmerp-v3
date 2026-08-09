@@ -1,4 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -9,6 +10,7 @@ import {
   type SerialReconciliationRow,
 } from "../../../shared/useSerialReports";
 import { SerialLotLayout } from "./SerialLotLayout";
+import { openSerialTrace } from "./openSerialTrace";
 
 function defaultFilters(): SerialReconciliationFilters {
   return { compare_by: "serial", q: "", mismatches_only: true };
@@ -19,6 +21,10 @@ function withRowIds<T extends object>(rows: T[], page: number, pageSize: number)
 }
 
 export default function SerialReconciliationReportPage() {
+  const navigate = useNavigate();
+  const goTrace = (row: { serial_no?: string | null }) => {
+    if (row.serial_no) openSerialTrace(navigate, row.serial_no);
+  };
   const [draft, setDraft] = createSignal<SerialReconciliationFilters>(defaultFilters());
   const [submitted, setSubmitted] = createSignal<SerialReconciliationFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
@@ -155,18 +161,34 @@ export default function SerialReconciliationReportPage() {
               onPageChange={setPage}
               onRefresh={search}
               onNew={() => {}}
-              onEdit={() => {}}
+              onEdit={goTrace}
+              showNew={false}
             />
           }
         >
           <SpreadsheetGrid<SerialReconciliationRow & { id: number }>
             columns={[
-              { key: "item_code", header: "Item code" },
-              { key: "item_name", header: "Item name" },
-              { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
-              { key: "item_qty_on_hand", header: "Item qty", render: (r) => String(r.item_qty_on_hand) },
-              { key: "serial_unit_count", header: "Serial count", render: (r) => String(r.serial_unit_count) },
-              { key: "variance", header: "Variance", render: (r) => String(r.variance) },
+              { key: "item_code", header: "Item code", clickable: false },
+              { key: "item_name", header: "Item name", clickable: false },
+              {
+                key: "location_name",
+                header: "Location",
+                clickable: false,
+                render: (r) => r.location_name || "—",
+              },
+              {
+                key: "item_qty_on_hand",
+                header: "Item qty",
+                clickable: false,
+                render: (r) => String(r.item_qty_on_hand),
+              },
+              {
+                key: "serial_unit_count",
+                header: "Serial count",
+                clickable: false,
+                render: (r) => String(r.serial_unit_count),
+              },
+              { key: "variance", header: "Variance", clickable: false, render: (r) => String(r.variance) },
             ]}
             rows={withRowIds(report.data?.rows ?? [], page(), pageSize)}
             loading={report.isFetching}
@@ -184,6 +206,7 @@ export default function SerialReconciliationReportPage() {
             onRefresh={search}
             onNew={() => {}}
             onEdit={() => {}}
+            showNew={false}
           />
         </Show>
       </div>
