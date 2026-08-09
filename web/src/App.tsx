@@ -163,7 +163,7 @@ import {
   CrmNotificationsPage,
   FollowUpTasksPage,
   QuotationPipelinePage,
-  WarrantyAssetsPage,
+  CustomerWarrantyPage,
   AlertRulesSettingsPage,
   CustomerQuotationsReportPage,
   ItemDemandReportPage,
@@ -536,6 +536,7 @@ export default function App() {
           <Route path="/after-sales/register-repair/status" component={RegisterRepairStatusPage} />
           <Route path="/after-sales/register-repair/consumption" component={RegisterRepairConsumptionPage} />
           <Route path="/after-sales/register-repair" component={RegisterRepairListPage} />
+          <Route path="/after-sales/warranty" component={CustomerWarrantyPage} />
           <Route path="/quotation/setup" component={ModuleSetupHubPage} />
           <Route path="/quotation/tax-mngt/tax-types/settings" component={TaxTypeSettingsPage} />
           <Route path="/quotation/tax-mngt/tax-types" component={TaxTypeListPage} />
@@ -741,9 +742,10 @@ export default function App() {
           <Route path="/crm/pipelines/quotations" component={() => (
             <CrmRoute><QuotationPipelinePage /></CrmRoute>
           )} />
-          <Route path="/crm/warranty-assets" component={() => (
-            <CrmRoute><WarrantyAssetsPage /></CrmRoute>
-          )} />
+          <Route path="/crm/warranty-assets" component={() => {
+            const loc = useLocation();
+            return <Navigate href={`/app/after-sales/warranty${loc.search || ""}`} />;
+          }} />
           <Route path="/crm/settings/alert-rules" component={() => (
             <CrmRoute><AlertRulesSettingsPage /></CrmRoute>
           )} />

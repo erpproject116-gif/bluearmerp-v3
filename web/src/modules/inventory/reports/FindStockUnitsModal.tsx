@@ -129,7 +129,7 @@ export function FindStockUnitsModal(props: Props) {
                         <tr>
                           <th class="px-3 py-2">Serial no.</th>
                           <th class="px-3 py-2">Status</th>
-                          <th class="px-3 py-2">Warranty end</th>
+                          <th class="px-3 py-2">Unit warranty end</th>
                         </tr>
                       </thead>
                       <tbody>

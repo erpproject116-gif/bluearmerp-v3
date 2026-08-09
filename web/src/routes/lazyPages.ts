@@ -161,6 +161,7 @@ export const CrmNotificationsPage = lazy(() => import("../modules/crm/CrmNotific
 export const FollowUpTasksPage = lazy(() => import("../modules/crm/FollowUpTasksPage"));
 export const QuotationPipelinePage = lazy(() => import("../modules/crm/QuotationPipelinePage"));
 export const WarrantyAssetsPage = lazy(() => import("../modules/crm/WarrantyAssetsPage"));
+export const CustomerWarrantyPage = lazy(() => import("../modules/inventory/after-sales/CustomerWarrantyPage"));
 export const AlertRulesSettingsPage = lazy(() => import("../modules/crm/AlertRulesSettingsPage"));
 export const CustomerQuotationsReportPage = lazy(() => import("../modules/crm/reports/CustomerQuotationsReportPage"));
 export const ItemDemandReportPage = lazy(() => import("../modules/crm/reports/ItemDemandReportPage"));

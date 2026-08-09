@@ -7,7 +7,7 @@ export function crmNotificationHref(n: CrmNotification): string {
     case "quo_quotation":
       return "/app/quotation/quotations";
     case "crm_warranty_asset":
-      return "/app/crm/warranty-assets";
+      return "/app/after-sales/warranty";
     case "inv_item":
     case "inv_item_location_balance":
       return "/app/crm/reports/low-stock";

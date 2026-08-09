@@ -66,11 +66,11 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
   return (
     <AfterSalesLayout>
       <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-slate-700">
-        Repair jobs and service work. For sold-unit warranty end dates and CRM follow-ups, see{" "}
-        <A href="/app/crm/warranty-assets" class="font-medium text-brand-700 hover:underline">
-          Warranty coverage
-        </A>{" "}
-        (CRM).
+        Repair jobs and service work. For sold serials with customer coverage, see{" "}
+        <A href="/app/after-sales/warranty" class="font-medium text-brand-700 hover:underline">
+          Customer Warranty
+        </A>
+        .
       </div>
       <SpreadsheetGrid
         columns={[
