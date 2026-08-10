@@ -69,12 +69,7 @@ func arApStatusSQL(tenantID int64, asOf time.Time, statusType string, partnerID 
 		  select si.partner_id,
 		    coalesce(sum(si.grand_total), 0)::float8 - coalesce(sum(paid.paid), 0)::float8 as balance
 		  from public.fin_supplier_invoices si
-		  left join lateral (
-		    select coalesce(sum(a.applied_amount), 0)::float8 as paid
-		    from public.fin_payment_applications a
-		    join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		    where a.supplier_invoice_id = si.id and pv.deleted_at is null and pv.payment_date <= $2::date
-		  ) paid on true
+		  ` + supplierInvoiceAppliedLateralSQLAsOf("si", "$2::date") + `
 		  where si.tenant_id = $1 and si.deleted_at is null and si.invoice_date <= $2::date
 		  group by si.partner_id
 		)

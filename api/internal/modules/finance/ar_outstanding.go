@@ -148,3 +148,8 @@ func saleAppliedLateralSQLAsOf(salesAlias, asOfParam string) string {
 		  )::float8 as received
 		) recv on true`, salesAlias, orDate, salesAlias, cnDate, salesAlias, riDate)
 }
+
+// SaleAppliedLateralSQLAsOf is the exported form of the sales applied-amount lateral (OR + CN + retainer).
+func SaleAppliedLateralSQLAsOf(salesAlias, asOfParam string) string {
+	return saleAppliedLateralSQLAsOf(salesAlias, asOfParam)
+}

@@ -1,6 +1,7 @@
 package finance
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -88,9 +89,10 @@ func arAgingSQL(extraWhere string) string {
 		  end as age_bucket
 		from public.sa_sales s
 		join public.inv_partners p on p.id = s.partner_id
-		` + saleAppliedLateralSQL("s") + `
+		` + saleAppliedLateralSQLAsOf("s", "$2::date") + `
 		where s.tenant_id = $1
 		  and s.deleted_at is null
+		  and s.order_date <= $2::date
 		  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001` + extraWhere
 }
 
@@ -112,14 +114,10 @@ func apAgingSQL(extraWhere string) string {
 		  end as age_bucket
 		from public.fin_supplier_invoices si
 		join public.inv_partners p on p.id = si.partner_id
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as paid
-		  from public.fin_payment_applications a
-		  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		  where a.supplier_invoice_id = si.id and pv.deleted_at is null
-		) paid on true
+		` + supplierInvoiceAppliedLateralSQLAsOf("si", "$2::date") + `
 		where si.tenant_id = $1
 		  and si.deleted_at is null
+		  and si.invoice_date <= $2::date
 		  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001` + extraWhere
 }
 
@@ -137,6 +135,29 @@ func appendAgingSummary(summary *agingSummary, bucket string, balance float64) {
 		summary.Over90 += balance
 	}
 	summary.Total += balance
+}
+
+// loadAgingSummary aggregates buckets across the full open-balance set (not the current page).
+func loadAgingSummary(ctx context.Context, pool *pgxpool.Pool, baseSQL string, args []any) (agingSummary, error) {
+	var summary agingSummary
+	q := fmt.Sprintf(`
+		select age_bucket, coalesce(sum(balance), 0)::float8
+		from (%s) sub
+		group by age_bucket`, baseSQL)
+	rows, err := pool.Query(ctx, q, args...)
+	if err != nil {
+		return summary, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var bucket string
+		var bal float64
+		if err := rows.Scan(&bucket, &bal); err != nil {
+			return summary, err
+		}
+		appendAgingSummary(&summary, bucket, bal)
+	}
+	return summary, rows.Err()
 }
 
 func listArAging(pool *pgxpool.Pool) http.HandlerFunc {
@@ -172,9 +193,14 @@ func listArAging(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to count A/R ageing.", "ERR_INTERNAL")
 			return
 		}
-		args = append(args, p.PageSize, offset)
+		summary, err := loadAgingSummary(r.Context(), pool, base, args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to summarize A/R ageing.", "ERR_INTERNAL")
+			return
+		}
+		pageArgs := append(append([]any{}, args...), p.PageSize, offset)
 		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $%d offset $%d", base, p.Sort, orderSQL(p.Order), argN, argN+1)
-		rows, err := pool.Query(r.Context(), q, args...)
+		rows, err := pool.Query(r.Context(), q, pageArgs...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load A/R ageing.", "ERR_INTERNAL")
 			return
@@ -182,7 +208,6 @@ func listArAging(pool *pgxpool.Pool) http.HandlerFunc {
 		defer rows.Close()
 
 		var out []arAgingRow
-		var summary agingSummary
 		for rows.Next() {
 			var row arAgingRow
 			if err := rows.Scan(&row.SalesID, &row.SalesNo, &row.CustomerName, &row.DueDate, &row.Balance, &row.AgeDays, &row.AgeBucket); err != nil {
@@ -190,7 +215,6 @@ func listArAging(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			out = append(out, row)
-			appendAgingSummary(&summary, row.AgeBucket, row.Balance)
 		}
 		if out == nil {
 			out = []arAgingRow{}
@@ -278,9 +302,14 @@ func listApAging(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to count A/P ageing.", "ERR_INTERNAL")
 			return
 		}
-		args = append(args, p.PageSize, offset)
+		summary, err := loadAgingSummary(r.Context(), pool, base, args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to summarize A/P ageing.", "ERR_INTERNAL")
+			return
+		}
+		pageArgs := append(append([]any{}, args...), p.PageSize, offset)
 		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $%d offset $%d", base, p.Sort, orderSQL(p.Order), argN, argN+1)
-		rows, err := pool.Query(r.Context(), q, args...)
+		rows, err := pool.Query(r.Context(), q, pageArgs...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load A/P ageing.", "ERR_INTERNAL")
 			return
@@ -288,7 +317,6 @@ func listApAging(pool *pgxpool.Pool) http.HandlerFunc {
 		defer rows.Close()
 
 		var out []apAgingRow
-		var summary agingSummary
 		for rows.Next() {
 			var row apAgingRow
 			if err := rows.Scan(&row.SupplierInvoiceID, &row.InvoiceNo, &row.VendorName, &row.DueDate, &row.Balance, &row.AgeDays, &row.AgeBucket); err != nil {
@@ -296,7 +324,6 @@ func listApAging(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			out = append(out, row)
-			appendAgingSummary(&summary, row.AgeBucket, row.Balance)
 		}
 		if out == nil {
 			out = []apAgingRow{}
