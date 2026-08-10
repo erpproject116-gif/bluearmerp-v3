@@ -5,32 +5,32 @@ import type { KbArticle } from "./documentationTypes";
  * Problem-oriented articles: blockers, paraphrases, and deeper module Q&A.
  */
 export const helpScenarioArticles: KbArticle[] = [
-  // ─── MyPage / Ecount navigation ─────────────────────────────────────────
+  // ─── Home / navigation ──────────────────────────────────────────────────
   {
     id: "mypage-flow-chart",
-    title: "Where do I start? MyPage how work flows",
+    title: "Where do I start? Home and how work flows",
     scenario:
       "You do not know which screen to open for sales, purchases, cash in/out, or stock — or you opened the wrong menu and filed a ticket.",
     intro:
-      "Open Home. Use Learn for common lists, or How work flows for Sell (New Sales → Get paid) and Buy (PO → Purchase Receive → Bill → Payment Made). Dashed steps are optional. Load Slip is a button inside New Sales / New Bill / PO — not a separate menu. Sidebar: Stocks, Sell, Buy, Accounting.",
+      "Open Home. Use Learn for common lists, or How work flows for Sell (New Sales → Get paid) and Buy (PO → Purchase Receive → Payment Made). Dashed steps are optional. Load Slip is a button inside New Sales / Purchase Receive / PO — not a separate menu. Sidebar: Stocks, Sell, Buy, Accounting.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Go to /app/dashboard (Home / MyPage).",
+          "Go to Home (/app/dashboard).",
           "Set masters once if needed: Partners, Items (qty tracking on for stock), Locations, Tax, Accounting setup.",
           "Click a solid pill in How work flows for the screen you need — dashed pills are optional.",
-          "On New Sales / New Bill, use Load Slip only when pulling lines from an earlier document (SO, PO, Purchase Receive).",
+          "On New Sales / Purchase Receive, use Load Slip only when pulling lines from an earlier document (SO, PO).",
           "Use Site Map (/app/dashboard/site-map) to search menu names.",
         ],
       },
       {
         type: "tip",
-        text: "Wrong-screen tickets usually mean skipping MyPage. Bookmark Home and follow the chain left to right.",
+        text: "Wrong-screen tickets usually mean skipping Home. Bookmark Home and follow the chain left to right.",
       },
     ],
     primaryHref: "/app/dashboard",
-    primaryLabel: "Open MyPage",
+    primaryLabel: "Open Home",
     relatedGuideIds: ["load-slip-overview", "official-receipt-after-si", "payment-voucher-after-purchase"],
   },
   // ─── P0: Blockers & confusion ───────────────────────────────────────────
@@ -543,24 +543,24 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Purchase Receive with serial numbers",
     scenario: "Vendor delivery includes serial-tracked items and you must post Purchase Receive with serials into stock.",
     intro:
-      "Post Purchase Receive against the PO, then scan serials on Track serial lines until count matches qty. Serials become available in the registry.",
+      "Confirm Purchase Receive against the PO, then scan serials on Track serial lines until count matches qty. Serials appear under Serials; Inv Per Branch shows location qty plus a serial count pill.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Purchase Receive and Load Slip from the purchase order (or create receive linked to PO).",
+          "Open Buy → Purchase Receive and Load Slip from the purchase order (or create a blank receive and pick items).",
           "Set received quantities for each line.",
           "On Track serial lines, scan each unit until accepted count equals received qty.",
-          "Post / confirm the Purchase Receive.",
-          "Optionally create the Bill via Load Slip → Purchase Receive.",
+          "Confirm the Purchase Receive (stock, serials, and AP post on confirm).",
+          "Check Inv Per Branch for qty and Serials for unit identity / warranty.",
         ],
       },
       {
         type: "tip",
-        text: "If serial already exists in stock, the receive scan will fail — trace the serial before forcing a duplicate.",
+        text: "If a serial already exists in stock, the receive scan will fail — open Serials and look up that unit before forcing a duplicate.",
       },
     ],
-    primaryHref: "/app/purchase-order/goods-receipt",
+    primaryHref: "/app/purchases/purchase-receive",
     primaryLabel: "Purchase Receive",
     relatedGuideIds: ["serial-count-mismatch", "serial-barcode-scanning", "goods-receipt-load-slip"],
   },
@@ -706,7 +706,7 @@ export const helpScenarioArticles: KbArticle[] = [
           "Switch Active branch from the branch switcher to the warehouse you are working in — new quotes, orders, and receipts default to that location.",
           "When creating SO, GR, transfers, or issues, confirm the location field matches that branch.",
           "Use Stock transfer between branches when goods physically move — do not only switch active branch.",
-          "Use Find Stock (or Inventory Status with Branch = All) to inquire qty across branches; document write access remains scoped for branch staff.",
+          "Use Inv Per Branch (Branch = All) to inquire qty across branches; document write access remains scoped for branch staff.",
         ],
       },
       {
@@ -1276,7 +1276,7 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Empty list — branch scope or filters",
     scenario: "Partners, stock, or documents disappear from a list even though you know they exist.",
     intro:
-      "Owners and company admins see documents across all branches; Active branch alone does not empty their grids. Branch-scoped staff only see documents for locations assigned under Data scopes. Stock inquiry (Find Stock) can still show qty at every branch.",
+      "Owners and company admins see documents across all branches; Active branch alone does not empty their grids. Branch-scoped staff only see documents for locations assigned under Data scopes. Stock inquiry (Inv Per Branch) can still show qty at every branch.",
     blocks: [
       {
         type: "steps",

@@ -14,7 +14,7 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
   { query: "switch between businesses", path: "/app/dashboard", expectArticleId: "switch-between-businesses" },
   { query: "where do I start mypage flow chart", path: "/app/dashboard", expectArticleId: "mypage-flow-chart" },
   { query: "which screen for sales cash in", path: "/app/dashboard", expectArticleId: "mypage-flow-chart" },
-  { query: "ecount inv i navigation", path: "/app/dashboard", expectArticleId: "mypage-flow-chart" },
+  { query: "bluearmerp home navigation flow chart", path: "/app/dashboard", expectArticleId: "mypage-flow-chart" },
   { query: "what is load slip", path: "/app/sales-order", expectArticleId: "load-slip-overview" },
   { query: "onboarding playbook", path: "/app/onboarding", expectArticleId: "onboarding-playbook" },
 

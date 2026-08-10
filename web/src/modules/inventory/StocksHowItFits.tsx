@@ -1,7 +1,7 @@
 import { A } from "@solidjs/router";
 import { InlineTip } from "../../shared/inlineGuides";
 
-/** Short map of Stocks screens — keeps Find Stock / Items / Serial-Lot from feeling like separate apps. */
+/** Short map of Stocks screens — keeps Inv Per Branch / Items / Serials from feeling like separate apps. */
 export function StocksHowItFits(props?: { class?: string }) {
   return (
     <InlineTip tipId="stocks-how-it-fits" class={`rounded-lg border border-dashed border-stroke bg-slate-50/90 px-3 py-2.5 ${props?.class ?? ""}`}>
@@ -22,9 +22,9 @@ export function StocksHowItFits(props?: { class?: string }) {
         </li>
         <li>
           <A href="/app/inventory/find-stock" class="font-medium text-brand-700 hover:underline">
-            Find Stock
+            Inv Per Branch
           </A>{" "}
-          — on-hand qty by branch, plus serial/lot counts when tracked.
+          — on-hand qty by branch; serial pill when units are tracked (full list under Serials).
         </li>
         <li>
           <A href="/app/purchases/purchase-receive" class="font-medium text-brand-700 hover:underline">

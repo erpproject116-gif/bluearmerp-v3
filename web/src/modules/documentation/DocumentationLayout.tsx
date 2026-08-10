@@ -6,7 +6,7 @@ import { filterKbArticles, filterSections } from "./documentationSearch";
 import { HelpAssistantAskButton } from "../help-assistant/HelpAssistantAskButton";
 import { workflowGuides } from "../../shared/workflowGuides";
 
-export type DocTab = "guides" | "knowledgebase";
+export type DocTab = "guides" | "knowledgebase" | "whats-new";
 
 export function DocumentationHeaderTabs(props: { active: DocTab }) {
   const tabClass = (tab: DocTab) =>
@@ -30,6 +30,14 @@ export function DocumentationHeaderTabs(props: { active: DocTab }) {
           aria-selected={props.active === "knowledgebase"}
         >
           Knowledge base
+        </A>
+        <A
+          href="/app/documentation/whats-new"
+          class={tabClass("whats-new")}
+          role="tab"
+          aria-selected={props.active === "whats-new"}
+        >
+          What’s New
         </A>
       </div>
     </div>

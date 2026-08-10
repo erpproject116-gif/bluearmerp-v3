@@ -44,17 +44,17 @@ const STEPS: Step[] = [
   {
     id: "opening",
     title: "4. Record what is already on the shelf",
-    why: "If you already have goods in the store, enter opening counts here. Creating a product or purchase order alone does not fill Find Stock.",
+    why: "If you already have goods in the store, enter opening counts here. Creating a product or purchase order alone does not fill Inv Per Branch.",
     href: "/app/inventory/stock-entries",
     cta: "Open stock entries",
     done: (s) => (s?.items_with_stock ?? 0) > 0,
   },
   {
     id: "check",
-    title: "5. Check Find Stock",
+    title: "5. Check Inv Per Branch",
     why: "This is your shelf view — how much you have by place. It fills after step 4, or after you receive a delivery (once trading is unlocked).",
     href: "/app/inventory/find-stock",
-    cta: "Open Find Stock",
+    cta: "Open Inv Per Branch",
     done: (s) => (s?.items_with_stock ?? 0) > 0,
   },
 ];
@@ -118,7 +118,7 @@ export function StocksDay1Setup(props: Props) {
               confirmation by Bluearm.
             </p>
             <p class="mt-1 text-xs text-text-secondary">
-              Order: places → people (optional) → products → opening stock → Find Stock → pay → then buy / sell.
+              Order: places → people (optional) → products → opening stock → Inv Per Branch → pay → then buy / sell.
             </p>
           </div>
           <Show when={tradeUnlocked()}>
@@ -205,7 +205,7 @@ export function StocksDay1Setup(props: Props) {
               }
             >
               You’re ready to trade. Buying: order → New Bill (stock + serials + AP on confirm) → pay. Selling: sale → get
-              paid. Find Stock updates when goods come in or go out.
+              paid. Inv Per Branch updates when goods come in or go out.
             </Show>
           </p>
           <div class="mt-2 flex flex-wrap gap-2">

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,13 +21,33 @@ const drainBatchSize = 50
 
 // DrainPending processes up to batchSize pending events; returns count processed.
 func DrainPending(ctx context.Context, pool *pgxpool.Pool, handler func(ctx context.Context, pool *pgxpool.Pool, ev Event) error) (int, error) {
-	rows, err := pool.Query(ctx, `
-		select id, tenant_id, event_type, idempotency_key, payload
-		from public.outbox_events
-		where status = 'pending'
-		order by created_at
-		limit $1
-		for update skip locked`, drainBatchSize)
+	return DrainPendingOfTypes(ctx, pool, nil, handler)
+}
+
+// DrainPendingOfTypes is like DrainPending but only claims events whose type is in eventTypes.
+// Pass nil/empty eventTypes to claim any pending event (legacy behavior).
+func DrainPendingOfTypes(ctx context.Context, pool *pgxpool.Pool, eventTypes []string, handler func(ctx context.Context, pool *pgxpool.Pool, ev Event) error) (int, error) {
+	var (
+		rows pgx.Rows
+		err  error
+	)
+	if len(eventTypes) == 0 {
+		rows, err = pool.Query(ctx, `
+			select id, tenant_id, event_type, idempotency_key, payload
+			from public.outbox_events
+			where status = 'pending'
+			order by created_at
+			limit $1
+			for update skip locked`, drainBatchSize)
+	} else {
+		rows, err = pool.Query(ctx, `
+			select id, tenant_id, event_type, idempotency_key, payload
+			from public.outbox_events
+			where status = 'pending' and event_type = any($2::text[])
+			order by created_at
+			limit $1
+			for update skip locked`, drainBatchSize, eventTypes)
+	}
 	if err != nil {
 		return 0, err
 	}

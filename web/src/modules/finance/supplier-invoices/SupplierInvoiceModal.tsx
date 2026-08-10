@@ -57,11 +57,11 @@ import {
 } from "../../purchase-request/purchase-request/PurchaseRequestLineGrid";
 import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
 import { SupplierInvoiceApprovalPanel } from "./SupplierInvoiceApprovalPanel";
-import { SupplierInvoicePostSaveDialog } from "./SupplierInvoicePostSaveDialog";
-import { CashPaymentToVendorModal } from "./CashPaymentToVendorModal";
 import { tryAutoSavePurchaseInvoice } from "../../../shared/invoiceApi";
 import { TermHint } from "../../../shared/TermHint";
 import { A } from "@solidjs/router";
+import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
+import { useCustomValues } from "../../../shared/useCustomValues";
 
 export type { SupplierInvoiceDetail as PurchaseDetail };
 
@@ -127,7 +127,8 @@ export function SupplierInvoiceModal(props: Props) {
   const auth = useAuth();
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
-  const { fields, byKey } = useFormFieldSettings(PURCHASES_ENTITY.purchases);
+  const { fields, byKey, activeCustomFields } = useFormFieldSettings(PURCHASES_ENTITY.purchases);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const [attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
@@ -135,8 +136,6 @@ export function SupplierInvoiceModal(props: Props) {
   const currencies = () => currenciesQuery.data ?? [];
   const [saving, setSaving] = createSignal(false);
   const [createdInvoice, setCreatedInvoice] = createSignal<SupplierInvoiceDetail | null>(null);
-  const [postSaveOpen, setPostSaveOpen] = createSignal(false);
-  const [cashPaymentOpen, setCashPaymentOpen] = createSignal(false);
   const effectiveEditing = () => props.editing ?? createdInvoice();
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
@@ -169,7 +168,6 @@ export function SupplierInvoiceModal(props: Props) {
   const [projectLabel, setProjectLabel] = createSignal("");
   const [projectName, setProjectName] = createSignal("");
   const [dueDate, setDueDate] = createSignal("");
-  const [termsOfPayment, setTermsOfPayment] = createSignal("");
   const [paymentTerms, setPaymentTerms] = createSignal("");
   const [vendorInvoiceNo, setVendorInvoiceNo] = createSignal("");
   const [reference, setReference] = createSignal("");
@@ -230,13 +228,13 @@ export function SupplierInvoiceModal(props: Props) {
     project_label: projectLabel(),
     project_name: projectName(),
     due_date: dueDate(),
-    terms_of_payment: termsOfPayment(),
     payment_terms: paymentTerms(),
     vendor_invoice_no: vendorInvoiceNo(),
     reference: reference(),
     notes: notes(),
     progress_status: progressStatus(),
     lines: lines(),
+    custom_values: customValues(),
   });
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
@@ -254,13 +252,13 @@ export function SupplierInvoiceModal(props: Props) {
     setProjectLabel(payload.project_label);
     setProjectName(payload.project_name);
     setDueDate(payload.due_date);
-    setTermsOfPayment(payload.terms_of_payment);
     setPaymentTerms(payload.payment_terms);
     setVendorInvoiceNo(payload.vendor_invoice_no);
     setReference(payload.reference);
     setNotes(payload.notes);
     setProgressStatus(payload.progress_status || "unconfirmed");
     setLines(payload.lines?.length ? payload.lines : [emptyPurchaseRequestLine(1)]);
+    loadCustom(payload.custom_values ?? {});
   };
 
   const draft = useDocumentDraft({
@@ -307,13 +305,13 @@ export function SupplierInvoiceModal(props: Props) {
       setProjectLabel(ed.project_name ?? "");
       setProjectName(ed.project_name ?? "");
       setDueDate(ed.due_date ?? "");
-      setTermsOfPayment(ed.terms_of_payment ?? "");
       setPaymentTerms(ed.payment_terms ?? "");
       setVendorInvoiceNo(ed.vendor_invoice_no ?? "");
       setReference(ed.reference ?? "");
       setNotes(ed.notes ?? "");
       setProgressStatus(ed.progress_status || "unconfirmed");
       setLines(linesFromDetail(ed.lines));
+      loadCustom(ed.custom_values ?? {});
       setWithholdingLines(
         (ed.withholding_lines ?? []).map((ln) => ({
           tax_code_id: ln.tax_code_id,
@@ -341,12 +339,12 @@ export function SupplierInvoiceModal(props: Props) {
       setProjectLabel("");
       setProjectName("");
       setDueDate("");
-      setTermsOfPayment("");
       setPaymentTerms("");
       setVendorInvoiceNo("");
       setReference("");
       setNotes("");
       setProgressStatus("unconfirmed");
+      loadCustom({});
       setWithholdingLines([]);
       seededNewLines = seedLines.length > 0;
       if (seededNewLines) {
@@ -571,7 +569,9 @@ export function SupplierInvoiceModal(props: Props) {
       vendor_invoice_no: vendorInvoiceNo(),
       notes: notes(),
     };
-    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    const clientError =
+      requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields())) ??
+      validateCustomFields(customValues(), activeCustomFields());
     if (clientError) {
       toast.warning(clientError);
       return;
@@ -599,7 +599,7 @@ export function SupplierInvoiceModal(props: Props) {
       project_id: projectId(),
       project_name: projectName() || null,
       due_date: dueDate() || null,
-      terms_of_payment: termsOfPayment() || null,
+      terms_of_payment: null,
       payment_terms: paymentTerms() || null,
       vendor_invoice_no: vendorInvoiceNo() || null,
       reference: reference() || null,
@@ -633,6 +633,7 @@ export function SupplierInvoiceModal(props: Props) {
       withholding_lines: withholdingLines()
         .filter((ln) => ln.tax_code_id && Number(ln.base_amount) > 0)
         .map((ln) => ({ tax_code_id: ln.tax_code_id!, base_amount: Number(ln.base_amount) })),
+      custom_values: customValues(),
     };
 
     if (body.lines.length === 0) {
@@ -693,7 +694,7 @@ export function SupplierInvoiceModal(props: Props) {
       stockMsg =
         "Stock updated at the purchase location when items track inventory (auto-receive). BOM recipes are unchanged.";
     } else if (hasGRLines) {
-      stockMsg = "Already received earlier — this save is billing only. Check Find Stock / Stock Movements for qty.";
+      stockMsg = "Already received earlier — this save is billing only. Check Inv Per Branch / Stock Movements for qty.";
     }
     stockMsg = `${stockMsg} ${autoSave.message}`;
     if (toast.action) {
@@ -701,7 +702,7 @@ export function SupplierInvoiceModal(props: Props) {
         type: autoSave.ok ? "success" : "warning",
         title: autoSave.ok ? "Purchase created — accounting ready." : "Purchase created.",
         message: stockMsg,
-        actionLabel: "Find Stock",
+        actionLabel: "Inv Per Branch",
         href: "/app/inventory/find-stock",
       });
     } else if (autoSave.ok) {
@@ -709,11 +710,6 @@ export function SupplierInvoiceModal(props: Props) {
     } else {
       toast.warning(stockMsg);
     }
-    setPostSaveOpen(true);
-  };
-
-  const finishPostSave = () => {
-    setPostSaveOpen(false);
     props.onClose();
   };
 
@@ -750,7 +746,7 @@ export function SupplierInvoiceModal(props: Props) {
                 dueDate: dueDate(),
                 currencyCode: currencies().find((c) => c.id === currencyId())?.currency_code,
                 grandTotal: lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0),
-                paymentTerms: paymentTerms() || termsOfPayment(),
+                paymentTerms: paymentTerms(),
                 notes: notes(),
                 lines: lines(),
                 companyName: auth.me?.tenant.company_name,
@@ -980,19 +976,12 @@ export function SupplierInvoiceModal(props: Props) {
                 />
               )}
             </ModalField>
-            <Field label="Terms of payment">
-              <select class={inputClass} value={termsOfPayment()} onChange={(e) => setTermsOfPayment(e.currentTarget.value)}>
-                <option value="">—</option>
-                <option value="30_days_terms">30 Days Terms</option>
-                <option value="cash">Cash</option>
-              </select>
-            </Field>
             <ModalField settings={byKey} fieldKey="payment_terms" fallbackLabel="Payment terms">
               {(m) => (
                 <input
                   class={inputClass}
                   value={paymentTerms()}
-                  placeholder={m.placeholder}
+                  placeholder={m.placeholder || "e.g. Net 30, COD, 50% deposit"}
                   disabled={m.disabled}
                   onInput={(e) => setPaymentTerms(e.currentTarget.value)}
                 />
@@ -1055,6 +1044,11 @@ export function SupplierInvoiceModal(props: Props) {
                 <input class={inputClass} value={effectiveEditing()?.created_by_name ?? ""} readOnly />
               </Field>
             </Show>
+            <CustomFieldsSection
+              entityType={PURCHASES_ENTITY.purchases}
+              values={customValues}
+              onChange={setCustom}
+            />
           </div>
           <div class="col-span-full mb-2 mt-2 flex flex-wrap items-center gap-2">
             <LoadSlipMenu
@@ -1259,43 +1253,6 @@ export function SupplierInvoiceModal(props: Props) {
         targetId={effectiveEditing()?.id}
         title="History — Purchase"
       />
-
-      <SupplierInvoicePostSaveDialog
-        open={postSaveOpen()}
-        invoiceNo={createdInvoice()?.invoice_no ?? ""}
-        amount={createdInvoice()?.grand_total ?? 0}
-        hasSerials={lines().some(
-          (ln) => Boolean(ln.track_serial) && (ln.planned_serial_nos?.length ?? 0) > 0,
-        )}
-        onCashPayment={() => {
-          setPostSaveOpen(false);
-          setCashPaymentOpen(true);
-        }}
-        onAccounting={() => {
-          setPostSaveOpen(false);
-          setActiveTab("invoice");
-        }}
-        onDone={finishPostSave}
-      />
-
-      <Show when={createdInvoice()}>
-        {(inv) => (
-          <CashPaymentToVendorModal
-            open={cashPaymentOpen()}
-            supplierInvoiceId={inv().id}
-            partnerId={inv().partner_id}
-            currencyId={inv().currency_id}
-            amount={inv().grand_total}
-            invoiceNo={inv().invoice_no}
-            paymentDate={inv().invoice_date}
-            onClose={() => {
-              setCashPaymentOpen(false);
-              finishPostSave();
-            }}
-            onSaved={() => props.onSaved()}
-          />
-        )}
-      </Show>
 
       <QuickCustomerModal
         open={showNewVendor()}

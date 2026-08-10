@@ -22,7 +22,7 @@ const tiles: KpiTile[] = [
 ];
 
 const reportLinks = [
-  { label: "Find Stock", href: "/app/inventory/find-stock" },
+  { label: "Inv Per Branch", href: "/app/inventory/find-stock" },
   { label: "Inventory Balance (on hand)", href: "/app/inventory/reports/on-hand" },
   { label: "Inventory Status", href: "/app/inventory/reports/inventory-status" },
   { label: "Inv. Book", href: "/app/inventory/reports/inv-book" },
@@ -45,7 +45,7 @@ export default function StockWorkspacePage() {
         <h1 class="text-lg font-semibold text-text-primary">Stocks</h1>
         <p class="mt-1 text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-1 text-sm text-text-secondary">
-          Set up places and products first. See what’s on the shelf in Find Stock after you enter opening counts or
+          Set up places and products first. See what’s on the shelf in Inv Per Branch after you enter opening counts or
           receive a delivery.
         </p>
       </section>

@@ -68,13 +68,13 @@ import {
   type SalesTemplateCode,
 } from "./SalesLineGrid";
 import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
-import { CashInFromCustomerModal } from "./CashInFromCustomerModal";
-import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
 import { SalesHoldListModal, type SalesHoldPayload } from "./SalesHoldListModal";
 import { ReturnSaleLinesModal } from "./ReturnSaleLinesModal";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { TermHint } from "../../../shared/TermHint";
 import { A } from "@solidjs/router";
+import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
+import { useCustomValues } from "../../../shared/useCustomValues";
 import {
   SalesCommissionPanel,
   type SaleCommissionRow,
@@ -102,6 +102,7 @@ export type SalesDetail = {
   payment_terms?: string | null;
   si_dr_no?: string | null;
   notes?: string | null;
+  custom_values?: Record<string, unknown>;
   progress_status: string;
   invoicing_status?: boolean;
   template_code: SalesTemplateCode;
@@ -229,7 +230,8 @@ export function SalesModal(props: Props) {
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
-  const { fields, byKey } = useFormFieldSettings(SALES_ENTITY.sales);
+  const { fields, byKey, activeCustomFields } = useFormFieldSettings(SALES_ENTITY.sales);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const [saving, setSaving] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
@@ -238,8 +240,6 @@ export function SalesModal(props: Props) {
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [createdSale, setCreatedSale] = createSignal<SalesDetail | null>(null);
-  const [postSaveOpen, setPostSaveOpen] = createSignal(false);
-  const [cashInOpen, setCashInOpen] = createSignal(false);
   const [holdOpen, setHoldOpen] = createSignal(false);
   const effectiveEditing = () => props.editing ?? createdSale();
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
@@ -269,7 +269,6 @@ export function SalesModal(props: Props) {
   const [projectLabel, setProjectLabel] = createSignal("");
   const [projectName, setProjectName] = createSignal("");
   const [dueDate, setDueDate] = createSignal("");
-  const [termsOfPayment, setTermsOfPayment] = createSignal("");
   const [paymentTerms, setPaymentTerms] = createSignal("");
   const [siDrNo, setSiDrNo] = createSignal("");
   const [notes, setNotes] = createSignal("");
@@ -306,7 +305,6 @@ export function SalesModal(props: Props) {
     project_label: projectLabel(),
     project_name: projectName(),
     due_date: dueDate(),
-    terms_of_payment: termsOfPayment(),
     payment_terms: paymentTerms(),
     si_dr_no: siDrNo(),
     notes: notes(),
@@ -316,6 +314,7 @@ export function SalesModal(props: Props) {
     template_code: templateCode(),
     lines: lines(),
     commissions: commissions(),
+    custom_values: customValues(),
   });
 
   const buildHoldPayload = (): SalesHoldPayload => {
@@ -334,7 +333,7 @@ export function SalesModal(props: Props) {
       project_label: d.project_label,
       project_name: d.project_name,
       due_date: d.due_date,
-      terms_of_payment: d.terms_of_payment,
+      terms_of_payment: "",
       payment_terms: d.payment_terms,
       si_dr_no: d.si_dr_no,
       notes: d.notes,
@@ -380,7 +379,6 @@ export function SalesModal(props: Props) {
     setProjectLabel(ed.project_name ?? "");
     setProjectName(ed.project_name ?? "");
     setDueDate(ed.due_date ?? "");
-    setTermsOfPayment(ed.terms_of_payment ?? "");
     setPaymentTerms(ed.payment_terms ?? "");
     setSiDrNo(ed.si_dr_no ?? "");
     setNotes(ed.notes ?? "");
@@ -389,6 +387,7 @@ export function SalesModal(props: Props) {
     setSourceSalesOrderId(ed.source_sales_order_id ?? null);
     setLines(linesFromDetail(ed.lines));
     setDetailLines(ed.lines ?? []);
+    loadCustom(ed.custom_values ?? {});
     setCommissions(
       (ed.commissions ?? []).map((c, i) => ({
         line_no: c.line_no || i + 1,
@@ -438,6 +437,7 @@ export function SalesModal(props: Props) {
       location_label: payload.location_label ?? "",
       project_label: payload.project_label ?? "",
       commissions: [],
+      custom_values: {},
     });
   };
 
@@ -486,7 +486,6 @@ export function SalesModal(props: Props) {
     setProjectLabel(payload.project_label);
     setProjectName(payload.project_name);
     setDueDate(payload.due_date);
-    setTermsOfPayment(payload.terms_of_payment);
     setPaymentTerms(payload.payment_terms);
     setSiDrNo(payload.si_dr_no);
     setNotes(payload.notes);
@@ -495,6 +494,7 @@ export function SalesModal(props: Props) {
     setSourceSalesOrderId(payload.source_sales_order_id);
     setLines(payload.lines);
     setCommissions((payload.commissions as SaleCommissionRow[] | undefined) ?? []);
+    loadCustom(payload.custom_values ?? {});
   };
 
   const draft = useDocumentDraft({
@@ -539,8 +539,6 @@ export function SalesModal(props: Props) {
     if (!props.open) {
       newFormSeededForOpen = false;
       setCreatedSale(null);
-      setPostSaveOpen(false);
-      setCashInOpen(false);
       setActiveTab("details");
       setSourceAttachPreview(null);
       return;
@@ -570,7 +568,6 @@ export function SalesModal(props: Props) {
       setProjectLabel("");
       setProjectName("");
       setDueDate("");
-      setTermsOfPayment("");
       setPaymentTerms("");
       setSiDrNo("");
       setNotes("");
@@ -578,6 +575,7 @@ export function SalesModal(props: Props) {
       setSalesCategory("");
       setSourceSalesOrderId(null);
       setSourceAttachPreview(null);
+      loadCustom({});
       seededNewLines = seedLines.length > 0;
       if (seededNewLines) {
         setLines(seedLines);
@@ -892,7 +890,8 @@ export function SalesModal(props: Props) {
         progress_status: status,
       },
     );
-    const clientError = requireFields(formValues, checks);
+    const clientError =
+      requireFields(formValues, checks) ?? validateCustomFields(customValues(), activeCustomFields());
     if (clientError) {
       toast.warning(clientError);
       return;
@@ -920,7 +919,7 @@ export function SalesModal(props: Props) {
       project_id: projectId(),
       project_name: projectName() || null,
       due_date: dueDate() || null,
-      terms_of_payment: termsOfPayment() || null,
+      terms_of_payment: null,
       payment_terms: paymentTerms() || null,
       si_dr_no: siDrNo() || null,
       notes: notes() || null,
@@ -960,6 +959,7 @@ export function SalesModal(props: Props) {
           sales_line_id: c.scope === "item" ? c.sales_line_id || null : null,
           sales_line_no: c.scope === "item" ? c.sales_line_no || null : null,
         })),
+      custom_values: customValues(),
     };
 
     setSaving(true);
@@ -997,21 +997,13 @@ export function SalesModal(props: Props) {
     } else {
       toast.warning(stockNote);
     }
-    // Allow pending uploads / server Copy to surface on AttachmentsField, then open next-step dialog (create) or close (edit).
+    // Allow pending uploads / server Copy to surface on AttachmentsField, then close.
     const sourced =
       !!sourceSalesOrderId() ||
       !!sourceAttachPreview() ||
       lines().some((ln) => !!ln.source_sales_order_line_id || !!ln.source_quotation_line_id);
     const delayMs = !ed && (attachmentCount() > 0 || sourced) ? 600 : 0;
-    window.setTimeout(() => {
-      if (!ed) setPostSaveOpen(true);
-      else props.onClose();
-    }, delayMs);
-  };
-
-  const finishPostSave = () => {
-    setPostSaveOpen(false);
-    props.onClose();
+    window.setTimeout(() => props.onClose(), delayMs);
   };
 
   return (
@@ -1272,19 +1264,12 @@ export function SalesModal(props: Props) {
             />
           )}
         </ModalField>
-        <Field label="Terms of payment">
-          <select class={inputClass} value={termsOfPayment()} onChange={(e) => setTermsOfPayment(e.currentTarget.value)}>
-            <option value="">—</option>
-            <option value="30_days_terms">30 Days Terms</option>
-            <option value="cash">Cash</option>
-          </select>
-        </Field>
         <ModalField settings={byKey} fieldKey="payment_terms" fallbackLabel="Payment terms">
           {(m) => (
             <input
               class={inputClass}
               value={paymentTerms()}
-              placeholder={m.placeholder}
+              placeholder={m.placeholder || "e.g. Net 30, COD, 50% deposit"}
               disabled={m.disabled}
               onInput={(e) => setPaymentTerms(e.currentTarget.value)}
             />
@@ -1376,6 +1361,11 @@ export function SalesModal(props: Props) {
             <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />
           </Field>
         </Show>
+        <CustomFieldsSection
+          entityType={SALES_ENTITY.sales}
+          values={customValues}
+          onChange={setCustom}
+        />
         </div>
         <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">
           <LoadSlipMenu
@@ -1462,45 +1452,6 @@ export function SalesModal(props: Props) {
         targetId={effectiveEditing()?.id}
         title={effectiveEditing() ? `History — Sale ${effectiveEditing()!.sales_no}` : "History"}
       />
-
-      <SalesPostSaveDialog
-        open={postSaveOpen()}
-        salesNo={createdSale()?.sales_no ?? ""}
-        amount={createdSale()?.grand_total ?? 0}
-        hasSerials={lines().some(
-          (ln) =>
-            Boolean(ln.track_serial) &&
-            ((ln.serial_unit_ids?.length ?? 0) > 0 || Boolean(ln.serial_lot_no?.trim())),
-        )}
-        onCashIn={() => {
-          setPostSaveOpen(false);
-          setCashInOpen(true);
-        }}
-        onAccounting={() => {
-          setPostSaveOpen(false);
-          setActiveTab("invoice");
-        }}
-        onDone={finishPostSave}
-      />
-
-      <Show when={createdSale()}>
-        {(sale) => (
-          <CashInFromCustomerModal
-            open={cashInOpen()}
-            salesId={sale().id}
-            partnerId={sale().partner_id}
-            currencyId={sale().currency_id}
-            amount={sale().grand_total}
-            salesNo={sale().sales_no}
-            receiptDate={sale().order_date}
-            onClose={() => {
-              setCashInOpen(false);
-              finishPostSave();
-            }}
-            onSaved={() => props.onSaved()}
-          />
-        )}
-      </Show>
 
       <SalesOrderLinePickerModal
         open={soPickerOpen()}

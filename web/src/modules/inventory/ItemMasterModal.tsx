@@ -382,7 +382,7 @@ export function ItemMasterModal(props: Props) {
                 Lot batches
               </A>
               {" · "}
-              <A href="/app/purchase-order/goods-receipt" class="text-brand-600 hover:underline">
+              <A href="/app/purchases/purchase-receive" class="text-brand-600 hover:underline">
                 Purchase Receive
               </A>
             </p>

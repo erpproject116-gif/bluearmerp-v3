@@ -14,14 +14,14 @@ export type LearnGroup = {
   links: LearnLink[];
 };
 
-/** Mirrors Ecount MyPage "Learn to use" groups for Bluearm Computer Store daily ops. */
+/** Home "Learn to use" groups for BluearmERP daily ops. */
 export const LEARN_GROUPS: LearnGroup[] = [
   {
     title: "Enter / view inventory slips",
     links: [
       { label: "Sales list", href: "/app/sales/sales", ready: true },
       { label: "Purchase List", href: "/app/purchases/purchase-receive", ready: true },
-      { label: "Purchase Receive", href: "/app/purchase-order/goods-receipt", ready: true },
+      { label: "Purchase Receive", href: "/app/purchases/purchase-receive", ready: true },
     ],
   },
   {
@@ -48,9 +48,14 @@ export function MyPageLearnPanel() {
     <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
       <div class="mb-3 flex items-center justify-between gap-2">
         <h2 class="text-sm font-semibold text-text-primary">Learn to use BluearmERP</h2>
-        <A href="/app/documentation" class="text-xs font-medium text-brand-600 hover:underline">
-          Help &amp; guides
-        </A>
+        <div class="flex flex-wrap items-center gap-3">
+          <A href="/app/documentation/whats-new" class="text-xs font-medium text-brand-600 hover:underline">
+            What’s New
+          </A>
+          <A href="/app/documentation" class="text-xs font-medium text-brand-600 hover:underline">
+            Help &amp; guides
+          </A>
+        </div>
       </div>
       <p class="mb-4 text-xs text-text-secondary">
         Start here for daily ops. Prefer these links over guessing menus (fewer wrong-screen tickets).

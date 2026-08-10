@@ -1,14 +1,13 @@
 import { A } from "@solidjs/router";
 
-/** Ecount New Sales L2 “Goods Receipt I” shell — honest CTA into Bluearm receive (not Production GR I). */
+/** New Sales workspace shell — CTAs into BluearmERP Purchase Receive (not Production GR). */
 export function GoodsReceiptIShell() {
   return (
     <div class="rounded-xl border border-stroke bg-white p-6 shadow-sm">
-      <h2 class="text-lg font-semibold text-text-primary">Goods Receipt I</h2>
+      <h2 class="text-lg font-semibold text-text-primary">Receive stock</h2>
       <p class="mt-2 max-w-xl text-sm text-text-secondary">
-        In Ecount, this New Sales workspace tab opens a Goods Receipt I template. Bluearm receives stock
-        through Purchase Receive (confirm posts inventory and serials). Legacy receive history stays available
-        for audit.
+        BluearmERP receives stock through Purchase Receive (confirm posts inventory and serials). Legacy receive
+        history stays available for audit.
       </p>
       <div class="mt-4 flex flex-wrap gap-3">
         <A

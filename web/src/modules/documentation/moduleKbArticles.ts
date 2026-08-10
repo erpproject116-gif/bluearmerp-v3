@@ -1111,7 +1111,7 @@ export const moduleKbArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Soft-delete stops access but keeps role, groups, overrides, and scopes for Restore. Use Remove & reset for re-invite (More menu) to clear scopes/overrides/groups, unlink Google, and invite again. Platform Command → Customers: Suspend keeps company data; Close & wipe deletes the tenant (then Provision again).",
+        text: "Invite sends email when SMTP is configured; otherwise the invite stays pending and you ask them to sign in with Google at /signin. Use Resend on a pending invite to re-queue mail. Soft-delete stops access but keeps role, groups, overrides, and scopes for Restore. Use Remove & reset for re-invite (More menu) to clear scopes/overrides/groups, unlink Google, and invite again.",
       },
     ],
     primaryHref: "/app/user-management/users",
@@ -1258,7 +1258,7 @@ export const moduleKbArticles: KbArticle[] = [
           "Open a serial for detail: unit warranty dates, customer coverage after sale, and operational events.",
           "Use the Origin filter (Linked slip vs Manual) to separate receipt-linked units from manual registration.",
           "Lots tracks batch numbers when items use lot tracking instead of individual serials (expiry, not warranty).",
-          "Receive (under Serial & Lot) is an alternate path to scan serials against open PO lines.",
+          "Prefer Buy → Purchase Receive to scan new serials; Serial & Lot → Receive is a legacy alternate for open PO lines.",
           "Bills of Material and Work Orders build finished goods and backflush components on completion.",
           "Open History on a Serials or lot-batch row to see who registered, transferred, or adjusted that unit or lot (system audit).",
         ],
