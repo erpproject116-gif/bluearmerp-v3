@@ -296,6 +296,7 @@ import {
   ApprovalsQueuePage,
   SiteMapPage,
   DocumentationPage,
+  WhatsNewPage,
   BudgetListPage,
   BudgetDetailPage,
   BudgetVsActualReportPage,
@@ -466,6 +467,7 @@ export default function App() {
           <Route path="/reports" component={ReportsIndexPage} />
           <Route path="/documentation/kb/:articleId" component={DocumentationPage} />
           <Route path="/documentation/kb" component={DocumentationPage} />
+          <Route path="/documentation/whats-new" component={WhatsNewPage} />
           <Route path="/documentation" component={DocumentationPage} />
           <Route path="/documentation/:sectionId" component={DocumentationPage} />
           <Route path="/baiko" component={CopilotWorkspacePage} />

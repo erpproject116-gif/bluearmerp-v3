@@ -89,6 +89,7 @@ type SupplierInvoice struct {
 	InvoicingStatus bool                  `json:"invoicing_status"`
 	Lines            []SupplierInvoiceLine     `json:"lines,omitempty"`
 	WithholdingLines []WithholdingLineResponse `json:"withholding_lines,omitempty"`
+	CustomValues     map[string]any            `json:"custom_values,omitempty"`
 }
 
 type supplierInvoiceLineBody struct {
@@ -134,6 +135,7 @@ type supplierInvoiceBody struct {
 	ProgressStatus  string                    `json:"progress_status"`
 	Lines            []supplierInvoiceLineBody `json:"lines"`
 	WithholdingLines []withholdingLineBody     `json:"withholding_lines"`
+	CustomValues     map[string]any            `json:"custom_values"`
 }
 
 type openPOLineRow struct {
@@ -747,6 +749,7 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		return SupplierInvoice{}, err
 	}
 	inv.WithholdingLines = wht
+	inv.CustomValues = attachSupplierInvoiceCustom(ctx, pool, tenantID, id)
 	return inv, nil
 }
 
@@ -1053,6 +1056,10 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmart(w, map[string]string{"withholding_lines": err.Error()})
 			return
 		}
+		if errs := saveSupplierInvoiceCustom(r.Context(), tx, tu.TenantID, id, body.CustomValues); errs != nil {
+			response.ValidationSmart(w, errs)
+			return
+		}
 
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
@@ -1066,7 +1073,7 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		// Load Slip â†’ Save: copy originating PO attachments when lines reference PO lines.
+		// Load Slip → Save: copy originating PO attachments when lines reference PO lines.
 		poIDs := map[int64]struct{}{}
 		for _, ln := range body.Lines {
 			if ln.PurchaseOrderLineID == nil || *ln.PurchaseOrderLineID <= 0 {
@@ -1432,6 +1439,10 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := replaceWithholdingLines(r.Context(), tx, tu.TenantID, "supplier_invoice", id, body.WithholdingLines); err != nil {
 			response.ValidationSmart(w, map[string]string{"withholding_lines": err.Error()})
+			return
+		}
+		if errs := saveSupplierInvoiceCustom(r.Context(), tx, tu.TenantID, id, body.CustomValues); errs != nil {
+			response.ValidationSmart(w, errs)
 			return
 		}
 

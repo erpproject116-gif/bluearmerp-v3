@@ -64,6 +64,7 @@ export type SupplierInvoiceDetail = SupplierInvoiceRow & {
   payment_terms?: string | null;
   reference?: string | null;
   notes?: string | null;
+  custom_values?: Record<string, unknown>;
   subtotal: number;
   tax_total: number;
   lines?: SupplierInvoiceLine[];

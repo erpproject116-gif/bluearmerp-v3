@@ -171,7 +171,11 @@ function CashFlowCard() {
   );
 }
 
-/** Zoho-style home cards: receivables, payables, cash flow. */
+/**
+ * Home cards: receivables / payables / cash flow.
+ * Totals and overdue buckets come only from A/R and A/P aging API summaries
+ * (same handlers as /finance/reports/ar-aging and ap-aging-details) — do not recompute here.
+ */
 export function HomeFinanceOverview() {
   const auth = useAuth();
   const asOf = todayISO();
@@ -195,6 +199,7 @@ export function HomeFinanceOverview() {
 
   const arSummary = () => ar.data?.summary;
   const apSummary = () => ap.data?.summary;
+  // Overdue = aging buckets excluding "current" — matches aging report summary fields.
   const arOverdue = () => {
     const s = arSummary();
     if (!s) return 0;
@@ -235,7 +240,7 @@ export function HomeFinanceOverview() {
           total={apSummary()?.total ?? 0}
           current={apSummary()?.current ?? 0}
           overdue={apOverdue()}
-          href="/app/finance/reports/ap-aging"
+          href="/app/finance/reports/ap-aging-details"
           newHref="/app/purchases/purchase-receive/new"
           newLabel="New"
         />

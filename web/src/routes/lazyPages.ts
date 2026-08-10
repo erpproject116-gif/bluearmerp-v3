@@ -294,6 +294,7 @@ export const DashboardPage = lazy(() => import("../modules/dashboard/DashboardPa
 export const ApprovalsQueuePage = lazy(() => import("../modules/dashboard/ApprovalsQueuePage"));
 export const SiteMapPage = lazy(() => import("../modules/dashboard/SiteMapPage"));
 export const DocumentationPage = lazy(() => import("../modules/documentation/DocumentationPage"));
+export const WhatsNewPage = lazy(() => import("../modules/documentation/WhatsNewPage"));
 export const BudgetListPage = lazy(() => import("../modules/company-budget/BudgetListPage"));
 export const BudgetDetailPage = lazy(() => import("../modules/company-budget/BudgetDetailPage"));
 export const BudgetVsActualReportPage = lazy(() => import("../modules/finance/reports/BudgetVsActualReportPage"));

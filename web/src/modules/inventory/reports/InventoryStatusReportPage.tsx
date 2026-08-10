@@ -155,8 +155,8 @@ export default function InventoryStatusReportPage() {
 
   return (
     <ReportPageLayout
-      title="Find Stock"
-      description="Cross-branch inquiry: on-hand qty by item and location, plus serial/lot counts when tracked. Balances appear after Bill (auto-receive), Purchase Receive, Stock Entry, or Sales — not from item master alone. Search (F8)."
+      title="Inv Per Branch"
+      description="On-hand qty by item and location, plus a serial count when units are tracked. Serial units also appear under Serials; this screen shows location qty + serial count after Confirm on Purchase Receive (or Bill auto-receive / Stock Entry / Sales). Search (F8)."
       showDateFilters={false}
       submitted={true}
       loading={report.isFetching}
@@ -241,10 +241,6 @@ export default function InventoryStatusReportPage() {
         />
         <p class="mt-3 text-center text-sm">
           <A href="/app/purchases/purchase-receive" class="text-brand-600 hover:underline">
-            Bills
-          </A>
-          {" · "}
-          <A href="/app/purchase-order/goods-receipt" class="text-brand-600 hover:underline">
             Purchase Receive
           </A>
           {" · "}
@@ -288,7 +284,16 @@ export default function InventoryStatusReportPage() {
                       </td>
                       <td class="px-3 py-2">{r.unit_code || "—"}</td>
                       <td class="px-3 py-2">{r.branch_name}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.qty_on_hand)}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">
+                        <div class="inline-flex items-center justify-end gap-1.5">
+                          <span>{fmtQty(r.qty_on_hand)}</span>
+                          <Show when={r.track_serial && (r.serial_unit_count ?? 0) > 0}>
+                            <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
+                              {fmtCount(r.serial_unit_count)} sn
+                            </span>
+                          </Show>
+                        </div>
+                      </td>
                       <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.qty_reserved)}</td>
                       <td class="px-3 py-2 text-right tabular-nums">
                         <div>{fmtQty(r.available_qty)}</div>

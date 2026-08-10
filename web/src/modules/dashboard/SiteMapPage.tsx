@@ -49,8 +49,7 @@ export default function SiteMapPage() {
     <div class="mx-auto max-w-3xl">
       <h2 class="text-lg font-semibold text-text-primary">Site Map / Search Menu</h2>
       <p class="mt-1 text-sm text-text-secondary">
-        Find screens by name — same idea as Ecount Search Menu. Results come from the Bluearm shell catalog
-        (not every Ecount prgId until Gate G3 parity).
+        Find screens by name across the BluearmERP menu catalog.
       </p>
       <input
         type="search"

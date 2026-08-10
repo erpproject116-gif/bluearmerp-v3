@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -53,6 +54,27 @@ func registerUserRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/users/{id}/groups", getUserGroups(pool))
 	r.Put("/users/{id}/groups", putUserGroups(pool))
 	r.Post("/invites/{id}/revoke", revokeInvite(pool))
+	r.Post("/invites/{id}/resend", resendInvite(pool))
+}
+
+func inviteSuccessMessage() string {
+	if inviteEmailSMTPEnabled() {
+		return "Invite sent by email. They must sign in with Google using the invited email."
+	}
+	return "Invite saved as pending. Email is not configured — ask them to sign in with Google using the invited email."
+}
+
+func enqueueInviteEmailTx(ctx context.Context, tx pgx.Tx, pool *pgxpool.Pool, tenantID, inviterUserID, inviteID, userID int64, email, fullName, roleCode, idemSuffix string) error {
+	companyName, inviterName, signInURL := loadInviteEmailContext(ctx, pool, tenantID, inviterUserID)
+	payload := inviteEmailPayload{
+		InviteID: inviteID, UserID: userID, Email: email, FullName: fullName,
+		RoleCode: roleCode, CompanyName: companyName, InviterName: inviterName, SignInURL: signInURL,
+	}
+	key := fmt.Sprintf("user.invite:%d:%d", tenantID, inviteID)
+	if idemSuffix != "" {
+		key = fmt.Sprintf("user.invite:%d:%d:%s", tenantID, inviteID, idemSuffix)
+	}
+	return outbox.EnqueueTx(ctx, tx, tenantID, inviteEmailEventType, key, payload)
 }
 
 func registerRoleRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -247,10 +269,12 @@ func createInvite(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
 					return
 				}
+				_ = enqueueInviteEmailTx(r.Context(), tx, pool, tu.TenantID, tu.AppUserID, inviteID, existingID, email, fullName, roleCode, fmt.Sprintf("reinvite:%d", time.Now().UnixNano()))
 				if err := tx.Commit(r.Context()); err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
 					return
 				}
+				_ = DrainInviteOutbox(r.Context(), pool)
 
 				_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.reinvite", "user", &existingID, nil, map[string]any{
 					"email": email, "tenant_role": roleCode,
@@ -259,7 +283,7 @@ func createInvite(pool *pgxpool.Pool) http.HandlerFunc {
 					ID: existingID, Email: email, FullName: fullName, TenantRole: roleCode,
 					Status: "invited", AuthLinked: false, InviteID: &inviteID, InvitedAt: &invitedAt,
 					InvitedBy: &tu.AppUserID,
-				}, "User re-invited. They must sign in with Google using this email.")
+				}, inviteSuccessMessage())
 				return
 			}
 			response.Err(w, http.StatusConflict, "A user with this email already exists.", "ERR_CONFLICT")
@@ -296,11 +320,13 @@ func createInvite(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
 			return
 		}
+		_ = enqueueInviteEmailTx(r.Context(), tx, pool, tu.TenantID, tu.AppUserID, inviteID, userID, email, fullName, roleCode, "")
 
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
 			return
 		}
+		_ = DrainInviteOutbox(r.Context(), pool)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.invite", "user", &userID, nil, map[string]any{
 			"email": email, "tenant_role": roleCode,
@@ -311,7 +337,63 @@ func createInvite(pool *pgxpool.Pool) http.HandlerFunc {
 			ID: userID, Email: email, FullName: fullName, TenantRole: roleCode,
 			Status: "invited", AuthLinked: false, InviteID: &inviteID, InvitedAt: &now,
 			InvitedBy: &tu.AppUserID,
-		}, "User invited. They must sign in with Google using this email.")
+		}, inviteSuccessMessage())
+	}
+}
+
+func resendInvite(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		inviteID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid invite id."})
+			return
+		}
+
+		var userID int64
+		var email, fullName, roleCode string
+		err = pool.QueryRow(r.Context(), `
+			select ui.user_id, ui.email, ui.full_name, ui.role_code
+			from public.user_invites ui
+			join public.users u on u.id = ui.user_id
+			where ui.id = $1 and ui.tenant_id = $2
+			  and ui.revoked_at is null and ui.accepted_at is null
+			  and u.status = 'invited' and u.auth_user_id is null`, inviteID, tu.TenantID).
+			Scan(&userID, &email, &fullName, &roleCode)
+		if err == pgx.ErrNoRows {
+			response.Err(w, http.StatusNotFound, "Pending invite not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to resend invite.", "ERR_INTERNAL")
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to resend invite.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		if err := enqueueInviteEmailTx(r.Context(), tx, pool, tu.TenantID, tu.AppUserID, inviteID, userID, email, fullName, roleCode, fmt.Sprintf("resend:%d", time.Now().UnixNano())); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to queue invite email.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to resend invite.", "ERR_INTERNAL")
+			return
+		}
+		_ = DrainInviteOutbox(r.Context(), pool)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.invite_resend", "user", &userID, nil, map[string]any{
+			"email": email, "invite_id": inviteID,
+		})
+
+		msg := "Invite email re-queued."
+		if !inviteEmailSMTPEnabled() {
+			msg = "Invite is still pending. Email is not configured — ask them to sign in with Google using the invited email."
+		}
+		response.OK(w, map[string]any{"id": userID, "invite_id": inviteID}, msg)
 	}
 }
 

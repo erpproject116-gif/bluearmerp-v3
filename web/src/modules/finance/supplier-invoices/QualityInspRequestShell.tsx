@@ -12,7 +12,7 @@ type GrRow = {
   receipt_date?: string;
 };
 
-/** Ecount New Purchases L2 “New Quality Insp. Request” shell — creates QC from a Goods Receipt. */
+/** New Purchases shell — creates QC from a goods receipt / Purchase Receive. */
 export function QualityInspRequestShell() {
   const toast = useToast();
   const client = useQueryClient();
@@ -59,8 +59,8 @@ export function QualityInspRequestShell() {
     <div class="rounded-xl border border-stroke bg-white p-6 shadow-sm">
       <h2 class="text-lg font-semibold text-text-primary">New Quality Insp. Request</h2>
       <p class="mt-2 max-w-xl text-sm text-text-secondary">
-        Quality inspection requests are tied to Purchase Receive in Bluearm (same as Ecount’s GR-based QC path).
-        Pick a receipt below or open the full QC list.
+        Quality inspection requests are tied to Purchase Receive in BluearmERP. Pick a receipt below or open the
+        full QC list.
       </p>
 
       <div class="mt-4 grid max-w-lg gap-3">

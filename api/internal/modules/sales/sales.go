@@ -100,6 +100,7 @@ type Sale struct {
 	ItemNameSummary    string               `json:"item_name_summary,omitempty"`
 	Lines              []SaleLine           `json:"lines,omitempty"`
 	Commissions        []SaleCommissionLine `json:"commissions,omitempty"`
+	CustomValues       map[string]any       `json:"custom_values,omitempty"`
 }
 
 type saleLineBody struct {
@@ -143,6 +144,7 @@ type saleBody struct {
 	SourceSalesOrderID *int64                   `json:"source_sales_order_id"`
 	Lines              []saleLineBody           `json:"lines"`
 	Commissions        []saleCommissionLineBody `json:"commissions"`
+	CustomValues       map[string]any           `json:"custom_values"`
 }
 
 type computedLine struct {
@@ -444,6 +446,7 @@ func loadSale(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Sale
 		return Sale{}, err
 	}
 	sale.Commissions = comms
+	sale.CustomValues = attachCustom(ctx, pool, tenantID, entitySales, id)
 	return sale, nil
 }
 
@@ -694,6 +697,11 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, body.CustomValues); errs != nil {
+			response.ValidationSmart(w, errs)
+			return
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
@@ -894,6 +902,11 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to post commission journal.", "ERR_INTERNAL")
 				return
 			}
+		}
+
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, body.CustomValues); errs != nil {
+			response.ValidationSmart(w, errs)
+			return
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {

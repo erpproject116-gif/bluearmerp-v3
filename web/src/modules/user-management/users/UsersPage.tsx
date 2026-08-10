@@ -198,21 +198,27 @@ export default function UsersPage() {
       return;
     }
     setSaving(true);
-    const ok = await submitEntity(
-      () =>
-        apiFetch<TenantUserRow>("/api/v1/user-management/invites", {
-          method: "POST",
-          body: JSON.stringify({
-            email,
-            full_name: fullName,
-            tenant_role: inviteRole(),
-          }),
-        }, { silent: true }),
-      toast,
-      `User invited. Ask them to sign in at /signin with Google using ${email} (same address). They will join this company as a member—not start a separate trial.`,
+    const res = await apiFetch<TenantUserRow>(
+      "/api/v1/user-management/invites",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          full_name: fullName,
+          tenant_role: inviteRole(),
+        }),
+      },
+      { silent: true },
     );
     setSaving(false);
-    if (!ok) return;
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not invite user.");
+      return;
+    }
+    toast.success(
+      res.message ??
+        `Invite saved. Ask them to sign in at /signin with Google using ${email} (same address).`,
+    );
     setInviteOpen(false);
     // Keep pending invites visible after invite (default Active filter used to hide them).
     if (statusFilter() === "active") setStatusFilter("active_pending");
@@ -312,6 +318,20 @@ export default function UsersPage() {
     } else {
       toast.warning(res.message ?? "Failed to revoke invite.");
     }
+  };
+
+  const resendInvite = async (row: TenantUserRow) => {
+    if (!row.invite_id) return;
+    const res = await apiFetch(
+      `/api/v1/user-management/invites/${row.invite_id}/resend`,
+      { method: "POST" },
+      { silent: true },
+    );
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to resend invite.");
+      return;
+    }
+    toast.success(res.message ?? "Invite email re-queued.");
   };
 
   const resetForReinvite = async (row: TenantUserRow) => {
@@ -637,6 +657,18 @@ export default function UsersPage() {
               <button
                 type="button"
                 role="menuitem"
+                class="block w-full px-3 py-1.5 text-left text-sm text-brand-600 hover:bg-slate-50"
+                onClick={() => {
+                  const row = menuRow()!;
+                  closeRowMenu();
+                  void resendInvite(row);
+                }}
+              >
+                Resend invite
+              </button>
+              <button
+                type="button"
+                role="menuitem"
                 class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
                 onClick={() => {
                   const row = menuRow()!;
@@ -682,7 +714,8 @@ export default function UsersPage() {
           </select>
         </Field>
         <p class="text-xs text-text-secondary">
-          The user must sign in with Google using this exact email address.
+          We email an invite when SMTP is configured. They join by signing in with Google using this exact email — no
+          separate Accept step. If email is not configured, the invite stays pending and you can share /signin.
         </p>
       </EntityModal>
 

@@ -75,12 +75,13 @@ export const knowledgebaseArticles: KbArticle[] = [
     title: "I was invited—how do I join my company's workspace?",
     scenario: "An admin invited your email but you have not entered the ERP yet.",
     intro:
-      "Invites are tied to your email address. Use the same email on sign-in that your administrator invited.",
+      "Your admin invites your email (email is sent when SMTP is configured). Join by signing in with that same Google email — there is no separate Accept button.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open the sign-in page and continue with Google, or sign in with the email and password you registered.",
+          "Check your inbox for the invite email (company name, role, and a link to sign in), or ask your admin to resend if SMTP was not set up yet.",
+          "Open the sign-in page and continue with Google using the exact email your administrator invited.",
           "On first sign-in, BluearmERP automatically links your login to every pending invite for that email.",
           "You land inside the company workspace. If you also have a personal trial, use Active business in the sidebar footer to pick the right company.",
         ],
@@ -91,7 +92,7 @@ export const knowledgebaseArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Invited users appear as Invited in User Management until they complete their first sign-in.",
+        text: "Invited users appear as Invited in User Management until they complete their first Google sign-in. Admins can Resend invite when email is configured.",
       },
     ],
     primaryHref: "/signin",
@@ -144,7 +145,7 @@ export const knowledgebaseArticles: KbArticle[] = [
       },
       {
         type: "paragraph",
-        text: "Company-wide roles (owner, store_admin without Apply user data scopes) keep seeing all branch documents. Branch-only staff need Apply user data scopes plus assigned locations. Use Find Stock to inquire qty across branches.",
+        text: "Company-wide roles (owner, store_admin without Apply user data scopes) keep seeing all branch documents. Branch-only staff need Apply user data scopes plus assigned locations. Use Inv Per Branch to inquire qty across branches.",
       },
       {
         type: "tip",
