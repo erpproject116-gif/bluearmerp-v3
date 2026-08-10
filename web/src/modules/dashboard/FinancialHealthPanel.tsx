@@ -210,7 +210,7 @@ export function FinancialHealthPanel() {
             <p class="mt-1 text-xl font-bold text-text-primary">{formatMoney(d()!.receivables.total)}</p>
             <p class="mt-1 text-[11px] text-amber-700">Overdue {formatMoney(d()!.receivables.overdue)}</p>
           </A>
-          <A href="/app/finance/reports/ap-aging" class="rounded-xl border border-stroke bg-white p-4 shadow-sm hover:border-brand-300">
+          <A href="/app/finance/reports/ap-aging-details" class="rounded-xl border border-stroke bg-white p-4 shadow-sm hover:border-brand-300">
             <p class="text-xs uppercase tracking-wide text-text-secondary">Payables</p>
             <p class="mt-1 text-xl font-bold text-text-primary">{formatMoney(d()!.payables.total)}</p>
             <p class="mt-1 text-[11px] text-text-secondary">Past due {formatMoney(d()!.payables.overdue)}</p>

@@ -173,13 +173,16 @@ function CashFlowCard() {
 
 /**
  * Home cards: receivables / payables / cash flow.
- * Totals and overdue buckets come only from A/R and A/P aging API summaries
- * (same handlers as /finance/reports/ar-aging and ap-aging-details) — do not recompute here.
+ * Totals and overdue buckets come from A/R and A/P aging API summaries (full open set,
+ * not the current page). Same open-balance formula as aging report pages and financial health:
+ * AR = sales grand_total − (OR + credit note + retainer applications as-of date);
+ * AP = supplier invoice grand_total − (payment + vendor credit applications as-of date).
  */
 export function HomeFinanceOverview() {
   const auth = useAuth();
   const asOf = todayISO();
 
+  // pageSize 1 only limits the unused row payload; summary is aggregated server-side for all open docs.
   const ar = useArAgingReport(() => ({
     filters: { as_of: asOf },
     page: 1,

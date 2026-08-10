@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -223,13 +224,9 @@ func loadARBuckets(ctx context.Context, pool *pgxpool.Pool, tenantID int64, toda
 		  end as bucket,
 		  sum((s.grand_total - coalesce(recv.received, 0)))::float8
 		from public.sa_sales s
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as received
-		  from public.fin_receipt_applications a
-		  join public.fin_official_receipts r on r.id = a.official_receipt_id
-		  where a.sales_id = s.id and r.deleted_at is null
-		) recv on true
+		`+finance.SaleAppliedLateralSQLAsOf("s", "$2::date")+`
 		where s.tenant_id = $1 and s.deleted_at is null
+		  and s.order_date <= $2::date
 		  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001
 		group by 1`, tenantID, today)
 	if err != nil {
@@ -273,13 +270,9 @@ func loadAPBuckets(ctx context.Context, pool *pgxpool.Pool, tenantID int64, toda
 		  end as bucket,
 		  sum((si.grand_total - coalesce(paid.paid, 0)))::float8
 		from public.fin_supplier_invoices si
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as paid
-		  from public.fin_payment_applications a
-		  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		  where a.supplier_invoice_id = si.id and pv.deleted_at is null
-		) paid on true
+		`+finance.SupplierInvoiceAppliedLateralSQLAsOf("si", "$2::date")+`
 		where si.tenant_id = $1 and si.deleted_at is null
+		  and si.invoice_date <= $2::date
 		  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001
 		group by 1`, tenantID, today)
 	if err != nil {
@@ -315,13 +308,9 @@ func loadOverdueAlerts(ctx context.Context, pool *pgxpool.Pool, tenantID int64, 
 	var total int64
 	_ = pool.QueryRow(ctx, `
 		select count(*) from public.sa_sales s
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as received
-		  from public.fin_receipt_applications a
-		  join public.fin_official_receipts r on r.id = a.official_receipt_id
-		  where a.sales_id = s.id and r.deleted_at is null
-		) recv on true
+		`+finance.SaleAppliedLateralSQLAsOf("s", "$2::date")+`
 		where s.tenant_id = $1 and s.deleted_at is null
+		  and s.order_date <= $2::date
 		  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001
 		  and ($2::date - coalesce(s.due_date, s.order_date)::date) > 0`,
 		tenantID, today).Scan(&total)
@@ -329,7 +318,7 @@ func loadOverdueAlerts(ctx context.Context, pool *pgxpool.Pool, tenantID int64, 
 	rows, err := pool.Query(ctx, `
 		select s.id, s.sales_no, p.company_name,
 		  coalesce(s.due_date, s.order_date)::date::text,
-		  (s.grand_total - coalesce(recv.received, 0))::float8,
+		  (s.grand_total - coalesce(recv.received, 0))::float8 as balance,
 		  ($2::date - coalesce(s.due_date, s.order_date)::date)::int,
 		  case
 		    when ($2::date - coalesce(s.due_date, s.order_date)::date) <= 30 then '1-30'
@@ -339,13 +328,9 @@ func loadOverdueAlerts(ctx context.Context, pool *pgxpool.Pool, tenantID int64, 
 		  end
 		from public.sa_sales s
 		join public.inv_partners p on p.id = s.partner_id
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as received
-		  from public.fin_receipt_applications a
-		  join public.fin_official_receipts r on r.id = a.official_receipt_id
-		  where a.sales_id = s.id and r.deleted_at is null
-		) recv on true
+		`+finance.SaleAppliedLateralSQLAsOf("s", "$2::date")+`
 		where s.tenant_id = $1 and s.deleted_at is null
+		  and s.order_date <= $2::date
 		  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001
 		  and ($2::date - coalesce(s.due_date, s.order_date)::date) > 0
 		order by ($2::date - coalesce(s.due_date, s.order_date)::date) desc, balance desc

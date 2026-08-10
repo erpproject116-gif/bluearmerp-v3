@@ -2,6 +2,7 @@ package finance
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -58,4 +59,35 @@ func supplierInvoiceOutstandingQ(ctx context.Context, q Querier, tenantID, invoi
 
 func supplierInvoiceOutstanding(ctx context.Context, pool *pgxpool.Pool, tenantID, invoiceID int64, excludePaymentID *int64) (float64, error) {
 	return supplierInvoiceOutstandingQ(ctx, pool, tenantID, invoiceID, excludePaymentID)
+}
+
+// SupplierInvoiceAppliedLateralSQLAsOf returns a LEFT JOIN LATERAL exposing paid.paid as
+// payments + vendor credits applied to a supplier invoice (optionally as-of a date param).
+func SupplierInvoiceAppliedLateralSQLAsOf(invoiceAlias, asOfParam string) string {
+	return supplierInvoiceAppliedLateralSQLAsOf(invoiceAlias, asOfParam)
+}
+
+func supplierInvoiceAppliedLateralSQLAsOf(invoiceAlias, asOfParam string) string {
+	pvDate, vcDate := "", ""
+	if asOfParam != "" {
+		pvDate = " and pv.payment_date <= " + asOfParam
+		vcDate = " and vc.credit_date <= " + asOfParam
+	}
+	return fmt.Sprintf(`
+		left join lateral (
+		  select (
+		    coalesce((
+		      select sum(a.applied_amount)
+		      from public.fin_payment_applications a
+		      join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
+		      where a.supplier_invoice_id = %s.id and pv.deleted_at is null%s
+		    ), 0)
+		    + coalesce((
+		      select sum(a.applied_amount)
+		      from public.fin_vendor_credit_applications a
+		      join public.fin_vendor_credits vc on vc.id = a.vendor_credit_id
+		      where a.supplier_invoice_id = %s.id and vc.deleted_at is null%s
+		    ), 0)
+		  )::float8 as paid
+		) paid on true`, invoiceAlias, pvDate, invoiceAlias, vcDate)
 }
