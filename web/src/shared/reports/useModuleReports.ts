@@ -350,6 +350,8 @@ export type InventoryStatusFilters = {
   location_id?: number;
   branch_id?: number;
   in_stock_only?: number | boolean;
+  /** When "matrix", API pages by item and returns all branch rows for those items. */
+  view?: "matrix" | string;
 };
 
 export type InventoryStatusRow = {
@@ -366,6 +368,8 @@ export type InventoryStatusRow = {
   qty_on_hand: number;
   qty_reserved: number;
   available_qty: number;
+  purchase_price?: number;
+  vip_price?: number;
   sales_price: number;
   company_available_qty: number;
   reorder_level?: number;

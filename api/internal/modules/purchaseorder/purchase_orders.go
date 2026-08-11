@@ -94,6 +94,7 @@ type PurchaseOrder struct {
 }
 
 type purchaseOrderLineBody struct {
+	ID                    *int64   `json:"id"`
 	LineNo                int      `json:"line_no"`
 	PurchaseRequestLineID *int64   `json:"purchase_request_line_id"`
 	PartnerID             *int64   `json:"partner_id"`
@@ -146,6 +147,7 @@ type fromSupplierQuotationBody struct {
 }
 
 type computedLine struct {
+	ID                      *int64
 	LineNo                  int
 	PurchaseRequestLineID   *int64
 	RFQRequestLineID        *int64
@@ -866,7 +868,13 @@ func createFromSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			inputBasis := taxcalc.InputVatIncUnit
 			amounts := taxcalc.ComputeLine(tt, unitPrice, qty, inputBasis)
 			sqLineIDCopy := sqLineID
-			resolvedUnitID, resolvedUnitCode := inventory.ResolveLineUnit(r.Context(), pool, tu.TenantID, itemID, unitID, unitCode)
+			resolvedUnitID, resolvedUnitCode, unitErr := inventory.PreferStockLineUnit(r.Context(), pool, tu.TenantID, itemID, unitID, unitCode)
+			if unitErr != nil {
+				response.Validation(w, map[string]string{
+					fmt.Sprintf("lines[%d].unit_id", lineNo-1): unitErr.Error(),
+				})
+				return
+			}
 			computed = append(computed, computedLine{
 				LineNo:                  lineNo,
 				PurchaseRequestLineID:   nil,
@@ -1301,12 +1309,76 @@ func insertPurchaseOrderLines(ctx context.Context, tx pgx.Tx, purchaseOrderID in
 	return ids, nil
 }
 
+// replacePurchaseOrderLines upserts draft PO lines so existing line IDs stay stable for
+// Load Slip / Bill refs. Unknown or foreign IDs are treated as inserts.
 func replacePurchaseOrderLines(ctx context.Context, tx pgx.Tx, purchaseOrderID int64, lines []computedLine) error {
-	if _, err := tx.Exec(ctx, `delete from public.po_purchase_order_lines where purchase_order_id = $1`, purchaseOrderID); err != nil {
+	existing := map[int64]struct{}{}
+	rows, err := tx.Query(ctx, `select id from public.po_purchase_order_lines where purchase_order_id = $1`, purchaseOrderID)
+	if err != nil {
 		return err
 	}
-	_, err := insertPurchaseOrderLines(ctx, tx, purchaseOrderID, lines)
-	return err
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[id] = struct{}{}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	keep := map[int64]struct{}{}
+	for i, ln := range lines {
+		lineNo := ln.LineNo
+		if lineNo <= 0 {
+			lineNo = i + 1
+		}
+		if ln.ID != nil && *ln.ID > 0 {
+			if _, ok := existing[*ln.ID]; ok {
+				_, err := tx.Exec(ctx, `
+					update public.po_purchase_order_lines set
+					  purchase_request_line_id = $1, rfq_request_line_id = $2, supplier_quotation_line_id = $3,
+					  line_no = $4, partner_id = $5, partner_code = $6, partner_name = $7,
+					  item_id = $8, item_code = $9, item_name = $10, spec_name = $11, description = $12,
+					  qty = $13, unit_id = $14, unit_code = $15, input_basis = $16,
+					  unit_non_vat = $17, non_vat_total = $18, tax_amount = $19, unit_vat_inc = $20, line_total = $21,
+					  remark = $22, planned_serial_nos = $23, warranty_duration_months = $24
+					where id = $25 and purchase_order_id = $26`,
+					ln.PurchaseRequestLineID, ln.RFQRequestLineID, ln.SupplierQuotationLineID,
+					lineNo, ln.PartnerID, strings.TrimSpace(ln.PartnerCode), strings.TrimSpace(ln.PartnerName),
+					ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.SpecName, ln.Description,
+					ln.Qty, ln.UnitID, ln.UnitCode, ln.InputBasis,
+					ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount, ln.Amounts.UnitVatInc, ln.Amounts.LineTotal,
+					ln.Remark, ln.PlannedSerialNos, ln.WarrantyDurationMonths,
+					*ln.ID, purchaseOrderID)
+				if err != nil {
+					return err
+				}
+				keep[*ln.ID] = struct{}{}
+				continue
+			}
+		}
+		ids, err := insertPurchaseOrderLines(ctx, tx, purchaseOrderID, []computedLine{ln})
+		if err != nil {
+			return err
+		}
+		if len(ids) > 0 {
+			keep[ids[0]] = struct{}{}
+		}
+	}
+
+	for id := range existing {
+		if _, ok := keep[id]; ok {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `delete from public.po_purchase_order_lines where id = $1 and purchase_order_id = $2`, id, purchaseOrderID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func applyBuyingRatesToPOLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, headerPartnerID *int64, lines []purchaseOrderLineBody) []purchaseOrderLineBody {
@@ -1355,8 +1427,13 @@ func computePurchaseOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID
 			continue
 		}
 		amounts := taxcalc.ComputeLine(tt, ln.UnitPrice, ln.Qty, inputBasis)
-		unitID, unitCode := inventory.ResolveLineUnit(ctx, pool, tenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
+		unitID, unitCode, unitErr := inventory.PreferStockLineUnit(ctx, pool, tenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
+		if unitErr != nil {
+			errs[fmt.Sprintf("lines[%d].unit_id", i)] = unitErr.Error()
+			continue
+		}
 		out = append(out, computedLine{
+			ID:                     ln.ID,
 			LineNo:                 ln.LineNo,
 			PurchaseRequestLineID:  ln.PurchaseRequestLineID,
 			PartnerID:              ln.PartnerID,

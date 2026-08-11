@@ -178,7 +178,7 @@ func receiveFromPOLine(
 		purchaseOrderLineID, tenantID,
 	).Scan(&poID, &ordered, &received, &itemID, &unitID, &unitCost, &trackInventory, &warrantyMonths)
 	if err != nil {
-		return nil, errors.New("purchase order line not found")
+		return nil, errors.New("Purchase order line no longer exists (PO was re-saved). Use Load Slip again.")
 	}
 	if invoiceWarrantyMonths != nil {
 		warrantyMonths = invoiceWarrantyMonths

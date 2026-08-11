@@ -152,6 +152,10 @@ type openPOLineRow struct {
 	OrderedQty          float64 `json:"ordered_qty"`
 	BilledQty           float64 `json:"billed_qty"`
 	BalanceQty          float64 `json:"balance_qty"`
+	UnitID              *int64  `json:"unit_id,omitempty"`
+	UnitCode            string  `json:"unit_code,omitempty"`
+	BaseUnitID          *int64  `json:"base_unit_id,omitempty"`
+	BaseUnitCode        string  `json:"base_unit_code,omitempty"`
 	UnitNonVat          float64 `json:"unit_non_vat"`
 	UnitVatInc          float64 `json:"unit_vat_inc"`
 	TrackSerial            bool `json:"track_serial,omitempty"`
@@ -197,6 +201,8 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  pol.item_id, pol.item_code, pol.item_name,
 			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
 			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
+			  pol.unit_id, coalesce(pol.unit_code, ''),
+			  i.base_unit_id, coalesce(bu.code, ''),
 			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8,
 			  coalesce(i.track_serial, false),
 			  coalesce(pol.warranty_duration_months, i.warranty_duration_months)
@@ -204,6 +210,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
 			left join public.inv_partners p on p.id = po.partner_id
 			left join public.inv_items i on i.id = pol.item_id
+			left join public.inv_units bu on bu.id = i.base_unit_id
 			where %s
 			  and (pol.qty - coalesce(pol.billed_qty, 0)) > 0.0001
 			order by po.order_date desc, pol.line_no`, where)
@@ -223,6 +230,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.PartnerID, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
+				&row.UnitID, &row.UnitCode, &row.BaseUnitID, &row.BaseUnitCode,
 				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial, &row.WarrantyDurationMonths,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read PO lines.", "ERR_INTERNAL")
@@ -331,6 +339,10 @@ type openGRLineRow struct {
 	ReceivedQty         float64 `json:"received_qty"`
 	BilledQty           float64 `json:"billed_qty"`
 	BalanceQty          float64 `json:"balance_qty"`
+	UnitID              *int64  `json:"unit_id,omitempty"`
+	UnitCode            string  `json:"unit_code,omitempty"`
+	BaseUnitID          *int64  `json:"base_unit_id,omitempty"`
+	BaseUnitCode        string  `json:"base_unit_code,omitempty"`
 	UnitNonVat          float64 `json:"unit_non_vat"`
 	UnitVatInc          float64 `json:"unit_vat_inc"`
 }
@@ -420,12 +432,16 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  grl.received_qty::float8,
 			  coalesce(sl.billed, 0)::float8,
 			  (grl.received_qty - coalesce(sl.billed, 0))::float8,
+			  pol.unit_id, coalesce(pol.unit_code, ''),
+			  i.base_unit_id, coalesce(bu.code, ''),
 			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8
 			from public.gr_goods_receipt_lines grl
 			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
 			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
 			left join public.inv_partners p on p.id = po.partner_id
+			left join public.inv_items i on i.id = pol.item_id
+			left join public.inv_units bu on bu.id = i.base_unit_id
 			left join (
 			  select goods_receipt_line_id, sum(qty) as billed
 			  from public.gr_goods_receipt_slip_lines
@@ -451,6 +467,7 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.PartnerID, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.ReceivedQty, &row.BilledQty, &row.BalanceQty,
+				&row.UnitID, &row.UnitCode, &row.BaseUnitID, &row.BaseUnitCode,
 				&row.UnitNonVat, &row.UnitVatInc,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read GR lines.", "ERR_INTERNAL")
@@ -932,7 +949,7 @@ func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenan
 			seenPO[*ln.PurchaseOrderLineID] = true
 			balance, poID, linePartnerID, err := poLineBalanceExcluding(ctx, tx, tenantID, *ln.PurchaseOrderLineID, excludeInvoiceID)
 			if err != nil {
-				errs[key+".purchase_order_line_id"] = "Purchase order line not found."
+				errs[key+".purchase_order_line_id"] = "Purchase order line no longer exists (PO was re-saved). Use Load Slip again."
 				continue
 			}
 			if linePartnerID != partnerID {
@@ -1255,7 +1272,10 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 			return fmt.Errorf("line %d: goods receipt line not found", lineNo)
 		}
 		poLineID := ref.POLineID
-		unitID, unitCode := inventory.ResolveLineUnit(ctx, tx, tenantID, ref.ItemID, ref.UnitID, ref.UnitCode)
+		unitID, unitCode, unitErr := inventory.PreferStockLineUnit(ctx, tx, tenantID, ref.ItemID, ref.UnitID, ref.UnitCode)
+		if unitErr != nil {
+			return fmt.Errorf("line %d: %w", lineNo, unitErr)
+		}
 
 		_, err = tx.Exec(ctx, `
 			insert into public.fin_supplier_invoice_lines (

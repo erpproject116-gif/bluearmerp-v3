@@ -27,6 +27,8 @@ import {
 } from "../../../shared/warrantyDurationParts";
 
 export type PurchaseRequestLineRow = {
+  /** Persisted PO/PR line id when editing an existing document. */
+  id?: number | null;
   line_no: number;
   partner_id?: number | null;
   partner_code: string;

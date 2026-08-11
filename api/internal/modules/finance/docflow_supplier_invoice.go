@@ -197,7 +197,10 @@ func CreateSupplierInvoiceFromGoodsReceipt(ctx context.Context, pool *pgxpool.Po
 				from public.po_purchase_order_lines pol where pol.id = $1`, polID).
 				Scan(&itemID, &itemCode, &itemName, &unitID, &unitCode)
 		}
-		resolvedUnitID, resolvedUnitCode := inventory.ResolveLineUnit(ctx, tx, tu.TenantID, itemID, unitID, unitCode)
+		resolvedUnitID, resolvedUnitCode, unitErr := inventory.PreferStockLineUnit(ctx, tx, tu.TenantID, itemID, unitID, unitCode)
+		if unitErr != nil {
+			return 0, unitErr
+		}
 
 		var lineID int64
 		err = tx.QueryRow(ctx, `

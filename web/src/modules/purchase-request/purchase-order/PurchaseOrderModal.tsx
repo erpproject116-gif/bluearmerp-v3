@@ -108,6 +108,7 @@ export type PurchaseOrderDetail = {
   grand_total: number;
   created_by_name?: string;
   lines?: Array<{
+    id?: number;
     line_no: number;
     partner_id?: number | null;
     partner_code: string;
@@ -162,6 +163,7 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
 function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestLineRow[] {
   if (!lines?.length) return [emptyPurchaseRequestLine(1)];
   return lines.map((ln) => ({
+    id: ln.id ?? null,
     line_no: ln.line_no,
     partner_id: ln.partner_id,
     partner_code: ln.partner_code ?? "",
@@ -594,6 +596,7 @@ export function PurchaseOrderModal(props: Props) {
       reference: reference() || null,
       notes: notes() || null,
       lines: lines().map((ln, i) => ({
+        id: ln.id || null,
         line_no: i + 1,
         purchase_request_line_id: ln.purchase_request_line_id ?? null,
         supplier_quotation_line_id: ln.supplier_quotation_line_id ?? null,

@@ -58,7 +58,7 @@ func TestInventoryStatusSQLArgCount(t *testing.T) {
 	if !strings.Contains(sql, "available_qty > 0") {
 		t.Fatalf("expected in_stock_only predicate in sql: %s", sql)
 	}
-	if !strings.Contains(sql, "sales_price") || !strings.Contains(sql, "company_available_qty") {
-		t.Fatalf("expected sales_price and company_available_qty in sql: %s", sql)
+	if !strings.Contains(sql, "sales_price") || !strings.Contains(sql, "company_available_qty") || !strings.Contains(sql, "purchase_price") {
+		t.Fatalf("expected price columns in sql: %s", sql)
 	}
 }

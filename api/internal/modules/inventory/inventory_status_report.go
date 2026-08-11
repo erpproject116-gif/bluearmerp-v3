@@ -39,6 +39,8 @@ type inventoryStatusRow struct {
 	QtyOnHand           float64  `json:"qty_on_hand"`
 	QtyReserved         float64  `json:"qty_reserved"`
 	AvailableQty        float64  `json:"available_qty"`
+	PurchasePrice       float64  `json:"purchase_price"`
+	VIPPrice            float64  `json:"vip_price"`
 	SalesPrice          float64  `json:"sales_price"`
 	CompanyAvailableQty float64  `json:"company_available_qty"`
 	ReorderLevel        *float64 `json:"reorder_level,omitempty"`
@@ -69,6 +71,8 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 		  bal.qty_on_hand::float8,
 		  bal.qty_reserved::float8,
 		  (bal.qty_on_hand - bal.qty_reserved)::float8 as available_qty,
+		  coalesce(i.purchase_price, 0)::float8 as purchase_price,
+		  coalesce(i.vip_price, 0)::float8 as vip_price,
 		  coalesce(i.sales_price, 0)::float8 as sales_price,
 		  coalesce(co_bal.company_available_qty, 0)::float8 as company_available_qty,
 		  i.reorder_level::float8 as reorder_level,
@@ -223,7 +227,7 @@ func scanInventoryStatusRow(rows interface {
 		&row.CategoryID, &row.CategoryName,
 		&row.LocationID, &row.LocationName, &row.BranchName,
 		&row.QtyOnHand, &row.QtyReserved, &row.AvailableQty,
-		&row.SalesPrice, &row.CompanyAvailableQty,
+		&row.PurchasePrice, &row.VIPPrice, &row.SalesPrice, &row.CompanyAvailableQty,
 		&reorder, &row.StockStatus, &row.TrackSerial,
 		&row.TrackLot, &row.SerialUnitCount, &row.LotBatchCount,
 		&row.LastSoldAt, &row.LastSoldBy, &row.LastSoldRefType, &row.LastSoldRefID,
@@ -249,6 +253,80 @@ func listInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
 		base, args := inventoryStatusSQL(tu.TenantID, qFilter, stockStatus, categoryID, locationID, inStockOnly)
+
+		// Matrix view: page by distinct item, then return all branch rows for those items
+		// so the UI can show one item row with horizontal branch columns (Ecount-style).
+		if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("view")), "matrix") {
+			countQ := fmt.Sprintf("select count(*) from (select distinct item_id from (%s) d) c", base)
+			var total int64
+			if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to count inventory status.", "ERR_INTERNAL")
+				return
+			}
+			itemArgs := append(append([]any{}, args...), p.PageSize, offset)
+			itemQ := fmt.Sprintf(`
+				select item_id from (
+				  select item_id, min(item_code) as item_code
+				  from (%s) d
+				  group by item_id
+				) x
+				order by item_code %s
+				limit $%d offset $%d`,
+				base, reports.OrderSQL(p.Order), len(itemArgs)-1, len(itemArgs))
+			itemRows, err := pool.Query(r.Context(), itemQ, itemArgs...)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load inventory status.", "ERR_INTERNAL")
+				return
+			}
+			var itemIDs []int64
+			for itemRows.Next() {
+				var id int64
+				if err := itemRows.Scan(&id); err != nil {
+					itemRows.Close()
+					response.Err(w, http.StatusInternalServerError, "Failed to read inventory status.", "ERR_INTERNAL")
+					return
+				}
+				itemIDs = append(itemIDs, id)
+			}
+			itemRows.Close()
+			if err := itemRows.Err(); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read inventory status.", "ERR_INTERNAL")
+				return
+			}
+			if len(itemIDs) == 0 {
+				response.OKList(w, []inventoryStatusRow{}, p.Page, p.PageSize, total)
+				return
+			}
+
+			// Expand: all non-RMA location balances for the page of items (ignore branch filter
+			// so columns stay comparable across branches).
+			expand, expandArgs := inventoryStatusSQL(tu.TenantID, "", "", nil, nil, false)
+			expandArgs = append(expandArgs, itemIDs)
+			expandQ := fmt.Sprintf(
+				"%s and item_id = any($%d) order by item_code asc, location_name asc",
+				expand, len(expandArgs))
+			rows, err := pool.Query(r.Context(), expandQ, expandArgs...)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load inventory status.", "ERR_INTERNAL")
+				return
+			}
+			defer rows.Close()
+			var out []inventoryStatusRow
+			for rows.Next() {
+				row, err := scanInventoryStatusRow(rows)
+				if err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to read inventory status.", "ERR_INTERNAL")
+					return
+				}
+				out = append(out, row)
+			}
+			if out == nil {
+				out = []inventoryStatusRow{}
+			}
+			response.OKList(w, out, p.Page, p.PageSize, total)
+			return
+		}
+
 		countQ := fmt.Sprintf("select count(*) from (%s) c", base)
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
@@ -302,7 +380,7 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		cw := csv.NewWriter(w)
 		_ = cw.Write([]string{
 			"Item Code", "Item Name", "Unit", "Item Status", "Category", "Branch/Location",
-			"Qty On Hand", "Qty Reserved", "Available", "Sales Price", "Company Available",
+			"Qty On Hand", "Qty Reserved", "Available", "Purchase Price", "VIP Price", "Sales Price", "Company Available",
 			"Reorder Level", "Stock Status", "Track Serial", "Track Lot", "Serials In Stock", "Lot Batches",
 			"Last Sold At", "Last Sold By", "Last Sold Ref", "Last Movement At", "Last Movement Type",
 		})
@@ -331,6 +409,7 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			_ = cw.Write([]string{
 				row.ItemCode, row.ItemName, row.UnitCode, row.ItemStatus, row.CategoryName, row.BranchName,
 				fmt.Sprintf("%.4f", row.QtyOnHand), fmt.Sprintf("%.4f", row.QtyReserved), fmt.Sprintf("%.4f", row.AvailableQty),
+				fmt.Sprintf("%.4f", row.PurchasePrice), fmt.Sprintf("%.4f", row.VIPPrice),
 				fmt.Sprintf("%.4f", row.SalesPrice), fmt.Sprintf("%.4f", row.CompanyAvailableQty),
 				reorder, row.StockStatus,
 				fmt.Sprintf("%t", row.TrackSerial), fmt.Sprintf("%t", row.TrackLot),

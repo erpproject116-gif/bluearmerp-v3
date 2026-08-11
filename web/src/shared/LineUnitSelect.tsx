@@ -24,20 +24,36 @@ type Props = {
 
 /**
  * Optional UoM picker for document lines. Falls back to showing whatever code the
- * line already carries so historic free-text units stay visible.
+ * line already carries so historic free-text units stay visible. When unit_id is set
+ * but missing from the active list (inactive / not loaded), keep a synthetic option
+ * so the select does not look blank ("—").
  */
 export function LineUnitSelect(props: Props) {
   const [units] = createResource(loadActiveUnits);
 
   const currentCode = () => (props.unitCode ?? "").trim();
-  const isUnlisted = () =>
+  const listedById = () =>
+    props.unitId != null && props.unitId > 0
+      ? (units() ?? []).find((u) => u.id === props.unitId)
+      : undefined;
+  const isUnlistedCode = () =>
     !props.unitId && currentCode() !== "" && !(units() ?? []).some((u) => u.code === currentCode());
+  const isOrphanId = () =>
+    props.unitId != null && props.unitId > 0 && !listedById() && (units() !== undefined);
+
+  const orphanLabel = () => currentCode() || `unit #${props.unitId}`;
 
   return (
     <select
       class={`${inputClass} w-full`}
       disabled={props.disabled}
-      value={props.unitId ? String(props.unitId) : isUnlisted() ? `code:${currentCode()}` : ""}
+      value={
+        props.unitId
+          ? String(props.unitId)
+          : isUnlistedCode()
+            ? `code:${currentCode()}`
+            : ""
+      }
       onChange={(e) => {
         const raw = e.currentTarget.value;
         if (!raw) {
@@ -50,12 +66,18 @@ export function LineUnitSelect(props: Props) {
         }
         const id = Number(raw);
         const hit = (units() ?? []).find((u) => u.id === id);
-        props.onChange({ unit_id: id, unit_code: hit?.code ?? "" });
+        props.onChange({
+          unit_id: id,
+          unit_code: hit?.code ?? (id === props.unitId ? currentCode() : ""),
+        });
       }}
     >
       <option value="">—</option>
-      <Show when={isUnlisted()}>
+      <Show when={isUnlistedCode()}>
         <option value={`code:${currentCode()}`}>{currentCode()}</option>
+      </Show>
+      <Show when={isOrphanId()}>
+        <option value={String(props.unitId)}>{orphanLabel()}</option>
       </Show>
       <For each={units() ?? []}>{(u) => <option value={String(u.id)}>{u.code}</option>}</For>
     </select>
