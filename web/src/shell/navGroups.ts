@@ -72,8 +72,8 @@ export const navGroups: NavGroup[] = [
         kind: "link",
         moduleId: "sales",
         label: "Accounts Receivable",
-        href: "/app/sales/reports/ar-by-customer",
-        basePath: "/app/sales/reports/ar-by-customer",
+        href: "/app/finance/receivables",
+        basePath: "/app/finance/receivables",
       },
       {
         kind: "subBranch",
@@ -111,8 +111,8 @@ export const navGroups: NavGroup[] = [
         kind: "link",
         moduleId: "purchases",
         label: "Accounts Payable",
-        href: "/app/purchases/purchase-receive/ap-by-vendor",
-        basePath: "/app/purchases/purchase-receive/ap-by-vendor",
+        href: "/app/finance/payables",
+        basePath: "/app/finance/payables",
       },
       { kind: "module", moduleId: "buying" },
     ],
@@ -124,7 +124,7 @@ export const navGroups: NavGroup[] = [
     defaultExpanded: true,
     entries: [
       { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_i", branchLabel: "Ledger" },
-      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "Cash & AR/AP" },
+      { kind: "subBranch", moduleId: "finance", featureCode: "finance.acct_ii", branchLabel: "AR / AP payments" },
       { kind: "subBranch", moduleId: "finance", featureCode: "quotation.tax_mngt", branchLabel: "Taxes" },
       { kind: "subBranch", moduleId: "finance", featureCode: "finance.payment_vouchers", branchLabel: "Supplier payments" },
       {

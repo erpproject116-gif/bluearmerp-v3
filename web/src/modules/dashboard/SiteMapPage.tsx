@@ -54,7 +54,7 @@ export default function SiteMapPage() {
       <input
         type="search"
         class="mt-4 w-full rounded-lg border border-stroke px-3 py-2 text-sm shadow-sm outline-none focus:border-brand-400"
-        placeholder="Search Menu (e.g. Sales List, Cash In, Serial)"
+        placeholder="Search Menu (e.g. Sales List, New Receivable Payment, Serial)"
         value={q()}
         onInput={(e) => setQ(e.currentTarget.value)}
         autofocus

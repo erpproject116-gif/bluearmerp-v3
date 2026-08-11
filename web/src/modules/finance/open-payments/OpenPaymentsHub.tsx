@@ -58,12 +58,13 @@ export const AR_PAYMENT_NAV: OpenPaymentNavItem[] = [
   { label: "Receivable Status", href: "/app/selling/reports/receivable-status" },
   { label: "AR Aging Details", href: "/app/finance/reports/ar-aging-details" },
   { label: "Customer AR Book", href: "/app/finance/reports/customer-vendor-book-ar" },
-  { label: "Collections", href: "/app/finance/collections" },
+  { label: "Collections hub", href: "/app/finance/collections" },
 ];
 
 export const AP_PAYMENT_NAV: OpenPaymentNavItem[] = [
   { label: "New Payable Payment", href: "/app/finance/payables", exact: true },
   { label: "Payment Vouchers", href: "/app/finance/payment-vouchers" },
+  { label: "Payables hub", href: "/app/finance/disbursements" },
   { label: "Supplier Payment Status", href: "/app/finance/reports/supplier-payment-status" },
   { label: "Payable Status", href: "/app/buying/reports/payable-status" },
   { label: "AP Aging Details", href: "/app/finance/reports/ap-aging-details" },

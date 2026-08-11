@@ -17,7 +17,8 @@ export const REVIEW_PURCHASES_PREFIXES = [
 
 export const reviewPurchasesNavLinks: ReviewPurchasesNavLink[] = [
   { label: "Payment Vouchers", href: "/app/finance/payment-vouchers", permissionCode: "finance.payment_vouchers" },
-  { label: "New Payment", href: "/app/finance/payment-vouchers/new", permissionCode: "finance.payment_vouchers_new" },
+  { label: "New Payable Payment", href: "/app/finance/payables", permissionCode: "finance.payment_vouchers_new" },
+  { label: "Blank Payment Voucher", href: "/app/finance/payment-vouchers/new", permissionCode: "finance.payment_vouchers_new" },
   { label: "Payment Status", href: "/app/finance/reports/supplier-payment-status", permissionCode: "finance.reports_supplier_payment_status" },
   { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor", permissionCode: "finance.reports_ap_by_vendor" },
   { label: "A/P Aging", href: "/app/finance/reports/ap-aging", permissionCode: "finance.reports_ap_by_vendor" },

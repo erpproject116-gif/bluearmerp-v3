@@ -233,9 +233,9 @@ export function HomeFinanceOverview() {
           total={arSummary()?.total ?? 0}
           current={arSummary()?.current ?? 0}
           overdue={arOverdue()}
-          href="/app/finance/reports/ar-aging"
-          newHref="/app/sales/sales/new"
-          newLabel="New"
+          href="/app/finance/receivables"
+          newHref="/app/finance/receivables"
+          newLabel="Collect"
         />
         <AgingSplitBar
           title="Total payables"
@@ -243,9 +243,9 @@ export function HomeFinanceOverview() {
           total={apSummary()?.total ?? 0}
           current={apSummary()?.current ?? 0}
           overdue={apOverdue()}
-          href="/app/finance/reports/ap-aging-details"
-          newHref="/app/purchases/purchase-receive/new"
-          newLabel="New"
+          href="/app/finance/payables"
+          newHref="/app/finance/payables"
+          newLabel="Pay"
         />
         <CashFlowCard />
       </div>

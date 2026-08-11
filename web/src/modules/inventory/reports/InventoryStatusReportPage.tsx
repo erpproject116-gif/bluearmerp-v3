@@ -12,11 +12,13 @@ import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ReportEmptyMessage } from "../../../shared/reports/ReportTableStates";
 import { apiFetch } from "../../../shared/api";
 import { formatMoney } from "../../../shared/money";
+import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
+import { useResizableColumns, type ColumnWidthDef } from "../../../shared/useResizableColumns";
 import { StocksHowItFits } from "../StocksHowItFits";
 import { FindStockUnitsModal, type FindStockUnitsTarget } from "./FindStockUnitsModal";
 
 type CategoryOpt = { id: number; name: string };
-type LocationOpt = { id: number; location_name: string; is_rma?: boolean };
+type LocationOpt = { id: number; location_name: string; is_rma?: boolean; status?: string };
 
 const STOCK_STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -27,7 +29,8 @@ const STOCK_STATUS_OPTIONS = [
   { value: "inactive_item", label: "Inactive item" },
 ];
 
-type BranchCol = { id: number; name: string };
+/** One matrix column; may merge multiple location ids that share the same display name. */
+type BranchCol = { key: string; id: number; name: string; locationIds: number[] };
 
 type MatrixCell = {
   location_id: number;
@@ -100,6 +103,63 @@ function fmtQty(n: number) {
   return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "";
 }
 
+/** Merge duplicate location names (case-insensitive) into one column; sum qty when reading cells. */
+function buildBranchCols(locs: LocationOpt[], rows: InventoryStatusRow[]): BranchCol[] {
+  // Include inactive non-RMA so duplicate "HQ" rows still merge into one column (qty summed).
+  const source = locs.filter((l) => !l.is_rma);
+
+  const byName = new Map<string, BranchCol>();
+  const push = (id: number, name: string) => {
+    const label = (name || `Location ${id}`).trim() || `Location ${id}`;
+    const key = label.toLowerCase();
+    const existing = byName.get(key);
+    if (existing) {
+      if (!existing.locationIds.includes(id)) existing.locationIds.push(id);
+      return;
+    }
+    byName.set(key, { key, id, name: label, locationIds: [id] });
+  };
+
+  if (source.length > 0) {
+    for (const l of source) push(l.id, l.location_name);
+  } else {
+    for (const r of rows) push(r.location_id, r.branch_name || r.location_name);
+  }
+
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function cellForBranch(item: MatrixItem, b: BranchCol): MatrixCell | null {
+  let qty = 0;
+  let available = 0;
+  let serial = 0;
+  let track = false;
+  let linkId = b.id;
+  let bestQty = -Infinity;
+  let found = false;
+  for (const id of b.locationIds) {
+    const c = item.byLocation.get(id);
+    if (!c) continue;
+    found = true;
+    qty += c.qty_on_hand;
+    available += c.available_qty;
+    serial += c.serial_unit_count;
+    track = track || c.track_serial;
+    if (c.qty_on_hand > bestQty) {
+      bestQty = c.qty_on_hand;
+      linkId = id;
+    }
+  }
+  if (!found) return null;
+  return {
+    location_id: linkId,
+    qty_on_hand: qty,
+    available_qty: available,
+    serial_unit_count: serial,
+    track_serial: track,
+  };
+}
+
 function pivotRows(rows: InventoryStatusRow[]): MatrixItem[] {
   const order: number[] = [];
   const map = new Map<number, MatrixItem>();
@@ -149,7 +209,9 @@ export default function InventoryStatusReportPage() {
     return res.success ? (res.data ?? []) : [];
   });
   const [locations] = createResource(async () => {
-    const res = await apiFetch<LocationOpt[]>("/api/v1/inventory/locations?page=1&pageSize=200");
+    const res = await apiFetch<LocationOpt[]>(
+      "/api/v1/inventory/locations?page=1&pageSize=500&sort=location_name&order=asc",
+    );
     return res.success ? (res.data ?? []) : [];
   });
 
@@ -210,19 +272,27 @@ export default function InventoryStatusReportPage() {
 
   const matrixItems = createMemo(() => pivotRows(report.data?.rows ?? []));
 
-  /** Always show every non-RMA branch as a column so stock is comparable side-by-side. */
-  const branchCols = createMemo((): BranchCol[] => {
-    const locs = (locations() ?? []).filter((l) => !l.is_rma);
-    const fromMaster = locs.map((l) => ({ id: l.id, name: l.location_name }));
-    if (fromMaster.length > 0) return fromMaster;
-    const seen = new Map<number, string>();
-    for (const r of report.data?.rows ?? []) {
-      if (!seen.has(r.location_id)) seen.set(r.location_id, r.branch_name || r.location_name);
-    }
-    return [...seen.entries()]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+  /** One column per branch name; duplicate HQ (etc.) location rows are merged. */
+  const branchCols = createMemo((): BranchCol[] =>
+    buildBranchCols(locations() ?? [], report.data?.rows ?? []),
+  );
+
+  const colDefs = createMemo((): ColumnWidthDef[] => {
+    const fixed: ColumnWidthDef[] = [
+      { key: "item_code", width: 120, minWidth: 88 },
+      { key: "item_name", width: 220, minWidth: 140 },
+      { key: "spec", width: 120, minWidth: 80 },
+      { key: "purchase", width: 100, minWidth: 72 },
+      { key: "vip", width: 100, minWidth: 72 },
+      { key: "sales", width: 100, minWidth: 72 },
+      { key: "total", width: 88, minWidth: 64 },
+    ];
+    return [
+      ...fixed,
+      ...branchCols().map((b) => ({ key: `loc-${b.key}`, width: 96, minWidth: 72 })),
+    ];
   });
+  const { widthFor, onResizeStart, tableWidth } = useResizableColumns(colDefs);
 
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
   const filters = () => submitted();
@@ -241,7 +311,7 @@ export default function InventoryStatusReportPage() {
   return (
     <ReportPageLayout
       title="Inv Per Branch"
-      description="One row per item with on-hand qty across branches (Ecount-style). Branch filter limits which items appear; columns still show every branch so you can compare. Filters apply live; F8 refreshes."
+      description="One row per item with on-hand qty across branches (Ecount-style). Branch filter limits which items appear; columns still show every branch so you can compare. Drag column edges to resize. Filters apply live; F8 refreshes."
       showDateFilters={false}
       submitted={true}
       loading={report.isFetching}
@@ -278,7 +348,7 @@ export default function InventoryStatusReportPage() {
                 }
               >
                 <option value="">All branches</option>
-                <For each={(locations() ?? []).filter((l) => !l.is_rma)}>
+                <For each={(locations() ?? []).filter((l) => !l.is_rma && (l.status == null || l.status === "active"))}>
                   {(l) => <option value={l.id}>{l.location_name}</option>}
                 </For>
               </select>
@@ -341,18 +411,76 @@ export default function InventoryStatusReportPage() {
         </p>
       </Show>
       <Show when={matrixItems().length > 0}>
-        <div class="overflow-x-auto">
-          <table class="erp-grid min-w-full text-left text-sm">
+        <DataTableScroll class="overflow-x-auto">
+          <table
+            class="erp-grid text-left text-sm"
+            style={{ width: `${tableWidth()}px`, "min-width": "100%" }}
+          >
             <thead class="sticky top-0 z-10 bg-brand-50 text-xs font-semibold uppercase text-brand-700">
               <tr>
-                <th class="sticky left-0 z-20 min-w-[7.5rem] bg-brand-50 px-3 py-2">Item code</th>
-                <th class="sticky left-[7.5rem] z-20 min-w-[12rem] bg-brand-50 px-3 py-2">Item name</th>
-                <th class="px-3 py-2">Spec.</th>
-                <th class="px-3 py-2 text-right">Purchase</th>
-                <th class="px-3 py-2 text-right">VIP</th>
-                <th class="px-3 py-2 text-right">Sales</th>
-                <th class="px-3 py-2 text-right">Total</th>
-                <For each={branchCols()}>{(b) => <th class="px-3 py-2 text-right whitespace-nowrap">{b.name}</th>}</For>
+                <ResizableTh
+                  columnKey="item_code"
+                  width={widthFor("item_code")}
+                  onResizeStart={onResizeStart}
+                  class="sticky left-0 z-20 bg-brand-50 px-3 py-2"
+                >
+                  Item code
+                </ResizableTh>
+                <ResizableTh
+                  columnKey="item_name"
+                  width={widthFor("item_name")}
+                  onResizeStart={onResizeStart}
+                  class="sticky left-[7.5rem] z-20 bg-brand-50 px-3 py-2"
+                >
+                  Item name
+                </ResizableTh>
+                <ResizableTh columnKey="spec" width={widthFor("spec")} onResizeStart={onResizeStart} class="px-3 py-2">
+                  Spec.
+                </ResizableTh>
+                <ResizableTh
+                  columnKey="purchase"
+                  width={widthFor("purchase")}
+                  onResizeStart={onResizeStart}
+                  class="px-3 py-2 text-right"
+                >
+                  Purchase
+                </ResizableTh>
+                <ResizableTh
+                  columnKey="vip"
+                  width={widthFor("vip")}
+                  onResizeStart={onResizeStart}
+                  class="px-3 py-2 text-right"
+                >
+                  VIP
+                </ResizableTh>
+                <ResizableTh
+                  columnKey="sales"
+                  width={widthFor("sales")}
+                  onResizeStart={onResizeStart}
+                  class="px-3 py-2 text-right"
+                >
+                  Sales
+                </ResizableTh>
+                <ResizableTh
+                  columnKey="total"
+                  width={widthFor("total")}
+                  onResizeStart={onResizeStart}
+                  class="px-3 py-2 text-right"
+                >
+                  Total
+                </ResizableTh>
+                <For each={branchCols()}>
+                  {(b) => (
+                    <ResizableTh
+                      columnKey={`loc-${b.key}`}
+                      width={widthFor(`loc-${b.key}`)}
+                      onResizeStart={onResizeStart}
+                      class="px-3 py-2 text-right whitespace-nowrap"
+                    >
+                      {b.name}
+                    </ResizableTh>
+                  )}
+                </For>
               </tr>
             </thead>
             <tbody>
@@ -361,55 +489,77 @@ export default function InventoryStatusReportPage() {
                   const negTotal = item.total_on_hand < -0.0001;
                   return (
                     <tr class={`border-t border-stroke/60 ${negTotal ? "bg-red-50" : ""}`}>
-                      <td class="sticky left-0 z-[1] bg-inherit px-3 py-2 font-medium tabular-nums">{item.item_code}</td>
-                      <td class="sticky left-[7.5rem] z-[1] bg-inherit px-3 py-2">
+                      <ResizableTd
+                        width={widthFor("item_code")}
+                        class="sticky left-0 z-[1] bg-inherit px-3 py-2 font-medium tabular-nums"
+                      >
+                        {item.item_code}
+                      </ResizableTd>
+                      <ResizableTd
+                        width={widthFor("item_name")}
+                        class="sticky left-[7.5rem] z-[1] bg-inherit px-3 py-2"
+                      >
                         <A href={itemHref(item.item_code)} class="text-brand-700 hover:underline">
                           {item.item_name}
                         </A>
                         <Show when={item.unit_code}>
                           <div class="text-[11px] text-text-secondary">{item.unit_code}</div>
                         </Show>
-                      </td>
-                      <td class="px-3 py-2 text-text-secondary">{item.category_name || "—"}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{formatMoney(item.purchase_price)}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{formatMoney(item.vip_price)}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{formatMoney(item.sales_price)}</td>
-                      <td
+                      </ResizableTd>
+                      <ResizableTd width={widthFor("spec")} class="px-3 py-2 text-text-secondary">
+                        {item.category_name || "—"}
+                      </ResizableTd>
+                      <ResizableTd width={widthFor("purchase")} class="px-3 py-2 text-right tabular-nums">
+                        {formatMoney(item.purchase_price)}
+                      </ResizableTd>
+                      <ResizableTd width={widthFor("vip")} class="px-3 py-2 text-right tabular-nums">
+                        {formatMoney(item.vip_price)}
+                      </ResizableTd>
+                      <ResizableTd width={widthFor("sales")} class="px-3 py-2 text-right tabular-nums">
+                        {formatMoney(item.sales_price)}
+                      </ResizableTd>
+                      <ResizableTd
+                        width={widthFor("total")}
                         class={`px-3 py-2 text-right tabular-nums font-medium ${negTotal ? "text-red-700" : ""}`}
                       >
                         {fmtQty(item.total_on_hand)}
-                      </td>
+                      </ResizableTd>
                       <For each={branchCols()}>
                         {(b) => {
-                          const cell = item.byLocation.get(b.id);
-                          const qty = cell?.qty_on_hand;
-                          const empty = qty == null || Math.abs(qty) < 0.0000001;
-                          const neg = (qty ?? 0) < -0.0001;
+                          const cell = cellForBranch(item, b);
+                          const qty = cell?.qty_on_hand ?? 0;
+                          const empty = cell == null || Math.abs(qty) < 0.0000001;
+                          const neg = qty < -0.0001;
+                          const linkId = cell?.location_id ?? b.id;
                           return (
-                            <td
+                            <ResizableTd
+                              width={widthFor(`loc-${b.key}`)}
                               class={`px-3 py-2 text-right tabular-nums ${neg ? "bg-red-50 text-red-700" : ""}`}
                             >
-                              <Show when={!empty} fallback={<span class="text-text-secondary"> </span>}>
+                              <Show
+                                when={!empty}
+                                fallback={<span class="text-text-secondary">0</span>}
+                              >
                                 <div class="inline-flex items-center justify-end gap-1">
                                   <A
-                                    href={ledgerHref(item.item_id, b.id)}
+                                    href={ledgerHref(item.item_id, linkId)}
                                     class="hover:underline"
                                     title={`Movements — ${b.name}`}
                                   >
-                                    {fmtQty(qty!)}
+                                    {fmtQty(qty)}
                                   </A>
                                   <Show when={cell?.track_serial && (cell?.serial_unit_count ?? 0) > 0}>
                                     <button
                                       type="button"
                                       class="rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium text-slate-700"
-                                      onClick={() => openSerials(item, b.id, b.name)}
+                                      onClick={() => openSerials(item, linkId, b.name)}
                                     >
                                       {cell!.serial_unit_count} sn
                                     </button>
                                   </Show>
                                 </div>
                               </Show>
-                            </td>
+                            </ResizableTd>
                           );
                         }}
                       </For>
@@ -419,7 +569,7 @@ export default function InventoryStatusReportPage() {
               </For>
             </tbody>
           </table>
-        </div>
+        </DataTableScroll>
       </Show>
     </ReportPageLayout>
   );

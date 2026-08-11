@@ -111,9 +111,10 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
   }
   if (
     pathname.startsWith("/app/finance/acct-ii") ||
+    pathname.startsWith("/app/finance/receivables") ||
+    pathname.startsWith("/app/finance/payables") ||
     pathname.startsWith("/app/finance/collections") ||
     pathname.startsWith("/app/finance/bookkeeping") ||
-    pathname.startsWith("/app/finance/disbursements") ||
     pathname.startsWith("/app/finance/disbursements") ||
     pathname.startsWith("/app/finance/payment-vouchers") ||
     pathname.startsWith("/app/finance/banking") ||
@@ -307,11 +308,12 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "accounts_receivable",
         label: "Accounts Receivable",
-        href: "/app/sales/reports/ar-by-customer",
+        href: "/app/finance/receivables",
         iconId: "accounts_receivable",
         topId: "inv1",
         expandGroupId: "sales_process",
         moduleId: "sales",
+        hint: "New Receivable Payment — collect open balances",
       },
       {
         id: "combined_invoices",
@@ -409,11 +411,12 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "accounts_payable",
         label: "Accounts Payable",
-        href: "/app/purchases/purchase-receive/ap-by-vendor",
+        href: "/app/finance/payables",
         iconId: "accounts_payable",
         topId: "inv1",
         expandGroupId: "procurement_process",
         moduleId: "purchases",
+        hint: "New Payable Payment — pay open balances",
       },
     ],
   },
@@ -444,21 +447,23 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "cash",
-        label: "Collections",
-        href: "/app/finance/collections",
+        label: "New Receivable Payment",
+        href: "/app/finance/receivables",
         iconId: "collections",
         topId: "acct2",
         expandGroupId: "accounting_dept",
+        moduleId: "finance",
+        hint: "Open customer balances → collect",
       },
       {
         id: "disbursements",
-        label: "Payment Made",
-        href: "/app/finance/disbursements",
+        label: "New Payable Payment",
+        href: "/app/finance/payables",
         iconId: "disbursements",
         topId: "acct2",
         expandGroupId: "accounting_dept",
         moduleId: "finance",
-        hint: "Pay vendors after Bill",
+        hint: "Open vendor balances → pay",
       },
       {
         id: "banking",

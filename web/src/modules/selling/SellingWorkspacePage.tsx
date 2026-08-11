@@ -20,6 +20,7 @@ const tiles: KpiTile[] = [
 ];
 
 const reportLinks = [
+  { label: "New Receivable Payment", href: "/app/finance/receivables" },
   { label: "Sales Status", href: "/app/selling/reports" },
   { label: "Receivable Status", href: "/app/selling/reports/receivable-status" },
   { label: "Commissions", href: "/app/selling/commissions" },

@@ -34,7 +34,7 @@ const FLOWS: FlowRow[] = [
       { label: "Quotation", href: "/app/quotation/quotations", sub: "Optional", optional: true },
       { label: "Sales Order", href: "/app/sales-order/sales-orders", sub: "Optional", optional: true },
       { label: "New Sales", href: "/app/sales/sales", sub: "Invoice + stock out" },
-      { label: "Get paid", href: "/app/finance/official-receipts", sub: "Official Receipt", accent: true },
+      { label: "Get paid", href: "/app/finance/receivables", sub: "New Receivable Payment", accent: true },
     ],
   },
   {
@@ -46,7 +46,7 @@ const FLOWS: FlowRow[] = [
       { label: "Purchase Order", href: "/app/purchase-order/purchase-orders", sub: "Commit to vendor" },
       { label: "Purchase Receive", href: "/app/purchase-order/goods-receipt", sub: "Stock + proof" },
       { label: "Purchase Receive", href: "/app/purchases/purchase-receive", sub: "Stock + amount owed" },
-      { label: "Payment Made", href: "/app/finance/disbursements", sub: "Pay vendor", accent: true },
+      { label: "Payment Made", href: "/app/finance/payables", sub: "New Payable Payment", accent: true },
     ],
   },
 ];

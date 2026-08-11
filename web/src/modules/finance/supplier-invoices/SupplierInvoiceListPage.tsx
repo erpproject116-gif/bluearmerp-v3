@@ -276,10 +276,14 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Next:{" "}
-          <A href="/app/finance/disbursements" class="text-brand-600 hover:underline">
-            Payment Made (Disbursements)
+          <A href="/app/finance/payables" class="font-medium text-brand-700 hover:underline">
+            New Payable Payment
           </A>{" "}
-          or Payment Voucher. Optional history:{" "}
+          (open balances → pay) or{" "}
+          <A href="/app/finance/disbursements" class="text-brand-600 hover:underline">
+            Payables hub
+          </A>
+          . Optional history:{" "}
           <A href="/app/purchase-order/goods-receipt" class="font-medium text-brand-700 hover:underline">
             Receive history
           </A>{" "}
