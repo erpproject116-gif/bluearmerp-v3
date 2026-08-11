@@ -176,7 +176,10 @@ type Props = {
    * bill: New Bill — scan-next, qty-first (do not overwrite qty from serial length).
    */
   serialCaptureMode?: "planned" | "bill";
-  /** Year + month warranty duration on PO / Purchase Receive lines. */
+  /**
+   * When true, Warranty may appear if Settings → Line columns has it Visible.
+   * Defaults hidden via column-label DefaultHidden for PO / Purchase Receive.
+   */
   showWarrantyColumns?: boolean;
 };
 
@@ -309,13 +312,23 @@ export function PurchaseRequestLineGrid(props: Props) {
 
   const columns = createMemo(() => {
     props.taxTypeId();
+    const labelsByKey = lineLabels.byKey();
     const base = filterTaxLineColumns(LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
     let filtered = !props.hidePartnerColumns
       ? [...base]
       : base.filter((c) => c.key !== "partner_code" && c.key !== "partner_name");
-    if (!props.showWarrantyColumns) {
-      filtered = filtered.filter((c) => c.key !== "warranty");
-    }
+    // Warranty only on PO / Purchase Receive (showWarrantyColumns), and only when Settings → Visible.
+    filtered = filtered.filter((c) => {
+      if (c.key === "warranty") {
+        if (!props.showWarrantyColumns) return false;
+        const row = labelsByKey["warranty"];
+        if (!row || row.is_visible === undefined) return false;
+        return row.is_visible !== false;
+      }
+      const row = labelsByKey[c.key];
+      if (!row || row.is_visible === undefined) return true;
+      return row.is_visible !== false;
+    });
     return applyColumnLabels(filtered, lineLabels.columnLabel);
   });
   const hasCol = (key: string) => columns().some((c) => c.key === key);

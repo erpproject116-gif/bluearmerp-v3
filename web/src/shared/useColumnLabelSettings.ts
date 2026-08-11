@@ -6,7 +6,7 @@ export type ColumnLabelSetting = {
   column_key: string;
   label: string;
   sort_order: number;
-  /** Tenant default visibility for list views; line grids ignore this in UI. */
+  /** Tenant visibility for list and line grids (when column is registered). */
   is_visible?: boolean;
 };
 

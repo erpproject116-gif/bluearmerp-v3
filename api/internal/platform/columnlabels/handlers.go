@@ -96,7 +96,7 @@ func LoadMerged(ctx context.Context, pool *pgxpool.Pool, tenantID int64, viewKey
 	var out []ColumnSetting
 	for _, sc := range StandardColumns(viewKey) {
 		label := sc.Label
-		visible := true
+		visible := !sc.DefaultHidden
 		if o, ok := overrides[sc.ColumnKey]; ok {
 			if o.Label != nil && strings.TrimSpace(*o.Label) != "" {
 				label = *o.Label

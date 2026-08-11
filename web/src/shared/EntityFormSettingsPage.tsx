@@ -88,7 +88,12 @@ export function EntityFormSettingsPage(props: Props) {
 
   createEffect(() => {
     if (!columnDirty()) {
-      setColumnDraft([...lineLabels.columns()]);
+      setColumnDraft(
+        lineLabels.columns().map((c) => ({
+          ...c,
+          is_visible: c.is_visible !== false,
+        })),
+      );
     }
   });
 
@@ -109,9 +114,10 @@ export function EntityFormSettingsPage(props: Props) {
     [...listColumnDraft()].sort((a, b) => a.sort_order - b.sort_order),
   );
 
-  const updateColumnRow = (columnKey: string, label: string) => {
+  const updateColumnRow = (columnKey: string, patch: Partial<ColumnLabelSetting> | string) => {
     setColumnDirty(true);
-    setColumnDraft((list) => list.map((r) => (r.column_key === columnKey ? { ...r, label } : r)));
+    const next = typeof patch === "string" ? { label: patch } : patch;
+    setColumnDraft((list) => list.map((r) => (r.column_key === columnKey ? { ...r, ...next } : r)));
   };
 
   const updateListColumnRow = (columnKey: string, patch: Partial<ColumnLabelSetting>) => {
@@ -123,7 +129,12 @@ export function EntityFormSettingsPage(props: Props) {
     if (!canEdit() || !showLineColumns()) return;
     setSaving(true);
     try {
-      await lineLabels.save(sortedColumnRows());
+      await lineLabels.save(
+        sortedColumnRows().map((c) => ({
+          ...c,
+          is_visible: c.is_visible !== false,
+        })),
+      );
       setColumnDirty(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save column labels.");
@@ -460,6 +471,7 @@ export function EntityFormSettingsPage(props: Props) {
               <tr>
                 <th class="px-4 py-3 font-semibold">Column</th>
                 <th class="px-4 py-3 font-semibold">Header label</th>
+                <th class="px-4 py-3 font-semibold">Visible</th>
               </tr>
             </thead>
             <tbody>
@@ -472,7 +484,18 @@ export function EntityFormSettingsPage(props: Props) {
                         class={inputClass}
                         value={row().label}
                         disabled={!canEdit()}
-                        onInput={(e) => updateColumnRow(row().column_key, e.currentTarget.value)}
+                        onInput={(e) => updateColumnRow(row().column_key, { label: e.currentTarget.value })}
+                      />
+                    </td>
+                    <td class="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-stroke"
+                        checked={row().is_visible !== false}
+                        disabled={!canEdit()}
+                        onChange={(e) =>
+                          updateColumnRow(row().column_key, { is_visible: e.currentTarget.checked })
+                        }
                       />
                     </td>
                   </tr>

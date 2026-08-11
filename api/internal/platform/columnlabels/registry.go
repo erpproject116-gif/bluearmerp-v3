@@ -1,9 +1,11 @@
 package columnlabels
 
 type StandardColumn struct {
-	ColumnKey string `json:"column_key"`
-	Label     string `json:"label"`
-	SortOrder int    `json:"sort_order"`
+	ColumnKey      string `json:"column_key"`
+	Label          string `json:"label"`
+	SortOrder      int    `json:"sort_order"`
+	// DefaultHidden hides the column until a tenant explicitly enables it in settings.
+	DefaultHidden bool `json:"-"`
 }
 
 // view_key → default column headers for line grids and list tables.
@@ -72,28 +74,38 @@ var standardRegistry = map[string][]StandardColumn{
 		{ColumnKey: "line_no", Label: "#", SortOrder: 10},
 		{ColumnKey: "item_code", Label: "Item Code", SortOrder: 20},
 		{ColumnKey: "item_name", Label: "Item Name", SortOrder: 30},
+		{ColumnKey: "spec_name", Label: "Spec Name", SortOrder: 35},
 		{ColumnKey: "description", Label: "Description", SortOrder: 40},
 		{ColumnKey: "qty", Label: "Qty", SortOrder: 50},
+		{ColumnKey: "unit", Label: "UoM", SortOrder: 55},
 		{ColumnKey: "basis", Label: "Basis", SortOrder: 60},
+		{ColumnKey: "unit_price", Label: "Unit Price", SortOrder: 65},
 		{ColumnKey: "unit_non_vat", Label: "Unit (Non-VAT)", SortOrder: 70},
 		{ColumnKey: "non_vat_total", Label: "Non-VAT Total", SortOrder: 80},
 		{ColumnKey: "tax", Label: "Tax", SortOrder: 90},
 		{ColumnKey: "unit_vat_inc", Label: "Unit (VAT inc.)", SortOrder: 100},
 		{ColumnKey: "line_total", Label: "Line Total", SortOrder: 110},
+		{ColumnKey: "warranty", Label: "Warranty", SortOrder: 115, DefaultHidden: true},
+		{ColumnKey: "serials", Label: "Serials", SortOrder: 118},
 		{ColumnKey: "remark", Label: "Remark", SortOrder: 120},
 	},
 	"fin_supplier_invoice.lines": {
 		{ColumnKey: "line_no", Label: "#", SortOrder: 10},
 		{ColumnKey: "item_code", Label: "Item Code", SortOrder: 20},
 		{ColumnKey: "item_name", Label: "Item Name", SortOrder: 30},
+		{ColumnKey: "spec_name", Label: "Spec Name", SortOrder: 35},
 		{ColumnKey: "description", Label: "Description", SortOrder: 40},
 		{ColumnKey: "qty", Label: "Qty", SortOrder: 50},
+		{ColumnKey: "unit", Label: "UoM", SortOrder: 55},
 		{ColumnKey: "basis", Label: "Basis", SortOrder: 60},
+		{ColumnKey: "unit_price", Label: "Unit Price", SortOrder: 65},
 		{ColumnKey: "unit_non_vat", Label: "Unit (Non-VAT)", SortOrder: 70},
 		{ColumnKey: "non_vat_total", Label: "Non-VAT Total", SortOrder: 80},
 		{ColumnKey: "tax", Label: "Tax", SortOrder: 90},
 		{ColumnKey: "unit_vat_inc", Label: "Unit (VAT inc.)", SortOrder: 100},
 		{ColumnKey: "line_total", Label: "Line Total", SortOrder: 110},
+		{ColumnKey: "warranty", Label: "Warranty", SortOrder: 115, DefaultHidden: true},
+		{ColumnKey: "serials", Label: "Serials", SortOrder: 118},
 		{ColumnKey: "remark", Label: "Remark", SortOrder: 120},
 	},
 	"fin_supplier_invoice.list": {
