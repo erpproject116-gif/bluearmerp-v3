@@ -276,6 +276,8 @@ import {
   PayableStatusReportPage,
   ReceivableStatusReportPage,
   CollectionsHubPage,
+  ReceivablesPaymentPage,
+  PayablesPaymentPage,
   BookkeepingHubPage,
   DisbursementsHubPage,
   ExpensesPage,
@@ -640,6 +642,8 @@ export default function App() {
           <Route path="/finance/acct-ii/checks" component={CheckRegisterPage} />
           <Route path="/finance/acct-ii/setup" component={ModuleSetupHubPage} />
           <Route path="/finance/collections" component={CollectionsHubPage} />
+          <Route path="/finance/receivables" component={ReceivablesPaymentPage} />
+          <Route path="/finance/payables" component={PayablesPaymentPage} />
           <Route path="/finance/bookkeeping" component={BookkeepingHubPage} />
           <Route path="/finance/disbursements" component={DisbursementsHubPage} />
           <Route path="/purchases/expenses" component={ExpensesPage} />

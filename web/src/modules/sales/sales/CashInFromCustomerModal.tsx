@@ -62,6 +62,8 @@ export function CashInFromCustomerModal(props: Props) {
             <option value="check">Check</option>
             <option value="bank_transfer">Bank transfer</option>
             <option value="card">Card</option>
+            <option value="note">Note</option>
+            <option value="other">Other Account</option>
           </select>
         </Field>
         <Field label="Reference no.">

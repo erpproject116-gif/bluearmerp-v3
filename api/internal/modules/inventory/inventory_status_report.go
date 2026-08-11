@@ -181,6 +181,170 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 	return outer, args
 }
 
+// inventoryMatrixItemCatalogSQL pages the same masters as /inventory/items (active by default).
+// Missing balance rows count as zero so never-received items still appear in Inv Per Branch.
+func inventoryMatrixItemCatalogSQL(tenantID int64, q, stockStatus string, categoryID, locationID *int64, inStockOnly bool) (fromWhere string, args []any) {
+	args = []any{tenantID}
+	argN := 2
+	fromWhere = `
+		from public.inv_items i
+		left join public.inv_item_categories c on c.tenant_id = i.tenant_id and c.id = i.item_category_id
+		where i.tenant_id = $1 and i.deleted_at is null`
+	if stockStatus == invStatusInactiveItem {
+		fromWhere += ` and i.status = 'inactive'`
+	} else {
+		fromWhere += ` and i.status = 'active'`
+	}
+	if q != "" {
+		fromWhere += fmt.Sprintf(` and (i.item_code ilike $%d or i.item_name ilike $%d or coalesce(c.name, '') ilike $%d)`, argN, argN, argN)
+		args = append(args, "%"+q+"%")
+		argN++
+	}
+	if categoryID != nil {
+		fromWhere += fmt.Sprintf(` and i.item_category_id = $%d`, argN)
+		args = append(args, *categoryID)
+		argN++
+	}
+
+	locPred := ""
+	if locationID != nil {
+		locPred = fmt.Sprintf(` and bal.location_id = $%d`, argN)
+		args = append(args, *locationID)
+		argN++
+	}
+	companyAvail := `coalesce((
+		select sum(bal.qty_on_hand - bal.qty_reserved)::float8
+		from public.inv_item_location_balances bal
+		join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id
+		  and coalesce(l.is_rma, false) = false and l.deleted_at is null
+		where bal.tenant_id = i.tenant_id and bal.item_id = i.id` + locPred + `
+	), 0)`
+
+	if inStockOnly || stockStatus == invStatusInStock {
+		fromWhere += ` and ` + companyAvail + ` > 0`
+	}
+	switch stockStatus {
+	case invStatusOutOfStock:
+		fromWhere += ` and ` + companyAvail + ` <= 0`
+	case invStatusBelowSafety:
+		fromWhere += ` and i.reorder_level is not null and ` + companyAvail + ` < i.reorder_level`
+	case invStatusHasReserved:
+		fromWhere += ` and exists (
+			select 1
+			from public.inv_item_location_balances bal
+			join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id
+			  and coalesce(l.is_rma, false) = false and l.deleted_at is null
+			where bal.tenant_id = i.tenant_id and bal.item_id = i.id
+			  and bal.qty_reserved > 0` + locPred + `
+		)`
+	}
+	return fromWhere, args
+}
+
+func inventoryStatusMatrixExpandSQL(tenantID int64, itemIDs []int64) (string, []any) {
+	// One row per item × non-RMA location; LEFT JOIN balances so zeros fill empty branches.
+	return `
+		select
+		  i.id as item_id,
+		  i.item_code,
+		  i.item_name,
+		  i.status as item_status,
+		  coalesce(bu.code, coalesce(i.unit, '')) as unit_code,
+		  i.item_category_id as category_id,
+		  coalesce(c.name, coalesce(i.item_category, '')) as category_name,
+		  l.id as location_id,
+		  l.location_name,
+		  l.location_name as branch_name,
+		  coalesce(bal.qty_on_hand, 0)::float8 as qty_on_hand,
+		  coalesce(bal.qty_reserved, 0)::float8 as qty_reserved,
+		  (coalesce(bal.qty_on_hand, 0) - coalesce(bal.qty_reserved, 0))::float8 as available_qty,
+		  coalesce(i.purchase_price, 0)::float8 as purchase_price,
+		  coalesce(i.vip_price, 0)::float8 as vip_price,
+		  coalesce(i.sales_price, 0)::float8 as sales_price,
+		  coalesce(co_bal.company_available_qty, 0)::float8 as company_available_qty,
+		  i.reorder_level::float8 as reorder_level,
+		  case
+		    when i.status = 'inactive' then 'inactive_item'
+		    when coalesce(bal.qty_on_hand, 0) <= 0 then 'out_of_stock'
+		    when i.reorder_level is not null and coalesce(bal.qty_on_hand, 0) < i.reorder_level then 'below_safety'
+		    when coalesce(bal.qty_reserved, 0) > 0 then 'has_reserved'
+		    else 'in_stock'
+		  end as stock_status,
+		  coalesce(i.track_serial, false) as track_serial,
+		  coalesce(i.track_lot, false) as track_lot,
+		  coalesce(sc.cnt, 0)::float8 as serial_unit_count,
+		  coalesce(lc.cnt, 0)::float8 as lot_batch_count,
+		  last_sale.sold_at::text as last_sold_at,
+		  coalesce(last_sale.sold_by, '') as last_sold_by,
+		  coalesce(last_sale.ref_type, '') as last_sold_ref_type,
+		  last_sale.ref_id as last_sold_ref_id,
+		  last_mv.moved_at::text as last_movement_at,
+		  coalesce(last_mv.movement_type, '') as last_movement_type
+		from public.inv_items i
+		cross join public.inv_locations l
+		left join public.inv_item_location_balances bal
+		  on bal.tenant_id = i.tenant_id and bal.item_id = i.id and bal.location_id = l.id
+		left join public.inv_units bu on bu.id = i.base_unit_id
+		left join public.inv_item_categories c on c.id = i.item_category_id and c.tenant_id = i.tenant_id
+		left join (
+		  select item_id, location_id, count(*)::float8 as cnt
+		  from public.inv_serial_units
+		  where tenant_id = $1 and status in ('in_stock', 'reserved')
+		  group by item_id, location_id
+		) sc on sc.item_id = i.id and sc.location_id = l.id
+		left join (
+		  select item_id, location_id, count(*)::float8 as cnt
+		  from public.inv_lot_batches
+		  where tenant_id = $1 and qty_on_hand > 0.0001
+		  group by item_id, location_id
+		) lc on lc.item_id = i.id and lc.location_id = l.id
+		left join lateral (
+		  select coalesce(sum(b.qty_on_hand - b.qty_reserved), 0) as company_available_qty
+		  from public.inv_item_location_balances b
+		  join public.inv_locations loc on loc.id = b.location_id and loc.tenant_id = b.tenant_id
+		    and coalesce(loc.is_rma, false) = false and loc.deleted_at is null
+		  where b.tenant_id = i.tenant_id and b.item_id = i.id
+		) co_bal on true
+		left join lateral (
+		  select sm.created_at as sold_at, coalesce(u.full_name, '') as sold_by,
+		    case
+		      when sm.ref_type = 'sa_sales_line' then 'sales'
+		      else sm.ref_type
+		    end as ref_type,
+		    case
+		      when sm.ref_type = 'sa_sales_line' then (
+		        select ln.sales_id from public.sa_sales_lines ln where ln.id = sm.ref_id limit 1
+		      )
+		      else sm.ref_id
+		    end as ref_id
+		  from public.inv_stock_movements sm
+		  left join public.users u on u.id = sm.created_by_user_id
+		  where sm.tenant_id = i.tenant_id
+		    and sm.item_id = i.id
+		    and sm.location_id = l.id
+		    and sm.qty_delta < 0
+		    and sm.movement_type in ('sales', 'issue', 'out', 'delivery')
+		  order by sm.created_at desc, sm.id desc
+		  limit 1
+		) last_sale on true
+		left join lateral (
+		  select sm.created_at as moved_at, sm.movement_type
+		  from public.inv_stock_movements sm
+		  where sm.tenant_id = i.tenant_id
+		    and sm.item_id = i.id
+		    and sm.location_id = l.id
+		  order by sm.created_at desc, sm.id desc
+		  limit 1
+		) last_mv on true
+		where i.tenant_id = $1
+		  and i.id = any($2)
+		  and l.tenant_id = $1
+		  and coalesce(l.is_rma, false) = false
+		  and l.deleted_at is null
+		order by i.item_code asc, l.location_name asc
+	`, []any{tenantID, itemIDs}
+}
+
 func parseInventoryStatusFilters(r *http.Request) (q, stockStatus string, categoryID, locationID *int64, inStockOnly bool, errs map[string]string) {
 	q = strings.TrimSpace(r.URL.Query().Get("q"))
 	stockStatus = strings.TrimSpace(r.URL.Query().Get("status"))
@@ -254,25 +418,23 @@ func listInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		offset := httputil.Offset(p)
 		base, args := inventoryStatusSQL(tu.TenantID, qFilter, stockStatus, categoryID, locationID, inStockOnly)
 
-		// Matrix view: page by distinct item, then return all branch rows for those items
-		// so the UI can show one item row with horizontal branch columns (Ecount-style).
+		// Matrix view: page item masters (same catalog as /inventory/items), then expand
+		// every non-RMA branch with LEFT JOIN balances (zeros where never received).
 		if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("view")), "matrix") {
-			countQ := fmt.Sprintf("select count(*) from (select distinct item_id from (%s) d) c", base)
+			catalogFrom, catalogArgs := inventoryMatrixItemCatalogSQL(tu.TenantID, qFilter, stockStatus, categoryID, locationID, inStockOnly)
+			countQ := "select count(*) " + catalogFrom
 			var total int64
-			if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
+			if err := pool.QueryRow(r.Context(), countQ, catalogArgs...).Scan(&total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to count inventory status.", "ERR_INTERNAL")
 				return
 			}
-			itemArgs := append(append([]any{}, args...), p.PageSize, offset)
+			itemArgs := append(append([]any{}, catalogArgs...), p.PageSize, offset)
 			itemQ := fmt.Sprintf(`
-				select item_id from (
-				  select item_id, min(item_code) as item_code
-				  from (%s) d
-				  group by item_id
-				) x
-				order by item_code %s
+				select i.id
+				%s
+				order by i.item_code %s
 				limit $%d offset $%d`,
-				base, reports.OrderSQL(p.Order), len(itemArgs)-1, len(itemArgs))
+				catalogFrom, reports.OrderSQL(p.Order), len(itemArgs)-1, len(itemArgs))
 			itemRows, err := pool.Query(r.Context(), itemQ, itemArgs...)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load inventory status.", "ERR_INTERNAL")
@@ -298,13 +460,7 @@ func listInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 
-			// Expand: all non-RMA location balances for the page of items (ignore branch filter
-			// so columns stay comparable across branches).
-			expand, expandArgs := inventoryStatusSQL(tu.TenantID, "", "", nil, nil, false)
-			expandArgs = append(expandArgs, itemIDs)
-			expandQ := fmt.Sprintf(
-				"%s and item_id = any($%d) order by item_code asc, location_name asc",
-				expand, len(expandArgs))
+			expandQ, expandArgs := inventoryStatusMatrixExpandSQL(tu.TenantID, itemIDs)
 			rows, err := pool.Query(r.Context(), expandQ, expandArgs...)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load inventory status.", "ERR_INTERNAL")

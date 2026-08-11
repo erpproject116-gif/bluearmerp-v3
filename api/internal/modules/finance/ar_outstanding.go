@@ -23,7 +23,7 @@ func saleAppliedLateralSQL(salesAlias string) string {
 // saleReceiptApplied returns OR applications against a sales invoice.
 func saleReceiptApplied(ctx context.Context, q Querier, tenantID, salesID int64, excludeReceiptID *int64) (float64, error) {
 	sql := `
-		select coalesce(sum(a.applied_amount), 0)::float8
+		select coalesce(sum(a.applied_amount + coalesce(a.discount_amount, 0)), 0)::float8
 		from public.fin_receipt_applications a
 		join public.fin_official_receipts r on r.id = a.official_receipt_id
 		where a.sales_id = $1 and r.tenant_id = $2 and r.deleted_at is null`
@@ -128,7 +128,7 @@ func saleAppliedLateralSQLAsOf(salesAlias, asOfParam string) string {
 		left join lateral (
 		  select (
 		    coalesce((
-		      select sum(a.applied_amount)
+		      select sum(a.applied_amount + coalesce(a.discount_amount, 0))
 		      from public.fin_receipt_applications a
 		      join public.fin_official_receipts r on r.id = a.official_receipt_id
 		      where a.sales_id = %s.id and r.deleted_at is null%s

@@ -32,6 +32,8 @@ type ProcessPolicy = {
   sales_require_attachment: boolean;
   purchase_order_require_attachment: boolean;
   supplier_invoice_require_attachment: boolean;
+  ar_payment_discount_account_id?: number | null;
+  ap_payment_discount_account_id?: number | null;
 };
 
 type PolicyField = {
@@ -181,7 +183,7 @@ const SECTIONS: PolicySection[] = [
       {
         key: "accounts_auto_post_sales",
         label: "Auto-post sales invoice journal",
-        help: "When on, saving the sales Invoice tab posts the A/R journal entry immediately.",
+        help: "When on, saving a sale (or the Invoice tab) posts the A/R journal when Sales + A/R defaults are mapped.",
       },
       {
         key: "accounts_auto_post_purchase",
@@ -467,6 +469,50 @@ export default function ProcessPoliciesPage() {
                     {(opt) => <option value={opt.value}>{opt.label}</option>}
                   </For>
                 </select>
+              </section>
+
+              <section class="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div>
+                  <h2 class="text-sm font-semibold text-slate-900">Payment discount GL accounts</h2>
+                  <p class="mt-0.5 text-xs text-slate-500">
+                    Required before Discount Amount on New Receivable/Payable Payment. Use Chart of Accounts account ids
+                    (expense/income). Discounts will not post silently without these.
+                  </p>
+                </div>
+                <label class="block text-sm">
+                  <span class="font-medium text-slate-900">AR payment discount account id</span>
+                  <input
+                    type="number"
+                    class="mt-1 w-full max-w-xs rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50"
+                    value={p.ar_payment_discount_account_id ?? ""}
+                    disabled={!canManage()}
+                    placeholder="e.g. sales discount expense"
+                    onInput={(e) => {
+                      const v = e.currentTarget.value.trim();
+                      setPolicy({
+                        ...p,
+                        ar_payment_discount_account_id: v ? Number(v) : null,
+                      });
+                    }}
+                  />
+                </label>
+                <label class="block text-sm">
+                  <span class="font-medium text-slate-900">AP payment discount account id</span>
+                  <input
+                    type="number"
+                    class="mt-1 w-full max-w-xs rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50"
+                    value={p.ap_payment_discount_account_id ?? ""}
+                    disabled={!canManage()}
+                    placeholder="e.g. purchase discount income"
+                    onInput={(e) => {
+                      const v = e.currentTarget.value.trim();
+                      setPolicy({
+                        ...p,
+                        ap_payment_discount_account_id: v ? Number(v) : null,
+                      });
+                    }}
+                  />
+                </label>
               </section>
 
               <Show when={canManage()}>

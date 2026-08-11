@@ -62,3 +62,56 @@ func TestInventoryStatusSQLArgCount(t *testing.T) {
 		t.Fatalf("expected price columns in sql: %s", sql)
 	}
 }
+
+func TestInventoryMatrixItemCatalogSQL(t *testing.T) {
+	from, args := inventoryMatrixItemCatalogSQL(1, "", "", nil, nil, false)
+	if len(args) != 1 || args[0].(int64) != 1 {
+		t.Fatalf("tenant-only args: %v", args)
+	}
+	if !strings.Contains(from, "from public.inv_items i") {
+		t.Fatalf("expected item catalog from: %s", from)
+	}
+	if !strings.Contains(from, "i.status = 'active'") {
+		t.Fatalf("expected active item filter: %s", from)
+	}
+	if strings.Contains(from, "from public.inv_item_location_balances") {
+		t.Fatalf("default catalog should not join balances as a required source: %s", from)
+	}
+
+	cat := int64(3)
+	loc := int64(9)
+	from, args = inventoryMatrixItemCatalogSQL(1, "mouse", invStatusOutOfStock, &cat, &loc, true)
+	if len(args) != 4 {
+		t.Fatalf("want 4 args (tenant,q,cat,loc), got %d: %v", len(args), args)
+	}
+	if !strings.Contains(from, "<=") {
+		t.Fatalf("expected out_of_stock / zero-qty filter: %s", from)
+	}
+	if !strings.Contains(from, "bal.location_id") {
+		t.Fatalf("expected location scope on aggregates: %s", from)
+	}
+
+	from, args = inventoryMatrixItemCatalogSQL(1, "", invStatusInactiveItem, nil, nil, false)
+	if len(args) != 1 {
+		t.Fatalf("inactive catalog args: %v", args)
+	}
+	if !strings.Contains(from, "i.status = 'inactive'") {
+		t.Fatalf("expected inactive filter: %s", from)
+	}
+}
+
+func TestInventoryStatusMatrixExpandSQL(t *testing.T) {
+	sql, args := inventoryStatusMatrixExpandSQL(7, []int64{1, 2, 3})
+	if len(args) != 2 || args[0].(int64) != 7 {
+		t.Fatalf("bad expand args: %v", args)
+	}
+	if !strings.Contains(sql, "cross join public.inv_locations") {
+		t.Fatalf("expected item×location cross join: %s", sql)
+	}
+	if !strings.Contains(sql, "left join public.inv_item_location_balances") {
+		t.Fatalf("expected left join balances for zero fill: %s", sql)
+	}
+	if !strings.Contains(sql, "i.id = any($2)") {
+		t.Fatalf("expected item id filter: %s", sql)
+	}
+}
