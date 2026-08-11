@@ -23,13 +23,15 @@ const tiles: KpiTile[] = [
 ];
 
 const operationalLinks = [
-  { label: "Payment Receipts", href: "/app/finance/official-receipts" },
+  { label: "New Receivable Payment", href: "/app/finance/receivables" },
+  { label: "New Payable Payment", href: "/app/finance/payables" },
+  { label: "Official Receipts", href: "/app/finance/official-receipts" },
   { label: "Payment Vouchers", href: "/app/finance/payment-vouchers" },
+  { label: "Receivables hub", href: "/app/finance/collections" },
+  { label: "Payables hub", href: "/app/finance/disbursements" },
   { label: "Supplier Invoices", href: "/app/purchases/purchase-receive" },
   { label: "A/R by Customer", href: "/app/finance/reports/ar-by-customer" },
-  { label: "Customer/Vendor Book I (AR)", href: "/app/finance/reports/customer-vendor-book-ar" },
   { label: "A/P by Vendor", href: "/app/finance/reports/ap-by-vendor" },
-  { label: "Customer/Vendor Book I (AP)", href: "/app/finance/reports/customer-vendor-book-ap" },
   { label: "A/R Aging", href: "/app/finance/reports/ar-aging" },
   { label: "A/P Aging", href: "/app/finance/reports/ap-aging" },
 ];
@@ -45,13 +47,38 @@ export default function FinanceWorkspacePage() {
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-2 text-sm text-text-secondary">
-          BluearmERP accounting lives under <strong class="font-medium text-text-primary">Accounting</strong> in the
-          sidebar: <strong class="font-medium text-text-primary">Bookkeeping</strong> for GL and journals;{" "}
-          <strong class="font-medium text-text-primary">Collections</strong> for customer receipts;{" "}
-          <strong class="font-medium text-text-primary">Disbursements</strong> for vendor payments; Banking for cash
-          accounts.
+          Collect and pay from open balances under{" "}
+          <strong class="font-medium text-text-primary">Accounting</strong>: use{" "}
+          <strong class="font-medium text-text-primary">New Receivable Payment</strong> and{" "}
+          <strong class="font-medium text-text-primary">New Payable Payment</strong>. Bookkeeping covers GL and
+          journals; Banking covers cash accounts.
         </p>
       </section>
+
+      <Show when={showAcctII()}>
+        <section class="grid gap-4 sm:grid-cols-2">
+          <A
+            href="/app/finance/receivables"
+            class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Collect from customers</p>
+            <h2 class="mt-1 text-lg font-semibold text-text-primary">New Receivable Payment</h2>
+            <p class="mt-2 text-sm text-text-secondary">
+              Open A/R balances → enter Decrease Amount → apply as Official Receipt.
+            </p>
+          </A>
+          <A
+            href="/app/finance/payables"
+            class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Pay vendors</p>
+            <h2 class="mt-1 text-lg font-semibold text-text-primary">New Payable Payment</h2>
+            <p class="mt-2 text-sm text-text-secondary">
+              Open A/P balances → enter Decrease Amount → apply as Payment Voucher.
+            </p>
+          </A>
+        </section>
+      </Show>
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <For each={tiles}>

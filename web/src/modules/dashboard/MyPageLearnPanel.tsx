@@ -29,15 +29,19 @@ export const LEARN_GROUPS: LearnGroup[] = [
     links: [
       { label: "New sales", href: "/app/sales/sales/new", ready: true },
       { label: "Purchase Invoice", href: "/app/purchases/purchase-receive/new", ready: true },
-      { label: "Cash In — From Customer", href: "/app/finance/official-receipts", ready: true },
-      { label: "Cash Out — To Vendor", href: "/app/finance/payment-vouchers", ready: true },
+      { label: "New Receivable Payment", href: "/app/finance/receivables", ready: true },
+      { label: "New Payable Payment", href: "/app/finance/payables", ready: true },
+      { label: "Official Receipts (list)", href: "/app/finance/official-receipts", ready: true },
+      { label: "Payment Vouchers (list)", href: "/app/finance/payment-vouchers", ready: true },
     ],
   },
   {
     title: "View accounting & collections",
     links: [
-      { label: "Collections (AR)", href: "/app/finance/collections", ready: true },
-      { label: "Disbursements (AP)", href: "/app/finance/disbursements", ready: true },
+      { label: "New Receivable Payment", href: "/app/finance/receivables", ready: true },
+      { label: "New Payable Payment", href: "/app/finance/payables", ready: true },
+      { label: "Receivables hub", href: "/app/finance/collections", ready: true },
+      { label: "Payables hub", href: "/app/finance/disbursements", ready: true },
       { label: "Journal entries", href: "/app/finance/acct-i/journal-entries", ready: true },
     ],
   },

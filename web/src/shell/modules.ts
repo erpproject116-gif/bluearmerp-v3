@@ -215,6 +215,13 @@ export const appModules: AppModule[] = [
     basePath: "/app/sales",
     features: [
       { label: "Sales List", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
+      {
+        label: "New Receivable Payment",
+        href: "/app/finance/receivables",
+        settingsHref: "/app/finance/official-receipts/settings",
+        featureCode: "finance.acct_ii",
+        headerPriority: "primary",
+      },
       { label: "Retainer Invoices", href: "/app/sales/retainer-invoices", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
       { label: "Recurring Invoices", href: "/app/sales/recurring-invoices", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
       { label: "Credit Notes", href: "/app/sales/credit-notes", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
@@ -324,6 +331,13 @@ export const appModules: AppModule[] = [
     basePath: "/app/purchases",
     features: [
       { label: "Purchase Receive", href: "/app/purchases/purchase-receive", settingsHref: "/app/purchases/purchase-receive/settings", headerPriority: "primary" },
+      {
+        label: "New Payable Payment",
+        href: "/app/finance/payables",
+        settingsHref: "/app/finance/official-receipts/settings",
+        featureCode: "finance.acct_ii",
+        headerPriority: "primary",
+      },
       { label: "Receive Status", href: "/app/purchases/purchase-receive/status", settingsHref: "/app/purchases/purchase-receive/settings" },
       { label: "Expenses", href: "/app/purchases/expenses", settingsHref: "/app/purchases/expenses", featureCode: "finance.expenses", headerPriority: "primary" },
       { label: "Recurring Expenses", href: "/app/purchases/recurring-expenses", settingsHref: "/app/purchases/recurring-expenses", featureCode: "finance.recurring_expenses", headerPriority: "primary" },
@@ -495,6 +509,20 @@ export const appModules: AppModule[] = [
     basePath: "/app/finance",
     features: [
       { label: "Workspace", href: "/app/finance", settingsHref: "/app/finance/official-receipts/settings", headerPriority: "primary" },
+      {
+        label: "New Receivable Payment",
+        href: "/app/finance/receivables",
+        settingsHref: "/app/finance/official-receipts/settings",
+        featureCode: "finance.acct_ii",
+        headerPriority: "primary",
+      },
+      {
+        label: "New Payable Payment",
+        href: "/app/finance/payables",
+        settingsHref: "/app/finance/official-receipts/settings",
+        featureCode: "finance.acct_ii",
+        headerPriority: "primary",
+      },
       { label: "Banking", href: "/app/finance/banking", settingsHref: "/app/finance/banking", headerPriority: "primary" },
       { label: "Reports", href: "/app/finance/reports", settingsHref: "/app/finance/official-receipts/settings", headerPriority: "primary" },
       { label: "Receipts", href: "/app/finance/official-receipts", settingsHref: "/app/finance/official-receipts/settings" },
