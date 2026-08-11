@@ -1,4 +1,4 @@
-import { createSignal, For, onMount, Show, createResource } from "solid-js";
+import { createMemo, createSignal, For, onMount, onCleanup, Show, createResource } from "solid-js";
 import { A, useSearchParams } from "@solidjs/router";
 import { ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
@@ -16,7 +16,7 @@ import { StocksHowItFits } from "../StocksHowItFits";
 import { FindStockUnitsModal, type FindStockUnitsTarget } from "./FindStockUnitsModal";
 
 type CategoryOpt = { id: number; name: string };
-type LocationOpt = { id: number; location_name: string };
+type LocationOpt = { id: number; location_name: string; is_rma?: boolean };
 
 const STOCK_STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -27,39 +27,48 @@ const STOCK_STATUS_OPTIONS = [
   { value: "inactive_item", label: "Inactive item" },
 ];
 
-function statusLabel(code: string) {
-  return STOCK_STATUS_OPTIONS.find((o) => o.value === code)?.label ?? code.replaceAll("_", " ");
-}
+type BranchCol = { id: number; name: string };
+
+type MatrixCell = {
+  location_id: number;
+  qty_on_hand: number;
+  available_qty: number;
+  serial_unit_count: number;
+  track_serial: boolean;
+};
+
+type MatrixItem = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  category_name: string;
+  unit_code: string;
+  purchase_price: number;
+  vip_price: number;
+  sales_price: number;
+  track_serial: boolean;
+  total_on_hand: number;
+  byLocation: Map<number, MatrixCell>;
+};
 
 function defaultFilters(): InventoryStatusFilters {
-  return {};
+  return { view: "matrix" };
 }
 
-function ledgerHref(r: InventoryStatusRow) {
+function itemHref(code: string) {
+  return `/app/inventory/items?q=${encodeURIComponent(code)}`;
+}
+
+function ledgerHref(itemId: number, locationId: number) {
   const qs = new URLSearchParams({
-    item_id: String(r.item_id),
-    location_id: String(r.location_id),
+    item_id: String(itemId),
+    location_id: String(locationId),
   });
   return `/app/inventory/reports/stock-ledger?${qs}`;
 }
 
-function itemHref(r: InventoryStatusRow) {
-  return `/app/inventory/items?q=${encodeURIComponent(r.item_code)}`;
-}
-
-function unitsTarget(r: InventoryStatusRow, kind: "serials" | "lots"): FindStockUnitsTarget {
-  return {
-    kind,
-    item_id: r.item_id,
-    item_code: r.item_code,
-    item_name: r.item_name,
-    location_id: r.location_id,
-    branch_name: r.branch_name,
-  };
-}
-
 function normalizeFilters(raw: InventoryStatusFilters): InventoryStatusFilters {
-  const next: InventoryStatusFilters = { ...raw };
+  const next: InventoryStatusFilters = { ...raw, view: "matrix" };
   if (!next.q) delete next.q;
   if (!next.status) delete next.status;
   if (!next.category_id) delete next.category_id;
@@ -73,7 +82,7 @@ function filtersFromSearchParams(params: Record<string, string | string[] | unde
     const v = params[key];
     return typeof v === "string" ? v.trim() : "";
   };
-  const out: InventoryStatusFilters = {};
+  const out: InventoryStatusFilters = { view: "matrix" };
   const q = one("q");
   if (q) out.q = q;
   const status = one("status");
@@ -88,12 +97,41 @@ function filtersFromSearchParams(params: Record<string, string | string[] | unde
 }
 
 function fmtQty(n: number) {
-  return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "—";
+  return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "";
 }
 
-function fmtCount(n: number | undefined) {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+function pivotRows(rows: InventoryStatusRow[]): MatrixItem[] {
+  const order: number[] = [];
+  const map = new Map<number, MatrixItem>();
+  for (const r of rows) {
+    let item = map.get(r.item_id);
+    if (!item) {
+      item = {
+        item_id: r.item_id,
+        item_code: r.item_code,
+        item_name: r.item_name,
+        category_name: r.category_name ?? "",
+        unit_code: r.unit_code ?? "",
+        purchase_price: r.purchase_price ?? 0,
+        vip_price: r.vip_price ?? 0,
+        sales_price: r.sales_price ?? 0,
+        track_serial: Boolean(r.track_serial),
+        total_on_hand: 0,
+        byLocation: new Map(),
+      };
+      map.set(r.item_id, item);
+      order.push(r.item_id);
+    }
+    item.total_on_hand += r.qty_on_hand;
+    item.byLocation.set(r.location_id, {
+      location_id: r.location_id,
+      qty_on_hand: r.qty_on_hand,
+      available_qty: r.available_qty,
+      serial_unit_count: r.serial_unit_count ?? 0,
+      track_serial: Boolean(r.track_serial),
+    });
+  }
+  return order.map((id) => map.get(id)!);
 }
 
 export default function InventoryStatusReportPage() {
@@ -104,6 +142,7 @@ export default function InventoryStatusReportPage() {
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [unitsTargetRow, setUnitsTargetRow] = createSignal<FindStockUnitsTarget | null>(null);
   const pageSize = 50;
+  let qDebounce: ReturnType<typeof setTimeout> | undefined;
 
   const [categories] = createResource(async () => {
     const res = await apiFetch<CategoryOpt[]>("/api/v1/inventory/item-categories");
@@ -123,40 +162,86 @@ export default function InventoryStatusReportPage() {
     enabled: true,
   }));
 
-  const search = () => {
-    const next = normalizeFilters(draft());
-    setSubmitted(next);
-    setPage(1);
+  const applySubmitted = (next: InventoryStatusFilters, resetPage = true) => {
+    setSubmitted(normalizeFilters(next));
+    if (resetPage) setPage(1);
     setGeneratedAt(new Date());
+  };
+
+  const search = () => applySubmitted(draft());
+
+  const patchLive = (p: Partial<InventoryStatusFilters>) => {
+    setDraft((prev) => {
+      const next = { ...prev, ...p };
+      applySubmitted(next);
+      return next;
+    });
+  };
+
+  const patchQ = (q: string) => {
+    setDraft((prev) => ({ ...prev, q }));
+    if (qDebounce) clearTimeout(qDebounce);
+    qDebounce = setTimeout(() => {
+      applySubmitted({ ...draft(), q });
+    }, 300);
   };
 
   onMount(() => {
     const fromUrl = filtersFromSearchParams(searchParams);
-    if (Object.keys(fromUrl).length > 0) {
+    if (Object.keys(fromUrl).some((k) => k !== "view")) {
       setDraft(fromUrl);
-      setSubmitted(normalizeFilters(fromUrl));
-      setGeneratedAt(new Date());
+      applySubmitted(fromUrl, false);
     } else {
       search();
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
         e.preventDefault();
+        if (qDebounce) clearTimeout(qDebounce);
         search();
       }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    onCleanup(() => {
+      window.removeEventListener("keydown", onKey);
+      if (qDebounce) clearTimeout(qDebounce);
+    });
   });
 
-  const patch = (p: Partial<InventoryStatusFilters>) => setDraft((prev) => ({ ...prev, ...p }));
+  const matrixItems = createMemo(() => pivotRows(report.data?.rows ?? []));
+
+  /** Always show every non-RMA branch as a column so stock is comparable side-by-side. */
+  const branchCols = createMemo((): BranchCol[] => {
+    const locs = (locations() ?? []).filter((l) => !l.is_rma);
+    const fromMaster = locs.map((l) => ({ id: l.id, name: l.location_name }));
+    if (fromMaster.length > 0) return fromMaster;
+    const seen = new Map<number, string>();
+    for (const r of report.data?.rows ?? []) {
+      if (!seen.has(r.location_id)) seen.set(r.location_id, r.branch_name || r.location_name);
+    }
+    return [...seen.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
   const filters = () => submitted();
+
+  const openSerials = (item: MatrixItem, locId: number, locName: string) => {
+    setUnitsTargetRow({
+      kind: "serials",
+      item_id: item.item_id,
+      item_code: item.item_code,
+      item_name: item.item_name,
+      location_id: locId,
+      branch_name: locName,
+    });
+  };
 
   return (
     <ReportPageLayout
       title="Inv Per Branch"
-      description="On-hand qty by item and location, plus a serial count when units are tracked. Serial units also appear under Serials; this screen shows location qty + serial count after Confirm on Purchase Receive (or Bill auto-receive / Stock Entry / Sales). Search (F8)."
+      description="One row per item with on-hand qty across branches (Ecount-style). Branch filter limits which items appear; columns still show every branch so you can compare. Filters apply live; F8 refreshes."
       showDateFilters={false}
       submitted={true}
       loading={report.isFetching}
@@ -166,10 +251,10 @@ export default function InventoryStatusReportPage() {
       onPageChange={setPage}
       onSearch={search}
       onReset={() => {
+        if (qDebounce) clearTimeout(qDebounce);
         setDraft(defaultFilters());
         setPage(1);
-        // Re-run immediately so Reset does not leave a blank results panel.
-        setSubmitted({});
+        setSubmitted(defaultFilters());
         setGeneratedAt(new Date());
       }}
       onExportCsv={() => void downloadReportCsv(inventoryStatusExportUrl(filters()), "find-stock.csv")}
@@ -181,19 +266,21 @@ export default function InventoryStatusReportPage() {
                 class={inputClass}
                 placeholder="Item code or name…"
                 value={draft().q ?? ""}
-                onInput={(e) => patch({ q: e.currentTarget.value })}
+                onInput={(e) => patchQ(e.currentTarget.value)}
               />
             </Field>
-            <Field label="Branch">
+            <Field label="Branch (item filter)">
               <select
                 class={inputClass}
                 value={draft().location_id ?? ""}
                 onChange={(e) =>
-                  patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
+                  patchLive({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
                 }
               >
                 <option value="">All branches</option>
-                <For each={locations() ?? []}>{(l) => <option value={l.id}>{l.location_name}</option>}</For>
+                <For each={(locations() ?? []).filter((l) => !l.is_rma)}>
+                  {(l) => <option value={l.id}>{l.location_name}</option>}
+                </For>
               </select>
             </Field>
             <Field label="Category">
@@ -201,7 +288,7 @@ export default function InventoryStatusReportPage() {
                 class={inputClass}
                 value={draft().category_id ?? ""}
                 onChange={(e) =>
-                  patch({ category_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
+                  patchLive({ category_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
                 }
               >
                 <option value="">All categories</option>
@@ -212,7 +299,7 @@ export default function InventoryStatusReportPage() {
               <select
                 class={inputClass}
                 value={draft().status ?? ""}
-                onChange={(e) => patch({ status: e.currentTarget.value || undefined })}
+                onChange={(e) => patchLive({ status: e.currentTarget.value || undefined })}
               >
                 <For each={STOCK_STATUS_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
               </select>
@@ -222,21 +309,21 @@ export default function InventoryStatusReportPage() {
             <input
               type="checkbox"
               checked={Boolean(draft().in_stock_only)}
-              onChange={(e) => patch({ in_stock_only: e.currentTarget.checked ? 1 : undefined })}
+              onChange={(e) => patchLive({ in_stock_only: e.currentTarget.checked ? 1 : undefined })}
             />
-            In stock only (available &gt; 0)
+            In stock only (available &gt; 0 at filtered / any branch)
           </label>
         </div>
       }
     >
       <StocksHowItFits class="mb-4" />
       <FindStockUnitsModal target={unitsTargetRow()} onClose={() => setUnitsTargetRow(null)} />
-      <Show when={(report.data?.rows.length ?? 0) === 0 && !report.isFetching}>
+      <Show when={matrixItems().length === 0 && !report.isFetching}>
         <ReportEmptyMessage
           message={
-            Object.keys(normalizeFilters(filters())).length === 0
-              ? "No stock balances yet. Create qty-tracked items, then Bill (auto-receive), Purchase Receive, or Stock Entry. Bills do not edit BOM recipes — only on-hand qty."
-              : "No stock matches these filters — try All branches or clear filters, then Search."
+            Object.keys(normalizeFilters(filters())).filter((k) => k !== "view").length === 0
+              ? "No stock balances yet. Create qty-tracked items, then Bill (auto-receive), Purchase Receive, or Stock Entry."
+              : "No stock matches these filters — try All branches or clear filters."
           }
         />
         <p class="mt-3 text-center text-sm">
@@ -249,93 +336,79 @@ export default function InventoryStatusReportPage() {
           </A>
         </p>
       </Show>
-      <Show when={(report.data?.rows.length ?? 0) > 0}>
+      <Show when={matrixItems().length > 0}>
         <div class="overflow-x-auto">
           <table class="erp-grid min-w-full text-left text-sm">
-            <thead class="sticky top-0 bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+            <thead class="sticky top-0 z-10 bg-brand-50 text-xs font-semibold uppercase text-brand-700">
               <tr>
-                <th class="px-3 py-2">Item</th>
-                <th class="px-3 py-2">Unit</th>
-                <th class="px-3 py-2">Branch</th>
-                <th class="px-3 py-2 text-right">On hand</th>
-                <th class="px-3 py-2 text-right">Reserved</th>
-                <th class="px-3 py-2 text-right">Available</th>
-                <th class="px-3 py-2 text-right">Serials</th>
-                <th class="px-3 py-2 text-right">Lots</th>
-                <th class="px-3 py-2 text-right">Sales price</th>
-                <th class="px-3 py-2 text-right">Company avail.</th>
-                <th class="px-3 py-2">Status</th>
-                <th class="px-3 py-2">Actions</th>
+                <th class="sticky left-0 z-20 min-w-[7.5rem] bg-brand-50 px-3 py-2">Item code</th>
+                <th class="sticky left-[7.5rem] z-20 min-w-[12rem] bg-brand-50 px-3 py-2">Item name</th>
+                <th class="px-3 py-2">Spec.</th>
+                <th class="px-3 py-2 text-right">Purchase</th>
+                <th class="px-3 py-2 text-right">VIP</th>
+                <th class="px-3 py-2 text-right">Sales</th>
+                <th class="px-3 py-2 text-right">Total</th>
+                <For each={branchCols()}>{(b) => <th class="px-3 py-2 text-right whitespace-nowrap">{b.name}</th>}</For>
               </tr>
             </thead>
             <tbody>
-              <For each={report.data?.rows ?? []}>
-                {(r) => {
-                  const muted = r.available_qty <= 0;
-                  const otherBranches = r.available_qty <= 0 && r.company_available_qty > 0;
+              <For each={matrixItems()}>
+                {(item) => {
+                  const negTotal = item.total_on_hand < -0.0001;
                   return (
-                    <tr class={`border-t border-stroke/60 ${muted ? "text-text-secondary" : ""}`}>
-                      <td class="px-3 py-2">
-                        <div class="font-medium text-text-primary">{r.item_code}</div>
-                        <div class="text-xs text-text-secondary">{r.item_name}</div>
-                        <Show when={r.category_name}>
-                          <div class="text-[11px] text-text-secondary">{r.category_name}</div>
+                    <tr class={`border-t border-stroke/60 ${negTotal ? "bg-red-50" : ""}`}>
+                      <td class="sticky left-0 z-[1] bg-inherit px-3 py-2 font-medium tabular-nums">{item.item_code}</td>
+                      <td class="sticky left-[7.5rem] z-[1] bg-inherit px-3 py-2">
+                        <A href={itemHref(item.item_code)} class="text-brand-700 hover:underline">
+                          {item.item_name}
+                        </A>
+                        <Show when={item.unit_code}>
+                          <div class="text-[11px] text-text-secondary">{item.unit_code}</div>
                         </Show>
                       </td>
-                      <td class="px-3 py-2">{r.unit_code || "—"}</td>
-                      <td class="px-3 py-2">{r.branch_name}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">
-                        <div class="inline-flex items-center justify-end gap-1.5">
-                          <span>{fmtQty(r.qty_on_hand)}</span>
-                          <Show when={r.track_serial && (r.serial_unit_count ?? 0) > 0}>
-                            <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
-                              {fmtCount(r.serial_unit_count)} sn
-                            </span>
-                          </Show>
-                        </div>
+                      <td class="px-3 py-2 text-text-secondary">{item.category_name || "—"}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">{formatMoney(item.purchase_price)}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">{formatMoney(item.vip_price)}</td>
+                      <td class="px-3 py-2 text-right tabular-nums">{formatMoney(item.sales_price)}</td>
+                      <td
+                        class={`px-3 py-2 text-right tabular-nums font-medium ${negTotal ? "text-red-700" : ""}`}
+                      >
+                        {fmtQty(item.total_on_hand)}
                       </td>
-                      <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.qty_reserved)}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">
-                        <div>{fmtQty(r.available_qty)}</div>
-                        <Show when={otherBranches}>
-                          <div class="text-[11px] text-amber-700">Other branches</div>
-                        </Show>
-                      </td>
-                      <td class="px-3 py-2 text-right tabular-nums">
-                        <Show when={r.track_serial} fallback={<span class="text-text-secondary">—</span>}>
-                          <button
-                            type="button"
-                            class="text-brand-600 hover:underline"
-                            onClick={() => setUnitsTargetRow(unitsTarget(r, "serials"))}
-                          >
-                            {fmtCount(r.serial_unit_count)}
-                          </button>
-                        </Show>
-                      </td>
-                      <td class="px-3 py-2 text-right tabular-nums">
-                        <Show when={r.track_lot} fallback={<span class="text-text-secondary">—</span>}>
-                          <button
-                            type="button"
-                            class="text-brand-600 hover:underline"
-                            onClick={() => setUnitsTargetRow(unitsTarget(r, "lots"))}
-                          >
-                            {fmtCount(r.lot_batch_count)}
-                          </button>
-                        </Show>
-                      </td>
-                      <td class="px-3 py-2 text-right tabular-nums">{formatMoney(r.sales_price)}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{fmtQty(r.company_available_qty)}</td>
-                      <td class="px-3 py-2">{statusLabel(r.stock_status)}</td>
-                      <td class="px-3 py-2">
-                        <div class="flex flex-col gap-0.5 text-xs">
-                          <A href={itemHref(r)} class="text-brand-600 hover:underline">
-                            Open item
-                          </A>
-                          <A href={ledgerHref(r)} class="text-brand-600 hover:underline">
-                            Movements
-                          </A>
-                        </div>
-                      </td>
+                      <For each={branchCols()}>
+                        {(b) => {
+                          const cell = item.byLocation.get(b.id);
+                          const qty = cell?.qty_on_hand;
+                          const empty = qty == null || Math.abs(qty) < 0.0000001;
+                          const neg = (qty ?? 0) < -0.0001;
+                          return (
+                            <td
+                              class={`px-3 py-2 text-right tabular-nums ${neg ? "bg-red-50 text-red-700" : ""}`}
+                            >
+                              <Show when={!empty} fallback={<span class="text-text-secondary"> </span>}>
+                                <div class="inline-flex items-center justify-end gap-1">
+                                  <A
+                                    href={ledgerHref(item.item_id, b.id)}
+                                    class="hover:underline"
+                                    title={`Movements — ${b.name}`}
+                                  >
+                                    {fmtQty(qty!)}
+                                  </A>
+                                  <Show when={cell?.track_serial && (cell?.serial_unit_count ?? 0) > 0}>
+                                    <button
+                                      type="button"
+                                      class="rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium text-slate-700"
+                                      onClick={() => openSerials(item, b.id, b.name)}
+                                    >
+                                      {cell!.serial_unit_count} sn
+                                    </button>
+                                  </Show>
+                                </div>
+                              </Show>
+                            </td>
+                          );
+                        }}
+                      </For>
                     </tr>
                   );
                 }}

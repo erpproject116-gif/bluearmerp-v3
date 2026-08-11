@@ -307,8 +307,32 @@ type UnitQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
+// eachLikeUnitCodes are treated as equivalent "each" units (factor 1) when no
+// explicit inv_unit_conversions row exists. Real pack units (box, dozen, kg)
+// stay fail-closed.
+var eachLikeUnitCodes = map[string]struct{}{
+	"ea": {}, "pc": {}, "pcs": {}, "piece": {},
+}
+
+// NormalizeUnitCode trims and lowercases a unit code for comparisons.
+func NormalizeUnitCode(code string) string {
+	return strings.ToLower(strings.TrimSpace(code))
+}
+
+// IsEachLikeCode reports whether a unit code is an "each"-class synonym.
+func IsEachLikeCode(code string) bool {
+	_, ok := eachLikeUnitCodes[NormalizeUnitCode(code)]
+	return ok
+}
+
+// UnitsAreEachLike reports whether both codes are each-class synonyms.
+func UnitsAreEachLike(codeA, codeB string) bool {
+	return IsEachLikeCode(codeA) && IsEachLikeCode(codeB)
+}
+
 // ConvertQty converts qty from fromUnitID to toUnitID for the tenant.
 // Same unit => 1. Uses direct conversion or inverse (1/factor).
+// Each-like code pairs (ea/pc/pcs/piece) convert 1:1 when no conversion row exists.
 func ConvertQty(ctx context.Context, q UnitQuerier, tenantID, fromUnitID, toUnitID int64, qty float64) (float64, error) {
 	if fromUnitID <= 0 || toUnitID <= 0 {
 		return 0, fmt.Errorf("unit is required for conversion")
@@ -335,6 +359,9 @@ func ConvertQty(ctx context.Context, q UnitQuerier, tenantID, fromUnitID, toUnit
 		var fromCode, toCode string
 		_ = q.QueryRow(ctx, `select code from public.inv_units where id=$1`, fromUnitID).Scan(&fromCode)
 		_ = q.QueryRow(ctx, `select code from public.inv_units where id=$1`, toUnitID).Scan(&toCode)
+		if UnitsAreEachLike(fromCode, toCode) {
+			return qty, nil
+		}
 		return 0, fmt.Errorf("add conversion %s→%s (or reverse) under Inventory → Units", fromCode, toCode)
 	}
 	if err != nil {
@@ -344,6 +371,52 @@ func ConvertQty(ctx context.Context, q UnitQuerier, tenantID, fromUnitID, toUnit
 		return 0, fmt.Errorf("invalid conversion factor")
 	}
 	return qty / factor, nil
+}
+
+// RequireItemBaseUnit returns the item's base unit id/code, or a validation-friendly error
+// when the item has no base_unit_id. Callers should use this on buy/stock document lines
+// instead of silently storing null units.
+func RequireItemBaseUnit(ctx context.Context, q UnitQuerier, tenantID, itemID int64) (unitID int64, code string, err error) {
+	unitID, code, err = ItemBaseUnit(ctx, q, tenantID, itemID)
+	if err != nil {
+		return 0, "", fmt.Errorf("item base unit lookup failed")
+	}
+	if unitID <= 0 {
+		return 0, "", fmt.Errorf("Set a base unit on the item under Inventory → Items")
+	}
+	return unitID, code, nil
+}
+
+// PreferStockLineUnit resolves a document line unit for stock-posting buy docs.
+// Null or each-like-vs-base lines are coerced to the item base unit. Real alternate
+// units (e.g. box) are kept when a conversion exists; otherwise an error is returned
+// so save fails before stock post.
+func PreferStockLineUnit(ctx context.Context, q UnitQuerier, tenantID int64, itemID *int64, unitID *int64, unitCode string) (*int64, *string, error) {
+	resolvedID, resolvedCode := ResolveLineUnit(ctx, q, tenantID, itemID, unitID, unitCode)
+	if itemID == nil || *itemID <= 0 {
+		return resolvedID, resolvedCode, nil
+	}
+	baseID, baseCode, err := RequireItemBaseUnit(ctx, q, tenantID, *itemID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if resolvedID == nil || *resolvedID <= 0 {
+		return &baseID, &baseCode, nil
+	}
+	if *resolvedID == baseID {
+		return &baseID, &baseCode, nil
+	}
+	lineCode := ""
+	if resolvedCode != nil {
+		lineCode = *resolvedCode
+	}
+	if UnitsAreEachLike(lineCode, baseCode) {
+		return &baseID, &baseCode, nil
+	}
+	if _, err := ConvertQty(ctx, q, tenantID, *resolvedID, baseID, 1); err != nil {
+		return nil, nil, err
+	}
+	return resolvedID, resolvedCode, nil
 }
 
 // ResolveLineUnit normalizes the unit captured on a document line.

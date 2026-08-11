@@ -425,6 +425,8 @@ export function SupplierInvoiceModal(props: Props) {
       item_name: row.item_name,
       qty: String(row.balance_qty),
       unit_price: String(row.unit_vat_inc),
+      unit_id: row.unit_id ?? row.base_unit_id ?? null,
+      unit_code: row.unit_code || row.base_unit_code || "",
       goods_receipt_line_id: row.goods_receipt_line_id,
     }));
     const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...newLines].map((ln, i) => ({ ...ln, line_no: i + 1 }));
@@ -492,6 +494,8 @@ export function SupplierInvoiceModal(props: Props) {
       item_name: row.item_name,
       qty: String(row.balance_qty),
       unit_price: String(row.unit_vat_inc),
+      unit_id: row.unit_id ?? row.base_unit_id ?? null,
+      unit_code: row.unit_code || row.base_unit_code || "",
       purchase_order_line_id: row.purchase_order_line_id,
       track_serial: row.track_serial,
       warranty_duration_months: row.warranty_duration_months ?? 0,

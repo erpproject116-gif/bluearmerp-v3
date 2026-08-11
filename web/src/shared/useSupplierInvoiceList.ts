@@ -90,6 +90,10 @@ export type OpenGRLine = {
   item_code: string;
   item_name: string;
   balance_qty: number;
+  unit_id?: number | null;
+  unit_code?: string | null;
+  base_unit_id?: number | null;
+  base_unit_code?: string | null;
   unit_non_vat: number;
   unit_vat_inc: number;
 };
@@ -108,6 +112,10 @@ export type OpenPOLine = {
   ordered_qty: number;
   billed_qty: number;
   balance_qty: number;
+  unit_id?: number | null;
+  unit_code?: string | null;
+  base_unit_id?: number | null;
+  base_unit_code?: string | null;
   unit_non_vat: number;
   unit_vat_inc: number;
   track_serial?: boolean;

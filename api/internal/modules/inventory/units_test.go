@@ -71,7 +71,16 @@ func newFakeUnitDB() *fakeUnitDB {
 		// 1 box = 12 ea.
 		conversions:  map[[2]int64]float64{{2, 1}: 12},
 		itemBaseUnit: map[int64]int64{100: 1, 200: 0},
-		codes:        map[int64]string{1: "ea", 2: "box"},
+		codes:        map[int64]string{1: "ea", 2: "box", 3: "pc", 4: "dozen"},
+	}
+}
+
+func TestUnitsAreEachLike(t *testing.T) {
+	if !UnitsAreEachLike("EA", "pc") || !UnitsAreEachLike("pcs", "piece") {
+		t.Fatal("expected each-like synonyms to match")
+	}
+	if UnitsAreEachLike("ea", "box") || UnitsAreEachLike("kg", "pc") {
+		t.Fatal("non-each pairs must not match")
 	}
 }
 
@@ -88,8 +97,14 @@ func TestConvertQty(t *testing.T) {
 	if got, err := ConvertQty(ctx, db, 1, 1, 2, 24); err != nil || got != 2 {
 		t.Fatalf("ea->box via inverse: got %v, err %v", got, err)
 	}
-	if _, err := ConvertQty(ctx, db, 1, 3, 1, 1); err == nil {
-		t.Fatal("missing conversion should fail closed")
+	if got, err := ConvertQty(ctx, db, 1, 3, 1, 7); err != nil || got != 7 {
+		t.Fatalf("pc->ea each-like: got %v, err %v", got, err)
+	}
+	if got, err := ConvertQty(ctx, db, 1, 1, 3, 4); err != nil || got != 4 {
+		t.Fatalf("ea->pc each-like: got %v, err %v", got, err)
+	}
+	if _, err := ConvertQty(ctx, db, 1, 4, 1, 1); err == nil {
+		t.Fatal("dozen->ea without conversion should fail closed")
 	}
 	if _, err := ConvertQty(ctx, db, 1, 0, 1, 1); err == nil {
 		t.Fatal("missing unit should fail closed")
@@ -101,6 +116,7 @@ func TestBaseQtyForLine(t *testing.T) {
 	db := newFakeUnitDB()
 	boxUnit := int64(2)
 	eaUnit := int64(1)
+	pcUnit := int64(3)
 	unknownUnit := int64(9)
 
 	if got, err := BaseQtyForLine(ctx, db, 1, 100, nil, 7); err != nil || got != 7 {
@@ -108,6 +124,9 @@ func TestBaseQtyForLine(t *testing.T) {
 	}
 	if got, err := BaseQtyForLine(ctx, db, 1, 100, &eaUnit, 7); err != nil || got != 7 {
 		t.Fatalf("line unit equals base unit: got %v, err %v", got, err)
+	}
+	if got, err := BaseQtyForLine(ctx, db, 1, 100, &pcUnit, 5); err != nil || got != 5 {
+		t.Fatalf("pc line on ea item: got %v, err %v", got, err)
 	}
 	if got, err := BaseQtyForLine(ctx, db, 1, 100, &boxUnit, 2); err != nil || got != 24 {
 		t.Fatalf("box line on ea item: got %v, err %v", got, err)
@@ -117,5 +136,45 @@ func TestBaseQtyForLine(t *testing.T) {
 	}
 	if _, err := BaseQtyForLine(ctx, db, 1, 200, &boxUnit, 2); err == nil {
 		t.Fatal("item without base unit should fail closed")
+	}
+}
+
+func TestPreferStockLineUnit(t *testing.T) {
+	ctx := context.Background()
+	db := newFakeUnitDB()
+	itemID := int64(100)
+	pcUnit := int64(3)
+	boxUnit := int64(2)
+	dozenUnit := int64(4)
+
+	id, code, err := PreferStockLineUnit(ctx, db, 1, &itemID, &pcUnit, "pc")
+	if err != nil || id == nil || *id != 1 || code == nil || *code != "ea" {
+		t.Fatalf("pc should coerce to ea: id=%v code=%v err=%v", id, code, err)
+	}
+	id, code, err = PreferStockLineUnit(ctx, db, 1, &itemID, nil, "")
+	if err != nil || id == nil || *id != 1 || code == nil || *code != "ea" {
+		t.Fatalf("null unit should use base: id=%v code=%v err=%v", id, code, err)
+	}
+	id, code, err = PreferStockLineUnit(ctx, db, 1, &itemID, &boxUnit, "box")
+	if err != nil || id == nil || *id != 2 {
+		t.Fatalf("box with conversion should keep: id=%v code=%v err=%v", id, code, err)
+	}
+	if _, _, err = PreferStockLineUnit(ctx, db, 1, &itemID, &dozenUnit, "dozen"); err == nil {
+		t.Fatal("dozen without conversion should fail at save")
+	}
+	noBase := int64(200)
+	if _, _, err = PreferStockLineUnit(ctx, db, 1, &noBase, nil, ""); err == nil {
+		t.Fatal("item without base unit should fail")
+	}
+}
+
+func TestRequireItemBaseUnit(t *testing.T) {
+	ctx := context.Background()
+	db := newFakeUnitDB()
+	if id, code, err := RequireItemBaseUnit(ctx, db, 1, 100); err != nil || id != 1 || code != "ea" {
+		t.Fatalf("got id=%d code=%q err=%v", id, code, err)
+	}
+	if _, _, err := RequireItemBaseUnit(ctx, db, 1, 200); err == nil {
+		t.Fatal("expected missing base unit error")
 	}
 }
