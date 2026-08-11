@@ -9,7 +9,7 @@ import (
 
 func supplierPaymentApplied(ctx context.Context, q Querier, tenantID, invoiceID int64, excludePaymentID *int64) (float64, error) {
 	sql := `
-		select coalesce(sum(a.applied_amount), 0)::float8
+		select coalesce(sum(a.applied_amount + coalesce(a.discount_amount, 0)), 0)::float8
 		from public.fin_payment_applications a
 		join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
 		where a.supplier_invoice_id = $1 and pv.tenant_id = $2 and pv.deleted_at is null`
@@ -77,7 +77,7 @@ func supplierInvoiceAppliedLateralSQLAsOf(invoiceAlias, asOfParam string) string
 		left join lateral (
 		  select (
 		    coalesce((
-		      select sum(a.applied_amount)
+		      select sum(a.applied_amount + coalesce(a.discount_amount, 0))
 		      from public.fin_payment_applications a
 		      join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
 		      where a.supplier_invoice_id = %s.id and pv.deleted_at is null%s

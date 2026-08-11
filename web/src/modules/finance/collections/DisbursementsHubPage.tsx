@@ -15,8 +15,14 @@ export default function DisbursementsHubPage() {
         </div>
         <div class="flex flex-wrap gap-2">
           <A
-            href="/app/finance/payment-vouchers/new"
+            href="/app/finance/payables"
             class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            New Payable Payment
+          </A>
+          <A
+            href="/app/finance/payment-vouchers/new"
+            class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
           >
             New Payment Made
           </A>

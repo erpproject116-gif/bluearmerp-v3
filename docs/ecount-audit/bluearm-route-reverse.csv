@@ -41,6 +41,8 @@ bluearm_route,kind,prgIds,notes
 /app/finance/budgets,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
 /app/finance/official-receipts,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
 /app/finance/payment-vouchers,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
+/app/finance/payables,mapped,C000126;E060502,New Payable Payment worklist + Payments Journal Apply
+/app/finance/receivables,mapped,C000125;E060402,New Receivable Payment worklist + Receipts Journal Apply
 /app/finance/reports,mapped,C000001;E010702;E010712;E010730;E010801;E010802;E010803;E010804;E010805;E010807;E010808;E010809,
 /app/fixed-assets,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map
 /app/hr,orphan,,No coverage-matrix bluearm_route cover — Bluearm-only or needs Ecount map

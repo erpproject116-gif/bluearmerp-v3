@@ -31,7 +31,7 @@ import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeCon
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
-import { tryAutoSaveSalesInvoice } from "../../../shared/invoiceApi";
+import { tryAutoSaveSalesInvoice, type InvoiceAutoSaveResult } from "../../../shared/invoiceApi";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
@@ -41,6 +41,8 @@ import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
+import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
+import { CashInFromCustomerModal } from "./CashInFromCustomerModal";
 import {
   QuotationLinePickerModal,
   type PickedQuotationLine,
@@ -241,6 +243,9 @@ export function SalesModal(props: Props) {
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [createdSale, setCreatedSale] = createSignal<SalesDetail | null>(null);
   const [holdOpen, setHoldOpen] = createSignal(false);
+  const [postSaveOpen, setPostSaveOpen] = createSignal(false);
+  const [postSaveAccounting, setPostSaveAccounting] = createSignal<InvoiceAutoSaveResult | null>(null);
+  const [cashInOpen, setCashInOpen] = createSignal(false);
   const effectiveEditing = () => props.editing ?? createdSale();
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [showNewLocation, setShowNewLocation] = createSignal(false);
@@ -983,7 +988,8 @@ export function SalesModal(props: Props) {
     await draft.clearOnSave();
     props.onSaved();
     const autoSave = await tryAutoSaveSalesInvoice(res.data.id);
-    const stockNote = `${autoSave.message} Stock updates when the item tracks inventory quantity. Reopen from the list for Invoice / payment.`;
+    setPostSaveAccounting(autoSave);
+    const stockNote = `${autoSave.message} Stock updates when the item tracks inventory quantity.`;
     if (toast.action) {
       toast.action({
         type: autoSave.ok ? "success" : "warning",
@@ -997,12 +1003,17 @@ export function SalesModal(props: Props) {
     } else {
       toast.warning(stockNote);
     }
+    // New sales: keep form open behind post-save dialog (Cash In / Accounting).
+    if (!ed) {
+      setPostSaveOpen(true);
+      return;
+    }
     // Allow pending uploads / server Copy to surface on AttachmentsField, then close.
     const sourced =
       !!sourceSalesOrderId() ||
       !!sourceAttachPreview() ||
       lines().some((ln) => !!ln.source_sales_order_line_id || !!ln.source_quotation_line_id);
-    const delayMs = !ed && (attachmentCount() > 0 || sourced) ? 600 : 0;
+    const delayMs = attachmentCount() > 0 || sourced ? 600 : 0;
     window.setTimeout(() => props.onClose(), delayMs);
   };
 
@@ -1544,6 +1555,48 @@ export function SalesModal(props: Props) {
         onClose={() => setReturnLinesOpen(false)}
         onConfirm={(lineIds) => void returnSelectedLines(lineIds)}
       />
+
+      <SalesPostSaveDialog
+        open={postSaveOpen()}
+        salesId={createdSale()?.id ?? 0}
+        salesNo={createdSale()?.sales_no ?? salesNo()}
+        amount={createdSale()?.grand_total ?? 0}
+        hasSerials={lines().some((ln) => (ln.serial_unit_ids?.length ?? 0) > 0 || !!ln.serial_lot_no?.trim())}
+        accounting={postSaveAccounting()}
+        onDone={() => {
+          setPostSaveOpen(false);
+          props.onClose();
+        }}
+        onAccounting={() => {
+          setPostSaveOpen(false);
+          setActiveTab("invoice");
+        }}
+        onCashIn={() => {
+          setPostSaveOpen(false);
+          setCashInOpen(true);
+        }}
+      />
+
+      <Show when={createdSale()}>
+        <CashInFromCustomerModal
+          open={cashInOpen()}
+          salesId={createdSale()!.id}
+          partnerId={createdSale()!.partner_id}
+          currencyId={createdSale()!.currency_id}
+          amount={createdSale()!.grand_total}
+          salesNo={createdSale()!.sales_no}
+          receiptDate={createdSale()!.order_date}
+          onClose={() => {
+            setCashInOpen(false);
+            props.onClose();
+          }}
+          onSaved={() => {
+            props.onSaved();
+            setCashInOpen(false);
+            props.onClose();
+          }}
+        />
+      </Show>
     </>
   );
 }

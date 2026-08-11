@@ -517,7 +517,7 @@ export const appModules: AppModule[] = [
       {
         label: "Receivables & payables",
         prefix: ACCT_II_PREFIX,
-        href: "/app/finance/acct-ii/checks",
+        href: "/app/finance/receivables",
         settingsHref: "/app/finance/acct-ii/setup",
         featureCode: "finance.acct_ii",
       },

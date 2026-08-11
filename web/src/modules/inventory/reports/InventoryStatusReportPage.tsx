@@ -322,11 +322,15 @@ export default function InventoryStatusReportPage() {
         <ReportEmptyMessage
           message={
             Object.keys(normalizeFilters(filters())).filter((k) => k !== "view").length === 0
-              ? "No stock balances yet. Create qty-tracked items, then Bill (auto-receive), Purchase Receive, or Stock Entry."
-              : "No stock matches these filters — try All branches or clear filters."
+              ? "No active items yet. Create items under Inventory → Items, then receive stock to fill branch quantities."
+              : "No items match these filters — try All branches, clear Stock status, or turn off In stock only."
           }
         />
         <p class="mt-3 text-center text-sm">
+          <A href="/app/inventory/items" class="text-brand-600 hover:underline">
+            Items
+          </A>
+          {" · "}
           <A href="/app/purchases/purchase-receive" class="text-brand-600 hover:underline">
             Purchase Receive
           </A>

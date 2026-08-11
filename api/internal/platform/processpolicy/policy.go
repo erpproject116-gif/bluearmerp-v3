@@ -35,8 +35,10 @@ type Policy struct {
 	SalesRequireAttachment              bool   `json:"sales_require_attachment"`
 	PurchaseOrderRequireAttachment      bool   `json:"purchase_order_require_attachment"`
 	SupplierInvoiceRequireAttachment    bool   `json:"supplier_invoice_require_attachment"`
-	InventoryGLHybridEnabled            bool   `json:"inventory_gl_hybrid_enabled"`
-	InventoryRequireSerialAdjustmentApproval bool `json:"inventory_require_serial_adjustment_approval"`
+	InventoryGLHybridEnabled                 bool   `json:"inventory_gl_hybrid_enabled"`
+	InventoryRequireSerialAdjustmentApproval bool   `json:"inventory_require_serial_adjustment_approval"`
+	ARPaymentDiscountAccountID               *int64 `json:"ar_payment_discount_account_id"`
+	APPaymentDiscountAccountID               *int64 `json:"ap_payment_discount_account_id"`
 }
 
 // Patch is the writable subset for PATCH/PUT requests.
@@ -65,6 +67,8 @@ type Patch struct {
 	SupplierInvoiceRequireAttachment   *bool   `json:"supplier_invoice_require_attachment,omitempty"`
 	InventoryGLHybridEnabled           *bool   `json:"inventory_gl_hybrid_enabled,omitempty"`
 	InventoryRequireSerialAdjustmentApproval *bool `json:"inventory_require_serial_adjustment_approval,omitempty"`
+	ARPaymentDiscountAccountID         *int64  `json:"ar_payment_discount_account_id,omitempty"`
+	APPaymentDiscountAccountID         *int64  `json:"ap_payment_discount_account_id,omitempty"`
 }
 
 var ErrNotFound = errors.New("process policy not found")
@@ -94,7 +98,9 @@ const selectCols = `
   coalesce(purchase_order_require_attachment, true),
   coalesce(supplier_invoice_require_attachment, true),
   coalesce(inventory_gl_hybrid_enabled, false),
-  coalesce(inventory_require_serial_adjustment_approval, false)
+  coalesce(inventory_require_serial_adjustment_approval, false),
+  ar_payment_discount_account_id,
+  ap_payment_discount_account_id
 `
 
 // LoadStored returns the tenant policy as stored (for admin UI), inserting defaults when missing.
@@ -137,6 +143,8 @@ func LoadStored(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy
 		&p.SupplierInvoiceRequireAttachment,
 		&p.InventoryGLHybridEnabled,
 		&p.InventoryRequireSerialAdjustmentApproval,
+		&p.ARPaymentDiscountAccountID,
+		&p.APPaymentDiscountAccountID,
 	)
 	return p, err
 }
@@ -283,6 +291,22 @@ func ApplyPatch(current Policy, patch Patch) Policy {
 	if patch.InventoryRequireSerialAdjustmentApproval != nil {
 		next.InventoryRequireSerialAdjustmentApproval = *patch.InventoryRequireSerialAdjustmentApproval
 	}
+	if patch.ARPaymentDiscountAccountID != nil {
+		if *patch.ARPaymentDiscountAccountID <= 0 {
+			next.ARPaymentDiscountAccountID = nil
+		} else {
+			id := *patch.ARPaymentDiscountAccountID
+			next.ARPaymentDiscountAccountID = &id
+		}
+	}
+	if patch.APPaymentDiscountAccountID != nil {
+		if *patch.APPaymentDiscountAccountID <= 0 {
+			next.APPaymentDiscountAccountID = nil
+		} else {
+			id := *patch.APPaymentDiscountAccountID
+			next.APPaymentDiscountAccountID = &id
+		}
+	}
 	return next
 }
 
@@ -313,6 +337,8 @@ func writePolicyArgs(tenantID, userID int64, next Policy) []any {
 		next.SupplierInvoiceRequireAttachment,
 		next.InventoryGLHybridEnabled,
 		next.InventoryRequireSerialAdjustmentApproval,
+		next.ARPaymentDiscountAccountID,
+		next.APPaymentDiscountAccountID,
 		userID,
 	}
 }
@@ -343,7 +369,9 @@ const updatePolicySQL = `
 		  supplier_invoice_require_attachment = $23,
 		  inventory_gl_hybrid_enabled = $24,
 		  inventory_require_serial_adjustment_approval = $25,
-		  updated_by_user_id = $26,
+		  ar_payment_discount_account_id = $26,
+		  ap_payment_discount_account_id = $27,
+		  updated_by_user_id = $28,
 		  updated_at = now()
 		where tenant_id = $1`
 
@@ -424,6 +452,8 @@ func loadStoredTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error
 		&p.SupplierInvoiceRequireAttachment,
 		&p.InventoryGLHybridEnabled,
 		&p.InventoryRequireSerialAdjustmentApproval,
+		&p.ARPaymentDiscountAccountID,
+		&p.APPaymentDiscountAccountID,
 	)
 	return p, err
 }

@@ -52,8 +52,9 @@ type OfficialReceipt struct {
 }
 
 type applicationBody struct {
-	SalesID       int64   `json:"sales_id"`
-	AppliedAmount float64 `json:"applied_amount"`
+	SalesID        int64   `json:"sales_id"`
+	AppliedAmount  float64 `json:"applied_amount"`
+	DiscountAmount float64 `json:"discount_amount"`
 }
 
 type receiptBody struct {
@@ -132,7 +133,7 @@ func listOfficialReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}
-		if pm := strings.TrimSpace(r.URL.Query().Get("payment_method")); pm == "cash" || pm == "check" || pm == "bank_transfer" {
+		if pm := strings.TrimSpace(r.URL.Query().Get("payment_method")); isAllowedPaymentMethod(pm) {
 			where += fmt.Sprintf(" and r.payment_method = $%d", argN)
 			args = append(args, pm)
 			argN++
@@ -302,8 +303,8 @@ func validateReceiptBody(body receiptBody) map[string]string {
 		errs["currency_id"] = "Currency is required."
 	}
 	pm := strings.TrimSpace(body.PaymentMethod)
-	if pm != "cash" && pm != "check" && pm != "bank_transfer" {
-		errs["payment_method"] = "Payment method must be cash, check, or bank_transfer."
+	if !isAllowedPaymentMethod(pm) {
+		errs["payment_method"] = paymentMethodValidationMessage()
 	}
 	if len(body.Applications) == 0 {
 		errs["applications"] = "At least one sales application is required."
@@ -318,8 +319,14 @@ func validateReceiptBody(body receiptBody) map[string]string {
 		} else {
 			seenSales[app.SalesID] = true
 		}
-		if app.AppliedAmount <= 0 {
-			errs[key+".applied_amount"] = "Applied amount must be greater than zero."
+		if app.AppliedAmount < 0 {
+			errs[key+".applied_amount"] = "Applied amount cannot be negative."
+		}
+		if app.DiscountAmount < 0 {
+			errs[key+".discount_amount"] = "Discount amount cannot be negative."
+		}
+		if applicationTotalReduction(app.AppliedAmount, app.DiscountAmount) <= 0 {
+			errs[key+".applied_amount"] = "Applied amount plus discount must be greater than zero."
 		}
 	}
 	if len(errs) > 0 {
@@ -350,9 +357,17 @@ func validateApplications(ctx context.Context, pool *pgxpool.Pool, tenantID, par
 			errs[key+".applied_amount"] = "Failed to validate balance."
 			continue
 		}
-		if app.AppliedAmount > outstanding+0.0001 {
-			errs[key+".applied_amount"] = fmt.Sprintf("Applied amount exceeds outstanding balance (%.4f).", outstanding)
+		need := applicationTotalReduction(app.AppliedAmount, app.DiscountAmount)
+		if need > outstanding+0.0001 {
+			errs[key+".applied_amount"] = fmt.Sprintf("Applied amount plus discount exceeds outstanding balance (%.4f).", outstanding)
 		}
+	}
+	var discountTotal float64
+	for _, app := range apps {
+		discountTotal += app.DiscountAmount
+	}
+	if err := requireDiscountAccountConfigured(ctx, pool, tenantID, "ar", discountTotal); err != nil {
+		errs["discount_amount"] = err.Error()
 	}
 	if len(errs) > 0 {
 		return errs
@@ -380,8 +395,7 @@ func createOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, errs)
 			return
 		}
-		receiptDate, err := parseDate(body.ReceiptDate)
-		if err != nil {
+		if _, err := parseDate(body.ReceiptDate); err != nil {
 			response.Validation(w, map[string]string{"receipt_date": "Invalid date. Use YYYY-MM-DD."})
 			return
 		}
@@ -389,60 +403,101 @@ func createOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmart(w, errs)
 			return
 		}
-		amountTotal := sumApplicationAmounts(body.Applications)
-
-		tx, err := pool.Begin(r.Context())
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
+		rec, msg, status, errCode := createOfficialReceiptFromBody(r.Context(), pool, tu, body)
+		if errCode != "" {
+			if status == http.StatusConflict {
+				response.Err(w, status, msg, errCode)
+				return
+			}
+			response.Err(w, status, msg, errCode)
 			return
 		}
-		defer tx.Rollback(r.Context())
-
-		var dateSeq int
-		var receiptNo string
-		if seriesNo, used, err := allocateSeriesNumber(r.Context(), tx, tu.TenantID, "official_receipt"); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to allocate document series.", "ERR_INTERNAL")
-			return
-		} else if used {
-			receiptNo = seriesNo
-			dateSeq = 1
-		} else if err := tx.QueryRow(r.Context(),
-			`select date_seq, receipt_no from public.allocate_fin_receipt_sequences($1, $2::date)`,
-			tu.TenantID, receiptDate).Scan(&dateSeq, &receiptNo); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to allocate sequences.", "ERR_INTERNAL")
-			return
-		}
-
-		var id int64
-		err = tx.QueryRow(r.Context(), `
-			insert into public.fin_official_receipts (
-			  tenant_id, receipt_date, date_seq, receipt_no,
-			  partner_id, currency_id, payment_method, reference_no, notes,
-			  amount_total, created_by_user_id, accounting_slip_no
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-			returning id`,
-			tu.TenantID, receiptDate, dateSeq, receiptNo,
-			body.PartnerID, body.CurrencyID, strings.TrimSpace(body.PaymentMethod),
-			body.ReferenceNo, body.Notes, amountTotal, tu.AppUserID, "CR "+receiptNo).Scan(&id)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to insert official receipt.", "ERR_INTERNAL")
-			return
-		}
-
-		if err := insertReceiptApplications(r.Context(), tx, tu.TenantID, id, body.Applications); err != nil {
-			respondApplicationSaveError(w, err)
-			return
-		}
-
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
-			return
-		}
-
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.receipt.create", "fin_official_receipt", &id, nil, body)
-		rec, _ := loadOfficialReceipt(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, rec, "Created.")
+		response.OK(w, rec, msg)
 	}
+}
+
+// createOfficialReceiptFromBody creates an OR using the same path as POST /official-receipts.
+// Returns errCode "" on success.
+func createOfficialReceiptFromBody(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, body receiptBody) (OfficialReceipt, string, int, string) {
+	if errs := validateReceiptBody(body); errs != nil {
+		msg := "Invalid receipt."
+		for _, v := range errs {
+			msg = v
+			break
+		}
+		return OfficialReceipt{}, msg, http.StatusBadRequest, "ERR_VALIDATION"
+	}
+	receiptDate, err := parseDate(body.ReceiptDate)
+	if err != nil {
+		return OfficialReceipt{}, "Invalid date. Use YYYY-MM-DD.", http.StatusBadRequest, "ERR_VALIDATION"
+	}
+	if errs := validateApplications(ctx, pool, tu.TenantID, body.PartnerID, body.Applications, nil); errs != nil {
+		msg := "Invalid applications."
+		for _, v := range errs {
+			msg = v
+			break
+		}
+		return OfficialReceipt{}, msg, http.StatusBadRequest, "ERR_VALIDATION"
+	}
+	amountTotal := sumApplicationAmounts(body.Applications)
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return OfficialReceipt{}, "Failed to create.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+	defer tx.Rollback(ctx)
+
+	var dateSeq int
+	var receiptNo string
+	if seriesNo, used, err := allocateSeriesNumber(ctx, tx, tu.TenantID, "official_receipt"); err != nil {
+		return OfficialReceipt{}, "Failed to allocate document series.", http.StatusInternalServerError, "ERR_INTERNAL"
+	} else if used {
+		receiptNo = seriesNo
+		dateSeq = 1
+	} else if err := tx.QueryRow(ctx,
+		`select date_seq, receipt_no from public.allocate_fin_receipt_sequences($1, $2::date)`,
+		tu.TenantID, receiptDate).Scan(&dateSeq, &receiptNo); err != nil {
+		return OfficialReceipt{}, "Failed to allocate sequences.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	var id int64
+	err = tx.QueryRow(ctx, `
+		insert into public.fin_official_receipts (
+		  tenant_id, receipt_date, date_seq, receipt_no,
+		  partner_id, currency_id, payment_method, reference_no, notes,
+		  amount_total, created_by_user_id, accounting_slip_no
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		returning id`,
+		tu.TenantID, receiptDate, dateSeq, receiptNo,
+		body.PartnerID, body.CurrencyID, strings.TrimSpace(body.PaymentMethod),
+		body.ReferenceNo, body.Notes, amountTotal, tu.AppUserID, "CR "+receiptNo).Scan(&id)
+	if err != nil {
+		return OfficialReceipt{}, "Failed to insert official receipt.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	if err := insertReceiptApplications(ctx, tx, tu.TenantID, id, body.Applications); err != nil {
+		var over overAppliedError
+		if errors.As(err, &over) {
+			return OfficialReceipt{}, over.message, http.StatusConflict, "ERR_OVER_APPLIED"
+		}
+		return OfficialReceipt{}, "Failed to save applications.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	var discountTotal float64
+	for _, a := range body.Applications {
+		discountTotal += a.DiscountAmount
+	}
+	if err := postARPaymentDiscountJournalTx(ctx, tx, tu.TenantID, tu.AppUserID, body.PartnerID, receiptDate, receiptNo, discountTotal); err != nil {
+		return OfficialReceipt{}, err.Error(), http.StatusBadRequest, "ERR_VALIDATION"
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return OfficialReceipt{}, "Failed to save.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "finance.receipt.create", "fin_official_receipt", &id, nil, body)
+	rec, _ := loadOfficialReceipt(ctx, pool, tu.TenantID, id)
+	return rec, "Created.", http.StatusOK, ""
 }
 
 func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
@@ -562,8 +617,9 @@ func lockAndCheckReceiptApplications(ctx context.Context, tx pgx.Tx, tenantID, r
 		if err != nil {
 			return err
 		}
-		if app.AppliedAmount > outstanding+0.0001 {
-			return overAppliedError{message: fmt.Sprintf("Applied amount exceeds outstanding balance (%.4f) for sales %d. Another payment may have been applied concurrently.", outstanding, app.SalesID)}
+		need := applicationTotalReduction(app.AppliedAmount, app.DiscountAmount)
+		if need > outstanding+0.0001 {
+			return overAppliedError{message: fmt.Sprintf("Applied amount plus discount exceeds outstanding balance (%.4f) for sales %d. Another payment may have been applied concurrently.", outstanding, app.SalesID)}
 		}
 	}
 	return nil
@@ -575,9 +631,9 @@ func insertReceiptApplications(ctx context.Context, tx pgx.Tx, tenantID, receipt
 	}
 	for _, app := range apps {
 		if _, err := tx.Exec(ctx, `
-			insert into public.fin_receipt_applications (official_receipt_id, sales_id, applied_amount)
-			values ($1, $2, $3)`,
-			receiptID, app.SalesID, app.AppliedAmount); err != nil {
+			insert into public.fin_receipt_applications (official_receipt_id, sales_id, applied_amount, discount_amount)
+			values ($1, $2, $3, $4)`,
+			receiptID, app.SalesID, app.AppliedAmount, app.DiscountAmount); err != nil {
 			return err
 		}
 	}

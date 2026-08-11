@@ -35,18 +35,6 @@ type ReceiptJournalLine struct {
 	Remark              *string  `json:"remark,omitempty"`
 }
 
-type OpenReceivable struct {
-	SalesID        int64   `json:"sales_id"`
-	SalesNo        string  `json:"sales_no"`
-	DateNoDisplay  string  `json:"date_no_display"`
-	OccurrenceDate string  `json:"occurrence_date"`
-	DueDate        *string `json:"due_date,omitempty"`
-	Balance        float64 `json:"balance"`
-	LocationName   string  `json:"location_name,omitempty"`
-	ProjectName    *string `json:"project_name,omitempty"`
-	DepartmentName *string `json:"department_name,omitempty"`
-}
-
 type OfficialReceiptJournal struct {
 	OfficialReceipt
 	AccountingSlipNo  string               `json:"accounting_slip_no"`
@@ -99,7 +87,6 @@ type receiptJournalBody struct {
 }
 
 func registerReceiptJournalRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.Get("/receivables/open", listOpenReceivables(pool))
 	r.With(auth.RequirePermission("finance.official_receipts", auth.AccessWrite)).Patch("/official-receipts/{id}/journal", saveReceiptJournal(pool))
 }
 
@@ -221,72 +208,6 @@ func loadReceiptApplicationsWithRemark(ctx context.Context, pool *pgxpool.Pool, 
 		apps = []ReceiptApplication{}
 	}
 	return apps, nil
-}
-
-func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tu, _ := auth.FromContext(r.Context())
-		partnerID, ok := optionalInt64Query(r, "partner_id")
-		if !ok {
-			response.Validation(w, map[string]string{"partner_id": "Customer is required."})
-			return
-		}
-		excludeReceiptID, _ := optionalInt64Query(r, "exclude_receipt_id")
-
-		q := `
-			select s.id, s.sales_no, s.order_date, s.date_seq, s.due_date,
-			  (s.grand_total - coalesce(applied.total, 0))::float8 as balance,
-			  coalesce(loc.location_name, ''), coalesce(proj.project_name, ''), coalesce(dept.department_name, '')
-			from public.sa_sales s
-			left join public.inv_locations loc on loc.id = s.location_id
-			left join public.inv_projects proj on proj.id = s.project_id
-			left join public.inv_departments dept on dept.id = s.department_id
-			left join lateral (
-			  select coalesce(sum(a.applied_amount), 0) as total
-			  from public.fin_receipt_applications a
-			  join public.fin_official_receipts r on r.id = a.official_receipt_id
-			  where a.sales_id = s.id and r.deleted_at is null`
-		args := []any{tu.TenantID, *partnerID}
-		if excludeReceiptID != nil {
-			q += ` and r.id <> $3`
-			args = append(args, *excludeReceiptID)
-		}
-		q += `
-			) applied on true
-			where s.tenant_id = $1 and s.partner_id = $2 and s.deleted_at is null
-			  and (s.grand_total - coalesce(applied.total, 0)) > 0.0001
-			order by s.order_date desc, s.id desc`
-
-		rows, err := pool.Query(r.Context(), q, args...)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load receivables.", "ERR_INTERNAL")
-			return
-		}
-		defer rows.Close()
-		var out []OpenReceivable
-		for rows.Next() {
-			var row OpenReceivable
-			var orderDate time.Time
-			var dateSeq int
-			var dueDate *time.Time
-			if err := rows.Scan(&row.SalesID, &row.SalesNo, &orderDate, &dateSeq, &dueDate, &row.Balance,
-				&row.LocationName, &row.ProjectName, &row.DepartmentName); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to read receivables.", "ERR_INTERNAL")
-				return
-			}
-			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
-			row.OccurrenceDate = dateToStr(orderDate)
-			if dueDate != nil {
-				d := dateToStr(*dueDate)
-				row.DueDate = &d
-			}
-			out = append(out, row)
-		}
-		if out == nil {
-			out = []OpenReceivable{}
-		}
-		response.OK(w, out, "OK")
-	}
 }
 
 func saveReceiptJournal(pool *pgxpool.Pool) http.HandlerFunc {

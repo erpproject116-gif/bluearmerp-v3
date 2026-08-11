@@ -3,6 +3,7 @@ package finance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -53,6 +54,7 @@ type PaymentVoucher struct {
 type paymentApplicationBody struct {
 	SupplierInvoiceID int64   `json:"supplier_invoice_id"`
 	AppliedAmount     float64 `json:"applied_amount"`
+	DiscountAmount    float64 `json:"discount_amount"`
 }
 
 type paymentVoucherBody struct {
@@ -291,8 +293,8 @@ func validatePaymentVoucherBody(body paymentVoucherBody) map[string]string {
 		errs["currency_id"] = "Currency is required."
 	}
 	pm := strings.TrimSpace(body.PaymentMethod)
-	if pm != "cash" && pm != "check" && pm != "bank_transfer" {
-		errs["payment_method"] = "Payment method must be cash, check, or bank_transfer."
+	if !isAllowedPaymentMethod(pm) {
+		errs["payment_method"] = paymentMethodValidationMessage()
 	}
 	if len(body.Applications) == 0 {
 		errs["applications"] = "At least one supplier invoice application is required."
@@ -307,8 +309,14 @@ func validatePaymentVoucherBody(body paymentVoucherBody) map[string]string {
 		} else {
 			seen[app.SupplierInvoiceID] = true
 		}
-		if app.AppliedAmount <= 0 {
-			errs[key+".applied_amount"] = "Applied amount must be greater than zero."
+		if app.AppliedAmount < 0 {
+			errs[key+".applied_amount"] = "Applied amount cannot be negative."
+		}
+		if app.DiscountAmount < 0 {
+			errs[key+".discount_amount"] = "Discount amount cannot be negative."
+		}
+		if applicationTotalReduction(app.AppliedAmount, app.DiscountAmount) <= 0 {
+			errs[key+".applied_amount"] = "Applied amount plus discount must be greater than zero."
 		}
 	}
 	if len(errs) > 0 {
@@ -338,9 +346,17 @@ func validatePaymentApplications(ctx context.Context, pool *pgxpool.Pool, tenant
 			errs[key+".applied_amount"] = "Failed to validate balance."
 			continue
 		}
-		if app.AppliedAmount > outstanding+0.0001 {
-			errs[key+".applied_amount"] = fmt.Sprintf("Applied amount exceeds outstanding balance (%.4f).", outstanding)
+		need := applicationTotalReduction(app.AppliedAmount, app.DiscountAmount)
+		if need > outstanding+0.0001 {
+			errs[key+".applied_amount"] = fmt.Sprintf("Applied amount plus discount exceeds outstanding balance (%.4f).", outstanding)
 		}
+	}
+	var discountTotal float64
+	for _, app := range apps {
+		discountTotal += app.DiscountAmount
+	}
+	if err := requireDiscountAccountConfigured(ctx, pool, tenantID, "ap", discountTotal); err != nil {
+		errs["discount_amount"] = err.Error()
 	}
 	if len(errs) > 0 {
 		return errs
@@ -359,30 +375,28 @@ func sumPaymentApplicationAmounts(apps []paymentApplicationBody) float64 {
 // lockAndCheckPaymentApplications locks each referenced supplier invoice row
 // (FOR UPDATE) and re-validates the applied amounts inside the current
 // transaction, so concurrent payment vouchers cannot over-pay the same
-// invoice. Rows are locked in invoice-id order to avoid deadlocks.
+// invoice. Outstanding includes vendor credits (same as create validation).
+// Rows are locked in invoice-id order to avoid deadlocks.
 func lockAndCheckPaymentApplications(ctx context.Context, tx pgx.Tx, tenantID, paymentID int64, apps []paymentApplicationBody) error {
 	ordered := make([]paymentApplicationBody, len(apps))
 	copy(ordered, apps)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].SupplierInvoiceID < ordered[j].SupplierInvoiceID })
+	excludeID := paymentID
 	for _, app := range ordered {
-		var grandTotal float64
+		var locked float64
 		if err := tx.QueryRow(ctx, `
 			select grand_total::float8 from public.fin_supplier_invoices
 			where id = $1 and tenant_id = $2 and deleted_at is null
-			for update`, app.SupplierInvoiceID, tenantID).Scan(&grandTotal); err != nil {
+			for update`, app.SupplierInvoiceID, tenantID).Scan(&locked); err != nil {
 			return err
 		}
-		var applied float64
-		if err := tx.QueryRow(ctx, `
-			select coalesce(sum(a.applied_amount), 0)::float8
-			from public.fin_payment_applications a
-			join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-			where a.supplier_invoice_id = $1 and pv.tenant_id = $2 and pv.deleted_at is null and pv.id <> $3`,
-			app.SupplierInvoiceID, tenantID, paymentID).Scan(&applied); err != nil {
+		outstanding, err := supplierInvoiceOutstandingQ(ctx, tx, tenantID, app.SupplierInvoiceID, &excludeID)
+		if err != nil {
 			return err
 		}
-		if outstanding := grandTotal - applied; app.AppliedAmount > outstanding+0.0001 {
-			return overAppliedError{message: fmt.Sprintf("Applied amount exceeds outstanding balance (%.4f) for supplier invoice %d. Another payment may have been applied concurrently.", outstanding, app.SupplierInvoiceID)}
+		need := applicationTotalReduction(app.AppliedAmount, app.DiscountAmount)
+		if need > outstanding+0.0001 {
+			return overAppliedError{message: fmt.Sprintf("Applied amount plus discount exceeds outstanding balance (%.4f) for supplier invoice %d. Another payment may have been applied concurrently.", outstanding, app.SupplierInvoiceID)}
 		}
 	}
 	return nil
@@ -394,9 +408,9 @@ func insertPaymentApplications(ctx context.Context, tx pgx.Tx, tenantID, payment
 	}
 	for _, app := range apps {
 		_, err := tx.Exec(ctx, `
-			insert into public.fin_payment_applications (payment_voucher_id, supplier_invoice_id, applied_amount)
-			values ($1, $2, $3)`,
-			paymentID, app.SupplierInvoiceID, app.AppliedAmount)
+			insert into public.fin_payment_applications (payment_voucher_id, supplier_invoice_id, applied_amount, discount_amount)
+			values ($1, $2, $3, $4)`,
+			paymentID, app.SupplierInvoiceID, app.AppliedAmount, app.DiscountAmount)
 		if err != nil {
 			return err
 		}
@@ -416,8 +430,7 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, errs)
 			return
 		}
-		paymentDate, err := parseDate(body.PaymentDate)
-		if err != nil {
+		if _, err := parseDate(body.PaymentDate); err != nil {
 			response.Validation(w, map[string]string{"payment_date": "Invalid date. Use YYYY-MM-DD."})
 			return
 		}
@@ -425,104 +438,135 @@ func createPaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmart(w, errs)
 			return
 		}
-		amountTotal := sumPaymentApplicationAmounts(body.Applications)
-
-		tx, err := pool.Begin(r.Context())
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
+		pv, msg, status, errCode := createPaymentVoucherFromBody(r.Context(), pool, tu, body)
+		if errCode != "" {
+			response.Err(w, status, msg, errCode)
 			return
-		}
-		defer tx.Rollback(r.Context())
-
-		var dateSeq int
-		var paymentNo string
-		if err := tx.QueryRow(r.Context(),
-			`select date_seq, payment_no from public.allocate_fin_payment_voucher_sequences($1, $2::date)`,
-			tu.TenantID, paymentDate).Scan(&dateSeq, &paymentNo); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to allocate sequences.", "ERR_INTERNAL")
-			return
-		}
-
-		var id int64
-		err = tx.QueryRow(r.Context(), `
-			insert into public.fin_payment_vouchers (
-			  tenant_id, payment_date, date_seq, payment_no,
-			  partner_id, currency_id, payment_method, reference_no, notes,
-			  amount_total, created_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-			returning id`,
-			tu.TenantID, paymentDate, dateSeq, paymentNo,
-			body.PartnerID, body.CurrencyID, strings.TrimSpace(body.PaymentMethod),
-			body.ReferenceNo, body.Notes, amountTotal, tu.AppUserID).Scan(&id)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to insert payment voucher.", "ERR_INTERNAL")
-			return
-		}
-
-		if err := insertPaymentApplications(r.Context(), tx, tu.TenantID, id, body.Applications); err != nil {
-			respondApplicationSaveError(w, err)
-			return
-		}
-
-		var payeeName string
-		_ = tx.QueryRow(r.Context(), `select company_name from public.inv_partners where id = $1 and tenant_id = $2`, body.PartnerID, tu.TenantID).Scan(&payeeName)
-		if err := insertWithholdingLines(r.Context(), tx, tu.TenantID, "payment_voucher", id, body.WithholdingLines); err != nil {
-			response.ValidationSmart(w, map[string]string{"withholding_lines": err.Error()})
-			return
-		}
-
-		whtTotal, err := sumWithholdingTax(r.Context(), tx, tu.TenantID, body.WithholdingLines)
-		if err != nil {
-			response.ValidationSmart(w, map[string]string{"withholding_lines": err.Error()})
-			return
-		}
-		netPay := amountTotal - whtTotal
-		if netPay < 0 {
-			netPay = 0
-		}
-		if err := syncPaymentVoucherCheck(r.Context(), tx, tu.TenantID, id, &tu.AppUserID, paymentDate, payeeName, body.PaymentMethod, body.ReferenceNo, body.BankAccountID, netPay); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to register check.", "ERR_INTERNAL")
-			return
-		}
-
-		ev := withEntryDate(buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod, mustEWTPayableCode(r.Context(), tx, tu.TenantID)), paymentDate)
-		deferredApproval, _, err := ensureAmountApproval(r.Context(), tx, tu, "payment_voucher", id, amountTotal)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to check approval policy.", "ERR_INTERNAL")
-			return
-		}
-		glStatus := ""
-		if !deferredApproval {
-			var postErr error
-			glStatus, postErr = postWithJournalPoster(r.Context(), tx, tu.TenantID, ev)
-			if postErr != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
-				return
-			}
-		}
-
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
-			return
-		}
-
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.payment_voucher.create", "fin_payment_voucher", &id, nil, body)
-		pv, _ := loadPaymentVoucher(r.Context(), pool, tu.TenantID, id)
-		msg := "Created."
-		if deferredApproval {
-			msg = "Created. Amount exceeds approval threshold — journal posting deferred until approved."
-		} else {
-			switch glStatus {
-			case "audit_only":
-				msg = "Created. Not on Trial Balance yet — enable Payment Voucher auto-post under Finance setup, or post the journal manually."
-			case "draft":
-				msg = "Created. Journal entry is draft — post it under Journal Entries for Trial Balance."
-			case "posted":
-				msg = "Created. Journal posted to the general ledger."
-			}
 		}
 		response.OK(w, pv, msg)
 	}
+}
+
+func createPaymentVoucherFromBody(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, body paymentVoucherBody) (PaymentVoucher, string, int, string) {
+	if errs := validatePaymentVoucherBody(body); errs != nil {
+		msg := "Invalid payment voucher."
+		for _, v := range errs {
+			msg = v
+			break
+		}
+		return PaymentVoucher{}, msg, http.StatusBadRequest, "ERR_VALIDATION"
+	}
+	paymentDate, err := parseDate(body.PaymentDate)
+	if err != nil {
+		return PaymentVoucher{}, "Invalid date. Use YYYY-MM-DD.", http.StatusBadRequest, "ERR_VALIDATION"
+	}
+	if errs := validatePaymentApplications(ctx, pool, tu.TenantID, body.PartnerID, body.Applications, nil); errs != nil {
+		msg := "Invalid applications."
+		for _, v := range errs {
+			msg = v
+			break
+		}
+		return PaymentVoucher{}, msg, http.StatusBadRequest, "ERR_VALIDATION"
+	}
+	amountTotal := sumPaymentApplicationAmounts(body.Applications)
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return PaymentVoucher{}, "Failed to create.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+	defer tx.Rollback(ctx)
+
+	var dateSeq int
+	var paymentNo string
+	if err := tx.QueryRow(ctx,
+		`select date_seq, payment_no from public.allocate_fin_payment_voucher_sequences($1, $2::date)`,
+		tu.TenantID, paymentDate).Scan(&dateSeq, &paymentNo); err != nil {
+		return PaymentVoucher{}, "Failed to allocate sequences.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	var id int64
+	err = tx.QueryRow(ctx, `
+		insert into public.fin_payment_vouchers (
+		  tenant_id, payment_date, date_seq, payment_no,
+		  partner_id, currency_id, payment_method, reference_no, notes,
+		  amount_total, created_by_user_id
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		returning id`,
+		tu.TenantID, paymentDate, dateSeq, paymentNo,
+		body.PartnerID, body.CurrencyID, strings.TrimSpace(body.PaymentMethod),
+		body.ReferenceNo, body.Notes, amountTotal, tu.AppUserID).Scan(&id)
+	if err != nil {
+		return PaymentVoucher{}, "Failed to insert payment voucher.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	if err := insertPaymentApplications(ctx, tx, tu.TenantID, id, body.Applications); err != nil {
+		var over overAppliedError
+		if errors.As(err, &over) {
+			return PaymentVoucher{}, over.message, http.StatusConflict, "ERR_OVER_APPLIED"
+		}
+		return PaymentVoucher{}, "Failed to save applications.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	var payeeName string
+	_ = tx.QueryRow(ctx, `select company_name from public.inv_partners where id = $1 and tenant_id = $2`, body.PartnerID, tu.TenantID).Scan(&payeeName)
+	if err := insertWithholdingLines(ctx, tx, tu.TenantID, "payment_voucher", id, body.WithholdingLines); err != nil {
+		return PaymentVoucher{}, err.Error(), http.StatusBadRequest, "ERR_VALIDATION"
+	}
+
+	whtTotal, err := sumWithholdingTax(ctx, tx, tu.TenantID, body.WithholdingLines)
+	if err != nil {
+		return PaymentVoucher{}, err.Error(), http.StatusBadRequest, "ERR_VALIDATION"
+	}
+	netPay := amountTotal - whtTotal
+	if netPay < 0 {
+		netPay = 0
+	}
+	if err := syncPaymentVoucherCheck(ctx, tx, tu.TenantID, id, &tu.AppUserID, paymentDate, payeeName, body.PaymentMethod, body.ReferenceNo, body.BankAccountID, netPay); err != nil {
+		return PaymentVoucher{}, "Failed to register check.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	var discountTotal float64
+	for _, a := range body.Applications {
+		discountTotal += a.DiscountAmount
+	}
+	if err := postAPPaymentDiscountJournalTx(ctx, tx, tu.TenantID, tu.AppUserID, body.PartnerID, paymentDate, paymentNo, discountTotal); err != nil {
+		return PaymentVoucher{}, err.Error(), http.StatusBadRequest, "ERR_VALIDATION"
+	}
+
+	ev := withEntryDate(buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod, mustEWTPayableCode(ctx, tx, tu.TenantID)), paymentDate)
+	deferredApproval, _, err := ensureAmountApproval(ctx, tx, tu, "payment_voucher", id, amountTotal)
+	if err != nil {
+		return PaymentVoucher{}, "Failed to check approval policy.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+	glStatus := ""
+	if !deferredApproval {
+		var postErr error
+		glStatus, postErr = postWithJournalPoster(ctx, tx, tu.TenantID, ev)
+		if postErr != nil {
+			return PaymentVoucher{}, "Failed to post journal entry.", http.StatusInternalServerError, "ERR_INTERNAL"
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return PaymentVoucher{}, "Failed to save.", http.StatusInternalServerError, "ERR_INTERNAL"
+	}
+
+	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "finance.payment_voucher.create", "fin_payment_voucher", &id, nil, body)
+	pv, _ := loadPaymentVoucher(ctx, pool, tu.TenantID, id)
+	msg := "Created."
+	if deferredApproval {
+		msg = "Created. Amount exceeds approval threshold — journal posting deferred until approved."
+	} else {
+		switch glStatus {
+		case "audit_only":
+			msg = "Created. Not on Trial Balance yet — enable Payment Voucher auto-post under Finance setup, or post the journal manually."
+		case "draft":
+			msg = "Created. Journal entry is draft — post it under Journal Entries for Trial Balance."
+		case "posted":
+			msg = "Created. Journal posted to the general ledger."
+		}
+	}
+	return pv, msg, http.StatusOK, ""
 }
 
 func deletePaymentVoucher(pool *pgxpool.Pool) http.HandlerFunc {

@@ -14,8 +14,14 @@ export default function CollectionsHubPage() {
         </div>
         <div class="flex flex-wrap gap-2">
           <A
-            href="/app/finance/official-receipts/new"
+            href="/app/finance/receivables"
             class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            New Receivable Payment
+          </A>
+          <A
+            href="/app/finance/official-receipts/new"
+            class="rounded-lg border border-stroke px-4 py-2 text-sm hover:bg-slate-50"
           >
             Record Official Receipt
           </A>

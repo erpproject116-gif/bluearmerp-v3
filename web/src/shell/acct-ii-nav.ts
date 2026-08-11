@@ -20,9 +20,11 @@ const ACCT_II_REPORT_PATHS = [
 
 /** BluearmERP Acct. II — receivable/payable depth, checks, budget, withholding, import cost, contracts, notes */
 export const acctIINavLinks: AcctNavLink[] = [
-  { label: "Receivables", href: "/app/finance/collections", permissionCode: "finance.reports_ar_by_customer", headerPriority: "primary" },
-  { label: "Payables", href: "/app/finance/disbursements", permissionCode: "finance.reports_ap_by_vendor", headerPriority: "primary" },
-  { label: "Check Register", href: "/app/finance/acct-ii/checks", permissionCode: "finance.check_read", headerPriority: "primary" },
+  { label: "New Receivable Payment", href: "/app/finance/receivables", permissionCode: "finance.official_receipts_new", headerPriority: "primary" },
+  { label: "New Payable Payment", href: "/app/finance/payables", permissionCode: "finance.payment_vouchers_new", headerPriority: "primary" },
+  { label: "Receivables", href: "/app/finance/collections", permissionCode: "finance.reports_ar_by_customer", headerPriority: "overflow" },
+  { label: "Payables", href: "/app/finance/disbursements", permissionCode: "finance.reports_ap_by_vendor", headerPriority: "overflow" },
+  { label: "Check Register", href: "/app/finance/acct-ii/checks", permissionCode: "finance.check_read", headerPriority: "overflow" },
   { label: "Withholding Tax", href: "/app/finance/acct-ii/withholding-codes", permissionCode: "finance.withholding_read", headerPriority: "overflow" },
   { label: "BIR Statutory", href: "/app/finance/statutory", permissionCode: "finance.statutory_read", headerPriority: "overflow" },
   { label: "BIR Taxpayer", href: "/app/finance/statutory/taxpayer-profile", permissionCode: "finance.statutory_read", headerPriority: "overflow" },
@@ -42,8 +44,9 @@ export const acctIINavLinks: AcctNavLink[] = [
 export function isAcctIIPath(pathname: string): boolean {
   if (pathname.startsWith(ACCT_II_PREFIX)) return true;
   if (pathname.startsWith("/app/finance/statutory")) return true;
-  if (pathname.startsWith("/app/finance/statutory")) return true;
   if (pathname.startsWith("/app/finance/budgets")) return true;
+  if (pathname.startsWith("/app/finance/receivables")) return true;
+  if (pathname.startsWith("/app/finance/payables")) return true;
   if (pathname.startsWith("/app/finance/collections")) return true;
   if (pathname.startsWith("/app/finance/disbursements")) return true;
   for (const report of ACCT_II_REPORT_PATHS) {

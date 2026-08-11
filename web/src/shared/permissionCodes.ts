@@ -93,6 +93,8 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/sales/reports/print-slips": "sales.print_sales_slips",
   "/app/finance/official-receipts/new": "finance.official_receipts_new",
   "/app/finance/official-receipts": "finance.official_receipts",
+  "/app/finance/receivables": "finance.official_receipts_new",
+  "/app/finance/payables": "finance.payment_vouchers_new",
   "/app/finance/collections": "finance.reports_ar_by_customer",
   "/app/finance/bookkeeping": "finance.journal_entries",
   "/app/finance/disbursements": "finance.reports_ap_by_vendor",

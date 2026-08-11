@@ -21,6 +21,8 @@ export type ProcessPolicy = {
   finance_require_je_approval: boolean;
   inventory_gl_hybrid_enabled?: boolean;
   inventory_require_serial_adjustment_approval?: boolean;
+  ar_payment_discount_account_id?: number | null;
+  ap_payment_discount_account_id?: number | null;
   budget_control_mode: string;
   quotation_require_attachment: boolean;
   sales_order_require_attachment: boolean;

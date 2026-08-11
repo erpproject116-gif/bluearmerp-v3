@@ -26,8 +26,8 @@ C000127,Acct. II,Check Management,Checks Received List,Checks Received List,list
 C000666,Acct. II,Contract,Contract Field List,Contract Field List,list,0,0,in-progress,25,25,—,missing,,P3,Pass 2 Acct II; contract subtree cataloged; see acct2-breadth.md
 C001258,Acct. II,Withholding,Withholding Tax on Sales List,Withholding Tax on Sales List,list,1,1,in-progress,30,30,—,missing,,P3,Pass 2 Acct II; purchase+sales WH subtrees; see acct2-breadth.md
 C000094,Inv. II,Plan Mgmt,Sales Forecast List,Sales Forecast List,list,2,2,in-progress,25,30,—,missing,,P3,Pass 2 Jul 2026; All/History pills; see inv2-wms-export-order-plan.md
-C000125,Acct. II,Receivable Management,New Receivable Payment,New Receivable Payment,list,0,0,in-progress,45,30,/app/finance/receivables,partial,,P2,Pass 1 Jul 2026; AR list columns; see acct2-breadth.md
-C000126,Acct. II,Payable Management,New Payable Payment,New Payable Payment,list,0,0,in-progress,45,30,/app/finance/payables,partial,,P2,Pass 1 Jul 2026; AP list columns; see acct2-breadth.md
+C000125,Acct. II,Receivable Management,New Receivable Payment,New Receivable Payment,list,0,0,shipped,85,80,/app/finance/receivables,parity,,P1,Aug 2026; open worklist + Receipts Journal Apply creates OR; Phase 0 outstanding; see acct2-breadth.md
+C000126,Acct. II,Payable Management,New Payable Payment,New Payable Payment,list,0,0,shipped,85,80,/app/finance/payables,parity,,P1,Aug 2026; open worklist + Payments Journal Apply creates PV; Phase 0 outstanding; see acct2-breadth.md
 C000021,Acct. II,Budget,Budget Status,Budget Status,report,2,2,in-progress,30,25,—,missing,,P3,Pass 1 Jul 2026; Default/All pills; see acct2-breadth.md
 C000005,Acct. II,Expenses,Trade Voucher List,Trade Voucher List,list,4,4,in-progress,25,20,—,missing,,P3,Pass 1 Jul 2026; import expenses subtree; see acct2-breadth.md
 C000131,Mgmt,Payroll,Payroll Book,Payroll Book,list,0,0,cataloged,20,10,—,deferred,Deferred — Mgmt/HR clone out of current IA wave; see deferred-register.md,P3,Pass 1 Jul 2026; see mgmt-gw-datacenter-breadth.md
@@ -245,14 +245,14 @@ E040726,Inv. I,Reports,Inventory Balance,Inv. balance converted by BOM,report,1,
 N000118,Acct. I,Reports,Others,Sales Invoice Status,report,1,1,in-progress,40,30,/app/finance/reports,partial,,P1,Pass 11 Jul 2026; menuType MENUTREE_000001; mirror N000119; see inv1-sales-reports.md
 N000126,Acct. I,Reports,Others,Purchase Invoice Status,report,1,1,in-progress,40,30,/app/finance/reports,partial,,P1,Pass 11 Jul 2026; menuType MENUTREE_000001; mirror N000127; see inv1-purchase-reports.md
 E041018,Inv. II,Serial/Lot No.,Item vs. Serial/Lot No. Balance,Item vs. Serial/Lot No. Balance,report,2,2,in-progress,45,45,/app/inventory/serial-lot,parity,,P1,Pass 18 Jul 2026; Compare by Serial/Lot No vs Item; menuSeq MENUTREE_002766; see inv2-serial-lot.md; known-parity: Item vs Serial balance — gaps Done
-E060402,Acct. II,Receivable Management,New Receivable Payment,New Receivable Payment,list,0,0,in-progress,50,40,/app/finance/receivables,partial,,P2,Pass 4 Jul 2026; Decrease Amount + Receipts Journal modal; see acct2-breadth.md
+E060402,Acct. II,Receivable Management,New Receivable Payment,New Receivable Payment,list,0,0,shipped,90,85,/app/finance/receivables,parity,,P1,Aug 2026; Decrease Amount + Receipts Journal Apply → OR; multi-partner optional; txn details; see acct2-breadth.md
 E060403,Acct. II,Receivable Management,Receivable List,Receivable List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000687
 E060404,Acct. II,Receivable Management,Receivable Status,Receivable Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000688
 E060405,Acct. II,Receivable Management,Receivable Transaction Details,Receivable Transaction Details,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000716
 E060406,Acct. II,Receivable Management,Registered Receivable Status,Registered Receivable Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000717
 E060407,Acct. II,Receivable Management,Receivable Payment Status,Receivable Payment Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000718
 E060408,Acct. II,Receivable Management,AR Aging Details,AR Aging Details,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_001314
-E060502,Acct. II,Payable Management,New Payable Payment,New Payable Payment,list,0,0,in-progress,50,40,/app/finance/payables,partial,,P2,Pass 4 Jul 2026; Decrease Amount + Payments Journal modal; see acct2-breadth.md
+E060502,Acct. II,Payable Management,New Payable Payment,New Payable Payment,list,0,0,shipped,90,85,/app/finance/payables,parity,,P1,Aug 2026; Decrease Amount + Payments Journal Apply → PV; multi-partner optional; txn details; see acct2-breadth.md
 E060503,Acct. II,Payable Management,Payable List,Payable List,list,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000692
 E060504,Acct. II,Payable Management,Payable Status,Payable Status,report,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000693
 E060505,Acct. II,Payable Management,Payable Transaction Details,Payable Transaction Details,form,0,0,cataloged,0,5,—,missing,,P1,Site Map catalog Jul 2026; menuSeq MENUTREE_000719

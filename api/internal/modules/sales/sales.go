@@ -702,6 +702,11 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if err := syncSalesInvoiceJournalFromDefaultsTx(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to sync sales journal.", "ERR_INTERNAL")
+			return
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
@@ -906,6 +911,11 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, body.CustomValues); errs != nil {
 			response.ValidationSmart(w, errs)
+			return
+		}
+
+		if err := syncSalesInvoiceJournalFromDefaultsTx(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to sync sales journal.", "ERR_INTERNAL")
 			return
 		}
 
