@@ -1327,13 +1327,6 @@ export function SalesModal(props: Props) {
           required={policyRequiresAttachment(processPolicy.data, "sales")}
           onCountChange={setAttachmentCount}
         />
-        <Field label="Sales category">
-          <select class={inputClass} value={salesCategory()} onChange={(e) => setSalesCategory(e.currentTarget.value)}>
-            <option value="">—</option>
-            <option value="general">General</option>
-            <option value="returns">Returns</option>
-          </select>
-        </Field>
         <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
           {(m) => (
             <textarea

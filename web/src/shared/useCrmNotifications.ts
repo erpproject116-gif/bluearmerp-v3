@@ -2,6 +2,8 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 import { queryErrorFromApi, shouldRetryQuery } from "./queryRetry";
 
+export type CrmNotificationSource = "activity" | "rule" | "support" | "system";
+
 export type CrmNotification = {
   id: number;
   severity: "info" | "warning" | "critical";
@@ -9,6 +11,8 @@ export type CrmNotification = {
   body: string;
   entity_type?: string | null;
   entity_id?: number | null;
+  source?: CrmNotificationSource;
+  href?: string;
   read_at?: string | null;
   created_at: string;
 };
@@ -17,6 +21,7 @@ export type CrmNotificationListParams = {
   page: number;
   pageSize: number;
   unreadOnly?: boolean;
+  source?: CrmNotificationSource | "";
   enabled?: boolean;
 };
 
@@ -28,6 +33,7 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
       pageSize: String(p.pageSize),
     });
     if (p.unreadOnly) qs.set("unread_only", "true");
+    if (p.source) qs.set("source", p.source);
     return {
       queryKey: ["crm-notifications", p],
       enabled: p.enabled !== false,
@@ -42,7 +48,7 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
       },
       staleTime: 30_000,
       refetchInterval: p.enabled !== false ? 60_000 : false,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
       retry: shouldRetryQuery,
     };
   });
@@ -66,13 +72,13 @@ export function useCrmNotificationFeed(enabled: () => boolean) {
 
 export async function markCrmNotificationRead(id: number) {
   return apiFetch(`/api/v1/crm/notifications/${id}/read`, { method: "PATCH" }, {
-    successMessage: "Notification marked read.",
+    silent: true,
   });
 }
 
 export async function markAllCrmNotificationsRead() {
   return apiFetch("/api/v1/crm/notifications/read-all", { method: "POST" }, {
-    successMessage: "All notifications marked read.",
+    silent: true,
   });
 }
 

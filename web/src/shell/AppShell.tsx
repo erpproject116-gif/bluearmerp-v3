@@ -1,7 +1,7 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import { Show, createSignal, For, onCleanup, onMount } from "solid-js";
-import { useAuth, canViewCrm, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
+import { useAuth, canViewCrm, canViewCrmNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
@@ -416,7 +416,10 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 <span class="sm:hidden">Help</span>
               </A>
               <PresenceAvatars />
-              <CrmNotificationPoller enabled={Boolean(auth.me)} />
+              <CrmNotificationPoller
+                enabled={canViewCrmNotifications(auth.me)}
+                userId={auth.me?.user?.id ?? null}
+              />
               <Show when={canViewCrm(auth.me)}>
                 <button
                   type="button"
@@ -426,7 +429,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                   + CRM task
                 </button>
               </Show>
-              <CrmNotificationBell enabled={Boolean(auth.me)} />
+              <CrmNotificationBell enabled={canViewCrmNotifications(auth.me)} />
               <ThemeSwitcher />
             </div>
           </div>

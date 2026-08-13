@@ -2,7 +2,7 @@ import { For, Show, createContext, useContext, type ParentProps } from "solid-js
 import { createStore } from "solid-js/store";
 import { StatusIcon } from "./icons/StatusIcon";
 
-export type ToastType = "success" | "error" | "warning";
+export type ToastType = "success" | "error" | "warning" | "info";
 
 export type ActionToastInput = {
   type?: ToastType;
@@ -27,6 +27,7 @@ type ToastAPI = {
   success: (message: string) => void;
   error: (message: string) => void;
   warning: (message: string) => void;
+  info: (message: string) => void;
   /** Clickable toast with optional navigation or custom action. */
   action: (input: ActionToastInput) => void;
 };
@@ -45,6 +46,7 @@ const styles: Record<ToastType, string> = {
   success: "border-emerald-200 bg-emerald-50 text-emerald-900",
   error: "border-red-200 bg-red-50 text-red-900",
   warning: "border-amber-200 bg-amber-50 text-amber-950",
+  info: "border-slate-200 bg-slate-50 text-slate-900",
 };
 
 export function ToastProvider(props: ParentProps) {
@@ -67,6 +69,7 @@ export function ToastProvider(props: ParentProps) {
     success: (message) => push({ type: "success", message }, 5000),
     error: (message) => push({ type: "error", message }, 7000),
     warning: (message) => push({ type: "warning", message }, 5000),
+    info: (message) => push({ type: "info", message }, 5000),
     action: (input) =>
       push(
         {

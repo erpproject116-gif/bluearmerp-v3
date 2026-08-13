@@ -1,5 +1,5 @@
 import { createMemo, createSignal, onMount } from "solid-js";
-import { A, useLocation, useNavigate } from "@solidjs/router";
+import { A, useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
@@ -42,6 +42,7 @@ function formatValidity(row: QuotationRow): string {
 export function QuotationListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const auth = useAuth();
   const canSendEmail = () => hasPermission(auth.me, "comms.send", "write");
@@ -155,6 +156,23 @@ export function QuotationListPageInner(props: PageOptions = {}) {
 
   onMount(() => {
     if (props.openNewOnMount || loc.pathname.endsWith("/new")) openNew();
+    const openId = Number(searchParams.openId ?? "");
+    if (openId > 0) {
+      void (async () => {
+        const [res, deleted] = await Promise.all([
+          apiFetch<QuotationDetail>(lifecycle.detailUrl(openId)),
+          lifecycle.resolveDeleted(openId),
+        ]);
+        if (res.success && res.data) {
+          setEditing(res.data);
+          setViewingDeleted(deleted);
+          setModalOpen(true);
+        } else {
+          toast.warning(res.message ?? "Could not open that quotation.");
+        }
+        setSearchParams({ openId: undefined }, { replace: true });
+      })();
+    }
   });
 
   return (

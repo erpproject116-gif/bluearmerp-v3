@@ -61,6 +61,12 @@ describe("shell polling", () => {
     expect(read("CrmNotificationPoller.tsx")).not.toContain("unreadOnly: true");
   });
 
+  it("poller only toasts warning and critical", () => {
+    const src = read("CrmNotificationPoller.tsx");
+    expect(src).toContain('n.severity !== "warning"');
+    expect(src).toContain('n.severity !== "critical"');
+  });
+
   it("presence heartbeat stops while the tab is hidden", () => {
     const src = read("PresenceHeartbeat.tsx");
     expect(src).toContain("document.hidden");

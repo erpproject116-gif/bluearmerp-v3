@@ -21,6 +21,8 @@ export type AttachmentScope =
   | "sales-order/sales-orders"
   | "purchase-order/purchase-orders"
   | "finance/supplier-invoices"
+  | "finance/official-receipts"
+  | "finance/payment-vouchers"
   | "support/tickets";
 
 async function authHeaders(): Promise<Record<string, string>> {

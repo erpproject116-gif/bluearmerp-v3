@@ -330,6 +330,7 @@ type openGRLineRow struct {
 	GoodsReceiptLineID  int64   `json:"goods_receipt_line_id"`
 	GoodsReceiptID      int64   `json:"goods_receipt_id"`
 	PurchaseOrderLineID int64   `json:"purchase_order_line_id"`
+	PurchaseOrderID     int64   `json:"purchase_order_id"`
 	PurchaseOrderNo     string  `json:"purchase_order_no"`
 	PartnerID           int64   `json:"partner_id"`
 	PartnerName         string  `json:"partner_name"`
@@ -426,7 +427,7 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		q := fmt.Sprintf(`
-			select grl.id, gr.id, pol.id, po.purchase_order_no,
+			select grl.id, gr.id, pol.id, po.id, po.purchase_order_no,
 			  po.partner_id, coalesce(p.company_name, ''),
 			  pol.item_id, pol.item_code, pol.item_name,
 			  grl.received_qty::float8,
@@ -463,7 +464,7 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row openGRLineRow
 			if err := rows.Scan(
-				&row.GoodsReceiptLineID, &row.GoodsReceiptID, &row.PurchaseOrderLineID, &row.PurchaseOrderNo,
+				&row.GoodsReceiptLineID, &row.GoodsReceiptID, &row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo,
 				&row.PartnerID, &row.PartnerName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.ReceivedQty, &row.BilledQty, &row.BalanceQty,
@@ -1090,36 +1091,12 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		// Load Slip → Save: copy originating PO attachments when lines reference PO lines.
-		poIDs := map[int64]struct{}{}
-		for _, ln := range body.Lines {
-			if ln.PurchaseOrderLineID == nil || *ln.PurchaseOrderLineID <= 0 {
-				continue
-			}
-			var poID int64
-			if err := pool.QueryRow(r.Context(),
-				`select purchase_order_id from public.po_purchase_order_lines where id = $1`,
-				*ln.PurchaseOrderLineID).Scan(&poID); err == nil && poID > 0 {
-				poIDs[poID] = struct{}{}
-			}
-		}
-		for poID := range poIDs {
-			_, _ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
-				SrcBaseDir: attachmentx.Dir("purchase_order"),
-				DstBaseDir: attachmentx.Dir("supplier_invoice"),
-				SrcTable:   "public.po_purchase_order_attachments",
-				SrcFKCol:   "purchase_order_id",
-				SrcID:      poID,
-				DstTable:   "public.fin_supplier_invoice_attachments",
-				DstFKCol:   "supplier_invoice_id",
-				DstID:      id,
-				TenantID:   tu.TenantID,
-			})
-		}
+		// Load Slip → Save: copy originating PO attachments (from PO lines and/or GR → PO).
+		copied := copySupplierInvoiceSourceAttachments(r.Context(), pool, tu.TenantID, id, body.Lines)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.supplier_invoice.create", "fin_supplier_invoice", &id, nil, body)
 		inv, _ := loadSupplierInvoice(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, inv, "Created.")
+		response.OK(w, inv, supplierInvoiceCreateMessage(copied))
 	}
 }
 
@@ -1476,6 +1453,11 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 				response.ValidationSmart(w, map[string]string{"invoice": err.Error()})
 				return
 			}
+		}
+
+		// If Load Slip added PO/GR lines and this Purchase still has no files, copy from PO.
+		if existing, _ := attachmentx.Count(r.Context(), pool, "public.fin_supplier_invoice_attachments", "supplier_invoice_id", id); existing == 0 {
+			_ = copySupplierInvoiceSourceAttachments(r.Context(), pool, tu.TenantID, id, body.Lines)
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.supplier_invoice.update", "fin_supplier_invoice", &id, before, body)

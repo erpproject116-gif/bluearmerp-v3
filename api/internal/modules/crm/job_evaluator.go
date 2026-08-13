@@ -184,8 +184,8 @@ func insertNotification(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 	severity, title, body, entityType string, entityID int64, dedupeKey string) (bool, error) {
 	tag, err := pool.Exec(ctx, `
 		insert into public.crm_notifications (
-		  tenant_id, user_id, rule_id, severity, title, body, entity_type, entity_id, dedupe_key
-		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		  tenant_id, user_id, rule_id, severity, title, body, entity_type, entity_id, dedupe_key, source
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'rule')
 		on conflict (tenant_id, dedupe_key) do nothing`,
 		tenantID, userID, ruleID, severity, title, body, entityType, entityID, dedupeKey)
 	if err != nil {
