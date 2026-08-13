@@ -23,6 +23,7 @@ import (
 // RegisterRoutes mounts team chat under /comms/chat.
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/chat", func(cr chi.Router) {
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/unread-total", unreadTotal(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/channels", listChannels(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/channels", createChannel(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/dms", createOrGetDM(pool))
@@ -31,12 +32,23 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/channels/{id}/messages", listMessages(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/channels/{id}/messages", postMessage(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/channels/{id}/read", markRead(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/channels/{id}/typing", postTyping(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/channels/{id}/typing", listTyping(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/channels/{id}/slash", postSlash(pool))
 		cr.With(auth.RequirePermission("comms.chat_admin", auth.AccessWrite)).Post("/channels/{id}/archive", archiveChannel(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/messages/{id}/attachments", uploadAttachment(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/messages/{id}/forward", forwardMessage(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/messages/{id}/reactions", addReaction(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Delete("/messages/{id}/reactions", removeReaction(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/attachments/{id}/download", downloadAttachment(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/messages/{id}", getMessage(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/doc-search", docSearch(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/users", listChatUsers(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/baiko-capabilities", baikoCapabilities(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/reminders", createReminder(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/reminders", listReminders(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/reminders/due", dueReminders(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/reminders/{id}/cancel", cancelReminder(pool))
 	})
 }
 
@@ -52,14 +64,15 @@ func getMessage(pool *pgxpool.Pool) http.HandlerFunc {
 		var msg Message
 		var created time.Time
 		var deleted *time.Time
+		var parentID, fwdID *int64
 		err = pool.QueryRow(r.Context(), `
 			select m.id, m.channel_id, m.sender_user_id,
-			  coalesce(nullif(trim(u.full_name), ''), coalesce(u.email, 'User')),
-			  m.body, m.created_at, m.deleted_at
+			  coalesce(nullif(trim(u.full_name), ''), coalesce(u.email, case when m.sender_kind = 'baiko' then 'Baiko' when m.sender_kind = 'system' then 'System' else 'User' end)),
+			  m.body, m.created_at, m.deleted_at, m.parent_message_id, m.forwarded_from_message_id, coalesce(m.sender_kind, 'user')
 			from public.chat_messages m
 			left join public.users u on u.id = m.sender_user_id
 			where m.id = $1 and m.tenant_id = $2`, messageID, tu.TenantID,
-		).Scan(&msg.ID, &channelID, &msg.SenderUserID, &msg.SenderName, &msg.Body, &created, &deleted)
+		).Scan(&msg.ID, &channelID, &msg.SenderUserID, &msg.SenderName, &msg.Body, &created, &deleted, &parentID, &fwdID, &msg.SenderKind)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Message not found.", "ERR_NOT_FOUND")
 			return
@@ -69,6 +82,8 @@ func getMessage(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		msg.ChannelID = channelID
+		msg.ParentMessageID = parentID
+		msg.ForwardedFromMessageID = fwdID
 		msg.CreatedAt = created.Format(time.RFC3339)
 		if deleted != nil {
 			s := deleted.Format(time.RFC3339)
@@ -76,7 +91,7 @@ func getMessage(pool *pgxpool.Pool) http.HandlerFunc {
 			msg.Body = ""
 		}
 		tmp := []Message{msg}
-		enrichMessages(r.Context(), pool, tmp)
+		enrichMessages(r.Context(), pool, tmp, tu.AppUserID)
 		response.OK(w, tmp[0], "OK")
 	}
 }
@@ -420,8 +435,8 @@ func listMessages(pool *pgxpool.Pool) http.HandlerFunc {
 		args = append(args, limit)
 		q := fmt.Sprintf(`
 			select m.id, m.channel_id, m.sender_user_id,
-			  coalesce(nullif(trim(u.full_name), ''), coalesce(u.email, 'User')),
-			  m.body, m.created_at, m.deleted_at
+			  coalesce(nullif(trim(u.full_name), ''), coalesce(u.email, case when m.sender_kind = 'baiko' then 'Baiko' when m.sender_kind = 'system' then 'System' else 'User' end)),
+			  m.body, m.created_at, m.deleted_at, m.parent_message_id, m.forwarded_from_message_id, coalesce(m.sender_kind, 'user')
 			from public.chat_messages m
 			left join public.users u on u.id = m.sender_user_id
 			where %s
@@ -439,10 +454,13 @@ func listMessages(pool *pgxpool.Pool) http.HandlerFunc {
 			var msg Message
 			var created time.Time
 			var deleted *time.Time
-			if err := rows.Scan(&msg.ID, &msg.ChannelID, &msg.SenderUserID, &msg.SenderName, &msg.Body, &created, &deleted); err != nil {
+			var parentID, fwdID *int64
+			if err := rows.Scan(&msg.ID, &msg.ChannelID, &msg.SenderUserID, &msg.SenderName, &msg.Body, &created, &deleted, &parentID, &fwdID, &msg.SenderKind); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read messages.", "ERR_INTERNAL")
 				return
 			}
+			msg.ParentMessageID = parentID
+			msg.ForwardedFromMessageID = fwdID
 			msg.CreatedAt = created.Format(time.RFC3339)
 			if deleted != nil {
 				s := deleted.Format(time.RFC3339)
@@ -457,7 +475,7 @@ func listMessages(pool *pgxpool.Pool) http.HandlerFunc {
 			msgs[i], msgs[j] = msgs[j], msgs[i]
 		}
 		if len(ids) > 0 {
-			enrichMessages(r.Context(), pool, msgs)
+			enrichMessages(r.Context(), pool, msgs, tu.AppUserID)
 		}
 		if msgs == nil {
 			msgs = []Message{}
@@ -466,12 +484,56 @@ func listMessages(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func enrichMessages(ctx context.Context, pool *pgxpool.Pool, msgs []Message) {
+func enrichMessages(ctx context.Context, pool *pgxpool.Pool, msgs []Message, viewerUserID int64) {
 	byID := map[int64]*Message{}
 	ids := make([]int64, 0, len(msgs))
+	parentIDs := make([]int64, 0)
 	for i := range msgs {
 		byID[msgs[i].ID] = &msgs[i]
 		ids = append(ids, msgs[i].ID)
+		if msgs[i].ParentMessageID != nil {
+			parentIDs = append(parentIDs, *msgs[i].ParentMessageID)
+		}
+	}
+	if len(parentIDs) > 0 {
+		pRows, err := pool.Query(ctx, `
+			select m.id, m.body, m.deleted_at,
+			  coalesce(nullif(trim(u.full_name), ''), coalesce(u.email, case when m.sender_kind = 'baiko' then 'Baiko' when m.sender_kind = 'system' then 'System' else 'User' end))
+			from public.chat_messages m
+			left join public.users u on u.id = m.sender_user_id
+			where m.id = any($1)`, parentIDs)
+		if err == nil {
+			defer pRows.Close()
+			previews := map[int64]ParentPreview{}
+			for pRows.Next() {
+				var id int64
+				var body, name string
+				var deleted *time.Time
+				if pRows.Scan(&id, &body, &deleted, &name) != nil {
+					continue
+				}
+				pv := ParentPreview{ID: id, SenderName: name}
+				if deleted != nil {
+					pv.Deleted = true
+					pv.Body = "Original message deleted"
+				} else {
+					if len(body) > 160 {
+						body = body[:160] + "…"
+					}
+					pv.Body = body
+				}
+				previews[id] = pv
+			}
+			for i := range msgs {
+				if msgs[i].ParentMessageID == nil {
+					continue
+				}
+				if pv, ok := previews[*msgs[i].ParentMessageID]; ok {
+					cp := pv
+					msgs[i].ParentPreview = &cp
+				}
+			}
+		}
 	}
 	mRows, err := pool.Query(ctx, `
 		select message_id, user_id from public.chat_message_mentions
@@ -521,6 +583,24 @@ func enrichMessages(ctx context.Context, pool *pgxpool.Pool, msgs []Message) {
 			}
 		}
 	}
+	rRows, err := pool.Query(ctx, `
+		select message_id, emoji, count(*)::bigint,
+		  bool_or(user_id = $2) as me
+		from public.chat_message_reactions
+		where message_id = any($1)
+		group by message_id, emoji`, ids, viewerUserID)
+	if err == nil {
+		defer rRows.Close()
+		for rRows.Next() {
+			var mid int64
+			var react MessageReaction
+			if rRows.Scan(&mid, &react.Emoji, &react.Count, &react.Me) == nil {
+				if m := byID[mid]; m != nil {
+					m.Reactions = append(m.Reactions, react)
+				}
+			}
+		}
+	}
 }
 
 type postLinkBody struct {
@@ -530,9 +610,10 @@ type postLinkBody struct {
 }
 
 type postMessageBody struct {
-	Body       string         `json:"body"`
-	MentionIDs []int64        `json:"mention_ids"`
-	Links      []postLinkBody `json:"links"`
+	Body            string         `json:"body"`
+	MentionIDs      []int64        `json:"mention_ids"`
+	Links           []postLinkBody `json:"links"`
+	ParentMessageID *int64         `json:"parent_message_id"`
 }
 
 func postMessage(pool *pgxpool.Pool) http.HandlerFunc {
@@ -562,6 +643,20 @@ func postMessage(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		var parentID *int64
+		if body.ParentMessageID != nil && *body.ParentMessageID > 0 {
+			var parentChannel int64
+			err = pool.QueryRow(r.Context(), `
+				select channel_id from public.chat_messages
+				where id = $1 and tenant_id = $2`, *body.ParentMessageID, tu.TenantID,
+			).Scan(&parentChannel)
+			if err != nil || parentChannel != channelID {
+				response.Validation(w, map[string]string{"parent_message_id": "Parent must be a message in this channel."})
+				return
+			}
+			parentID = body.ParentMessageID
+		}
+
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to start transaction.", "ERR_INTERNAL")
@@ -572,9 +667,9 @@ func postMessage(pool *pgxpool.Pool) http.HandlerFunc {
 		var messageID int64
 		var created time.Time
 		err = tx.QueryRow(r.Context(), `
-			insert into public.chat_messages (tenant_id, channel_id, sender_user_id, body)
-			values ($1, $2, $3, $4) returning id, created_at`,
-			tu.TenantID, channelID, tu.AppUserID, text,
+			insert into public.chat_messages (tenant_id, channel_id, sender_user_id, body, parent_message_id, sender_kind)
+			values ($1, $2, $3, $4, $5, 'user') returning id, created_at`,
+			tu.TenantID, channelID, tu.AppUserID, text, parentID,
 		).Scan(&messageID, &created)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to post message.", "ERR_INTERNAL")
@@ -658,12 +753,13 @@ func postMessage(pool *pgxpool.Pool) http.HandlerFunc {
 		msg := Message{
 			ID: messageID, ChannelID: channelID, SenderUserID: &tu.AppUserID,
 			Body: text, CreatedAt: created.Format(time.RFC3339), MentionIDs: validMentions,
+			ParentMessageID: parentID, SenderKind: "user",
 		}
 		_ = pool.QueryRow(r.Context(), `
 			select coalesce(nullif(trim(full_name), ''), email) from public.users where id=$1`,
 			tu.AppUserID).Scan(&msg.SenderName)
 		tmp := []Message{msg}
-		enrichMessages(r.Context(), pool, tmp)
+		enrichMessages(r.Context(), pool, tmp, tu.AppUserID)
 		response.OK(w, tmp[0], "Posted.")
 	}
 }

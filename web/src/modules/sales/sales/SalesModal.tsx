@@ -1056,6 +1056,8 @@ export function SalesModal(props: Props) {
                 lines: lines(),
                 companyName: auth.me?.tenant.company_name,
               })}
+              shareEntityType="sa_sales"
+              shareLabel={salesNo() || "Sales invoice"}
             />
             <button
               type="button"

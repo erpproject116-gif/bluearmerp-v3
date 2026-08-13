@@ -603,15 +603,16 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Team Chat is first-party messaging inside your business (tenant). Create channels, group chats, and direct messages; @mention teammates (they get a bell notification); attach files up to 25 MB combined per message; and attach ERP documents (quotations, sales orders, invoices, receipts, and more) as openable cards. Chat never crosses into another company’s tenant.",
+        text: "Team Chat is first-party messaging inside your business (tenant). Create channels, group chats, and direct messages; reply and forward; react with a small emoji set; schedule in-app reminders; @mention teammates (bell notification); attach files up to 25 MB combined per message; and attach or share ERP documents as openable cards. The Communications sidebar shows an unread badge. Owners and platform superadmins can use / Baiko skills to open approve-to-seed create drafts — nothing is silent-written. Chat never crosses into another company’s tenant.",
       },
       {
         type: "steps",
         items: [
           "Open Communications → Team Chat.",
           "Create a channel, start a group, or DM a teammate.",
-          "Type a message; use @ to mention people; Attach file for images/PDFs/videos; Attach ERP doc to link a transaction (search by document number).",
-          "Click Open on a document card to jump into that ERP screen.",
+          "Reply, react, or forward messages; type /reminder for an in-app schedule (not Google Calendar sync).",
+          "Owners/superadmins: type / for Baiko skills (quotation, SO, ticket, CRM, ask) — confirm Approve to open.",
+          "Share a saved quotation, sales invoice, sales order, or purchase order with Share to chat beside Email.",
           "Email workflows remain under Inbox / Sent Documents / Settings — unchanged.",
         ],
       },

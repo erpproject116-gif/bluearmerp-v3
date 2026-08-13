@@ -12,6 +12,7 @@ import {
   HOME_SIDEBAR_AREAS,
   type HomeSidebarArea,
 } from "./ecount-top-nav";
+import { useChatUnreadTotal } from "../modules/comms/useChatUnreadTotal";
 
 export function isFinanceModulePath(pathname: string): boolean {
   if (pathname === "/app/finance" || pathname.startsWith("/app/finance/")) return true;
@@ -32,7 +33,13 @@ function areaEnabled(area: HomeSidebarArea, me: MeData | null | undefined): bool
   return isTenantModuleEnabled(me, area.moduleId);
 }
 
-function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean; nested?: boolean }) {
+function NavAreaLink(props: {
+  area: HomeSidebarArea;
+  active?: boolean;
+  nested?: boolean;
+  badgeCount?: number;
+  badgeLabel?: string;
+}) {
   const shell = useShell();
   const loc = useLocation();
   const active = () => {
@@ -60,6 +67,13 @@ function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean; nested?: 
     }
   };
 
+  const badgeText = () => {
+    const n = props.badgeCount ?? 0;
+    if (n <= 0) return "";
+    if (n > 99) return "99+";
+    return String(n);
+  };
+
   return (
     <A
       href={props.area.href}
@@ -73,9 +87,14 @@ function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean; nested?: 
         "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),
       }}
       onClick={onNavigate}
+      aria-label={
+        badgeText()
+          ? `${props.area.label}, ${badgeText()} unread`
+          : undefined
+      }
     >
       <span
-        class="flex shrink-0 items-center justify-center rounded-lg transition-colors"
+        class="relative flex shrink-0 items-center justify-center rounded-lg transition-colors"
         classList={{
           "h-8 w-8": !props.nested,
           "h-7 w-7": props.nested,
@@ -84,9 +103,25 @@ function NavAreaLink(props: { area: HomeSidebarArea; active?: boolean; nested?: 
         }}
       >
         <ModuleIcon id={props.area.iconId} class={props.nested ? "h-3.5 w-3.5" : undefined} />
+        <Show when={shell.collapsed() && badgeText()}>
+          <span
+            class="absolute -right-1 -top-1 min-w-[1rem] rounded-full bg-brand-600 px-1 text-center text-[9px] font-semibold leading-4 text-white"
+            aria-hidden="true"
+          >
+            {badgeText()}
+          </span>
+        </Show>
       </span>
       <Show when={!shell.collapsed()}>
-        <span class="truncate">{props.area.label}</span>
+        <span class="min-w-0 flex-1 truncate">{props.area.label}</span>
+        <Show when={badgeText()}>
+          <span
+            class="ml-1 shrink-0 rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold text-white"
+            aria-hidden="true"
+          >
+            {badgeText()}
+          </span>
+        </Show>
       </Show>
     </A>
   );
@@ -96,6 +131,7 @@ function HomeAreaBlock(props: {
   area: HomeSidebarArea;
   active: (a: HomeSidebarArea) => boolean;
   childrenOf: (area: HomeSidebarArea) => HomeSidebarArea[];
+  badgeCount?: number;
 }) {
   const shell = useShell();
   const children = () => props.childrenOf(props.area);
@@ -124,7 +160,11 @@ function HomeAreaBlock(props: {
     <div class="space-y-0.5">
       <div class="flex items-center gap-0.5">
         <div class="min-w-0 flex-1">
-          <NavAreaLink area={parentArea()} active={props.active(props.area)} />
+          <NavAreaLink
+            area={parentArea()}
+            active={props.active(props.area)}
+            badgeCount={props.area.id === "comms" ? props.badgeCount : undefined}
+          />
         </div>
         <Show when={!shell.collapsed() && children().length > 0}>
           <button
@@ -161,6 +201,7 @@ function HomeAreaBlock(props: {
 export function SidebarNav() {
   const auth = useAuth();
   const loc = useLocation();
+  const chatUnread = useChatUnreadTotal();
   let navEl: HTMLElement | undefined;
   let savedScrollTop = 0;
 
@@ -349,7 +390,14 @@ export function SidebarNav() {
       }}
     >
       <For each={HOME_SIDEBAR_AREAS}>
-        {(area) => <HomeAreaBlock area={area} active={homeActive} childrenOf={childrenOf} />}
+        {(area) => (
+          <HomeAreaBlock
+            area={area}
+            active={homeActive}
+            childrenOf={childrenOf}
+            badgeCount={area.id === "comms" ? chatUnread.unreadTotal() : undefined}
+          />
+        )}
       </For>
     </nav>
   );
