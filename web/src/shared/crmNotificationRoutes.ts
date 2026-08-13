@@ -18,11 +18,13 @@ export function crmNotificationHref(n: CrmNotification): string {
       return id ? `/app/sales/sales?openId=${id}` : "/app/sales/sales";
     case "so_sales_order":
     case "sa_sales_order":
-      return "/app/sales-order/sales-orders";
+      return id ? `/app/sales-order/sales-orders?openId=${id}` : "/app/sales-order/sales-orders";
     case "fin_supplier_invoice":
       return id ? `/app/purchases/purchase-receive?openId=${id}` : "/app/purchases/purchase-receive";
     case "po_purchase_order":
-      return "/app/purchase-request/purchase-orders";
+      return id ? `/app/purchase-order/purchase-orders?openId=${id}` : "/app/purchase-request/purchase-orders";
+    case "chat_message":
+      return id ? `/app/comms/chat?messageId=${id}` : "/app/comms/chat";
     case "support_ticket":
     case "support_ticket_attachment":
     case "sup_support_ticket":
@@ -51,6 +53,8 @@ export function crmNotificationSourceLabel(source?: CrmNotificationSource | stri
       return "Support";
     case "system":
       return "System";
+    case "chat":
+      return "Chat";
     case "activity":
     default:
       return "Activity";

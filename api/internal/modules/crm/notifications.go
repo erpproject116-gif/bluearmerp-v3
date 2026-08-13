@@ -51,7 +51,7 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		src := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("source")))
 		switch src {
-		case "activity", "rule", "support", "system":
+		case "activity", "rule", "support", "system", "chat":
 			where += fmt.Sprintf(" and n.source = $%d", n)
 			args = append(args, src)
 			n++

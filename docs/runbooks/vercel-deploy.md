@@ -31,7 +31,11 @@ No trailing slash on `VITE_API_BASE_URL`. **Redeploy after changing env vars** �
 Add to Supabase → Authentication → URL Configuration:
 
 - Site URL: `https://YOUR-APP.vercel.app`
-- Redirect URL: `https://YOUR-APP.vercel.app/auth/callback`
+- Redirect URLs (both required):
+  - `https://YOUR-APP.vercel.app/auth/callback`
+  - `https://YOUR-APP.vercel.app/auth/reset-password`
+
+Branded Auth email templates (confirm, reset, demo OTP) and Auth SMTP: [`supabase-auth-emails.md`](./supabase-auth-emails.md).
 
 ## SPA routing
 

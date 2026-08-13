@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your BluearmERP demo code</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f6fb;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+            <tr>
+              <td style="background-color:#3c50e0;padding:20px 28px;">
+                <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.02em;">BluearmERP</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#0f172a;">Your demo sign-in code</h1>
+                <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#334155;">
+                  Enter this 6-digit code on the BluearmERP demo signup screen to continue.
+                  The code expires shortly and can only be used once.
+                </p>
+                <p style="margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#64748b;">
+                  Verification code
+                </p>
+                <p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:0.2em;color:#3c50e0;font-family:Consolas,'Courier New',monospace;">
+                  {{ .Token }}
+                </p>
+                <p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#64748b;">
+                  Prefer a link instead? You can also open:
+                </p>
+                <p style="margin:0 0 24px;font-size:14px;line-height:1.55;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#3c50e0;text-decoration:underline;">Continue with this magic link</a>
+                </p>
+                <p style="margin:0;font-size:13px;line-height:1.5;color:#64748b;">
+                  If you did not start a BluearmERP demo, you can ignore this email.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px 24px;border-top:1px solid #e2e8f0;">
+                <p style="margin:0;font-size:12px;line-height:1.5;color:#94a3b8;">BluearmERP — demo access</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

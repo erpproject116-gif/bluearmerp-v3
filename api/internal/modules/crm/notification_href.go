@@ -49,9 +49,30 @@ func NotificationHref(entityType *string, entityID *int64) string {
 	case "crm_follow_up_task":
 		return "/app/crm/follow-up-tasks"
 	case "so_sales_order", "sa_sales_order", "sales_order":
+		if id > 0 {
+			return fmt.Sprintf("/app/sales-order/sales-orders?openId=%d", id)
+		}
 		return "/app/sales-order/sales-orders"
 	case "po_purchase_order", "purchase_order":
+		if id > 0 {
+			return fmt.Sprintf("/app/purchase-order/purchase-orders?openId=%d", id)
+		}
 		return "/app/purchase-request/purchase-orders"
+	case "fin_payment_voucher":
+		if id > 0 {
+			return fmt.Sprintf("/app/finance/payment-vouchers?openId=%d", id)
+		}
+		return "/app/finance/payment-vouchers"
+	case "fin_official_receipt":
+		if id > 0 {
+			return fmt.Sprintf("/app/finance/official-receipts?openId=%d", id)
+		}
+		return "/app/finance/official-receipts"
+	case "chat_message":
+		if id > 0 {
+			return fmt.Sprintf("/app/comms/chat?messageId=%d", id)
+		}
+		return "/app/comms/chat"
 	case "fin_account":
 		return "/app/finance/acct-i/chart-of-accounts"
 	case "wm_work_item":

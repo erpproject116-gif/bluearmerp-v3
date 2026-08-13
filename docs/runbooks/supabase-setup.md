@@ -23,7 +23,11 @@
    | Field | Value |
    |-------|--------|
    | Site URL | `http://localhost:5173` |
-   | Redirect URLs | `http://localhost:5173/auth/callback` |
+   | Redirect URLs | `http://localhost:5173/auth/callback` **and** `http://localhost:5173/auth/reset-password` |
+
+   For production/staging, use that env’s origin for both Site URL and the same two redirect paths. Full Auth email + SMTP steps: [`supabase-auth-emails.md`](./supabase-auth-emails.md).
+
+   **Auth SMTP ≠ API SMTP:** Supabase Authentication → SMTP sends confirm / reset / magic-link mail. Company invites and Communications use API `SMTP_*` on the server — see [`render-deploy.md`](./render-deploy.md).
 
 ### `Unable to exchange external code` / `server_error`
 
