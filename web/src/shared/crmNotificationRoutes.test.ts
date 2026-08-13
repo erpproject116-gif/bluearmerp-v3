@@ -53,7 +53,21 @@ describe("crmNotificationSourceLabel", () => {
   it("labels known sources", () => {
     expect(crmNotificationSourceLabel("rule")).toBe("Alert");
     expect(crmNotificationSourceLabel("support")).toBe("Support");
+    expect(crmNotificationSourceLabel("chat")).toBe("Chat");
     expect(crmNotificationSourceLabel("activity")).toBe("Activity");
+  });
+
+  it("maps chat_message entity", () => {
+    const n: CrmNotification = {
+      id: 1,
+      severity: "info",
+      title: "t",
+      body: "",
+      created_at: "2026-01-01T00:00:00Z",
+      entity_type: "chat_message",
+      entity_id: 42,
+    };
+    expect(crmNotificationHref(n)).toBe("/app/comms/chat?messageId=42");
   });
 });
 

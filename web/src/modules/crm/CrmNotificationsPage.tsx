@@ -30,6 +30,7 @@ const SOURCE_CHIPS: { value: SourceFilter; label: string }[] = [
   { value: "", label: "All" },
   { value: "rule", label: "Alerts" },
   { value: "support", label: "Support" },
+  { value: "chat", label: "Chat" },
   { value: "activity", label: "Activity" },
 ];
 

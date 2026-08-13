@@ -417,9 +417,10 @@ export const appModules: AppModule[] = [
   {
     id: "comms",
     label: "Communications",
-    href: "/app/comms/sent-documents",
+    href: "/app/comms/chat",
     basePath: "/app/comms",
     features: [
+      { label: "Team Chat", href: "/app/comms/chat", settingsHref: "/app/comms/settings" },
       { label: "Inbox", href: "/app/comms/inbox", settingsHref: "/app/comms/settings" },
       { label: "Sent Documents", href: "/app/comms/sent-documents", settingsHref: "/app/comms/settings" },
       { label: "Settings", href: "/app/comms/settings", settingsHref: "/app/comms/settings" },

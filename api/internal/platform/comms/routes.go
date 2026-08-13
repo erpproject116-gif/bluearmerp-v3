@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms/chat"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -31,6 +32,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		cr.With(auth.RequirePermission("comms.admin", auth.AccessWrite)).Post("/gmail/disconnect", disconnectGmail(pool))
 		cr.With(auth.RequirePermission("comms.admin", auth.AccessWrite)).Post("/gmail/sync", triggerGmailSync(pool))
 		cr.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/send-report-email", sendReportEmail(pool))
+		chat.RegisterRoutes(cr, pool)
 	})
 }
 

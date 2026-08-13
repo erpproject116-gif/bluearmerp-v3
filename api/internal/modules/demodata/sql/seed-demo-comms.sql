@@ -34,7 +34,71 @@ begin
       select 1 from public.com_sent_messages
       where tenant_id = v_tenant and subject = 'DEMO-COMMS-QUOTE'
     ) then
-      raise notice 'seed-demo-comms: demo sent messages exist for % — skip', v_code;
+      -- chat seed below still runs; skip email inserts via continue after chat block
+      null;
+    end if;
+
+    -- Team Chat demo (always idempotent; independent of email seed skip).
+    if to_regclass('public.chat_channels') is not null then
+      select u.id into v_user_id
+      from public.users u
+      where u.tenant_id = v_tenant and u.status = 'active'
+      order by u.id
+      limit 1;
+
+      select q.id, q.reference_no into v_q_id, v_q_ref
+      from public.quo_quotations q
+      where q.tenant_id = v_tenant and q.deleted_at is null
+      order by case when q.reference_no like 'DEMO%' then 0 else 1 end, q.id
+      limit 1;
+
+      if v_user_id is not null and not exists (
+        select 1 from public.chat_channels
+        where tenant_id = v_tenant and type = 'channel' and name = 'general'
+      ) then
+        insert into public.chat_channels (tenant_id, type, name, topic, is_private, created_by_user_id)
+        values (v_tenant, 'channel', 'general', 'Company-wide chat', false, v_user_id);
+
+        insert into public.chat_channel_members (channel_id, user_id, role)
+        select c.id, v_user_id, 'admin'
+        from public.chat_channels c
+        where c.tenant_id = v_tenant and c.type = 'channel' and c.name = 'general'
+        limit 1;
+
+        insert into public.chat_channel_members (channel_id, user_id, role)
+        select c.id, u.id, 'member'
+        from public.chat_channels c
+        cross join lateral (
+          select id from public.users
+          where tenant_id = v_tenant and status = 'active' and id <> v_user_id
+          order by id limit 1
+        ) u
+        where c.tenant_id = v_tenant and c.type = 'channel' and c.name = 'general'
+        on conflict do nothing;
+
+        insert into public.chat_messages (tenant_id, channel_id, sender_user_id, body)
+        select v_tenant, c.id, v_user_id, 'Welcome to Team Chat — share invoices and say hello.'
+        from public.chat_channels c
+        where c.tenant_id = v_tenant and c.type = 'channel' and c.name = 'general'
+        limit 1;
+
+        if v_q_id is not null then
+          insert into public.chat_message_links (message_id, entity_type, entity_id, label)
+          select m.id, 'quo_quotation', v_q_id, coalesce(v_q_ref, 'Demo quotation')
+          from public.chat_messages m
+          join public.chat_channels c on c.id = m.channel_id
+          where c.tenant_id = v_tenant and c.name = 'general'
+          order by m.id desc
+          limit 1;
+        end if;
+      end if;
+    end if;
+
+    if exists (
+      select 1 from public.com_sent_messages
+      where tenant_id = v_tenant and subject = 'DEMO-COMMS-QUOTE'
+    ) then
+      raise notice 'seed-demo-comms: demo sent messages exist for % — skip email seed', v_code;
       continue;
     end if;
 

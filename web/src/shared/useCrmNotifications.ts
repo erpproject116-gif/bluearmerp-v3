@@ -2,7 +2,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 import { queryErrorFromApi, shouldRetryQuery } from "./queryRetry";
 
-export type CrmNotificationSource = "activity" | "rule" | "support" | "system";
+export type CrmNotificationSource = "activity" | "rule" | "support" | "system" | "chat";
 
 export type CrmNotification = {
   id: number;

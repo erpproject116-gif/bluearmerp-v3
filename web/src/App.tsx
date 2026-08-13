@@ -198,6 +198,7 @@ import {
   SentDocumentsPage,
   CommsInboxPage,
   CommsSettingsPage,
+  TeamChatPage,
   OperationsHubPage,
   OperationsPacksPage,
   OperationsWorkItemSettingsPage,
@@ -793,6 +794,9 @@ export default function App() {
           )} />
           <Route path="/comms/inbox" component={() => (
             <CommsRoute><CommsInboxPage /></CommsRoute>
+          )} />
+          <Route path="/comms/chat" component={() => (
+            <CommsRoute><TeamChatPage /></CommsRoute>
           )} />
           <Route path="/comms/sent-documents" component={() => (
             <CommsRoute><SentDocumentsPage /></CommsRoute>

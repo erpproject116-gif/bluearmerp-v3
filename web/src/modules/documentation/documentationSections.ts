@@ -597,13 +597,31 @@ export const documentationSections: DocSection[] = [
     id: "comms",
     title: "Communications",
     iconId: "crm",
-    intro: "Email documents with PDF attachments and review what was sent.",
-    primaryHref: "/app/comms/sent-documents",
-    primaryLabel: "Open Sent Documents",
+    intro: "Team chat for staff, plus document email with PDF attachments.",
+    primaryHref: "/app/comms/chat",
+    primaryLabel: "Open Team Chat",
     blocks: [
       {
         type: "paragraph",
-        text: "Communications logs every document email your team sends. Use the Email button on saved quotations, sales orders, sales invoices, purchase orders, RFQs, and supplier invoices (purchases). Each send queues a PDF attachment through the server.",
+        text: "Team Chat is first-party messaging inside your business (tenant). Create channels, group chats, and direct messages; @mention teammates (they get a bell notification); attach files up to 25 MB combined per message; and attach ERP documents (quotations, sales orders, invoices, receipts, and more) as openable cards. Chat never crosses into another company’s tenant.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open Communications → Team Chat.",
+          "Create a channel, start a group, or DM a teammate.",
+          "Type a message; use @ to mention people; Attach file for images/PDFs/videos; Attach ERP doc to link a transaction (search by document number).",
+          "Click Open on a document card to jump into that ERP screen.",
+          "Email workflows remain under Inbox / Sent Documents / Settings — unchanged.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Load Slip is a form tool that copies lines between documents — attach the source SO/PO/quotation in chat, not a “load slip” record. Mentions appear in the notification bell with a link back to the message.",
+      },
+      {
+        type: "paragraph",
+        text: "Communications also logs every document email your team sends. Use the Email button on saved quotations, sales orders, sales invoices, purchase orders, RFQs, and supplier invoices. Each send queues a PDF attachment through the server.",
       },
       {
         type: "steps",
@@ -612,12 +630,7 @@ export const documentationSections: DocSection[] = [
           "Enter recipients and optional subject or message, then send.",
           "Open Communications → Sent Documents to see delivery status for all outbound messages.",
           "Open Communications → Settings to connect Gmail (optional) or confirm SMTP is configured on the server.",
-          "When Gmail is connected, Communications → Inbox shows synced threads. Document modals also show an Email history panel—including purchase orders, RFQs, and purchases on the buying side.",
         ],
-      },
-      {
-        type: "tip",
-        text: "Selling documents (quotation, sales order, sale) and buying documents (PO, RFQ, purchase) all share the same sent-log and history pattern.",
       },
     ],
   },

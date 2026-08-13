@@ -150,6 +150,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/crm/settings/alert-rules": "crm.settings_alert_rules",
   "/app/support/tickets": "support.tickets",
   "/app/comms/inbox": "comms.inbox",
+  "/app/comms/chat": "comms.chat",
   "/app/comms/sent-documents": "comms.read",
   "/app/comms/settings": "comms.admin",
   "/app/pos": "pos.terminal",

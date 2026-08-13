@@ -42,6 +42,10 @@ Use this for **every** API + web deploy to Render/Vercel (or any hosted environm
 1. Confirm `VITE_API_BASE_URL=https://YOUR-API.onrender.com`
 2. Deploy / promote production.
 3. Hard refresh browser (Ctrl+Shift+R) after deploy.
+4. **Supabase Auth URLs + emails** (if first deploy or Auth changed):
+   - Redirect allowlist includes `{web origin}/auth/callback` **and** `{web origin}/auth/reset-password`
+   - Auth templates applied from `supabase/templates/` (see [`supabase-auth-emails.md`](./supabase-auth-emails.md))
+   - Record smoke results in [`supabase-auth-emails-smoke.md`](./supabase-auth-emails-smoke.md)
 
 ## Smoke after deploy
 

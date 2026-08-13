@@ -52,6 +52,18 @@ enable_signup = true
 enable_signup = true
 enable_confirmations = false
 
+[auth.email.template.confirmation]
+subject = "Confirm your BluearmERP account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your BluearmERP password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Your BluearmERP demo code"
+content_path = "./supabase/templates/magic_link.html"
+
 [auth.external.google]
 enabled = false
 # Enable in Dashboard for hosted; set client_id and secret locally when ready.

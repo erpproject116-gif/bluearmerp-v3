@@ -1,24 +1,31 @@
 # Communications module
 
-Transactional document email with PDF attachments, sent-message log, optional Gmail OAuth sync, and email history panels on document modals.
+Transactional document email with PDF attachments, sent-message log, optional Gmail OAuth sync, email history panels on document modals, and **native Team Chat** (channels / GC / DM).
 
 ## Features
 
 | Feature | Web route | API |
 |---------|-----------|-----|
+| Team Chat | `/app/comms/chat` | `/api/v1/comms/chat/*` |
 | Sent Documents | `/app/comms/sent-documents` | `GET /api/v1/comms/sent-messages` |
 | Inbox (Gmail sync) | `/app/comms/inbox` | `GET /api/v1/comms/inbox` |
 | Settings / Gmail | `/app/comms/settings` | `GET/POST /api/v1/comms/gmail/*`, `GET/PUT /api/v1/comms/email-signature` |
 | Email from document | modal **Email** button | `POST .../{doc}/send-email` per module |
 | Doc email history | modal panel | `GET /api/v1/comms/doc-emails?doc_type=&doc_id=` |
 
-## Supported document types
+## Team Chat
 
-**Selling:** quotation, sales order, sales invoice.
+First-party staff messaging scoped to the JWT tenant (`tenant_id` on all tables + membership checks). Not Mattermost.
 
-**Buying:** purchase order, RFQ (`rfq`), supplier quotation, supplier invoice (purchase).
+| Capability | Notes |
+|------------|--------|
+| Channels / groups / DMs | `comms.chat` permission |
+| @mentions | Writes `crm_notifications` with `source=chat` |
+| ERP document cards | Allowlisted entity types; server-built hrefs |
+| File attachments | Combined **25 MiB** per message, Postgres `bytea` (same as support tickets) |
+| Realtime v1 | Poll ~4s while the chat page is visible |
 
-Email history panels are on all of the above modals (buy-side added in phase 4).
+Schema: migration `244_comms_chat.sql` (`chat_channels`, `chat_messages`, …).
 
 ## Schema
 
@@ -26,6 +33,7 @@ Email history panels are on all of the above modals (buy-side added in phase 4).
 |-----------|---------|
 | `136_comms_foundation.sql` | `com_sent_messages`, `com_email_templates`, `com_thread_links`, module + permissions |
 | `139_gmail_comms.sql` | `com_mail_messages`, Gmail connection tables, `comms.inbox` permission |
+| `244_comms_chat.sql` | Team chat tables + `comms.chat` / `comms.chat_admin` + `crm_notifications` source `chat` |
 
 ## Delivery
 
@@ -39,7 +47,7 @@ Signatures are per-user (`com_email_signatures`); edit under **Communications �
 
 ## Demo data
 
-`api/internal/modules/demodata/sql/seed-demo-comms.sql` creates sample sent messages with subjects `DEMO-COMMS-*` and stub inbox rows linked to demo quotations/orders.
+`api/internal/modules/demodata/sql/seed-demo-comms.sql` creates sample sent messages with subjects `DEMO-COMMS-*`, stub inbox rows, and Team Chat channel `#general` with a sample quotation link when migration 244 is applied.
 
 Status check: `demo_comms_sent` on Demo Data screen.
 
@@ -66,9 +74,9 @@ Status check: `demo_comms_sent` on Demo Data screen.
 
 ## Manual test checklist
 
-1. Apply migrations `136`, `139`; enable `comms` module.
-2. Save a quotation → Email → recipient receives PDF (or sent log shows `pending`/`sent`).
-3. Communications → Sent Documents lists the message.
-4. Reopen quotation modal — Email history panel shows the send.
-5. Repeat on PO, RFQ, and supplier invoice modals.
-6. Demo Data populate — `DEMO-COMMS-*` subjects appear in status checks.
+1. Apply migrations `136`, `139`, `244`; enable `comms` module.
+2. Communications → Team Chat → create channel / DM → post message, @mention, attach ERP doc + file under 25 MB.
+3. Other tenant / non-member cannot open channel id or download attachment.
+4. Save a quotation → Email → recipient receives PDF (or sent log shows `pending`/`sent`).
+5. Communications → Sent Documents lists the message.
+6. Demo Data populate — `#general` appears when chat tables exist; `DEMO-COMMS-*` subjects in email status checks.
