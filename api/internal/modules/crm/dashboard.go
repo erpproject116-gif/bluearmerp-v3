@@ -128,7 +128,8 @@ func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = pool.QueryRow(ctx, `
 			select count(*) from public.crm_notifications n
 			where n.tenant_id = $1 and n.read_at is null
-			  and (n.user_id is null or n.user_id = $2)`,
+			  and (n.user_id is null or n.user_id = $2)
+			  and (n.actor_user_id is null or n.actor_user_id <> $2)`,
 			tu.TenantID, tu.AppUserID).Scan(&s.UnreadNotificationsCount)
 
 		_ = pool.QueryRow(ctx, fmt.Sprintf(`

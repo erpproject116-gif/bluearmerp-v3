@@ -1,14 +1,20 @@
 import { createSignal, For, Show } from "solid-js";
-import { useNavigate } from "@solidjs/router";
-import { crmNotificationHref } from "../../shared/crmNotificationRoutes";
+import { A, useNavigate } from "@solidjs/router";
+import {
+  crmNotificationHref,
+  crmNotificationRelativeTime,
+  crmNotificationSourceLabel,
+} from "../../shared/crmNotificationRoutes";
 import {
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
   useCrmNotifications,
   useInvalidateCrmNotifications,
   type CrmNotification,
+  type CrmNotificationSource,
 } from "../../shared/useCrmNotifications";
 import { useToast } from "../../shared/toast";
+import { canManageCrmRules, useAuth } from "../../shared/auth-context";
 import { CrmLayout } from "./CrmLayout";
 import { LoadingText } from "../../shared/LoadingText";
 
@@ -18,10 +24,21 @@ const severityClass: Record<CrmNotification["severity"], string> = {
   critical: "border-l-red-500",
 };
 
+type SourceFilter = "" | CrmNotificationSource;
+
+const SOURCE_CHIPS: { value: SourceFilter; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "rule", label: "Alerts" },
+  { value: "support", label: "Support" },
+  { value: "activity", label: "Activity" },
+];
+
 export default function CrmNotificationsPage() {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [page, setPage] = createSignal(1);
   const [unreadOnly, setUnreadOnly] = createSignal(false);
+  const [source, setSource] = createSignal<SourceFilter>("");
   const pageSize = 25;
   const toast = useToast();
   const invalidate = useInvalidateCrmNotifications();
@@ -30,18 +47,20 @@ export default function CrmNotificationsPage() {
     page: page(),
     pageSize,
     unreadOnly: unreadOnly(),
+    source: source(),
   }));
 
   const totalPages = () => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize));
 
   const markRead = async (n: CrmNotification) => {
-    if (n.read_at) return;
+    if (n.read_at) return true;
     const res = await markCrmNotificationRead(n.id);
     if (!res.success) {
       toast.warning(res.message ?? "Could not mark as read.");
-      return;
+      return false;
     }
     invalidate();
+    return true;
   };
 
   const markAll = async () => {
@@ -54,15 +73,18 @@ export default function CrmNotificationsPage() {
   };
 
   const openNotification = async (n: CrmNotification) => {
-    await markRead(n);
+    const ok = await markRead(n);
+    if (!ok) return;
     navigate(crmNotificationHref(n));
   };
 
   return (
     <CrmLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-text-secondary">In-app alerts from warranty, quotations, and stock rules.</p>
-        <div class="flex flex-wrap gap-2">
+        <p class="text-sm text-text-secondary">
+          Inbox for alert rules, support updates, and important activity events.
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
           <label class="flex items-center gap-2 text-sm text-text-secondary">
             <input
               type="checkbox"
@@ -84,14 +106,44 @@ export default function CrmNotificationsPage() {
         </div>
       </div>
 
+      <div class="mb-4 flex flex-wrap gap-2">
+        <For each={SOURCE_CHIPS}>
+          {(chip) => (
+            <button
+              type="button"
+              class="rounded-lg border px-3 py-1 text-xs font-medium transition"
+              classList={{
+                "border-brand-600 bg-brand-50 text-brand-700": source() === chip.value,
+                "border-stroke text-text-secondary hover:bg-slate-50": source() !== chip.value,
+              }}
+              onClick={() => {
+                setSource(chip.value);
+                setPage(1);
+              }}
+            >
+              {chip.label}
+            </button>
+          )}
+        </For>
+      </div>
+
       <div class="space-y-2">
         <Show when={list.isFetching}>
           <LoadingText class="text-sm text-text-secondary" as="p" />
         </Show>
         <Show when={!list.isFetching && (list.data?.rows.length ?? 0) === 0}>
-          <p class="rounded-xl border border-stroke bg-white p-8 text-center text-sm text-text-secondary">
-            No notifications.
-          </p>
+          <div class="rounded-xl border border-stroke bg-white p-8 text-center text-sm text-text-secondary">
+            <p>No notifications.</p>
+            <Show when={canManageCrmRules(auth.me)}>
+              <p class="mt-2">
+                Configure when alerts are generated in{" "}
+                <A href="/app/crm/settings/alert-rules" class="font-medium text-brand-600 hover:underline">
+                  Alert Rules
+                </A>
+                .
+              </p>
+            </Show>
+          </div>
         </Show>
         <For each={list.data?.rows ?? []}>
           {(n) => (
@@ -103,12 +155,20 @@ export default function CrmNotificationsPage() {
             >
               <div class="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <h3 class="font-medium text-text-primary">{n.title}</h3>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="font-medium text-text-primary">{n.title}</h3>
+                    <span class="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+                      {crmNotificationSourceLabel(n.source)}
+                    </span>
+                  </div>
                   <Show when={n.body}>
                     <p class="mt-1 text-sm text-text-secondary">{n.body}</p>
                   </Show>
-                  <p class="mt-2 text-xs text-text-secondary">{new Date(n.created_at).toLocaleString()}</p>
-                  <p class="mt-1 text-xs font-medium text-brand-600">Click to open</p>
+                  <p class="mt-2 text-xs text-text-secondary">
+                    {crmNotificationRelativeTime(n.created_at)}
+                    <span class="mx-1.5 text-stroke">·</span>
+                    {new Date(n.created_at).toLocaleString()}
+                  </p>
                 </div>
                 <Show when={!n.read_at}>
                   <span class="rounded-lg bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600">Unread</span>

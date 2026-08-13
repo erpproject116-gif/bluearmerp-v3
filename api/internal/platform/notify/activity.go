@@ -11,38 +11,54 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// FromAudit mirrors create/update audit events into the in-app notification bell
-// (crm_notifications) and the owner change-alert digest queue.
+// FromAudit mirrors high-value audit events into the in-app notification bell
+// (crm_notifications) and queues the owner change-alert digest for the broader set.
 // Actor is stored so list endpoints can hide the actor's own events.
 func FromAudit(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, oldJSON, newJSON []byte) {
-	if pool == nil || !shouldNotify(actionCode) {
+	if pool == nil {
+		return
+	}
+	writeBell := shouldWriteBell(actionCode)
+	queueDigest := shouldQueueDigest(actionCode)
+	if !writeBell && !queueDigest {
 		return
 	}
 	title, body := describeAction(actionCode, targetType, targetID)
 	body = enrichTrailBody(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, body, oldJSON, newJSON)
-	dedupe := fmt.Sprintf("act:%s:%v:%d", actionCode, targetID, time.Now().UnixNano())
-	var entityID any
-	if targetID != nil {
-		entityID = *targetID
-	} else {
-		entityID = nil
+	if writeBell {
+		dedupe := activityBellDedupeKey(actionCode, targetType, targetID, time.Now().UTC())
+		var entityID any
+		if targetID != nil {
+			entityID = *targetID
+		} else {
+			entityID = nil
+		}
+		var actor any
+		if actorUserID > 0 {
+			actor = actorUserID
+		} else {
+			actor = nil
+		}
+		_, _ = pool.Exec(ctx, `
+			insert into public.crm_notifications
+			  (tenant_id, user_id, rule_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id, source)
+			values ($1, null, null, 'info', $2, $3, $4, $5, $6, $7, 'activity')
+			on conflict (tenant_id, dedupe_key) do nothing`,
+			tenantID, title, body, nullIfEmpty(targetType), entityID, dedupe, actor)
 	}
-	var actor any
-	if actorUserID > 0 {
-		actor = actorUserID
-	} else {
-		actor = nil
+	if queueDigest {
+		QueueChangeAlert(ctx, pool, tenantID, actorUserID, actionCode, title, body, targetType, targetID)
 	}
-	_, _ = pool.Exec(ctx, `
-		insert into public.crm_notifications
-		  (tenant_id, user_id, rule_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id)
-		values ($1, null, null, 'info', $2, $3, $4, $5, $6, $7)
-		on conflict (tenant_id, dedupe_key) do nothing`,
-		tenantID, title, body, nullIfEmpty(targetType), entityID, dedupe, actor)
-	QueueChangeAlert(ctx, pool, tenantID, actorUserID, actionCode, title, body, targetType, targetID)
 }
 
-func shouldNotify(actionCode string) bool {
+// shouldQueueDigest is the broader gate for owner email digests (legacy shouldNotify).
+func shouldQueueDigest(actionCode string) bool {
+	return shouldNotifyInteresting(actionCode) && hasNotifyModulePrefix(actionCode)
+}
+
+// shouldWriteBell is the narrow gate for in-app bell rows — high-value verbs only.
+// Generic create/update/delete/restore never write to the bell.
+func shouldWriteBell(actionCode string) bool {
 	if actionCode == "" {
 		return false
 	}
@@ -52,7 +68,36 @@ func shouldNotify(actionCode string) bool {
 	if strings.Contains(actionCode, ".list") || strings.Contains(actionCode, ".export") {
 		return false
 	}
-	interesting := strings.HasSuffix(actionCode, ".create") ||
+	if strings.HasSuffix(actionCode, ".create") ||
+		strings.HasSuffix(actionCode, ".update") ||
+		strings.HasSuffix(actionCode, ".delete") ||
+		strings.HasSuffix(actionCode, ".restore") {
+		return false
+	}
+	highValue := strings.Contains(actionCode, ".progress") ||
+		strings.Contains(actionCode, ".confirm") ||
+		strings.Contains(actionCode, ".checkout") ||
+		strings.Contains(actionCode, ".build") ||
+		strings.Contains(actionCode, ".share") ||
+		strings.HasSuffix(actionCode, ".post") ||
+		strings.Contains(actionCode, ".send_email")
+	if !highValue {
+		return false
+	}
+	return hasNotifyModulePrefix(actionCode)
+}
+
+func shouldNotifyInteresting(actionCode string) bool {
+	if actionCode == "" {
+		return false
+	}
+	if strings.Contains(actionCode, ".attachment.") {
+		return false
+	}
+	if strings.Contains(actionCode, ".list") || strings.Contains(actionCode, ".export") {
+		return false
+	}
+	return strings.HasSuffix(actionCode, ".create") ||
 		strings.HasSuffix(actionCode, ".update") ||
 		strings.HasSuffix(actionCode, ".delete") ||
 		strings.HasSuffix(actionCode, ".restore") ||
@@ -63,9 +108,9 @@ func shouldNotify(actionCode string) bool {
 		strings.Contains(actionCode, ".share") ||
 		strings.HasSuffix(actionCode, ".post") ||
 		strings.Contains(actionCode, ".send_email")
-	if !interesting {
-		return false
-	}
+}
+
+func hasNotifyModulePrefix(actionCode string) bool {
 	prefixes := []string{
 		"quotation.", "sales.", "sales_order.", "purchase.", "purchase_order.", "purchase_request.",
 		"goods_receipt.", "delivery_receipt.", "finance.", "inventory.", "crm.", "support.",
@@ -77,6 +122,19 @@ func shouldNotify(actionCode string) bool {
 		}
 	}
 	return false
+}
+
+func activityBellDedupeKey(actionCode, targetType string, targetID *int64, at time.Time) string {
+	idPart := "0"
+	if targetID != nil {
+		idPart = fmt.Sprintf("%d", *targetID)
+	}
+	et := strings.TrimSpace(targetType)
+	if et == "" {
+		et = "_"
+	}
+	bucket := at.UTC().Format("2006-01-02-15")
+	return fmt.Sprintf("act:%s:%s:%s:%s", actionCode, et, idPart, bucket)
 }
 
 func describeAction(actionCode, targetType string, targetID *int64) (title, body string) {

@@ -23,6 +23,8 @@ type Notification struct {
 	Body       string  `json:"body"`
 	EntityType *string `json:"entity_type,omitempty"`
 	EntityID   *int64  `json:"entity_id,omitempty"`
+	Source     string  `json:"source"`
+	Href       string  `json:"href"`
 	ReadAt     *string `json:"read_at,omitempty"`
 	CreatedAt  string  `json:"created_at"`
 }
@@ -47,8 +49,15 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 		if strings.TrimSpace(r.URL.Query().Get("unread_only")) == "true" {
 			where += " and n.read_at is null"
 		}
+		src := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("source")))
+		switch src {
+		case "activity", "rule", "support", "system":
+			where += fmt.Sprintf(" and n.source = $%d", n)
+			args = append(args, src)
+			n++
+		}
 		q := fmt.Sprintf(`select n.id, n.rule_id, n.severity, n.title, n.body,
-		  n.entity_type, n.entity_id, n.read_at, n.created_at, count(*) over()
+		  n.entity_type, n.entity_id, coalesce(n.source, 'activity'), n.read_at, n.created_at, count(*) over()
 		  from public.crm_notifications n
 		  where %s
 		  order by n.created_at %s limit $%d offset $%d`,
@@ -68,13 +77,14 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 			var createdAt time.Time
 			if err := rows.Scan(
 				&row.ID, &row.RuleID, &row.Severity, &row.Title, &row.Body,
-				&row.EntityType, &row.EntityID, &readAt, &createdAt, &total,
+				&row.EntityType, &row.EntityID, &row.Source, &readAt, &createdAt, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read notifications.", "ERR_INTERNAL")
 				return
 			}
 			row.ReadAt = datePtrToStr(readAt)
 			row.CreatedAt = createdAt.Format(time.RFC3339)
+			row.Href = NotificationHref(row.EntityType, row.EntityID)
 			out = append(out, row)
 		}
 		if out == nil {

@@ -1,9 +1,14 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { Modal } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
 import { createQuery } from "@tanstack/solid-query";
+import {
+  formatFileSize,
+  uploadAttachment,
+  type AttachmentScope,
+} from "../../../shared/attachments";
 
 export type ApplyAppLine = {
   doc_id: number;
@@ -22,8 +27,14 @@ type Props = {
   onApplied: () => void;
 };
 
+type PendingFile = { key: string; file: File };
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function attachmentScope(side: "ar" | "ap"): AttachmentScope {
+  return side === "ar" ? "finance/official-receipts" : "finance/payment-vouchers";
 }
 
 export function PaymentApplyJournalModal(props: Props) {
@@ -35,6 +46,14 @@ export function PaymentApplyJournalModal(props: Props) {
   const [remarkMode, setRemarkMode] = createSignal<"same" | "doc" | "manual">("same");
   const [manualRemark, setManualRemark] = createSignal("");
   const [referenceNo, setReferenceNo] = createSignal("");
+  const [pendingFiles, setPendingFiles] = createSignal<PendingFile[]>([]);
+
+  createEffect(() => {
+    if (!props.open) {
+      setPendingFiles([]);
+      setSaving(false);
+    }
+  });
 
   const banks = createQuery(() => ({
     queryKey: ["bank-accounts-open-pay"],
@@ -70,6 +89,53 @@ export function PaymentApplyJournalModal(props: Props) {
     return props.partnerLabel ? `Payment — ${props.partnerLabel}` : null;
   };
 
+  const onPickFiles = (e: Event & { currentTarget: HTMLInputElement }) => {
+    const files = Array.from(e.currentTarget.files ?? []);
+    e.currentTarget.value = "";
+    if (files.length === 0) return;
+    const stamp = Date.now();
+    setPendingFiles((prev) => [
+      ...prev,
+      ...files.map((file, i) => ({ key: `${file.name}-${file.size}-${stamp}-${i}`, file })),
+    ]);
+  };
+
+  const extractCreatedIds = (data: unknown): number[] => {
+    if (!data) return [];
+    if (Array.isArray(data)) {
+      return data
+        .map((row) => (row && typeof row === "object" && "id" in row ? Number((row as { id: number }).id) : 0))
+        .filter((id) => id > 0);
+    }
+    if (typeof data === "object" && data !== null && "id" in data) {
+      const id = Number((data as { id: number }).id);
+      return id > 0 ? [id] : [];
+    }
+    return [];
+  };
+
+  const uploadPendingToDocs = async (docIds: number[]) => {
+    const queue = pendingFiles();
+    if (!queue.length || !docIds.length) return;
+    const scope = attachmentScope(props.side);
+    let ok = 0;
+    let fail = 0;
+    for (const docId of docIds) {
+      for (const entry of queue) {
+        const res = await uploadAttachment(scope, docId, entry.file);
+        if (res.success) ok += 1;
+        else fail += 1;
+      }
+    }
+    if (ok > 0) {
+      toast.success(ok === 1 ? "Receipt attached." : `${ok} attachment(s) uploaded.`);
+    }
+    if (fail > 0) {
+      toast.warning(`${fail} attachment(s) failed to upload. Open the voucher/receipt to retry.`);
+    }
+    setPendingFiles([]);
+  };
+
   const apply = async () => {
     if (props.lines.length === 0) {
       toast.warning("Select at least one row with a decrease amount.");
@@ -84,7 +150,7 @@ export function PaymentApplyJournalModal(props: Props) {
         : referenceNo().trim() || null;
 
     if (props.side === "ar") {
-      const res = await apiFetch(
+      const res = await apiFetch<{ id: number } | { id: number }[]>(
         "/api/v1/finance/receivables/apply",
         {
           method: "POST",
@@ -104,14 +170,15 @@ export function PaymentApplyJournalModal(props: Props) {
         },
         { silent: true },
       );
-      setSaving(false);
       if (!res.success) {
+        setSaving(false);
         toast.error(res.message ?? "Failed to apply receivable payment.");
         return;
       }
       toast.success(res.message ?? "Receivable payment applied.");
+      await uploadPendingToDocs(extractCreatedIds(res.data));
     } else {
-      const res = await apiFetch(
+      const res = await apiFetch<{ id: number } | { id: number }[]>(
         "/api/v1/finance/payables/apply",
         {
           method: "POST",
@@ -131,13 +198,15 @@ export function PaymentApplyJournalModal(props: Props) {
         },
         { silent: true },
       );
-      setSaving(false);
       if (!res.success) {
+        setSaving(false);
         toast.error(res.message ?? "Failed to apply payable payment.");
         return;
       }
       toast.success(res.message ?? "Payable payment applied.");
+      await uploadPendingToDocs(extractCreatedIds(res.data));
     }
+    setSaving(false);
     props.onApplied();
     props.onClose();
   };
@@ -214,6 +283,54 @@ export function PaymentApplyJournalModal(props: Props) {
         <Field label="Reference no.">
           <input class={inputClass} value={referenceNo()} onInput={(e) => setReferenceNo(e.currentTarget.value)} />
         </Field>
+
+        <div class="rounded-lg border border-stroke bg-slate-50/80 px-3 py-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p class="text-sm font-medium text-text-primary">Attachments</p>
+              <p class="mt-0.5 text-xs text-text-secondary">
+                Add receipt photos or PDFs. Files upload when you Apply.
+              </p>
+            </div>
+            <label class="inline-flex cursor-pointer items-center rounded-lg border border-stroke bg-white px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50">
+              Add files
+              <input
+                type="file"
+                class="sr-only"
+                multiple
+                accept="image/*,.pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx"
+                disabled={saving()}
+                onChange={onPickFiles}
+              />
+            </label>
+          </div>
+          <Show
+            when={pendingFiles().length > 0}
+            fallback={<p class="mt-2 text-xs text-text-secondary">No files selected yet.</p>}
+          >
+            <ul class="mt-2 space-y-1.5">
+              <For each={pendingFiles()}>
+                {(entry) => (
+                  <li class="flex items-center justify-between gap-2 rounded-md border border-stroke bg-white px-2 py-1.5 text-sm">
+                    <span class="min-w-0 truncate text-text-primary">
+                      {entry.file.name}
+                      <span class="ml-2 text-xs text-text-secondary">{formatFileSize(entry.file.size)}</span>
+                    </span>
+                    <button
+                      type="button"
+                      class="shrink-0 text-xs font-medium text-rose-600 hover:underline"
+                      disabled={saving()}
+                      onClick={() => setPendingFiles((prev) => prev.filter((p) => p.key !== entry.key))}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+
         <p class="text-sm text-text-secondary">
           Applying {props.lines.length} line(s) for <strong>{props.partnerLabel || "selected partners"}</strong>
           {props.allowMultiPartner ? " (multi-partner bundling on)." : "."}

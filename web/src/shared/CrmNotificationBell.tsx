@@ -1,6 +1,10 @@
 import { A, useNavigate } from "@solidjs/router";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { crmNotificationHref } from "./crmNotificationRoutes";
+import {
+  crmNotificationHref,
+  crmNotificationRelativeTime,
+  crmNotificationSourceLabel,
+} from "./crmNotificationRoutes";
 import {
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
@@ -41,13 +45,21 @@ export function CrmNotificationBell(props: Props) {
       const t = e.target as HTMLElement;
       if (!t.closest("[data-crm-bell]")) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("click", close);
-    onCleanup(() => document.removeEventListener("click", close));
+    document.addEventListener("keydown", onKey);
+    onCleanup(() => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", onKey);
+    });
   });
 
   const openNotification = async (n: CrmNotification) => {
     if (!n.read_at) {
-      await markCrmNotificationRead(n.id);
+      const res = await markCrmNotificationRead(n.id);
+      if (!res.success) return;
       invalidate();
     }
     setOpen(false);
@@ -55,7 +67,8 @@ export function CrmNotificationBell(props: Props) {
   };
 
   const markAllRead = async () => {
-    await markAllCrmNotificationsRead();
+    const res = await markAllCrmNotificationsRead();
+    if (!res.success) return;
     invalidate();
   };
 
@@ -66,6 +79,7 @@ export function CrmNotificationBell(props: Props) {
           type="button"
           class="relative rounded-lg border border-stroke p-2 text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
           aria-label="Notifications"
+          aria-expanded={open()}
           onClick={(e) => {
             e.stopPropagation();
             setOpen((v) => !v);
@@ -133,11 +147,16 @@ export function CrmNotificationBell(props: Props) {
                         <StatusIcon kind={severityKind(n.severity)} size="sm" />
                       </span>
                       <div class="min-w-0 flex-1">
-                        <p class="text-sm font-medium text-text-primary">{n.title}</p>
+                        <div class="flex items-center gap-2">
+                          <p class="text-sm font-medium text-text-primary">{n.title}</p>
+                          <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
+                            {crmNotificationSourceLabel(n.source)}
+                          </span>
+                        </div>
                         <Show when={n.body}>
                           <p class="mt-0.5 line-clamp-2 text-xs text-text-secondary">{n.body}</p>
                         </Show>
-                        <p class="mt-1 text-[10px] text-brand-600">Click to open</p>
+                        <p class="mt-1 text-[10px] text-text-secondary">{crmNotificationRelativeTime(n.created_at)}</p>
                       </div>
                     </div>
                   </button>

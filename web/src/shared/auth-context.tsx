@@ -150,6 +150,15 @@ export function canViewCrm(me: MeData | null | undefined): boolean {
   return Boolean(u.can_view_crm || u.is_platform_superadmin || u.is_tenant_owner);
 }
 
+/** Same gate as the notifications inbox page (CrmRoute + ModuleAccessGate). */
+export function canViewCrmNotifications(me: MeData | null | undefined): boolean {
+  if (!canViewCrm(me)) return false;
+  if (me?.user?.permissions && Object.keys(me.user.permissions).length > 0) {
+    return hasPermission(me, "crm.notifications", "read");
+  }
+  return true;
+}
+
 export function canManageCrmRules(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;

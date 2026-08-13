@@ -75,6 +75,7 @@ func registerPaymentVoucherRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("finance.payment_vouchers_new", auth.AccessWrite)).Post("/payment-vouchers", createPaymentVoucher(pool))
 	r.Get("/payment-vouchers/{id}", getPaymentVoucher(pool))
 	r.With(auth.RequirePermission("finance.payment_vouchers", auth.AccessWrite)).Delete("/payment-vouchers/{id}", deletePaymentVoucher(pool))
+	registerPVAttachmentRoutes(r, pool)
 	registerPaymentVoucherApprovalRoutes(r, pool)
 }
 

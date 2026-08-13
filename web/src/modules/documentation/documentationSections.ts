@@ -557,7 +557,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "tip",
-        text: "The bell icon at the top of the screen shows CRM alerts when you have new notifications. The floating Help (?) button opens the help assistant; the ticket button above it opens a new support ticket. Drag the pair to move them; double-click to reset position.",
+        text: "The bell icon at the top of the screen shows your notification inbox for alert rules, support updates, and important activity events. The floating Help (?) button opens the help assistant; the ticket button above it opens a new support ticket. Drag the pair to move them; double-click to reset position.",
       },
       {
         type: "tip",

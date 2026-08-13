@@ -87,34 +87,25 @@ func notifyTicketUpdate(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 		body = fmt.Sprintf("%s — assigned to %s (status: %s).", after.Subject, assignee, strings.ReplaceAll(after.Status, "_", " "))
 	}
 
-	recipients := map[int64]struct{}{}
-	if after.CreatedByUserID != nil && *after.CreatedByUserID > 0 {
-		recipients[*after.CreatedByUserID] = struct{}{}
-	}
-	if after.AssignedUserID != nil && *after.AssignedUserID > 0 {
-		recipients[*after.AssignedUserID] = struct{}{}
-	}
-	if before.AssignedUserID != nil && *before.AssignedUserID > 0 {
-		recipients[*before.AssignedUserID] = struct{}{}
-	}
-	delete(recipients, tu.AppUserID)
+	recipients := ticketNotifyRecipients(after.CreatedByUserID, after.AssignedUserID, before.AssignedUserID, tu.AppUserID)
 
 	entityType := "support_ticket"
+	severity := ticketNotifySeverity(after.Priority, changed)
 	assigneeKey := "0"
 	if after.AssignedUserID != nil {
 		assigneeKey = fmt.Sprintf("%d", *after.AssignedUserID)
 	}
-	for userID := range recipients {
+	for _, userID := range recipients {
 		// Include resulting values so successive status changes still notify
 		// (dedupe_key is unique per tenant; field names alone are not enough).
 		dedupe := fmt.Sprintf("support.ticket_updated:%d:%d:%d:%s:%s:%s:%s",
 			tu.TenantID, after.ID, userID, after.Status, after.Priority, assigneeKey, strings.Join(changed, ","))
 		_, err := pool.Exec(ctx, `
 			insert into public.crm_notifications (
-			  tenant_id, user_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id
-			) values ($1, $2, 'info', $3, $4, $5, $6, $7, $8)
+			  tenant_id, user_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id, source
+			) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'support')
 			on conflict (tenant_id, dedupe_key) do nothing`,
-			tu.TenantID, userID, title, body, entityType, after.ID, dedupe, tu.AppUserID)
+			tu.TenantID, userID, severity, title, body, entityType, after.ID, dedupe, tu.AppUserID)
 		if err != nil {
 			log.Printf("support: notify user %d on ticket %s: %v", userID, after.TicketNo, err)
 		}
@@ -130,4 +121,36 @@ func containsStr(list []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// ticketNotifySeverity picks bell severity from ticket priority and changed fields.
+func ticketNotifySeverity(priority string, changed []string) string {
+	p := strings.ToLower(strings.TrimSpace(priority))
+	if p == "urgent" || p == "high" {
+		return "critical"
+	}
+	if containsStr(changed, "status") || containsStr(changed, "assignee") {
+		return "warning"
+	}
+	return "info"
+}
+
+// ticketNotifyRecipients returns user IDs that should receive a bell row (actor excluded).
+func ticketNotifyRecipients(createdBy, assignedAfter, assignedBefore *int64, actorUserID int64) []int64 {
+	set := map[int64]struct{}{}
+	if createdBy != nil && *createdBy > 0 {
+		set[*createdBy] = struct{}{}
+	}
+	if assignedAfter != nil && *assignedAfter > 0 {
+		set[*assignedAfter] = struct{}{}
+	}
+	if assignedBefore != nil && *assignedBefore > 0 {
+		set[*assignedBefore] = struct{}{}
+	}
+	delete(set, actorUserID)
+	out := make([]int64, 0, len(set))
+	for id := range set {
+		out = append(out, id)
+	}
+	return out
 }
