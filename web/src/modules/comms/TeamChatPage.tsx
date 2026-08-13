@@ -16,25 +16,56 @@ import { formatFileSize } from "../../shared/attachments";
 import {
   CHAT_ENTITY_TYPES,
   CHAT_MAX_ATTACH_BYTES,
+  CHAT_REACTION_EMOJIS,
+  addChatReaction,
   createChatChannel,
+  createChatReminder,
   createOrGetDM,
   downloadChatAttachment,
+  fetchBaikoCapabilities,
+  fetchDueChatReminders,
+  forwardChatMessage,
   getChatMessage,
   listChatChannels,
   listChatMessages,
+  listChatTyping,
   listChatUsers,
   markChatRead,
   postChatMessage,
+  postChatSlash,
+  postChatTyping,
+  removeChatReaction,
   searchChatDocs,
   uploadChatAttachment,
   type ChatChannel,
   type ChatMessage,
   type ChatMessageLink,
+  type ChatTypingUser,
   type ChatUser,
   type DocSearchHit,
 } from "./chatApi";
 
 type PendingLink = { entity_type: string; entity_id?: number | null; label: string; href: string };
+
+type SlashItem = { command: string; label: string; baikoOnly?: boolean };
+
+const SLASH_ITEMS: SlashItem[] = [
+  { command: "reminder", label: "Schedule a reminder" },
+  { command: "baiko", label: "Ask Baiko", baikoOnly: true },
+  { command: "ask", label: "Ask Baiko (free text)", baikoOnly: true },
+  { command: "analyze", label: "Analyze linked docs", baikoOnly: true },
+  { command: "quotation", label: "Open new quotation", baikoOnly: true },
+  { command: "sales-order", label: "Open new sales order", baikoOnly: true },
+  { command: "sales", label: "Open new sales invoice", baikoOnly: true },
+  { command: "purchase-request", label: "Open purchase request", baikoOnly: true },
+  { command: "purchase-order", label: "Open purchase order", baikoOnly: true },
+  { command: "rfq", label: "Open RFQ", baikoOnly: true },
+  { command: "purchase", label: "Open supplier invoice", baikoOnly: true },
+  { command: "ticket", label: "Open support tickets", baikoOnly: true },
+  { command: "crm", label: "Open CRM leads", baikoOnly: true },
+];
+
+const BUBBLE_TAILS_KEY = "bluearm.chat.bubbleTails";
 
 function escapeHtml(s: string): string {
   return s
@@ -57,6 +88,16 @@ function renderBodyWithMentions(body: string, users: ChatUser[]): string {
       return p;
     })
     .join("");
+}
+
+function readBubbleTails(): boolean {
+  try {
+    const v = localStorage.getItem(BUBBLE_TAILS_KEY);
+    if (v === null) return true;
+    return v !== "0";
+  } catch {
+    return true;
+  }
 }
 
 export default function TeamChatPage() {
@@ -86,17 +127,39 @@ export default function TeamChatPage() {
   const [docType, setDocType] = createSignal("quo_quotation");
   const [docQ, setDocQ] = createSignal("");
   const [docHits, setDocHits] = createSignal<DocSearchHit[]>([]);
-  const [pageVisible, setPageVisible] = createSignal(typeof document === "undefined" ? true : document.visibilityState === "visible");
+  const [pageVisible, setPageVisible] = createSignal(
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
+  const [replyTo, setReplyTo] = createSignal<ChatMessage | null>(null);
+  const [forwardMsg, setForwardMsg] = createSignal<ChatMessage | null>(null);
+  const [forwardChannelId, setForwardChannelId] = createSignal<number | null>(null);
+  const [bubbleTails, setBubbleTails] = createSignal(readBubbleTails());
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  const [typers, setTypers] = createSignal<ChatTypingUser[]>([]);
+  const [canBaikoSlash, setCanBaikoSlash] = createSignal(false);
+  const [slashOpen, setSlashOpen] = createSignal(false);
+  const [slashQ, setSlashQ] = createSignal("");
+  const [reminderOpen, setReminderOpen] = createSignal(false);
+  const [reminderTitle, setReminderTitle] = createSignal("");
+  const [reminderAt, setReminderAt] = createSignal("");
+  const [reminderNotify, setReminderNotify] = createSignal(true);
+  const [reminderCrm, setReminderCrm] = createSignal(false);
+  const [pendingApprove, setPendingApprove] = createSignal<{
+    navigate: string;
+    hint?: string;
+    draftType?: string;
+  } | null>(null);
 
   const meId = () => auth.me?.user?.id ?? 0;
-
   const selected = createMemo(() => channels().find((c) => c.id === selectedId()) ?? null);
 
   const filteredChannels = createMemo(() => {
     const q = filter().trim().toLowerCase();
     const rows = channels();
     if (!q) return rows;
-    return rows.filter((c) => c.name.toLowerCase().includes(q) || (c.last_message_preview ?? "").toLowerCase().includes(q));
+    return rows.filter(
+      (c) => c.name.toLowerCase().includes(q) || (c.last_message_preview ?? "").toLowerCase().includes(q),
+    );
   });
 
   const channelsBySection = createMemo(() => {
@@ -116,6 +179,15 @@ export default function TeamChatPage() {
     return users().filter(
       (u) => u.id !== meId() && (!q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)),
     );
+  });
+
+  const slashCandidates = createMemo(() => {
+    const q = slashQ().toLowerCase();
+    return SLASH_ITEMS.filter((item) => {
+      if (item.baikoOnly && !canBaikoSlash()) return false;
+      if (!q) return true;
+      return item.command.includes(q) || item.label.toLowerCase().includes(q);
+    });
   });
 
   const refreshChannels = async () => {
@@ -146,8 +218,34 @@ export default function TeamChatPage() {
   const selectChannel = (id: number) => {
     setSelectedId(id);
     setMobileShowThread(true);
+    setReplyTo(null);
+    setPendingApprove(null);
     void loadMessages(id);
   };
+
+  const toggleBubbleTails = () => {
+    setBubbleTails((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(BUBBLE_TAILS_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const signalTyping = (() => {
+    let last = 0;
+    return () => {
+      const id = selectedId();
+      if (!id) return;
+      const now = Date.now();
+      if (now - last < 2000) return;
+      last = now;
+      void postChatTyping(id);
+    };
+  })();
 
   onMount(() => {
     const onVis = () => setPageVisible(document.visibilityState === "visible");
@@ -158,6 +256,15 @@ export default function TeamChatPage() {
       await refreshChannels();
       const u = await listChatUsers("");
       if (u.success) setUsers(u.data ?? []);
+      const caps = await fetchBaikoCapabilities();
+      if (caps.success && caps.data) setCanBaikoSlash(Boolean(caps.data.can_use_baiko_slash));
+
+      const due = await fetchDueChatReminders();
+      if (due.success && (due.data?.length ?? 0) > 0) {
+        for (const rem of due.data ?? []) {
+          toast.success(`Reminder: ${rem.title}`);
+        }
+      }
 
       const mid = Number(params.messageId || 0);
       const cid = Number(params.channelId || 0);
@@ -188,6 +295,14 @@ export default function TeamChatPage() {
           void refreshChannels();
         }
       });
+      void listChatTyping(id).then((res) => {
+        if (res.success) setTypers(res.data ?? []);
+      });
+      void fetchDueChatReminders().then((res) => {
+        if (res.success && (res.data?.length ?? 0) > 0) {
+          for (const rem of res.data ?? []) toast.success(`Reminder: ${rem.title}`);
+        }
+      });
     }, interval);
     onCleanup(() => window.clearInterval(t));
   });
@@ -207,6 +322,7 @@ export default function TeamChatPage() {
     const res = await postChatMessage(id, {
       body: text || (links.length ? "Shared a document" : "Shared a file"),
       mention_ids: mentionIds(),
+      parent_message_id: replyTo()?.id ?? null,
       links: links.map((l) => ({
         entity_type: l.entity_type,
         entity_id: l.entity_id ?? null,
@@ -230,20 +346,78 @@ export default function TeamChatPage() {
     setPendingFiles([]);
     setPendingLinks([]);
     setMentionIds([]);
+    setReplyTo(null);
     setSending(false);
     await loadMessages(id);
+  };
+
+  const runSlash = async (command: string, args = "") => {
+    const id = selectedId();
+    if (!id) return;
+    if (command === "reminder") {
+      setSlashOpen(false);
+      setDraft("");
+      setReminderOpen(true);
+      return;
+    }
+    setSending(true);
+    const res = await postChatSlash(id, command, args);
+    setSending(false);
+    setSlashOpen(false);
+    setDraft("");
+    if (!res.success) {
+      toast.error(res.message || "Slash command failed.");
+      return;
+    }
+    const data = res.data;
+    if (data?.navigate) {
+      setPendingApprove({
+        navigate: data.navigate,
+        hint: data.approve_hint,
+        draftType: data.action_draft?.type,
+      });
+    }
+    await loadMessages(id);
+  };
+
+  const handleComposerInput = (value: string) => {
+    setDraft(value);
+    signalTyping();
+    const trimmed = value.trimStart();
+    if (trimmed.startsWith("/")) {
+      const rest = trimmed.slice(1);
+      const space = rest.search(/\s/);
+      setSlashOpen(true);
+      setSlashQ(space >= 0 ? rest.slice(0, space) : rest);
+      setMentionOpen(false);
+      return;
+    }
+    setSlashOpen(false);
+    const m = value.match(/@([^\s@]*)$/);
+    if (m) {
+      setMentionOpen(true);
+      setMentionQ(m[1] ?? "");
+    } else {
+      setMentionOpen(false);
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      const trimmed = draft().trim();
+      if (trimmed.startsWith("/") && slashOpen() && slashCandidates()[0]) {
+        const item = slashCandidates()[0]!;
+        const args = trimmed.replace(new RegExp(`^/${item.command}\\s*`, "i"), "").trim();
+        void runSlash(item.command, args);
+        return;
+      }
       void handleSend();
     }
-    if (e.key === "@") {
-      setMentionOpen(true);
-      setMentionQ("");
+    if (e.key === "Escape") {
+      setMentionOpen(false);
+      setSlashOpen(false);
     }
-    if (e.key === "Escape") setMentionOpen(false);
   };
 
   const handleCreate = async () => {
@@ -323,10 +497,88 @@ export default function TeamChatPage() {
     const next = [...pendingFiles(), ...Array.from(files)];
     const total = next.reduce((s, f) => s + f.size, 0);
     if (total > CHAT_MAX_ATTACH_BYTES) {
-      toast.error(`Combined attachments must stay under 25 MB (${formatFileSize(CHAT_MAX_ATTACH_BYTES - pendingBytes())} remaining).`);
+      toast.error(
+        `Combined attachments must stay under 25 MB (${formatFileSize(CHAT_MAX_ATTACH_BYTES - pendingBytes())} remaining).`,
+      );
       return;
     }
     setPendingFiles(next);
+  };
+
+  const toggleReaction = async (m: ChatMessage, emoji: string) => {
+    const mine = m.reactions?.find((r) => r.emoji === emoji && r.me);
+    const res = mine ? await removeChatReaction(m.id, emoji) : await addChatReaction(m.id, emoji);
+    if (!res.success) {
+      toast.error(res.message || "Failed to react.");
+      return;
+    }
+    const id = selectedId();
+    if (id) await loadMessages(id);
+  };
+
+  const handleForward = async () => {
+    const msg = forwardMsg();
+    const chId = forwardChannelId();
+    if (!msg || !chId) return;
+    const res = await forwardChatMessage(msg.id, chId);
+    if (!res.success) {
+      toast.error(res.message || "Forward failed.");
+      return;
+    }
+    toast.success("Message forwarded.");
+    setForwardMsg(null);
+    await refreshChannels();
+    selectChannel(chId);
+  };
+
+  const handleCreateReminder = async () => {
+    const title = reminderTitle().trim();
+    if (!title) {
+      toast.error("Title is required.");
+      return;
+    }
+    const local = reminderAt().trim();
+    if (!local) {
+      toast.error("When is required.");
+      return;
+    }
+    const remindAt = new Date(local).toISOString();
+    const res = await createChatReminder({
+      title,
+      remind_at: remindAt,
+      channel_id: selectedId(),
+      notify_channel: reminderNotify(),
+      also_crm_task: reminderCrm(),
+    });
+    if (!res.success) {
+      toast.error(res.message || "Failed to schedule reminder.");
+      return;
+    }
+    toast.success("Reminder scheduled.");
+    setReminderOpen(false);
+    setReminderTitle("");
+    setReminderAt("");
+    const id = selectedId();
+    if (id) await loadMessages(id);
+  };
+
+  const senderLabel = (m: ChatMessage) => {
+    if (m.sender_kind === "baiko") return "Baiko";
+    if (m.sender_kind === "system") return "System";
+    if (m.sender_user_id === meId()) return "You";
+    return m.sender_name || "User";
+  };
+
+  const messageShellClass = (m: ChatMessage) => {
+    if (!bubbleTails()) {
+      return m.sender_user_id === meId() ? "bg-brand-50/60" : "";
+    }
+    if (m.sender_kind === "baiko") return "ml-0 mr-8 rounded-2xl rounded-bl-md bg-slate-100 px-3 py-2";
+    if (m.sender_kind === "system") return "mx-auto max-w-[90%] rounded-lg bg-amber-50 px-3 py-2 text-center";
+    if (m.sender_user_id === meId()) {
+      return "ml-8 mr-0 rounded-2xl rounded-br-md bg-brand-100 px-3 py-2";
+    }
+    return "ml-0 mr-8 rounded-2xl rounded-bl-md bg-slate-100 px-3 py-2";
   };
 
   return (
@@ -387,7 +639,7 @@ export default function TeamChatPage() {
               Message a teammate
             </button>
           </Show>
-          <For each={(["channel", "group", "dm"] as const)}>
+          <For each={["channel", "group", "dm"] as const}>
             {(section) => (
               <Show when={channelsBySection()[section].length > 0}>
                 <p class="mb-1 mt-3 px-2 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
@@ -407,7 +659,7 @@ export default function TeamChatPage() {
                         {ch.type === "channel" ? `# ${ch.name}` : ch.name}
                       </span>
                       <Show when={ch.unread_count > 0}>
-                        <span class="ml-2 animate-[fadeIn_0.2s_ease] rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold text-white">
+                        <span class="ml-2 rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold text-white">
                           {ch.unread_count > 99 ? "99+" : ch.unread_count}
                         </span>
                       </Show>
@@ -428,9 +680,7 @@ export default function TeamChatPage() {
       </aside>
 
       <section
-        class={`min-w-0 flex-1 flex-col ${
-          !mobileShowThread() && selectedId() ? "hidden md:flex" : "flex"
-        }`}
+        class={`min-w-0 flex-1 flex-col ${!mobileShowThread() && selectedId() ? "hidden md:flex" : "flex"}`}
       >
         <Show
           when={selected()}
@@ -442,7 +692,7 @@ export default function TeamChatPage() {
         >
           {(ch) => (
             <>
-              <header class="flex items-center gap-2 border-b border-stroke px-3 py-2">
+              <header class="relative flex items-center gap-2 border-b border-stroke px-3 py-2">
                 <button
                   type="button"
                   class="rounded-lg border border-stroke px-2 py-1 text-sm md:hidden"
@@ -457,6 +707,45 @@ export default function TeamChatPage() {
                   </h3>
                   <p class="text-xs text-text-secondary">{ch().member_count} members</p>
                 </div>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-2 py-1 text-sm"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen()}
+                  aria-label="Chat options"
+                  onClick={() => setMenuOpen((v) => !v)}
+                >
+                  ⋯
+                </button>
+                <Show when={menuOpen()}>
+                  <div
+                    class="absolute right-3 top-12 z-10 min-w-[12rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
+                    role="menu"
+                  >
+                    <button
+                      type="button"
+                      class="block w-full px-3 py-2 text-left text-sm hover:bg-brand-50"
+                      role="menuitem"
+                      onClick={() => {
+                        toggleBubbleTails();
+                        setMenuOpen(false);
+                      }}
+                    >
+                      Bubble layout: {bubbleTails() ? "On" : "Off"}
+                    </button>
+                    <button
+                      type="button"
+                      class="block w-full px-3 py-2 text-left text-sm hover:bg-brand-50"
+                      role="menuitem"
+                      onClick={() => {
+                        setReminderOpen(true);
+                        setMenuOpen(false);
+                      }}
+                    >
+                      Schedule reminder
+                    </button>
+                  </div>
+                </Show>
               </header>
 
               <div class="flex-1 space-y-3 overflow-y-auto px-3 py-3" role="log" aria-live="polite">
@@ -469,23 +758,41 @@ export default function TeamChatPage() {
                 <For each={messages()}>
                   {(m) => (
                     <article
-                      class={`animate-[fadeIn_0.25s_ease] rounded-lg px-2 py-1.5 ${
-                        m.sender_user_id === meId() ? "bg-brand-50/60" : ""
-                      }`}
+                      class={`group animate-[fadeIn_0.25s_ease] ${m.parent_message_id ? "ml-4 border-l-2 border-brand-200 pl-3" : ""} ${messageShellClass(m)}`}
                     >
                       <Show
                         when={!m.deleted_at}
                         fallback={<p class="text-sm italic text-text-secondary">Message removed</p>}
                       >
+                        <Show when={m.parent_preview}>
+                          {(pv) => (
+                            <div class="mb-1 rounded border border-stroke/80 bg-white/70 px-2 py-1 text-xs text-text-secondary">
+                              <span class="font-medium text-text-primary">{pv().sender_name || "User"}</span>
+                              <span class="ml-1">{pv().body}</span>
+                            </div>
+                          )}
+                        </Show>
+                        <Show when={m.forwarded_from_message_id}>
+                          <p class="mb-0.5 text-[11px] italic text-text-secondary">Forwarded message</p>
+                        </Show>
                         <div class="mb-0.5 flex flex-wrap items-baseline gap-2">
-                          <span class={`text-sm ${m.sender_user_id === meId() ? "font-semibold" : "font-medium"} text-text-primary`}>
-                            {m.sender_user_id === meId() ? "You" : m.sender_name || "User"}
+                          <span
+                            class={`text-sm ${
+                              m.sender_kind === "baiko"
+                                ? "font-semibold text-brand-800"
+                                : m.sender_user_id === meId()
+                                  ? "font-semibold"
+                                  : "font-medium"
+                            } text-text-primary`}
+                          >
+                            {senderLabel(m)}
                           </span>
-                          <span class="text-[11px] text-text-secondary">{crmNotificationRelativeTime(m.created_at)}</span>
+                          <span class="text-[11px] text-text-secondary">
+                            {crmNotificationRelativeTime(m.created_at)}
+                          </span>
                         </div>
                         <p
                           class="whitespace-pre-wrap text-sm text-text-primary"
-                          // Mentions are escaped then wrapped; body is never raw HTML from server.
                           innerHTML={renderBodyWithMentions(m.body, users())}
                         />
                         <Show when={(m.links?.length ?? 0) > 0}>
@@ -519,7 +826,61 @@ export default function TeamChatPage() {
                                   onClick={() => void downloadChatAttachment(att)}
                                 >
                                   <span class="truncate">{att.file_name}</span>
-                                  <span class="shrink-0 text-xs text-text-secondary">{formatFileSize(att.size_bytes)}</span>
+                                  <span class="shrink-0 text-xs text-text-secondary">
+                                    {formatFileSize(att.size_bytes)}
+                                  </span>
+                                </button>
+                              )}
+                            </For>
+                          </div>
+                        </Show>
+                        <div class="mt-1 flex flex-wrap items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                          <For each={[...CHAT_REACTION_EMOJIS]}>
+                            {(emoji) => (
+                              <button
+                                type="button"
+                                class="rounded px-1 text-sm hover:bg-white/80"
+                                aria-label={`React ${emoji}`}
+                                onClick={() => void toggleReaction(m, emoji)}
+                              >
+                                {emoji}
+                                <Show when={m.reactions?.find((r) => r.emoji === emoji)}>
+                                  {(r) => <span class="ml-0.5 text-[10px]">{r().count}</span>}
+                                </Show>
+                              </button>
+                            )}
+                          </For>
+                          <button
+                            type="button"
+                            class="rounded px-1.5 text-[11px] font-medium text-brand-700 hover:bg-white/80"
+                            onClick={() => setReplyTo(m)}
+                          >
+                            Reply
+                          </button>
+                          <button
+                            type="button"
+                            class="rounded px-1.5 text-[11px] font-medium text-brand-700 hover:bg-white/80"
+                            onClick={() => {
+                              setForwardMsg(m);
+                              setForwardChannelId(channels().find((c) => c.id !== selectedId())?.id ?? null);
+                            }}
+                          >
+                            Forward
+                          </button>
+                        </div>
+                        <Show when={(m.reactions?.length ?? 0) > 0}>
+                          <div class="mt-1 flex flex-wrap gap-1">
+                            <For each={m.reactions ?? []}>
+                              {(r) => (
+                                <button
+                                  type="button"
+                                  class={`rounded-full border px-1.5 text-xs ${
+                                    r.me ? "border-brand-400 bg-brand-50" : "border-stroke bg-white"
+                                  }`}
+                                  aria-pressed={r.me}
+                                  onClick={() => void toggleReaction(m, r.emoji)}
+                                >
+                                  {r.emoji} {r.count}
                                 </button>
                               )}
                             </For>
@@ -532,13 +893,56 @@ export default function TeamChatPage() {
               </div>
 
               <div class="border-t border-stroke p-3">
+                <Show when={pendingApprove()}>
+                  {(pa) => (
+                    <div class="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm">
+                      <span class="flex-1 text-text-primary">
+                        {pa().hint || "Approve to open the ERP screen — nothing is auto-posted."}
+                      </span>
+                      <button
+                        type="button"
+                        class="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white"
+                        onClick={() => {
+                          navigate(pa().navigate);
+                          setPendingApprove(null);
+                        }}
+                      >
+                        Approve to open
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-stroke px-2 py-1 text-xs"
+                        onClick={() => setPendingApprove(null)}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+                </Show>
+                <Show when={replyTo()}>
+                  {(m) => (
+                    <div class="mb-2 flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/80 px-2 py-1.5 text-xs">
+                      <div class="min-w-0 flex-1">
+                        <span class="font-medium">Replying to {senderLabel(m())}</span>
+                        <span class="ml-1 truncate text-text-secondary">{m().body.slice(0, 80)}</span>
+                      </div>
+                      <button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>
+                        ×
+                      </button>
+                    </div>
+                  )}
+                </Show>
                 <Show when={pendingLinks().length > 0 || pendingFiles().length > 0}>
                   <div class="mb-2 flex flex-wrap gap-1">
                     <For each={pendingLinks()}>
                       {(l, i) => (
                         <span class="inline-flex items-center gap-1 rounded-full border border-stroke bg-white px-2 py-0.5 text-xs">
                           {l.label}
-                          <button type="button" aria-label="Remove document" onClick={() => setPendingLinks((p) => p.filter((_, idx) => idx !== i()))}>
+                          <button
+                            type="button"
+                            aria-label="Remove document"
+                            onClick={() => setPendingLinks((p) => p.filter((_, idx) => idx !== i()))}
+                          >
                             ×
                           </button>
                         </span>
@@ -548,7 +952,11 @@ export default function TeamChatPage() {
                       {(f, i) => (
                         <span class="inline-flex items-center gap-1 rounded-full border border-stroke bg-white px-2 py-0.5 text-xs">
                           {f.name}
-                          <button type="button" aria-label="Remove file" onClick={() => setPendingFiles((p) => p.filter((_, idx) => idx !== i()))}>
+                          <button
+                            type="button"
+                            aria-label="Remove file"
+                            onClick={() => setPendingFiles((p) => p.filter((_, idx) => idx !== i()))}
+                          >
                             ×
                           </button>
                         </span>
@@ -557,6 +965,28 @@ export default function TeamChatPage() {
                     <span class="text-xs text-text-secondary">
                       {formatFileSize(remainingBytes())} of 25 MB remaining
                     </span>
+                  </div>
+                </Show>
+                <Show when={slashOpen()}>
+                  <div class="mb-2 max-h-48 overflow-y-auto rounded-lg border border-stroke bg-white shadow-sm">
+                    <For each={slashCandidates()} fallback={<p class="p-2 text-xs text-text-secondary">No commands</p>}>
+                      {(item) => (
+                        <button
+                          type="button"
+                          class="block w-full px-3 py-2 text-left text-sm hover:bg-brand-50"
+                          onClick={() => {
+                            const args = draft()
+                              .trim()
+                              .replace(new RegExp(`^/${item.command}\\s*`, "i"), "")
+                              .trim();
+                            void runSlash(item.command, args);
+                          }}
+                        >
+                          <span class="font-medium">/{item.command}</span>
+                          <span class="ml-2 text-text-secondary">{item.label}</span>
+                        </button>
+                      )}
+                    </For>
                   </div>
                 </Show>
                 <Show when={mentionOpen()}>
@@ -574,6 +1004,14 @@ export default function TeamChatPage() {
                     </For>
                   </div>
                 </Show>
+                <Show when={typers().length > 0}>
+                  <p class="mb-1 text-xs text-text-secondary" aria-live="polite">
+                    {typers()
+                      .map((t) => t.full_name)
+                      .join(", ")}{" "}
+                    {typers().length === 1 ? "is" : "are"} typing…
+                  </p>
+                </Show>
                 <label class="sr-only" for="team-chat-composer">
                   Message
                 </label>
@@ -581,17 +1019,13 @@ export default function TeamChatPage() {
                   id="team-chat-composer"
                   class="mb-2 w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
                   rows={3}
-                  placeholder="Write a message… Enter to send, Shift+Enter for newline. Type @ to mention."
+                  placeholder={
+                    canBaikoSlash()
+                      ? "Message… / for Baiko skills & reminder, @ to mention"
+                      : "Message… /reminder, @ to mention"
+                  }
                   value={draft()}
-                  onInput={(e) => {
-                    setDraft(e.currentTarget.value);
-                    const v = e.currentTarget.value;
-                    const m = v.match(/@([^\s@]*)$/);
-                    if (m) {
-                      setMentionOpen(true);
-                      setMentionQ(m[1] ?? "");
-                    }
-                  }}
+                  onInput={(e) => handleComposerInput(e.currentTarget.value)}
                   onKeyDown={handleKeyDown}
                   disabled={sending()}
                 />
@@ -606,6 +1040,18 @@ export default function TeamChatPage() {
                     }}
                   >
                     @
+                  </button>
+                  <button
+                    type="button"
+                    class="min-h-10 rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium"
+                    aria-label="Slash commands"
+                    onClick={() => {
+                      setDraft("/");
+                      setSlashOpen(true);
+                      setSlashQ("");
+                    }}
+                  >
+                    /
                   </button>
                   <label class="min-h-10 cursor-pointer rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium">
                     Attach file
@@ -640,7 +1086,7 @@ export default function TeamChatPage() {
                   </button>
                 </div>
                 <p class="mt-2 text-xs text-text-secondary">
-                  Attach source documents (SO, PO, invoice, etc.) — Load Slip is a form tool, not a chat attachment.{" "}
+                  Attach source documents (SO, PO, invoice, etc.).{" "}
                   <A href="/app/comms/sent-documents" class="text-brand-700 underline">
                     Email inbox
                   </A>
@@ -672,7 +1118,9 @@ export default function TeamChatPage() {
               >
                 <option value="">Select user…</option>
                 <For each={users().filter((u) => u.id !== meId())}>
-                  {(u) => <option value={u.id}>{u.full_name}</option>}
+                  {(u) => (
+                    <option value={u.id}>{u.full_name}</option>
+                  )}
                 </For>
               </select>
             </Show>
@@ -699,7 +1147,11 @@ export default function TeamChatPage() {
               <div class="mb-3 max-h-48 overflow-y-auto rounded-lg border border-stroke">
                 <For each={docHits()} fallback={<p class="p-3 text-sm text-text-secondary">No results</p>}>
                   {(hit) => (
-                    <button type="button" class="block w-full border-b border-stroke px-3 py-2 text-left text-sm hover:bg-brand-50" onClick={() => attachDoc(hit)}>
+                    <button
+                      type="button"
+                      class="block w-full border-b border-stroke px-3 py-2 text-left text-sm hover:bg-brand-50"
+                      onClick={() => attachDoc(hit)}
+                    >
                       {hit.label}
                     </button>
                   )}
@@ -711,10 +1163,94 @@ export default function TeamChatPage() {
                 Cancel
               </button>
               <Show when={showCreate() !== "doc"}>
-                <button type="button" class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white" onClick={() => void handleCreate()}>
+                <button
+                  type="button"
+                  class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white"
+                  onClick={() => void handleCreate()}
+                >
                   Create
                 </button>
               </Show>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={forwardMsg()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Forward message">
+          <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
+            <h3 class="mb-3 text-base font-semibold">Forward message</h3>
+            <select
+              class="mb-3 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
+              value={forwardChannelId() ?? ""}
+              onChange={(e) => setForwardChannelId(Number(e.currentTarget.value) || null)}
+            >
+              <option value="">Select conversation…</option>
+              <For each={channels()}>
+                {(c) => (
+                  <option value={c.id}>{c.type === "channel" ? `# ${c.name}` : c.name}</option>
+                )}
+              </For>
+            </select>
+            <div class="flex justify-end gap-2">
+              <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setForwardMsg(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white"
+                disabled={!forwardChannelId()}
+                onClick={() => void handleForward()}
+              >
+                Forward
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={reminderOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Schedule reminder">
+          <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
+            <h3 class="mb-3 text-base font-semibold">Schedule reminder</h3>
+            <label class="mb-1 block text-xs font-medium text-text-secondary" for="chat-rem-title">
+              Title
+            </label>
+            <input
+              id="chat-rem-title"
+              class="mb-3 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
+              value={reminderTitle()}
+              onInput={(e) => setReminderTitle(e.currentTarget.value)}
+            />
+            <label class="mb-1 block text-xs font-medium text-text-secondary" for="chat-rem-at">
+              When
+            </label>
+            <input
+              id="chat-rem-at"
+              type="datetime-local"
+              class="mb-3 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
+              value={reminderAt()}
+              onInput={(e) => setReminderAt(e.currentTarget.value)}
+            />
+            <label class="mb-2 flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={reminderNotify()} onChange={(e) => setReminderNotify(e.currentTarget.checked)} />
+              Post in this channel when due
+            </label>
+            <label class="mb-3 flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={reminderCrm()} onChange={(e) => setReminderCrm(e.currentTarget.checked)} />
+              Also create CRM follow-up task
+            </label>
+            <div class="flex justify-end gap-2">
+              <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setReminderOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white"
+                onClick={() => void handleCreateReminder()}
+              >
+                Schedule
+              </button>
             </div>
           </div>
         </div>

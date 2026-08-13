@@ -487,7 +487,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     children: [
       { id: "crm", label: "CRM", href: "/app/crm/dashboard", iconId: "crm", topId: "more", moduleId: "crm", expandGroupId: "more_apps" },
       { id: "booking", label: "Booking", href: "/app/booking/bookings", iconId: "booking", topId: "more", moduleId: "booking", expandGroupId: "more_apps" },
-      { id: "comms", label: "Communications", href: "/app/comms/sent-documents", iconId: "comms", topId: "more", moduleId: "comms", expandGroupId: "more_apps" },
+      { id: "comms", label: "Communications", href: "/app/comms/chat", iconId: "comms", topId: "more", moduleId: "comms", expandGroupId: "more_apps" },
       { id: "operations", label: "Project Management", href: "/app/operations", iconId: "operations", topId: "more", moduleId: "operations", expandGroupId: "more_apps" },
       { id: "sop", label: "SOP", href: "/app/sop", iconId: "sop", topId: "more", moduleId: "sop", expandGroupId: "more_apps" },
       { id: "okr", label: "OKRs", href: "/app/okr", iconId: "okr", topId: "more", moduleId: "okr", expandGroupId: "more_apps" },

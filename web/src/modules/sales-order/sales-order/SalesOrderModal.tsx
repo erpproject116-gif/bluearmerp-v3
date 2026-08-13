@@ -630,6 +630,8 @@ export function SalesOrderModal(props: Props) {
                 lines: lines(),
                 companyName: auth.me?.tenant.company_name,
               })}
+              shareEntityType="so_sales_order"
+              shareLabel={salesOrderNo() || "Sales order"}
             />
             <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
               History

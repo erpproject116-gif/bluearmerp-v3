@@ -20,12 +20,18 @@ First-party staff messaging scoped to the JWT tenant (`tenant_id` on all tables 
 | Capability | Notes |
 |------------|--------|
 | Channels / groups / DMs | `comms.chat` permission |
+| Unread badge | Sidebar Communications badge via `GET /comms/chat/unread-total` |
+| Reply / forward | `parent_message_id`, `POST .../messages/{id}/forward` |
+| Share to chat | Document toolbars (quotation, sales, SO, PO) next to Email |
+| Typing / reactions / bubbles | Ephemeral typing TTL; emoji subset; `localStorage` bubble tails |
+| Reminders | In-app `chat_reminders` (+ optional CRM follow-up); `/reminder` for everyone — **not** Google Calendar OAuth |
+| Baiko `/` skills | **Owner or platform superadmin only**; approve-to-open drafts — never silent ERP writes |
 | @mentions | Writes `crm_notifications` with `source=chat` |
 | ERP document cards | Allowlisted entity types; server-built hrefs |
-| File attachments | Combined **25 MiB** per message, Postgres `bytea` (same as support tickets) |
+| File attachments | Combined **25 MiB** per message, Postgres `bytea` |
 | Realtime v1 | Poll ~4s while the chat page is visible |
 
-Schema: migration `244_comms_chat.sql` (`chat_channels`, `chat_messages`, …).
+Schema: migrations `244_comms_chat.sql`, `245_chat_reply_forward_reactions_reminders.sql`.
 
 ## Schema
 
@@ -34,6 +40,7 @@ Schema: migration `244_comms_chat.sql` (`chat_channels`, `chat_messages`, …).
 | `136_comms_foundation.sql` | `com_sent_messages`, `com_email_templates`, `com_thread_links`, module + permissions |
 | `139_gmail_comms.sql` | `com_mail_messages`, Gmail connection tables, `comms.inbox` permission |
 | `244_comms_chat.sql` | Team chat tables + `comms.chat` / `comms.chat_admin` + `crm_notifications` source `chat` |
+| `245_chat_reply_forward_reactions_reminders.sql` | Reply, forward, reactions, typing, reminders, `sender_kind` |
 
 ## Delivery
 
@@ -74,9 +81,12 @@ Status check: `demo_comms_sent` on Demo Data screen.
 
 ## Manual test checklist
 
-1. Apply migrations `136`, `139`, `244`; enable `comms` module.
-2. Communications → Team Chat → create channel / DM → post message, @mention, attach ERP doc + file under 25 MB.
-3. Other tenant / non-member cannot open channel id or download attachment.
-4. Save a quotation → Email → recipient receives PDF (or sent log shows `pending`/`sent`).
-5. Communications → Sent Documents lists the message.
-6. Demo Data populate — `#general` appears when chat tables exist; `DEMO-COMMS-*` subjects in email status checks.
+1. Apply migrations `136`, `139`, `244`, `245`; enable `comms` module.
+2. Communications → Team Chat → create channel / DM → post, reply, react, forward; @mention; attach ERP doc + file under 25 MB.
+3. Sidebar Communications shows unread badge; top-nav Communications lands on Team Chat.
+4. Owners/superadmins see `/` Baiko skills; members only see `/reminder` (API returns 403 for Baiko slash if forged).
+5. Reminder fires in-app notification (and optional channel system message) — no Google Calendar OAuth.
+6. Other tenant / non-member cannot open channel id or download attachment.
+7. Save a quotation → Email / Share to chat → recipient or channel receives content.
+8. Communications → Sent Documents lists email sends; Settings for Gmail/SMTP.
+9. Demo Data populate — `#general` appears when chat tables exist; `DEMO-COMMS-*` subjects in email status checks.

@@ -29,6 +29,7 @@ import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { SendEmailModal } from "../../comms/SendEmailModal";
+import { ShareToChatModal } from "../../comms/ShareToChatModal";
 import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
 import { fetchQuotationPrint } from "./quotationPrint";
@@ -253,7 +254,9 @@ export function QuotationModal(props: Props) {
   const [profitRows, setProfitRows] = createSignal<ProfitLineRow[]>([]);
   const [profitBusy, setProfitBusy] = createSignal(false);
   const [emailOpen, setEmailOpen] = createSignal(false);
+  const [shareOpen, setShareOpen] = createSignal(false);
   const [emailDefaultTo, setEmailDefaultTo] = createSignal("");
+  const canShareChat = () => hasPermission(auth.me, "comms.chat", "write");
   const [newCustomerName, setNewCustomerName] = createSignal("");
   const [picUserId, setPicUserId] = createSignal<number | null>(null);
   const [picName, setPicName] = createSignal("");
@@ -768,6 +771,16 @@ export function QuotationModal(props: Props) {
                 Email
               </button>
             </Show>
+            <Show when={canShareChat()}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-slate-50"
+                onClick={() => setShareOpen(true)}
+                aria-label="Share to Team Chat"
+              >
+                Share to chat
+              </button>
+            </Show>
             <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
               History
             </button>
@@ -1086,6 +1099,13 @@ export function QuotationModal(props: Props) {
         lines: lines(),
         companyName: auth.me?.tenant.company_name,
       })}
+    />
+    <ShareToChatModal
+      open={shareOpen()}
+      onClose={() => setShareOpen(false)}
+      entityType="quo_quotation"
+      entityId={effectiveEditing()?.id ?? 0}
+      label={referenceNo() || "Quotation"}
     />
 
     <Show when={rfqImportOpen()}>

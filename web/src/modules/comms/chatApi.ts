@@ -44,13 +44,56 @@ export type ChatMessage = {
   channel_id: number;
   sender_user_id?: number | null;
   sender_name?: string;
+  sender_kind?: "user" | "baiko" | "system";
   body: string;
   created_at: string;
   deleted_at?: string | null;
+  parent_message_id?: number | null;
+  forwarded_from_message_id?: number | null;
+  parent_preview?: {
+    id: number;
+    body: string;
+    sender_name?: string;
+    deleted?: boolean;
+  } | null;
   mention_ids?: number[];
   links?: ChatMessageLink[];
   attachments?: ChatAttachment[];
+  reactions?: { emoji: string; count: number; me: boolean }[];
 };
+
+export type ChatTypingUser = {
+  user_id: number;
+  full_name: string;
+};
+
+export type ChatReminder = {
+  id: number;
+  channel_id?: number | null;
+  title: string;
+  body?: string;
+  remind_at: string;
+  status: string;
+  notify_channel: boolean;
+  crm_task_id?: number | null;
+  created_at: string;
+};
+
+export type BaikoCapabilities = {
+  can_use_baiko_slash: boolean;
+  commands: string[];
+  everyone_commands: string[];
+};
+
+export type SlashResult = {
+  message?: ChatMessage;
+  navigate?: string;
+  action_draft?: { type: string; payload?: Record<string, unknown> };
+  approve_hint?: string;
+  ask_query?: string;
+};
+
+export const CHAT_REACTION_EMOJIS = ["👍", "❤️", "😂", "👀", "✅"] as const;
 
 export type DocSearchHit = {
   entity_type: string;
@@ -114,6 +157,7 @@ export async function postChatMessage(
     body: string;
     mention_ids?: number[];
     links?: { entity_type: string; entity_id?: number | null; label?: string }[];
+    parent_message_id?: number | null;
   },
 ) {
   return apiFetch<ChatMessage>(`/api/v1/comms/chat/channels/${channelId}/messages`, {
@@ -193,5 +237,66 @@ export async function addChatMembers(channelId: number, userIds: number[]) {
   return apiFetch(`/api/v1/comms/chat/channels/${channelId}/members`, {
     method: "POST",
     body: JSON.stringify({ user_ids: userIds }),
+  });
+}
+
+export async function fetchChatUnreadTotal() {
+  return apiFetch<{ unread_total: number }>("/api/v1/comms/chat/unread-total", {}, { silent: true });
+}
+
+export async function postChatTyping(channelId: number) {
+  return apiFetch(`/api/v1/comms/chat/channels/${channelId}/typing`, { method: "POST", body: "{}" }, { silent: true });
+}
+
+export async function listChatTyping(channelId: number) {
+  return apiFetch<ChatTypingUser[]>(`/api/v1/comms/chat/channels/${channelId}/typing`, {}, { silent: true });
+}
+
+export async function addChatReaction(messageId: number, emoji: string) {
+  return apiFetch(`/api/v1/comms/chat/messages/${messageId}/reactions`, {
+    method: "POST",
+    body: JSON.stringify({ emoji }),
+  });
+}
+
+export async function removeChatReaction(messageId: number, emoji: string) {
+  return apiFetch(`/api/v1/comms/chat/messages/${messageId}/reactions?emoji=${encodeURIComponent(emoji)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function forwardChatMessage(messageId: number, channelId: number) {
+  return apiFetch<ChatMessage>(`/api/v1/comms/chat/messages/${messageId}/forward`, {
+    method: "POST",
+    body: JSON.stringify({ channel_id: channelId }),
+  });
+}
+
+export async function createChatReminder(body: {
+  title: string;
+  body?: string;
+  remind_at: string;
+  channel_id?: number | null;
+  notify_channel?: boolean;
+  also_crm_task?: boolean;
+}) {
+  return apiFetch<ChatReminder>("/api/v1/comms/chat/reminders", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchDueChatReminders() {
+  return apiFetch<ChatReminder[]>("/api/v1/comms/chat/reminders/due", {}, { silent: true });
+}
+
+export async function fetchBaikoCapabilities() {
+  return apiFetch<BaikoCapabilities>("/api/v1/comms/chat/baiko-capabilities", {}, { silent: true });
+}
+
+export async function postChatSlash(channelId: number, command: string, args = "") {
+  return apiFetch<SlashResult>(`/api/v1/comms/chat/channels/${channelId}/slash`, {
+    method: "POST",
+    body: JSON.stringify({ command, args }),
   });
 }

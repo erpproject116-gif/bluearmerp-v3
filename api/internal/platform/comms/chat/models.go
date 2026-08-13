@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 )
 
 type Channel struct {
@@ -51,17 +53,57 @@ type MessageAttachment struct {
 	DownloadPath     string `json:"download_path"`
 }
 
+type MessageReaction struct {
+	Emoji string `json:"emoji"`
+	Count int64  `json:"count"`
+	Me    bool   `json:"me"`
+}
+
+type ParentPreview struct {
+	ID         int64  `json:"id"`
+	Body       string `json:"body"`
+	SenderName string `json:"sender_name,omitempty"`
+	Deleted    bool   `json:"deleted,omitempty"`
+}
+
 type Message struct {
-	ID           int64               `json:"id"`
-	ChannelID    int64               `json:"channel_id"`
-	SenderUserID *int64              `json:"sender_user_id,omitempty"`
-	SenderName   string              `json:"sender_name,omitempty"`
-	Body         string              `json:"body"`
-	CreatedAt    string              `json:"created_at"`
-	DeletedAt    *string             `json:"deleted_at,omitempty"`
-	MentionIDs   []int64             `json:"mention_ids,omitempty"`
-	Links        []MessageLink       `json:"links,omitempty"`
-	Attachments  []MessageAttachment `json:"attachments,omitempty"`
+	ID                     int64               `json:"id"`
+	ChannelID              int64               `json:"channel_id"`
+	SenderUserID           *int64              `json:"sender_user_id,omitempty"`
+	SenderName             string              `json:"sender_name,omitempty"`
+	SenderKind             string              `json:"sender_kind,omitempty"`
+	Body                   string              `json:"body"`
+	CreatedAt              string              `json:"created_at"`
+	DeletedAt              *string             `json:"deleted_at,omitempty"`
+	ParentMessageID        *int64              `json:"parent_message_id,omitempty"`
+	ForwardedFromMessageID *int64              `json:"forwarded_from_message_id,omitempty"`
+	ParentPreview          *ParentPreview      `json:"parent_preview,omitempty"`
+	MentionIDs             []int64             `json:"mention_ids,omitempty"`
+	Links                  []MessageLink       `json:"links,omitempty"`
+	Attachments            []MessageAttachment `json:"attachments,omitempty"`
+	Reactions              []MessageReaction   `json:"reactions,omitempty"`
+}
+
+type TypingUser struct {
+	UserID   int64  `json:"user_id"`
+	FullName string `json:"full_name"`
+}
+
+type Reminder struct {
+	ID               int64   `json:"id"`
+	ChannelID        *int64  `json:"channel_id,omitempty"`
+	CreatedByUserID  *int64  `json:"created_by_user_id,omitempty"`
+	Title            string  `json:"title"`
+	Body             string  `json:"body,omitempty"`
+	RemindAt         string  `json:"remind_at"`
+	Status           string  `json:"status"`
+	CRMTaskID        *int64  `json:"crm_task_id,omitempty"`
+	NotifyChannel    bool    `json:"notify_channel"`
+	CreatedAt        string  `json:"created_at"`
+}
+
+func canUseBaikoSlash(tu auth.TenantUser) bool {
+	return tu.IsPlatformSuperadmin || tu.IsTenantOwner
 }
 
 type ChatUser struct {
