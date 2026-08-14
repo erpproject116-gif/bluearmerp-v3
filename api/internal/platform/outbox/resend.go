@@ -41,10 +41,15 @@ type resendSendBody struct {
 	Text    string   `json:"text,omitempty"`
 }
 
-// SendResendEmail sends plain text and/or HTML via Resend's HTTPS API.
+// SendResendEmail sends plain text and/or HTML via Resend's HTTPS API (single recipient).
 func SendResendEmail(cfg ResendConfig, to, subject, textBody, htmlBody string) error {
-	to = strings.TrimSpace(to)
-	if to == "" {
+	return SendResendEmailToMany(cfg, []string{to}, subject, textBody, htmlBody)
+}
+
+// SendResendEmailToMany sends to one or more recipients via Resend HTTPS.
+func SendResendEmailToMany(cfg ResendConfig, to []string, subject, textBody, htmlBody string) error {
+	to = trimNonEmpty(to)
+	if len(to) == 0 {
 		return fmt.Errorf("recipient email is required")
 	}
 	if !cfg.Enabled() {
@@ -56,7 +61,7 @@ func SendResendEmail(cfg ResendConfig, to, subject, textBody, htmlBody string) e
 
 	payload := resendSendBody{
 		From:    cfg.From,
-		To:      []string{to},
+		To:      to,
 		Subject: subject,
 		Text:    textBody,
 		Html:    htmlBody,

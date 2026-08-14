@@ -16,7 +16,6 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -62,19 +61,6 @@ func inviteSuccessMessage() string {
 		return "Invite sent by email. They must sign in with Google using the invited email."
 	}
 	return "Invite saved as pending. Email is not configured — ask them to sign in with Google using the invited email."
-}
-
-func enqueueInviteEmailTx(ctx context.Context, tx pgx.Tx, pool *pgxpool.Pool, tenantID, inviterUserID, inviteID, userID int64, email, fullName, roleCode, idemSuffix string) error {
-	companyName, inviterName, signInURL := loadInviteEmailContext(ctx, pool, tenantID, inviterUserID)
-	payload := inviteEmailPayload{
-		InviteID: inviteID, UserID: userID, Email: email, FullName: fullName,
-		RoleCode: roleCode, CompanyName: companyName, InviterName: inviterName, SignInURL: signInURL,
-	}
-	key := fmt.Sprintf("user.invite:%d:%d", tenantID, inviteID)
-	if idemSuffix != "" {
-		key = fmt.Sprintf("user.invite:%d:%d:%s", tenantID, inviteID, idemSuffix)
-	}
-	return outbox.EnqueueTx(ctx, tx, tenantID, inviteEmailEventType, key, payload)
 }
 
 func registerRoleRoutes(r chi.Router, pool *pgxpool.Pool) {

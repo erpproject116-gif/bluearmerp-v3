@@ -9,6 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inviteemail"
 )
 
 var (
@@ -155,6 +157,11 @@ func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArg
 		}
 		result.Invited = true
 		result.InviteID = &inviteID
+		var inviterID int64
+		if a.InvitedByUserID != nil {
+			inviterID = *a.InvitedByUserID
+		}
+		_ = inviteemail.EnqueueUserInviteTx(ctx, tx, pool, tenantID, inviterID, inviteID, result.UserID, email, fullName, "store_admin", "")
 	}
 
 	if _, err := tx.Exec(ctx,
@@ -202,6 +209,10 @@ func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArg
 
 	if err := tx.Commit(ctx); err != nil {
 		return TenantResult{}, err
+	}
+
+	if result.Invited {
+		inviteemail.DrainUserInvitesAsync(pool)
 	}
 
 	result.TenantID = tenantID
