@@ -98,6 +98,19 @@ function shouldAutoSuccessToast(path: string, method?: string, options?: ApiFetc
   if (path.includes("/preview")) return false;
   if (/\/export(\?|$)/.test(path)) return false;
   if (/\/print(\?|$)/.test(path)) return false;
+  // Team chat is realtime UI — don't toast every send / react / typing pulse.
+  if (path.includes("/comms/chat/")) {
+    if (
+      path.includes("/messages") ||
+      path.includes("/typing") ||
+      path.includes("/reactions") ||
+      path.includes("/slash") ||
+      path.includes("/read") ||
+      path.includes("/forward")
+    ) {
+      return false;
+    }
+  }
   return true;
 }
 
