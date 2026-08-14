@@ -220,6 +220,8 @@ export default function TeamChatPage() {
     setMobileShowThread(true);
     setReplyTo(null);
     setPendingApprove(null);
+    setMentionOpen(false);
+    setSlashOpen(false);
     void loadMessages(id);
   };
 
@@ -347,6 +349,8 @@ export default function TeamChatPage() {
     setPendingLinks([]);
     setMentionIds([]);
     setReplyTo(null);
+    setMentionOpen(false);
+    setSlashOpen(false);
     setSending(false);
     await loadMessages(id);
   };
@@ -393,7 +397,8 @@ export default function TeamChatPage() {
       return;
     }
     setSlashOpen(false);
-    const m = value.match(/@([^\s@]*)$/);
+    // Only treat "@…" as a mention when @ starts a token (not mid-email like name@domain.com).
+    const m = value.match(/(?:^|[\s([{])@([^\s@]*)$/);
     if (m) {
       setMentionOpen(true);
       setMentionQ(m[1] ?? "");
@@ -486,10 +491,15 @@ export default function TeamChatPage() {
   const addMention = (u: ChatUser) => {
     setMentionIds((ids) => (ids.includes(u.id) ? ids : [...ids, u.id]));
     const cur = draft();
-    const at = cur.lastIndexOf("@");
-    const next = at >= 0 ? `${cur.slice(0, at)}@${u.full_name} ` : `${cur}@${u.full_name} `;
-    setDraft(next);
+    // Replace the active @token (after whitespace/start), not an email domain.
+    const next = cur.replace(/(?:^|[\s([{])@([^\s@]*)$/, (full) => {
+      const prefix = full.startsWith("@") ? "" : full[0]!;
+      return `${prefix}@${u.full_name} `;
+    });
+    setDraft(next === cur ? `${cur.replace(/\s*$/, "")}${cur ? " " : ""}@${u.full_name} ` : next);
     setMentionOpen(false);
+    setMentionQ("");
+    queueMicrotask(() => document.getElementById("team-chat-composer")?.focus());
   };
 
   const onPickFiles = (files: FileList | null) => {
@@ -1035,8 +1045,10 @@ export default function TeamChatPage() {
                     class="min-h-10 rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium"
                     aria-label="Mention teammate"
                     onClick={() => {
-                      setMentionOpen(true);
-                      setMentionQ("");
+                      const cur = draft();
+                      const next = /(?:^|[\s([{])@$/.test(cur) || cur.endsWith("@") ? cur : `${cur}${cur && !/\s$/.test(cur) ? " " : ""}@`;
+                      handleComposerInput(next);
+                      queueMicrotask(() => document.getElementById("team-chat-composer")?.focus());
                     }}
                   >
                     @
