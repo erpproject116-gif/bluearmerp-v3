@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inviteemail"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -111,10 +112,54 @@ func (s *service) createStaffInvite(w http.ResponseWriter, r *http.Request) {
 		response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
 		return
 	}
+	inviterName := "A teammate"
+	if tu.PlatformUserID > 0 {
+		_ = s.pool.QueryRow(r.Context(), `
+			select coalesce(nullif(trim(full_name), ''), coalesce(email, 'A teammate'))
+			from public.platform_users where id = $1`, tu.PlatformUserID).Scan(&inviterName)
+	}
+	inviteemail.SendStaffInviteAsync(id, email, strings.TrimSpace(body.FullName), role, inviterName)
+	msg := "Invite created. Staff must sign in with Google using " + email + "."
+	if inviteemail.MailConfigured() {
+		msg = "Invite emailed. Staff must sign in with Google using " + email + "."
+	} else {
+		msg = "Invite saved as pending. Email is not configured — ask them to sign in with Google using " + email + "."
+	}
 	response.OK(w, map[string]any{
-		"id": id,
-		"message": "Invite created. Staff must sign in with Google using " + email + ".",
+		"id":      id,
+		"message": msg,
 	}, "Created.")
+}
+
+func (s *service) resendStaffInvite(w http.ResponseWriter, r *http.Request) {
+	tu, _ := auth.FromContext(r.Context())
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		response.Validation(w, map[string]string{"id": "Invalid invite id."})
+		return
+	}
+	var email, fullName, role string
+	err = s.pool.QueryRow(r.Context(), `
+		select email, coalesce(full_name, ''), role
+		from public.platform_user_invites
+		where id = $1 and accepted_at is null and revoked_at is null
+		  and expires_at > now()`, id).Scan(&email, &fullName, &role)
+	if err != nil {
+		response.Err(w, http.StatusNotFound, "Pending staff invite not found.", "ERR_NOT_FOUND")
+		return
+	}
+	inviterName := "A teammate"
+	if tu.PlatformUserID > 0 {
+		_ = s.pool.QueryRow(r.Context(), `
+			select coalesce(nullif(trim(full_name), ''), coalesce(email, 'A teammate'))
+			from public.platform_users where id = $1`, tu.PlatformUserID).Scan(&inviterName)
+	}
+	inviteemail.SendStaffInviteAsync(id, email, fullName, role, inviterName)
+	msg := "Invite email re-queued."
+	if !inviteemail.MailConfigured() {
+		msg = "Invite is still pending. Email is not configured — ask them to sign in with Google using the invited email."
+	}
+	response.OK(w, map[string]any{"id": id}, msg)
 }
 
 func (s *service) revokeStaffInvite(w http.ResponseWriter, r *http.Request) {

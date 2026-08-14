@@ -79,6 +79,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.With(requirePlatformPermission("platform.staff.manage")).Get("/platform/console/staff", svc.listStaff)
 		cr.With(requirePlatformPermission("platform.staff.manage")).Get("/platform/console/staff/invites", svc.listStaffInvites)
 		cr.With(requirePlatformPermission("platform.staff.manage")).Post("/platform/console/staff/invites", svc.createStaffInvite)
+		cr.With(requirePlatformPermission("platform.staff.manage")).Post("/platform/console/staff/invites/{id}/resend", svc.resendStaffInvite)
 		cr.With(requirePlatformPermission("platform.staff.manage")).Post("/platform/console/staff/invites/{id}/revoke", svc.revokeStaffInvite)
 		cr.With(requirePlatformPermission("platform.staff.manage")).Patch("/platform/console/staff/{id}", svc.patchStaff)
 

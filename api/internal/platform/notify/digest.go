@@ -94,12 +94,12 @@ func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 	company := tenantCompanyName(ctx, pool, tenantID)
 	subject, html := formatDigest(company, rows)
 
-	if smtpErr := trySendDigestSMTP(emails, subject, html); smtpErr == nil {
-		via = "smtp"
+	if smtpErr := trySendDigestMail(emails, subject, html); smtpErr == nil {
+		via = "resend_or_smtp"
 	} else {
-		log.Printf("change-alert: tenant=%d SMTP unavailable (%v); trying Gmail", tenantID, smtpErr)
+		log.Printf("change-alert: tenant=%d Resend/SMTP unavailable (%v); trying Gmail", tenantID, smtpErr)
 		if gmailErr := trySendDigestGmail(ctx, pool, tenantID, emails, subject, html); gmailErr != nil {
-			log.Printf("change-alert: tenant=%d delivery failed (SMTP + Gmail): %v; leaving queue pending", tenantID, gmailErr)
+			log.Printf("change-alert: tenant=%d delivery failed (Resend/SMTP + Gmail): %v; leaving queue pending", tenantID, gmailErr)
 			return false, emails, "", nil
 		}
 		via = "gmail"
@@ -118,12 +118,11 @@ func sendImmediateDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 	return true, emails, via, nil
 }
 
-func trySendDigestSMTP(emails []string, subject, html string) error {
-	cfg := outbox.LoadSMTPConfig()
-	if !cfg.Enabled() {
-		return fmt.Errorf("SMTP not configured")
+func trySendDigestMail(emails []string, subject, html string) error {
+	if !outbox.MailConfigured() {
+		return fmt.Errorf("email not configured")
 	}
-	return outbox.SendEmailMIME(cfg, emails, nil, subject, html, nil)
+	return outbox.DeliverHTMLToMany(emails, subject, html, "")
 }
 
 func trySendDigestGmail(ctx context.Context, pool *pgxpool.Pool, tenantID int64, emails []string, subject, html string) error {
@@ -416,9 +415,10 @@ func DrainHourlyDigests(ctx context.Context, pool *pgxpool.Pool) (tenants int, e
 	return tenants, events, details, nil
 }
 
-// RegisterJobRoutes mounts the change-alert digest cron endpoint.
+// RegisterJobRoutes mounts change-alert and daily-ops digest cron endpoints.
 func RegisterJobRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/platform/jobs/change-alert-digest", changeAlertDigestJob(pool))
+	r.Post("/platform/jobs/daily-ops-digest", dailyOpsDigestJob(pool))
 }
 
 func changeAlertDigestJob(pool *pgxpool.Pool) http.HandlerFunc {

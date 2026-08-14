@@ -26,8 +26,17 @@ func DeliverText(to, subject, body string) error {
 // DeliverHTML sends an HTML email (optional plain-text alternative via Resend).
 // Prefers Resend HTTPS, then SMTP MIME.
 func DeliverHTML(to, subject, htmlBody, textFallback string) error {
+	return DeliverHTMLToMany([]string{to}, subject, htmlBody, textFallback)
+}
+
+// DeliverHTMLToMany sends HTML to one or more recipients. Prefers Resend, then SMTP.
+func DeliverHTMLToMany(to []string, subject, htmlBody, textFallback string) error {
+	to = trimNonEmpty(to)
+	if len(to) == 0 {
+		return fmt.Errorf("at least one recipient is required")
+	}
 	if r := LoadResendConfig(); r.Enabled() {
-		if err := SendResendEmail(r, to, subject, textFallback, htmlBody); err != nil {
+		if err := SendResendEmailToMany(r, to, subject, textFallback, htmlBody); err != nil {
 			return fmt.Errorf("resend: %w", err)
 		}
 		return nil
@@ -36,5 +45,5 @@ func DeliverHTML(to, subject, htmlBody, textFallback string) error {
 	if !cfg.Enabled() {
 		return fmt.Errorf("email not configured (set RESEND_API_KEY + RESEND_FROM/SMTP_FROM, or SMTP_HOST + SMTP_FROM)")
 	}
-	return SendEmailMIME(cfg, []string{to}, nil, subject, htmlBody, nil)
+	return SendEmailMIME(cfg, to, nil, subject, htmlBody, nil)
 }

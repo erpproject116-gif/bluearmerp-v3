@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inviteemail"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -234,21 +235,69 @@ func (s *service) resendTenantInvites(w http.ResponseWriter, r *http.Request) {
 		response.Err(w, http.StatusNotFound, "Customer tenant not found.", "ERR_NOT_FOUND")
 		return
 	}
-	tag, err := s.pool.Exec(r.Context(), `
-		update public.user_invites
-		set invited_at = now(), revoked_at = null
-		where tenant_id = $1 and accepted_at is null`, *c.TenantID)
+	tenantID := *c.TenantID
+	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to refresh invites.", "ERR_INTERNAL")
 		return
 	}
+	defer tx.Rollback(r.Context())
+
+	_, err = tx.Exec(r.Context(), `
+		update public.user_invites
+		set invited_at = now(), revoked_at = null
+		where tenant_id = $1 and accepted_at is null`, tenantID)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to refresh invites.", "ERR_INTERNAL")
+		return
+	}
+
+	rows, err := tx.Query(r.Context(), `
+		select ui.id, ui.user_id, ui.email, ui.full_name, ui.role_code
+		from public.user_invites ui
+		join public.users u on u.id = ui.user_id
+		where ui.tenant_id = $1 and ui.accepted_at is null and ui.revoked_at is null
+		  and u.status = 'invited'`, tenantID)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to list pending invites.", "ERR_INTERNAL")
+		return
+	}
+	type pending struct {
+		InviteID, UserID               int64
+		Email, FullName, RoleCode string
+	}
+	var pendingList []pending
+	for rows.Next() {
+		var p pending
+		if rows.Scan(&p.InviteID, &p.UserID, &p.Email, &p.FullName, &p.RoleCode) != nil {
+			continue
+		}
+		pendingList = append(pendingList, p)
+	}
+	rows.Close()
+
+	suffix := "platform-resend:" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	inviterID := tu.AppUserID
+	for _, p := range pendingList {
+		_ = inviteemail.EnqueueUserInviteTx(r.Context(), tx, s.pool, tenantID, inviterID, p.InviteID, p.UserID, p.Email, p.FullName, p.RoleCode, suffix)
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to queue invite emails.", "ERR_INTERNAL")
+		return
+	}
+	inviteemail.DrainUserInvitesAsync(s.pool)
+
 	logPlatformAudit(r.Context(), s.pool, tu, platformAuditEntry{
 		ActionCode: "platform.invite.resend", EventKind: "change",
 		HTTPMethod: "POST", RoutePath: r.URL.Path,
 		PlatformCustomerID: &c.CustomerID, TenantID: c.TenantID,
-		TargetType: "user_invites", Summary: "Refreshed pending tenant invites",
+		TargetType: "user_invites", Summary: "Resent pending tenant invite emails",
 	})
-	response.OK(w, map[string]any{"refreshed": tag.RowsAffected()}, "Pending invites refreshed. Users sign in with Google using the invited email.")
+	msg := "Pending invites refreshed. Users sign in with Google using the invited email."
+	if inviteemail.MailConfigured() && len(pendingList) > 0 {
+		msg = "Pending invite emails re-queued. Users sign in with Google using the invited email."
+	}
+	response.OK(w, map[string]any{"refreshed": len(pendingList)}, msg)
 }
 
 func (s *service) quickFollowUp(w http.ResponseWriter, r *http.Request) {

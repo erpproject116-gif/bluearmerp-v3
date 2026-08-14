@@ -97,26 +97,38 @@ After deploying the latest API, Vercel preview URLs (`*.vercel.app`) are allowed
 
 ## Email / SMTP on Render
 
-**User Management invites** (and other outbox mail) prefer **Resend HTTPS** when configured — this works on **Render free** (no SMTP ports required):
+**API transactional mail** (User Management invites, Platform Command staff invites, platform tenant invite resend, hourly change-alert digests, daily ops digests) prefer **Resend HTTPS** when configured — this works on **Render free** (no SMTP ports required):
 
 | Variable | Example |
 |----------|---------|
 | `RESEND_API_KEY` | `re_…` from [Resend API keys](https://resend.com/api-keys) |
 | `RESEND_FROM` or `SMTP_FROM` | `BluearmERP <noreply@your-verified-domain.com>` |
-| `APP_PUBLIC_URL` | `https://app.bluearmerp.com` (absolute Sign in link in invite emails) |
+| `APP_PUBLIC_URL` | `https://app.bluearmerp.com` (absolute Sign in / deep links in emails) |
+| `CHANGE_ALERT_JOB_SECRET` (or `CRM_JOB_SECRET`) | Shared secret for digest cron jobs |
 
-Optional SMTP (`SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`) is used when Resend is **not** set. Document email and digests still use SMTP and/or Gmail.
+Optional SMTP (`SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`) is used when Resend is **not** set. Digests try **Resend → SMTP → connected Gmail**.
 
-**Render free web services block outbound SMTP** on ports `25`, `465`, and `587`. Setting only `SMTP_*` on free Render will not deliver invites — use `RESEND_API_KEY` instead.
+**Render free web services block outbound SMTP** on ports `25`, `465`, and `587`. Setting only `SMTP_*` on free Render will not deliver invites or digests — use `RESEND_API_KEY` instead.
+
+### Cron jobs (Render Cron or external scheduler)
+
+| Schedule | Endpoint | Header |
+|----------|----------|--------|
+| Hourly | `POST /api/v1/platform/jobs/change-alert-digest` | `X-Change-Alert-Job-Secret` (or `X-CRM-Job-Secret`) |
+| Daily (e.g. 18:00 Asia/Manila ≈ 10:00 UTC) | `POST /api/v1/platform/jobs/daily-ops-digest` | same |
+
+- **Hourly digest:** tenant **owner** (override all recipients with `CHANGE_ALERT_DIGEST_TO`).
+- **Daily ops digest:** owner + active `store_admin` emails (same override). Summarizes sales completed today, pending SO/PO/PR, open AR/AP counts, zero/low stock, reconciliation gaps. Idempotent per UTC day via `owner_change_alert_prefs.last_daily_ops_at`.
 
 Options if not using Resend:
 1. **Upgrade** the API service to any **paid** instance type (ports 465/587 work; port 25 stays blocked).
-2. Use **Gmail OAuth** for document email (HTTPS, not SMTP): set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT`, then **Communications → Settings → Connect Gmail**. Owner digests try SMTP first, then the same connected Gmail account.
-3. Cron: `POST /api/v1/platform/jobs/change-alert-digest` with `X-Change-Alert-Job-Secret` (or `X-CRM-Job-Secret`) every hour. Digests go to the **tenant owner** email (optional override: `CHANGE_ALERT_DIGEST_TO`).
+2. Use **Gmail OAuth** for document email / digest fallback (HTTPS): set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT`, then **Communications → Settings → Connect Gmail**.
 
 After changing Resend / SMTP / Google env vars, **redeploy** (or restart) so the process picks them up.
 
 **Auth emails** (confirm / reset / demo OTP) are **not** these vars — configure Resend under Supabase → Authentication → SMTP. See [`supabase-auth-emails.md`](./supabase-auth-emails.md).
+
+**Quota / PO note:** Do **not** send per-sale or per-purchase emails on the free Resend plan (~100/day). Use the daily ops digest + in-app CRM notification bell (`crm_notifications`) and the evaluate-alerts cron for realtime awareness. See [`ops-email-notifications.md`](./ops-email-notifications.md).
 
 ## Passwords with special characters
 
