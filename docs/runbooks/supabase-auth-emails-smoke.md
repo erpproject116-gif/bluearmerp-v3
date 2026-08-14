@@ -4,36 +4,31 @@ Fill this in after applying templates on the **hosted** Supabase project (see [`
 
 | Field | Value |
 |-------|--------|
-| Date (UTC+8 or note TZ) | 2026-08-13 (repo deliverables ready; hosted apply pending operator) |
-| Operator | Agent prepared artifacts; Dashboard/API apply requires human token |
-| Supabase project ref | `hqmhlvahlvrtxtwecdip` (from local link) |
-| Web origin tested | _pending operator_ |
-| Hosted “Confirm email” setting (ON/OFF) | _read during apply — do not flip_ |
-| Auth custom SMTP configured? (Y/N) | _pending operator_ |
-| Click tracking disabled on Auth SMTP? (Y/N/N/A) | _pending operator_ |
+| Date (UTC+8 or note TZ) | 2026-08-14 |
+| Operator | Applied via `scripts/apply-supabase-auth-email-templates.mjs` (retry after ECONNRESET) |
+| Supabase project ref | `hqmhlvahlvrtxtwecdip` |
+| Web origin tested | _pending smoke_ |
+| Hosted “Confirm email” setting (ON/OFF) | _read during smoke — do not flip_ |
+| Auth custom SMTP configured? (Y/N) | _pending operator verify_ |
+| Click tracking disabled on Auth SMTP? (Y/N/N/A) | _pending operator verify_ |
 
-## Repo status (2026-08-13)
+## Repo status (2026-08-14)
 
 - [x] Templates in `supabase/templates/` (confirmation, recovery, magic_link)
 - [x] Local `supabase/config.toml` wired; `enable_confirmations` left `false`
 - [x] Runbook [`supabase-auth-emails.md`](./supabase-auth-emails.md)
-- [x] Apply script `scripts/apply-supabase-auth-email-templates.mjs` (needs `SUPABASE_ACCESS_TOKEN`)
+- [x] Apply script `scripts/apply-supabase-auth-email-templates.mjs`
 - [x] Deploy docs updated with `/auth/reset-password`
-- [ ] Hosted templates applied (blocked: no `SUPABASE_ACCESS_TOKEN` in this environment; Supabase Management API list also failed network)
+- [x] Hosted templates applied (`Applied Auth email templates to project hqmhlvahlvrtxtwecdip`)
 - [ ] Smoke matrix executed against live mail
 
-**Operator next steps**
+**Earlier failure:** `fetch failed` / `ECONNRESET` to `api.supabase.com` was a transient network drop (token was fine). Retry succeeded.
 
-1. Ensure Redirect URLs include `{origin}/auth/callback` and `{origin}/auth/reset-password`.
-2. Paste templates in Dashboard **or** run:
+**Remaining operator steps**
 
-   ```bash
-   export SUPABASE_ACCESS_TOKEN=sbp_...
-   export SUPABASE_PROJECT_REF=hqmhlvahlvrtxtwecdip
-   node scripts/apply-supabase-auth-email-templates.mjs
-   ```
-
-3. Complete the checklists below and replace this pending section.
+1. Authentication → URL Configuration: `{origin}/auth/callback` **and** `{origin}/auth/reset-password`
+2. Confirm Auth SMTP / disable click tracking for production
+3. Complete smoke matrix below
 
 ## Redirect allowlist check
 

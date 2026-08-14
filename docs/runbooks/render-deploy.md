@@ -97,16 +97,26 @@ After deploying the latest API, Vercel preview URLs (`*.vercel.app`) are allowed
 
 ## Email / SMTP on Render
 
-Document email and **owner hourly change digests** use `SMTP_HOST`, `SMTP_FROM`, and usually `SMTP_USER` / `SMTP_PASS` / `SMTP_PORT` (default `587`).
+**User Management invites** (and other outbox mail) prefer **Resend HTTPS** when configured — this works on **Render free** (no SMTP ports required):
 
-**Render free web services block outbound SMTP** on ports `25`, `465`, and `587`. Env vars can be set correctly and send-email / digests will still fail (often a hang → timeout error).
+| Variable | Example |
+|----------|---------|
+| `RESEND_API_KEY` | `re_…` from [Resend API keys](https://resend.com/api-keys) |
+| `RESEND_FROM` or `SMTP_FROM` | `BluearmERP <noreply@your-verified-domain.com>` |
+| `APP_PUBLIC_URL` | `https://app.bluearmerp.com` (absolute Sign in link in invite emails) |
 
-Options:
+Optional SMTP (`SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`) is used when Resend is **not** set. Document email and digests still use SMTP and/or Gmail.
+
+**Render free web services block outbound SMTP** on ports `25`, `465`, and `587`. Setting only `SMTP_*` on free Render will not deliver invites — use `RESEND_API_KEY` instead.
+
+Options if not using Resend:
 1. **Upgrade** the API service to any **paid** instance type (ports 465/587 work; port 25 stays blocked).
 2. Use **Gmail OAuth** for document email (HTTPS, not SMTP): set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT`, then **Communications → Settings → Connect Gmail**. Owner digests try SMTP first, then the same connected Gmail account.
 3. Cron: `POST /api/v1/platform/jobs/change-alert-digest` with `X-Change-Alert-Job-Secret` (or `X-CRM-Job-Secret`) every hour. Digests go to the **tenant owner** email (optional override: `CHANGE_ALERT_DIGEST_TO`).
 
-After changing SMTP / Google env vars, **redeploy** (or restart) so the process picks them up.
+After changing Resend / SMTP / Google env vars, **redeploy** (or restart) so the process picks them up.
+
+**Auth emails** (confirm / reset / demo OTP) are **not** these vars — configure Resend under Supabase → Authentication → SMTP. See [`supabase-auth-emails.md`](./supabase-auth-emails.md).
 
 ## Passwords with special characters
 

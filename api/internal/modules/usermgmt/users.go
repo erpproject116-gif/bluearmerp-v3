@@ -274,7 +274,7 @@ func createInvite(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
 					return
 				}
-				_ = DrainInviteOutbox(r.Context(), pool)
+				drainInviteOutboxAsync(pool)
 
 				_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.reinvite", "user", &existingID, nil, map[string]any{
 					"email": email, "tenant_role": roleCode,
@@ -326,7 +326,7 @@ func createInvite(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
 			return
 		}
-		_ = DrainInviteOutbox(r.Context(), pool)
+		drainInviteOutboxAsync(pool)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.invite", "user", &userID, nil, map[string]any{
 			"email": email, "tenant_role": roleCode,
@@ -384,7 +384,7 @@ func resendInvite(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to resend invite.", "ERR_INTERNAL")
 			return
 		}
-		_ = DrainInviteOutbox(r.Context(), pool)
+		drainInviteOutboxAsync(pool)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.invite_resend", "user", &userID, nil, map[string]any{
 			"email": email, "invite_id": inviteID,
 		})

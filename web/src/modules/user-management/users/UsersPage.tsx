@@ -198,31 +198,34 @@ export default function UsersPage() {
       return;
     }
     setSaving(true);
-    const res = await apiFetch<TenantUserRow>(
-      "/api/v1/user-management/invites",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          email,
-          full_name: fullName,
-          tenant_role: inviteRole(),
-        }),
-      },
-      { silent: true },
-    );
-    setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not invite user.");
-      return;
+    try {
+      const res = await apiFetch<TenantUserRow>(
+        "/api/v1/user-management/invites",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            email,
+            full_name: fullName,
+            tenant_role: inviteRole(),
+          }),
+        },
+        { silent: true },
+      );
+      if (!res.success) {
+        toast.warning(res.message ?? "Could not invite user.");
+        return;
+      }
+      toast.success(
+        res.message ??
+          `Invite saved. Ask them to sign in at /signin with Google using ${email} (same address).`,
+      );
+      setInviteOpen(false);
+      // Keep pending invites visible after invite (default Active filter used to hide them).
+      if (statusFilter() === "active") setStatusFilter("active_pending");
+      invalidate.all();
+    } finally {
+      setSaving(false);
     }
-    toast.success(
-      res.message ??
-        `Invite saved. Ask them to sign in at /signin with Google using ${email} (same address).`,
-    );
-    setInviteOpen(false);
-    // Keep pending invites visible after invite (default Active filter used to hide them).
-    if (statusFilter() === "active") setStatusFilter("active_pending");
-    invalidate.all();
   };
 
   const saveEdit = async () => {
@@ -689,6 +692,7 @@ export default function UsersPage() {
         onClose={() => setInviteOpen(false)}
         onSave={() => void sendInvite()}
         saving={saving()}
+        saveLabel="Send invite"
       >
         <Field label="Email *">
           <input
@@ -714,8 +718,9 @@ export default function UsersPage() {
           </select>
         </Field>
         <p class="text-xs text-text-secondary">
-          We email an invite when SMTP is configured. They join by signing in with Google using this exact email — no
-          separate Accept step. If email is not configured, the invite stays pending and you can share /signin.
+          We email an invite when Resend (`RESEND_API_KEY`) or SMTP is configured on the API. They join by signing in
+          with Google using this exact email — no separate Accept step. If email is not configured, the invite stays
+          pending and you can share /signin.
         </p>
       </EntityModal>
 
