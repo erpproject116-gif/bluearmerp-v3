@@ -11,6 +11,10 @@ Fact-locked runbook for Platform Command invites, hourly change-alert digests, a
 | Platform tenant / owner invite | Provision workspace; **Resend invites** playbook | Pending invitees | Outbox `user.invite` + async drain |
 | Hourly change-alert digest | Cron `POST .../change-alert-digest` | Tenant owner (or `CHANGE_ALERT_DIGEST_TO`) | Resend → SMTP → Gmail |
 | Daily ops digest | Cron `POST .../daily-ops-digest` | Owner + active `store_admin` (or override) | Resend → SMTP |
+| Weekly BI digest | Cron `POST .../weekly-bi-digest` | Owner + `store_admin` | Resend → SMTP |
+| Monthly BI digest | Cron `POST .../monthly-bi-digest` | Owner + `store_admin` | Resend → SMTP |
+
+**In-app:** `/app/dashboard/period-summary?period=weekly|monthly` (same snapshot as the emails).
 
 **Not in this pipe:** Supabase Auth confirm / reset / demo OTP (Dashboard SMTP). **Not shipped:** per-sale / per-purchase / per-SKU emails (protects free Resend quota).
 
@@ -34,9 +38,32 @@ curl -X POST "https://YOUR-API.onrender.com/api/v1/platform/jobs/change-alert-di
 # Once daily (document timezone; job is idempotent per UTC calendar day)
 curl -X POST "https://YOUR-API.onrender.com/api/v1/platform/jobs/daily-ops-digest" \
   -H "X-Change-Alert-Job-Secret: $CHANGE_ALERT_JOB_SECRET"
+
+# Once weekly (idempotent per UTC week)
+curl -X POST "https://YOUR-API.onrender.com/api/v1/platform/jobs/weekly-bi-digest" \
+  -H "X-Change-Alert-Job-Secret: $CHANGE_ALERT_JOB_SECRET"
+
+# Once monthly (idempotent per UTC month)
+curl -X POST "https://YOUR-API.onrender.com/api/v1/platform/jobs/monthly-bi-digest" \
+  -H "X-Change-Alert-Job-Secret: $CHANGE_ALERT_JOB_SECRET"
 ```
 
 Also keep CRM evaluate-alerts cron running so `low_stock` / `reconciliation_gap` land in the in-app bell (`crm_notifications`).
+
+## Daily ops email template
+
+Polished HTML in `notify/formatDailyOps`: BluearmERP `#3c50e0` header (same family as invites), KPI cards by section (Today / Open pipeline / Cash / Stock & risk), amber accent on risk counts, real `/app/...` deep links, “No major movement today” when all metrics are zero, subject variants (`quiet day` / `N risk signals`), and plain-text parity. Hourly digest header uses the same brand blue.
+
+## Weekly / monthly BI
+
+Owner-facing intelligence built from dashboard financial-health + sales/pipeline/stock queries (`dashboard.LoadPeriodBI`):
+
+| Cadence | Prefs | Content highlights |
+|---------|-------|--------------------|
+| Weekly | `weekly_bi_enabled`, `last_weekly_bi_at` | 7-day sales window, cash MTD, AR/AP, pipeline, top customers/items, risk signals |
+| Monthly | `monthly_bi_enabled`, `last_monthly_bi_at` | MTD/YTD sales & cash, posted P&L when journals exist, margin by product, same risk/pipeline |
+
+In-app: **Dashboard → Period summary** (`/app/dashboard/period-summary`).
 
 ## Smoke matrix
 
@@ -47,7 +74,9 @@ Also keep CRM evaluate-alerts cron running so `low_stock` / `reconciliation_gap`
 | 3 | User Management invite | Still works (regression) |
 | 4 | `POST .../change-alert-digest` with secret | Digest via Resend when SMTP blocked |
 | 5 | `POST .../daily-ops-digest` | One mail per enabled tenant; owner + store_admin |
-| 6 | Auth reset / OTP | Unchanged (Supabase Auth SMTP) |
+| 6 | `POST .../weekly-bi-digest` | Weekly BI mail; `/app/dashboard/period-summary?period=weekly` matches |
+| 7 | `POST .../monthly-bi-digest` | Monthly BI mail; period summary monthly tab |
+| 8 | Auth reset / OTP | Unchanged (Supabase Auth SMTP) |
 
 ## PO expectations (free Resend)
 

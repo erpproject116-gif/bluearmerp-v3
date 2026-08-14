@@ -116,9 +116,12 @@ Optional SMTP (`SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`) 
 |----------|----------|--------|
 | Hourly | `POST /api/v1/platform/jobs/change-alert-digest` | `X-Change-Alert-Job-Secret` (or `X-CRM-Job-Secret`) |
 | Daily (e.g. 18:00 Asia/Manila ≈ 10:00 UTC) | `POST /api/v1/platform/jobs/daily-ops-digest` | same |
+| Weekly (e.g. Friday 18:00 Asia/Manila) | `POST /api/v1/platform/jobs/weekly-bi-digest` | same |
+| Monthly (e.g. 1st 09:00 Asia/Manila, or last day of month) | `POST /api/v1/platform/jobs/monthly-bi-digest` | same |
 
 - **Hourly digest:** tenant **owner** (override all recipients with `CHANGE_ALERT_DIGEST_TO`).
 - **Daily ops digest:** owner + active `store_admin` emails (same override). Summarizes sales completed today, pending SO/PO/PR, open AR/AP counts, zero/low stock, reconciliation gaps. Idempotent per UTC day via `owner_change_alert_prefs.last_daily_ops_at`.
+- **Weekly / monthly BI:** owner + `store_admin`. Sales, cash, AR/AP, pipeline, stock, top customers/items, risk signals; monthly also includes P&L (when journals exist), YTD cash, margin by product. Idempotent per UTC week/month via `last_weekly_bi_at` / `last_monthly_bi_at`. In-app twin: `/app/dashboard/period-summary`.
 
 Options if not using Resend:
 1. **Upgrade** the API service to any **paid** instance type (ports 465/587 work; port 25 stays blocked).

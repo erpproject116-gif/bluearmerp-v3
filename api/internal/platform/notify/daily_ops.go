@@ -174,13 +174,60 @@ func collectDailyOpsMetrics(ctx context.Context, pool *pgxpool.Pool, tenantID in
 	return m
 }
 
+type dailyOpsKPI struct {
+	Label string
+	Value int64
+	Href  string
+	Link  string // short CTA label
+	Empty string
+	Risk  bool
+}
+
+type dailyOpsSection struct {
+	Title string
+	KPIs  []dailyOpsKPI
+}
+
+func dailyOpsSections(m dailyOpsMetrics, link func(string) string) []dailyOpsSection {
+	return []dailyOpsSection{
+		{
+			Title: "Today",
+			KPIs: []dailyOpsKPI{
+				{"Sales completed", m.SalesCompletedToday, link("/app/sales/sales"), "Open sales", "None completed today", false},
+			},
+		},
+		{
+			Title: "Open pipeline",
+			KPIs: []dailyOpsKPI{
+				{"Sales orders", m.PendingSalesOrders, link("/app/sales-order/sales-orders"), "Open sales orders", "No pending sales orders", false},
+				{"Purchase orders", m.PendingPurchases, link("/app/purchase-order/purchase-orders"), "Open purchase orders", "No pending purchase orders", false},
+				{"Purchase requests", m.PendingPRs, link("/app/purchase-request/purchase-requests"), "Open purchase requests", "No pending purchase requests", false},
+			},
+		},
+		{
+			Title: "Cash position",
+			KPIs: []dailyOpsKPI{
+				{"Open receivables", m.OpenReceivables, link("/app/finance/collections"), "Open collections", "No open receivables", false},
+				{"Open payables", m.OpenPayables, link("/app/finance/disbursements"), "Open disbursements", "No open payables", false},
+			},
+		},
+		{
+			Title: "Stock & risk",
+			KPIs: []dailyOpsKPI{
+				{"Zero stock items", m.ZeroStockItems, link("/app/inventory/find-stock"), "Find stock", "No zero-stock items", true},
+				{"Below reorder", m.LowStockItems, link("/app/inventory/reports/inventory-status"), "Inventory status", "No below-reorder items", true},
+				{"Reconciliation gaps", m.ReconGaps, link("/app/inventory/stock-reconciliation"), "Stock reconciliation", "No reconciliation gaps", true},
+			},
+		},
+	}
+}
+
 func formatDailyOps(company string, m dailyOpsMetrics, baseURL string) (subject, htmlBody, textBody string) {
 	company = strings.TrimSpace(company)
 	if company == "" {
 		company = "BluearmERP"
 	}
 	day := time.Now().UTC().Format("2006-01-02")
-	subject = fmt.Sprintf("%s daily ops — %s", company, day)
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	link := func(path string) string {
 		if baseURL == "" {
@@ -188,63 +235,129 @@ func formatDailyOps(company string, m dailyOpsMetrics, baseURL string) (subject,
 		}
 		return baseURL + path
 	}
+	sections := dailyOpsSections(m, link)
 
-	type row struct {
-		Label string
-		Value int64
-		Href  string
-		Empty string
-	}
-	rows := []row{
-		{"Sales completed today", m.SalesCompletedToday, link("/app/sales/sales"), "No completed sales today"},
-		{"Pending sales orders", m.PendingSalesOrders, link("/app/selling/sales-orders"), "No pending sales orders"},
-		{"Pending purchase orders", m.PendingPurchases, link("/app/buying/purchase-orders"), "No pending purchase orders"},
-		{"Pending purchase requests", m.PendingPRs, link("/app/buying/purchase-requests"), "No pending purchase requests"},
-		{"Open receivables (docs)", m.OpenReceivables, link("/app/finance/collections"), "No open receivables counted"},
-		{"Open payables (docs)", m.OpenPayables, link("/app/finance/disbursements"), "No open payables counted"},
-		{"Zero stock items", m.ZeroStockItems, link("/app/inventory/stocks"), "No zero-stock items"},
-		{"Below reorder items", m.LowStockItems, link("/app/inventory/stocks"), "No below-reorder items"},
-		{"Reconciliation gaps", m.ReconGaps, link("/app/dashboard"), "No reconciliation gaps counted"},
+	riskHits := m.ZeroStockItems + m.LowStockItems + m.ReconGaps
+	activityHits := m.SalesCompletedToday + m.PendingSalesOrders + m.PendingPurchases + m.PendingPRs + m.OpenReceivables + m.OpenPayables + riskHits
+	quiet := activityHits == 0
+	switch {
+	case quiet:
+		subject = fmt.Sprintf("%s daily ops — quiet day (%s)", company, day)
+	case riskHits > 0:
+		subject = fmt.Sprintf("%s daily ops — %d risk signal%s (%s)", company, riskHits, pluralS(int(riskHits)), day)
+	default:
+		subject = fmt.Sprintf("%s daily ops — %s", company, day)
 	}
 
+	esc := html.EscapeString
 	var b strings.Builder
-	b.WriteString(`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">`)
-	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:24px 12px;"><tr><td align="center">`)
-	b.WriteString(`<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">`)
-	b.WriteString(`<tr><td style="background:#3c50e0;color:#ffffff;padding:20px 24px;">`)
-	b.WriteString(`<div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;opacity:0.85;margin-bottom:6px;">Daily ops digest</div>`)
-	b.WriteString(`<div style="font-size:20px;font-weight:700;">`)
-	b.WriteString(html.EscapeString(company))
-	b.WriteString(`</div>`)
-	b.WriteString(fmt.Sprintf(`<div style="font-size:13px;opacity:0.9;margin-top:6px;">UTC day %s</div>`, html.EscapeString(day)))
-	b.WriteString(`</td></tr><tr><td style="padding:18px 24px;">`)
+	b.WriteString(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>`)
+	b.WriteString(esc(subject))
+	b.WriteString(`</title></head>`)
+	b.WriteString(`<body style="margin:0;padding:0;background-color:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6fb;padding:32px 16px;"><tr><td align="center">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">`)
 
-	var textParts []string
-	textParts = append(textParts, fmt.Sprintf("%s daily ops — %s\n", company, day))
-	for _, r := range rows {
-		label := html.EscapeString(r.Label)
-		if r.Value == 0 {
-			b.WriteString(`<div style="padding:10px 0;border-bottom:1px solid #e2e8f0;">`)
-			b.WriteString(`<div style="font-size:13px;font-weight:600;color:#0f172a;">` + label + `</div>`)
-			b.WriteString(`<div style="font-size:13px;color:#64748b;margin-top:4px;">` + html.EscapeString(r.Empty) + `</div></div>`)
-			textParts = append(textParts, fmt.Sprintf("%s: 0 (%s)", r.Label, r.Empty))
-			continue
+	// Header — aligned with invite + hourly digest brand
+	b.WriteString(`<tr><td style="background-color:#3c50e0;padding:20px 28px;">`)
+	b.WriteString(`<p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;">BluearmERP</p>`)
+	b.WriteString(`</td></tr>`)
+	b.WriteString(`<tr><td style="padding:24px 28px 8px;">`)
+	b.WriteString(`<div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#64748b;margin-bottom:6px;">Daily ops digest</div>`)
+	b.WriteString(`<h1 style="margin:0;font-size:22px;line-height:1.3;color:#0f172a;">`)
+	b.WriteString(esc(company))
+	b.WriteString(`</h1>`)
+	b.WriteString(fmt.Sprintf(`<p style="margin:8px 0 0;font-size:14px;color:#64748b;">UTC day %s</p>`, esc(day)))
+	b.WriteString(`</td></tr>`)
+
+	if quiet {
+		b.WriteString(`<tr><td style="padding:12px 28px 8px;">`)
+		b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">`)
+		b.WriteString(`<tr><td style="padding:16px 18px;">`)
+		b.WriteString(`<div style="font-size:15px;font-weight:700;color:#0f172a;">No major movement today</div>`)
+		b.WriteString(`<div style="font-size:13px;color:#64748b;margin-top:6px;line-height:1.5;">Sales, pipeline, cash, and stock risk counts are all clear for this UTC day. Open BluearmERP anytime for live detail.</div>`)
+		if baseURL != "" {
+			b.WriteString(fmt.Sprintf(`<div style="margin-top:12px;"><a href="%s" style="font-size:13px;font-weight:600;color:#3c50e0;text-decoration:none;">Go to dashboard →</a></div>`, esc(link("/app/dashboard"))))
 		}
-		b.WriteString(`<div style="padding:10px 0;border-bottom:1px solid #e2e8f0;">`)
-		b.WriteString(`<div style="font-size:13px;font-weight:600;color:#0f172a;">` + label + `</div>`)
-		b.WriteString(fmt.Sprintf(`<div style="font-size:22px;font-weight:700;color:#3c50e0;margin-top:4px;">%d</div>`, r.Value))
-		if r.Href != "" {
-			b.WriteString(fmt.Sprintf(`<div style="margin-top:6px;"><a href="%s" style="font-size:13px;color:#3c50e0;">Open in BluearmERP</a></div>`, html.EscapeString(r.Href)))
-		}
-		b.WriteString(`</div>`)
-		textParts = append(textParts, fmt.Sprintf("%s: %d", r.Label, r.Value))
+		b.WriteString(`</td></tr></table></td></tr>`)
 	}
 
-	b.WriteString(`</td></tr><tr><td style="padding:12px 24px 22px;font-size:12px;color:#94a3b8;line-height:1.5;">`)
+	for _, sec := range sections {
+		b.WriteString(`<tr><td style="padding:16px 28px 4px;">`)
+		b.WriteString(`<div style="font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#64748b;margin-bottom:10px;">`)
+		b.WriteString(esc(sec.Title))
+		b.WriteString(`</div>`)
+
+		for i := 0; i < len(sec.KPIs); i += 2 {
+			left := sec.KPIs[i]
+			var right *dailyOpsKPI
+			if i+1 < len(sec.KPIs) {
+				right = &sec.KPIs[i+1]
+			}
+			b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;"><tr>`)
+			b.WriteString(`<td width="50%" valign="top" style="padding-right:5px;">`)
+			writeDailyOpsKPICard(&b, left)
+			b.WriteString(`</td><td width="50%" valign="top" style="padding-left:5px;">`)
+			if right != nil {
+				writeDailyOpsKPICard(&b, *right)
+			} else {
+				b.WriteString(`&nbsp;`)
+			}
+			b.WriteString(`</td></tr></table>`)
+		}
+		b.WriteString(`</td></tr>`)
+	}
+
+	b.WriteString(`<tr><td style="padding:12px 28px 24px;font-size:12px;color:#94a3b8;line-height:1.55;">`)
 	b.WriteString(`Sent to the tenant owner and store admins. Instant per-sale emails are not sent on the free plan — use this digest and the in-app notification bell.`)
 	b.WriteString(`</td></tr></table></td></tr></table></body></html>`)
 
+	textParts := []string{subject, "", fmt.Sprintf("Company: %s", company), fmt.Sprintf("UTC day: %s", day), ""}
+	if quiet {
+		textParts = append(textParts, "No major movement today.", "Sales, pipeline, cash, and stock risk counts are all clear for this UTC day.", "")
+	}
+	for _, sec := range sections {
+		textParts = append(textParts, strings.ToUpper(sec.Title))
+		for _, k := range sec.KPIs {
+			if k.Value == 0 {
+				textParts = append(textParts, fmt.Sprintf("- %s: 0 (%s)", k.Label, k.Empty))
+			} else {
+				textParts = append(textParts, fmt.Sprintf("- %s: %d", k.Label, k.Value))
+			}
+			if k.Href != "" {
+				textParts = append(textParts, fmt.Sprintf("  %s: %s", k.Link, k.Href))
+			}
+		}
+		textParts = append(textParts, "")
+	}
+	textParts = append(textParts,
+		"Sent to the tenant owner and store admins.",
+		"Instant per-sale emails are not sent on the free plan — use this digest and the in-app notification bell.",
+		"",
+		"— BluearmERP",
+	)
 	return subject, b.String(), strings.Join(textParts, "\n")
+}
+
+func writeDailyOpsKPICard(b *strings.Builder, k dailyOpsKPI) {
+	esc := html.EscapeString
+	valueColor := "#3c50e0"
+	if k.Risk && k.Value > 0 {
+		valueColor = "#b45309"
+	}
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">`)
+	b.WriteString(`<tr><td style="padding:12px 14px;background:#f8fafc;">`)
+	b.WriteString(`<div style="font-size:12px;color:#64748b;font-weight:600;">` + esc(k.Label) + `</div>`)
+	if k.Value == 0 {
+		b.WriteString(`<div style="font-size:22px;font-weight:700;color:#94a3b8;margin-top:6px;line-height:1.2;">0</div>`)
+		b.WriteString(`<div style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.4;">` + esc(k.Empty) + `</div>`)
+	} else {
+		b.WriteString(fmt.Sprintf(`<div style="font-size:22px;font-weight:700;color:%s;margin-top:6px;line-height:1.2;">%d</div>`, valueColor, k.Value))
+	}
+	if k.Href != "" {
+		b.WriteString(fmt.Sprintf(`<div style="margin-top:8px;"><a href="%s" style="font-size:12px;font-weight:600;color:#3c50e0;text-decoration:none;">%s →</a></div>`, esc(k.Href), esc(k.Link)))
+	}
+	b.WriteString(`</td></tr></table>`)
 }
 
 // DrainDailyOpsDigests sends one daily ops email per due tenant.
