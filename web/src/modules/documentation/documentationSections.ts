@@ -603,7 +603,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Team Chat is first-party messaging inside your business (tenant). Create channels, group chats, and direct messages; reply and forward; react with a small emoji set; schedule in-app reminders; @mention teammates (bell notification); attach files up to 25 MB combined per message; and attach or share ERP documents as openable cards. The Communications sidebar shows an unread badge. Owners and platform superadmins can use / Baiko skills to open approve-to-seed create drafts — nothing is silent-written. Chat never crosses into another company’s tenant.",
+        text: "Team Chat is first-party messaging inside your business (tenant). Create channels, group chats, and direct messages; reply and forward; react with a small emoji set; schedule in-app reminders; @mention teammates (bell notification); attach files up to 25 MB combined per message; and attach or share ERP documents as openable cards. The Communications sidebar shows an unread badge. Owners and platform superadmins can use / Baiko skills: /ask and /analyze post a grounded Baiko reply in-channel (stub if Copilot is off); /quotation and other create skills show an Approve chip that uses the same seed handoff as Baiko Help — nothing is silent-written. Ticket and CRM skills deep-link only. Chat never crosses into another company’s tenant.",
       },
       {
         type: "steps",
@@ -611,14 +611,14 @@ export const documentationSections: DocSection[] = [
           "Open Communications → Team Chat.",
           "Create a channel, start a group, or DM a teammate.",
           "Reply, react, or forward messages; type /reminder for an in-app schedule (not Google Calendar sync).",
-          "Owners/superadmins: type / for Baiko skills (quotation, SO, ticket, CRM, ask) — confirm Approve to open.",
+          "Owners/superadmins: type / for Baiko skills — Approve to open commercial drafts (or Support/CRM links).",
           "Share a saved quotation, sales invoice, sales order, or purchase order with Share to chat beside Email.",
           "Email workflows remain under Inbox / Sent Documents / Settings — unchanged.",
         ],
       },
       {
         type: "tip",
-        text: "Load Slip is a form tool that copies lines between documents — attach the source SO/PO/quotation in chat, not a “load slip” record. Mentions appear in the notification bell with a link back to the message.",
+        text: "Notification links open Team Chat with ?messageId= and scroll to that message. Load Slip is a form tool — attach the source SO/PO/quotation in chat, not a load-slip record.",
       },
       {
         type: "paragraph",

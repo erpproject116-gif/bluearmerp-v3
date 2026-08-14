@@ -35,6 +35,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/channels/{id}/typing", postTyping(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessRead)).Get("/channels/{id}/typing", listTyping(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/channels/{id}/slash", postSlash(pool))
+		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/channels/{id}/baiko-messages", postBaikoMessage(pool))
 		cr.With(auth.RequirePermission("comms.chat_admin", auth.AccessWrite)).Post("/channels/{id}/archive", archiveChannel(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/messages/{id}/attachments", uploadAttachment(pool))
 		cr.With(auth.RequirePermission("comms.chat", auth.AccessWrite)).Post("/messages/{id}/forward", forwardMessage(pool))
@@ -65,14 +66,16 @@ func getMessage(pool *pgxpool.Pool) http.HandlerFunc {
 		var created time.Time
 		var deleted *time.Time
 		var parentID, fwdID *int64
+		var actionDraft []byte
 		err = pool.QueryRow(r.Context(), `
 			select m.id, m.channel_id, m.sender_user_id,
 			  coalesce(nullif(trim(u.full_name), ''), coalesce(u.email, case when m.sender_kind = 'baiko' then 'Baiko' when m.sender_kind = 'system' then 'System' else 'User' end)),
-			  m.body, m.created_at, m.deleted_at, m.parent_message_id, m.forwarded_from_message_id, coalesce(m.sender_kind, 'user')
+			  m.body, m.created_at, m.deleted_at, m.parent_message_id, m.forwarded_from_message_id, coalesce(m.sender_kind, 'user'),
+			  m.action_draft
 			from public.chat_messages m
 			left join public.users u on u.id = m.sender_user_id
 			where m.id = $1 and m.tenant_id = $2`, messageID, tu.TenantID,
-		).Scan(&msg.ID, &channelID, &msg.SenderUserID, &msg.SenderName, &msg.Body, &created, &deleted, &parentID, &fwdID, &msg.SenderKind)
+		).Scan(&msg.ID, &channelID, &msg.SenderUserID, &msg.SenderName, &msg.Body, &created, &deleted, &parentID, &fwdID, &msg.SenderKind, &actionDraft)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Message not found.", "ERR_NOT_FOUND")
 			return
@@ -84,6 +87,7 @@ func getMessage(pool *pgxpool.Pool) http.HandlerFunc {
 		msg.ChannelID = channelID
 		msg.ParentMessageID = parentID
 		msg.ForwardedFromMessageID = fwdID
+		msg.ActionDraft = decodeActionDraft(actionDraft)
 		msg.CreatedAt = created.Format(time.RFC3339)
 		if deleted != nil {
 			s := deleted.Format(time.RFC3339)
@@ -436,7 +440,8 @@ func listMessages(pool *pgxpool.Pool) http.HandlerFunc {
 		q := fmt.Sprintf(`
 			select m.id, m.channel_id, m.sender_user_id,
 			  coalesce(nullif(trim(u.full_name), ''), coalesce(u.email, case when m.sender_kind = 'baiko' then 'Baiko' when m.sender_kind = 'system' then 'System' else 'User' end)),
-			  m.body, m.created_at, m.deleted_at, m.parent_message_id, m.forwarded_from_message_id, coalesce(m.sender_kind, 'user')
+			  m.body, m.created_at, m.deleted_at, m.parent_message_id, m.forwarded_from_message_id, coalesce(m.sender_kind, 'user'),
+			  m.action_draft
 			from public.chat_messages m
 			left join public.users u on u.id = m.sender_user_id
 			where %s
@@ -455,12 +460,14 @@ func listMessages(pool *pgxpool.Pool) http.HandlerFunc {
 			var created time.Time
 			var deleted *time.Time
 			var parentID, fwdID *int64
-			if err := rows.Scan(&msg.ID, &msg.ChannelID, &msg.SenderUserID, &msg.SenderName, &msg.Body, &created, &deleted, &parentID, &fwdID, &msg.SenderKind); err != nil {
+			var actionDraft []byte
+			if err := rows.Scan(&msg.ID, &msg.ChannelID, &msg.SenderUserID, &msg.SenderName, &msg.Body, &created, &deleted, &parentID, &fwdID, &msg.SenderKind, &actionDraft); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read messages.", "ERR_INTERNAL")
 				return
 			}
 			msg.ParentMessageID = parentID
 			msg.ForwardedFromMessageID = fwdID
+			msg.ActionDraft = decodeActionDraft(actionDraft)
 			msg.CreatedAt = created.Format(time.RFC3339)
 			if deleted != nil {
 				s := deleted.Format(time.RFC3339)

@@ -511,6 +511,13 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Workspace", href: "/app/finance", settingsHref: "/app/finance/official-receipts/settings", headerPriority: "primary" },
       {
+        label: "Bookkeeping",
+        href: "/app/finance/bookkeeping",
+        settingsHref: "/app/finance/setup",
+        featureCode: "finance.acct_i",
+        headerPriority: "primary",
+      },
+      {
         label: "New Receivable Payment",
         href: "/app/finance/receivables",
         settingsHref: "/app/finance/official-receipts/settings",

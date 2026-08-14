@@ -18,6 +18,7 @@ import {
   CHAT_MAX_ATTACH_BYTES,
   CHAT_REACTION_EMOJIS,
   addChatReaction,
+  cancelChatReminder,
   createChatChannel,
   createChatReminder,
   createOrGetDM,
@@ -28,22 +29,33 @@ import {
   getChatMessage,
   listChatChannels,
   listChatMessages,
+  listChatReminders,
   listChatTyping,
   listChatUsers,
   markChatRead,
+  postBaikoChatMessage,
   postChatMessage,
   postChatSlash,
   postChatTyping,
   removeChatReaction,
   searchChatDocs,
   uploadChatAttachment,
+  type ChatActionDraft,
   type ChatChannel,
   type ChatMessage,
   type ChatMessageLink,
+  type ChatReminder,
   type ChatTypingUser,
   type ChatUser,
   type DocSearchHit,
 } from "./chatApi";
+import { askCopilot } from "../help-assistant/helpApi";
+import {
+  approveAndOpenCopilotDraft,
+  isNavigateOnlyDraftType,
+  navigateOnlySafeAppPath,
+} from "../../shared/copilotApproveHandoff";
+import { safeAppPath } from "../help-assistant/safeAppPath";
 
 type PendingLink = { entity_type: string; entity_id?: number | null; label: string; href: string };
 
@@ -145,10 +157,14 @@ export default function TeamChatPage() {
   const [reminderNotify, setReminderNotify] = createSignal(true);
   const [reminderCrm, setReminderCrm] = createSignal(false);
   const [pendingApprove, setPendingApprove] = createSignal<{
-    navigate: string;
+    navigate?: string;
     hint?: string;
-    draftType?: string;
+    draft?: ChatActionDraft | null;
   } | null>(null);
+  const [highlightId, setHighlightId] = createSignal<number | null>(null);
+  const [remindersOpen, setRemindersOpen] = createSignal(false);
+  const [reminders, setReminders] = createSignal<ChatReminder[]>([]);
+  let messagesEndEl: HTMLDivElement | undefined;
 
   const meId = () => auth.me?.user?.id ?? 0;
   const selected = createMemo(() => channels().find((c) => c.id === selectedId()) ?? null);
@@ -201,7 +217,13 @@ export default function TeamChatPage() {
     setLoadingChannels(false);
   };
 
-  const loadMessages = async (channelId: number) => {
+  const scrollMessagesToEnd = () => {
+    queueMicrotask(() => {
+      messagesEndEl?.scrollIntoView({ block: "end" });
+    });
+  };
+
+  const loadMessages = async (channelId: number, opts?: { highlightId?: number }) => {
     setLoadingMsgs(true);
     const res = await listChatMessages(channelId);
     setLoadingMsgs(false);
@@ -213,16 +235,24 @@ export default function TeamChatPage() {
     const last = (res.data ?? []).at(-1);
     void markChatRead(channelId, last?.id);
     void refreshChannels();
+    scrollMessagesToEnd();
+    if (opts?.highlightId) {
+      setHighlightId(opts.highlightId);
+      queueMicrotask(() => {
+        document.getElementById(`chat-msg-${opts.highlightId}`)?.scrollIntoView({ block: "center" });
+      });
+      window.setTimeout(() => setHighlightId(null), 3000);
+    }
   };
 
-  const selectChannel = (id: number) => {
+  const selectChannel = (id: number, highlightMessageId?: number) => {
     setSelectedId(id);
     setMobileShowThread(true);
     setReplyTo(null);
     setPendingApprove(null);
     setMentionOpen(false);
     setSlashOpen(false);
-    void loadMessages(id);
+    void loadMessages(id, highlightMessageId ? { highlightId: highlightMessageId } : undefined);
   };
 
   const toggleBubbleTails = () => {
@@ -273,7 +303,7 @@ export default function TeamChatPage() {
       if (mid > 0) {
         const msg = await getChatMessage(mid);
         if (msg.success && msg.data) {
-          selectChannel(msg.data.channel_id);
+          selectChannel(msg.data.channel_id, mid);
           return;
         }
       }
@@ -293,8 +323,11 @@ export default function TeamChatPage() {
     const t = window.setInterval(() => {
       void listChatMessages(id).then((res) => {
         if (res.success && res.data) {
+          const prevLast = messages().at(-1)?.id ?? 0;
+          const nextLast = res.data.at(-1)?.id ?? 0;
           setMessages(res.data);
           void refreshChannels();
+          if (nextLast > prevLast) scrollMessagesToEnd();
         }
       });
       void listChatTyping(id).then((res) => {
@@ -355,6 +388,80 @@ export default function TeamChatPage() {
     await loadMessages(id);
   };
 
+  const approveChatDraft = async (draft: ChatActionDraft | null | undefined, navigateFallback?: string) => {
+    if (!draft?.type) {
+      const next = navigateFallback ? safeAppPath(navigateFallback) : null;
+      if (next) window.location.assign(next);
+      return;
+    }
+    if (isNavigateOnlyDraftType(draft.type)) {
+      const href = draft.navigate || navigateFallback || "";
+      if (!navigateOnlySafeAppPath(href)) {
+        toast.error("Invalid destination.");
+      }
+      return;
+    }
+    const outcome = await approveAndOpenCopilotDraft({
+      type: draft.type,
+      summary: draft.summary || draft.type,
+      payload: draft.payload ?? {},
+      api: draft.api,
+      method: draft.method,
+    });
+    if (!outcome.ok) {
+      toast.error(outcome.message);
+      return;
+    }
+    if (!outcome.assigned && outcome.next) {
+      window.location.assign(outcome.next);
+    } else if (!outcome.assigned && !outcome.next && navigateFallback) {
+      const next = safeAppPath(navigateFallback);
+      if (next) window.location.assign(next);
+    }
+  };
+
+  const runClientAsk = async (channelId: number, query: string, analyze: boolean) => {
+    const entities = analyze
+      ? messages()
+          .flatMap((m) => m.links ?? [])
+          .filter((l) => l.entity_id != null && l.entity_id > 0)
+          .slice(0, 20)
+          .map((l) => ({
+            type: l.entity_type,
+            id: Number(l.entity_id),
+            label: l.label,
+          }))
+      : [];
+    const ask = await askCopilot({
+      query,
+      pathname: "/app/comms/chat",
+      entities,
+    });
+    if (!ask) {
+      const stub =
+        "Baiko is not enabled or briefly unavailable. Open Baiko to continue with grounded tools — nothing is auto-posted from chat.";
+      await postBaikoChatMessage(channelId, stub, {
+        type: "open_baiko",
+        summary: "Continue in Baiko",
+        payload: {},
+        navigate: "/app/baiko",
+      });
+      return;
+    }
+    let draft: ChatActionDraft | null = null;
+    if (ask.action_draft?.type) {
+      draft = {
+        type: ask.action_draft.type,
+        summary: ask.action_draft.summary,
+        payload: ask.action_draft.payload ?? {},
+        api: ask.action_draft.api,
+        method: ask.action_draft.method,
+      };
+    }
+    const body = (ask.message || "").trim() || "Baiko had no text reply.";
+    await postBaikoChatMessage(channelId, body.slice(0, 8000), draft);
+  };
+
   const runSlash = async (command: string, args = "") => {
     const id = selectedId();
     if (!id) return;
@@ -366,22 +473,36 @@ export default function TeamChatPage() {
     }
     setSending(true);
     const res = await postChatSlash(id, command, args);
-    setSending(false);
-    setSlashOpen(false);
-    setDraft("");
     if (!res.success) {
+      setSending(false);
       toast.error(res.message || "Slash command failed.");
       return;
     }
     const data = res.data;
-    if (data?.navigate) {
+    setSlashOpen(false);
+    setDraft("");
+    if (data?.need_client_ask && data.ask_query) {
+      await runClientAsk(id, data.ask_query, Boolean(data.analyze));
+      setSending(false);
+      await loadMessages(id);
+      return;
+    }
+    setSending(false);
+    if (data?.action_draft || data?.navigate) {
       setPendingApprove({
         navigate: data.navigate,
         hint: data.approve_hint,
-        draftType: data.action_draft?.type,
+        draft: data.action_draft ?? null,
       });
     }
     await loadMessages(id);
+  };
+
+  const openRemindersList = async () => {
+    const res = await listChatReminders();
+    if (res.success) setReminders(res.data ?? []);
+    setRemindersOpen(true);
+    setMenuOpen(false);
   };
 
   const handleComposerInput = (value: string) => {
@@ -754,6 +875,14 @@ export default function TeamChatPage() {
                     >
                       Schedule reminder
                     </button>
+                    <button
+                      type="button"
+                      class="block w-full px-3 py-2 text-left text-sm hover:bg-brand-50"
+                      role="menuitem"
+                      onClick={() => void openRemindersList()}
+                    >
+                      Reminders
+                    </button>
                   </div>
                 </Show>
               </header>
@@ -768,7 +897,10 @@ export default function TeamChatPage() {
                 <For each={messages()}>
                   {(m) => (
                     <article
-                      class={`group animate-[fadeIn_0.25s_ease] ${m.parent_message_id ? "ml-4 border-l-2 border-brand-200 pl-3" : ""} ${messageShellClass(m)}`}
+                      id={`chat-msg-${m.id}`}
+                      class={`group animate-[fadeIn_0.25s_ease] ${m.parent_message_id ? "ml-4 border-l-2 border-brand-200 pl-3" : ""} ${messageShellClass(m)} ${
+                        highlightId() === m.id ? "ring-2 ring-brand-400 ring-offset-2" : ""
+                      }`}
                     >
                       <Show
                         when={!m.deleted_at}
@@ -896,10 +1028,25 @@ export default function TeamChatPage() {
                             </For>
                           </div>
                         </Show>
+                        <Show when={m.sender_kind === "baiko" && m.action_draft?.type}>
+                          <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
+                            <p class="font-medium">
+                              {m.action_draft!.summary || "Action draft — Approve to continue (nothing posted yet)"}
+                            </p>
+                            <button
+                              type="button"
+                              class="mt-2 rounded bg-brand-600 px-2 py-1 text-white"
+                              onClick={() => void approveChatDraft(m.action_draft!, m.action_draft!.navigate)}
+                            >
+                              Approve to open
+                            </button>
+                          </div>
+                        </Show>
                       </Show>
                     </article>
                   )}
                 </For>
+                <div ref={messagesEndEl} />
               </div>
 
               <div class="border-t border-stroke p-3">
@@ -913,8 +1060,7 @@ export default function TeamChatPage() {
                         type="button"
                         class="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white"
                         onClick={() => {
-                          navigate(pa().navigate);
-                          setPendingApprove(null);
+                          void approveChatDraft(pa().draft, pa().navigate).then(() => setPendingApprove(null));
                         }}
                       >
                         Approve to open
@@ -1262,6 +1408,49 @@ export default function TeamChatPage() {
                 onClick={() => void handleCreateReminder()}
               >
                 Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={remindersOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Scheduled reminders">
+          <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
+            <h3 class="mb-3 text-base font-semibold">Scheduled reminders</h3>
+            <div class="mb-3 max-h-64 space-y-2 overflow-y-auto">
+              <For
+                each={reminders().filter((r) => r.status === "scheduled")}
+                fallback={<p class="text-sm text-text-secondary">No scheduled reminders.</p>}
+              >
+                {(rem) => (
+                  <div class="flex items-start justify-between gap-2 rounded-lg border border-stroke px-2 py-2 text-sm">
+                    <div class="min-w-0">
+                      <p class="font-medium text-text-primary">{rem.title}</p>
+                      <p class="text-xs text-text-secondary">{rem.remind_at}</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="shrink-0 rounded border border-stroke px-2 py-1 text-xs"
+                      onClick={async () => {
+                        const res = await cancelChatReminder(rem.id);
+                        if (!res.success) {
+                          toast.error(res.message || "Cancel failed.");
+                          return;
+                        }
+                        setReminders((prev) => prev.map((r) => (r.id === rem.id ? { ...r, status: "cancelled" } : r)));
+                        toast.success("Reminder cancelled.");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </For>
+            </div>
+            <div class="flex justify-end">
+              <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setRemindersOpen(false)}>
+                Close
               </button>
             </div>
           </div>

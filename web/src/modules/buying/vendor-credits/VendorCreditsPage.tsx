@@ -1,4 +1,5 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { A } from "@solidjs/router";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { handleSaveResult } from "../../../shared/handleSaveResult";
@@ -27,6 +28,7 @@ type VendorCredit = {
   status: string;
   reason: string;
   notes: string;
+  journal_entry_id?: number | null;
 };
 
 export default function VendorCreditsPage() {
@@ -207,11 +209,12 @@ export default function VendorCreditsPage() {
               <th class="px-3 py-2 text-right">Total</th>
               <th class="px-3 py-2 text-right">Remaining</th>
               <th class="px-3 py-2 text-left">Status</th>
+              <th class="px-3 py-2 text-left">JE</th>
               <th class="px-3 py-2 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <For each={list.data ?? []} fallback={<tr><td class="px-3 py-6 text-center text-text-secondary" colSpan={8}>No vendor credits yet.</td></tr>}>
+            <For each={list.data ?? []} fallback={<tr><td class="px-3 py-6 text-center text-text-secondary" colSpan={9}>No vendor credits yet.</td></tr>}>
               {(row) => (
                 <tr class="border-t border-stroke/60">
                   <td class="px-3 py-2">{row.credit_no}</td>
@@ -221,6 +224,13 @@ export default function VendorCreditsPage() {
                   <td class="px-3 py-2 text-right">{formatPeso(row.amount_total)}</td>
                   <td class="px-3 py-2 text-right">{formatPeso(row.remaining_amount)}</td>
                   <td class="px-3 py-2 capitalize">{row.status}</td>
+                  <td class="px-3 py-2">
+                    <Show when={row.journal_entry_id} fallback={<span class="text-text-secondary">—</span>}>
+                      <A href="/app/finance/acct-i/journal-entries" class="text-brand-600 hover:underline">
+                        #{row.journal_entry_id}
+                      </A>
+                    </Show>
+                  </td>
                   <td class="px-3 py-2">
                     <div class="flex flex-wrap gap-2">
                       <button type="button" class="text-brand-600 hover:underline" onClick={() => openVendorCreditPrint(row.id)}>

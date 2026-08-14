@@ -899,3 +899,60 @@ export function useFinanceWorkspace() {
     staleTime: 30_000,
   }));
 }
+
+export type BooksHealthException = {
+  code: string;
+  severity: "block" | "warn" | string;
+  count: number;
+  label: string;
+  href: string;
+};
+
+export type BooksHealthSummary = {
+  as_of: string;
+  ready_to_close: boolean;
+  draft_journal_entries: number;
+  unmatched_bank_lines: number;
+  audit_only_pending: number;
+  credits_missing_je: number;
+  credit_notes_missing_je: number;
+  vendor_credits_missing_je: number;
+  ar_customers: number;
+  unpaid_supplier_invoices: number;
+  ap_over_application: number;
+  sales_unbilled_lines: number;
+  purchase_unbilled_gr_lines: number;
+  inventory_closing_difference: number;
+  hybrid_inventory_unmapped: boolean;
+  policies: {
+    accounts_auto_post_or: boolean;
+    accounts_auto_post_pv: boolean;
+    accounts_auto_post_sales: boolean;
+    accounts_auto_post_purchase: boolean;
+    inventory_gl_hybrid_enabled: boolean;
+  };
+  fiscal: {
+    period_id?: number;
+    period_code?: string;
+    is_closed: boolean;
+    year_code?: string;
+  };
+  exceptions: BooksHealthException[];
+  signoff_links: Record<string, string>;
+};
+
+export function useBooksHealth(asOf?: () => string) {
+  return createQuery(() => {
+    const day = asOf?.() ?? "";
+    const qs = day ? `?as_of=${encodeURIComponent(day)}` : "";
+    return {
+      queryKey: ["finance-books-health", day || "today"],
+      queryFn: async () => {
+        const res = await apiFetch<BooksHealthSummary>(`/api/v1/finance/books-health${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load books health");
+        return res.data!;
+      },
+      staleTime: 30_000,
+    };
+  });
+}

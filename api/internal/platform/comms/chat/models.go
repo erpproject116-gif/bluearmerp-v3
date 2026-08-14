@@ -82,6 +82,8 @@ type Message struct {
 	Links                  []MessageLink       `json:"links,omitempty"`
 	Attachments            []MessageAttachment `json:"attachments,omitempty"`
 	Reactions              []MessageReaction   `json:"reactions,omitempty"`
+	// ActionDraft is Baiko approve-to-open metadata (jsonb); omit for normal user messages.
+	ActionDraft any `json:"action_draft,omitempty"`
 }
 
 type TypingUser struct {

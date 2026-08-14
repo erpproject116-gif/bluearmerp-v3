@@ -39,6 +39,15 @@ export type ChatAttachment = {
   created_at: string;
 };
 
+export type ChatActionDraft = {
+  type: string;
+  summary?: string;
+  payload?: Record<string, unknown>;
+  api?: string;
+  method?: string;
+  navigate?: string;
+};
+
 export type ChatMessage = {
   id: number;
   channel_id: number;
@@ -60,6 +69,7 @@ export type ChatMessage = {
   links?: ChatMessageLink[];
   attachments?: ChatAttachment[];
   reactions?: { emoji: string; count: number; me: boolean }[];
+  action_draft?: ChatActionDraft | null;
 };
 
 export type ChatTypingUser = {
@@ -88,9 +98,11 @@ export type BaikoCapabilities = {
 export type SlashResult = {
   message?: ChatMessage;
   navigate?: string;
-  action_draft?: { type: string; payload?: Record<string, unknown> };
+  action_draft?: ChatActionDraft;
   approve_hint?: string;
   ask_query?: string;
+  need_client_ask?: boolean;
+  analyze?: boolean;
 };
 
 export const CHAT_REACTION_EMOJIS = ["👍", "❤️", "😂", "👀", "✅"] as const;
@@ -299,4 +311,23 @@ export async function postChatSlash(channelId: number, command: string, args = "
     method: "POST",
     body: JSON.stringify({ command, args }),
   }, { silent: true });
+}
+
+export async function postBaikoChatMessage(
+  channelId: number,
+  body: string,
+  actionDraft?: ChatActionDraft | null,
+) {
+  return apiFetch<ChatMessage>(`/api/v1/comms/chat/channels/${channelId}/baiko-messages`, {
+    method: "POST",
+    body: JSON.stringify({ body, action_draft: actionDraft ?? null }),
+  });
+}
+
+export async function listChatReminders() {
+  return apiFetch<ChatReminder[]>("/api/v1/comms/chat/reminders", {}, { silent: true });
+}
+
+export async function cancelChatReminder(id: number) {
+  return apiFetch(`/api/v1/comms/chat/reminders/${id}/cancel`, { method: "POST", body: "{}" });
 }

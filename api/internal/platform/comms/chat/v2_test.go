@@ -37,3 +37,23 @@ func TestSlashOpenDocsCatalog(t *testing.T) {
 		t.Fatal("quotation draft type mismatch")
 	}
 }
+
+func TestIsNavigateOnlyDraftType(t *testing.T) {
+	if !IsNavigateOnlyDraftType("open_support_tickets") || !IsNavigateOnlyDraftType("open_crm") || !IsNavigateOnlyDraftType("open_baiko") {
+		t.Fatal("ticket/crm/baiko must be navigate-only")
+	}
+	if IsNavigateOnlyDraftType("open_quotation") {
+		t.Fatal("open_quotation must use approve API")
+	}
+}
+
+func TestDecodeActionDraft(t *testing.T) {
+	if decodeActionDraft(nil) != nil {
+		t.Fatal("nil raw")
+	}
+	v := decodeActionDraft([]byte(`{"type":"open_quotation","payload":{}}`))
+	m, ok := v.(map[string]any)
+	if !ok || m["type"] != "open_quotation" {
+		t.Fatalf("got %#v", v)
+	}
+}
