@@ -163,7 +163,7 @@ export async function postChatMessage(
   return apiFetch<ChatMessage>(`/api/v1/comms/chat/channels/${channelId}/messages`, {
     method: "POST",
     body: JSON.stringify(body),
-  });
+  }, { silent: true });
 }
 
 export async function markChatRead(channelId: number, messageId?: number) {
@@ -256,20 +256,20 @@ export async function addChatReaction(messageId: number, emoji: string) {
   return apiFetch(`/api/v1/comms/chat/messages/${messageId}/reactions`, {
     method: "POST",
     body: JSON.stringify({ emoji }),
-  });
+  }, { silent: true });
 }
 
 export async function removeChatReaction(messageId: number, emoji: string) {
   return apiFetch(`/api/v1/comms/chat/messages/${messageId}/reactions?emoji=${encodeURIComponent(emoji)}`, {
     method: "DELETE",
-  });
+  }, { silent: true });
 }
 
 export async function forwardChatMessage(messageId: number, channelId: number) {
   return apiFetch<ChatMessage>(`/api/v1/comms/chat/messages/${messageId}/forward`, {
     method: "POST",
     body: JSON.stringify({ channel_id: channelId }),
-  });
+  }, { silent: true });
 }
 
 export async function createChatReminder(body: {
@@ -298,5 +298,5 @@ export async function postChatSlash(channelId: number, command: string, args = "
   return apiFetch<SlashResult>(`/api/v1/comms/chat/channels/${channelId}/slash`, {
     method: "POST",
     body: JSON.stringify({ command, args }),
-  });
+  }, { silent: true });
 }
