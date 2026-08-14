@@ -32,7 +32,7 @@ Official variable reference: [Auth email templates](https://supabase.com/docs/gu
 | System | Used for | Configure where |
 |--------|----------|-----------------|
 | **Supabase Auth SMTP** | Confirm signup, reset password, magic link / OTP | Dashboard → Authentication → SMTP (or default Supabase mail for tests) |
-| **API SMTP** (`SMTP_HOST`, `SMTP_FROM`, …) | Company invites, document email, digests | Render / API env — see [`render-deploy.md`](./render-deploy.md) |
+| **API mail** (`RESEND_API_KEY` + `RESEND_FROM`/`SMTP_FROM`, or `SMTP_*`) | Company invites, document email, digests | Render / API env — see [`render-deploy.md`](./render-deploy.md). On **Render free**, use Resend HTTPS (`RESEND_API_KEY`); SMTP ports are blocked. |
 
 Changing Auth templates or Auth SMTP does **not** change invite or Communications mail.
 

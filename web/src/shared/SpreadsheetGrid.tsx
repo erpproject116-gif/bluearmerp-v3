@@ -754,9 +754,10 @@ export function EntityModal(props: {
                 type="button"
                 class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 disabled={props.saving}
+                aria-busy={props.saving ? "true" : "false"}
                 onClick={() => props.onSave()}
               >
-                {props.saveLabel ?? "Save changes"}
+                {props.saving ? "Saving…" : (props.saveLabel ?? "Save changes")}
               </button>
             </div>
           </div>
