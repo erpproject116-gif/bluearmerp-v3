@@ -1000,11 +1000,11 @@ export const moduleKbArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Month-end: run Trial Balance and bank reconciliation after all material JEs for the period are posted. See the month-close runbook in docs.",
+        text: "Month-end: open Accounting → Bookkeeping (Books Health) for the live exception queue and checklist, then confirm Trial Balance / P&L / Balance Sheet. See also docs/runbooks/month-close-checklist.md.",
       },
     ],
-    primaryHref: "/app/finance/acct-i/journal-entries",
-    primaryLabel: "Journal entries",
+    primaryHref: "/app/finance/bookkeeping",
+    primaryLabel: "Books Health",
     relatedGuideIds: ["sales-cash-in-after-save", "finance-accounts-overview", "process-policies-foundation"],
   },
   {

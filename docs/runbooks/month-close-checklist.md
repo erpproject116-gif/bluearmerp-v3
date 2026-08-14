@@ -1,6 +1,6 @@
 # Month-close checklist (pilot)
 
-Use this at **month-end** before finance signs off. Most steps are in-app; tick each box in your pilot tracker.
+Use this at **month-end** before finance signs off. Prefer the in-app cockpit: **Accounting → Bookkeeping** (`/app/finance/bookkeeping`) — Books Health shows live Pass/Open status for the items below.
 
 ## Week before close
 
@@ -31,16 +31,20 @@ Use this at **month-end** before finance signs off. Most steps are in-app; tick 
 - [ ] **Trial Balance** — no unexpected draft-only accounts blocking close.
 - [ ] **Acct vs Inventory** — investigate variances before signing inventory valuation.
 - [ ] **Stock reconciliation** — clear red flags (serial mismatch, GR without SI, etc.).
+- [ ] **Credit / vendor credit journals** — open credits must have `journal_entry_id` (Books Health can backfill).
 
 ## Sign-off
 
+- [ ] Books Health shows **Ready to close** (or exceptions are accepted).
 - [ ] Finance lead confirms TB / P&L / Balance Sheet for the period.
+- [ ] Close the fiscal period from Bookkeeping (or Fiscal years).
 - [ ] `/health/schema` healthy on production (no pending migrations).
 - [ ] Golden path smoke passes against production API (optional but recommended).
 
 ## Related docs
 
 - [Deploy checklist](./deploy-checklist.md)
+- In-app: `/app/finance/bookkeeping`
 - KB: **Cash In and accounting after saving a sales invoice**
 - KB: **Journal entries: draft → review → post**
 - [`docs/modules/finance/README.md`](../modules/finance/README.md)

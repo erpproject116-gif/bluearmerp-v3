@@ -25,13 +25,13 @@ First-party staff messaging scoped to the JWT tenant (`tenant_id` on all tables 
 | Share to chat | Document toolbars (quotation, sales, SO, PO) next to Email |
 | Typing / reactions / bubbles | Ephemeral typing TTL; emoji subset; `localStorage` bubble tails |
 | Reminders | In-app `chat_reminders` (+ optional CRM follow-up); `/reminder` for everyone — **not** Google Calendar OAuth |
-| Baiko `/` skills | **Owner or platform superadmin only**; approve-to-open drafts — never silent ERP writes |
+| Baiko `/` skills | **Owner or platform superadmin only**; `/ask`/`/analyze` call `POST /copilot/ask` then post Baiko reply; commercial `/quotation` etc. store `action_draft` on the message; **Approve** uses the same `POST /copilot/actions/approve` + `sessionStorage` seed handoff as Baiko Help — never silent ERP writes. Ticket/CRM chips navigate only. |
 | @mentions | Writes `crm_notifications` with `source=chat` |
 | ERP document cards | Allowlisted entity types; server-built hrefs |
 | File attachments | Combined **25 MiB** per message, Postgres `bytea` |
 | Realtime v1 | Poll ~4s while the chat page is visible |
 
-Schema: migrations `244_comms_chat.sql`, `245_chat_reply_forward_reactions_reminders.sql`.
+Schema: migrations `244_comms_chat.sql`, `245_chat_reply_forward_reactions_reminders.sql`, `248_chat_message_action_draft.sql`.
 
 ## Schema
 
@@ -41,6 +41,7 @@ Schema: migrations `244_comms_chat.sql`, `245_chat_reply_forward_reactions_remin
 | `139_gmail_comms.sql` | `com_mail_messages`, Gmail connection tables, `comms.inbox` permission |
 | `244_comms_chat.sql` | Team chat tables + `comms.chat` / `comms.chat_admin` + `crm_notifications` source `chat` |
 | `245_chat_reply_forward_reactions_reminders.sql` | Reply, forward, reactions, typing, reminders, `sender_kind` |
+| `248_chat_message_action_draft.sql` | Persist Baiko `action_draft` jsonb on messages for Approve chips |
 
 ## Delivery
 

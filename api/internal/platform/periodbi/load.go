@@ -433,6 +433,27 @@ func loadRedFlags(ctx context.Context, pool *pgxpool.Pool, tenantID int64, today
 		  left join (select sales_line_id, count(*)::float8 as serial_cnt from public.inv_serial_unit_sales_lines group by sales_line_id) j on j.sales_line_id = ln.id
 		  where s.tenant_id = $1 and s.deleted_at is null and i.track_serial = true and ln.qty > 0 and coalesce(j.serial_cnt, 0) <> ln.qty
 		) x`, tenantID)
+
+	bookkeeping := []flag{
+		{"Draft journals", "/app/finance/bookkeeping", countInt64(ctx, pool, `
+			select count(*) from public.fin_journal_entries
+			where tenant_id = $1 and status = 'draft'`, tenantID)},
+		{"Unmatched bank lines", "/app/finance/bookkeeping", countInt64(ctx, pool, `
+			select count(*) from public.fin_bank_statement_lines
+			where tenant_id = $1 and matched_payment_id is null`, tenantID)},
+		{"Credits missing JE", "/app/finance/bookkeeping", countInt64(ctx, pool, `
+			select (
+			  (select count(*) from public.fin_credit_notes
+			   where tenant_id = $1 and deleted_at is null and status = 'open'
+			     and journal_entry_id is null and amount_total > 0.0001)
+			  +
+			  (select count(*) from public.fin_vendor_credits
+			   where tenant_id = $1 and deleted_at is null and status = 'open'
+			     and journal_entry_id is null and amount_total > 0.0001)
+			)`, tenantID)},
+	}
+	flags = append(flags, bookkeeping...)
+
 	var out []NamedAmount
 	for _, f := range flags {
 		if f.count <= 0 {

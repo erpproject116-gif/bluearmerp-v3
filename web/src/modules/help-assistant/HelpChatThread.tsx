@@ -1,42 +1,9 @@
 import { createSignal, For, Show } from "solid-js";
-import { approveCopilotAction, denyCopilotAction } from "./helpApi";
+import { denyCopilotAction } from "./helpApi";
 import { HelpDeepLinkChips, HelpMarkdown } from "./HelpMarkdown";
 import { HelpResultCard } from "./HelpResultCard";
 import type { HelpChatMessage } from "./helpTypes";
-import { safeAppPath } from "./safeAppPath";
-
-/** Approve-to-seed handoffs: draft type → sessionStorage key the target screen consumes once. */
-const SEED_STORAGE_KEYS: Record<string, string> = {
-  create_quotation_from_rfq: "bluearm.rfqQuotationSeed",
-  map_import_dataset: "bluearm.migImportSeed",
-  open_quotation: "bluearm.docSeed.quotation",
-  open_sales_order: "bluearm.docSeed.sales_order",
-  open_sales: "bluearm.docSeed.sales",
-  open_purchase_request: "bluearm.docSeed.purchase_request",
-  open_rfq: "bluearm.docSeed.rfq",
-  open_purchase_order: "bluearm.docSeed.purchase_order",
-  open_purchases: "bluearm.docSeed.purchases",
-  propose_serial_lot_import: "bluearm.serialLotSeed",
-};
-
-/** Soft-cap oversized seeds so we stay under typical sessionStorage quotas. */
-function capSeedForStorage(seed: unknown): unknown {
-  try {
-    const raw = JSON.stringify(seed);
-    if (raw.length <= 4_500_000) return seed;
-    const s = seed as { lines?: Array<{ description?: string }> };
-    if (Array.isArray(s?.lines)) {
-      for (const line of s.lines) {
-        if (line.description && line.description.length > 2_000) {
-          line.description = line.description.slice(0, 2_000) + "\n…[truncated]";
-        }
-      }
-    }
-    return s;
-  } catch {
-    return seed;
-  }
-}
+import { approveAndOpenCopilotDraft } from "../../shared/copilotApproveHandoff";
 
 function AssistantBubble(props: {
   message: Extract<HelpChatMessage, { role: "assistant" }>;
@@ -61,30 +28,16 @@ function AssistantBubble(props: {
     if (!draft || acting()) return;
     setActing(true);
     try {
-      const res = await approveCopilotAction(draft, reply().sessionId);
-      if (!res.success) {
-        setActionNote(res.message || "Approve failed.");
+      const outcome = await approveAndOpenCopilotDraft(draft, reply().sessionId);
+      if (!outcome.ok) {
+        setActionNote(outcome.message);
         return;
       }
-      const result = res.data?.result as { next?: string; hint?: string; seed?: unknown } | undefined;
-      const next = result?.next ? safeAppPath(result.next) : null;
-      if (next) {
-        const seedKey = SEED_STORAGE_KEYS[draft.type];
-        if (result?.seed && seedKey) {
-          try {
-            sessionStorage.setItem(seedKey, JSON.stringify(capSeedForStorage(result.seed)));
-          } catch {
-            setActionNote("Approved, but the draft could not be staged in this browser.");
-            return;
-          }
-        }
-        setActionNote(result?.hint || "Opening…");
-        window.setTimeout(() => {
-          window.location.assign(next);
-        }, 400);
+      if (outcome.assigned) {
+        setActionNote(outcome.hint || "Opening…");
         return;
       }
-      setActionNote(result?.hint || "Approved.");
+      setActionNote(outcome.hint || "Approved.");
     } finally {
       setActing(false);
     }
