@@ -15,6 +15,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 			kpi.Use(auth.RequirePermission("dashboard.kpis", auth.AccessRead))
 			kpi.Get("/summary", summaryHandler(pool))
 			kpi.Get("/financial-health", financialHealthHandler(pool))
+			kpi.Get("/period-summary", periodSummaryHandler(pool))
 		})
 
 		dr.Group(func(charts chi.Router) {

@@ -215,6 +215,12 @@ export default function DashboardPage() {
             </button>
           </div>
           <A
+            href="/app/dashboard/period-summary"
+            class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-brand-600 shadow-sm transition hover:shadow-md"
+          >
+            Period summary
+          </A>
+          <A
             href="/app/dashboard/approvals"
             class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-brand-600 shadow-sm transition hover:shadow-md"
           >

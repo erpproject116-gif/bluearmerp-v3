@@ -263,17 +263,17 @@ func formatDigest(company string, rows []queueRow) (subject, html string) {
 	subject = fmt.Sprintf("%s activity digest (%d changes)", company, n)
 
 	var b strings.Builder
-	b.WriteString(`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">`)
-	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;"><tr><td align="center">`)
-	b.WriteString(`<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">`)
+	b.WriteString(`<!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:32px 16px;"><tr><td align="center">`)
+	b.WriteString(`<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">`)
 
-	// Header
-	b.WriteString(`<tr><td style="background:#0f172a;color:#ffffff;padding:22px 24px;">`)
-	b.WriteString(`<div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;opacity:0.75;margin-bottom:6px;">Hourly activity digest</div>`)
+	// Header — brand unified with invites / daily ops (#3c50e0)
+	b.WriteString(`<tr><td style="background:#3c50e0;color:#ffffff;padding:20px 28px;">`)
+	b.WriteString(`<div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;opacity:0.85;margin-bottom:6px;">Hourly activity digest</div>`)
 	b.WriteString(`<div style="font-size:20px;font-weight:700;line-height:1.3;">`)
 	b.WriteString(htmlEscape(company))
 	b.WriteString(`</div>`)
-	b.WriteString(fmt.Sprintf(`<div style="font-size:13px;opacity:0.85;margin-top:8px;">%d change%s since last digest</div>`, n, pluralS(n)))
+	b.WriteString(fmt.Sprintf(`<div style="font-size:13px;opacity:0.9;margin-top:8px;">%d change%s since last digest</div>`, n, pluralS(n)))
 	b.WriteString(`</td></tr>`)
 
 	// Cards

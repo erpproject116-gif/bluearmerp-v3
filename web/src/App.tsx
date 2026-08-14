@@ -296,6 +296,7 @@ import {
   ReportsIndexPage,
   SavedViewsPage,
   DashboardPage,
+  PeriodSummaryPage,
   ApprovalsQueuePage,
   SiteMapPage,
   DocumentationPage,
@@ -463,6 +464,7 @@ export default function App() {
         </Route>
         <Route path="/app" component={AppLayout}>
           <Route path="/dashboard" component={DashboardPage} />
+          <Route path="/dashboard/period-summary" component={PeriodSummaryPage} />
           <Route path="/thank-you-activated" component={ThankYouActivatedPage} />
           <Route path="/dashboard/approvals" component={ApprovalsQueuePage} />
           <Route path="/dashboard/site-map" component={SiteMapPage} />
