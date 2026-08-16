@@ -46,22 +46,14 @@ func HandleOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event)
 		log.Printf("approval outbox: tenant=%d entity=%s/%d — SMTP not configured", ev.TenantID, p.EntityType, p.EntityID)
 		return nil
 	}
-	perm := approverPermissionForEntity(p.EntityType)
+	perm := ApproverPermissionForEntity(p.EntityType)
 	if perm == "" {
 		return nil
 	}
-	rows, err := pool.Query(ctx, `
-		select distinct u.email
-		from public.users u
-		join public.tenant_user_roles tur on tur.user_id = u.id and tur.tenant_id = $1
-		join public.tenant_role_permissions trp on trp.tenant_id = tur.tenant_id and trp.role_code = tur.role_code
-		where u.tenant_id = $1 and u.is_active = true
-		  and trp.permission_code = $2 and trp.access_level in ('write', 'submit')
-		  and coalesce(trim(u.email), '') <> ''`, ev.TenantID, perm)
+	emails, err := pendingApprovalRecipientEmails(ctx, pool, ev.TenantID, perm, p.EntityType)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 	label := p.EntityLabel
 	if label == "" {
 		label = fmt.Sprintf("%s #%d", p.EntityType, p.EntityID)
@@ -70,11 +62,7 @@ func HandleOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event)
 	body := fmt.Sprintf("An item requires your approval.\n\nType: %s\nReference: %s\nSubmitted by: %s\n\nOpen the Approvals queue in Bluearm ERP to review.",
 		p.EntityType, label, strings.TrimSpace(p.Submitter))
 	sent := 0
-	for rows.Next() {
-		var email string
-		if err := rows.Scan(&email); err != nil {
-			return err
-		}
+	for _, email := range emails {
 		if err := outbox.SendEmail(cfg, email, subject, body); err != nil {
 			log.Printf("approval outbox: failed to email %s: %v", email, err)
 			continue
@@ -100,13 +88,71 @@ func DrainOutbox(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 }
 
-func approverPermissionForEntity(entityType string) string {
+// ApproverPermissionForEntity maps approval entity types to permission codes.
+func ApproverPermissionForEntity(entityType string) string {
 	switch strings.TrimSpace(entityType) {
 	case "purchase_request", "pr_purchase_request":
 		return "purchase_request.approve"
 	case "journal_entry", "fin_journal_entry":
 		return "finance.journal_entries"
+	case "inv_serial_adjustment_request":
+		return "inventory.serial_adjustment_approve"
+	case "inv_stock_adjustment_request":
+		return "inventory.stock_adjustment_approve"
 	default:
 		return "purchase_request.approve"
 	}
+}
+
+func pendingApprovalRecipientEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64, perm, entityType string) ([]string, error) {
+	seen := map[string]bool{}
+	var out []string
+	add := func(email string) {
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email == "" || seen[email] {
+			return
+		}
+		seen[email] = true
+		out = append(out, email)
+	}
+
+	rows, err := pool.Query(ctx, `
+		select distinct u.email
+		from public.users u
+		join public.tenant_user_roles tur on tur.user_id = u.id and tur.tenant_id = $1
+		join public.tenant_role_permissions trp on trp.tenant_id = tur.tenant_id and trp.role_code = tur.role_code
+		where u.tenant_id = $1 and u.status = 'active'
+		  and trp.permission_code = $2 and trp.access_level in ('write', 'submit')
+		  and coalesce(trim(u.email), '') <> ''`, tenantID, perm)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, err
+		}
+		add(email)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Owner is notified on inventory adjustment submissions (even without approve permission).
+	switch strings.TrimSpace(entityType) {
+	case "inv_stock_adjustment_request", "inv_serial_adjustment_request":
+		var ownerEmail string
+		err := pool.QueryRow(ctx, `
+			select lower(trim(u.email))
+			from public.tenants t
+			join public.users u on u.id = t.owner_user_id
+			where t.id = $1
+			  and u.status = 'active'
+			  and coalesce(trim(u.email), '') <> ''`, tenantID).Scan(&ownerEmail)
+		if err == nil {
+			add(ownerEmail)
+		}
+	}
+	return out, nil
 }

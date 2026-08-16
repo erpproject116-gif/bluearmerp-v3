@@ -23,6 +23,7 @@ type ProcessPolicy = {
   accounts_auto_post_purchase: boolean;
   inventory_gl_hybrid_enabled: boolean;
   inventory_require_serial_adjustment_approval: boolean;
+  inventory_require_stock_adjustment_approval: boolean;
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
@@ -200,6 +201,11 @@ const SECTIONS: PolicySection[] = [
         label: "Require approval for serial qty fixes (threshold)",
         help: "Off by default. When on, Apply on Qty fix (serials) goes to Approvals Queue if there are 5+ lines or any positive qty change. Small negative-only fixes still post immediately.",
       },
+      {
+        key: "inventory_require_stock_adjustment_approval",
+        label: "Require approval for stock quantity adjustments",
+        help: "Off by default. When on, stock quantity changes need store admin approval before inventory updates. Recommended for controlled inventory.",
+      },
     ],
   },
 ];
@@ -232,6 +238,7 @@ const PRESETS: { id: PresetId; label: string; help: string; apply: (p: ProcessPo
       purchase_require_po_approval: false,
       finance_require_je_approval: false,
       inventory_require_serial_adjustment_approval: false,
+      inventory_require_stock_adjustment_approval: false,
       quotation_require_attachment: false,
       sales_order_require_attachment: false,
       sales_require_attachment: false,

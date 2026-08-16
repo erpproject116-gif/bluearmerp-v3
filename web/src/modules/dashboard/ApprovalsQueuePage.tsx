@@ -23,6 +23,7 @@ const ENTITY_LABELS: Record<string, string> = {
   sa_sales: "Sales",
   fin_supplier_invoice: "Purchase",
   inv_serial_adjustment_request: "Serial qty fix",
+  inv_stock_adjustment_request: "Stock adjustment",
 };
 
 function entityLabel(type: string): string {
@@ -66,14 +67,17 @@ export default function ApprovalsQueuePage() {
     if (
       row.entity_type === "sa_sales" ||
       row.entity_type === "fin_supplier_invoice" ||
-      row.entity_type === "inv_serial_adjustment_request"
+      row.entity_type === "inv_serial_adjustment_request" ||
+      row.entity_type === "inv_stock_adjustment_request"
     ) {
       const base =
         row.entity_type === "sa_sales"
           ? `/api/v1/sales/${row.entity_id}`
           : row.entity_type === "fin_supplier_invoice"
             ? `/api/v1/finance/supplier-invoices/${row.entity_id}`
-            : `/api/v1/inventory/serial-units/adjustment-requests/${row.entity_id}`;
+            : row.entity_type === "inv_serial_adjustment_request"
+              ? `/api/v1/inventory/serial-units/adjustment-requests/${row.entity_id}`
+              : `/api/v1/inventory/stock-adjustment-requests/${row.entity_id}`;
       if (approve) {
         res = await apiFetch(`${base}/approve`, { method: "POST", body: JSON.stringify({}) });
       } else {

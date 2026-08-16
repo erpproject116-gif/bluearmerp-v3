@@ -714,6 +714,9 @@ export function EntityModal(props: {
   stacked?: boolean;
   /** Primary action label (default: Save changes). */
   saveLabel?: string;
+  /** Optional secondary action (e.g. Save draft). */
+  secondarySaveLabel?: string;
+  onSecondarySave?: () => void;
   /** Optional controls at the right of the title (e.g. History). */
   headerActions?: JSX.Element;
   children: JSX.Element;
@@ -750,6 +753,16 @@ export function EntityModal(props: {
               >
                 Cancel
               </button>
+              <Show when={props.secondarySaveLabel && props.onSecondarySave}>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:erp-panel disabled:opacity-50"
+                  disabled={props.saving}
+                  onClick={() => props.onSecondarySave?.()}
+                >
+                  {props.secondarySaveLabel}
+                </button>
+              </Show>
               <button
                 type="button"
                 class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"

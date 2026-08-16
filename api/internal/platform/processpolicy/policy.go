@@ -37,6 +37,7 @@ type Policy struct {
 	SupplierInvoiceRequireAttachment    bool   `json:"supplier_invoice_require_attachment"`
 	InventoryGLHybridEnabled                 bool   `json:"inventory_gl_hybrid_enabled"`
 	InventoryRequireSerialAdjustmentApproval bool   `json:"inventory_require_serial_adjustment_approval"`
+	InventoryRequireStockAdjustmentApproval  bool   `json:"inventory_require_stock_adjustment_approval"`
 	ARPaymentDiscountAccountID               *int64 `json:"ar_payment_discount_account_id"`
 	APPaymentDiscountAccountID               *int64 `json:"ap_payment_discount_account_id"`
 }
@@ -67,6 +68,7 @@ type Patch struct {
 	SupplierInvoiceRequireAttachment   *bool   `json:"supplier_invoice_require_attachment,omitempty"`
 	InventoryGLHybridEnabled           *bool   `json:"inventory_gl_hybrid_enabled,omitempty"`
 	InventoryRequireSerialAdjustmentApproval *bool `json:"inventory_require_serial_adjustment_approval,omitempty"`
+	InventoryRequireStockAdjustmentApproval  *bool `json:"inventory_require_stock_adjustment_approval,omitempty"`
 	ARPaymentDiscountAccountID         *int64  `json:"ar_payment_discount_account_id,omitempty"`
 	APPaymentDiscountAccountID         *int64  `json:"ap_payment_discount_account_id,omitempty"`
 }
@@ -99,6 +101,7 @@ const selectCols = `
   coalesce(supplier_invoice_require_attachment, true),
   coalesce(inventory_gl_hybrid_enabled, false),
   coalesce(inventory_require_serial_adjustment_approval, false),
+  coalesce(inventory_require_stock_adjustment_approval, false),
   ar_payment_discount_account_id,
   ap_payment_discount_account_id
 `
@@ -143,6 +146,7 @@ func LoadStored(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy
 		&p.SupplierInvoiceRequireAttachment,
 		&p.InventoryGLHybridEnabled,
 		&p.InventoryRequireSerialAdjustmentApproval,
+		&p.InventoryRequireStockAdjustmentApproval,
 		&p.ARPaymentDiscountAccountID,
 		&p.APPaymentDiscountAccountID,
 	)
@@ -291,6 +295,9 @@ func ApplyPatch(current Policy, patch Patch) Policy {
 	if patch.InventoryRequireSerialAdjustmentApproval != nil {
 		next.InventoryRequireSerialAdjustmentApproval = *patch.InventoryRequireSerialAdjustmentApproval
 	}
+	if patch.InventoryRequireStockAdjustmentApproval != nil {
+		next.InventoryRequireStockAdjustmentApproval = *patch.InventoryRequireStockAdjustmentApproval
+	}
 	if patch.ARPaymentDiscountAccountID != nil {
 		if *patch.ARPaymentDiscountAccountID <= 0 {
 			next.ARPaymentDiscountAccountID = nil
@@ -337,6 +344,7 @@ func writePolicyArgs(tenantID, userID int64, next Policy) []any {
 		next.SupplierInvoiceRequireAttachment,
 		next.InventoryGLHybridEnabled,
 		next.InventoryRequireSerialAdjustmentApproval,
+		next.InventoryRequireStockAdjustmentApproval,
 		next.ARPaymentDiscountAccountID,
 		next.APPaymentDiscountAccountID,
 		userID,
@@ -369,9 +377,10 @@ const updatePolicySQL = `
 		  supplier_invoice_require_attachment = $23,
 		  inventory_gl_hybrid_enabled = $24,
 		  inventory_require_serial_adjustment_approval = $25,
-		  ar_payment_discount_account_id = $26,
-		  ap_payment_discount_account_id = $27,
-		  updated_by_user_id = $28,
+		  inventory_require_stock_adjustment_approval = $26,
+		  ar_payment_discount_account_id = $27,
+		  ap_payment_discount_account_id = $28,
+		  updated_by_user_id = $29,
 		  updated_at = now()
 		where tenant_id = $1`
 
@@ -452,6 +461,7 @@ func loadStoredTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error
 		&p.SupplierInvoiceRequireAttachment,
 		&p.InventoryGLHybridEnabled,
 		&p.InventoryRequireSerialAdjustmentApproval,
+		&p.InventoryRequireStockAdjustmentApproval,
 		&p.ARPaymentDiscountAccountID,
 		&p.APPaymentDiscountAccountID,
 	)

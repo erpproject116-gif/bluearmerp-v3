@@ -16,28 +16,33 @@ import (
 )
 
 type serialQtyMismatchRow struct {
-	ContextType string  `json:"context_type"`
-	ContextID   int64   `json:"context_id"`
-	ParentID    int64   `json:"parent_id"`
-	ItemID      *int64  `json:"item_id,omitempty"`
-	ItemCode    string  `json:"item_code"`
-	ItemName    string  `json:"item_name"`
-	ExpectedQty float64 `json:"expected_qty"`
-	SerialCount float64 `json:"serial_count"`
-	GapQty      float64 `json:"gap_qty"`
+	ContextType    string  `json:"context_type"`
+	ContextID      int64   `json:"context_id"`
+	ParentID       int64   `json:"parent_id"`
+	ItemID         *int64  `json:"item_id,omitempty"`
+	ItemCode       string  `json:"item_code"`
+	ItemName       string  `json:"item_name"`
+	ExpectedQty    float64 `json:"expected_qty"`
+	SerialCount    float64 `json:"serial_count"`
+	GapQty         float64 `json:"gap_qty"`
+	DocumentNo     string  `json:"document_no,omitempty"`
+	DocumentLabel  string  `json:"document_label,omitempty"`
+	ContextLabel   string  `json:"context_label,omitempty"`
 }
 
 type reservedStaleRow struct {
-	ID           int64   `json:"id"`
-	SerialNo     string  `json:"serial_no"`
-	ItemID       int64   `json:"item_id"`
-	ItemCode     string  `json:"item_code"`
-	ItemName     string  `json:"item_name"`
-	LocationID   *int64  `json:"location_id,omitempty"`
-	LocationName string  `json:"location_name,omitempty"`
-	ReservedAt   string  `json:"reserved_at"`
-	DaysStale    int     `json:"days_stale"`
-	ReleaseLineID *int64 `json:"sales_order_release_line_id,omitempty"`
+	ID            int64   `json:"id"`
+	SerialNo      string  `json:"serial_no"`
+	ItemID        int64   `json:"item_id"`
+	ItemCode      string  `json:"item_code"`
+	ItemName      string  `json:"item_name"`
+	LocationID    *int64  `json:"location_id,omitempty"`
+	LocationName  string  `json:"location_name,omitempty"`
+	ReservedAt    string  `json:"reserved_at"`
+	DaysStale     int     `json:"days_stale"`
+	ReleaseLineID *int64  `json:"sales_order_release_line_id,omitempty"`
+	SalesOrderNo  string  `json:"sales_order_no,omitempty"`
+	SalesOrderID  *int64  `json:"sales_order_id,omitempty"`
 }
 
 type soReleaseGapRow struct {
@@ -62,6 +67,8 @@ type grSerialGapRow struct {
 	ReceivedQty        float64 `json:"received_qty"`
 	SerialCount        float64 `json:"serial_count"`
 	GapQty             float64 `json:"gap_qty"`
+	Reference          string  `json:"reference,omitempty"`
+	DocumentLabel      string  `json:"document_label,omitempty"`
 }
 
 func registerReconciliationRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -207,11 +214,13 @@ func listSerialQtyMismatch(pool *pgxpool.Pool) http.HandlerFunc {
 			select context_type, context_id, parent_id, item_id, item_code, item_name,
 			  expected_qty::float8, serial_cnt::float8,
 			  (expected_qty - serial_cnt)::float8,
+			  coalesce(document_no, ''),
 			  count(*) over()
 			from (
 			  select 'sales_line' as context_type, ln.id as context_id, s.id as parent_id,
 			    ln.item_id, ln.item_code, ln.item_name, ln.qty as expected_qty,
-			    coalesce(j.serial_cnt, 0) as serial_cnt
+			    coalesce(j.serial_cnt, 0) as serial_cnt,
+			    coalesce(nullif(trim(s.sales_no), ''), s.id::text) as document_no
 			  from public.sa_sales_lines ln
 			  join public.sa_sales s on s.id = ln.sales_id
 			  join public.inv_items i on i.id = ln.item_id
@@ -226,7 +235,8 @@ func listSerialQtyMismatch(pool *pgxpool.Pool) http.HandlerFunc {
 			  union all
 			  select 'release_line', rl.id, so.id,
 			    ln.item_id, ln.item_code, ln.item_name, rl.release_qty,
-			    coalesce(su.serial_cnt, 0)
+			    coalesce(su.serial_cnt, 0),
+			    coalesce(nullif(trim(so.sales_order_no), ''), so.id::text)
 			  from public.so_sales_order_release_lines rl
 			  join public.so_sales_order_lines ln on ln.id = rl.sales_order_line_id
 			  join public.so_sales_orders so on so.id = ln.sales_order_id
@@ -255,10 +265,21 @@ func listSerialQtyMismatch(pool *pgxpool.Pool) http.HandlerFunc {
 			var row serialQtyMismatchRow
 			if err := rows.Scan(
 				&row.ContextType, &row.ContextID, &row.ParentID, &row.ItemID, &row.ItemCode, &row.ItemName,
-				&row.ExpectedQty, &row.SerialCount, &row.GapQty, &total,
+				&row.ExpectedQty, &row.SerialCount, &row.GapQty, &row.DocumentNo, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read serial quantity mismatches.", "ERR_INTERNAL")
 				return
+			}
+			switch row.ContextType {
+			case "sales_line":
+				row.ContextLabel = "Sales line"
+				row.DocumentLabel = "Sales " + row.DocumentNo
+			case "release_line":
+				row.ContextLabel = "Release line"
+				row.DocumentLabel = "SO " + row.DocumentNo
+			default:
+				row.ContextLabel = row.ContextType
+				row.DocumentLabel = row.DocumentNo
 			}
 			out = append(out, row)
 		}
@@ -291,10 +312,15 @@ func listReservedStale(pool *pgxpool.Pool) http.HandlerFunc {
 			  su.reserved_at,
 			  (extract(epoch from (now() - su.reserved_at)) / 86400)::int,
 			  su.sales_order_release_line_id,
+			  so.id,
+			  coalesce(nullif(trim(so.sales_order_no), ''), ''),
 			  count(*) over()
 			from public.inv_serial_units su
 			join public.inv_items i on i.id = su.item_id
 			left join public.inv_locations loc on loc.id = su.location_id
+			left join public.so_sales_order_release_lines rl on rl.id = su.sales_order_release_line_id
+			left join public.so_sales_order_lines sol on sol.id = rl.sales_order_line_id
+			left join public.so_sales_orders so on so.id = sol.sales_order_id
 			where su.tenant_id = $1 and su.status = 'reserved'
 			  and su.reserved_at is not null
 			  and su.reserved_at < (now() - make_interval(days => $2))
@@ -311,15 +337,17 @@ func listReservedStale(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row reservedStaleRow
 			var reservedAt time.Time
+			var soID *int64
 			if err := rows.Scan(
 				&row.ID, &row.SerialNo, &row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.LocationID, &row.LocationName,
-				&reservedAt, &row.DaysStale, &row.ReleaseLineID, &total,
+				&reservedAt, &row.DaysStale, &row.ReleaseLineID, &soID, &row.SalesOrderNo, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read stale reserved serials.", "ERR_INTERNAL")
 				return
 			}
 			row.ReservedAt = reservedAt.Format(time.RFC3339)
+			row.SalesOrderID = soID
 			out = append(out, row)
 		}
 		if out == nil {
@@ -388,7 +416,14 @@ func listSOReleaseGap(pool *pgxpool.Pool) http.HandlerFunc {
 func listGRSerialGap(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		where := `gr.tenant_id = $1 and gr.status = 'draft' and coalesce(i.track_serial, false) = true`
+		p := httputil.ParseListParams(r, "goods_receipt_id", map[string]string{
+			"goods_receipt_id": "gr.id",
+			"gap_qty":          "gap_qty",
+			"line_no":          "grl.line_no",
+		})
+		offset := httputil.Offset(p)
+
+		where := `gr.tenant_id = $1 and gr.status = 'posted' and coalesce(i.track_serial, false) = true`
 		args := []any{tu.TenantID}
 		argN := 2
 		if grIDStr := strings.TrimSpace(r.URL.Query().Get("goods_receipt_id")); grIDStr != "" {
@@ -399,13 +434,19 @@ func listGRSerialGap(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			where += fmt.Sprintf(" and gr.id = $%d", argN)
 			args = append(args, grID)
+			argN++
 		}
+		args = append(args, p.PageSize, offset)
+		limitArg := argN
+		offsetArg := argN + 1
 
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
 			select gr.id, grl.id, grl.line_no, pol.item_code, pol.item_name,
 			  grl.expected_qty::float8, grl.received_qty::float8,
 			  coalesce(sc.cnt, 0)::float8,
-			  (grl.received_qty - coalesce(sc.cnt, 0))::float8
+			  (grl.received_qty - coalesce(sc.cnt, 0))::float8,
+			  coalesce(nullif(trim(gr.reference), ''), ''),
+			  count(*) over()
 			from public.gr_goods_receipt_lines grl
 			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
 			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
@@ -417,7 +458,8 @@ func listGRSerialGap(pool *pgxpool.Pool) http.HandlerFunc {
 			) sc on sc.goods_receipt_line_id = grl.id
 			where %s
 			  and abs(grl.received_qty - coalesce(sc.cnt, 0)) > 0.0001
-			order by gr.id desc, grl.line_no asc`, where), args...)
+			order by gr.id desc, grl.line_no asc
+			limit $%d offset $%d`, where, limitArg, offsetArg), args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load goods receipt serial gaps.", "ERR_INTERNAL")
 			return
@@ -425,22 +467,29 @@ func listGRSerialGap(pool *pgxpool.Pool) http.HandlerFunc {
 		defer rows.Close()
 
 		var out []grSerialGapRow
+		var total int64
 		for rows.Next() {
 			var row grSerialGapRow
 			if err := rows.Scan(
 				&row.GoodsReceiptID, &row.GoodsReceiptLineID, &row.LineNo,
 				&row.ItemCode, &row.ItemName,
 				&row.ExpectedQty, &row.ReceivedQty, &row.SerialCount, &row.GapQty,
+				&row.Reference, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read goods receipt serial gaps.", "ERR_INTERNAL")
 				return
+			}
+			if row.Reference != "" {
+				row.DocumentLabel = row.Reference
+			} else {
+				row.DocumentLabel = fmt.Sprintf("GR #%d", row.GoodsReceiptID)
 			}
 			out = append(out, row)
 		}
 		if out == nil {
 			out = []grSerialGapRow{}
 		}
-		response.OK(w, out, "OK")
+		response.OKList(w, out, p.Page, p.PageSize, total)
 	}
 }
 

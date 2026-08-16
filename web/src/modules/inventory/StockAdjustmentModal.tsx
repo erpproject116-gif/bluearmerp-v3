@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
@@ -9,11 +9,15 @@ import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { QuickLocationModal } from "../../shared/QuickLocationModal";
+import { useProcessPolicy } from "../../shared/useProcessPolicy";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  initialItemId?: number | null;
+  initialItemLabel?: string;
+  requestId?: number | null;
 };
 
 async function fetchItems(q: string): Promise<LookupOption[]> {
@@ -33,6 +37,7 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 export function StockAdjustmentModal(props: Props) {
   const toast = useToast();
   const auth = useAuth();
+  const policyQuery = useProcessPolicy();
   const [saving, setSaving] = createSignal(false);
   const [itemId, setItemId] = createSignal<number | null>(null);
   const [itemLabel, setItemLabel] = createSignal("");
@@ -42,6 +47,10 @@ export function StockAdjustmentModal(props: Props) {
   const [newLocationName, setNewLocationName] = createSignal("");
   const [qtyDelta, setQtyDelta] = createSignal("");
   const [reason, setReason] = createSignal("");
+  const [draftRequestId, setDraftRequestId] = createSignal<number | null>(null);
+  const [requestStatus, setRequestStatus] = createSignal<string | null>(null);
+
+  const requiresApproval = () => !!policyQuery.data?.inventory_require_stock_adjustment_approval;
 
   const reset = () => {
     setItemId(null);
@@ -50,6 +59,42 @@ export function StockAdjustmentModal(props: Props) {
     setLocationLabel("");
     setQtyDelta("");
     setReason("");
+    setDraftRequestId(null);
+    setRequestStatus(null);
+  };
+
+  createEffect(() => {
+    if (!props.open) return;
+    if (props.initialItemId) {
+      setItemId(props.initialItemId);
+      setItemLabel(props.initialItemLabel ?? "");
+    }
+    if (props.requestId) {
+      void loadRequest(props.requestId);
+    }
+  });
+
+  const loadRequest = async (id: number) => {
+    const res = await apiFetch<{
+      id: number;
+      item_id: number;
+      item_code: string;
+      item_name: string;
+      location_id: number;
+      location_name: string;
+      qty_delta: number;
+      reason: string;
+      status: string;
+    }>(`/api/v1/inventory/stock-adjustment-requests/${id}`);
+    if (!res.success || !res.data) return;
+    setDraftRequestId(res.data.id);
+    setRequestStatus(res.data.status);
+    setItemId(res.data.item_id);
+    setItemLabel(`${res.data.item_code} — ${res.data.item_name}`);
+    setLocationId(res.data.location_id);
+    setLocationLabel(res.data.location_name);
+    setQtyDelta(String(res.data.qty_delta));
+    setReason(res.data.reason);
   };
 
   const draft = useDocumentDraft({
@@ -62,6 +107,7 @@ export function StockAdjustmentModal(props: Props) {
       location_label: locationLabel(),
       qty_delta: qtyDelta(),
       reason: reason(),
+      request_id: draftRequestId(),
     }),
     onApply: (payload) => {
       setItemId(payload.item_id);
@@ -70,44 +116,97 @@ export function StockAdjustmentModal(props: Props) {
       setLocationLabel(payload.location_label);
       setQtyDelta(payload.qty_delta);
       setReason(payload.reason);
+      if (payload.request_id) setDraftRequestId(payload.request_id);
     },
-    enabled: () => props.open,
-    autoApply: () => props.open,
+    enabled: () => props.open && !props.requestId,
+    autoApply: () => props.open && !props.requestId,
   });
 
-  const save = async () => {
+  const payload = () => ({
+    item_id: itemId(),
+    location_id: locationId(),
+    qty_delta: Number(qtyDelta()),
+    reason: reason().trim(),
+  });
+
+  const validate = () => {
     if (!itemId() || !locationId()) {
       toast.warning("Item and location are required.");
-      return;
+      return false;
     }
     const qty = Number(qtyDelta());
     if (!qtyDelta() || qty === 0 || Number.isNaN(qty)) {
       toast.warning("Enter a non-zero quantity change.");
-      return;
+      return false;
     }
     if (!reason().trim()) {
       toast.warning("Reason is required.");
+      return false;
+    }
+    return true;
+  };
+
+  const submitOrPost = async () => {
+    if (!validate()) return;
+    setSaving(true);
+
+    if (requiresApproval() && draftRequestId() && requestStatus() === "draft") {
+      const ok = await submitEntity(
+        () =>
+          apiFetch(`/api/v1/inventory/stock-adjustment-requests/${draftRequestId()}/submit`, {
+            method: "POST",
+            body: JSON.stringify({ remarks: reason().trim() }),
+          }, { silent: true }),
+        toast,
+        "Sent for store admin approval; owner notified.",
+      );
+      setSaving(false);
+      if (!ok) return;
+      await draft.clearOnSave();
+      reset();
+      props.onSaved();
+      props.onClose();
       return;
     }
-    setSaving(true);
+
     const ok = await submitEntity(
       () =>
         apiFetch("/api/v1/inventory/stock-adjustments", {
           method: "POST",
-          body: JSON.stringify({
-            item_id: itemId(),
-            location_id: locationId(),
-            qty_delta: qty,
-            reason: reason().trim(),
-          }),
+          body: JSON.stringify(payload()),
         }, { silent: true }),
       toast,
-      "Stock adjusted.",
+      requiresApproval()
+        ? "Sent for store admin approval; owner notified."
+        : "Stock adjusted.",
     );
     setSaving(false);
     if (!ok) return;
     await draft.clearOnSave();
     reset();
+    props.onSaved();
+    props.onClose();
+  };
+
+  const saveDraftThenClose = async () => {
+    if (!validate()) return;
+    setSaving(true);
+    const body: Record<string, unknown> = { ...payload() };
+    if (draftRequestId()) body.id = draftRequestId();
+    const res = await apiFetch<{ id: number; status: string }>(
+      "/api/v1/inventory/stock-adjustments/draft",
+      { method: "POST", body: JSON.stringify(body) },
+      { silent: true },
+    );
+    setSaving(false);
+    if (!res.success) {
+      toast.error(res.message ?? "Failed to save draft.");
+      return;
+    }
+    if (res.data?.id) setDraftRequestId(res.data.id);
+    setRequestStatus("draft");
+    await draft.clearOnSave();
+    toast.success("Draft saved.");
     props.onSaved();
     props.onClose();
   };
@@ -121,11 +220,19 @@ export function StockAdjustmentModal(props: Props) {
         reset();
         props.onClose();
       }}
-      onSave={() => void save()}
+      onSave={() => void submitOrPost()}
+      onSecondarySave={requiresApproval() ? () => void saveDraftThenClose() : undefined}
+      secondarySaveLabel={requiresApproval() ? "Save draft" : undefined}
+      saveLabel={requiresApproval() ? "Submit for approval" : "Save changes"}
       saving={saving()}
     >
       <draft.DraftBanner />
       <ModalFormGuide guideId="stock_adjustment" spanFull />
+      <Show when={requestStatus()}>
+        <p class="col-span-full text-sm text-text-secondary">
+          Status: <span class="font-medium text-text-primary">{requestStatus()}</span>
+        </p>
+      </Show>
       <LookupCombo
         label="Item *"
         value={itemLabel}
