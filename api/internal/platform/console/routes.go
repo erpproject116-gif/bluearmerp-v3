@@ -74,6 +74,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.With(requirePlatformPermission("platform.access_logs.read")).Get("/platform/console/access-logs", svc.listAccessLogs)
 		cr.With(requirePlatformPermission("platform.access_logs.read")).Get("/platform/console/history", svc.listAccessLogs)
 		cr.With(requirePlatformPermission("platform.access_logs.read")).Get("/platform/console/change-logs", svc.listPlatformChangeLogs)
+		cr.With(requirePlatformPermission("platform.users.read")).Get("/platform/console/multi-memberships", svc.listMultiMemberships)
 
 		// Staff invites
 		cr.With(requirePlatformPermission("platform.staff.manage")).Get("/platform/console/staff", svc.listStaff)

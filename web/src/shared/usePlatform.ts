@@ -476,6 +476,21 @@ export function usePlatformStaffInvites() {
   }));
 }
 
+export function usePlatformMultiMemberships() {
+  return createQuery(() => ({
+    queryKey: ["platform-multi-memberships"],
+    queryFn: async () => {
+      const res = await apiFetch<{
+        rows: Array<{ email: string; tenant_count: number; company_codes: string[] }>;
+        count: number;
+        note?: string;
+      }>("/api/v1/platform/console/multi-memberships");
+      if (!res.ok) throw new Error(res.message ?? "Failed to load multi-memberships");
+      return res.data;
+    },
+  }));
+}
+
 export type PlatformAnalyticsTotals = {
   sessions: number;
   page_views: number;

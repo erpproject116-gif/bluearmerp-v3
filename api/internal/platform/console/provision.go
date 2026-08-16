@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/provision"
@@ -54,6 +55,14 @@ func (s *service) provisionCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if occ, err := auth.CustomerEmailOccupancy(ctx, s.pool, email); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to register customer.", "ERR_INTERNAL")
+		return
+	} else if occ.Occupied {
+		response.Err(w, http.StatusConflict, auth.CrossTenantOccupancyMessage(occ), "ERR_CONFLICT")
+		return
+	}
+
 	leadgenID, _ := customerregistry.LeadgenTenantIDFromCfg(ctx, s.pool, s.cfg)
 	res, err := customerregistry.UpsertCustomerLead(ctx, s.pool, leadgenID, customerregistry.UpsertParams{
 		Email:         email,
@@ -93,6 +102,11 @@ func (s *service) provisionCustomer(w http.ResponseWriter, r *http.Request) {
 		msg := "Failed to create workspace."
 		if errors.Is(err, provision.ErrEmailConflict) {
 			msg = "This email already has a user record in the workspace."
+		}
+		if errors.Is(err, provision.ErrEmailOccupiedElsewhere) {
+			response.Err(w, http.StatusConflict,
+				"This email already belongs to another business. Use a different email.", "ERR_CONFLICT")
+			return
 		}
 		response.Err(w, http.StatusInternalServerError, msg, "ERR_INTERNAL")
 		return

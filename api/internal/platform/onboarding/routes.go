@@ -163,7 +163,7 @@ func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) 
 	}
 
 	_ = touchFirstAppSeen(ctx, pool, tu.AppUserID)
-	userState, err := loadUserOnboardingState(ctx, pool, tu.TenantID, tu.AppUserID, tu.IsTenantOwner)
+	userState, err := loadUserOnboardingState(ctx, pool, tu.TenantID, tu.AppUserID, tu.IsTenantOwner, tu.IsStoreAdmin)
 	if err != nil {
 		return nil, err
 	}
@@ -181,19 +181,20 @@ func buildProgress(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) 
 		})
 	}
 
+	isNewUser := userState.canManageWorkspace() && (userState.playbookEligible(time.Now()) || !readiness.RequiredComplete)
 	out := map[string]any{
-		"steps":                  steps,
-		"percent":                readiness.Percent,
-		"overall_percent":        overallPercent,
-		"tracks":                 tracks,
-		"meta":                   meta,
-		"show_setup_checklist":   showSetup,
-		"show_playbook":          showPlaybook,
-		"playbook_dismissed":     userState.DismissedAt != nil,
-		"is_new_user":            userState.playbookEligible(time.Now()) || !readiness.RequiredComplete,
-		"required_complete":      readiness.RequiredComplete,
-		"ready":                  readiness.Ready,
-		"blocking_reason":        readiness.BlockingReason,
+		"steps":                steps,
+		"percent":              readiness.Percent,
+		"overall_percent":      overallPercent,
+		"tracks":               tracks,
+		"meta":                 meta,
+		"show_setup_checklist": showSetup && userState.canManageWorkspace(),
+		"show_playbook":        showPlaybook,
+		"playbook_dismissed":   userState.DismissedAt != nil,
+		"is_new_user":          isNewUser,
+		"required_complete":    readiness.RequiredComplete,
+		"ready":                readiness.Ready,
+		"blocking_reason":      readiness.BlockingReason,
 	}
 	if readiness.NextStep != nil {
 		out["next_step"] = map[string]any{

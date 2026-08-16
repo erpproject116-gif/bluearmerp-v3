@@ -711,7 +711,7 @@ export const helpScenarioArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Active branch is not the same as switching business (tenant). Use business switcher for another company workspace.",
+        text: "Active branch is not the same as switching company. Another company needs a different Google email (one email → one customer business), not a branch switch.",
       },
     ],
     primaryHref: "/app/inventory",
@@ -723,20 +723,20 @@ export const helpScenarioArticles: KbArticle[] = [
     title: "Switch business vs switch branch",
     scenario: "You need another company workspace or another warehouse and used the wrong switcher.",
     intro:
-      "Business (tenant) switch changes company data entirely. Branch switch stays inside the same company and changes default location context.",
+      "Branch switch stays inside the same company and changes default location context. Another customer company requires a different Google email under the one-email → one-business rule. An Active business dropdown only appears for grandfathered or ops accounts.",
     blocks: [
       {
         type: "steps",
         items: [
-          "To work in another company: use Switch business / workspace (multi-tenant login).",
           "To work in another warehouse under the same company: use Active branch.",
-          "Confirm the header shows the expected company name and branch label before posting documents.",
-          "Invite users per business — access does not automatically include every tenant.",
+          "To open or join another company: use a different Google email (own trial) or ask that company's admin to invite a different email.",
+          "If you see an Active business dropdown (legacy/ops only), confirm the sidebar company name before posting documents.",
+          "Invite users per business — one customer email cannot join two companies.",
         ],
       },
       {
         type: "tip",
-        text: "Documents never move between businesses when you switch branch. Wrong-company postings require the business switcher.",
+        text: "Documents never move between businesses when you switch branch.",
       },
     ],
     primaryHref: "/app/dashboard",
