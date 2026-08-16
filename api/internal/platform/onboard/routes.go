@@ -73,9 +73,11 @@ func (s *service) getOnboardingStatus(w http.ResponseWriter, r *http.Request) {
 		"pending_approval": nil,
 	}
 	if inviteTenantID, inviteCode, hasInvite := auth.PendingInviteTenant(ctx, s.pool, email); hasInvite {
+		info, _ := auth.PendingInviteTenantInfo(ctx, s.pool, email)
 		out["pending_invite"] = map[string]any{
 			"tenant_id":    inviteTenantID,
 			"company_code": inviteCode,
+			"company_name": info.CompanyName,
 		}
 	}
 	if tid, code, ok := auth.PendingApprovalTenant(ctx, s.pool, claims.Sub, email); ok {
@@ -154,6 +156,7 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 
 	// Pending store invite: join that tenant as the invited member — never create a second owner workspace.
 	if inviteTenantID, inviteCode, hasInvite := auth.PendingInviteTenant(ctx, s.pool, email); hasInvite {
+		info, _ := auth.PendingInviteTenantInfo(ctx, s.pool, email)
 		if err := auth.LinkProvisionedUser(ctx, s.pool, claims.Sub, email); err != nil {
 			response.Err(w, http.StatusForbidden,
 				"You have a pending company invite. Sign in with the invited Google email, or ask your admin to re-invite you.",
@@ -169,9 +172,11 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 		_ = customerregistry.EnsureCustomerForLinkedUser(
 			ctx, s.pool, leadgenID, claims.Sub, email, fullName,
 			customerregistry.EntryInvite, inviteTenantID)
+		companyName := info.CompanyName
 		response.OK(w, map[string]any{
 			"tenant_id":           inviteTenantID,
 			"company_code":        inviteCode,
+			"company_name":        companyName,
 			"joined_invite":       true,
 			"already_provisioned": true,
 		}, "Joined your company workspace from invite.")
@@ -198,6 +203,14 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 		response.OK(w, map[string]any{
 			"tenant_id": tid, "company_code": code, "already_provisioned": true, "trial_ends_at": endsAt,
 		}, "Trial workspace already provisioned.")
+		return
+	}
+
+	if occ, err := auth.CustomerEmailOccupancy(ctx, s.pool, email); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to start trial.", "ERR_INTERNAL")
+		return
+	} else if occ.Occupied {
+		response.Err(w, http.StatusConflict, auth.OwnBusinessRequiresDifferentEmailMessage(occ), "ERR_CONFLICT")
 		return
 	}
 

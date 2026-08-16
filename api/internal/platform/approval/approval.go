@@ -42,6 +42,27 @@ func Submit(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, entityType strin
 	return err
 }
 
+// Comment appends a timeline remark without changing approval status.
+func Comment(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, entityType string, entityID int64, remarks string) error {
+	remarks = strings.TrimSpace(remarks)
+	if remarks == "" {
+		return fmt.Errorf("remarks required")
+	}
+	var reqID int64
+	var status string
+	err := tx.QueryRow(ctx, `
+		select id, status from public.approval_requests
+		where tenant_id = $1 and entity_type = $2 and entity_id = $3`,
+		tu.TenantID, strings.TrimSpace(entityType), entityID).Scan(&reqID, &status)
+	if err != nil {
+		return fmt.Errorf("approval request not found")
+	}
+	_, err = tx.Exec(ctx, `
+		insert into public.approval_actions (request_id, action, actor_user_id, remarks, from_status, to_status)
+		values ($1, 'comment', $2, $3, $4, $4)`, reqID, tu.AppUserID, remarks, status)
+	return err
+}
+
 // Decide approves or rejects a pending request.
 func Decide(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, entityType string, entityID int64, approve bool, remarks *string) error {
 	toStatus := "confirmed"
@@ -139,6 +160,19 @@ func ListPending(ctx context.Context, pool *pgxpool.Pool, tenantID int64, limit 
 		switch r.EntityType {
 		case "inv_serial_adjustment_request":
 			r.EntityLabel = fmt.Sprintf("Serial qty fix #%d", r.EntityID)
+		case "inv_stock_adjustment_request":
+			var itemCode string
+			var qty float64
+			err := pool.QueryRow(ctx, `
+				select i.item_code, req.qty_delta::float8
+				from public.inv_stock_adjustment_requests req
+				join public.inv_items i on i.id = req.item_id
+				where req.id = $1 and req.tenant_id = $2`, r.EntityID, tenantID).Scan(&itemCode, &qty)
+			if err != nil {
+				r.EntityLabel = fmt.Sprintf("Stock adjustment #%d", r.EntityID)
+			} else {
+				r.EntityLabel = fmt.Sprintf("Stock adj %s %+g", itemCode, qty)
+			}
 		default:
 			r.EntityLabel = fmt.Sprintf("%s #%d", r.EntityType, r.EntityID)
 		}
@@ -193,6 +227,18 @@ func SyncEntityProgress(ctx context.Context, tx pgx.Tx, tenantID int64, entityTy
 		}
 		_, err := tx.Exec(ctx, `
 			update public.inv_serial_adjustment_requests set status = $1, updated_at = now()
+			where id = $2 and tenant_id = $3`, ps, entityID, tenantID)
+		return err
+	case "inv_stock_adjustment_request":
+		ps := progressStatus
+		if ps == "confirmed" {
+			ps = "completed"
+		}
+		if ps == "unconfirmed" {
+			ps = "rejected"
+		}
+		_, err := tx.Exec(ctx, `
+			update public.inv_stock_adjustment_requests set status = $1, updated_at = now()
 			where id = $2 and tenant_id = $3`, ps, entityID, tenantID)
 		return err
 	default:

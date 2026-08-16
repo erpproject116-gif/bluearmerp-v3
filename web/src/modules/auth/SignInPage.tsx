@@ -97,7 +97,8 @@ export default function SignInPage() {
               onError={setError}
             />
             <p class="text-center text-xs text-text-secondary">
-              Invited by your company? Sign in with the same Google email your admin used. To open your own trial workspace, use Welcome after sign-in.
+              Invited by your company? Sign in with that exact Google email. One email belongs to one customer business —
+              to open your own company, use a different email.
             </p>
             <Show when={demoSignInEnabled}>
               <button

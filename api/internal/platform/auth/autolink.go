@@ -39,13 +39,22 @@ func IsPlatformConsoleEmail(email string) bool {
 	return isBootstrapSuperadminEmail(email)
 }
 
-// tryAutoLinkProvisionedUser links a Supabase auth user to ALL pre-provisioned rows for
-// its email, across every tenant. Matches invited users (invite flow) and active users
-// without auth_user_id (platform owner seed). Supporting one login across many businesses
-// means the same email invited to multiple tenants is linked to each rather than rejected.
+// tryAutoLinkProvisionedUser links a Supabase auth user to at most ONE pre-provisioned
+// customer user row for its email (one email → one customer business).
+// Grandfather: if this auth already has an active membership, additional invites are not linked.
+// Legacy multi-invite: if several pending invites exist and auth has zero memberships, link the oldest only.
 func tryAutoLinkProvisionedUser(ctx context.Context, pool *pgxpool.Pool, authUserID, email string) error {
 	email = normalizeEmail(email)
 	if email == "" || authUserID == "" {
+		return ErrNoTenantProfile
+	}
+
+	existing, err := CountActiveMembershipsForAuth(ctx, pool, authUserID)
+	if err != nil {
+		return err
+	}
+	if existing > 0 && !isBootstrapSuperadminEmail(email) {
+		// Already in a customer business — do not attach further invites.
 		return ErrNoTenantProfile
 	}
 
@@ -55,50 +64,47 @@ func tryAutoLinkProvisionedUser(ctx context.Context, pool *pgxpool.Pool, authUse
 	}
 	defer tx.Rollback(ctx)
 
-	// Link every unclaimed row for this email whose tenant does not already have a row
-	// bound to this auth identity (the (auth_user_id, tenant_id) unique index guards this).
-	rows, err := tx.Query(ctx, `
-		update public.users u
-		set auth_user_id = $1::uuid, status = 'active', updated_at = now()
-		where lower(u.email) = $2
+	// Prefer oldest pending invite; fall back to unclaimed active seed row (platform owner).
+	var userID int64
+	var fullName string
+	err = tx.QueryRow(ctx, `
+		select u.id, coalesce(u.full_name, '')
+		from public.users u
+		left join public.user_invites ui on ui.user_id = u.id
+		  and ui.revoked_at is null and ui.accepted_at is null
+		where lower(u.email) = $1
 		  and u.auth_user_id is null
 		  and u.status in ('invited', 'active')
 		  and not exists (
 		    select 1 from public.users x
-		    where x.auth_user_id = $1::uuid and x.tenant_id = u.tenant_id
+		    where x.auth_user_id = $2::uuid and x.tenant_id = u.tenant_id
 		  )
-		returning u.id, u.full_name`, authUserID, email)
+		order by
+		  case when u.status = 'invited' then 0 else 1 end,
+		  ui.invited_at asc nulls last,
+		  u.id asc
+		limit 1`, email, authUserID).Scan(&userID, &fullName)
+	if err == pgx.ErrNoRows {
+		return ErrNoTenantProfile
+	}
 	if err != nil {
 		return err
 	}
-	var userIDs []int64
-	var fullName string
-	for rows.Next() {
-		var id int64
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			rows.Close()
-			return err
-		}
-		userIDs = append(userIDs, id)
-		if fullName == "" {
-			fullName = name
-		}
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
+
+	_, err = tx.Exec(ctx, `
+		update public.users
+		set auth_user_id = $1::uuid, status = 'active', updated_at = now()
+		where id = $2`, authUserID, userID)
+	if err != nil {
 		return err
-	}
-	if len(userIDs) == 0 {
-		return ErrNoTenantProfile
 	}
 
 	_, err = tx.Exec(ctx, `
-		update public.user_invites ui
+		update public.user_invites
 		set accepted_at = now()
-		where ui.user_id = any($1)
-		  and ui.revoked_at is null
-		  and ui.accepted_at is null`, userIDs)
+		where user_id = $1
+		  and revoked_at is null
+		  and accepted_at is null`, userID)
 	if err != nil {
 		return err
 	}
@@ -181,29 +187,11 @@ func LinkProvisionedUser(ctx context.Context, pool *pgxpool.Pool, authUserID, em
 
 // PendingInviteTenant returns the first tenant where this email still has an unclaimed invite.
 func PendingInviteTenant(ctx context.Context, pool *pgxpool.Pool, email string) (tenantID int64, companyCode string, ok bool) {
-	email = normalizeEmail(email)
-	if email == "" {
+	info, ok := PendingInviteTenantInfo(ctx, pool, email)
+	if !ok {
 		return 0, "", false
 	}
-	err := pool.QueryRow(ctx, `
-		select u.tenant_id, t.company_code
-		from public.users u
-		join public.tenants t on t.id = u.tenant_id
-		where lower(u.email) = $1
-		  and u.auth_user_id is null
-		  and u.status = 'invited'
-		  and exists (
-		    select 1 from public.user_invites ui
-		    where ui.user_id = u.id
-		      and ui.revoked_at is null
-		      and ui.accepted_at is null
-		  )
-		order by u.id
-		limit 1`, email).Scan(&tenantID, &companyCode)
-	if err != nil {
-		return 0, "", false
-	}
-	return tenantID, companyCode, true
+	return info.TenantID, info.CompanyCode, true
 }
 
 // SetActiveTenant records the user's preferred active tenant after invite join.

@@ -6,10 +6,10 @@ import { moduleKbArticles } from "./moduleKbArticles";
 export const knowledgebaseArticles: KbArticle[] = [
   {
     id: "add-another-business",
-    title: "How do I add another business to the same account?",
-    scenario: "You run more than one company and want one login for all of them.",
+    title: "How do I add another business?",
+    scenario: "You need a second company workspace on BluearmERP.",
     intro:
-      "Each business in BluearmERP is a separate workspace (tenant). You do not create a second business from inside an existing one—you get access when you are invited, when a platform admin provisions one for you, or when you start a new trial or demo with the same email.",
+      "One customer email belongs to one customer business. To run another company, use a different Google email (or have that company's owner start their own trial and invite teammates with their own emails).",
     blocks: [
       {
         type: "heading",
@@ -18,9 +18,8 @@ export const knowledgebaseArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Ask your BluearmERP platform contact to provision a workspace for that company, or have the new owner sign up at /signup and start a 90-day trial.",
-          "When the new workspace is ready, an administrator in that business invites your email under User Management → Users.",
-          "Sign out and sign back in (or refresh the page). Your account now lists both businesses.",
+          "Have the new owner sign up at /signup with an email that is not already invited or linked to another Bluearm company, then start a trial—or ask your BluearmERP platform contact to provision a workspace.",
+          "When that workspace is ready, an administrator invites teammates under User Management → Users using emails that are not already used on another company.",
         ],
       },
       {
@@ -30,60 +29,64 @@ export const knowledgebaseArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Complete signup or trial provisioning for the new company using your email.",
-          "BluearmERP links the same Google or email login to every workspace you are invited to—no second password.",
-          "Use the Active business control at the bottom of the sidebar to switch between companies.",
+          "Sign up and start a trial (or demo) with a Google email that is not already on another Bluearm company.",
+          "Complete the setup wizard for that workspace.",
+          "Invite teammates with their own emails — do not reuse an email that already belongs to another customer business.",
         ],
       },
       {
         type: "tip",
         text: "Data never mixes between businesses. Partners, items, stock, and finance are isolated per workspace.",
       },
+      {
+        type: "tip",
+        text: "You cannot join Company A with an email and also create Company B with the same email. Use a different email for your own business.",
+      },
     ],
-    primaryHref: "/app/user-management/users",
-    primaryLabel: "Open user management",
-    relatedGuideIds: ["admin", "getting-started"],
+    primaryHref: "/signup",
+    primaryLabel: "Create an account",
+    relatedGuideIds: ["admin", "getting-started", "join-business-by-invite"],
   },
   {
     id: "switch-between-businesses",
-    title: "How do I switch between businesses?",
-    scenario: "Your login has access to multiple company workspaces.",
+    title: "Why do I see Active business in the sidebar?",
+    scenario: "Your login lists more than one company name (legacy or Bluearm ops accounts).",
     intro:
-      "When your email is linked to more than one business, a selector appears in the sidebar footer so you can change the active workspace.",
+      "Customer accounts follow one email → one business. An Active business dropdown only appears for grandfathered multi-membership logins or certain Bluearm platform/ops accounts. It is not the normal path for new customers.",
     blocks: [
       {
         type: "steps",
         items: [
           "Expand the sidebar if it is collapsed so the footer panel is visible.",
-          "Under Active business, choose the company name from the dropdown.",
-          "BluearmERP reloads your session for that tenant and returns you to the app home. Lists, stock, and documents now belong to the selected business only.",
+          "If Active business shows a dropdown, choose the company name you intend to work in.",
+          "BluearmERP reloads your session for that tenant. Lists, stock, and documents belong to the selected business only.",
         ],
       },
       {
         type: "paragraph",
-        text: "If you only see one business name (no dropdown), your account has a single workspace. Ask an administrator of the other company to invite your email, or contact your platform admin to provision access.",
+        text: "Most users see a single company name with no dropdown. To work in another company, use a different Google email for that business (or ask its admin to invite a different email).",
       },
       {
         type: "tip",
-        text: "Bookmark /app after switching—browser tabs do not share active business state across different logins.",
+        text: "Confirm the company name in the sidebar header after sign-in so you know you joined the right workspace.",
       },
     ],
-    relatedGuideIds: ["getting-started"],
+    relatedGuideIds: ["getting-started", "add-another-business"],
   },
   {
     id: "join-business-by-invite",
     title: "I was invited—how do I join my company's workspace?",
     scenario: "An admin invited your email but you have not entered the ERP yet.",
     intro:
-      "Your admin invites your email (email is sent when SMTP is configured). Join by signing in with that same Google email — there is no separate Accept button.",
+      "Your admin invites your email (email is sent when SMTP is configured). Join by signing in with that same Google email — there is no separate Accept button. That email can only belong to this one customer business.",
     blocks: [
       {
         type: "steps",
         items: [
           "Check your inbox for the invite email (company name, role, and a link to sign in), or ask your admin to resend if SMTP was not set up yet.",
           "Open the sign-in page and continue with Google using the exact email your administrator invited.",
-          "On first sign-in, BluearmERP automatically links your login to every pending invite for that email.",
-          "You land inside the company workspace. If you also have a personal trial, use Active business in the sidebar footer to pick the right company.",
+          "On first sign-in, BluearmERP links your login to that company invite and lands you in that workspace.",
+          "Confirm the company name in the sidebar (and the Joined toast if shown).",
         ],
       },
       {
@@ -92,12 +95,12 @@ export const knowledgebaseArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "Invited users appear as Invited in User Management until they complete their first Google sign-in. Admins can Resend invite when email is configured.",
+        text: "Invited users appear as Invited in User Management until they complete their first Google sign-in. Admins can Resend invite when email is configured. To open your own company later, use a different Google email.",
       },
     ],
     primaryHref: "/signin",
     primaryLabel: "Go to sign in",
-    relatedGuideIds: ["admin"],
+    relatedGuideIds: ["admin", "add-another-business"],
   },
   {
     id: "add-branch",

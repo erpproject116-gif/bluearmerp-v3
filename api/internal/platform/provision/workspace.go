@@ -10,12 +10,14 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inviteemail"
 )
 
 var (
-	ErrCodeExhausted = errors.New("could not allocate unique company code")
-	ErrEmailConflict = errors.New("email already has a user in this workspace")
+	ErrCodeExhausted          = errors.New("could not allocate unique company code")
+	ErrEmailConflict          = errors.New("email already has a user in this workspace")
+	ErrEmailOccupiedElsewhere = errors.New("email already belongs to another customer business")
 )
 
 // TenantArgs configures production (non-demo) tenant creation.
@@ -85,6 +87,12 @@ func CreateProductionTenant(ctx context.Context, pool *pgxpool.Pool, a TenantArg
 	authID := strings.TrimSpace(a.AuthUserID)
 	if authID == "" {
 		authID = LookupAuthUserID(ctx, pool, email)
+	}
+
+	if occ, err := auth.CustomerEmailOccupancy(ctx, pool, email); err != nil {
+		return TenantResult{}, err
+	} else if occ.Occupied {
+		return TenantResult{}, ErrEmailOccupiedElsewhere
 	}
 
 	tx, err := pool.Begin(ctx)

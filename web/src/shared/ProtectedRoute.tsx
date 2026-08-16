@@ -58,18 +58,22 @@ export const ProtectedRoute: ParentComponent = (props) => {
                   </p>
                   <ul class="mt-3 list-inside list-disc space-y-1 text-sm text-text-secondary">
                     <li>
+                      Ask your administrator to invite this exact email, then{" "}
                       <a href="/welcome" class="font-medium text-brand-600 hover:underline">
-                        Start a 30-day free trial
-                      </a>{" "}
-                      (empty workspace for real data)
+                        join your company
+                      </a>
                     </li>
                     <li>
-                      <a href="/demo" class="font-medium text-brand-600 hover:underline">
-                        Start a free demo
+                      Or{" "}
+                      <a href="/welcome" class="font-medium text-brand-600 hover:underline">
+                        start a 30-day free trial
                       </a>{" "}
-                      (sample data, ~14 days)
+                      /{" "}
+                      <a href="/demo" class="font-medium text-brand-600 hover:underline">
+                        free demo
+                      </a>{" "}
+                      — only if this email is not already used on another Bluearm company
                     </li>
-                    <li>Ask your administrator to invite you, then sign in again with the same email</li>
                   </ul>
                   {auth.bootstrapMessage && (
                     <p class="mt-2 text-xs text-text-secondary">{auth.bootstrapMessage}</p>

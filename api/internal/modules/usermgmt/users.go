@@ -195,6 +195,14 @@ func createInvite(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if occ, elsewhere, occErr := auth.OccupiedElsewhere(r.Context(), pool, email, tu.TenantID); occErr != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create invite.", "ERR_INTERNAL")
+			return
+		} else if elsewhere {
+			response.Err(w, http.StatusConflict, auth.CrossTenantOccupancyMessage(occ), "ERR_CONFLICT")
+			return
+		}
+
 		var existingID int64
 		var existingStatus string
 		var existingLinked bool

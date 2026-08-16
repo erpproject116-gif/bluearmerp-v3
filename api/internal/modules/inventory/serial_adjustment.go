@@ -343,6 +343,13 @@ func applySerialAdjustments(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
 				return
 			}
+			label := fmt.Sprintf("Serial qty fix #%d", requestID)
+			submitter := ""
+			_ = tx.QueryRow(r.Context(), `select coalesce(full_name, email, '') from public.users where id = $1`, tu.AppUserID).Scan(&submitter)
+			if err := approval.EnqueuePendingApprovalTx(r.Context(), tx, tu.TenantID, entitySerialAdjustmentRequest, requestID, label, submitter); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to queue approval notice.", "ERR_INTERNAL")
+				return
+			}
 			if err := tx.Commit(r.Context()); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
 				return

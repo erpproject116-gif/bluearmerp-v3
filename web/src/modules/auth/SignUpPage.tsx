@@ -86,11 +86,11 @@ export default function SignUpPage() {
       title="Create your account"
       subtitle="Register with Google or email. Your admin can also invite you to a company workspace."
       heroTitle="Start with a workspace you can trust."
-      heroBody="Create your login in minutes. Join your company when an admin invites you with the same email—or start a free trial yourself from the welcome screen."
+      heroBody="Create your login in minutes. Join your company when an admin invites you with that exact email—or start a free trial with an email that is not already used on another company."
       trustPoints={[
         "Join by invite: sign in with the invited Google email",
-        "Optional 30-day trial workspace when you choose Start trial",
-        "Demo sandbox with sample data—no setup required",
+        "Own business: start trial only with an unused email",
+        "One email → one customer business",
       ]}
       footer={
         <p class="mt-8 text-xs text-text-secondary">
@@ -123,7 +123,8 @@ export default function SignUpPage() {
               onError={setError}
             />
             <p class="text-center text-xs text-text-secondary">
-              Company invite? Use the same email your admin invited, then sign in. Starting a trial is an explicit choice on the next screen—not automatic.
+              Company invite? Use the exact email your admin invited, then sign in. To open your own business, register
+              with a different email that is not already on Bluearm.
             </p>
           </div>
 

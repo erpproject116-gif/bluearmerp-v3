@@ -8,19 +8,20 @@ import (
 )
 
 const (
-	newUserWindowDays    = 30
-	freshTenantDays      = 7
-	snoozeDuration       = 7 * 24 * time.Hour
+	newUserWindowDays = 30
+	freshTenantDays   = 7
+	snoozeDuration    = 7 * 24 * time.Hour
 )
 
 type userOnboardingState struct {
-	FirstAppSeenAt     *time.Time
-	DismissedAt        *time.Time
-	SnoozeUntil        *time.Time
-	UserCreatedAt      time.Time
-	IsTenantOwner      bool
-	TenantCreatedAt    time.Time
-	TenantHasActivity  bool
+	FirstAppSeenAt    *time.Time
+	DismissedAt       *time.Time
+	SnoozeUntil       *time.Time
+	UserCreatedAt     time.Time
+	IsTenantOwner     bool
+	IsStoreAdmin      bool
+	TenantCreatedAt   time.Time
+	TenantHasActivity bool
 }
 
 func touchFirstAppSeen(ctx context.Context, pool *pgxpool.Pool, userID int64) error {
@@ -31,9 +32,10 @@ func touchFirstAppSeen(ctx context.Context, pool *pgxpool.Pool, userID int64) er
 	return err
 }
 
-func loadUserOnboardingState(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, isOwner bool) (userOnboardingState, error) {
+func loadUserOnboardingState(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, isOwner, isStoreAdmin bool) (userOnboardingState, error) {
 	var s userOnboardingState
 	s.IsTenantOwner = isOwner
+	s.IsStoreAdmin = isStoreAdmin
 	err := pool.QueryRow(ctx, `
 		select u.first_app_seen_at, u.onboarding_playbook_dismissed_at, u.onboarding_playbook_snooze_until, u.created_at,
 		  t.created_at
@@ -69,7 +71,14 @@ func dismissPlaybookForUser(ctx context.Context, pool *pgxpool.Pool, userID int6
 	return err
 }
 
+func (s userOnboardingState) canManageWorkspace() bool {
+	return s.IsTenantOwner || s.IsStoreAdmin
+}
+
 func (s userOnboardingState) playbookEligible(now time.Time) bool {
+	if !s.canManageWorkspace() {
+		return false
+	}
 	if s.DismissedAt != nil {
 		return false
 	}

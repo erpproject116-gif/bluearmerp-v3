@@ -109,12 +109,17 @@ export function OnboardingProminentPanel() {
   };
 
   const title = () => {
+    const company = me()?.tenant.company_name?.trim();
     if (onboarding.data?.is_new_user && foundationIncomplete()) {
-      return "Welcome — let's set up your workspace";
+      return company ? `Welcome — set up ${company}` : "Welcome — let's set up your workspace";
     }
-    if (showPlaybook() && !showSetupChecklist()) return "Onboarding playbook";
-    if (!canManage()) return "Workspace setup in progress";
-    return "Finish workspace setup";
+    if (showPlaybook() && !showSetupChecklist()) {
+      return company ? `Team guide for ${company}` : "Onboarding playbook";
+    }
+    if (!canManage()) {
+      return company ? `${company} — setup in progress` : "Workspace setup in progress";
+    }
+    return company ? `Finish setup for ${company}` : "Finish workspace setup";
   };
 
   const setupSteps = () => {

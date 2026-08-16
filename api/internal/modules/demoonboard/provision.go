@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/demodata"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
@@ -54,6 +55,21 @@ func (s *service) postProvision(w http.ResponseWriter, r *http.Request) {
 		response.OK(w, map[string]any{
 			"tenant_id": existing, "company_code": code, "industry_code": ind, "already_provisioned": true,
 		}, "Demo already provisioned.")
+		return
+	}
+
+	if info, hasInvite := auth.PendingInviteTenantInfo(ctx, s.pool, email); hasInvite {
+		response.Err(w, http.StatusConflict,
+			"This email has a pending invite to "+info.CompanyName+". Join that company instead of starting a demo. To open your own demo, use a different Google email.",
+			"ERR_CONFLICT")
+		return
+	}
+
+	if occ, err := auth.CustomerEmailOccupancy(ctx, s.pool, email); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to create demo workspace.", "ERR_INTERNAL")
+		return
+	} else if occ.Occupied {
+		response.Err(w, http.StatusConflict, auth.OwnBusinessRequiresDifferentEmailMessage(occ), "ERR_CONFLICT")
 		return
 	}
 

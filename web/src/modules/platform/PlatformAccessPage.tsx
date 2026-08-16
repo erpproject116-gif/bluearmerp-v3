@@ -1,7 +1,7 @@
 import { For, Show, createSignal } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
-import { usePlatformStaff, usePlatformStaffInvites } from "../../shared/usePlatform";
+import { usePlatformMultiMemberships, usePlatformStaff, usePlatformStaffInvites } from "../../shared/usePlatform";
 
 const ROLES = [
   "support_viewer",
@@ -16,6 +16,7 @@ export default function PlatformAccessPage() {
   const toast = useToast();
   const staff = usePlatformStaff();
   const invites = usePlatformStaffInvites();
+  const multi = usePlatformMultiMemberships();
   const [email, setEmail] = createSignal("");
   const [fullName, setFullName] = createSignal("");
   const [role, setRole] = createSignal("support_viewer");
@@ -52,7 +53,8 @@ export default function PlatformAccessPage() {
       <div>
         <h2 class="text-xl font-semibold">Staff & access</h2>
         <p class="mt-1 text-sm text-slate-500">
-          Invite platform staff by Google email. They sign in with Google — no user ID entry.
+          Invite platform staff by Google email. They sign in with Google — no user ID entry. Customer policy: one email
+          → one customer business (platform staff are a separate lane).
         </p>
       </div>
 
@@ -82,6 +84,31 @@ export default function PlatformAccessPage() {
         <p class="mt-2 text-xs text-slate-500">
           Follow-up SLA defaults to 48 hours; overdue items rank first on the Command overview.
         </p>
+      </section>
+
+      <section class="rounded-xl border border-amber-200 bg-amber-50/40">
+        <h3 class="border-b border-amber-200 px-4 py-3 text-sm font-semibold text-amber-950">
+          Grandfathered multi-membership emails
+        </h3>
+        <p class="border-b border-amber-100 px-4 py-2 text-xs text-amber-900/80">
+          {multi.data?.note ??
+            "Read-only list of emails with more than one active customer workspace. New second links are blocked."}
+        </p>
+        <ul class="divide-y divide-amber-100">
+          <Show when={!multi.data?.rows?.length}>
+            <li class="px-4 py-3 text-sm text-slate-500">None found — all active emails map to a single business.</li>
+          </Show>
+          <For each={multi.data?.rows ?? []}>
+            {(row) => (
+              <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
+                <span class="font-mono text-xs">{row.email}</span>
+                <span class="text-slate-600">
+                  {row.tenant_count} tenants · {(row.company_codes ?? []).join(", ")}
+                </span>
+              </li>
+            )}
+          </For>
+        </ul>
       </section>
 
       <section class="rounded-xl border border-slate-200 bg-white">

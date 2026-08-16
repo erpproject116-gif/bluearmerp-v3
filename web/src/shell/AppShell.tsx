@@ -48,6 +48,7 @@ import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
 import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
+import { JoinCompanyConfirm } from "../shared/JoinCompanyConfirm";
 import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
 import { useInlineGuides } from "../shared/inlineGuides";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
@@ -465,6 +466,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     <HelpAssistantProvider>
       {layout}
       <Show when={auth.me}>
+        <JoinCompanyConfirm />
         <OnboardingProminentPanel />
       </Show>
     </HelpAssistantProvider>

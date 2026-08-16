@@ -126,6 +126,7 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
       "finance_require_je_approval",
       "inventory_gl_hybrid_enabled",
       "inventory_require_serial_adjustment_approval",
+      "inventory_require_stock_adjustment_approval",
     ],
     showBudgetControl: true,
     modulesHref: "/app/user-management/tenant-modules",
@@ -136,6 +137,7 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
     blurb: "Optional gates for serial qty fixes and inventory GL.",
     policyKeys: [
       "inventory_require_serial_adjustment_approval",
+      "inventory_require_stock_adjustment_approval",
       "inventory_gl_hybrid_enabled",
     ],
     modulesHref: "/app/user-management/tenant-modules",

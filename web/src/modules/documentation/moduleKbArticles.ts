@@ -805,15 +805,15 @@ export const moduleKbArticles: KbArticle[] = [
     title: "Fix stock reconciliation red flags",
     scenario: "Dashboard or Stock workspace shows serial, GR, or SO release gaps.",
     intro:
-      "Stock Reconciliation groups common data-health issues so you can drill into the underlying documents.",
+      "Stock Reconciliation groups common data-health issues so you can drill into readable tables and fix them from the source document or a stock adjustment.",
     blocks: [
       {
         type: "flow",
         items: [
           "Open reconciliation list",
-          "Pick issue category",
-          "Open source document",
-          "Post correction",
+          "Expand an issue category",
+          "Review the table",
+          "Open document or fix",
         ],
       },
       {
@@ -821,7 +821,9 @@ export const moduleKbArticles: KbArticle[] = [
         items: [
           "Open Stock → Stock Reconciliation (or follow a red flag link from the Dashboard).",
           "Review categories: serial qty mismatch, GR without supplier invoice, SO release without delivery, etc.",
-          "Open the linked document and post the missing step (invoice, delivery note, or adjustment).",
+          "Expand a category to see a spreadsheet-style table with item names, document numbers, and gaps.",
+          "Use row actions to open the linked document, jump to serial tools, or start a stock adjustment (prefilled with the item).",
+          "If Process Policies requires stock adjustment approval, submit the change for store admin approval instead of posting immediately.",
         ],
       },
     ],

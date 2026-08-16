@@ -27,7 +27,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "tip",
-        text: "Have a specific situation in mind—multiple businesses, branches, POS checkout, or moving stock? Open Help & guides → Knowledge base for scenario walkthroughs covering every module.",
+        text: "Have a specific situation in mind—branches, POS checkout, or moving stock? Open Help & guides → Knowledge base for scenario walkthroughs. One email belongs to one customer business; use a different email for another company.",
       },
       {
         type: "paragraph",
