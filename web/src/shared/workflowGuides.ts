@@ -267,7 +267,12 @@ export const workflowGuides: WorkflowGuide[] = [
         title: "Transfer or adjust stock (Movements & Entries)",
         what: "Use stock movements and stock entries to transfer between locations or correct quantities. Check History on a row when you need an audit trail.",
         href: "/app/inventory/stock-movements",
-        routePrefixes: ["/app/inventory/stock-movements", "/app/inventory/stock-entries", "/app/inventory/stock-reconciliation"],
+        routePrefixes: [
+          "/app/inventory/stock-movements",
+          "/app/inventory/stock-adjustments",
+          "/app/inventory/stock-entries",
+          "/app/inventory/stock-reconciliation",
+        ],
         moduleCode: "inventory",
       },
       {

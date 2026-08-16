@@ -37,6 +37,7 @@ export const RegisterRepairNewPage = lazy(() => import("../modules/inventory/aft
 export const RegisterRepairStatusPage = lazy(() => import("../modules/inventory/after-sales/RegisterRepairStatusPage"));
 export const RegisterRepairConsumptionPage = lazy(() => import("../modules/inventory/after-sales/RegisterRepairConsumptionPage"));
 export const StockMovementsPage = lazy(() => import("../modules/inventory/StockMovementsPage"));
+export const StockAdjustmentsPage = lazy(() => import("../modules/inventory/StockAdjustmentsPage"));
 export const StockEntriesPage = lazy(() => import("../modules/inventory/StockEntriesPage"));
 export const StockReconciliationPage = lazy(() => import("../modules/inventory/StockReconciliationPage"));
 export const PriceListsPage = lazy(() => import("../modules/inventory/PriceListsPage"));

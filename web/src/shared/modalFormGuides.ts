@@ -171,11 +171,11 @@ export const MODAL_FORM_GUIDES: Record<string, ModalFormGuideDef> = {
   stock_adjustment: {
     id: "stock_adjustment",
     title: "Adjusting stock",
-    summary: "Use this when physical count does not match the system quantity.",
+    summary: "Use this when physical count does not match the system quantity. Inventory updates only after approval.",
     steps: [
       "Pick the item and warehouse location.",
       "Enter the quantity change (increase or decrease).",
-      "Add a short reason, then save.",
+      "Add a short reason, then Submit for approval (or Save draft).",
     ],
   },
   item_master: {
