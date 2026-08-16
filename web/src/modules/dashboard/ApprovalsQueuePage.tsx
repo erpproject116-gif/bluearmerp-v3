@@ -79,7 +79,24 @@ export default function ApprovalsQueuePage() {
               ? `/api/v1/inventory/serial-units/adjustment-requests/${row.entity_id}`
               : `/api/v1/inventory/stock-adjustment-requests/${row.entity_id}`;
       if (approve) {
-        res = await apiFetch(`${base}/approve`, { method: "POST", body: JSON.stringify({}) });
+        let approveBody: Record<string, string> = {};
+        if (row.entity_type === "inv_stock_adjustment_request") {
+          const remarks = window.prompt("Confirmation remarks (required to update inventory):");
+          if (remarks === null) {
+            setBusyKey(null);
+            return;
+          }
+          if (!remarks.trim()) {
+            setBusyKey(null);
+            toast.warning("Confirmation remarks are required to approve.");
+            return;
+          }
+          approveBody = { remarks: remarks.trim() };
+        }
+        res = await apiFetch(`${base}/approve`, {
+          method: "POST",
+          body: JSON.stringify(approveBody),
+        });
       } else {
         const remarks = window.prompt("Rejection remarks (required):");
         if (remarks === null) {

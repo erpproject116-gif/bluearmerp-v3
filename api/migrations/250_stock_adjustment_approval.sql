@@ -1,12 +1,11 @@
--- Stock quantity adjustment approval (policy default OFF).
--- When inventory_require_stock_adjustment_approval is on, POST /stock-adjustments
--- creates a request for Approvals Queue instead of posting immediately.
+-- Stock quantity adjustment approval (always required before inventory updates).
+-- POST /stock-adjustments creates a pending request; approve posts balance + movement.
 
 alter table public.tenant_process_policies
-  add column if not exists inventory_require_stock_adjustment_approval boolean not null default false;
+  add column if not exists inventory_require_stock_adjustment_approval boolean not null default true;
 
 comment on column public.tenant_process_policies.inventory_require_stock_adjustment_approval is
-  'When true, stock quantity adjustments require store admin approval before inventory updates. Default off.';
+  'Stock quantity adjustments require store admin / owner approval before inventory updates. Always on.';
 
 create table if not exists public.inv_stock_adjustment_requests (
   id bigserial primary key,

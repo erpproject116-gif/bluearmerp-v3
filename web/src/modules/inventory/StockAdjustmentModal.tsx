@@ -9,7 +9,6 @@ import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { QuickLocationModal } from "../../shared/QuickLocationModal";
-import { useProcessPolicy } from "../../shared/useProcessPolicy";
 
 type Props = {
   open: boolean;
@@ -37,7 +36,6 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 export function StockAdjustmentModal(props: Props) {
   const toast = useToast();
   const auth = useAuth();
-  const policyQuery = useProcessPolicy();
   const [saving, setSaving] = createSignal(false);
   const [itemId, setItemId] = createSignal<number | null>(null);
   const [itemLabel, setItemLabel] = createSignal("");
@@ -49,8 +47,6 @@ export function StockAdjustmentModal(props: Props) {
   const [reason, setReason] = createSignal("");
   const [draftRequestId, setDraftRequestId] = createSignal<number | null>(null);
   const [requestStatus, setRequestStatus] = createSignal<string | null>(null);
-
-  const requiresApproval = () => !!policyQuery.data?.inventory_require_stock_adjustment_approval;
 
   const reset = () => {
     setItemId(null);
@@ -146,11 +142,11 @@ export function StockAdjustmentModal(props: Props) {
     return true;
   };
 
-  const submitOrPost = async () => {
+  const submitForApproval = async () => {
     if (!validate()) return;
     setSaving(true);
 
-    if (requiresApproval() && draftRequestId() && requestStatus() === "draft") {
+    if (draftRequestId() && requestStatus() === "draft") {
       const ok = await submitEntity(
         () =>
           apiFetch(`/api/v1/inventory/stock-adjustment-requests/${draftRequestId()}/submit`, {
@@ -158,7 +154,7 @@ export function StockAdjustmentModal(props: Props) {
             body: JSON.stringify({ remarks: reason().trim() }),
           }, { silent: true }),
         toast,
-        "Sent for store admin approval; owner notified.",
+        "Sent for approval. Inventory updates only after an approver confirms.",
       );
       setSaving(false);
       if (!ok) return;
@@ -176,9 +172,7 @@ export function StockAdjustmentModal(props: Props) {
           body: JSON.stringify(payload()),
         }, { silent: true }),
       toast,
-      requiresApproval()
-        ? "Sent for store admin approval; owner notified."
-        : "Stock adjusted.",
+      "Sent for approval. Inventory updates only after an approver confirms.",
     );
     setSaving(false);
     if (!ok) return;
@@ -206,7 +200,7 @@ export function StockAdjustmentModal(props: Props) {
     if (res.data?.id) setDraftRequestId(res.data.id);
     setRequestStatus("draft");
     await draft.clearOnSave();
-    toast.success("Draft saved.");
+    toast.success("Draft saved. Stock is unchanged until submitted and approved.");
     props.onSaved();
     props.onClose();
   };
@@ -220,14 +214,17 @@ export function StockAdjustmentModal(props: Props) {
         reset();
         props.onClose();
       }}
-      onSave={() => void submitOrPost()}
-      onSecondarySave={requiresApproval() ? () => void saveDraftThenClose() : undefined}
-      secondarySaveLabel={requiresApproval() ? "Save draft" : undefined}
-      saveLabel={requiresApproval() ? "Submit for approval" : "Save changes"}
+      onSave={() => void submitForApproval()}
+      onSecondarySave={() => void saveDraftThenClose()}
+      secondarySaveLabel="Save draft"
+      saveLabel="Submit for approval"
       saving={saving()}
     >
       <draft.DraftBanner />
       <ModalFormGuide guideId="stock_adjustment" spanFull />
+      <p class="col-span-full text-sm text-text-secondary">
+        Quantity on hand does not change until a store admin or owner approves this request.
+      </p>
       <Show when={requestStatus()}>
         <p class="col-span-full text-sm text-text-secondary">
           Status: <span class="font-medium text-text-primary">{requestStatus()}</span>

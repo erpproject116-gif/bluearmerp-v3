@@ -60,7 +60,8 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 		  n.entity_type, n.entity_id, coalesce(n.source, 'activity'), n.read_at, n.created_at, count(*) over()
 		  from public.crm_notifications n
 		  where %s
-		  order by n.created_at %s limit $%d offset $%d`,
+		  order by (n.read_at is null) desc, n.created_at %s
+		  limit $%d offset $%d`,
 			where, orderSQL(p.Order), n, n+1)
 		args = append(args, p.PageSize, offset)
 		rows, err := pool.Query(r.Context(), q, args...)
@@ -96,7 +97,19 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 			where tenant_id = $1 and read_at is null
 			  and (user_id is null or user_id = $2)
 			  and (actor_user_id is null or actor_user_id <> $2)`, tu.TenantID, tu.AppUserID).Scan(&unreadTotal)
-		response.OKListWithMeta(w, out, p.Page, p.PageSize, total, &unreadTotal)
+		// Shell bell badge: skip routine activity "info" noise so the red pill matches
+		// alerts / chat / support / warnings instead of a static 99+ activity dump.
+		var badgeCount int64
+		_ = pool.QueryRow(r.Context(), `
+			select count(*) from public.crm_notifications
+			where tenant_id = $1 and read_at is null
+			  and (user_id is null or user_id = $2)
+			  and (actor_user_id is null or actor_user_id <> $2)
+			  and (
+			    coalesce(source, 'activity') <> 'activity'
+			    or severity in ('warning', 'critical')
+			  )`, tu.TenantID, tu.AppUserID).Scan(&badgeCount)
+		response.OKListWithMetaAndBadge(w, out, p.Page, p.PageSize, total, &unreadTotal, &badgeCount)
 	}
 }
 
@@ -127,7 +140,8 @@ func markAllNotificationsRead(pool *pgxpool.Pool) http.HandlerFunc {
 		tag, err := pool.Exec(r.Context(), `
 			update public.crm_notifications set read_at = now()
 			where tenant_id = $1 and read_at is null
-			  and (user_id is null or user_id = $2)`, tu.TenantID, tu.AppUserID)
+			  and (user_id is null or user_id = $2)
+			  and (actor_user_id is null or actor_user_id <> $2)`, tu.TenantID, tu.AppUserID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to mark read.", "ERR_INTERNAL")
 			return

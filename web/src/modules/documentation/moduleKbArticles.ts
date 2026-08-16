@@ -823,7 +823,7 @@ export const moduleKbArticles: KbArticle[] = [
           "Review categories: serial qty mismatch, GR without supplier invoice, SO release without delivery, etc.",
           "Expand a category to see a spreadsheet-style table with item names, document numbers, and gaps.",
           "Use row actions to open the linked document, jump to serial tools, or start a stock adjustment (prefilled with the item).",
-          "If Process Policies requires stock adjustment approval, submit the change for store admin approval instead of posting immediately.",
+          "Stock adjustments always go to Approvals: submit the change, then a store admin or owner confirms with remarks before on-hand quantity updates.",
         ],
       },
     ],

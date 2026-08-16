@@ -130,8 +130,8 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
     help: "Off by default. On = Qty fix (serials) needs Approvals Queue when lines ≥ 5 or any positive qty delta.",
   },
   inventory_require_stock_adjustment_approval: {
-    label: "Require approval for stock quantity adjustments",
-    help: "Off by default. On = stock quantity changes need store admin approval before inventory updates.",
+    label: "Stock quantity adjustments require approval (always on)",
+    help: "Always on. Stock quantity changes update inventory only after store admin or owner confirmation.",
   },
   finance_require_je_approval: {
     label: "Require approval before posting journals",

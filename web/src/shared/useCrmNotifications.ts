@@ -44,6 +44,11 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
           rows: res.data ?? [],
           total: res.meta?.total ?? 0,
           unreadTotal: Number((res.meta as { unread_total?: number } | undefined)?.unread_total ?? 0),
+          badgeCount: Number(
+            (res.meta as { badge_count?: number } | undefined)?.badge_count ??
+              (res.meta as { unread_total?: number } | undefined)?.unread_total ??
+              0,
+          ),
         };
       },
       staleTime: 30_000,
@@ -55,7 +60,7 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
 }
 
 /** Page size of the shell feed shared by the bell dropdown and the toast poller. */
-const SHELL_FEED_PAGE_SIZE = 10;
+const SHELL_FEED_PAGE_SIZE = 15;
 
 /**
  * The one notification query the app shell polls. Both the bell (badge +

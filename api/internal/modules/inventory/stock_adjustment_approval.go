@@ -17,7 +17,6 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -183,6 +182,45 @@ func submitStockAdjForApproval(ctx context.Context, tx pgx.Tx, tu auth.TenantUse
 	return approval.EnqueuePendingApprovalTx(ctx, tx, tu.TenantID, entityStockAdjustmentRequest, requestID, label, submitter)
 }
 
+// notifyStockAdjApproversInApp writes per-user CRM bell rows for store admins + owner.
+func notifyStockAdjApproversInApp(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID, requestID int64, label string) {
+	title := "Stock adjustment needs approval"
+	body := label
+	if body == "" {
+		body = fmt.Sprintf("Stock adjustment #%d is waiting for approval.", requestID)
+	}
+	rows, err := pool.Query(ctx, `
+		select distinct u.id
+		from public.users u
+		join public.tenant_user_roles tur on tur.user_id = u.id and tur.tenant_id = $1
+		join public.tenant_role_permissions trp on trp.tenant_id = tur.tenant_id and trp.role_code = tur.role_code
+		where u.tenant_id = $1 and u.status = 'active'
+		  and trp.permission_code = $2 and trp.access_level in ('write', 'submit')
+		  and u.id <> $3
+		union
+		select t.owner_user_id
+		from public.tenants t
+		where t.id = $1 and t.owner_user_id is not null and t.owner_user_id <> $3`,
+		tenantID, permissionStockAdjustmentApprove, actorUserID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID int64
+		if err := rows.Scan(&userID); err != nil || userID <= 0 {
+			continue
+		}
+		dedupe := fmt.Sprintf("inv_stock_adj_pending:%d:%d:%d", tenantID, requestID, userID)
+		_, _ = pool.Exec(ctx, `
+			insert into public.crm_notifications
+			  (tenant_id, user_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id, source)
+			values ($1, $2, 'warning', $3, $4, $5, $6, $7, $8, 'system')
+			on conflict (tenant_id, dedupe_key) do nothing`,
+			tenantID, userID, title, body, entityStockAdjustmentRequest, requestID, dedupe, actorUserID)
+	}
+}
+
 func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -200,82 +238,40 @@ func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
-			return
-		}
-
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to adjust stock.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to submit adjustment.", "ERR_INTERNAL")
 			return
 		}
 		defer tx.Rollback(r.Context())
 
 		reason := strings.TrimSpace(body.Reason)
-
-		if policy.InventoryRequireStockAdjustmentApproval {
-			var requestID int64
-			err = tx.QueryRow(r.Context(), `
-				insert into public.inv_stock_adjustment_requests
-				  (tenant_id, item_id, location_id, qty_delta, reason, status, created_by_user_id)
-				values ($1, $2, $3, $4, $5, 'e_approval', $6)
-				returning id`,
-				tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta, reason, tu.AppUserID).Scan(&requestID)
-			if err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to create adjustment request.", "ERR_INTERNAL")
-				return
-			}
-			if err := submitStockAdjForApproval(r.Context(), tx, tu, requestID, reason); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
-				return
-			}
-			if err := tx.Commit(r.Context()); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
-				return
-			}
-			_ = approval.DrainOutbox(r.Context(), pool)
-			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.submit", entityStockAdjustmentRequest, &requestID, nil, body)
-			response.OK(w, map[string]any{
-				"pending_approval": true,
-				"request_id":       requestID,
-			}, "Submitted for approval.")
-			return
-		}
-
-		movementID, validation, err := postStockAdjustment(r.Context(), tx, tu.TenantID, tu.AppUserID, body.ItemID, body.LocationID, body.QtyDelta, reason)
-		if validation != nil {
-			response.Validation(w, validation)
-			return
-		}
+		var requestID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.inv_stock_adjustment_requests
+			  (tenant_id, item_id, location_id, qty_delta, reason, status, created_by_user_id)
+			values ($1, $2, $3, $4, $5, 'e_approval', $6)
+			returning id`,
+			tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta, reason, tu.AppUserID).Scan(&requestID)
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to adjust stock.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to create adjustment request.", "ERR_INTERNAL")
+			return
+		}
+		if err := submitStockAdjForApproval(r.Context(), tx, tu, requestID, reason); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to adjust stock.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
 			return
 		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment", "inv_stock_movement", &movementID, nil, body)
-
-		var row StockMovement
-		var createdAt time.Time
-		_ = pool.QueryRow(r.Context(), `
-			select sm.id, sm.item_id, i.item_code, i.item_name,
-			  sm.location_id, l.location_name, sm.qty_delta::float8,
-			  sm.movement_type, sm.ref_type, sm.ref_id, sm.reason,
-			  sm.created_by_user_id, sm.created_at
-			from public.inv_stock_movements sm
-			join public.inv_items i on i.id = sm.item_id
-			join public.inv_locations l on l.id = sm.location_id
-			where sm.id = $1`, movementID).Scan(
-			&row.ID, &row.ItemID, &row.ItemCode, &row.ItemName,
-			&row.LocationID, &row.LocationName, &row.QtyDelta,
-			&row.MovementType, &row.RefType, &row.RefID, &row.Reason,
-			&row.CreatedByUserID, &createdAt)
-		row.CreatedAt = createdAt.Format(time.RFC3339)
-		response.OK(w, row, "Stock adjusted.")
+		_ = approval.DrainOutbox(r.Context(), pool)
+		notifyStockAdjApproversInApp(r.Context(), pool, tu.TenantID, tu.AppUserID, requestID, stockAdjLabel(r.Context(), pool, tu.TenantID, requestID))
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.submit", entityStockAdjustmentRequest, &requestID, nil, body)
+		response.OK(w, map[string]any{
+			"pending_approval": true,
+			"request_id":       requestID,
+		}, "Submitted for approval. Inventory will update only after an approver confirms.")
 	}
 }
 
@@ -536,16 +532,20 @@ func submitStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = approval.DrainOutbox(r.Context(), pool)
+		notifyStockAdjApproversInApp(r.Context(), pool, tu.TenantID, tu.AppUserID, id, stockAdjLabel(r.Context(), pool, tu.TenantID, id))
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.submit", entityStockAdjustmentRequest, &id, nil, nil)
 		response.OK(w, map[string]any{"request_id": id, "pending_approval": true}, "Submitted for approval.")
 	}
 }
 
+func canDecideStockAdjustment(tu auth.TenantUser) bool {
+	return tu.HasPermission(permissionStockAdjustmentApprove, auth.AccessWrite) || tu.IsTenantOwner
+}
+
 func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		if !tu.HasPermission(permissionStockAdjustmentApprove, auth.AccessWrite) &&
-			!tu.HasPermission("inventory.stock_movements", auth.AccessWrite) {
+		if !canDecideStockAdjustment(tu) {
 			response.Err(w, http.StatusForbidden, "You do not have permission to approve stock adjustments.", "ERR_FORBIDDEN")
 			return
 		}
@@ -557,7 +557,15 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		var body struct {
 			Remarks *string `json:"remarks"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if body.Remarks == nil || strings.TrimSpace(*body.Remarks) == "" {
+			response.Validation(w, map[string]string{"remarks": "Confirmation remarks are required to approve."})
+			return
+		}
+		remarks := strings.TrimSpace(*body.Remarks)
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -592,7 +600,7 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to post adjustment.", "ERR_INTERNAL")
 			return
 		}
-		if err := approval.Decide(r.Context(), tx, tu, entityStockAdjustmentRequest, id, true, body.Remarks); err != nil {
+		if err := approval.Decide(r.Context(), tx, tu, entityStockAdjustmentRequest, id, true, &remarks); err != nil {
 			response.Validation(w, map[string]string{"status": err.Error()})
 			return
 		}
@@ -610,16 +618,16 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.approve", entityStockAdjustmentRequest, &id, nil, map[string]any{
 			"movement_id": movementID,
+			"remarks":     remarks,
 		})
-		response.OK(w, map[string]any{"request_id": id, "movement_id": movementID}, "Stock adjustment approved.")
+		response.OK(w, map[string]any{"request_id": id, "movement_id": movementID}, "Stock adjustment approved and inventory updated.")
 	}
 }
 
 func rejectStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		if !tu.HasPermission(permissionStockAdjustmentApprove, auth.AccessWrite) &&
-			!tu.HasPermission("inventory.stock_movements", auth.AccessWrite) {
+		if !canDecideStockAdjustment(tu) {
 			response.Err(w, http.StatusForbidden, "You do not have permission to reject stock adjustments.", "ERR_FORBIDDEN")
 			return
 		}
