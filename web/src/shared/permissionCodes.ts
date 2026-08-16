@@ -17,6 +17,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/inventory/departments": "inventory.departments",
   "/app/inventory/items": "inventory.items",
   "/app/inventory/stock-movements": "inventory.stock_movements",
+  "/app/inventory/stock-adjustments": "inventory.stock_movements",
   "/app/inventory/stock-entries": "inventory.stock_entries",
   "/app/inventory/stock-reconciliation": "inventory.stock_movements",
   "/app/inventory/reports/stock-balance": "inventory.stock_movements",

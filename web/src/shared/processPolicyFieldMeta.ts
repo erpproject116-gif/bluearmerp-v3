@@ -94,8 +94,8 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
     help: "Off by default. On = Qty fix (serials) Apply needs Approvals Queue when lines ≥ 5 or any positive qty delta; small negative-only fixes still post immediately.",
   },
   inventory_require_stock_adjustment_approval: {
-    label: "Require approval for stock quantity adjustments",
-    help: "Off by default. On = stock quantity changes need store admin approval before inventory updates. Recommended for controlled inventory.",
+    label: "Stock quantity adjustments require approval (always on)",
+    help: "Always on. Stock quantity changes never update on-hand inventory until a store admin or owner confirms in Approvals.",
   },
 };
 

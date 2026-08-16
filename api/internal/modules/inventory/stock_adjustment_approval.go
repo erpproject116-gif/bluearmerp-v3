@@ -17,7 +17,6 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -33,10 +32,16 @@ type stockAdjustmentRequestRow struct {
 	ItemName        string   `json:"item_name"`
 	LocationID      int64    `json:"location_id"`
 	LocationName    string   `json:"location_name"`
+	QtyBefore       *float64 `json:"qty_before,omitempty"`
 	QtyDelta        float64  `json:"qty_delta"`
+	QtyAfter        *float64 `json:"qty_after,omitempty"`
 	Reason          string   `json:"reason"`
 	Status          string   `json:"status"`
 	CreatedByUserID *int64   `json:"created_by_user_id,omitempty"`
+	CreatedByName   string   `json:"created_by_name,omitempty"`
+	DecidedByName   string   `json:"decided_by_name,omitempty"`
+	DecidedAt       *string  `json:"decided_at,omitempty"`
+	Decision        string   `json:"decision,omitempty"` // approve | reject when decided
 	CreatedAt       string   `json:"created_at"`
 	UpdatedAt       string   `json:"updated_at"`
 	Actions         []any    `json:"actions,omitempty"`
@@ -102,31 +107,31 @@ func ensureItemLocation(ctx context.Context, pool *pgxpool.Pool, tenantID, itemI
 }
 
 // postStockAdjustment applies balance + movement inside an open transaction.
-func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID int64, itemID, locationID int64, qtyDelta float64, reason string) (int64, map[string]string, error) {
-	var qtyOnHand float64
-	err := tx.QueryRow(ctx, `
+// Returns movement id and the on-hand qty before/after the change.
+func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID int64, itemID, locationID int64, qtyDelta float64, reason string) (movementID int64, qtyBefore, qtyAfter float64, validation map[string]string, err error) {
+	err = tx.QueryRow(ctx, `
 		select qty_on_hand::float8
 		from public.inv_item_location_balances
 		where tenant_id = $1 and item_id = $2 and location_id = $3
 		for update`,
-		tenantID, itemID, locationID).Scan(&qtyOnHand)
+		tenantID, itemID, locationID).Scan(&qtyBefore)
 	if err != nil {
 		if qtyDelta < 0 {
-			return 0, map[string]string{"qty_delta": "No balance record at this location."}, nil
+			return 0, 0, 0, map[string]string{"qty_delta": "No balance record at this location."}, nil
 		}
 		_, err = tx.Exec(ctx, `
 			insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
 			values ($1, $2, $3, 0)`,
 			tenantID, itemID, locationID)
 		if err != nil {
-			return 0, nil, err
+			return 0, 0, 0, nil, err
 		}
-		qtyOnHand = 0
+		qtyBefore = 0
 	}
 
-	newQty := qtyOnHand + qtyDelta
-	if newQty < -0.0001 {
-		return 0, map[string]string{"qty_delta": fmt.Sprintf("Would make quantity negative (%.4f on hand).", qtyOnHand)}, nil
+	qtyAfter = qtyBefore + qtyDelta
+	if qtyAfter < -0.0001 {
+		return 0, qtyBefore, 0, map[string]string{"qty_delta": fmt.Sprintf("Would make quantity negative (%.4f on hand).", qtyBefore)}, nil
 	}
 
 	tag, err := tx.Exec(ctx, `
@@ -135,11 +140,10 @@ func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID int64,
 		where tenant_id = $2 and item_id = $3 and location_id = $4`,
 		qtyDelta, tenantID, itemID, locationID)
 	if err != nil || tag.RowsAffected() == 0 {
-		return 0, nil, fmt.Errorf("failed to update balance")
+		return 0, qtyBefore, 0, nil, fmt.Errorf("failed to update balance")
 	}
 
 	reason = strings.TrimSpace(reason)
-	var movementID int64
 	err = tx.QueryRow(ctx, `
 		insert into public.inv_stock_movements
 		  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, reason, created_by_user_id)
@@ -147,13 +151,36 @@ func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID int64,
 		returning id`,
 		tenantID, itemID, locationID, qtyDelta, reason, userID).Scan(&movementID)
 	if err != nil {
-		return 0, nil, err
+		return 0, qtyBefore, qtyAfter, nil, err
 	}
 	_, err = tx.Exec(ctx, `update public.inv_stock_movements set ref_id = $1 where id = $1`, movementID)
 	if err != nil {
-		return 0, nil, err
+		return 0, qtyBefore, qtyAfter, nil, err
 	}
-	return movementID, nil, nil
+	return movementID, qtyBefore, qtyAfter, nil, nil
+}
+
+type qtyRowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func readQtyOnHand(ctx context.Context, q qtyRowQuerier, tenantID, itemID, locationID int64) float64 {
+	var qty float64
+	err := q.QueryRow(ctx, `
+		select qty_on_hand::float8
+		from public.inv_item_location_balances
+		where tenant_id = $1 and item_id = $2 and location_id = $3`,
+		tenantID, itemID, locationID).Scan(&qty)
+	if err != nil {
+		return 0
+	}
+	return qty
+}
+
+func proposedQtySnapshot(ctx context.Context, q qtyRowQuerier, tenantID, itemID, locationID int64, qtyDelta float64) (before, after float64) {
+	before = readQtyOnHand(ctx, q, tenantID, itemID, locationID)
+	after = before + qtyDelta
+	return before, after
 }
 
 func stockAdjLabel(ctx context.Context, q interface {
@@ -183,6 +210,45 @@ func submitStockAdjForApproval(ctx context.Context, tx pgx.Tx, tu auth.TenantUse
 	return approval.EnqueuePendingApprovalTx(ctx, tx, tu.TenantID, entityStockAdjustmentRequest, requestID, label, submitter)
 }
 
+// notifyStockAdjApproversInApp writes per-user CRM bell rows for store admins + owner.
+func notifyStockAdjApproversInApp(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID, requestID int64, label string) {
+	title := "Stock adjustment needs approval"
+	body := label
+	if body == "" {
+		body = fmt.Sprintf("Stock adjustment #%d is waiting for approval.", requestID)
+	}
+	rows, err := pool.Query(ctx, `
+		select distinct u.id
+		from public.users u
+		join public.tenant_user_roles tur on tur.user_id = u.id and tur.tenant_id = $1
+		join public.tenant_role_permissions trp on trp.tenant_id = tur.tenant_id and trp.role_code = tur.role_code
+		where u.tenant_id = $1 and u.status = 'active'
+		  and trp.permission_code = $2 and trp.access_level in ('write', 'submit')
+		  and u.id <> $3
+		union
+		select t.owner_user_id
+		from public.tenants t
+		where t.id = $1 and t.owner_user_id is not null and t.owner_user_id <> $3`,
+		tenantID, permissionStockAdjustmentApprove, actorUserID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID int64
+		if err := rows.Scan(&userID); err != nil || userID <= 0 {
+			continue
+		}
+		dedupe := fmt.Sprintf("inv_stock_adj_pending:%d:%d:%d", tenantID, requestID, userID)
+		_, _ = pool.Exec(ctx, `
+			insert into public.crm_notifications
+			  (tenant_id, user_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id, source)
+			values ($1, $2, 'warning', $3, $4, $5, $6, $7, $8, 'system')
+			on conflict (tenant_id, dedupe_key) do nothing`,
+			tenantID, userID, title, body, entityStockAdjustmentRequest, requestID, dedupe, actorUserID)
+	}
+}
+
 func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -200,82 +266,41 @@ func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		policy, err := processpolicy.Load(r.Context(), pool, tu.TenantID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load process policies.", "ERR_INTERNAL")
-			return
-		}
-
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to adjust stock.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to submit adjustment.", "ERR_INTERNAL")
 			return
 		}
 		defer tx.Rollback(r.Context())
 
 		reason := strings.TrimSpace(body.Reason)
-
-		if policy.InventoryRequireStockAdjustmentApproval {
-			var requestID int64
-			err = tx.QueryRow(r.Context(), `
-				insert into public.inv_stock_adjustment_requests
-				  (tenant_id, item_id, location_id, qty_delta, reason, status, created_by_user_id)
-				values ($1, $2, $3, $4, $5, 'e_approval', $6)
-				returning id`,
-				tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta, reason, tu.AppUserID).Scan(&requestID)
-			if err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to create adjustment request.", "ERR_INTERNAL")
-				return
-			}
-			if err := submitStockAdjForApproval(r.Context(), tx, tu, requestID, reason); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
-				return
-			}
-			if err := tx.Commit(r.Context()); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
-				return
-			}
-			_ = approval.DrainOutbox(r.Context(), pool)
-			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.submit", entityStockAdjustmentRequest, &requestID, nil, body)
-			response.OK(w, map[string]any{
-				"pending_approval": true,
-				"request_id":       requestID,
-			}, "Submitted for approval.")
-			return
-		}
-
-		movementID, validation, err := postStockAdjustment(r.Context(), tx, tu.TenantID, tu.AppUserID, body.ItemID, body.LocationID, body.QtyDelta, reason)
-		if validation != nil {
-			response.Validation(w, validation)
-			return
-		}
+		qtyBefore, qtyAfter := proposedQtySnapshot(r.Context(), tx, tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta)
+		var requestID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.inv_stock_adjustment_requests
+			  (tenant_id, item_id, location_id, qty_delta, qty_before, qty_after, reason, status, created_by_user_id)
+			values ($1, $2, $3, $4, $5, $6, $7, 'e_approval', $8)
+			returning id`,
+			tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta, qtyBefore, qtyAfter, reason, tu.AppUserID).Scan(&requestID)
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to adjust stock.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to create adjustment request.", "ERR_INTERNAL")
+			return
+		}
+		if err := submitStockAdjForApproval(r.Context(), tx, tu, requestID, reason); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to adjust stock.", "ERR_INTERNAL")
+			response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
 			return
 		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment", "inv_stock_movement", &movementID, nil, body)
-
-		var row StockMovement
-		var createdAt time.Time
-		_ = pool.QueryRow(r.Context(), `
-			select sm.id, sm.item_id, i.item_code, i.item_name,
-			  sm.location_id, l.location_name, sm.qty_delta::float8,
-			  sm.movement_type, sm.ref_type, sm.ref_id, sm.reason,
-			  sm.created_by_user_id, sm.created_at
-			from public.inv_stock_movements sm
-			join public.inv_items i on i.id = sm.item_id
-			join public.inv_locations l on l.id = sm.location_id
-			where sm.id = $1`, movementID).Scan(
-			&row.ID, &row.ItemID, &row.ItemCode, &row.ItemName,
-			&row.LocationID, &row.LocationName, &row.QtyDelta,
-			&row.MovementType, &row.RefType, &row.RefID, &row.Reason,
-			&row.CreatedByUserID, &createdAt)
-		row.CreatedAt = createdAt.Format(time.RFC3339)
-		response.OK(w, row, "Stock adjusted.")
+		_ = approval.DrainOutbox(r.Context(), pool)
+		notifyStockAdjApproversInApp(r.Context(), pool, tu.TenantID, tu.AppUserID, requestID, stockAdjLabel(r.Context(), pool, tu.TenantID, requestID))
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.submit", entityStockAdjustmentRequest, &requestID, nil, body)
+		response.OK(w, map[string]any{
+			"pending_approval": true,
+			"request_id":       requestID,
+		}, "Submitted for approval. Inventory will update only after an approver confirms.")
 	}
 }
 
@@ -299,6 +324,7 @@ func saveStockAdjustmentDraft(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		reason := strings.TrimSpace(body.Reason)
+		qtyBefore, qtyAfter := proposedQtySnapshot(r.Context(), pool, tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta)
 
 		if body.ID != nil && *body.ID > 0 {
 			var status string
@@ -320,37 +346,46 @@ func saveStockAdjustmentDraft(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			_, err = pool.Exec(r.Context(), `
 				update public.inv_stock_adjustment_requests
-				set item_id = $1, location_id = $2, qty_delta = $3, reason = $4, updated_at = now()
-				where id = $5 and tenant_id = $6`,
-				body.ItemID, body.LocationID, body.QtyDelta, reason, *body.ID, tu.TenantID)
+				set item_id = $1, location_id = $2, qty_delta = $3, qty_before = $4, qty_after = $5,
+				    reason = $6, updated_at = now()
+				where id = $7 and tenant_id = $8`,
+				body.ItemID, body.LocationID, body.QtyDelta, qtyBefore, qtyAfter, reason, *body.ID, tu.TenantID)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
 				return
 			}
-			response.OK(w, map[string]any{"id": *body.ID, "status": "draft"}, "Draft saved.")
+			response.OK(w, map[string]any{
+				"id": *body.ID, "status": "draft",
+				"qty_before": qtyBefore, "qty_after": qtyAfter,
+			}, "Draft saved.")
 			return
 		}
 
 		var id int64
 		err := pool.QueryRow(r.Context(), `
 			insert into public.inv_stock_adjustment_requests
-			  (tenant_id, item_id, location_id, qty_delta, reason, status, created_by_user_id)
-			values ($1, $2, $3, $4, $5, 'draft', $6)
+			  (tenant_id, item_id, location_id, qty_delta, qty_before, qty_after, reason, status, created_by_user_id)
+			values ($1, $2, $3, $4, $5, $6, $7, 'draft', $8)
 			returning id`,
-			tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta, reason, tu.AppUserID).Scan(&id)
+			tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta, qtyBefore, qtyAfter, reason, tu.AppUserID).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, map[string]any{"id": id, "status": "draft"}, "Draft saved.")
+		response.OK(w, map[string]any{
+			"id": id, "status": "draft",
+			"qty_before": qtyBefore, "qty_after": qtyAfter,
+		}, "Draft saved.")
 	}
 }
 
 func listStockAdjustmentRequests(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{
-		"created_at": "r.created_at",
-		"status":     "r.status",
-		"item_code":  "i.item_code",
+		"created_at":    "r.created_at",
+		"status":        "r.status",
+		"item_code":     "i.item_code",
+		"location_name": "l.location_name",
+		"qty_delta":     "r.qty_delta",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -364,17 +399,71 @@ func listStockAdjustmentRequests(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, st)
 			argN++
 		}
+		if id, ok := optionalInt64Query(r, "item_id"); ok && id != nil {
+			where += fmt.Sprintf(" and r.item_id = $%d", argN)
+			args = append(args, *id)
+			argN++
+		}
+		if id, ok := optionalInt64Query(r, "location_id"); ok && id != nil {
+			where += fmt.Sprintf(" and r.location_id = $%d", argN)
+			args = append(args, *id)
+			argN++
+		}
+		if fromStr := strings.TrimSpace(r.URL.Query().Get("date_from")); fromStr != "" {
+			from, err := parseDate(fromStr)
+			if err != nil {
+				response.Validation(w, map[string]string{"date_from": "Invalid date."})
+				return
+			}
+			where += fmt.Sprintf(" and r.created_at >= $%d::timestamptz", argN)
+			args = append(args, from.Format("2006-01-02")+" 00:00:00+00")
+			argN++
+		}
+		if toStr := strings.TrimSpace(r.URL.Query().Get("date_to")); toStr != "" {
+			to, err := parseDate(toStr)
+			if err != nil {
+				response.Validation(w, map[string]string{"date_to": "Invalid date."})
+				return
+			}
+			where += fmt.Sprintf(" and r.created_at < ($%d::date + interval '1 day')", argN)
+			args = append(args, to.Format("2006-01-02"))
+			argN++
+		}
+		if p.Q != "" {
+			where += fmt.Sprintf(` and (
+				i.item_code ilike $%d or i.item_name ilike $%d or
+				l.location_name ilike $%d or coalesce(r.reason, '') ilike $%d or
+				r.status ilike $%d)`, argN, argN, argN, argN, argN)
+			args = append(args, "%"+p.Q+"%")
+			argN++
+		}
 		order := orderSQL(p.Order)
 		q := fmt.Sprintf(`
 			select r.id, r.item_id, i.item_code, i.item_name,
-			  r.location_id, l.location_name, r.qty_delta::float8, r.reason, r.status,
-			  r.created_by_user_id, r.created_at, r.updated_at, count(*) over()
+			  r.location_id, l.location_name,
+			  r.qty_before::float8, r.qty_delta::float8, r.qty_after::float8,
+			  r.reason, r.status, r.created_by_user_id,
+			  coalesce(nullif(trim(su.full_name), ''), coalesce(su.email, '')),
+			  coalesce(nullif(trim(du.full_name), ''), coalesce(du.email, '')),
+			  ar.decided_at,
+			  case
+			    when r.status = 'completed' then 'approve'
+			    when r.status = 'rejected' then 'reject'
+			    else ''
+			  end,
+			  r.created_at, r.updated_at, count(*) over()
 			from public.inv_stock_adjustment_requests r
 			join public.inv_items i on i.id = r.item_id
 			join public.inv_locations l on l.id = r.location_id
+			left join public.users su on su.id = r.created_by_user_id
+			left join public.approval_requests ar
+			  on ar.tenant_id = r.tenant_id
+			 and ar.entity_type = '%s'
+			 and ar.entity_id = r.id
+			left join public.users du on du.id = ar.decided_by_user_id
 			where %s
 			order by %s %s
-			limit $%d offset $%d`, where, p.Sort, order, argN, argN+1)
+			limit $%d offset $%d`, entityStockAdjustmentRequest, where, p.Sort, order, argN, argN+1)
 		args = append(args, p.PageSize, offset)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -387,16 +476,27 @@ func listStockAdjustmentRequests(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row stockAdjustmentRequestRow
 			var createdAt, updatedAt time.Time
+			var decidedAt *time.Time
 			var totalCount int64
+			var qtyBefore, qtyAfter *float64
 			if err := rows.Scan(&row.ID, &row.ItemID, &row.ItemCode, &row.ItemName,
-				&row.LocationID, &row.LocationName, &row.QtyDelta, &row.Reason, &row.Status,
-				&row.CreatedByUserID, &createdAt, &updatedAt, &totalCount); err != nil {
+				&row.LocationID, &row.LocationName,
+				&qtyBefore, &row.QtyDelta, &qtyAfter,
+				&row.Reason, &row.Status, &row.CreatedByUserID, &row.CreatedByName,
+				&row.DecidedByName, &decidedAt, &row.Decision,
+				&createdAt, &updatedAt, &totalCount); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read requests.", "ERR_INTERNAL")
 				return
 			}
+			row.QtyBefore = qtyBefore
+			row.QtyAfter = qtyAfter
 			total = totalCount
 			row.CreatedAt = createdAt.Format(time.RFC3339)
 			row.UpdatedAt = updatedAt.Format(time.RFC3339)
+			if decidedAt != nil {
+				s := decidedAt.Format(time.RFC3339)
+				row.DecidedAt = &s
+			}
 			out = append(out, row)
 		}
 		if out == nil {
@@ -447,23 +547,50 @@ func getStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		var row stockAdjustmentRequestRow
 		var createdAt, updatedAt time.Time
+		var decidedAt *time.Time
+		var qtyBefore, qtyAfter *float64
 		err = pool.QueryRow(r.Context(), `
 			select r.id, r.item_id, i.item_code, i.item_name,
-			  r.location_id, l.location_name, r.qty_delta::float8, r.reason, r.status,
-			  r.created_by_user_id, r.created_at, r.updated_at
+			  r.location_id, l.location_name,
+			  r.qty_before::float8, r.qty_delta::float8, r.qty_after::float8,
+			  r.reason, r.status, r.created_by_user_id,
+			  coalesce(nullif(trim(su.full_name), ''), coalesce(su.email, '')),
+			  coalesce(nullif(trim(du.full_name), ''), coalesce(du.email, '')),
+			  ar.decided_at,
+			  case
+			    when r.status = 'completed' then 'approve'
+			    when r.status = 'rejected' then 'reject'
+			    else ''
+			  end,
+			  r.created_at, r.updated_at
 			from public.inv_stock_adjustment_requests r
 			join public.inv_items i on i.id = r.item_id
 			join public.inv_locations l on l.id = r.location_id
-			where r.id = $1 and r.tenant_id = $2`, id, tu.TenantID).Scan(
+			left join public.users su on su.id = r.created_by_user_id
+			left join public.approval_requests ar
+			  on ar.tenant_id = r.tenant_id
+			 and ar.entity_type = $3
+			 and ar.entity_id = r.id
+			left join public.users du on du.id = ar.decided_by_user_id
+			where r.id = $1 and r.tenant_id = $2`, id, tu.TenantID, entityStockAdjustmentRequest).Scan(
 			&row.ID, &row.ItemID, &row.ItemCode, &row.ItemName,
-			&row.LocationID, &row.LocationName, &row.QtyDelta, &row.Reason, &row.Status,
-			&row.CreatedByUserID, &createdAt, &updatedAt)
+			&row.LocationID, &row.LocationName,
+			&qtyBefore, &row.QtyDelta, &qtyAfter,
+			&row.Reason, &row.Status, &row.CreatedByUserID, &row.CreatedByName,
+			&row.DecidedByName, &decidedAt, &row.Decision,
+			&createdAt, &updatedAt)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Request not found.", "ERR_NOT_FOUND")
 			return
 		}
+		row.QtyBefore = qtyBefore
+		row.QtyAfter = qtyAfter
 		row.CreatedAt = createdAt.Format(time.RFC3339)
 		row.UpdatedAt = updatedAt.Format(time.RFC3339)
+		if decidedAt != nil {
+			s := decidedAt.Format(time.RFC3339)
+			row.DecidedAt = &s
+		}
 		actions, err := loadStockAdjActions(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load timeline.", "ERR_INTERNAL")
@@ -500,9 +627,13 @@ func submitStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var status, reason string
 		var createdBy *int64
+		var itemID, locationID int64
+		var qtyDelta float64
 		err = tx.QueryRow(r.Context(), `
-			select status, reason, created_by_user_id from public.inv_stock_adjustment_requests
-			where id = $1 and tenant_id = $2 for update`, id, tu.TenantID).Scan(&status, &reason, &createdBy)
+			select status, reason, created_by_user_id, item_id, location_id, qty_delta::float8
+			from public.inv_stock_adjustment_requests
+			where id = $1 and tenant_id = $2 for update`, id, tu.TenantID).Scan(
+			&status, &reason, &createdBy, &itemID, &locationID, &qtyDelta)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Request not found.", "ERR_NOT_FOUND")
 			return
@@ -519,10 +650,11 @@ func submitStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		if body.Remarks != nil && strings.TrimSpace(*body.Remarks) != "" {
 			remarks = strings.TrimSpace(*body.Remarks)
 		}
+		qtyBefore, qtyAfter := proposedQtySnapshot(r.Context(), tx, tu.TenantID, itemID, locationID, qtyDelta)
 		_, err = tx.Exec(r.Context(), `
 			update public.inv_stock_adjustment_requests
-			set status = 'e_approval', updated_at = now()
-			where id = $1`, id)
+			set status = 'e_approval', qty_before = $2, qty_after = $3, updated_at = now()
+			where id = $1`, id, qtyBefore, qtyAfter)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to submit.", "ERR_INTERNAL")
 			return
@@ -536,16 +668,20 @@ func submitStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = approval.DrainOutbox(r.Context(), pool)
+		notifyStockAdjApproversInApp(r.Context(), pool, tu.TenantID, tu.AppUserID, id, stockAdjLabel(r.Context(), pool, tu.TenantID, id))
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.submit", entityStockAdjustmentRequest, &id, nil, nil)
 		response.OK(w, map[string]any{"request_id": id, "pending_approval": true}, "Submitted for approval.")
 	}
 }
 
+func canDecideStockAdjustment(tu auth.TenantUser) bool {
+	return tu.HasPermission(permissionStockAdjustmentApprove, auth.AccessWrite) || tu.IsTenantOwner
+}
+
 func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		if !tu.HasPermission(permissionStockAdjustmentApprove, auth.AccessWrite) &&
-			!tu.HasPermission("inventory.stock_movements", auth.AccessWrite) {
+		if !canDecideStockAdjustment(tu) {
 			response.Err(w, http.StatusForbidden, "You do not have permission to approve stock adjustments.", "ERR_FORBIDDEN")
 			return
 		}
@@ -557,7 +693,15 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		var body struct {
 			Remarks *string `json:"remarks"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if body.Remarks == nil || strings.TrimSpace(*body.Remarks) == "" {
+			response.Validation(w, map[string]string{"remarks": "Confirmation remarks are required to approve."})
+			return
+		}
+		remarks := strings.TrimSpace(*body.Remarks)
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -583,7 +727,7 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		movementID, validation, err := postStockAdjustment(r.Context(), tx, tu.TenantID, tu.AppUserID, itemID, locationID, qtyDelta, reason)
+		movementID, qtyBefore, qtyAfter, validation, err := postStockAdjustment(r.Context(), tx, tu.TenantID, tu.AppUserID, itemID, locationID, qtyDelta, reason)
 		if validation != nil {
 			response.Validation(w, validation)
 			return
@@ -592,14 +736,14 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to post adjustment.", "ERR_INTERNAL")
 			return
 		}
-		if err := approval.Decide(r.Context(), tx, tu, entityStockAdjustmentRequest, id, true, body.Remarks); err != nil {
+		if err := approval.Decide(r.Context(), tx, tu, entityStockAdjustmentRequest, id, true, &remarks); err != nil {
 			response.Validation(w, map[string]string{"status": err.Error()})
 			return
 		}
 		_, err = tx.Exec(r.Context(), `
 			update public.inv_stock_adjustment_requests
-			set status = 'completed', updated_at = now()
-			where id = $1`, id)
+			set status = 'completed', qty_before = $2, qty_after = $3, updated_at = now()
+			where id = $1`, id, qtyBefore, qtyAfter)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to complete request.", "ERR_INTERNAL")
 			return
@@ -610,16 +754,16 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.approve", entityStockAdjustmentRequest, &id, nil, map[string]any{
 			"movement_id": movementID,
+			"remarks":     remarks,
 		})
-		response.OK(w, map[string]any{"request_id": id, "movement_id": movementID}, "Stock adjustment approved.")
+		response.OK(w, map[string]any{"request_id": id, "movement_id": movementID}, "Stock adjustment approved and inventory updated.")
 	}
 }
 
 func rejectStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		if !tu.HasPermission(permissionStockAdjustmentApprove, auth.AccessWrite) &&
-			!tu.HasPermission("inventory.stock_movements", auth.AccessWrite) {
+		if !canDecideStockAdjustment(tu) {
 			response.Err(w, http.StatusForbidden, "You do not have permission to reject stock adjustments.", "ERR_FORBIDDEN")
 			return
 		}

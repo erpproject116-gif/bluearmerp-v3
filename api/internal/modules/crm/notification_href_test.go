@@ -20,6 +20,7 @@ func TestNotificationHref(t *testing.T) {
 		{et("inv_item_location_balance"), &id, "/app/crm/reports/low-stock"},
 		{et("so_sales_order"), &id, "/app/sales-order/sales-orders?openId=9"},
 		{et("chat_message"), &id, "/app/comms/chat?messageId=9"},
+		{et("inv_stock_adjustment_request"), &id, "/app/dashboard/approvals"},
 		{nil, nil, "/app/crm/notifications"},
 		{et("unknown_thing"), &id, "/app/crm/notifications"},
 	}

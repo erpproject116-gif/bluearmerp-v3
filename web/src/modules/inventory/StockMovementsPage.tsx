@@ -1,5 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
@@ -150,6 +150,12 @@ export default function StockMovementsPage() {
           <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => setAdjustOpen(true)}>
             Stock adjustment
           </button>
+          <A
+            href="/app/inventory/stock-adjustments"
+            class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+          >
+            Adjustment history
+          </A>
         </div>
       </div>
 

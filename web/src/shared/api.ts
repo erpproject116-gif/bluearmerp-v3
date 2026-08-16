@@ -64,7 +64,7 @@ export type ApiEnvelope<T> = {
   success: boolean;
   message?: string;
   data?: T;
-  meta?: { page: number; per_page: number; total: number };
+  meta?: { page: number; per_page: number; total: number; unread_total?: number; badge_count?: number };
   errors?: Record<string, string>;
   code?: string;
   assist?: ApiAssist;

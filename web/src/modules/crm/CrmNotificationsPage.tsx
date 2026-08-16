@@ -1,5 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
-import { A, useNavigate } from "@solidjs/router";
+import { createSignal, For, Show, onMount } from "solid-js";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import {
   crmNotificationHref,
   crmNotificationRelativeTime,
@@ -36,6 +36,7 @@ const SOURCE_CHIPS: { value: SourceFilter; label: string }[] = [
 
 export default function CrmNotificationsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const auth = useAuth();
   const [page, setPage] = createSignal(1);
   const [unreadOnly, setUnreadOnly] = createSignal(false);
@@ -43,6 +44,14 @@ export default function CrmNotificationsPage() {
   const pageSize = 25;
   const toast = useToast();
   const invalidate = useInvalidateCrmNotifications();
+
+  onMount(() => {
+    const raw = searchParams.unread;
+    const v = Array.isArray(raw) ? raw[0] : raw;
+    if (v === "1" || v === "true") {
+      setUnreadOnly(true);
+    }
+  });
 
   const list = useCrmNotifications(() => ({
     page: page(),

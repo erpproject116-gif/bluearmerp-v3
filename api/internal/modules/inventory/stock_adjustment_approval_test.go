@@ -15,13 +15,13 @@ func TestValidateStockAdjustmentBody(t *testing.T) {
 	}
 }
 
-func TestStockAdjRequiresApprovalPolicyFlag(t *testing.T) {
-	// Policy on means createStockAdjustment routes to request path (behavior covered by handler);
-	// keep a lightweight invariant that zero qty is always invalid regardless of policy.
+func TestStockAdjustmentNeverPostsWithoutApproval(t *testing.T) {
+	// createStockAdjustment always inserts e_approval and never calls postStockAdjustment
+	// until approveStockAdjustmentRequest. Zero qty remains invalid regardless.
 	errs := validateStockAdjustmentBody(stockAdjustmentBody{
 		ItemID: 1, LocationID: 1, QtyDelta: 0, Reason: "x",
 	})
 	if errs["qty_delta"] == "" {
-		t.Fatal("zero qty must be rejected")
+		t.Fatal("zero qty must be rejected before any approval path")
 	}
 }

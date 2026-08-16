@@ -10,6 +10,8 @@ type Meta struct {
 	PerPage     int    `json:"per_page"`
 	Total       int64  `json:"total"`
 	UnreadTotal *int64 `json:"unread_total,omitempty"`
+	// BadgeCount is an optional attention count (e.g. actionable unread for the shell bell).
+	BadgeCount *int64 `json:"badge_count,omitempty"`
 }
 
 // AssistAction is a single CTA for Smart Assist (in-app /app/... href only).
@@ -52,6 +54,10 @@ func OKList(w http.ResponseWriter, data any, page, perPage int, total int64) {
 }
 
 func OKListWithMeta(w http.ResponseWriter, data any, page, perPage int, total int64, unreadTotal *int64) {
+	OKListWithMetaAndBadge(w, data, page, perPage, total, unreadTotal, nil)
+}
+
+func OKListWithMetaAndBadge(w http.ResponseWriter, data any, page, perPage int, total int64, unreadTotal, badgeCount *int64) {
 	// Lists must not be browser-cached: after create/update, refetch must see fresh rows
 	// (max-age caused "saved successfully" while the grid stayed empty for ~30–60s).
 	w.Header().Set("Cache-Control", "private, no-cache, no-store, must-revalidate")
@@ -59,7 +65,13 @@ func OKListWithMeta(w http.ResponseWriter, data any, page, perPage int, total in
 		Success: true,
 		Message: "OK",
 		Data:    data,
-		Meta:    &Meta{Page: page, PerPage: perPage, Total: total, UnreadTotal: unreadTotal},
+		Meta: &Meta{
+			Page:        page,
+			PerPage:     perPage,
+			Total:       total,
+			UnreadTotal: unreadTotal,
+			BadgeCount:  badgeCount,
+		},
 	})
 }
 

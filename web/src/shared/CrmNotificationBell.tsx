@@ -1,5 +1,5 @@
 import { A, useNavigate } from "@solidjs/router";
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import {
   crmNotificationHref,
   crmNotificationRelativeTime,
@@ -14,6 +14,7 @@ import {
 } from "./useCrmNotifications";
 import { LoadingText } from "./LoadingText";
 import { StatusIcon, type StatusIconKind } from "./icons/StatusIcon";
+import { useToast } from "./toast";
 
 type Props = {
   enabled: boolean;
@@ -31,14 +32,34 @@ const severityTone: Record<CrmNotification["severity"], string> = {
   critical: "text-red-600",
 };
 
+function isActionableNotification(n: CrmNotification): boolean {
+  const src = n.source ?? "activity";
+  if (src !== "activity") return true;
+  return n.severity === "warning" || n.severity === "critical";
+}
+
+function formatBadge(n: number): string {
+  if (n > 99) return "99+";
+  return String(n);
+}
+
 export function CrmNotificationBell(props: Props) {
   const [open, setOpen] = createSignal(false);
+  const [markingAll, setMarkingAll] = createSignal(false);
   const navigate = useNavigate();
+  const toast = useToast();
   const invalidate = useInvalidateCrmNotifications();
 
   const preview = useCrmNotificationFeed(() => props.enabled);
 
+  /** Red pill: actionable unread (alerts / chat / support / warnings), not activity noise. */
+  const badge = () => preview.data?.badgeCount ?? 0;
+  /** Full unread count for inbox copy. */
   const unread = () => preview.data?.unreadTotal ?? 0;
+
+  const visibleRows = createMemo(() =>
+    (preview.data?.rows ?? []).filter((n) => !n.read_at && isActionableNotification(n)),
+  );
 
   onMount(() => {
     const close = (e: MouseEvent) => {
@@ -67,9 +88,21 @@ export function CrmNotificationBell(props: Props) {
   };
 
   const markAllRead = async () => {
+    setMarkingAll(true);
     const res = await markAllCrmNotificationsRead();
-    if (!res.success) return;
+    setMarkingAll(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not mark all as read.");
+      return;
+    }
     invalidate();
+    toast.success("All notifications marked read.");
+  };
+
+  const ariaLabel = () => {
+    const n = badge();
+    if (n <= 0) return "Notifications";
+    return `Notifications, ${n} needing attention`;
   };
 
   return (
@@ -78,7 +111,7 @@ export function CrmNotificationBell(props: Props) {
         <button
           type="button"
           class="relative rounded-lg border border-stroke p-2 text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
-          aria-label="Notifications"
+          aria-label={ariaLabel()}
           aria-expanded={open()}
           onClick={(e) => {
             e.stopPropagation();
@@ -92,30 +125,45 @@ export function CrmNotificationBell(props: Props) {
               d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
             />
           </svg>
-          <Show when={unread() > 0}>
+          <Show when={badge() > 0}>
             <span class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-              {unread() > 99 ? "99+" : unread()}
+              {formatBadge(badge())}
             </span>
           </Show>
         </button>
 
         <Show when={open()}>
           <div class="absolute right-0 z-50 mt-2 w-96 rounded-xl border border-stroke bg-white shadow-lg">
-            <div class="flex items-center justify-between border-b border-stroke px-4 py-3">
-              <h2 class="text-sm font-semibold text-text-primary">
-                Notifications
-                <Show when={unread() > 0}>
-                  <span class="ml-2 text-xs font-normal text-text-secondary">({unread()} unread)</span>
+            <div class="flex items-center justify-between gap-2 border-b border-stroke px-4 py-3">
+              <div class="min-w-0">
+                <h2 class="text-sm font-semibold text-text-primary">Notifications</h2>
+                <Show when={badge() > 0}>
+                  <p class="text-xs text-text-secondary">
+                    {badge()} need{badge() === 1 ? "s" : ""} attention
+                    <Show when={unread() > badge()}>
+                      <span> · {unread()} unread total</span>
+                    </Show>
+                  </p>
                 </Show>
-              </h2>
-              <div class="flex items-center gap-3">
+                <Show when={badge() === 0 && unread() > 0}>
+                  <p class="text-xs text-text-secondary">{unread()} activity items unread</p>
+                </Show>
+                <Show when={badge() === 0 && unread() === 0}>
+                  <p class="text-xs text-text-secondary">You're caught up</p>
+                </Show>
+              </div>
+              <div class="flex shrink-0 items-center gap-3">
                 <Show when={unread() > 0}>
                   <button
                     type="button"
-                    class="text-xs font-medium text-text-secondary hover:text-text-primary"
-                    onClick={() => void markAllRead()}
+                    class="text-xs font-medium text-text-secondary hover:text-text-primary disabled:opacity-50"
+                    disabled={markingAll()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void markAllRead();
+                    }}
                   >
-                    Mark all read
+                    {markingAll() ? "…" : "Mark all read"}
                   </button>
                 </Show>
                 <A
@@ -131,15 +179,27 @@ export function CrmNotificationBell(props: Props) {
               <Show when={preview.isFetching && (preview.data?.rows.length ?? 0) === 0}>
                 <LoadingText class="px-4 py-6 text-center text-sm text-text-secondary" as="p" />
               </Show>
-              <Show when={!preview.isFetching && (preview.data?.rows.length ?? 0) === 0}>
-                <p class="px-4 py-6 text-center text-sm text-text-secondary">No notifications</p>
+              <Show when={!preview.isFetching && visibleRows().length === 0}>
+                <div class="px-4 py-6 text-center text-sm text-text-secondary">
+                  <p>No items needing attention.</p>
+                  <Show when={unread() > 0}>
+                    <p class="mt-2">
+                      <A
+                        href="/app/crm/notifications?unread=1"
+                        class="font-medium text-brand-600 hover:underline"
+                        onClick={() => setOpen(false)}
+                      >
+                        Review {unread()} activity unread
+                      </A>
+                    </p>
+                  </Show>
+                </div>
               </Show>
-              <For each={preview.data?.rows ?? []}>
+              <For each={visibleRows()}>
                 {(n) => (
                   <button
                     type="button"
-                    class="w-full border-b border-stroke/60 px-4 py-3 text-left transition hover:bg-slate-50"
-                    classList={{ "bg-brand-50/50": !n.read_at }}
+                    class="w-full border-b border-stroke/60 px-4 py-3 text-left transition hover:bg-slate-50 bg-brand-50/50"
                     onClick={() => void openNotification(n)}
                   >
                     <div class="flex items-start gap-2">
@@ -163,6 +223,17 @@ export function CrmNotificationBell(props: Props) {
                 )}
               </For>
             </div>
+            <Show when={unread() > visibleRows().length && visibleRows().length > 0}>
+              <div class="border-t border-stroke px-4 py-2 text-center">
+                <A
+                  href="/app/crm/notifications?unread=1"
+                  class="text-xs font-medium text-brand-600 hover:underline"
+                  onClick={() => setOpen(false)}
+                >
+                  View all unread in inbox
+                </A>
+              </div>
+            </Show>
           </div>
         </Show>
       </div>

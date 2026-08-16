@@ -171,7 +171,7 @@ export function useProcessPolicy(enabled: () => boolean = () => true) {
           finance_require_je_approval: false,
           inventory_gl_hybrid_enabled: false,
           inventory_require_serial_adjustment_approval: false,
-          inventory_require_stock_adjustment_approval: false,
+          inventory_require_stock_adjustment_approval: true,
           budget_control_mode: "off",
           quotation_require_attachment: false,
           sales_order_require_attachment: false,

@@ -77,6 +77,7 @@ export const appModules: AppModule[] = [
       { label: "Departments", href: "/app/inventory/departments", settingsHref: "/app/inventory/departments/settings" },
       { label: "Items", href: "/app/inventory/items", settingsHref: "/app/inventory/items/settings", headerPriority: "primary" },
       { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements", headerPriority: "primary" },
+      { label: "Stock Adjustments", href: "/app/inventory/stock-adjustments", settingsHref: "/app/inventory/stock-adjustments", headerPriority: "primary" },
       { label: "Stock Entries", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries", headerPriority: "overflow" },
       { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation" },
       { label: "Inv Per Branch", href: "/app/inventory/find-stock", settingsHref: "/app/inventory/stock-movements", headerPriority: "primary" },

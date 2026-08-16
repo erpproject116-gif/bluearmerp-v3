@@ -101,7 +101,7 @@ const selectCols = `
   coalesce(supplier_invoice_require_attachment, true),
   coalesce(inventory_gl_hybrid_enabled, false),
   coalesce(inventory_require_serial_adjustment_approval, false),
-  coalesce(inventory_require_stock_adjustment_approval, false),
+  coalesce(inventory_require_stock_adjustment_approval, true),
   ar_payment_discount_account_id,
   ap_payment_discount_account_id
 `

@@ -77,6 +77,8 @@ func NotificationHref(entityType *string, entityID *int64) string {
 		return "/app/finance/acct-i/chart-of-accounts"
 	case "wm_work_item":
 		return "/app/operations"
+	case "inv_stock_adjustment_request", "inv_serial_adjustment_request":
+		return "/app/dashboard/approvals"
 	case "reconciliation":
 		return "/app/crm/notifications"
 	default:
