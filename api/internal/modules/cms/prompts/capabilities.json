@@ -1,0 +1,36 @@
+{
+  "bodega-at-stock": [
+    "Single on-hand quantity per item and location",
+    "Sales order / release cannot skip stock when qty is short",
+    "Stock is reduced on goods issue, not on the sales invoice paper"
+  ],
+  "benta-at-koleksyon": [
+    "Sales Invoice and Official Receipt are separate documents",
+    "Collections record against open A/R, not chat screenshots",
+    "Delivery / load slip is not the same as billed"
+  ],
+  "quotation-at-follow-up": [
+    "Quotations have status and expiry",
+    "CRM follow-up tasks can be scheduled from a quote"
+  ],
+  "pagbili-at-supplier": [
+    "Purchase request then purchase order with approval",
+    "Goods receipt then supplier invoice / A/P"
+  ],
+  "serial-at-warranty": [
+    "Serial registry tied to sales and receive",
+    "Warranty lookup from serial, not a notebook"
+  ],
+  "vat-at-resibo": [
+    "Tax types from Tax Management apply on quote and invoice lines",
+    "VAT-inclusive vs exclusive is a document setting, not a chat total"
+  ],
+  "books-at-pagsara": [
+    "One ledger; stock, OR, and bank must tie to the same books",
+    "Month-end uses posted documents, not three Excel files"
+  ],
+  "after-sales": ["Repair orders and warranty from serial history"],
+  "tindahan-pos": ["POS posts to the same stock and sales as the back office"],
+  "withholding-at-2307": ["2307 certificates from payment vouchers"],
+  "blog": ["Same trading chain: quote, order, deliver, invoice, collect"]
+}

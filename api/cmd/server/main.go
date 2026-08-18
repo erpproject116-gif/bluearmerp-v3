@@ -185,7 +185,7 @@ func main() {
 			jobcosting.RegisterRoutes(protected, pool)
 			operations.RegisterRoutes(protected, pool)
 			sop.RegisterRoutes(protected, pool)
-			cms.RegisterRoutes(protected, pool)
+			cms.RegisterRoutes(protected, pool, cfg)
 			okr.RegisterRoutes(protected, pool)
 			manufacturing.RegisterRoutes(protected, pool)
 			quality.RegisterRoutes(protected, pool)

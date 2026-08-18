@@ -18,20 +18,25 @@ import (
 )
 
 type Page struct {
-	ID              int64          `json:"id"`
-	Title           string         `json:"title"`
-	Topic           string         `json:"topic"`
-	Slug            string         `json:"slug"`
-	Permalink       string         `json:"permalink"`
-	Status          string         `json:"status"`
-	Body            string         `json:"body,omitempty"`
-	SEOTitle        *string        `json:"seo_title,omitempty"`
-	SEODescription  *string        `json:"seo_description,omitempty"`
-	FeaturedMediaID *int64         `json:"featured_media_id,omitempty"`
-	PublishedAt     *string        `json:"published_at,omitempty"`
-	CreatedAt       string         `json:"created_at"`
-	UpdatedAt       string         `json:"updated_at"`
-	CustomValues    map[string]any `json:"custom_values,omitempty"`
+	ID               int64          `json:"id"`
+	Title            string         `json:"title"`
+	Topic            string         `json:"topic"`
+	Slug             string         `json:"slug"`
+	Permalink        string         `json:"permalink"`
+	Status           string         `json:"status"`
+	Body             string         `json:"body,omitempty"`
+	SEOTitle         *string        `json:"seo_title,omitempty"`
+	SEODescription   *string        `json:"seo_description,omitempty"`
+	FeaturedMediaID  *int64         `json:"featured_media_id,omitempty"`
+	FeaturedMediaAlt string         `json:"featured_media_alt,omitempty"`
+	FeaturedMediaMime string        `json:"featured_media_mime,omitempty"`
+	Lang             string         `json:"lang,omitempty"`
+	FocusPhrase      *string        `json:"focus_phrase,omitempty"`
+	Visibility       string         `json:"visibility,omitempty"`
+	PublishedAt      *string        `json:"published_at,omitempty"`
+	CreatedAt        string         `json:"created_at"`
+	UpdatedAt        string         `json:"updated_at"`
+	CustomValues     map[string]any `json:"custom_values,omitempty"`
 }
 
 type pageCreate struct {
@@ -42,6 +47,9 @@ type pageCreate struct {
 	SEOTitle        *string        `json:"seo_title"`
 	SEODescription  *string        `json:"seo_description"`
 	FeaturedMediaID *int64         `json:"featured_media_id"`
+	Lang            string         `json:"lang"`
+	FocusPhrase     *string        `json:"focus_phrase"`
+	Visibility      string         `json:"visibility"`
 	CustomValues    map[string]any `json:"custom_values"`
 }
 
@@ -53,6 +61,10 @@ type pagePatch struct {
 	SEOTitle        *string        `json:"seo_title"`
 	SEODescription  *string        `json:"seo_description"`
 	FeaturedMediaID *int64         `json:"featured_media_id"`
+	Lang            *string        `json:"lang"`
+	FocusPhrase     *string        `json:"focus_phrase"`
+	Visibility      *string        `json:"visibility"`
+	UpdatedAt       *string        `json:"updated_at"`
 	LeaveRedirect   *bool          `json:"leave_redirect"`
 	CustomValues    map[string]any `json:"custom_values"`
 }
@@ -110,8 +122,12 @@ func listPages(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		q := fmt.Sprintf(`
 			select p.id, p.title, p.topic, p.slug, p.status, p.seo_title, p.seo_description, p.featured_media_id,
-			  p.published_at::text, p.created_at::text, p.updated_at::text, count(*) over()
+			  p.published_at::text, p.created_at::text, p.updated_at::text,
+			  coalesce(m.alt_text,''), coalesce(m.mime_type,''),
+			  coalesce(nullif(p.lang,''),'tl'), p.focus_phrase, coalesce(p.visibility,'internal'),
+			  count(*) over()
 			from public.cms_pages p
+			left join public.cms_media m on m.id = p.featured_media_id and m.deleted_at is null
 			where %s
 			order by %s %s
 			limit $%d offset $%d`, where, p.Sort, orderSQL(p.Order), n, n+1)
@@ -128,7 +144,8 @@ func listPages(pool *pgxpool.Pool) http.HandlerFunc {
 			var row Page
 			if err := rows.Scan(
 				&row.ID, &row.Title, &row.Topic, &row.Slug, &row.Status, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
-				&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &total,
+				&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt,
+				&row.FeaturedMediaAlt, &row.FeaturedMediaMime, &row.Lang, &row.FocusPhrase, &row.Visibility, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read pages.", "ERR_INTERNAL")
 				return
@@ -238,6 +255,9 @@ func createPage(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"featured_media_id": "Media not found."})
 			return
 		}
+		lang := normalizeLang(body.Lang)
+		vis := normalizeVisibility(body.Visibility)
+		focus := normalizeFocus(body.FocusPhrase)
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create page.", "ERR_INTERNAL")
@@ -248,10 +268,11 @@ func createPage(pool *pgxpool.Pool) http.HandlerFunc {
 		err = tx.QueryRow(r.Context(), `
 			insert into public.cms_pages (
 			  tenant_id, title, topic, slug, body, seo_title, seo_description, featured_media_id,
-			  created_by_user_id, updated_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)
+			  lang, focus_phrase, visibility, created_by_user_id, updated_by_user_id
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12)
 			returning id`,
-			tu.TenantID, title, topic, slug, body.Body, seoTitle, seoDesc, body.FeaturedMediaID, tu.AppUserID,
+			tu.TenantID, title, topic, slug, body.Body, seoTitle, seoDesc, body.FeaturedMediaID,
+			lang, focus, vis, tu.AppUserID,
 		).Scan(&id)
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -296,6 +317,10 @@ func patchPage(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
+		if body.UpdatedAt != nil && strings.TrimSpace(*body.UpdatedAt) != "" && strings.TrimSpace(*body.UpdatedAt) != existing.UpdatedAt {
+			response.Err(w, http.StatusConflict, "This page was saved by someone else. Reload and try again.", "ERR_CONFLICT")
+			return
+		}
 		title := existing.Title
 		topic := existing.Topic
 		slug := existing.Slug
@@ -303,6 +328,15 @@ func patchPage(pool *pgxpool.Pool) http.HandlerFunc {
 		seoTitle := existing.SEOTitle
 		seoDesc := existing.SEODescription
 		feat := existing.FeaturedMediaID
+		lang := existing.Lang
+		if lang == "" {
+			lang = "tl"
+		}
+		focus := existing.FocusPhrase
+		vis := existing.Visibility
+		if vis == "" {
+			vis = "internal"
+		}
 		if body.Title != nil {
 			title = strings.TrimSpace(*body.Title)
 			if !isPrintableTitle(title) {
@@ -360,6 +394,15 @@ func patchPage(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 		}
+		if body.Lang != nil {
+			lang = normalizeLang(*body.Lang)
+		}
+		if body.FocusPhrase != nil {
+			focus = normalizeFocus(body.FocusPhrase)
+		}
+		if body.Visibility != nil {
+			vis = normalizeVisibility(*body.Visibility)
+		}
 		leaveRedirect := true
 		if body.LeaveRedirect != nil {
 			leaveRedirect = *body.LeaveRedirect
@@ -374,9 +417,10 @@ func patchPage(pool *pgxpool.Pool) http.HandlerFunc {
 		_, err = tx.Exec(r.Context(), `
 			update public.cms_pages set
 			  title=$1, topic=$2, slug=$3, body=$4, seo_title=$5, seo_description=$6, featured_media_id=$7,
-			  updated_by_user_id=$8, updated_at=now()
-			where id=$9 and tenant_id=$10 and deleted_at is null`,
-			title, topic, slug, docBody, seoTitle, seoDesc, feat, tu.AppUserID, id, tu.TenantID)
+			  lang=$8, focus_phrase=$9, visibility=$10,
+			  updated_by_user_id=$11, updated_at=now()
+			where id=$12 and tenant_id=$13 and deleted_at is null`,
+			title, topic, slug, docBody, seoTitle, seoDesc, feat, lang, focus, vis, tu.AppUserID, id, tu.TenantID)
 		if err != nil {
 			if isUniqueViolation(err) {
 				response.Validation(w, map[string]string{"slug": "That slug is already used."})
@@ -401,6 +445,7 @@ func patchPage(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to update page.", "ERR_INTERNAL")
 			return
 		}
+		maybeInsertPageRevision(r.Context(), pool, tu.TenantID, tu.AppUserID, existing)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "cms.page.update", "cms_page", &id, nil, map[string]any{
 			"slug": slug,
 		})
@@ -417,6 +462,10 @@ func publishPage(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
+		}
+		existing, loadErr := loadPage(r.Context(), pool, tu.TenantID, id)
+		if loadErr == nil {
+			insertPageRevision(r.Context(), pool, tu.TenantID, tu.AppUserID, existing)
 		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.cms_pages set
@@ -458,12 +507,16 @@ func archivePage(pool *pgxpool.Pool) http.HandlerFunc {
 func loadPage(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Page, error) {
 	var row Page
 	err := pool.QueryRow(ctx, `
-		select id, title, topic, slug, status, body, seo_title, seo_description, featured_media_id,
-		  published_at::text, created_at::text, updated_at::text
-		from public.cms_pages
-		where id=$1 and tenant_id=$2 and deleted_at is null`, id, tenantID).Scan(
+		select p.id, p.title, p.topic, p.slug, p.status, p.body, p.seo_title, p.seo_description, p.featured_media_id,
+		  p.published_at::text, p.created_at::text, p.updated_at::text,
+		  coalesce(m.alt_text,''), coalesce(m.mime_type,''),
+		  coalesce(nullif(p.lang,''),'tl'), p.focus_phrase, coalesce(p.visibility,'internal')
+		from public.cms_pages p
+		left join public.cms_media m on m.id = p.featured_media_id and m.deleted_at is null
+		where p.id=$1 and p.tenant_id=$2 and p.deleted_at is null`, id, tenantID).Scan(
 		&row.ID, &row.Title, &row.Topic, &row.Slug, &row.Status, &row.Body, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
 		&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt,
+		&row.FeaturedMediaAlt, &row.FeaturedMediaMime, &row.Lang, &row.FocusPhrase, &row.Visibility,
 	)
 	if err == nil {
 		row.Permalink = articlePermalink(row.Topic, row.Slug)
@@ -474,12 +527,16 @@ func loadPage(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Page
 func loadPageBySlug(ctx context.Context, pool *pgxpool.Pool, tenantID int64, slug string) (Page, error) {
 	var row Page
 	err := pool.QueryRow(ctx, `
-		select id, title, topic, slug, status, body, seo_title, seo_description, featured_media_id,
-		  published_at::text, created_at::text, updated_at::text
-		from public.cms_pages
-		where tenant_id=$1 and slug=$2 and deleted_at is null`, tenantID, slug).Scan(
+		select p.id, p.title, p.topic, p.slug, p.status, p.body, p.seo_title, p.seo_description, p.featured_media_id,
+		  p.published_at::text, p.created_at::text, p.updated_at::text,
+		  coalesce(m.alt_text,''), coalesce(m.mime_type,''),
+		  coalesce(nullif(p.lang,''),'tl'), p.focus_phrase, coalesce(p.visibility,'internal')
+		from public.cms_pages p
+		left join public.cms_media m on m.id = p.featured_media_id and m.deleted_at is null
+		where p.tenant_id=$1 and p.slug=$2 and p.deleted_at is null`, tenantID, slug).Scan(
 		&row.ID, &row.Title, &row.Topic, &row.Slug, &row.Status, &row.Body, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
 		&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt,
+		&row.FeaturedMediaAlt, &row.FeaturedMediaMime, &row.Lang, &row.FocusPhrase, &row.Visibility,
 	)
 	if err == nil {
 		row.Permalink = articlePermalink(row.Topic, row.Slug)

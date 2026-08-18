@@ -228,6 +228,71 @@ export function markdownToSafeHtml(md: string): string {
   return parts.join("");
 }
 
+function inlineMarkdownToPublicHtml(raw: string, mediaUrl: (id: number) => string): string {
+  let s = escapeHtml(raw);
+  s = s.replace(/!\[([^\]]*)\]\(cms-media:(\d+)\)/g, (_m, alt, idStr) => {
+    const id = Number(idStr);
+    const a = escapeHtml(String(alt ?? ""));
+    if (!Number.isFinite(id) || id <= 0) return a;
+    return `<img src="${escapeHtml(mediaUrl(id))}" alt="${a}" />`;
+  });
+  s = s.replace(/!\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g, (_m, alt, href) => {
+    const yt = parseYouTubeId(String(href));
+    if (yt) return youtubeIframeHtml(yt);
+    const url = safeHttpsUrl(String(href));
+    if (!url) return escapeHtml(String(alt ?? ""));
+    return `<img src="${escapeHtml(url)}" alt="${escapeHtml(String(alt ?? ""))}" />`;
+  });
+  s = s.replace(/\[([^\]]+)\]\((\/articles(?:\/[^)\s]+)?|\/app\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, (_m, label, href) => {
+    return `<a href="${escapeHtml(String(href))}">${label}</a>`;
+  });
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, "$1<em>$2</em>");
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  return s;
+}
+
+function youtubeIframeHtml(id: string): string {
+  const src = youtubeEmbedUrl(id);
+  return `<iframe src="${escapeHtml(src)}" title="YouTube" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+}
+
+/** Crawler/standalone HTML: real images + YouTube iframes (not editor chips). */
+export function markdownToPublicHtml(md: string, mediaUrl: (id: number) => string): string {
+  const parts: string[] = [];
+  for (const block of parseCmsMarkdown(md)) {
+    if (block.type === "p") {
+      parts.push(`<p>${inlineMarkdownToPublicHtml(block.text, mediaUrl)}</p>`);
+    } else if (block.type === "h") {
+      const tag = block.level === 2 ? "h2" : "h3";
+      parts.push(`<${tag}>${inlineMarkdownToPublicHtml(block.text, mediaUrl)}</${tag}>`);
+    } else if (block.type === "ul") {
+      parts.push(`<ul>${block.items.map((it) => `<li>${inlineMarkdownToPublicHtml(it, mediaUrl)}</li>`).join("")}</ul>`);
+    } else if (block.type === "ol") {
+      parts.push(`<ol>${block.items.map((it) => `<li>${inlineMarkdownToPublicHtml(it, mediaUrl)}</li>`).join("")}</ol>`);
+    } else if (block.type === "quote") {
+      parts.push(`<blockquote><p>${inlineMarkdownToPublicHtml(block.text, mediaUrl)}</p></blockquote>`);
+    } else if (block.type === "img") {
+      parts.push(`<p><img src="${escapeHtml(block.src)}" alt="${escapeHtml(block.alt)}" /></p>`);
+    } else if (block.type === "youtube") {
+      parts.push(`<div class="cms-yt">${youtubeIframeHtml(block.id)}</div>`);
+    } else {
+      parts.push(`<pre>${escapeHtml(block.text)}</pre>`);
+    }
+  }
+  return parts.join("\n");
+}
+
+export function firstParagraphPlain(md: string): string {
+  const { body } = splitFrontmatter(md);
+  for (const block of parseCmsMarkdown(body)) {
+    if (block.type === "p" && block.text.trim()) {
+      return block.text.replace(/\*+/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
+    }
+  }
+  return "";
+}
+
 function yamlScalar(raw: string): string {
   let s = raw.trim();
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {

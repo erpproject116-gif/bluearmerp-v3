@@ -51,6 +51,25 @@ export default function CmsMediaPage() {
           { key: "file_name", header: "File", clickable: true },
           { key: "mime_type", header: "Type" },
           {
+            key: "alt_text",
+            header: "Alt",
+            sortable: false,
+            render: (r) => (
+              <Show when={canWrite()} fallback={<span>{r.alt_text || "—"}</span>}>
+                <input
+                  class="w-40 rounded border border-stroke px-1 text-sm"
+                  value={r.alt_text || ""}
+                  onClick={(e) => e.stopPropagation()}
+                  onBlur={(e) => {
+                    const v = e.currentTarget.value.trim();
+                    if (v === (r.alt_text || "")) return;
+                    void mutations.patchMedia.mutateAsync({ id: r.id, alt_text: v }).then(() => toast.success("Alt saved.")).catch((err) => toast.warning(err instanceof Error ? err.message : "Save failed."));
+                  }}
+                />
+              </Show>
+            ),
+          },
+          {
             key: "size_bytes",
             header: "Size",
             render: (r) => formatFileSize(r.size_bytes),

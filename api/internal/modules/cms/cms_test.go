@@ -2,7 +2,9 @@ package cms
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 )
@@ -87,5 +89,84 @@ func TestPageVisibleToReader(t *testing.T) {
 	}
 	if pageVisibleToReader("draft") || pageVisibleToReader("archived") {
 		t.Fatal("draft/archived hidden from readers")
+	}
+}
+
+func TestNormalizeLangVisibility(t *testing.T) {
+	if normalizeLang("") != "tl" || normalizeLang("en-us") != "en-US" {
+		t.Fatal(normalizeLang(""), normalizeLang("en-us"))
+	}
+	if normalizeVisibility("public") != "public" || normalizeVisibility("") != "internal" {
+		t.Fatal(normalizeVisibility("public"))
+	}
+}
+
+func TestPreviewTokenRoundTrip(t *testing.T) {
+	tok := signPreviewToken(42, 7, time.Now().Add(time.Minute))
+	tenant, page, ok := parsePreviewToken(tok)
+	if !ok || tenant != 7 || page != 42 {
+		t.Fatalf("token %s -> %d %d %v", tok, tenant, page, ok)
+	}
+	expired := signPreviewToken(1, 1, time.Now().Add(-time.Minute))
+	if _, _, ok := parsePreviewToken(expired); ok {
+		t.Fatal("expired token must fail")
+	}
+}
+
+func TestValidateGeneratedArticle(t *testing.T) {
+	raw := `---
+title: Bakit palaging mali ang stock?
+topic: bodega-at-stock
+slug: meron-pa-test
+seo_title: Bakit mali
+seo_description: Short desk.
+---
+
+Opening scene that is long enough to count. ` + strings.Repeat("salita ", 450) + `
+
+## Akala ninyo okay pa
+x
+## Magkano
+x
+## Bakit hindi kaya ng Excel o Viber
+x
+## Ano ang itsura ng proper system
+x
+## Kung ito ang Lunes ninyo
+x
+`
+	got, errs := validateGeneratedArticle(raw, "bodega-at-stock")
+	if errs != nil {
+		t.Fatalf("%v", errs)
+	}
+	if got.Slug != "meron-pa-test" {
+		t.Fatal(got.Slug)
+	}
+	_, bad := validateGeneratedArticle(raw+"\nSee facebook.com/BluearmERPGlobal\n", "bodega-at-stock")
+	if bad == nil {
+		t.Fatal("expected facebook chrome rejection")
+	}
+}
+
+func TestValidateGeneratedArticleExamplePrompt(t *testing.T) {
+	got, errs := validateGeneratedArticle(articleExample, "bodega-at-stock")
+	if errs != nil {
+		t.Fatalf("embedded example.md must pass validator: %v", errs)
+	}
+	if got.Topic != "bodega-at-stock" {
+		t.Fatal(got.Topic)
+	}
+	htmlRaw := strings.Replace(articleExample, "counter — at ang totoo ay nasa rack na wala na.", "counter.<div>hack</div>", 1)
+	if _, bad := validateGeneratedArticle(htmlRaw, "bodega-at-stock"); bad == nil {
+		t.Fatal("expected raw HTML rejection")
+	}
+}
+
+func TestCacheControlForPublicMedia(t *testing.T) {
+	if cacheControlForPublicMedia("image/png") != publicImageCacheControl {
+		t.Fatal(cacheControlForPublicMedia("image/png"))
+	}
+	if cacheControlForPublicMedia("application/pdf") != "" {
+		t.Fatal("pdf should not be immutable public cache")
 	}
 }

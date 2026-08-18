@@ -5,7 +5,18 @@
   "outputDirectory": "dist",
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/app/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    },
+    {
+      "source": "/((?!articles(?:/|$)|llms\\.txt|llms-full\\.txt|robots\\.txt|sitemap\\.xml|api/).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
@@ -16,5 +27,19 @@
       ]
     }
   ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/robots.txt", "destination": "/api/cms-public?kind=robots" },
+    { "source": "/sitemap.xml", "destination": "/api/cms-public?kind=sitemap" },
+    { "source": "/llms.txt", "destination": "/api/cms-public?kind=llms" },
+    { "source": "/llms-full.txt", "destination": "/api/cms-public?kind=llms-full" },
+    { "source": "/articles.md", "destination": "/api/cms-public?kind=index-md" },
+    { "source": "/articles/:topic/:slug.md", "destination": "/api/cms-public?kind=md&topic=:topic&slug=:slug" },
+    { "source": "/articles/:topic/:slug", "destination": "/api/cms-public?kind=article&topic=:topic&slug=:slug" },
+    { "source": "/articles/:topic", "destination": "/api/cms-public?kind=topic&topic=:topic" },
+    { "source": "/articles", "destination": "/api/cms-public?kind=hub" },
+    { "source": "/app/articles/:topic/:slug", "destination": "/api/cms-public?kind=legacy&topic=:topic&slug=:slug" },
+    { "source": "/app/articles/:topic", "destination": "/api/cms-public?kind=legacy&topic=:topic" },
+    { "source": "/app/articles", "destination": "/api/cms-public?kind=legacy" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

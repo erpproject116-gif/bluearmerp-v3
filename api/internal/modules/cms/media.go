@@ -190,9 +190,11 @@ func deleteMedia(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var used int64
+		token := fmt.Sprintf("cms-media:%d)", id)
 		_ = pool.QueryRow(r.Context(), `
 			select count(*) from public.cms_pages
-			where tenant_id=$1 and featured_media_id=$2 and deleted_at is null`, tu.TenantID, id).Scan(&used)
+			where tenant_id=$1 and deleted_at is null
+			  and (featured_media_id=$2 or position($3 in body) > 0)`, tu.TenantID, id, token).Scan(&used)
 		if used > 0 {
 			response.Err(w, http.StatusConflict, "This file is used as a page image. Remove it from pages first.", "ERR_CONFLICT")
 			return

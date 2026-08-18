@@ -1,16 +1,19 @@
-import { A, Navigate, useParams } from "@solidjs/router";
+import { A, Navigate, useParams, useSearchParams } from "@solidjs/router";
 import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { useCmsPageBySlug, usePublicCmsPageBySlug } from "../../shared/useCms";
 import { CmsMarkdown } from "./CmsMarkdown";
+import { CmsArticleFooter } from "./CmsArticleFooter";
 import { fetchPublicCmsMediaObjectUrl } from "../../shared/cmsMedia";
 import { splitFrontmatter } from "./cmsMarkdownCodec";
 import { CMS_ARTICLES_PREFIX, cmsArticlePath, cmsTopicOrDefault, cmsTopicPath } from "./cmsPermalink";
 
 export default function CmsPageReaderPage() {
   const params = useParams();
+  const [search] = useSearchParams();
   const slug = () => (params.slug ?? "").toLowerCase();
   const topicParam = () => (params.topic ?? "").toLowerCase();
-  const q = usePublicCmsPageBySlug(slug);
+  const preview = () => String(search.preview ?? "");
+  const q = usePublicCmsPageBySlug(slug, preview);
   const [heroUrl, setHeroUrl] = createSignal<string | null>(null);
 
   const page = () => q.data?.page;
@@ -70,7 +73,7 @@ export default function CmsPageReaderPage() {
                   <p class="text-sm text-text-secondary">{p().seo_description}</p>
                 </Show>
                 <Show when={heroUrl()}>
-                  <img src={heroUrl()!} alt="" class="max-h-80 w-full rounded-lg border border-stroke object-contain" />
+                  <img src={heroUrl()!} alt={p().featured_media_alt || ""} class="max-h-80 w-full rounded-lg border border-stroke object-contain" />
                 </Show>
                 <Show
                   when={bodyMd()}
@@ -82,6 +85,7 @@ export default function CmsPageReaderPage() {
                 >
                   <CmsMarkdown content={bodyMd()} class="text-base" publicMedia />
                 </Show>
+                <CmsArticleFooter canonicalUrl={`${typeof window !== "undefined" ? window.location.origin : ""}${canonical()}`} />
               </article>
             </>
           );

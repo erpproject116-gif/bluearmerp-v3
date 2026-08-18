@@ -242,7 +242,7 @@ export function CmsBodyEditor(props: CmsBodyEditorProps) {
                 applyVisual(props.markdown);
               }}
               class="cms-rte relative z-[1] min-h-[320px] max-w-none px-3 py-3 text-sm leading-relaxed text-text-primary outline-none"
-              contentEditable={props.disabled ? "false" : "true"}
+              contentEditable={!props.disabled}
               role="textbox"
               aria-multiline="true"
               aria-label="Page body"

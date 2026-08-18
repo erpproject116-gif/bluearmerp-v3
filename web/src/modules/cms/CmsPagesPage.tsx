@@ -83,6 +83,20 @@ export default function CmsPagesPage() {
           { key: "topic", header: "Topic" },
           { key: "slug", header: "Slug", clickable: true },
           { key: "status", header: "Status" },
+          { key: "visibility", header: "Visibility" },
+          { key: "published_at", header: "Published" },
+          {
+            key: "permalink",
+            header: "URL",
+            sortable: false,
+            render: (r) => r.permalink || "",
+          },
+          {
+            key: "seo",
+            header: "SEO",
+            sortable: false,
+            render: (r) => (!r.seo_description || !r.featured_media_id ? "Incomplete" : "Ready"),
+          },
           { key: "updated_at", header: "Updated" },
         ]}
         rows={list.data?.rows ?? []}
