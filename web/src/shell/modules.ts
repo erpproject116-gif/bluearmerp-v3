@@ -456,6 +456,17 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "cms",
+    label: "Pages",
+    href: "/app/cms",
+    basePath: "/app/cms",
+    features: [
+      { label: "Pages", href: "/app/cms", settingsHref: "/app/cms/pages/settings" },
+      { label: "Media", href: "/app/cms/media", settingsHref: "/app/cms/pages/settings" },
+      { label: "Redirects", href: "/app/cms/redirects", settingsHref: "/app/cms/pages/settings" },
+    ],
+  },
+  {
     id: "okr",
     label: "OKRs",
     href: "/app/okr",

@@ -207,6 +207,12 @@ export const OperationsAutomationPage = lazy(() => import("../modules/operations
 export const SopLibraryPage = lazy(() => import("../modules/sop/SopLibraryPage"));
 export const SopDashboardPage = lazy(() => import("../modules/sop/SopDashboardPage"));
 export const SopDocumentPage = lazy(() => import("../modules/sop/SopDocumentPage"));
+export const CmsPagesPage = lazy(() => import("../modules/cms/CmsPagesPage"));
+export const CmsPagesSettingsPage = lazy(() => import("../modules/cms/CmsPagesSettingsPage"));
+export const CmsPageEditorPage = lazy(() => import("../modules/cms/CmsPageEditorPage"));
+export const CmsPageReaderPage = lazy(() => import("../modules/cms/CmsPageReaderPage"));
+export const CmsMediaPage = lazy(() => import("../modules/cms/CmsMediaPage"));
+export const CmsRedirectsPage = lazy(() => import("../modules/cms/CmsRedirectsPage"));
 export const OkrListPage = lazy(() => import("../modules/okr/OkrListPage"));
 export const OkrDashboardPage = lazy(() => import("../modules/okr/OkrDashboardPage"));
 export const CommsInboxPage = lazy(() => import("../modules/comms/InboxPage"));

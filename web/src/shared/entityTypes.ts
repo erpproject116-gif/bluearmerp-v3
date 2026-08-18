@@ -127,6 +127,16 @@ export const HR_SETTINGS_HREF = {
 
 export type HrFeature = keyof typeof HR_ENTITY;
 
+export const CMS_ENTITY = {
+  page: "cms_page",
+} as const;
+
+export const CMS_SETTINGS_HREF = {
+  page: "/app/cms/pages/settings",
+} as const;
+
+export type CmsFeature = keyof typeof CMS_ENTITY;
+
 /** Entity type strings for the unsaved-form draft hook (`useDocumentDraft`). Reuses existing
  * entity constants where one already exists for that record type. */
 export const DRAFT_ENTITY = {

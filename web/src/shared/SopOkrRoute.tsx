@@ -24,3 +24,14 @@ export const OkrRoute: ParentComponent = (props) => {
     </Show>
   );
 };
+
+export const CmsRoute: ParentComponent = (props) => {
+  const auth = useAuth();
+  return (
+    <Show when={!auth.bootstrapping} fallback={<SessionLoading />}>
+      <Show when={hasModuleAccess(auth.me, "cms")} fallback={<Navigate href="/app/dashboard" />}>
+        {props.children}
+      </Show>
+    </Show>
+  );
+};

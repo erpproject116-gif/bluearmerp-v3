@@ -636,6 +636,34 @@ export const documentationSections: DocSection[] = [
     ],
   },
   {
+    id: "cms",
+    title: "Pages",
+    iconId: "cms",
+    intro: "Write internal pages your signed-in team can open in Bluearm. This is not a public website.",
+    primaryHref: "/app/cms",
+    primaryLabel: "Open Pages",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Pages lives under More apps. Use it for store notices, how-to write-ups, and other internal reading. Visitors from the internet cannot open these pages. Search engines do not index them. Only people who sign in to your workspace—and who have Pages access—can read them.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open Pages from the sidebar (More apps). The list shows titles and slugs. Staff with write access can create a draft from New page.",
+          "On the editor, fill in the body in markdown. Optional SEO title becomes the browser tab name when someone opens the published page; SEO description shows under the heading.",
+          "Upload pictures from Media or from the editor. Images in the body use a token like ![alt](cms-media:12)—do not paste a public image URL.",
+          "Click Publish when the page is ready. Share it in-app as /app/cms/p/store-hours (use your page’s slug).",
+          "If you rename a published slug, Bluearm keeps the old name so existing in-app links still open the new page. Manage those under Redirects.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Turn Pages off for the whole workspace under User Management → Module & Features. Who can edit vs only read is set on Roles (Pages group). The tenant owner always has access. This library is separate from Help & guides and from SOP.",
+      },
+    ],
+  },
+  {
     id: "support",
     title: "Support tickets",
     iconId: "crm",

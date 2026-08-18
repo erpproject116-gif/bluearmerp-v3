@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-07-17T13:19:18.253Z",
+  "generatedAt": "2026-08-18T03:02:10.803Z",
   "source": "src/App.tsx",
   "totals": {
-    "all": 282,
-    "smokeable": 193,
+    "all": 390,
+    "smokeable": 275,
     "byKind": {
-      "app_static": 193,
-      "parametrized": 27,
-      "print_or_doc": 8,
-      "redirect": 34,
-      "platform": 10,
-      "public": 10
+      "app_static": 275,
+      "parametrized": 37,
+      "print_or_doc": 9,
+      "redirect": 47,
+      "platform": 11,
+      "public": 11
     }
   },
   "smokeable": [
@@ -24,16 +24,32 @@
     "/app/after-sales/repair-orders/new",
     "/app/after-sales/repair-orders/settings",
     "/app/after-sales/repair-orders/status",
+    "/app/booking",
+    "/app/booking/bookings",
+    "/app/booking/calendar",
+    "/app/booking/resources",
+    "/app/booking/services",
     "/app/buying",
+    "/app/buying/expenses",
+    "/app/buying/reports",
     "/app/buying/reports/payable-status",
     "/app/buying/reports/pre-invoicing",
     "/app/buying/reports/purchase-status",
+    "/app/buying/setup",
+    "/app/buying/vendor-credits",
+    "/app/cms",
+    "/app/cms/media",
+    "/app/cms/pages/settings",
+    "/app/cms/redirects",
+    "/app/comms/chat",
     "/app/comms/inbox",
     "/app/comms/sent-documents",
     "/app/comms/settings",
+    "/app/crm/clients",
     "/app/crm/dashboard",
     "/app/crm/follow-up-tasks",
     "/app/crm/leads",
+    "/app/crm/leads/dashboard",
     "/app/crm/notifications",
     "/app/crm/opportunities",
     "/app/crm/pipelines/quotations",
@@ -43,21 +59,23 @@
     "/app/crm/reports/item-demand",
     "/app/crm/reports/low-stock",
     "/app/crm/settings/alert-rules",
-    "/app/crm/warranty-assets",
-    "/app/after-sales/warranty",
     "/app/dashboard",
     "/app/dashboard/approvals",
+    "/app/dashboard/period-summary",
+    "/app/dashboard/site-map",
     "/app/data-center/inbox",
     "/app/data-center/ingestion-rules",
-    "/app/documentation",
     "/app/documentation/kb",
+    "/app/documentation/whats-new",
     "/app/finance",
     "/app/finance/acct-i/bank-reconciliation",
     "/app/finance/acct-i/chart-of-accounts",
     "/app/finance/acct-i/fiscal-years",
     "/app/finance/acct-i/journal-entries",
     "/app/finance/acct-i/payment-entries",
-    "/app/finance/acct-i/reports/balance-sheet",
+    "/app/finance/acct-i/reports/cash-book",
+    "/app/finance/acct-i/reports/cash-flow-statement",
+    "/app/finance/acct-i/reports/fund-statement",
     "/app/finance/acct-i/reports/general-ledger",
     "/app/finance/acct-i/reports/profit-and-loss",
     "/app/finance/acct-i/reports/trial-balance",
@@ -65,25 +83,58 @@
     "/app/finance/acct-ii/contracts",
     "/app/finance/acct-ii/landed-costs",
     "/app/finance/acct-ii/notes",
+    "/app/finance/acct-ii/setup",
     "/app/finance/acct-ii/withholding-codes",
+    "/app/finance/banking",
+    "/app/finance/bookkeeping",
+    "/app/finance/collections",
+    "/app/finance/disbursements",
     "/app/finance/official-receipts",
     "/app/finance/official-receipts/new",
     "/app/finance/official-receipts/settings",
+    "/app/finance/payables",
+    "/app/finance/receivables",
+    "/app/finance/reports",
     "/app/finance/reports/acct-inventory-reconciliation",
     "/app/finance/reports/ap-aging",
+    "/app/finance/reports/ap-aging-details",
     "/app/finance/reports/ap-by-vendor",
     "/app/finance/reports/ar-aging",
+    "/app/finance/reports/ar-aging-details",
     "/app/finance/reports/ar-ap-status",
     "/app/finance/reports/ar-by-customer",
     "/app/finance/reports/customer-vendor-book-ap",
     "/app/finance/reports/customer-vendor-book-ar",
+    "/app/finance/reports/customer-vendor-book-ii-ap",
+    "/app/finance/reports/customer-vendor-book-ii-ar",
     "/app/finance/reports/official-receipt-status",
     "/app/finance/reports/receipt-status",
     "/app/finance/reports/supplier-payment-status",
+    "/app/finance/setup",
+    "/app/finance/statutory",
+    "/app/finance/statutory/1601-eq",
+    "/app/finance/statutory/2307-certificates",
+    "/app/finance/statutory/2550",
+    "/app/finance/statutory/attachments",
+    "/app/finance/statutory/books",
+    "/app/finance/statutory/compensation-wht",
+    "/app/finance/statutory/document-series",
+    "/app/finance/statutory/percentage-tax",
+    "/app/finance/statutory/taxpayer-profile",
+    "/app/finance/statutory/vat/purchases",
+    "/app/finance/statutory/vat/sales",
+    "/app/finance/statutory/year-end-close",
     "/app/fixed-assets",
+    "/app/hr/absenteeism",
     "/app/hr/attendance",
+    "/app/hr/discipline",
     "/app/hr/employees",
+    "/app/hr/employees/settings",
     "/app/hr/ess",
+    "/app/hr/evaluations",
+    "/app/hr/hire-onboarding",
+    "/app/hr/learning",
+    "/app/hr/leave",
     "/app/hr/pay-items",
     "/app/hr/payroll-runs",
     "/app/hr/remittances",
@@ -91,6 +142,7 @@
     "/app/inventory",
     "/app/inventory/departments",
     "/app/inventory/departments/settings",
+    "/app/inventory/find-stock",
     "/app/inventory/items",
     "/app/inventory/items/settings",
     "/app/inventory/locations",
@@ -102,6 +154,7 @@
     "/app/inventory/projects",
     "/app/inventory/projects/settings",
     "/app/inventory/reports/inv-book",
+    "/app/inventory/reports/inventory-status",
     "/app/inventory/reports/on-hand",
     "/app/inventory/reports/stock-ageing",
     "/app/inventory/reports/stock-balance",
@@ -120,20 +173,29 @@
     "/app/inventory/serial-lot/reports/status",
     "/app/inventory/serial-lot/settings",
     "/app/inventory/serial-lot/trace",
+    "/app/inventory/setup",
+    "/app/inventory/stock-adjustments",
     "/app/inventory/stock-entries",
     "/app/inventory/stock-movements",
     "/app/inventory/stock-reconciliation",
+    "/app/inventory/units",
     "/app/inventory/wms/scheduled-receipts",
     "/app/job-costing",
+    "/app/okr",
+    "/app/okr/dashboard",
     "/app/operations",
     "/app/operations/automation",
     "/app/operations/calendar",
     "/app/operations/dashboard",
+    "/app/operations/job-costing",
     "/app/operations/packs",
+    "/app/operations/tasks",
     "/app/operations/timeline",
     "/app/operations/work-items/settings",
     "/app/pos",
     "/app/pos/manage",
+    "/app/pos/setup",
+    "/app/purchase-order/goods-receipt",
     "/app/purchase-order/purchase-orders",
     "/app/purchase-order/purchase-orders/outstanding",
     "/app/purchase-order/purchase-orders/status",
@@ -141,14 +203,20 @@
     "/app/purchase-order/reports/items-to-receive",
     "/app/purchase-order/reports/po-analysis",
     "/app/purchase-order/rfq",
+    "/app/purchase-order/setup",
     "/app/purchase-request/purchase-requests",
     "/app/purchase-request/purchase-requests/new",
     "/app/purchase-request/purchase-requests/settings",
     "/app/purchase-request/purchase-requests/status",
+    "/app/purchases/expenses",
     "/app/purchases/purchase-receive/new",
+    "/app/purchases/purchase-receive/payment-status",
     "/app/purchases/purchase-receive/pre-invoicing",
     "/app/purchases/purchase-receive/settings",
     "/app/purchases/purchase-receive/status",
+    "/app/purchases/recurring-expenses",
+    "/app/purchases/setup",
+    "/app/purchases/vendor-credits",
     "/app/quality/capa",
     "/app/quality/ncrs",
     "/app/quality/qc-requests",
@@ -157,6 +225,7 @@
     "/app/quotation/quotations/outstanding",
     "/app/quotation/quotations/settings",
     "/app/quotation/quotations/status",
+    "/app/quotation/setup",
     "/app/quotation/tax-mngt/currencies",
     "/app/quotation/tax-mngt/currencies/settings",
     "/app/quotation/tax-mngt/tax-types",
@@ -165,6 +234,7 @@
     "/app/reports/saved-views",
     "/app/sales-order/delivery-receipts",
     "/app/sales-order/delivery-receipts/new",
+    "/app/sales-order/reports",
     "/app/sales-order/reports/pending-shipment",
     "/app/sales-order/reports/shipment-status",
     "/app/sales-order/reports/shipping-order-status",
@@ -175,17 +245,21 @@
     "/app/sales-order/sales-orders/release",
     "/app/sales-order/sales-orders/settings",
     "/app/sales-order/sales-orders/status",
+    "/app/sales-order/setup",
     "/app/sales-order/shipping/orders",
     "/app/sales-order/shipping/rules",
     "/app/sales-order/shipping/trips",
     "/app/sales/collective-invoicing/list",
     "/app/sales/collective-invoicing/status",
     "/app/sales/commission-rules",
+    "/app/sales/credit-notes",
+    "/app/sales/recurring-invoices",
     "/app/sales/reports/ar-by-customer",
     "/app/sales/reports/customer-credit-balance",
     "/app/sales/reports/discount-status",
     "/app/sales/reports/official-receipt-status",
     "/app/sales/reports/si-receipt-status",
+    "/app/sales/retainer-invoices",
     "/app/sales/sales",
     "/app/sales/sales-returns",
     "/app/sales/sales/new",
@@ -193,16 +267,23 @@
     "/app/sales/sales/price-batch",
     "/app/sales/sales/settings",
     "/app/sales/sales/status",
+    "/app/sales/setup",
     "/app/selling",
+    "/app/selling/commissions",
     "/app/selling/reports",
     "/app/selling/reports/receivable-status",
+    "/app/selling/setup",
     "/app/settings/billing",
     "/app/settings/branding",
+    "/app/sop",
+    "/app/sop/dashboard",
     "/app/support/tickets",
+    "/app/thank-you-activated",
     "/app/user-management/demo-data",
     "/app/user-management/groups",
     "/app/user-management/help-feedback",
     "/app/user-management/mapping-center",
+    "/app/user-management/migration-center",
     "/app/user-management/process-policies",
     "/app/user-management/roles",
     "/app/user-management/tenant-modules",
@@ -263,7 +344,43 @@
       "kind": "print_or_doc"
     },
     {
+      "path": "/app/after-sales/warranty",
+      "kind": "print_or_doc"
+    },
+    {
+      "path": "/app/baiko",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/booking",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/booking/bookings",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/booking/calendar",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/booking/resources",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/booking/services",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/buying",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/buying/expenses",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/buying/reports",
       "kind": "app_static"
     },
     {
@@ -279,6 +396,46 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/buying/setup",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/buying/vendor-credits",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/buying/vendor-credits/:id/print",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/cms",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/cms/media",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/cms/p/:slug",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/cms/pages/:id",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/cms/pages/settings",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/cms/redirects",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/comms/chat",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/comms/inbox",
       "kind": "app_static"
     },
@@ -291,6 +448,18 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/copilot",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/crm/clients",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/crm/clients/:id",
+      "kind": "parametrized"
+    },
+    {
       "path": "/app/crm/dashboard",
       "kind": "app_static"
     },
@@ -300,6 +469,10 @@
     },
     {
       "path": "/app/crm/leads",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/crm/leads/dashboard",
       "kind": "app_static"
     },
     {
@@ -340,11 +513,7 @@
     },
     {
       "path": "/app/crm/warranty-assets",
-      "kind": "app_static"
-    },
-    {
-      "path": "/app/after-sales/warranty",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/dashboard",
@@ -352,6 +521,14 @@
     },
     {
       "path": "/app/dashboard/approvals",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/dashboard/period-summary",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/dashboard/site-map",
       "kind": "app_static"
     },
     {
@@ -364,11 +541,11 @@
     },
     {
       "path": "/app/documentation",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/documentation/:sectionId",
-      "kind": "parametrized"
+      "kind": "redirect"
     },
     {
       "path": "/app/documentation/kb",
@@ -377,6 +554,10 @@
     {
       "path": "/app/documentation/kb/:articleId",
       "kind": "parametrized"
+    },
+    {
+      "path": "/app/documentation/whats-new",
+      "kind": "app_static"
     },
     {
       "path": "/app/finance",
@@ -403,7 +584,15 @@
       "kind": "app_static"
     },
     {
-      "path": "/app/finance/acct-i/reports/balance-sheet",
+      "path": "/app/finance/acct-i/reports/cash-book",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/cash-flow-statement",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/fund-statement",
       "kind": "app_static"
     },
     {
@@ -435,12 +624,28 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/finance/acct-ii/setup",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/finance/acct-ii/withholding-codes",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/bank-reconciliation",
       "kind": "redirect"
+    },
+    {
+      "path": "/app/finance/banking",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/banking/:id",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/finance/bookkeeping",
+      "kind": "app_static"
     },
     {
       "path": "/app/finance/budgets",
@@ -453,6 +658,14 @@
     {
       "path": "/app/finance/chart-of-accounts",
       "kind": "redirect"
+    },
+    {
+      "path": "/app/finance/collections",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/disbursements",
+      "kind": "app_static"
     },
     {
       "path": "/app/finance/fiscal-years",
@@ -475,6 +688,10 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/finance/payables",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/finance/payment-entries",
       "kind": "redirect"
     },
@@ -491,6 +708,14 @@
       "kind": "redirect"
     },
     {
+      "path": "/app/finance/receivables",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/reports",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/finance/reports/acct-inventory-reconciliation",
       "kind": "app_static"
     },
@@ -499,11 +724,19 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/finance/reports/ap-aging-details",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/finance/reports/ap-by-vendor",
       "kind": "app_static"
     },
     {
       "path": "/app/finance/reports/ar-aging",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/reports/ar-aging-details",
       "kind": "app_static"
     },
     {
@@ -531,6 +764,14 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/finance/reports/customer-vendor-book-ii-ap",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/reports/customer-vendor-book-ii-ar",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/finance/reports/general-ledger",
       "kind": "redirect"
     },
@@ -555,6 +796,66 @@
       "kind": "redirect"
     },
     {
+      "path": "/app/finance/setup",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/1601-eq",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/2307-certificates",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/2307-certificates/:id/print",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/finance/statutory/2550",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/attachments",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/books",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/compensation-wht",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/document-series",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/percentage-tax",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/taxpayer-profile",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/vat/purchases",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/vat/sales",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/statutory/year-end-close",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/finance/supplier-invoices",
       "kind": "redirect"
     },
@@ -575,7 +876,15 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/hr/absenteeism",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/hr/attendance",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/discipline",
       "kind": "app_static"
     },
     {
@@ -583,7 +892,27 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/hr/employees/settings",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/hr/ess",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/evaluations",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/hire-onboarding",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/learning",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/hr/leave",
       "kind": "app_static"
     },
     {
@@ -615,11 +944,19 @@
       "kind": "parametrized"
     },
     {
+      "path": "/app/inventory/boms",
+      "kind": "redirect"
+    },
+    {
       "path": "/app/inventory/departments",
       "kind": "app_static"
     },
     {
       "path": "/app/inventory/departments/settings",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/inventory/find-stock",
       "kind": "app_static"
     },
     {
@@ -664,6 +1001,10 @@
     },
     {
       "path": "/app/inventory/reports/inv-book",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/inventory/reports/inventory-status",
       "kind": "app_static"
     },
     {
@@ -739,6 +1080,14 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/inventory/setup",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/inventory/stock-adjustments",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/inventory/stock-entries",
       "kind": "app_static"
     },
@@ -751,8 +1100,16 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/inventory/units",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/inventory/wms/scheduled-receipts",
       "kind": "app_static"
+    },
+    {
+      "path": "/app/inventory/work-orders",
+      "kind": "redirect"
     },
     {
       "path": "/app/job-costing",
@@ -765,6 +1122,14 @@
     {
       "path": "/app/manufacturing/work-orders",
       "kind": "redirect"
+    },
+    {
+      "path": "/app/okr",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/okr/dashboard",
+      "kind": "app_static"
     },
     {
       "path": "/app/onboarding",
@@ -787,7 +1152,15 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/operations/job-costing",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/operations/packs",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/operations/tasks",
       "kind": "app_static"
     },
     {
@@ -825,6 +1198,10 @@
     {
       "path": "/app/platform-command/customers/:id/analytics",
       "kind": "parametrized"
+    },
+    {
+      "path": "/app/platform-command/day1-payments",
+      "kind": "platform"
     },
     {
       "path": "/app/platform-command/follow-ups",
@@ -879,8 +1256,12 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/pos/setup",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/purchase-order/goods-receipt",
-      "kind": "redirect"
+      "kind": "app_static"
     },
     {
       "path": "/app/purchase-order/goods-receipt/settings",
@@ -931,6 +1312,10 @@
       "kind": "parametrized"
     },
     {
+      "path": "/app/purchase-order/setup",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/purchase-order/supplier-quotations/:sqId/print",
       "kind": "parametrized"
     },
@@ -967,6 +1352,14 @@
       "kind": "print_or_doc"
     },
     {
+      "path": "/app/purchase-request/setup",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchases/expenses",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/purchases/purchase-receive",
       "kind": "redirect"
     },
@@ -988,7 +1381,7 @@
     },
     {
       "path": "/app/purchases/purchase-receive/payment-status",
-      "kind": "redirect"
+      "kind": "app_static"
     },
     {
       "path": "/app/purchases/purchase-receive/pre-invoicing",
@@ -1001,6 +1394,58 @@
     {
       "path": "/app/purchases/purchase-receive/status",
       "kind": "app_static"
+    },
+    {
+      "path": "/app/purchases/purchases",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchases/purchases/:id/print",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/purchases/purchases/:purchaseId/print-doc",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/purchases/purchases/ap-by-vendor",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchases/purchases/new",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchases/purchases/payment-status",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchases/purchases/pre-invoicing",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchases/purchases/settings",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchases/purchases/status",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchases/recurring-expenses",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/purchases/setup",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/purchases/vendor-credits",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/purchases/vendor-credits/:id/print",
+      "kind": "parametrized"
     },
     {
       "path": "/app/quality/capa",
@@ -1043,6 +1488,10 @@
       "kind": "print_or_doc"
     },
     {
+      "path": "/app/quotation/setup",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/quotation/tax-mngt/currencies",
       "kind": "app_static"
     },
@@ -1072,6 +1521,10 @@
     },
     {
       "path": "/app/sales-order/delivery-receipts/new",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/sales-order/reports",
       "kind": "app_static"
     },
     {
@@ -1123,6 +1576,10 @@
       "kind": "print_or_doc"
     },
     {
+      "path": "/app/sales-order/setup",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/sales-order/shipping/orders",
       "kind": "app_static"
     },
@@ -1159,6 +1616,18 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/sales/credit-notes",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/sales/credit-notes/:id/print",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/sales/recurring-invoices",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/sales/reports/ar-by-customer",
       "kind": "app_static"
     },
@@ -1188,6 +1657,10 @@
     },
     {
       "path": "/app/sales/reports/si-receipt-status",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/sales/retainer-invoices",
       "kind": "app_static"
     },
     {
@@ -1227,7 +1700,15 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/sales/setup",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/selling",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/selling/commissions",
       "kind": "app_static"
     },
     {
@@ -1236,6 +1717,10 @@
     },
     {
       "path": "/app/selling/reports/receivable-status",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/selling/setup",
       "kind": "app_static"
     },
     {
@@ -1255,12 +1740,28 @@
       "kind": "redirect"
     },
     {
+      "path": "/app/sop",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/sop/dashboard",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/sop/documents/:id",
+      "kind": "parametrized"
+    },
+    {
       "path": "/app/support/tickets",
       "kind": "app_static"
     },
     {
       "path": "/app/support/tickets/:id",
       "kind": "parametrized"
+    },
+    {
+      "path": "/app/thank-you-activated",
+      "kind": "app_static"
     },
     {
       "path": "/app/user-management/demo-data",
@@ -1276,6 +1777,10 @@
     },
     {
       "path": "/app/user-management/mapping-center",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/user-management/migration-center",
       "kind": "app_static"
     },
     {
@@ -1321,6 +1826,10 @@
     {
       "path": "/payslip/:token",
       "kind": "parametrized"
+    },
+    {
+      "path": "/pending-approval",
+      "kind": "public"
     },
     {
       "path": "/portal/dashboard",

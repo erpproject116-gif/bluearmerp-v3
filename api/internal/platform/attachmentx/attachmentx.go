@@ -30,6 +30,8 @@ func Dir(key string) string {
 		return envOr("PURCHASE_ORDER_UPLOAD_DIR", "data/purchase-order-attachments")
 	case "supplier_invoice":
 		return envOr("SUPPLIER_INVOICE_UPLOAD_DIR", "data/supplier-invoice-attachments")
+	case "cms":
+		return envOr("CMS_UPLOAD_DIR", "data/cms-media")
 	default:
 		return filepath.Join("data", key+"-attachments")
 	}

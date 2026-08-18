@@ -174,6 +174,10 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/operations/tasks": "operations.dashboard",
   "/app/sop": "sop.documents",
   "/app/sop/dashboard": "sop.documents",
+  "/app/cms": "cms.pages",
+  "/app/cms/pages/settings": "cms.pages",
+  "/app/cms/media": "cms.media",
+  "/app/cms/redirects": "cms.pages",
   "/app/okr": "okr.objectives",
   "/app/okr/dashboard": "okr.objectives",
   "/app/job-costing": "job_costing.projects",
@@ -262,6 +266,7 @@ export function permissionCodeForHref(href: string): string | undefined {
   const path = href.split(/[?#]/)[0];
   if (hrefPermissionCode[path]) return hrefPermissionCode[path];
   if (path.startsWith("/app/support/tickets/")) return "support.tickets";
+  if (path.startsWith("/app/cms/pages/") || /^\/app\/cms\/p\//.test(path)) return "cms.pages";
   if (path.startsWith("/app/booking/")) return "booking.bookings";
   if (path.startsWith("/app/user-management/migration-center")) return "migration.center";
   if (path.startsWith("/app/finance/budgets/")) return "finance.budget_read";

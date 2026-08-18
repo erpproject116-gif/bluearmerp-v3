@@ -359,6 +359,7 @@ export function SidebarNav() {
     if (area.id === "comms") return pathStarts(p, ["/app/comms"]);
     if (area.id === "operations") return pathStarts(p, ["/app/operations"]);
     if (area.id === "sop") return pathStarts(p, ["/app/sop"]);
+    if (area.id === "cms") return pathStarts(p, ["/app/cms"]);
     if (area.id === "okr") return pathStarts(p, ["/app/okr"]);
     if (area.id === "quality") return pathStarts(p, ["/app/quality"]);
     if (area.id === "reports") return pathStarts(p, ["/app/reports"]);

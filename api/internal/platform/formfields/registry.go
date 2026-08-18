@@ -194,6 +194,15 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "tax_status", Label: "Tax status", FieldType: "select", SortOrder: 160},
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 170},
 	},
+	"cms_page": {
+		{FieldKey: "title", Label: "Title", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "slug", Label: "Slug", FieldType: "text", SortOrder: 20},
+		{FieldKey: "body", Label: "Body", FieldType: "textarea", SortOrder: 30},
+		{FieldKey: "seo_title", Label: "SEO title", FieldType: "text", SortOrder: 40},
+		{FieldKey: "seo_description", Label: "SEO description", FieldType: "textarea", SortOrder: 50},
+		{FieldKey: "featured_media_id", Label: "Featured image", FieldType: "select", SortOrder: 60},
+		{FieldKey: "status", Label: "Status", FieldType: "select", SortOrder: 70},
+	},
 }
 
 func StandardFields(entityType string) []StandardField {
