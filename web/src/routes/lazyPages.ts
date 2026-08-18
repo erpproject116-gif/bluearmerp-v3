@@ -211,6 +211,10 @@ export const CmsPagesPage = lazy(() => import("../modules/cms/CmsPagesPage"));
 export const CmsPagesSettingsPage = lazy(() => import("../modules/cms/CmsPagesSettingsPage"));
 export const CmsPageEditorPage = lazy(() => import("../modules/cms/CmsPageEditorPage"));
 export const CmsPageReaderPage = lazy(() => import("../modules/cms/CmsPageReaderPage"));
+export const CmsLegacyArticleRedirect = lazy(() =>
+  import("../modules/cms/CmsPageReaderPage").then((m) => ({ default: m.CmsLegacyArticleRedirect })),
+);
+export const CmsArticlesHubPage = lazy(() => import("../modules/cms/CmsArticlesHubPage"));
 export const CmsMediaPage = lazy(() => import("../modules/cms/CmsMediaPage"));
 export const CmsRedirectsPage = lazy(() => import("../modules/cms/CmsRedirectsPage"));
 export const OkrListPage = lazy(() => import("../modules/okr/OkrListPage"));

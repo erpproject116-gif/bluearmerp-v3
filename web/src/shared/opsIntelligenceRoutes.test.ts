@@ -17,6 +17,7 @@ describe("ops intelligence routes", () => {
     expect(hrefPermissionCode["/app/cms"]).toBe("cms.pages");
     expect(hrefPermissionCode["/app/cms/media"]).toBe("cms.media");
     expect(hrefPermissionCode["/app/cms/redirects"]).toBe("cms.pages");
+    expect(hrefPermissionCode["/app/articles"]).toBe("cms.pages");
     expect(hrefPermissionCode["/app/okr"]).toBe("okr.objectives");
   });
 
@@ -24,6 +25,7 @@ describe("ops intelligence routes", () => {
     expect(appModules.some((m) => m.id === "sop")).toBe(true);
     expect(appModules.some((m) => m.id === "cms")).toBe(true);
     expect(appModules.find((m) => m.id === "cms")?.features.some((f) => f.href === "/app/cms")).toBe(true);
+    expect(appModules.find((m) => m.id === "cms")?.features.some((f) => f.href === "/articles")).toBe(true);
     expect(appModules.find((m) => m.id === "cms")?.features.some((f) => f.href === "/app/cms/media")).toBe(true);
     expect(appModules.some((m) => m.id === "okr")).toBe(true);
     expect(appModules.find((m) => m.id === "crm")?.features.some((f) => f.href === "/app/crm/clients")).toBe(true);

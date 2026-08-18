@@ -462,6 +462,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/cms",
     features: [
       { label: "Pages", href: "/app/cms", settingsHref: "/app/cms/pages/settings" },
+      { label: "Articles", href: "/articles", settingsHref: "/app/cms/pages/settings", prefix: "/articles", headerPriority: "primary" },
       { label: "Media", href: "/app/cms/media", settingsHref: "/app/cms/pages/settings" },
       { label: "Redirects", href: "/app/cms/redirects", settingsHref: "/app/cms/pages/settings" },
     ],
@@ -702,6 +703,10 @@ export function resolveModule(pathname: string): AppModule | undefined {
     pathname === "/app/sales/reports/customer-credit-balance"
   ) {
     return finance();
+  }
+
+  if (pathname === "/articles" || pathname.startsWith("/articles/") || pathname === "/app/articles" || pathname.startsWith("/app/articles/")) {
+    return appModules.find((m) => m.id === "cms");
   }
 
   return appModules.find((m) => pathname === m.basePath || pathname.startsWith(`${m.basePath}/`));

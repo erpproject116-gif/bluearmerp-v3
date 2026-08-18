@@ -35,6 +35,7 @@ type Config struct {
 	GzipEnabled           bool
 	DemoSignupEnabled     bool
 	DemoLeadgenTenantCode string
+	CmsPublicTenantCode   string
 	DemoJobSecret         string
 	DemoTTLDays           int
 	PlatformJobSecret     string
@@ -82,6 +83,7 @@ func Load() Config {
 		GzipEnabled:         os.Getenv("GZIP_ENABLED") == "true",
 		DemoSignupEnabled:   os.Getenv("DEMO_SIGNUP_ENABLED") != "false",
 		DemoLeadgenTenantCode: envOr("DEMO_LEADGEN_TENANT_CODE", "BLUEARM"),
+		CmsPublicTenantCode:   envOr("CMS_PUBLIC_TENANT_CODE", envOr("DEMO_LEADGEN_TENANT_CODE", "BLUEARM")),
 		DemoJobSecret:       os.Getenv("DEMO_JOB_SECRET"),
 		DemoTTLDays:         ParseIntDefault(os.Getenv("DEMO_TTL_DAYS"), 14),
 		PlatformJobSecret:   os.Getenv("PLATFORM_JOB_SECRET"),

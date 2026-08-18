@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-08-18T03:02:10.803Z",
+  "generatedAt": "2026-08-18T04:34:31.268Z",
   "source": "src/App.tsx",
   "totals": {
-    "all": 390,
+    "all": 396,
     "smokeable": 275,
     "byKind": {
       "app_static": 275,
-      "parametrized": 37,
+      "parametrized": 39,
       "print_or_doc": 9,
-      "redirect": 47,
+      "redirect": 50,
       "platform": 11,
-      "public": 11
+      "public": 12
     }
   },
   "smokeable": [
@@ -346,6 +346,18 @@
     {
       "path": "/app/after-sales/warranty",
       "kind": "print_or_doc"
+    },
+    {
+      "path": "/app/articles",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/articles/:topic",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/articles/:topic/:slug",
+      "kind": "redirect"
     },
     {
       "path": "/app/baiko",
@@ -1802,6 +1814,18 @@
     {
       "path": "/app/user-management/users",
       "kind": "app_static"
+    },
+    {
+      "path": "/articles",
+      "kind": "public"
+    },
+    {
+      "path": "/articles/:topic",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/articles/:topic/:slug",
+      "kind": "parametrized"
     },
     {
       "path": "/auth/callback",

@@ -4,7 +4,9 @@ import { apiFetch } from "./api";
 export type CmsPage = {
   id: number;
   title: string;
+  topic?: string;
   slug: string;
+  permalink?: string;
   status: string;
   body?: string;
   seo_title?: string | null;
@@ -40,6 +42,7 @@ export type CmsRedirect = {
 
 export type CmsPagePatch = {
   title?: string;
+  topic?: string;
   slug?: string;
   body?: string;
   seo_title?: string | null;
@@ -49,16 +52,17 @@ export type CmsPagePatch = {
   custom_values?: Record<string, unknown>;
 };
 
-export function useCmsPages(params: () => { page: number; pageSize: number; status?: string; q?: string; sort?: string; order?: string }) {
+export function useCmsPages(params: () => { page: number; pageSize: number; status?: string; topic?: string; q?: string; sort?: string; order?: string }) {
   return createQuery(() => {
     const p = params();
     const qs = new URLSearchParams({ page: String(p.page), pageSize: String(p.pageSize) });
     if (p.status) qs.set("status", p.status);
+    if (p.topic) qs.set("topic", p.topic);
     if (p.q) qs.set("q", p.q);
     if (p.sort) qs.set("sort", p.sort);
     if (p.order) qs.set("order", p.order);
     return {
-      queryKey: ["cms-pages", p.page, p.pageSize, p.status ?? "", p.q ?? "", p.sort ?? "", p.order ?? ""],
+      queryKey: ["cms-pages", p.page, p.pageSize, p.status ?? "", p.topic ?? "", p.q ?? "", p.sort ?? "", p.order ?? ""],
       queryFn: async () => {
         const res = await apiFetch<CmsPage[]>(`/api/v1/cms/pages?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load pages");
@@ -92,6 +96,44 @@ export function useCmsPageBySlug(slug: () => string) {
       enabled: s.length > 0,
       queryFn: async () => {
         const res = await apiFetch<CmsSlugResolve>(`/api/v1/cms/pages/by-slug/${encodeURIComponent(s)}`);
+        if (!res.success) throw new Error(res.message ?? "Page not found");
+        return res.data!;
+      },
+    };
+  });
+}
+
+/** Anonymous catalog: platform/marketing tenant only (CMS_PUBLIC_TENANT_CODE). */
+export function usePublicCmsPages(params: () => { page: number; pageSize: number; topic?: string; q?: string }) {
+  return createQuery(() => {
+    const p = params();
+    const qs = new URLSearchParams({ page: String(p.page), pageSize: String(p.pageSize), sort: "published_at", order: "desc" });
+    if (p.topic) qs.set("topic", p.topic);
+    if (p.q) qs.set("q", p.q);
+    return {
+      queryKey: ["public-cms-pages", p.page, p.pageSize, p.topic ?? "", p.q ?? ""],
+      queryFn: async () => {
+        const res = await apiFetch<CmsPage[]>(`/api/v1/public/cms/pages?${qs}`, undefined, { silent: true });
+        if (!res.success) throw new Error(res.message ?? "Failed to load articles");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 30_000,
+    };
+  });
+}
+
+export function usePublicCmsPageBySlug(slug: () => string) {
+  return createQuery(() => {
+    const s = slug();
+    return {
+      queryKey: ["public-cms-page-slug", s],
+      enabled: s.length > 0,
+      queryFn: async () => {
+        const res = await apiFetch<CmsSlugResolve>(
+          `/api/v1/public/cms/pages/by-slug/${encodeURIComponent(s)}`,
+          undefined,
+          { silent: true },
+        );
         if (!res.success) throw new Error(res.message ?? "Page not found");
         return res.data!;
       },
@@ -142,7 +184,7 @@ export function useCmsMutations() {
   };
   return {
     createPage: createMutation(() => ({
-      mutationFn: async (body: { title: string; slug?: string; custom_values?: Record<string, unknown> }) => {
+      mutationFn: async (body: { title: string; slug?: string; topic?: string; custom_values?: Record<string, unknown> }) => {
         const res = await apiFetch<CmsPage>("/api/v1/cms/pages", { method: "POST", body: JSON.stringify(body) });
         if (!res.success) throw new Error(res.message ?? "Create failed");
         return res.data!;

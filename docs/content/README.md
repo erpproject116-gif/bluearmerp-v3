@@ -2,6 +2,8 @@
 
 Markdown in `docs/content/blog/` is meant to be pasted into **Pages** (`/app/cms/pages/:id`).
 
+Published reading URL is **`/articles/{topic}/{slug}`**, not `/app/cms/p/{slug}`. Set `topic` (cluster) and `slug` in the YAML; the editor permalink preview shows the full path. Old `/app/articles/…` links redirect.
+
 The in-app editor stores **markdown**. Visual mode is a Word-like toolbar; Markdown mode is the source. Pasting a whole `.md` file (including YAML frontmatter) fills title, slug, and SEO, and puts only the body in the article.
 
 ## Generate in this shape
@@ -13,6 +15,7 @@ number: 1
 lang: tl
 status: draft
 title: Short title
+topic: sme-walang-sistema
 slug: lowercase-hyphen-slug
 seo_title: Browser tab title
 seo_description: One or two sentences, max ~320 characters.
@@ -36,7 +39,7 @@ Numbered lists:
 
 Rules:
 
-- CommonMark only: `##` / `###`, `**bold**`, `*italic*`, `-` or `1.` lists, `> quotes`, `[label](/app/…)` or `https://` links.
+- CommonMark only: `##` / `###`, `**bold**`, `*italic*`, `-` or `1.` lists, `> quotes`, `[label](/articles/…)` or `[label](/app/…)` or `https://` links.
 - No raw HTML in the body. No public image URLs; featured art is metadata, in-app images are uploaded in Pages.
 - YAML frontmatter is for generation and paste — it is **not** part of the published body.
 - After writing or generating a file, wrap it:

@@ -10,6 +10,15 @@ const maxSlugLen = 120
 const maxPageBodyBytes = 200 * 1024
 const maxSEODescLen = 320
 const maxSEOTitleLen = 200
+const defaultTopic = "blog"
+
+func articlePermalink(topic, slug string) string {
+	t := topic
+	if t == "" {
+		t = defaultTopic
+	}
+	return "/articles/" + t + "/" + slug
+}
 
 var slugRe = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 var nonSlug = regexp.MustCompile(`[^a-z0-9]+`)

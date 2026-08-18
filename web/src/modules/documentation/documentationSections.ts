@@ -639,22 +639,22 @@ export const documentationSections: DocSection[] = [
     id: "cms",
     title: "Pages",
     iconId: "cms",
-    intro: "Write internal pages your signed-in team can open in Bluearm. This is not a public website.",
+    intro: "Write pages for your signed-in team, and publish Bluearm articles on the public /articles catalog.",
     primaryHref: "/app/cms",
     primaryLabel: "Open Pages",
     blocks: [
       {
         type: "paragraph",
-        text: "Pages lives under More apps. Use it for store notices, how-to write-ups, and other internal reading. Visitors from the internet cannot open these pages. Search engines do not index them. Only people who sign in to your workspace—and who have Pages access—can read them.",
+        text: "Pages lives under More apps. Use it for store notices, how-to write-ups, and Bluearm articles. The public catalog at /articles is the platform marketing tenant (BLUEARM) — visitors do not sign in. Other workspaces’ pages stay in Pages admin and are not listed on /articles. Search engines can open the public URLs. Old /app/articles and /app/cms/p links still redirect.",
       },
       {
         type: "steps",
         items: [
           "Open Pages from the sidebar (More apps). The list shows titles and slugs. Staff with write access can create a draft from New page.",
-          "On the page editor, write in Visual (toolbar like Word) or switch to Markdown. You can paste a generated .md file — title, slug, and SEO fill in, and the body keeps headings and bold.",
+          "On the page editor, set Topic cluster and Slug — the permalink is /articles/{topic}/{slug} and is shown above the form. Write in Visual or Markdown, or paste a generated .md file (title, topic, slug, and SEO fill in).",
           "Optional SEO title becomes the browser tab name when someone opens the published page; SEO description shows under the heading.",
           "Upload pictures from Media or from the editor. They appear in the article; do not paste a public image URL.",
-          "Click Publish when the page is ready. Share it in-app as /app/cms/p/store-hours (use your page’s slug).",
+          "Click Publish when the page is ready. Share the published URL /articles/{topic}/{slug} — for example /articles/sme-walang-sistema/meron-pa-na-palaging-mali. Topic cluster and slug are editable on the editor (the permalink preview). Open published opens in a new tab. Old /app/articles/{topic}/{slug} and /app/cms/p/{slug} links still redirect.",
           "If you rename a published slug, Bluearm keeps the old name so existing in-app links still open the new page. Manage those under Redirects.",
         ],
       },

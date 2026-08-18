@@ -128,6 +128,7 @@ func main() {
 		periodbi.RegisterJobRoutes(api, pool)
 		portal.RegisterRoutes(api, pool, cfg.SupabaseURL, cfg.SupabaseJWTSecret)
 		hr.RegisterPublicRoutes(api, pool)
+		cms.RegisterPublicRoutes(api, pool, cfg)
 		demoonboard.RegisterRoutes(api, pool, cfg)
 		onboard.RegisterRoutes(api, pool, cfg)
 		api.Group(func(protected chi.Router) {

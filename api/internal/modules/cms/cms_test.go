@@ -39,6 +39,15 @@ func TestSlugFromTitle(t *testing.T) {
 	}
 }
 
+func TestArticlePermalink(t *testing.T) {
+	if articlePermalink("sme-walang-sistema", "meron-pa-na-palaging-mali") != "/articles/sme-walang-sistema/meron-pa-na-palaging-mali" {
+		t.Fatal(articlePermalink("sme-walang-sistema", "meron-pa-na-palaging-mali"))
+	}
+	if articlePermalink("", "store-hours") != "/articles/blog/store-hours" {
+		t.Fatal(articlePermalink("", "store-hours"))
+	}
+}
+
 func TestAllowedUpload(t *testing.T) {
 	if !allowedUpload("image/png", "logo.png") || !allowedUpload("application/pdf", "a.pdf") {
 		t.Fatal("expected allow")
