@@ -215,6 +215,8 @@ import {
   CmsPagesSettingsPage,
   CmsPageEditorPage,
   CmsPageReaderPage,
+  CmsLegacyArticleRedirect,
+  CmsArticlesHubPage,
   CmsMediaPage,
   CmsRedirectsPage,
   OkrListPage,
@@ -337,6 +339,7 @@ import {
   LandedCostPage,
   ContractsPage,
 } from "./routes/lazyPages";
+import CmsPublicLayout from "./modules/cms/CmsPublicLayout";
 import { AdminModuleRoute } from "./shared/AdminModuleRoute";
 import { ActivityLogRoute } from "./shared/ActivityLogRoute";
 import { ChangeLogRoute } from "./shared/ChangeLogRoute";
@@ -415,6 +418,20 @@ export default function App() {
         <Route path="/portal/login" component={PortalLoginPage} />
         <Route path="/portal/dashboard" component={PortalDashboardPage} />
         <Route path="/payslip/:token" component={PayslipSharedPage} />
+        <Route path="/articles" component={CmsPublicLayout}>
+          <Route path="/" component={CmsArticlesHubPage} />
+          <Route path="/:topic" component={CmsArticlesHubPage} />
+          <Route path="/:topic/:slug" component={CmsPageReaderPage} />
+        </Route>
+        <Route path="/app/articles/:topic/:slug" component={() => {
+          const p = useParams();
+          return <Navigate href={`/articles/${p.topic}/${p.slug}`} />;
+        }} />
+        <Route path="/app/articles/:topic" component={() => {
+          const p = useParams();
+          return <Navigate href={`/articles/${p.topic}`} />;
+        }} />
+        <Route path="/app/articles" component={() => <Navigate href="/articles" />} />
         <Route path="/" component={AuthEntryRedirect} />
         <Route path="/app/hr/payslips/:payslipId/print" component={PayslipPrintPage} />
         <Route path="/app/after-sales/repair-orders/:orderId/receipt" component={RepairOrderReceiptPrintPage} />
@@ -859,7 +876,7 @@ export default function App() {
             <CmsRoute><CmsPageEditorPage /></CmsRoute>
           )} />
           <Route path="/cms/p/:slug" component={() => (
-            <CmsRoute><CmsPageReaderPage /></CmsRoute>
+            <CmsRoute><CmsLegacyArticleRedirect /></CmsRoute>
           )} />
           <Route path="/cms/media" component={() => (
             <CmsRoute><CmsMediaPage /></CmsRoute>

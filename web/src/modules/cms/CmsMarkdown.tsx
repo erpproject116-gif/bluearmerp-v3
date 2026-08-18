@@ -1,8 +1,9 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { helpMarkdownHasExternalLink } from "../help-assistant/HelpMarkdown";
 import { safeAppPath } from "../help-assistant/safeAppPath";
-import { fetchCmsMediaObjectUrl } from "../../shared/cmsMedia";
+import { fetchCmsMediaObjectUrl, fetchPublicCmsMediaObjectUrl } from "../../shared/cmsMedia";
 import { escapeHtml, parseCmsMarkdown } from "./cmsMarkdownCodec";
+import { safeArticlesPath } from "./cmsPermalink";
 
 const mediaToken = /!\[([^\]]*)\]\(cms-media:(\d+)\)/g;
 
@@ -17,10 +18,15 @@ function inlineMarkdown(raw: string, mediaUrls: Record<number, string>): string 
     }
     return `<img src="${src}" alt="${a}" class="max-h-64 max-w-full rounded-lg border border-stroke" />`;
   });
-  s = s.replace(/\[([^\]]+)\]\((\/app\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, (_m, label, href) => {
+  s = s.replace(/\[([^\]]+)\]\((\/articles(?:\/[^)\s]+)?|\/app\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, (_m, label, href) => {
     const h = String(href);
     if (h.startsWith("/app/")) {
       const safe = safeAppPath(h);
+      if (!safe) return label;
+      return `<a href="${escapeHtml(safe)}" class="text-brand-600 underline underline-offset-2 hover:text-brand-700">${label}</a>`;
+    }
+    if (h === "/articles" || h.startsWith("/articles/")) {
+      const safe = safeArticlesPath(h);
       if (!safe) return label;
       return `<a href="${escapeHtml(safe)}" class="text-brand-600 underline underline-offset-2 hover:text-brand-700">${label}</a>`;
     }
@@ -49,18 +55,19 @@ export function insertCmsMediaToken(body: string, id: number, alt: string): stri
   return `${body.trimEnd()}\n\n${token}\n`;
 }
 
-export function CmsMarkdown(props: { content: string; class?: string }) {
+export function CmsMarkdown(props: { content: string; class?: string; publicMedia?: boolean }) {
   const [urls, setUrls] = createSignal<Record<number, string>>({});
   const ids = createMemo(() => collectMediaIds(props.content || ""));
 
   createEffect(() => {
     const wanted = ids();
+    const publicMedia = props.publicMedia === true;
     let cancelled = false;
     const created: string[] = [];
     void (async () => {
       const next: Record<number, string> = {};
       for (const id of wanted) {
-        const url = await fetchCmsMediaObjectUrl(id);
+        const url = publicMedia ? await fetchPublicCmsMediaObjectUrl(id) : await fetchCmsMediaObjectUrl(id);
         if (cancelled) {
           if (url) URL.revokeObjectURL(url);
           return;

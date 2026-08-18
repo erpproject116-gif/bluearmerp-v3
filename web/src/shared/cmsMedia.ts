@@ -40,6 +40,18 @@ export async function fetchCmsMediaObjectUrl(id: number): Promise<string | null>
   return URL.createObjectURL(blob);
 }
 
+export async function fetchPublicCmsMediaBlob(id: number): Promise<Blob | null> {
+  const res = await fetch(`${apiBase}/api/v1/public/cms/media/${id}/download`);
+  if (!res.ok) return null;
+  return res.blob();
+}
+
+export async function fetchPublicCmsMediaObjectUrl(id: number): Promise<string | null> {
+  const blob = await fetchPublicCmsMediaBlob(id);
+  if (!blob) return null;
+  return URL.createObjectURL(blob);
+}
+
 export function downloadCmsBlob(blob: Blob, fileName: string) {
   const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");

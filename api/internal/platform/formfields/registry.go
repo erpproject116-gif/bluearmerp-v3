@@ -196,6 +196,7 @@ var standardRegistry = map[string][]StandardField{
 	},
 	"cms_page": {
 		{FieldKey: "title", Label: "Title", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "topic", Label: "Topic cluster", FieldType: "text", SortOrder: 15},
 		{FieldKey: "slug", Label: "Slug", FieldType: "text", SortOrder: 20},
 		{FieldKey: "body", Label: "Body", FieldType: "textarea", SortOrder: 30},
 		{FieldKey: "seo_title", Label: "SEO title", FieldType: "text", SortOrder: 40},

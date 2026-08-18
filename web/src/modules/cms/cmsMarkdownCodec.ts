@@ -11,6 +11,7 @@ export type CmsMdBlock =
 export type CmsArticlePaste = {
   body: string;
   title?: string;
+  topic?: string;
   slug?: string;
   seoTitle?: string;
   seoDescription?: string;
@@ -174,6 +175,7 @@ export function extractCmsArticlePaste(raw: string): CmsArticlePaste {
   return {
     body: formatted,
     title: yamlField(frontmatter, "title"),
+    topic: yamlField(frontmatter, "topic") || yamlField(frontmatter, "series"),
     slug: yamlField(frontmatter, "slug"),
     seoTitle: yamlField(frontmatter, "seo_title"),
     seoDescription: yamlField(frontmatter, "seo_description"),

@@ -20,7 +20,9 @@ import (
 type Page struct {
 	ID              int64          `json:"id"`
 	Title           string         `json:"title"`
+	Topic           string         `json:"topic"`
 	Slug            string         `json:"slug"`
+	Permalink       string         `json:"permalink"`
 	Status          string         `json:"status"`
 	Body            string         `json:"body,omitempty"`
 	SEOTitle        *string        `json:"seo_title,omitempty"`
@@ -34,6 +36,7 @@ type Page struct {
 
 type pageCreate struct {
 	Title           string         `json:"title"`
+	Topic           string         `json:"topic"`
 	Slug            string         `json:"slug"`
 	Body            string         `json:"body"`
 	SEOTitle        *string        `json:"seo_title"`
@@ -44,6 +47,7 @@ type pageCreate struct {
 
 type pagePatch struct {
 	Title           *string        `json:"title"`
+	Topic           *string        `json:"topic"`
 	Slug            *string        `json:"slug"`
 	Body            *string        `json:"body"`
 	SEOTitle        *string        `json:"seo_title"`
@@ -63,7 +67,8 @@ func listPages(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		writer := canWritePages(tu)
 		p := httputil.ParseListParams(r, "updated_at", map[string]string{
-			"title": "p.title", "slug": "p.slug", "status": "p.status", "updated_at": "p.updated_at", "created_at": "p.created_at",
+			"title": "p.title", "slug": "p.slug", "topic": "p.topic", "status": "p.status",
+			"updated_at": "p.updated_at", "created_at": "p.created_at", "published_at": "p.published_at",
 		})
 		where := "p.tenant_id = $1 and p.deleted_at is null"
 		args := []any{tu.TenantID}
@@ -88,13 +93,23 @@ func listPages(pool *pgxpool.Pool) http.HandlerFunc {
 		} else {
 			where += " and p.status = 'published'"
 		}
+		topic := normalizeSlug(r.URL.Query().Get("topic"))
+		if topic != "" {
+			if !validSlug(topic) {
+				response.Validation(w, map[string]string{"topic": "Use lowercase letters, numbers, and hyphens."})
+				return
+			}
+			where += fmt.Sprintf(" and p.topic = $%d", n)
+			args = append(args, topic)
+			n++
+		}
 		if p.Q != "" {
-			where += fmt.Sprintf(" and (p.title ilike $%d or p.slug ilike $%d)", n, n)
+			where += fmt.Sprintf(" and (p.title ilike $%d or p.slug ilike $%d or p.topic ilike $%d)", n, n, n)
 			args = append(args, "%"+p.Q+"%")
 			n++
 		}
 		q := fmt.Sprintf(`
-			select p.id, p.title, p.slug, p.status, p.seo_title, p.seo_description, p.featured_media_id,
+			select p.id, p.title, p.topic, p.slug, p.status, p.seo_title, p.seo_description, p.featured_media_id,
 			  p.published_at::text, p.created_at::text, p.updated_at::text, count(*) over()
 			from public.cms_pages p
 			where %s
@@ -112,12 +127,13 @@ func listPages(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row Page
 			if err := rows.Scan(
-				&row.ID, &row.Title, &row.Slug, &row.Status, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
+				&row.ID, &row.Title, &row.Topic, &row.Slug, &row.Status, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
 				&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read pages.", "ERR_INTERNAL")
 				return
 			}
+			row.Permalink = articlePermalink(row.Topic, row.Slug)
 			out = append(out, row)
 		}
 		if out == nil {
@@ -168,7 +184,12 @@ func getPageBySlug(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		to, ok := lookupRedirect(r.Context(), pool, tu.TenantID, slug)
 		if ok {
-			response.OK(w, slugResolve{RedirectTo: to}, "OK")
+			dest, derr := loadPageBySlug(r.Context(), pool, tu.TenantID, to)
+			if derr == nil {
+				response.OK(w, slugResolve{RedirectTo: articlePermalink(dest.Topic, dest.Slug)}, "OK")
+				return
+			}
+			response.OK(w, slugResolve{RedirectTo: articlePermalink(defaultTopic, to)}, "OK")
 			return
 		}
 		response.Err(w, http.StatusNotFound, "Page not found.", "ERR_NOT_FOUND")
@@ -200,6 +221,14 @@ func createPage(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"slug": "Use lowercase letters, numbers, and hyphens."})
 			return
 		}
+		topic := normalizeSlug(body.Topic)
+		if topic == "" {
+			topic = defaultTopic
+		}
+		if !validSlug(topic) {
+			response.Validation(w, map[string]string{"topic": "Use lowercase letters, numbers, and hyphens."})
+			return
+		}
 		seoTitle, seoDesc, ferr := normalizeSEO(body.SEOTitle, body.SEODescription)
 		if ferr != nil {
 			response.Validation(w, ferr)
@@ -218,11 +247,11 @@ func createPage(pool *pgxpool.Pool) http.HandlerFunc {
 		var id int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.cms_pages (
-			  tenant_id, title, slug, body, seo_title, seo_description, featured_media_id,
+			  tenant_id, title, topic, slug, body, seo_title, seo_description, featured_media_id,
 			  created_by_user_id, updated_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$8)
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)
 			returning id`,
-			tu.TenantID, title, slug, body.Body, seoTitle, seoDesc, body.FeaturedMediaID, tu.AppUserID,
+			tu.TenantID, title, topic, slug, body.Body, seoTitle, seoDesc, body.FeaturedMediaID, tu.AppUserID,
 		).Scan(&id)
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -268,6 +297,7 @@ func patchPage(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		title := existing.Title
+		topic := existing.Topic
 		slug := existing.Slug
 		docBody := existing.Body
 		seoTitle := existing.SEOTitle
@@ -277,6 +307,16 @@ func patchPage(pool *pgxpool.Pool) http.HandlerFunc {
 			title = strings.TrimSpace(*body.Title)
 			if !isPrintableTitle(title) {
 				response.Validation(w, map[string]string{"title": "Required."})
+				return
+			}
+		}
+		if body.Topic != nil {
+			topic = normalizeSlug(*body.Topic)
+			if topic == "" {
+				topic = defaultTopic
+			}
+			if !validSlug(topic) {
+				response.Validation(w, map[string]string{"topic": "Use lowercase letters, numbers, and hyphens."})
 				return
 			}
 		}
@@ -333,10 +373,10 @@ func patchPage(pool *pgxpool.Pool) http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 		_, err = tx.Exec(r.Context(), `
 			update public.cms_pages set
-			  title=$1, slug=$2, body=$3, seo_title=$4, seo_description=$5, featured_media_id=$6,
-			  updated_by_user_id=$7, updated_at=now()
-			where id=$8 and tenant_id=$9 and deleted_at is null`,
-			title, slug, docBody, seoTitle, seoDesc, feat, tu.AppUserID, id, tu.TenantID)
+			  title=$1, topic=$2, slug=$3, body=$4, seo_title=$5, seo_description=$6, featured_media_id=$7,
+			  updated_by_user_id=$8, updated_at=now()
+			where id=$9 and tenant_id=$10 and deleted_at is null`,
+			title, topic, slug, docBody, seoTitle, seoDesc, feat, tu.AppUserID, id, tu.TenantID)
 		if err != nil {
 			if isUniqueViolation(err) {
 				response.Validation(w, map[string]string{"slug": "That slug is already used."})
@@ -418,26 +458,32 @@ func archivePage(pool *pgxpool.Pool) http.HandlerFunc {
 func loadPage(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Page, error) {
 	var row Page
 	err := pool.QueryRow(ctx, `
-		select id, title, slug, status, body, seo_title, seo_description, featured_media_id,
+		select id, title, topic, slug, status, body, seo_title, seo_description, featured_media_id,
 		  published_at::text, created_at::text, updated_at::text
 		from public.cms_pages
 		where id=$1 and tenant_id=$2 and deleted_at is null`, id, tenantID).Scan(
-		&row.ID, &row.Title, &row.Slug, &row.Status, &row.Body, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
+		&row.ID, &row.Title, &row.Topic, &row.Slug, &row.Status, &row.Body, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
 		&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt,
 	)
+	if err == nil {
+		row.Permalink = articlePermalink(row.Topic, row.Slug)
+	}
 	return row, err
 }
 
 func loadPageBySlug(ctx context.Context, pool *pgxpool.Pool, tenantID int64, slug string) (Page, error) {
 	var row Page
 	err := pool.QueryRow(ctx, `
-		select id, title, slug, status, body, seo_title, seo_description, featured_media_id,
+		select id, title, topic, slug, status, body, seo_title, seo_description, featured_media_id,
 		  published_at::text, created_at::text, updated_at::text
 		from public.cms_pages
 		where tenant_id=$1 and slug=$2 and deleted_at is null`, tenantID, slug).Scan(
-		&row.ID, &row.Title, &row.Slug, &row.Status, &row.Body, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
+		&row.ID, &row.Title, &row.Topic, &row.Slug, &row.Status, &row.Body, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
 		&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt,
 	)
+	if err == nil {
+		row.Permalink = articlePermalink(row.Topic, row.Slug)
+	}
 	return row, err
 }
 

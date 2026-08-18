@@ -12,6 +12,7 @@ import { useListState } from "../../shared/useListState";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { CMS_ENTITY, CMS_SETTINGS_HREF } from "../../shared/entityTypes";
 import { useCmsPages, type CmsPage } from "../../shared/useCms";
+import { DEFAULT_CMS_TOPIC } from "./cmsPermalink";
 
 export default function CmsPagesPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -26,6 +27,7 @@ export default function CmsPagesPage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [title, setTitle] = createSignal("");
+  const [topic, setTopic] = createSignal(DEFAULT_CMS_TOPIC);
   const [slug, setSlug] = createSignal("");
   const [saving, setSaving] = createSignal(false);
   const { customValues, setCustom, loadCustom } = useCustomValues();
@@ -41,6 +43,7 @@ export default function CmsPagesPage() {
 
   const openNew = () => {
     setTitle("");
+    setTopic(DEFAULT_CMS_TOPIC);
     setSlug("");
     loadCustom({});
     setModalOpen(true);
@@ -55,7 +58,7 @@ export default function CmsPagesPage() {
       return;
     }
     setSaving(true);
-    const payload = { title: title().trim(), slug: slug().trim() || undefined, custom_values: customValues() };
+    const payload = { title: title().trim(), slug: slug().trim() || undefined, topic: topic().trim() || DEFAULT_CMS_TOPIC, custom_values: customValues() };
     let createdId: number | null = null;
     const ok = await submitEntity(
       async () => {
@@ -77,6 +80,7 @@ export default function CmsPagesPage() {
       <SpreadsheetGrid<CmsPage>
         columns={[
           { key: "title", header: "Title", clickable: true },
+          { key: "topic", header: "Topic" },
           { key: "slug", header: "Slug", clickable: true },
           { key: "status", header: "Status" },
           { key: "updated_at", header: "Updated" },
@@ -130,6 +134,17 @@ export default function CmsPagesPage() {
             />
           )}
         </ModalField>
+        <ModalField settings={byKey} fieldKey="topic" fallbackLabel="Topic cluster">
+          {(m) => (
+            <input
+              class={inputClass}
+              placeholder={DEFAULT_CMS_TOPIC}
+              value={topic()}
+              disabled={m.disabled}
+              onInput={(e) => setTopic(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
         <ModalField settings={byKey} fieldKey="slug" fallbackLabel="Slug">
           {(m) => (
             <input
@@ -142,7 +157,7 @@ export default function CmsPagesPage() {
           )}
         </ModalField>
         <Field label="">
-          <p class="text-xs text-text-secondary">Leave slug blank to generate it from the title. Body and SEO are on the next screen.</p>
+          <p class="text-xs text-text-secondary">Topic + slug become the published URL /articles/topic/slug. Leave slug blank to generate it from the title. Body and SEO are on the next screen.</p>
         </Field>
         <CustomFieldsSection entityType={CMS_ENTITY.page} values={customValues} onChange={setCustom} />
       </EntityModal>
