@@ -4,7 +4,13 @@ import { appModules } from "../shell/modules";
 
 describe("ops intelligence routes", () => {
   it("maps new dashboard paths to permissions", () => {
-    expect(hrefPermissionCode["/app/crm/leads/dashboard"]).toBe("crm.leads");
+    expect(hrefPermissionCode["/app/dashboard/period-summary"]).toBe("dashboard.view");
+    expect(appModules.find((m) => m.id === "dashboard")?.features.some((f) => f.href === "/app/dashboard?tab=intel")).toBe(
+      true,
+    );
+    expect(appModules.find((m) => m.id === "dashboard")?.features.some((f) => f.href === "/app/dashboard/period-summary")).toBe(
+      true,
+    );
     expect(hrefPermissionCode["/app/crm/clients"]).toBe("crm.clients");
     expect(hrefPermissionCode["/app/operations/tasks"]).toBe("operations.dashboard");
     expect(hrefPermissionCode["/app/sop"]).toBe("sop.documents");

@@ -4,6 +4,7 @@ import { createQuery } from "@tanstack/solid-query";
 import { DashboardLayout } from "./DashboardLayout";
 import { apiFetch } from "../../shared/api";
 import { formatPeso } from "../../shared/money";
+import { OpsIntelligencePanel } from "./OpsIntelligencePanel";
 
 type NamedAmount = {
   label: string;
@@ -286,6 +287,8 @@ export default function PeriodSummaryPage() {
               <p class="text-xs text-text-secondary">
                 The same snapshot is emailed to the owner and store admins via weekly/monthly BI cron jobs. Instant per-sale emails are not sent on the free plan.
               </p>
+
+              <OpsIntelligencePanel variant="period" />
             </>
           )}
         </Show>

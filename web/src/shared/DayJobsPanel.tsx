@@ -164,7 +164,7 @@ export function DayJobsPanel() {
     expired_quotes: "/app/quotation/quotations/outstanding",
     serial_qty_mismatch: "/app/inventory/serial-lot/registry",
     reserved_stale: "/app/inventory/serial-lot/registry",
-    open_po: "/app/purchase-request/purchase-orders",
+    open_po: "/app/purchase-order/purchase-orders",
     so_release_gap: "/app/sales-order/sales-orders/release",
     reserve_without_dr: "/app/sales-order/delivery-receipts/new",
     dr_without_invoice: "/app/sales/sales/new",
