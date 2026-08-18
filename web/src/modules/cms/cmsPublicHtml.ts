@@ -1,1 +1,1 @@
-export * from "../../../lib/cms-public/publicHtml";
+export * from "../../../api/_lib/publicHtml";

@@ -1,14 +1,14 @@
 import { randomBytes } from "node:crypto";
-import { firstParagraphPlain, markdownToPublicHtml, splitFrontmatter } from "./markdown";
-import { cmsArticlePath, cmsTopicPath, CMS_ARTICLES_PREFIX } from "./permalink";
+import { firstParagraphPlain, markdownToPublicHtml, splitFrontmatter } from "./markdown.js";
+import { cmsArticlePath, cmsTopicPath, CMS_ARTICLES_PREFIX } from "./permalink.js";
 import {
   articleFooterHtml,
   articleFooterMarkdown,
   CMS_DEFAULT_LANG,
   CMS_FACEBOOK_PAGE,
   CMS_SITE_NAME_DEFAULT,
-} from "./social";
-import { givenSeoDescription, givenSeoTitle } from "./seoGiven";
+} from "./social.js";
+import { givenSeoDescription, givenSeoTitle } from "./seoGiven.js";
 
 export type CmsPublicPage = {
   id: number;

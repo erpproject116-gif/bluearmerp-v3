@@ -11,7 +11,7 @@ import {
   renderNotFoundHtml,
   renderRobotsTxt,
   renderSitemapXml,
-} from "../lib/cms-public/publicHtml";
+} from "./_lib/publicHtml.js";
 
 type Envelope<T> = { success?: boolean; data?: T; meta?: { total?: number }; message?: string };
 
