@@ -7,7 +7,8 @@
   "functions": {
     "web/api/cms-public.ts": {
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "web/api/_lib/**"
     }
   },
   "headers": [
