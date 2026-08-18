@@ -211,6 +211,12 @@ import {
   SopLibraryPage,
   SopDashboardPage,
   SopDocumentPage,
+  CmsPagesPage,
+  CmsPagesSettingsPage,
+  CmsPageEditorPage,
+  CmsPageReaderPage,
+  CmsMediaPage,
+  CmsRedirectsPage,
   OkrListPage,
   OkrDashboardPage,
   PosPage,
@@ -338,7 +344,7 @@ import { CrmRoute } from "./shared/CrmRoute";
 import { SupportRoute } from "./shared/SupportRoute";
 import { CommsRoute } from "./shared/CommsRoute";
 import { OperationsRoute } from "./shared/OperationsRoute";
-import { SopRoute, OkrRoute } from "./shared/SopOkrRoute";
+import { SopRoute, OkrRoute, CmsRoute } from "./shared/SopOkrRoute";
 import { PosRoute } from "./shared/PosRoute";
 import { HrRoute } from "./shared/HrRoute";
 import { BookingRoute } from "./shared/BookingRoute";
@@ -845,6 +851,24 @@ export default function App() {
           )} />
           <Route path="/sop" component={() => (
             <SopRoute><SopLibraryPage /></SopRoute>
+          )} />
+          <Route path="/cms/pages/settings" component={() => (
+            <CmsRoute><CmsPagesSettingsPage /></CmsRoute>
+          )} />
+          <Route path="/cms/pages/:id" component={() => (
+            <CmsRoute><CmsPageEditorPage /></CmsRoute>
+          )} />
+          <Route path="/cms/p/:slug" component={() => (
+            <CmsRoute><CmsPageReaderPage /></CmsRoute>
+          )} />
+          <Route path="/cms/media" component={() => (
+            <CmsRoute><CmsMediaPage /></CmsRoute>
+          )} />
+          <Route path="/cms/redirects" component={() => (
+            <CmsRoute><CmsRedirectsPage /></CmsRoute>
+          )} />
+          <Route path="/cms" component={() => (
+            <CmsRoute><CmsPagesPage /></CmsRoute>
           )} />
           <Route path="/okr/dashboard" component={() => (
             <OkrRoute><OkrDashboardPage /></OkrRoute>

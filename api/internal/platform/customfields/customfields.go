@@ -57,6 +57,7 @@ var formEntityTypes = map[string]bool{
 	"pr_purchase_request": true, "po_purchase_order": true, "gr_goods_receipt": true,
 	"fin_official_receipt": true, "fin_supplier_invoice": true,
 	"ops_work_item": true,
+	"cms_page":      true,
 }
 
 type querier interface {

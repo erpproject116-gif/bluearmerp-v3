@@ -37,6 +37,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/okr"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/quality"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sop"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/cms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/jobcosting"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaseorder"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/purchaserequest"
@@ -183,6 +184,7 @@ func main() {
 			jobcosting.RegisterRoutes(protected, pool)
 			operations.RegisterRoutes(protected, pool)
 			sop.RegisterRoutes(protected, pool)
+			cms.RegisterRoutes(protected, pool)
 			okr.RegisterRoutes(protected, pool)
 			manufacturing.RegisterRoutes(protected, pool)
 			quality.RegisterRoutes(protected, pool)

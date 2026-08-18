@@ -50,6 +50,7 @@ No API, migration, or permission row is required. Help & guides is visible to ev
 | `crm` | CRM dashboard and follow-ups |
 | `operations` | Operations Hub (workspaces, Kanban, calendar) |
 | `comms` | Document email and sent history |
+| `cms` | In-app Pages (signed-in only) |
 | `after-sales` | Repair orders |
 | `admin` | Users, logs, branding |
 

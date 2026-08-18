@@ -46,6 +46,8 @@ var moduleMutationRules = []moduleRouteRule{
 		message: "SOP is turned off for this workspace.", nextHint: "/app/user-management/tenant-modules"},
 	{prefix: "/api/v1/okr", moduleCode: "okr",
 		message: "OKR is turned off for this workspace.", nextHint: "/app/user-management/tenant-modules"},
+	{prefix: "/api/v1/cms", moduleCode: "cms",
+		message: "Pages is turned off for this workspace.", nextHint: "/app/user-management/tenant-modules"},
 }
 
 // ModuleEnablement blocks mutating API calls when the mapped module/feature is disabled.

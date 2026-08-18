@@ -138,6 +138,7 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
     pathname.startsWith("/app/hr") ||
     pathname.startsWith("/app/operations") ||
     pathname.startsWith("/app/sop") ||
+    pathname.startsWith("/app/cms") ||
     pathname.startsWith("/app/okr") ||
     pathname.startsWith("/app/booking") ||
     pathname.startsWith("/app/comms") ||
@@ -490,6 +491,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       { id: "comms", label: "Communications", href: "/app/comms/chat", iconId: "comms", topId: "more", moduleId: "comms", expandGroupId: "more_apps" },
       { id: "operations", label: "Project Management", href: "/app/operations", iconId: "operations", topId: "more", moduleId: "operations", expandGroupId: "more_apps" },
       { id: "sop", label: "SOP", href: "/app/sop", iconId: "sop", topId: "more", moduleId: "sop", expandGroupId: "more_apps" },
+      { id: "cms", label: "Pages", href: "/app/cms", iconId: "cms", topId: "more", moduleId: "cms", expandGroupId: "more_apps" },
       { id: "okr", label: "OKRs", href: "/app/okr", iconId: "okr", topId: "more", moduleId: "okr", expandGroupId: "more_apps" },
       { id: "quality", label: "Quality", href: "/app/quality/ncrs", iconId: "quality", topId: "more", moduleId: "quality", expandGroupId: "more_apps" },
       { id: "reports", label: "Reports", href: "/app/reports", iconId: "reports", topId: "more", moduleId: "reports", expandGroupId: "more_apps" },
