@@ -12,6 +12,11 @@ export type CmsPage = {
   seo_title?: string | null;
   seo_description?: string | null;
   featured_media_id?: number | null;
+  featured_media_alt?: string | null;
+  featured_media_mime?: string | null;
+  lang?: string | null;
+  focus_phrase?: string | null;
+  visibility?: string | null;
   published_at?: string | null;
   created_at: string;
   updated_at: string;
@@ -48,9 +53,16 @@ export type CmsPagePatch = {
   seo_title?: string | null;
   seo_description?: string | null;
   featured_media_id?: number | null;
+  lang?: string | null;
+  focus_phrase?: string | null;
+  visibility?: string | null;
+  updated_at?: string;
   leave_redirect?: boolean;
   custom_values?: Record<string, unknown>;
 };
+
+export type CmsTopic = { topic: string; count: number };
+export type CmsRevision = { id: number; title: string; topic: string; slug: string; created_at: string };
 
 export function useCmsPages(params: () => { page: number; pageSize: number; status?: string; topic?: string; q?: string; sort?: string; order?: string }) {
   return createQuery(() => {
@@ -122,20 +134,47 @@ export function usePublicCmsPages(params: () => { page: number; pageSize: number
   });
 }
 
-export function usePublicCmsPageBySlug(slug: () => string) {
+export function usePublicCmsPageBySlug(slug: () => string, previewToken?: () => string) {
   return createQuery(() => {
     const s = slug();
+    const token = previewToken ? previewToken() : "";
     return {
-      queryKey: ["public-cms-page-slug", s],
-      enabled: s.length > 0,
+      queryKey: ["public-cms-page-slug", s, token],
+      enabled: s.length > 0 || token.length > 0,
       queryFn: async () => {
-        const res = await apiFetch<CmsSlugResolve>(
-          `/api/v1/public/cms/pages/by-slug/${encodeURIComponent(s)}`,
-          undefined,
-          { silent: true },
-        );
+        const path = token
+          ? `/api/v1/public/cms/preview?token=${encodeURIComponent(token)}`
+          : `/api/v1/public/cms/pages/by-slug/${encodeURIComponent(s)}`;
+        const res = await apiFetch<CmsSlugResolve>(path, undefined, { silent: true });
         if (!res.success) throw new Error(res.message ?? "Page not found");
         return res.data!;
+      },
+    };
+  });
+}
+
+export function useCmsTopics() {
+  return createQuery(() => ({
+    queryKey: ["cms-topics"],
+    queryFn: async () => {
+      const res = await apiFetch<CmsTopic[]>("/api/v1/cms/topics");
+      if (!res.success) throw new Error(res.message ?? "Failed to load topics");
+      return res.data ?? [];
+    },
+    staleTime: 60_000,
+  }));
+}
+
+export function useCmsRevisions(id: () => number | null) {
+  return createQuery(() => {
+    const pageId = id();
+    return {
+      queryKey: ["cms-revisions", pageId],
+      enabled: pageId != null && pageId > 0,
+      queryFn: async () => {
+        const res = await apiFetch<CmsRevision[]>(`/api/v1/cms/pages/${pageId}/revisions`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load revisions");
+        return res.data ?? [];
       },
     };
   });
@@ -181,6 +220,8 @@ export function useCmsMutations() {
     void qc.invalidateQueries({ queryKey: ["cms-page-slug"] });
     void qc.invalidateQueries({ queryKey: ["cms-media"] });
     void qc.invalidateQueries({ queryKey: ["cms-redirects"] });
+    void qc.invalidateQueries({ queryKey: ["cms-revisions"] });
+    void qc.invalidateQueries({ queryKey: ["cms-topics"] });
   };
   return {
     createPage: createMutation(() => ({
@@ -210,10 +251,63 @@ export function useCmsMutations() {
       },
       onSuccess: invalidate,
     })),
+    unpublishPage: createMutation(() => ({
+      mutationFn: async (id: number) => {
+        const res = await apiFetch<CmsPage>(`/api/v1/cms/pages/${id}/unpublish`, { method: "POST" });
+        if (!res.success) throw new Error(res.message ?? "Unpublish failed");
+        return res.data!;
+      },
+      onSuccess: invalidate,
+    })),
     archivePage: createMutation(() => ({
       mutationFn: async (id: number) => {
         const res = await apiFetch<CmsPage>(`/api/v1/cms/pages/${id}/archive`, { method: "POST" });
         if (!res.success) throw new Error(res.message ?? "Archive failed");
+        return res.data!;
+      },
+      onSuccess: invalidate,
+    })),
+    clonePage: createMutation(() => ({
+      mutationFn: async (id: number) => {
+        const res = await apiFetch<CmsPage>(`/api/v1/cms/pages/${id}/clone`, { method: "POST" });
+        if (!res.success) throw new Error(res.message ?? "Clone failed");
+        return res.data!;
+      },
+      onSuccess: invalidate,
+    })),
+    generatePage: createMutation(() => ({
+      mutationFn: async (args: { id: number; ugat?: string }) => {
+        const res = await apiFetch<CmsPage>(`/api/v1/cms/pages/${args.id}/generate`, {
+          method: "POST",
+          body: JSON.stringify({ ugat: args.ugat ?? "" }),
+        });
+        if (!res.success) throw new Error(res.message ?? "Generate failed");
+        return res.data!;
+      },
+      onSuccess: invalidate,
+    })),
+    previewToken: createMutation(() => ({
+      mutationFn: async (id: number) => {
+        const res = await apiFetch<{ token: string; url: string }>(`/api/v1/cms/pages/${id}/preview-token`, { method: "POST" });
+        if (!res.success) throw new Error(res.message ?? "Preview failed");
+        return res.data!;
+      },
+    })),
+    restoreRevision: createMutation(() => ({
+      mutationFn: async (args: { id: number; rid: number }) => {
+        const res = await apiFetch<CmsPage>(`/api/v1/cms/pages/${args.id}/revisions/${args.rid}/restore`, { method: "POST" });
+        if (!res.success) throw new Error(res.message ?? "Restore failed");
+        return res.data!;
+      },
+      onSuccess: invalidate,
+    })),
+    patchMedia: createMutation(() => ({
+      mutationFn: async (args: { id: number; alt_text: string }) => {
+        const res = await apiFetch<CmsMedia>(`/api/v1/cms/media/${args.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ alt_text: args.alt_text }),
+        });
+        if (!res.success) throw new Error(res.message ?? "Update failed");
         return res.data!;
       },
       onSuccess: invalidate,

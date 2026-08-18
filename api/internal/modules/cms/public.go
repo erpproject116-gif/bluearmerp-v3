@@ -24,6 +24,7 @@ func RegisterPublicRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 	r.Route("/public/cms", func(sr chi.Router) {
 		sr.Get("/pages", publicListPublished(pool, cfg))
 		sr.Get("/pages/by-slug/{slug}", publicGetBySlug(pool, cfg))
+		sr.Get("/preview", publicPreview(pool, cfg))
 		sr.Get("/media/{id}/download", publicDownloadMedia(pool, cfg))
 	})
 }
@@ -47,7 +48,7 @@ func publicListPublished(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc
 			"title": "p.title", "slug": "p.slug", "topic": "p.topic",
 			"published_at": "p.published_at", "updated_at": "p.updated_at",
 		})
-		where := "p.tenant_id = $1 and p.deleted_at is null and p.status = 'published'"
+		where := "p.tenant_id = $1 and p.deleted_at is null and p.status = 'published' and p.visibility = 'public'"
 		args := []any{tenantID}
 		n := 2
 		topic := normalizeSlug(r.URL.Query().Get("topic"))
@@ -67,8 +68,12 @@ func publicListPublished(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc
 		}
 		q := fmt.Sprintf(`
 			select p.id, p.title, p.topic, p.slug, p.status, p.seo_title, p.seo_description, p.featured_media_id,
-			  p.published_at::text, p.created_at::text, p.updated_at::text, count(*) over()
+			  p.published_at::text, p.created_at::text, p.updated_at::text,
+			  coalesce(m.alt_text,''), coalesce(m.mime_type,''),
+			  coalesce(nullif(p.lang,''),'tl'), p.focus_phrase, coalesce(p.visibility,'internal'),
+			  count(*) over()
 			from public.cms_pages p
+			left join public.cms_media m on m.id = p.featured_media_id and m.deleted_at is null
 			where %s
 			order by %s %s
 			limit $%d offset $%d`, where, p.Sort, orderSQL(p.Order), n, n+1)
@@ -85,7 +90,8 @@ func publicListPublished(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc
 			var row Page
 			if err := rows.Scan(
 				&row.ID, &row.Title, &row.Topic, &row.Slug, &row.Status, &row.SEOTitle, &row.SEODescription, &row.FeaturedMediaID,
-				&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt, &total,
+				&row.PublishedAt, &row.CreatedAt, &row.UpdatedAt,
+				&row.FeaturedMediaAlt, &row.FeaturedMediaMime, &row.Lang, &row.FocusPhrase, &row.Visibility, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read pages.", "ERR_INTERNAL")
 				return
@@ -113,14 +119,14 @@ func publicGetBySlug(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 			return
 		}
 		row, err := loadPageBySlug(r.Context(), pool, tenantID, slug)
-		if err == nil && row.Status == "published" {
+		if err == nil && row.Status == "published" && row.Visibility == "public" {
 			response.OK(w, slugResolve{Page: &row}, "OK")
 			return
 		}
 		to, rok := lookupRedirect(r.Context(), pool, tenantID, slug)
 		if rok {
 			dest, derr := loadPageBySlug(r.Context(), pool, tenantID, to)
-			if derr == nil && dest.Status == "published" {
+			if derr == nil && dest.Status == "published" && dest.Visibility == "public" {
 				response.OK(w, slugResolve{RedirectTo: articlePermalink(dest.Topic, dest.Slug)}, "OK")
 				return
 			}
@@ -145,7 +151,7 @@ func publicDownloadMedia(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc
 		token := fmt.Sprintf("cms-media:%d)", id)
 		_ = pool.QueryRow(r.Context(), `
 			select count(*) from public.cms_pages
-			where tenant_id=$1 and deleted_at is null and status='published'
+			where tenant_id=$1 and deleted_at is null and status='published' and visibility='public'
 			  and (featured_media_id=$2 or position($3 in body) > 0)`,
 			tenantID, id, token).Scan(&used)
 		if used == 0 {
@@ -165,8 +171,9 @@ func publicDownloadMedia(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc
 			return
 		}
 		dispName := fileName
-		if isImageMIME(mime) {
+		if cc := cacheControlForPublicMedia(mime); cc != "" {
 			w.Header().Set("Content-Disposition", `inline; filename="`+strings.ReplaceAll(fileName, `"`, "")+`"`)
+			w.Header().Set("Cache-Control", cc)
 			dispName = ""
 		}
 		if err := filedownload.ServeBytesOrStoredFile(w, r, fileBytes, attachmentx.Dir("cms"), storagePath, dispName, mime, createdAt); err != nil {

@@ -28,6 +28,8 @@ type Props = {
   /** When true, field is always treated as required. */
   forceRequired?: boolean;
   span?: "full";
+  /** Passed to Field — div for rich-text so a wrapping label does not block typing. */
+  as?: "label" | "div";
   children: (meta: ModalFieldMeta) => JSX.Element;
 };
 
@@ -54,7 +56,7 @@ export function ModalField(props: Props) {
   return (
     <Show when={meta()}>
       {(m) => (
-        <Field label={m().label} span={props.span}>
+        <Field label={m().label} span={props.span} as={props.as}>
           {props.children(m())}
         </Field>
       )}

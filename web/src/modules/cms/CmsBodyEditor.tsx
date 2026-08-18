@@ -1,11 +1,15 @@
 import { Show, createEffect, createSignal, on, type JSX } from "solid-js";
+import { safeAppPath } from "../help-assistant/safeAppPath";
 import {
   extractCmsArticlePaste,
   htmlToMarkdown,
   looksLikeMarkdown,
   markdownToSafeHtml,
+  parseYouTubeId,
+  safeHttpsUrl,
   type CmsArticlePaste,
 } from "./cmsMarkdownCodec";
+import { safeArticlesPath } from "./cmsPermalink";
 
 export type CmsBodyEditorProps = {
   markdown: string;
@@ -26,9 +30,25 @@ export function CmsBodyEditor(props: CmsBodyEditorProps) {
 
   const applyVisual = (md: string) => {
     if (!editor) return;
-    const html = markdownToSafeHtml(md);
+    const html = markdownToSafeHtml(md).trim();
     lastExternal = md;
-    if (editor.innerHTML !== html) editor.innerHTML = html;
+    const next = html || "<p><br></p>";
+    if (editor.innerHTML !== next) editor.innerHTML = next;
+  };
+
+  const insertHtml = (html: string) => {
+    if (props.disabled) return;
+    editor?.focus();
+    document.execCommand("insertHTML", false, html);
+    emitFromVisual();
+  };
+
+  const safeEditorHref = (raw: string): string | null => {
+    const s = (raw || "").trim();
+    if (!s || /^(javascript|data|vbscript):/i.test(s)) return null;
+    if (s.startsWith("/app/")) return safeAppPath(s);
+    if (s === "/articles" || s.startsWith("/articles/")) return safeArticlesPath(s);
+    return safeHttpsUrl(s.startsWith("http://") ? s.replace(/^http:/, "https:") : s);
   };
 
   createEffect(
@@ -117,7 +137,7 @@ export function CmsBodyEditor(props: CmsBodyEditorProps) {
             Markdown
           </button>
         </div>
-        <p class="text-[11px] text-text-secondary">Paste a generated .md file — frontmatter fills title/SEO, body stays markdown.</p>
+        <p class="text-[11px] text-text-secondary">Paste a generated .md file, or use Image URL / YouTube on the toolbar.</p>
       </div>
       <Show when={mode() === "visual"} fallback={
         <textarea
@@ -168,11 +188,48 @@ export function CmsBodyEditor(props: CmsBodyEditorProps) {
               title="Insert link"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
-                const url = window.prompt("Link URL (/app/… or https://)");
-                if (url) run("createLink", url);
+                const url = window.prompt("Link URL (/articles/…, /app/…, or https://)");
+                if (!url) return;
+                const safe = safeEditorHref(url);
+                if (!safe) return;
+                run("createLink", safe);
               }}
             >
               Link
+            </button>
+            <button
+              type="button"
+              class={btn}
+              disabled={props.disabled}
+              title="Image from URL"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const url = window.prompt("Image URL (https://…)");
+                if (!url) return;
+                const safe = safeHttpsUrl(url.startsWith("http://") ? url.replace(/^http:/, "https:") : url);
+                if (!safe) return;
+                const alt = window.prompt("Alt text") ?? "";
+                const a = alt.replace(/"/g, "");
+                insertHtml(`<img class="cms-url-img" src="${safe.replace(/"/g, "")}" alt="${a}" />`);
+              }}
+            >
+              Image URL
+            </button>
+            <button
+              type="button"
+              class={btn}
+              disabled={props.disabled}
+              title="YouTube video"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const url = window.prompt("YouTube URL");
+                if (!url) return;
+                const id = parseYouTubeId(url.trim().replace(/^http:\/\//i, "https://"));
+                if (!id) return;
+                insertHtml(`<div class="cms-yt-chip" contenteditable="false" data-cms-youtube="${id}">[YouTube]</div>`);
+              }}
+            >
+              YouTube
             </button>
             <button type="button" class={btn} disabled={props.disabled} title="Remove formatting" onMouseDown={(e) => e.preventDefault()} onClick={() => run("removeFormat")}>
               Clear
@@ -195,6 +252,12 @@ export function CmsBodyEditor(props: CmsBodyEditorProps) {
               onPaste={onVisualPaste}
             />
             <style>{`
+              .cms-rte {
+                user-select: text;
+                -webkit-user-select: text;
+                cursor: text;
+              }
+              .cms-rte[contenteditable="false"] { cursor: not-allowed; opacity: 0.7; }
               .cms-rte:empty:before {
                 content: attr(data-placeholder);
                 color: var(--color-text-secondary, #64748b);
@@ -215,14 +278,23 @@ export function CmsBodyEditor(props: CmsBodyEditorProps) {
                 color: #475569;
               }
               .cms-rte a { color: #2563eb; text-decoration: underline; }
-              .cms-rte .cms-media-chip {
+              .cms-rte img.cms-url-img, .cms-rte img {
+                display: block;
+                max-height: 16rem;
+                max-width: 100%;
+                margin: 0.5rem 0;
+                border-radius: 0.5rem;
+                border: 1px solid #e2e8f0;
+              }
+              .cms-rte .cms-media-chip, .cms-rte .cms-yt-chip {
                 display: inline-block;
-                padding: 0.1rem 0.4rem;
+                padding: 0.15rem 0.5rem;
                 border-radius: 0.25rem;
                 background: #f1f5f9;
                 font-size: 0.75rem;
                 color: #475569;
               }
+              .cms-rte .cms-yt-chip { background: #0f172a; color: #e2e8f0; }
               .cms-rte p:last-child { margin-bottom: 0; }
             `}</style>
           </div>

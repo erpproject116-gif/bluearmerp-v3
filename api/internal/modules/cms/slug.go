@@ -60,6 +60,48 @@ func pageVisibleToReader(status string) bool {
 	return status == "published"
 }
 
+func normalizeLang(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return "tl"
+	}
+	s = strings.ReplaceAll(s, "_", "-")
+	parts := strings.SplitN(s, "-", 2)
+	if len(parts[0]) != 2 {
+		return "tl"
+	}
+	lang := strings.ToLower(parts[0])
+	if len(parts) == 1 {
+		return lang
+	}
+	if len(parts[1]) != 2 {
+		return lang
+	}
+	return lang + "-" + strings.ToUpper(parts[1])
+}
+
+func normalizeVisibility(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	if s == "public" {
+		return "public"
+	}
+	return "internal"
+}
+
+func normalizeFocus(raw *string) *string {
+	if raw == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*raw)
+	if s == "" {
+		return nil
+	}
+	if len(s) > 120 {
+		s = s[:120]
+	}
+	return &s
+}
+
 func isPrintableTitle(title string) bool {
 	for _, r := range title {
 		if unicode.IsControl(r) && r != '\t' {

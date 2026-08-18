@@ -202,6 +202,9 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "seo_title", Label: "SEO title", FieldType: "text", SortOrder: 40},
 		{FieldKey: "seo_description", Label: "SEO description", FieldType: "textarea", SortOrder: 50},
 		{FieldKey: "featured_media_id", Label: "Featured image", FieldType: "select", SortOrder: 60},
+		{FieldKey: "lang", Label: "Language", FieldType: "text", SortOrder: 62},
+		{FieldKey: "focus_phrase", Label: "Focus phrase", FieldType: "text", SortOrder: 64},
+		{FieldKey: "visibility", Label: "Visibility", FieldType: "select", SortOrder: 66},
 		{FieldKey: "status", Label: "Status", FieldType: "select", SortOrder: 70},
 	},
 }

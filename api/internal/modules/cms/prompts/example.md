@@ -1,47 +1,12 @@
 ---
 series: sme-walang-sistema
-number: 1
 lang: tl
 status: draft
 title: Bakit palaging nagsisinungaling ang "meron pa" sa SME?
 topic: bodega-at-stock
 slug: meron-pa-na-palaging-mali
 seo_title: Bakit palaging mali ang "meron pa" kung walang sistema
-seo_description: Sa maraming SME, ang "meron pa" ay tiwala — hindi numero. Excel, Viber, at memorya ng bodega. Hanggang may customer sa counter at wala na pala.
-cms_paste:
-  title: Bakit palaging nagsisinungaling ang "meron pa" sa SME?
-  topic: bodega-at-stock
-  slug: meron-pa-na-palaging-mali
-  seo_title: Bakit palaging mali ang "meron pa" kung walang sistema
-  seo_description: Sa maraming SME, ang "meron pa" ay tiwala — hindi numero. Excel, Viber, at memorya ng bodega. Hanggang may customer sa counter at wala na pala.
-featured_image:
-  filename: meron-pa-na-palaging-mali.jpg
-  alt: Sales na nagsasabing meron pa sa telepono, habang bakante ang rack sa bodega at may customer na naghihintay sa counter.
-  aspect: "16:9"
-  prompt: >
-    Photorealistic cinematic still, 16:9, documentary photography, Philippine SME
-    trading warehouse attached to a small computer-parts or hardware store.
-    Morning light through dusty high windows mixed with warm fluorescent tubes.
-    Foreground left: a Filipino salesperson in his early 30s, faded navy polo,
-    standing at a worn wooden counter, phone to his ear, giving a confident
-    thumbs-up as if saying the item is still available. Open laptop on the
-    counter shows a messy spreadsheet with green cells (no readable words or
-    logos). Midground: metal warehouse racks, mixed cardboard boxes, one shelf
-    clearly empty where the promised item should be. A bodegero in a gray
-    t-shirt and slippers stands in the aisle, clipboard of handwritten tick
-    marks in hand, shaking his head at the empty slot. Background right: a
-    customer at the counter holding cash, waiting, slightly impatient, not
-    caricatured. Dust motes in the light, scuffed concrete floor, faded tarpaulin
-    on one wall, no brand names, no ERP UI, no posters with slogans, no
-    watermarks, no overlaid text. Shallow depth of field: sharp on the thumbs-up
-    and the empty shelf, softer on the waiting customer. Mood: the quiet lie of
-    "meron pa" — trust colliding with an empty rack. Colors: dusty beige, steel
-    gray, warm wood, muted navy. Shot like a still from a Filipino indie drama,
-    not a stock-photo smile.
-  negative_prompt: >
-    text overlay, watermarks, logos, brand names, readable Excel headers, futuristic
-    holograms, robots, neon cyberpunk, American big-box warehouse, fake stock-photo
-    grins, cartoon, illustration, extra fingers, warped faces, English slogan posters
+seo_description: Sa maraming SME, ang "meron pa" ay tiwala — hindi numero. Excel, Viber, at memorya ng bodega.
 ---
 
 Sa maraming tindahan, ang **"meron pa"** ay hindi numero. Iyon ay tiwala.
@@ -71,7 +36,7 @@ Wala sa dalawa ang nagsasabing: **hindi puwedeng i-release, kulang.** At walang
 nakakakita, sa iisang screen, kung ano na ang naka-promise at kung ano pa ang totoo sa
 rack.
 
-## Magkano ang isang "meron pa"
+## Magkano
 
 Isang mali sa stock ay hindi isang cell sa spreadsheet.
 
@@ -87,7 +52,7 @@ Ang sistema ninyo ang walang ngipin.
 
 Walang proper system, paulit-ulit ito. Hindi "minsan lang." Iyon na ang proseso ninyo.
 
-## Bakit hindi kaya ng Excel at Viber
+## Bakit hindi kaya ng Excel o Viber
 
 Ang Excel ay nagre-record **pagkatapos.** May nagbenta sa umaga, na-update ang sheet sa
 hapon — kung na-update. May copy si sales, may copy si bodega, may *final v3* si

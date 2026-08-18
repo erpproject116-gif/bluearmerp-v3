@@ -79,3 +79,12 @@ func sniffAllowedMIME(data []byte, claimed, filename string) (string, bool) {
 func isImageMIME(mime string) bool {
 	return strings.HasPrefix(strings.ToLower(mime), "image/")
 }
+
+const publicImageCacheControl = "public, max-age=86400, immutable"
+
+func cacheControlForPublicMedia(mime string) string {
+	if isImageMIME(mime) {
+		return publicImageCacheControl
+	}
+	return ""
+}
