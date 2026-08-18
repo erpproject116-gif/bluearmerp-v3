@@ -2,7 +2,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "so
 import { helpMarkdownHasExternalLink } from "../help-assistant/HelpMarkdown";
 import { safeAppPath } from "../help-assistant/safeAppPath";
 import { fetchCmsMediaObjectUrl, fetchPublicCmsMediaObjectUrl } from "../../shared/cmsMedia";
-import { escapeHtml, parseCmsMarkdown } from "./cmsMarkdownCodec";
+import { escapeHtml, parseCmsMarkdown, parseYouTubeId, safeHttpsUrl, youtubeEmbedUrl } from "./cmsMarkdownCodec";
 import { safeArticlesPath } from "./cmsPermalink";
 
 const mediaToken = /!\[([^\]]*)\]\(cms-media:(\d+)\)/g;
@@ -17,6 +17,13 @@ function inlineMarkdown(raw: string, mediaUrls: Record<number, string>): string 
       return `<span class="text-text-secondary">[${a || "image"}]</span>`;
     }
     return `<img src="${src}" alt="${a}" class="max-h-64 max-w-full rounded-lg border border-stroke" />`;
+  });
+  s = s.replace(/!\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g, (_m, alt, href) => {
+    if (parseYouTubeId(String(href))) return escapeHtml(String(alt || "YouTube"));
+    const url = safeHttpsUrl(String(href));
+    const a = escapeHtml(String(alt ?? ""));
+    if (!url) return a;
+    return `<img src="${escapeHtml(url)}" alt="${a}" class="max-h-80 w-full rounded-lg border border-stroke object-contain" />`;
   });
   s = s.replace(/\[([^\]]+)\]\((\/articles(?:\/[^)\s]+)?|\/app\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, (_m, label, href) => {
     const h = String(href);
@@ -113,6 +120,30 @@ export function CmsMarkdown(props: { content: string; class?: string; publicMedi
           if (block.type === "quote") {
             return (
               <blockquote class="m-0 border-l-2 border-stroke pl-3 text-text-secondary" innerHTML={inlineMarkdown(block.text, urls())} />
+            );
+          }
+          if (block.type === "img") {
+            return (
+              <img
+                src={block.src}
+                alt={block.alt}
+                class="max-h-80 w-full rounded-lg border border-stroke object-contain"
+              />
+            );
+          }
+          if (block.type === "youtube") {
+            return (
+              <div class="aspect-video w-full overflow-hidden rounded-lg border border-stroke bg-slate-900">
+                <iframe
+                  class="h-full w-full"
+                  src={youtubeEmbedUrl(block.id)}
+                  title="YouTube video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                  loading="lazy"
+                  referrerpolicy="strict-origin-when-cross-origin"
+                />
+              </div>
             );
           }
           return (

@@ -11,7 +11,7 @@ This module is **not** Help & guides, SOP, or document attachments on quotations
 - Authenticated download is `/api/v1/cms/media/{id}/download`. Public images used on a published page use `/api/v1/public/cms/media/{id}/download`. Gzip middleware skips paths containing `/download`.
 - Public catalog tenant is `CMS_PUBLIC_TENANT_CODE` (falls back to `DEMO_LEADGEN_TENANT_CODE`, default `BLUEARM`).
 - SEO columns (`seo_title`, `seo_description`) set the browser tab and reader chrome.
-- Page editor is Visual (toolbar) + Markdown source. Storage is markdown. Paste a generated `docs/content/blog/*.md` file to fill title/SEO and body. Format those files with `cd web && npm run format:cms-articles`.
+- Page editor is Visual (toolbar) + Markdown source. Storage is markdown. Visual mode is a `div` (not a form label) so it stays typeable. Toolbar includes Image URL (`![alt](https://…)`) and YouTube (`![YouTube](https://www.youtube.com/watch?v=…)`). Paste a generated `docs/content/blog/*.md` file to fill title/SEO and body. Format those files with `cd web && npm run format:cms-articles`.
 - **Publish saves first.** Clicking Publish writes the current body, then sets status to published. Opening a published page that only shows the title usually means Publish was clicked before Save (fixed) or the body was empty.
 
 ## Routes

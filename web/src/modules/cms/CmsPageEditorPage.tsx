@@ -41,9 +41,10 @@ export default function CmsPageEditorPage() {
   const [featuredId, setFeaturedId] = createSignal<number | null>(null);
   const [uploading, setUploading] = createSignal(false);
 
-  createEffect(() => {
+  createEffect((prev: string | undefined) => {
     const d = doc.data;
-    if (!d) return;
+    if (!d) return prev;
+    if (prev === d.updated_at) return prev;
     setTitle(d.title);
     setTopic(cmsTopicOrDefault(d.topic));
     setSlug(d.slug);
@@ -52,6 +53,7 @@ export default function CmsPageEditorPage() {
     setSeoDesc(d.seo_description ?? "");
     setFeaturedId(d.featured_media_id ?? null);
     loadCustom(d.custom_values ?? {});
+    return d.updated_at;
   });
 
   const permalink = () => cmsArticlePath(topic(), slug());
@@ -234,13 +236,13 @@ export default function CmsPageEditorPage() {
               </Show>
             </div>
             <p class="text-xs text-text-secondary">PNG, JPEG, GIF, WebP, or PDF. Max 25 MB. Upload inserts into the body and the featured-image list.</p>
-            <ModalField settings={byKey} fieldKey="body" fallbackLabel="Body">
-              {() => (
+            <ModalField settings={byKey} fieldKey="body" fallbackLabel="Body" as="div">
+              {(m) => (
                 <CmsBodyEditor
                   markdown={body()}
                   onMarkdown={setBody}
                   onPasteArticle={applyPastedArticle}
-                  disabled={!canWrite()}
+                  disabled={!canWrite() || m.disabled}
                 />
               )}
             </ModalField>

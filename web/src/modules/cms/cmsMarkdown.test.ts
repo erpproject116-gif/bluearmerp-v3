@@ -9,6 +9,9 @@ import {
   htmlToMarkdown,
   looksLikeMarkdown,
   markdownToSafeHtml,
+  parseCmsMarkdown,
+  parseYouTubeId,
+  safeHttpsUrl,
 } from "./cmsMarkdownCodec";
 import { insertCmsMediaToken } from "./CmsMarkdown";
 import { permissionCodeForHref } from "../../shared/permissionCodes";
@@ -23,12 +26,12 @@ describe("cms markdown tokens", () => {
 
 describe("cms permalinks", () => {
   it("builds /articles/{topic}/{slug}", () => {
-    expect(cmsArticlePath("sme-walang-sistema", "meron-pa-na-palaging-mali")).toBe(
-      "/articles/sme-walang-sistema/meron-pa-na-palaging-mali",
+    expect(cmsArticlePath("bodega-at-stock", "meron-pa-na-palaging-mali")).toBe(
+      "/articles/bodega-at-stock/meron-pa-na-palaging-mali",
     );
     expect(cmsArticlePath("", "Store Hours")).toBe(`/articles/${DEFAULT_CMS_TOPIC}/store-hours`);
-    expect(safeArticlesPath("/articles/sme-walang-sistema/meron-pa-na-palaging-mali")).toBe(
-      "/articles/sme-walang-sistema/meron-pa-na-palaging-mali",
+    expect(safeArticlesPath("/articles/bodega-at-stock/meron-pa-na-palaging-mali")).toBe(
+      "/articles/bodega-at-stock/meron-pa-na-palaging-mali",
     );
     expect(safeArticlesPath("/articles/../../etc")).toBeNull();
     expect(safeArticlesPath("/app/articles/blog/x")).toBeNull();
@@ -38,9 +41,9 @@ describe("cms permalinks", () => {
 describe("cms permission hrefs", () => {
   it("maps reader and editor paths to cms.pages", () => {
     expect(permissionCodeForHref("/app/cms/p/store-hours")).toBe("cms.pages");
-    expect(permissionCodeForHref("/app/articles/sme-walang-sistema/meron-pa-na-palaging-mali")).toBe("cms.pages");
+    expect(permissionCodeForHref("/app/articles/bodega-at-stock/meron-pa-na-palaging-mali")).toBe("cms.pages");
     expect(permissionCodeForHref("/app/articles")).toBe("cms.pages");
-    expect(permissionCodeForHref("/articles/sme-walang-sistema/meron-pa-na-palaging-mali")).toBeUndefined();
+    expect(permissionCodeForHref("/articles/bodega-at-stock/meron-pa-na-palaging-mali")).toBeUndefined();
     expect(permissionCodeForHref("/app/cms/pages/42")).toBe("cms.pages");
     expect(permissionCodeForHref("/app/cms/pages/settings")).toBe("cms.pages");
     expect(permissionCodeForHref("/app/cms/media")).toBe("cms.media");
@@ -90,6 +93,24 @@ Sa **tindahan**, meron pa.
     expect(back).toContain("<strong>");
   });
 
+  it("parses https images and YouTube as blocks", () => {
+    expect(safeHttpsUrl("javascript:alert(1)")).toBeNull();
+    expect(safeHttpsUrl("https://cdn.example.com/a.jpg")).toBe("https://cdn.example.com/a.jpg");
+    expect(parseYouTubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(parseYouTubeId("https://youtu.be/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(parseYouTubeId("https://evil.example/watch?v=dQw4w9WgXcQ")).toBeNull();
+    const md = "![Store](https://cdn.example.com/a.jpg)\n\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ\n";
+    const blocks = parseCmsMarkdown(md);
+    expect(blocks.some((b) => b.type === "img" && b.src === "https://cdn.example.com/a.jpg")).toBe(true);
+    expect(blocks.some((b) => b.type === "youtube" && b.id === "dQw4w9WgXcQ")).toBe(true);
+    const html = markdownToSafeHtml(md);
+    expect(html).toContain("cdn.example.com/a.jpg");
+    expect(html).toContain("data-cms-youtube=\"dQw4w9WgXcQ\"");
+    const round = htmlToMarkdown(html);
+    expect(round).toContain("![Store](https://cdn.example.com/a.jpg)");
+    expect(round).toContain("dQw4w9WgXcQ");
+  });
+
   it("formats the meron-pa article for CMS paste", () => {
     const path = resolve(
       dirname(fileURLToPath(import.meta.url)),
@@ -99,7 +120,7 @@ Sa **tindahan**, meron pa.
     const formatted = formatCmsArticleDocument(raw);
     const pasted = extractCmsArticlePaste(formatted);
     expect(pasted.slug).toBe("meron-pa-na-palaging-mali");
-    expect(pasted.topic).toBe("sme-walang-sistema");
+    expect(pasted.topic).toBe("bodega-at-stock");
     expect(pasted.body).toContain("## Akala ninyo okay pa");
     expect(pasted.body).toContain('**"meron pa"**');
     expect(formatted.startsWith("---\n")).toBe(true);

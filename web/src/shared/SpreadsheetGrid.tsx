@@ -780,15 +780,23 @@ export function EntityModal(props: {
   );
 }
 
-export function Field(props: { label: string | JSX.Element; span?: "full"; children: JSX.Element }) {
-  return (
-    <label class={props.span === "full" ? "col-span-full block" : "block"}>
+export function Field(props: {
+  label: string | JSX.Element;
+  span?: "full";
+  /** Use div for contenteditable / rich text so the browser does not steal clicks. */
+  as?: "label" | "div";
+  children: JSX.Element;
+}) {
+  const cls = () => (props.span === "full" ? "col-span-full block" : "block");
+  const inner = () => (
+    <>
       <span class="mb-1 block text-sm font-medium" style={{ color: "var(--color-label, var(--color-text-primary))" }}>
         {props.label}
       </span>
       {props.children}
-    </label>
+    </>
   );
+  return props.as === "div" ? <div class={cls()}>{inner()}</div> : <label class={cls()}>{inner()}</label>;
 }
 
 export function ModalMessage(props: { children: JSX.Element }) {

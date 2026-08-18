@@ -4,13 +4,13 @@ number: 1
 lang: tl
 status: draft
 title: Bakit palaging nagsisinungaling ang "meron pa" sa SME?
-topic: sme-walang-sistema
+topic: bodega-at-stock
 slug: meron-pa-na-palaging-mali
 seo_title: Bakit palaging mali ang "meron pa" kung walang sistema
 seo_description: Sa maraming SME, ang "meron pa" ay tiwala — hindi numero. Excel, Viber, at memorya ng bodega. Hanggang may customer sa counter at wala na pala.
 cms_paste:
   title: Bakit palaging nagsisinungaling ang "meron pa" sa SME?
-  topic: sme-walang-sistema
+  topic: bodega-at-stock
   slug: meron-pa-na-palaging-mali
   seo_title: Bakit palaging mali ang "meron pa" kung walang sistema
   seo_description: Sa maraming SME, ang "meron pa" ay tiwala — hindi numero. Excel, Viber, at memorya ng bodega. Hanggang may customer sa counter at wala na pala.

@@ -6,7 +6,9 @@ export type CmsMdBlock =
   | { type: "ol"; items: string[] }
   | { type: "h"; level: 2 | 3; text: string }
   | { type: "quote"; text: string }
-  | { type: "code"; text: string };
+  | { type: "code"; text: string }
+  | { type: "img"; alt: string; src: string }
+  | { type: "youtube"; id: string };
 
 export type CmsArticlePaste = {
   body: string;
@@ -18,6 +20,72 @@ export type CmsArticlePaste = {
 };
 
 const WRAP = 88;
+const YT_ID = /^[a-zA-Z0-9_-]{11}$/;
+
+/** https only — no javascript:, data:, or credentials. */
+export function safeHttpsUrl(raw: string): string | null {
+  const s = (raw || "").trim();
+  if (!s || s.length > 2048 || /[\s\\\x00<>"]/.test(s)) return null;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:") return null;
+  if (u.username || u.password) return null;
+  return u.toString();
+}
+
+export function parseYouTubeId(raw: string): string | null {
+  const s = (raw || "").trim();
+  if (YT_ID.test(s)) return s;
+  const url = safeHttpsUrl(s);
+  if (!url) return null;
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.replace(/^www\./, "").toLowerCase();
+  let id = "";
+  if (host === "youtu.be") {
+    id = u.pathname.split("/").filter(Boolean)[0] ?? "";
+  } else if (host === "youtube.com" || host === "youtube-nocookie.com" || host === "m.youtube.com") {
+    if (u.searchParams.get("v")) id = u.searchParams.get("v") ?? "";
+    else {
+      const parts = u.pathname.split("/").filter(Boolean);
+      if ((parts[0] === "embed" || parts[0] === "shorts" || parts[0] === "live") && parts[1]) id = parts[1];
+    }
+  }
+  id = id.replace(/[^a-zA-Z0-9_-]/g, "");
+  return YT_ID.test(id) ? id : null;
+}
+
+export function youtubeWatchUrl(id: string): string {
+  return `https://www.youtube.com/watch?v=${id}`;
+}
+
+export function youtubeEmbedUrl(id: string): string {
+  return `https://www.youtube-nocookie.com/embed/${id}`;
+}
+
+function parseStandaloneEmbed(text: string): CmsMdBlock | null {
+  const m = text.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+  if (m) {
+    const alt = m[1] ?? "";
+    const dest = (m[2] ?? "").trim();
+    if (/^cms-media:\d+$/.test(dest)) return null;
+    const yt = parseYouTubeId(dest);
+    if (yt) return { type: "youtube", id: yt };
+    const url = safeHttpsUrl(dest);
+    if (url) return { type: "img", alt, src: url };
+    return null;
+  }
+  const yt = parseYouTubeId(text);
+  return yt ? { type: "youtube", id: yt } : null;
+}
 
 export function escapeHtml(s: string): string {
   return s
@@ -33,7 +101,17 @@ export function inlineMarkdownToHtml(raw: string): string {
     const a = escapeHtml(String(alt ?? ""));
     return `<span class="cms-media-chip" contenteditable="false" data-cms-media="${id}" data-alt="${a}">[image: ${a || id}]</span>`;
   });
-  s = s.replace(/\[([^\]]+)\]\((\/app\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, (_m, label, href) => {
+  s = s.replace(/!\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g, (_m, alt, href) => {
+    const yt = parseYouTubeId(String(href));
+    if (yt) {
+      return `<span class="cms-yt-chip" contenteditable="false" data-cms-youtube="${yt}">[YouTube]</span>`;
+    }
+    const url = safeHttpsUrl(String(href));
+    if (!url) return escapeHtml(String(alt ?? ""));
+    const a = escapeHtml(String(alt ?? ""));
+    return `<img class="cms-url-img" src="${escapeHtml(url)}" alt="${a}" />`;
+  });
+  s = s.replace(/\[([^\]]+)\]\((\/articles(?:\/[^)\s]+)?|\/app\/[^)\s]+|https?:\/\/[^)\s]+)\)/g, (_m, label, href) => {
     return `<a href="${escapeHtml(String(href))}">${label}</a>`;
   });
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -114,7 +192,9 @@ export function parseCmsMarkdown(md: string): CmsMdBlock[] {
       para.push(lines[i] ?? "");
       i += 1;
     }
-    blocks.push({ type: "p", text: para.join(" ").replace(/\s+/g, " ").trim() });
+    const text = para.join(" ").replace(/\s+/g, " ").trim();
+    const embed = parseStandaloneEmbed(text);
+    blocks.push(embed ?? { type: "p", text });
   }
   return blocks;
 }
@@ -133,6 +213,14 @@ export function markdownToSafeHtml(md: string): string {
       parts.push(`<ol>${block.items.map((it) => `<li>${inlineMarkdownToHtml(it)}</li>`).join("")}</ol>`);
     } else if (block.type === "quote") {
       parts.push(`<blockquote><p>${inlineMarkdownToHtml(block.text)}</p></blockquote>`);
+    } else if (block.type === "img") {
+      parts.push(
+        `<p><img class="cms-url-img" src="${escapeHtml(block.src)}" alt="${escapeHtml(block.alt)}" /></p>`,
+      );
+    } else if (block.type === "youtube") {
+      parts.push(
+        `<div class="cms-yt-chip" contenteditable="false" data-cms-youtube="${escapeHtml(block.id)}">[YouTube]</div>`,
+      );
     } else {
       parts.push(`<pre>${escapeHtml(block.text)}</pre>`);
     }
@@ -190,7 +278,8 @@ export function looksLikeMarkdown(text: string): boolean {
   if (/(?:^|\n)>\s+\S/.test(s)) return true;
   if (/(?:^|\n)(?:[-*]|\d+\.)\s+\S/.test(s)) return true;
   if (/!\[[^\]]*\]\(cms-media:\d+\)/.test(s)) return true;
-  if (/\[[^\]]+\]\((\/app\/|https?:\/\/)/.test(s)) return true;
+  if (/!\[[^\]]*\]\(https:\/\/[^)\s]+\)/.test(s)) return true;
+  if (/\[[^\]]+\]\((\/articles(?:\/)?|\/app\/|https?:\/\/)/.test(s)) return true;
   return false;
 }
 
@@ -223,6 +312,8 @@ export function formatCmsMarkdownBody(md: string): string {
     else if (block.type === "ul") out.push(block.items.map((it) => `- ${it.trim()}`).join("\n"));
     else if (block.type === "ol") out.push(block.items.map((it, i) => `${i + 1}. ${it.trim()}`).join("\n"));
     else if (block.type === "quote") out.push(wrapLine(block.text).split("\n").map((l) => `> ${l}`).join("\n"));
+    else if (block.type === "img") out.push(`![${block.alt}](${block.src})`);
+    else if (block.type === "youtube") out.push(`![YouTube](${youtubeWatchUrl(block.id)})`);
     else out.push(`\`\`\`\n${block.text}\n\`\`\``);
   }
   return `${out.join("\n\n").trim()}\n`;
@@ -253,6 +344,25 @@ function nodeToMarkdown(node: Node): string {
     const id = attr(el, "data-cms-media");
     const alt = attr(el, "data-alt") || (el.textContent ?? "").replace(/^\[image:\s?/, "").replace(/\]$/, "");
     return `![${alt}](cms-media:${id})`;
+  }
+  if (el.hasAttribute("data-cms-youtube")) {
+    const id = parseYouTubeId(attr(el, "data-cms-youtube"));
+    if (id) return `\n\n![YouTube](${youtubeWatchUrl(id)})\n\n`;
+    return "";
+  }
+  if (tag === "img") {
+    const src = attr(el, "src");
+    const alt = attr(el, "alt");
+    const yt = parseYouTubeId(src);
+    if (yt) return `\n\n![YouTube](${youtubeWatchUrl(yt)})\n\n`;
+    const url = safeHttpsUrl(src);
+    if (url) return `\n\n![${alt}](${url})\n\n`;
+    return "";
+  }
+  if (tag === "iframe") {
+    const id = parseYouTubeId(attr(el, "src"));
+    if (id) return `\n\n![YouTube](${youtubeWatchUrl(id)})\n\n`;
+    return "";
   }
   const inner = childMarkdown(el);
   switch (tag) {
