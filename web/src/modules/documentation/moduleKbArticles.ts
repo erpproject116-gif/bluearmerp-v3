@@ -1130,6 +1130,8 @@ export const moduleKbArticles: KbArticle[] = [
         type: "steps",
         items: [
           "Open Dashboard for sales, stock, and finance alerts — Start here checklist until setup is complete.",
+          "Use the Intelligence tab for inventory, sales, why sales/purchase orders are still open, purchases, and follow-ups. Export each chart as CSV, PNG, or PDF.",
+          "Period summary adds the same open-now SO/PO/follow-up charts under the weekly or monthly snapshot.",
           "Selling → Receivable Status and Buying → Payable Status for as-of AR/AP.",
           "Sales → Pre-Invoicing and Buying → Pre-Invoicing (Purchases) for unbilled backlog.",
           "Finance → Customer/Vendor Book I (AR/AP) for slip-level ledgers.",

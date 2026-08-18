@@ -16,6 +16,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 			kpi.Get("/summary", summaryHandler(pool))
 			kpi.Get("/financial-health", financialHealthHandler(pool))
 			kpi.Get("/period-summary", periodSummaryHandler(pool))
+			kpi.Get("/ops-intelligence", opsIntelligenceHandler(pool))
 		})
 
 		dr.Group(func(charts chi.Router) {

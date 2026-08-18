@@ -2,6 +2,7 @@
 export const hrefPermissionCode: Record<string, string> = {
   "/app/dashboard": "dashboard.view",
   "/app/dashboard/approvals": "dashboard.view",
+  "/app/dashboard/period-summary": "dashboard.view",
   "/app/dashboard/site-map": "dashboard.view",
   "/app/baiko": "dashboard.view",
   "/app/copilot": "dashboard.view",

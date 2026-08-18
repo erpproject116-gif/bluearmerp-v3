@@ -18,8 +18,10 @@ import {
   useDashboardTopItems,
   useDashboardTopVendors,
   type DashboardRedFlagCategory,
-  type DashboardTrendPoint,
 } from "../../shared/useDashboard";
+import { useOpsIntelligence } from "../../shared/useOpsIntelligence";
+import { BiReportCard } from "./BiReportCard";
+import { OpsIntelligencePanel } from "./OpsIntelligencePanel";
 
 function int(n: number) {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -38,7 +40,7 @@ const kpiTiles: KpiTile[] = [
   { label: "Sales YTD", value: (s) => s?.sales_ytd ?? 0, href: "/app/sales/sales", format: "money" },
   { label: "Low stock SKUs", value: (s) => s?.low_stock_count ?? 0, href: "/app/crm/reports/low-stock", accent: "text-amber-600" },
   { label: "A/R customers", value: (s) => s?.ar_customers ?? 0, href: "/app/finance/reports/ar-by-customer" },
-  { label: "Open PO lines", value: (s) => s?.open_po_lines ?? 0, href: "/app/purchase-request/purchase-orders" },
+  { label: "Open PO lines", value: (s) => s?.open_po_lines ?? 0, href: "/app/purchase-order/purchase-orders" },
   { label: "Warranty tasks", value: (s) => s?.warranty_due ?? 0, href: "/app/crm/follow-up-tasks" },
   { label: "Expired quotes", value: (s) => s?.expired_quotes ?? 0, href: "/app/quotation/quotations/outstanding", accent: "text-red-600" },
   { label: "Quotes expiring (7d)", value: (s) => s?.quotes_expiring_7d ?? 0, href: "/app/quotation/quotations/outstanding", accent: "text-amber-600" },
@@ -50,7 +52,7 @@ const redFlagLinks: Record<string, string> = {
   expired_quotes: "/app/quotation/quotations/outstanding",
   serial_qty_mismatch: "/app/inventory/serial-lot/registry",
   reserved_stale: "/app/inventory/serial-lot/registry",
-  open_po: "/app/purchase-request/purchase-orders",
+  open_po: "/app/purchase-order/purchase-orders",
   so_release_gap: "/app/sales-order/sales-orders/release",
   reserve_without_dr: "/app/sales-order/delivery-receipts/new",
   dr_without_invoice: "/app/sales/sales/new",
@@ -59,39 +61,6 @@ const redFlagLinks: Record<string, string> = {
   budget_overrun: "/app/finance/reports/budget-vs-actual",
   overdue_ar: "/app/finance/reports/ar-aging",
 };
-
-function CssBarChart(props: { title: string; points: DashboardTrendPoint[]; valueFormat?: "money" | "int" }) {
-  const max = () => Math.max(...props.points.map((p) => p.value), 1);
-  const format = (v: number) => (props.valueFormat === "money" ? formatPeso(v) : int(v));
-
-  return (
-    <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
-      <h3 class="mb-4 text-sm font-semibold text-text-primary">{props.title}</h3>
-      <Show when={props.points.length > 0} fallback={<p class="text-sm text-text-secondary">No data.</p>}>
-        <div class="flex items-end gap-1 sm:gap-2" style={{ height: "160px" }}>
-          <For each={props.points}>
-            {(pt) => {
-              const pct = () => Math.max(4, (pt.value / max()) * 100);
-              return (
-                <div class="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
-                  <span class="text-[10px] text-text-secondary" title={format(pt.value)}>
-                    {pt.value > 0 ? format(pt.value) : ""}
-                  </span>
-                  <div
-                    class="w-full rounded-t bg-brand-500/80"
-                    style={{ height: `${pct()}%` }}
-                    title={`${pt.period}: ${format(pt.value)}`}
-                  />
-                  <span class="truncate text-[10px] text-text-secondary">{pt.period}</span>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </Show>
-    </section>
-  );
-}
 
 function RankedList(props: { title: string; items: { label: string; value: string }[]; emptyText: string }) {
   return (
@@ -141,8 +110,7 @@ function RedFlagsTable(props: { categories: DashboardRedFlagCategory[]; total: n
 
 export default function DashboardPage() {
   const [params, setParams] = useSearchParams();
-  // Business overview is the default landing tab; MyPage is opt-in via ?tab=mypage.
-  const tab = () => (params.tab === "mypage" ? "mypage" : "overview");
+  const tab = () => (params.tab === "mypage" ? "mypage" : params.tab === "intel" ? "intel" : "overview");
 
   const summary = useDashboardSummary();
   const salesTrend = useDashboardSalesTrend();
@@ -151,6 +119,7 @@ export default function DashboardPage() {
   const topCustomers = useDashboardTopCustomers();
   const topVendors = useDashboardTopVendors();
   const topItems = useDashboardTopItems();
+  const intelPreview = useOpsIntelligence(() => tab() === "overview");
 
   const loading = () => summary.isLoading;
   const summaryData = () => summary.data;
@@ -181,12 +150,14 @@ export default function DashboardPage() {
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-semibold text-text-primary">
-            {tab() === "overview" ? "Business overview" : "MyPage"}
+            {tab() === "overview" ? "Business overview" : tab() === "intel" ? "Operations intelligence" : "MyPage"}
           </h2>
           <p class="text-sm text-text-secondary">
             {tab() === "overview"
               ? "KPIs, trends, and financial health for this workspace."
-              : "Guided home — learn links and process flow."}
+              : tab() === "intel"
+                ? "Inventory, sales, open orders, purchases, and follow-ups — with Chart.js and CSV/PNG/PDF export."
+                : "Guided home — learn links and process flow."}
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -201,6 +172,17 @@ export default function DashboardPage() {
               onClick={() => setParams({ tab: undefined })}
             >
               Business overview
+            </button>
+            <button
+              type="button"
+              class="rounded-md px-3 py-1.5 font-medium transition"
+              classList={{
+                "bg-brand-600 text-white": tab() === "intel",
+                "text-text-secondary hover:text-text-primary": tab() !== "intel",
+              }}
+              onClick={() => setParams({ tab: "intel" })}
+            >
+              Intelligence
             </button>
             <button
               type="button"
@@ -268,9 +250,60 @@ export default function DashboardPage() {
           </For>
         </div>
 
+        <Show when={intelPreview.data}>
+          {(d) => (
+            <A
+              href="/app/dashboard?tab=intel"
+              class="mt-4 grid gap-3 rounded-xl border border-stroke bg-white p-4 shadow-sm transition hover:shadow-md sm:grid-cols-4"
+            >
+              <div>
+                <p class="text-xs uppercase tracking-wide text-text-secondary">Open SO headers</p>
+                <p class="mt-1 text-xl font-bold text-text-primary">{int(d().sales_orders.open_headers)}</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wide text-text-secondary">Classified SO</p>
+                <p class="mt-1 text-xl font-bold text-text-primary">{int(d().sales_orders.classified_headers)}</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wide text-text-secondary">Open PO headers</p>
+                <p class="mt-1 text-xl font-bold text-text-primary">{int(d().purchase_orders.open_headers)}</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wide text-text-secondary">Pending approvals</p>
+                <p class="mt-1 text-xl font-bold text-text-primary">{int(d().follow_up.pending_approvals)}</p>
+              </div>
+            </A>
+          )}
+        </Show>
+
         <div class="mt-6 grid gap-4 lg:grid-cols-2">
-          <CssBarChart title="Sales trend (12 months)" points={salesTrend.data?.points ?? []} valueFormat="money" />
-          <CssBarChart title="Inventory receipts (12 months)" points={inventoryTrend.data?.points ?? []} valueFormat="int" />
+          <BiReportCard
+            id="overview-sales-trend"
+            title="Sales invoices (12 months)"
+            type="bar"
+            labels={(salesTrend.data?.points ?? []).map((p) => p.period)}
+            values={(salesTrend.data?.points ?? []).map((p) => p.value)}
+            valueFormat="money"
+            columns={[
+              { key: "period", header: "Period", value: (r) => String(r.period ?? "") },
+              { key: "value", header: "Amount", value: (r) => Number(r.value ?? 0) },
+            ]}
+            rows={(salesTrend.data?.points ?? []).map((p) => ({ period: p.period, value: p.value }))}
+          />
+          <BiReportCard
+            id="overview-inbound-trend"
+            title="Inbound stock qty (all movement types)"
+            caption="Positive stock movements, not goods receipts only."
+            type="bar"
+            labels={(inventoryTrend.data?.points ?? []).map((p) => p.period)}
+            values={(inventoryTrend.data?.points ?? []).map((p) => p.value)}
+            valueFormat="int"
+            columns={[
+              { key: "period", header: "Period", value: (r) => String(r.period ?? "") },
+              { key: "value", header: "Qty", value: (r) => Number(r.value ?? 0) },
+            ]}
+            rows={(inventoryTrend.data?.points ?? []).map((p) => ({ period: p.period, value: p.value }))}
+          />
         </div>
 
         <div class="mt-6">
@@ -282,6 +315,10 @@ export default function DashboardPage() {
           <RankedList title="Top vendors (90d)" items={vendorItems()} emptyText="No purchase orders in the last 90 days." />
           <RankedList title="Top selling items (90d)" items={itemItems()} emptyText="No sales lines in the last 90 days." />
         </div>
+      </Show>
+
+      <Show when={tab() === "intel"}>
+        <OpsIntelligencePanel variant="full" />
       </Show>
     </DashboardLayout>
   );

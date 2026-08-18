@@ -53,17 +53,17 @@ export type DashboardRedFlags = {
   categories: DashboardRedFlagCategory[];
 };
 
-export function useDashboardSummary(enabled = true) {
+export function useDashboardSummary(enabled: boolean | (() => boolean) = true) {
   return createQuery(() => ({
     queryKey: ["dashboard-summary"],
-    enabled,
+    enabled: typeof enabled === "function" ? enabled() : enabled,
     queryFn: async () => {
       const res = await apiFetch<DashboardSummary>("/api/v1/dashboard/summary");
       if (!res.success) throw new Error(res.message ?? "Failed to load dashboard summary");
       return res.data ?? ({} as DashboardSummary);
     },
     staleTime: 30_000,
-    refetchInterval: enabled ? 60_000 : false,
+    refetchInterval: (typeof enabled === "function" ? enabled() : enabled) ? 60_000 : false,
   }));
 }
 
@@ -160,5 +160,6 @@ export function useInvalidateDashboard() {
     void client.invalidateQueries({ queryKey: ["dashboard-top-vendors"] });
     void client.invalidateQueries({ queryKey: ["dashboard-top-items"] });
     void client.invalidateQueries({ queryKey: ["dashboard-red-flags"] });
+    void client.invalidateQueries({ queryKey: ["dashboard-ops-intelligence"] });
   };
 }
