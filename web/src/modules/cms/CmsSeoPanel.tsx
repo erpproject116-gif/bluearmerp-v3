@@ -36,31 +36,33 @@ export function CmsSeoPanel(props: {
   const usingDefaultTitle = () => !(props.seoTitle || "").trim();
   const usingDefaultDesc = () => !(props.seoDescription || "").trim();
   return (
-    <section class="rounded-lg border border-stroke bg-slate-50 p-3 space-y-3">
+    <section class="rounded-lg border border-stroke bg-slate-50 p-3">
       <h2 class="text-sm font-semibold text-text-primary">Search & share</h2>
-      <div class="rounded-md border border-stroke bg-white p-3">
-        <p class="text-xs text-text-secondary">{props.permalink}</p>
-        <p class="text-base text-blue-800">{displayTitle()}</p>
-        <p class="text-sm text-text-secondary">{displayDesc()}</p>
-        <Show when={usingDefaultTitle()}>
-          <p class="mt-1 text-xs text-text-secondary">Using default: from title</p>
-        </Show>
-        <Show when={usingDefaultDesc()}>
-          <p class="text-xs text-text-secondary">Using default: from first paragraph</p>
-        </Show>
-        <p class="mt-2 text-xs text-text-secondary">
-          Title {titleLen().chars} chars ({titleLen().band}) · Description {descLen().chars} chars ({descLen().band})
-        </p>
+      <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[3fr_2fr]">
+        <div class="rounded-md border border-stroke bg-white p-3">
+          <p class="text-xs text-text-secondary">{props.permalink}</p>
+          <p class="text-base text-blue-800">{displayTitle()}</p>
+          <p class="text-sm text-text-secondary">{displayDesc()}</p>
+          <Show when={usingDefaultTitle()}>
+            <p class="mt-1 text-xs text-text-secondary">Using default: from title</p>
+          </Show>
+          <Show when={usingDefaultDesc()}>
+            <p class="text-xs text-text-secondary">Using default: from first paragraph</p>
+          </Show>
+          <p class="mt-2 text-xs text-text-secondary">
+            Title {titleLen().chars} chars ({titleLen().band}) · Description {descLen().chars} chars ({descLen().band})
+          </p>
+        </div>
+        <ul class="space-y-1 text-sm">
+          <For each={checks()}>
+            {(c) => (
+              <li class={c.ok ? "text-emerald-700" : c.warn ? "text-amber-700" : "text-red-700"}>
+                {c.ok ? "Pass" : "Warn"} — {c.label}
+              </li>
+            )}
+          </For>
+        </ul>
       </div>
-      <ul class="space-y-1 text-sm">
-        <For each={checks()}>
-          {(c) => (
-            <li class={c.ok ? "text-emerald-700" : c.warn ? "text-amber-700" : "text-red-700"}>
-              {c.ok ? "Pass" : "Warn"} — {c.label}
-            </li>
-          )}
-        </For>
-      </ul>
     </section>
   );
 }

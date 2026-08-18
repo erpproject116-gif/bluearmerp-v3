@@ -11,7 +11,7 @@ import {
   renderNotFoundHtml,
   renderRobotsTxt,
   renderSitemapXml,
-} from "../src/modules/cms/cmsPublicHtml";
+} from "../lib/cms-public/publicHtml";
 
 type Envelope<T> = { success?: boolean; data?: T; meta?: { total?: number }; message?: string };
 
@@ -45,8 +45,15 @@ function envOf(): { siteUrl: string; apiBase: string; siteName: string } {
 
 async function fetchJson<T>(url: string): Promise<Envelope<T>> {
   const res = await fetch(url, { headers: { accept: "application/json" } });
-  const json = (await res.json()) as Envelope<T>;
-  return json;
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`CMS API ${res.status} for ${url}: ${text.slice(0, 200)}`);
+  }
+  try {
+    return JSON.parse(text) as Envelope<T>;
+  } catch {
+    throw new Error(`CMS API returned non-JSON from ${url}`);
+  }
 }
 
 function send(res: ServerResponse, status: number, contentType: string, body: string, extra?: Record<string, string>) {
@@ -145,6 +152,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     send(res, 404, "text/html; charset=utf-8", nf.html, { "Content-Security-Policy": nf.csp });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to render.";
+    console.error("cms-public:", msg);
     send(res, 502, "text/plain; charset=utf-8", msg);
   }
 }

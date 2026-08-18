@@ -216,46 +216,50 @@ export default function CmsPageEditorPage() {
                 <input class={`${inputClass} text-lg font-semibold`} value={title()} disabled={m.disabled || !canWrite()} onInput={(e) => { setTitle(e.currentTarget.value); scheduleAutosave(); }} />
               )}
             </ModalField>
-            <ModalField settings={byKey} fieldKey="topic" fallbackLabel="Topic cluster">
-              {(m) => (
-                <>
-                  <input
-                    class={inputClass}
-                    list="cms-topics"
-                    placeholder={DEFAULT_CMS_TOPIC}
-                    value={topic()}
-                    disabled={m.disabled || !canWrite()}
-                    onInput={(e) => { setTopic(e.currentTarget.value); scheduleAutosave(); }}
-                  />
-                  <datalist id="cms-topics">
-                    <For each={topics.data ?? []}>{(t) => <option value={t.topic} />}</For>
-                  </datalist>
-                </>
-              )}
-            </ModalField>
-            <ModalField settings={byKey} fieldKey="slug" fallbackLabel="Slug" fallbackRequired>
-              {(m) => (
-                <input class={inputClass} value={slug()} disabled={m.disabled || !canWrite()} onInput={(e) => { setSlug(e.currentTarget.value); scheduleAutosave(); }} />
-              )}
-            </ModalField>
-            <ModalField settings={byKey} fieldKey="lang" fallbackLabel="Language">
-              {(m) => (
-                <input class={inputClass} value={lang()} disabled={m.disabled || !canWrite()} onInput={(e) => { setLang(e.currentTarget.value); scheduleAutosave(); }} />
-              )}
-            </ModalField>
-            <ModalField settings={byKey} fieldKey="visibility" fallbackLabel="Visibility">
-              {(m) => (
-                <select class={inputClass} value={visibility()} disabled={m.disabled || !canWrite()} onChange={(e) => { setVisibility(e.currentTarget.value); scheduleAutosave(); }}>
-                  <option value="internal">Internal</option>
-                  <option value="public">Public catalog</option>
-                </select>
-              )}
-            </ModalField>
-            <ModalField settings={byKey} fieldKey="focus_phrase" fallbackLabel="Focus phrase">
-              {(m) => (
-                <input class={inputClass} value={focusPhrase()} disabled={m.disabled || !canWrite()} onInput={(e) => { setFocusPhrase(e.currentTarget.value); scheduleAutosave(); }} />
-              )}
-            </ModalField>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <ModalField settings={byKey} fieldKey="topic" fallbackLabel="Topic cluster">
+                {(m) => (
+                  <>
+                    <input
+                      class={inputClass}
+                      list="cms-topics"
+                      placeholder={DEFAULT_CMS_TOPIC}
+                      value={topic()}
+                      disabled={m.disabled || !canWrite()}
+                      onInput={(e) => { setTopic(e.currentTarget.value); scheduleAutosave(); }}
+                    />
+                    <datalist id="cms-topics">
+                      <For each={topics.data ?? []}>{(t) => <option value={t.topic} />}</For>
+                    </datalist>
+                  </>
+                )}
+              </ModalField>
+              <ModalField settings={byKey} fieldKey="slug" fallbackLabel="Slug" fallbackRequired>
+                {(m) => (
+                  <input class={inputClass} value={slug()} disabled={m.disabled || !canWrite()} onInput={(e) => { setSlug(e.currentTarget.value); scheduleAutosave(); }} />
+                )}
+              </ModalField>
+              <ModalField settings={byKey} fieldKey="lang" fallbackLabel="Language">
+                {(m) => (
+                  <input class={inputClass} value={lang()} disabled={m.disabled || !canWrite()} onInput={(e) => { setLang(e.currentTarget.value); scheduleAutosave(); }} />
+                )}
+              </ModalField>
+            </div>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <ModalField settings={byKey} fieldKey="visibility" fallbackLabel="Visibility">
+                {(m) => (
+                  <select class={inputClass} value={visibility()} disabled={m.disabled || !canWrite()} onChange={(e) => { setVisibility(e.currentTarget.value); scheduleAutosave(); }}>
+                    <option value="internal">Internal</option>
+                    <option value="public">Public catalog</option>
+                  </select>
+                )}
+              </ModalField>
+              <ModalField settings={byKey} fieldKey="focus_phrase" fallbackLabel="Focus phrase">
+                {(m) => (
+                  <input class={inputClass} value={focusPhrase()} disabled={m.disabled || !canWrite()} onInput={(e) => { setFocusPhrase(e.currentTarget.value); scheduleAutosave(); }} />
+                )}
+              </ModalField>
+            </div>
             <ModalField settings={byKey} fieldKey="seo_title" fallbackLabel="SEO title">
               {(m) => (
                 <input class={inputClass} placeholder="Browser tab title (optional)" value={seoTitle()} disabled={m.disabled || !canWrite()} onInput={(e) => { setSeoTitle(e.currentTarget.value); scheduleAutosave(); }} />
@@ -278,58 +282,35 @@ export default function CmsPageEditorPage() {
               featuredMediaAlt={featuredAlt()}
               focusPhrase={focusPhrase()}
             />
-            <div class="flex flex-wrap items-end gap-3">
-              <div class="min-w-[14rem] flex-1">
-                <ModalField settings={byKey} fieldKey="featured_media_id" fallbackLabel="Featured image">
-                  {(m) => (
-                    <select
-                      class={inputClass}
-                      disabled={m.disabled || !canWrite()}
-                      value={featuredId() ?? ""}
-                      onChange={(e) => { setFeaturedId(e.currentTarget.value ? Number(e.currentTarget.value) : null); scheduleAutosave(); }}
-                    >
-                      <option value="">None</option>
-                      <For each={media.data?.rows ?? []}>
-                        {(row) => (
-                          <option value={row.id}>{row.file_name}</option>
-                        )}
-                      </For>
-                    </select>
-                  )}
-                </ModalField>
-              </div>
+            <div class="flex flex-wrap items-end gap-2">
               <Show when={canWrite()}>
-                <div class="shrink-0">
-                  <span class="mb-1 block text-sm font-medium" style={{ color: "var(--color-label, var(--color-text-primary))" }}>
-                    Insert image
-                  </span>
-                  <label
-                    class={`inline-flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-stroke bg-white px-3 text-sm font-medium text-text-primary shadow-sm hover:bg-slate-50 ${uploading() ? "pointer-events-none opacity-60" : ""}`}
-                  >
-                    <span>{uploading() ? "Uploading…" : "Upload image"}</span>
-                    <input
-                      type="file"
-                      class="sr-only"
-                      accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
-                      disabled={uploading()}
-                      onChange={(e) => {
-                        const f = e.currentTarget.files?.[0];
-                        e.currentTarget.value = "";
-                        if (f) void insertMedia(f);
-                      }}
-                    />
-                  </label>
-                </div>
+                <label
+                  class={`inline-flex h-[38px] shrink-0 cursor-pointer items-center rounded-lg border border-stroke bg-white px-3 text-sm font-medium text-text-primary shadow-sm hover:bg-slate-50 ${uploading() ? "pointer-events-none opacity-60" : ""}`}
+                >
+                  <span>{uploading() ? "Uploading…" : "Upload image"}</span>
+                  <input
+                    type="file"
+                    class="sr-only"
+                    accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
+                    disabled={uploading()}
+                    onChange={(e) => {
+                      const f = e.currentTarget.files?.[0];
+                      e.currentTarget.value = "";
+                      if (f) void insertMedia(f);
+                    }}
+                  />
+                </label>
               </Show>
-            </div>
-            <p class="text-xs text-text-secondary">PNG, JPEG, GIF, WebP, or PDF. Max 25 MB. Upload inserts into the body and the featured-image list.</p>
-            <Show when={canGenerate()}>
-              <div class="rounded-lg border border-stroke p-3 space-y-2">
-                <p class="text-sm font-medium">Draft with Baiko</p>
-                <input class={inputClass} placeholder="Optional ugat / angle" value={ugat()} onInput={(e) => setUgat(e.currentTarget.value)} />
+              <Show when={canGenerate()}>
+                <input
+                  class={`${inputClass} min-w-[12rem] flex-1`}
+                  placeholder="Optional ugat / angle"
+                  value={ugat()}
+                  onInput={(e) => setUgat(e.currentTarget.value)}
+                />
                 <button
                   type="button"
-                  class="rounded-lg border border-stroke px-3 py-2 text-sm"
+                  class="inline-flex h-[38px] shrink-0 items-center rounded-lg border border-stroke bg-white px-3 text-sm font-medium text-text-primary shadow-sm hover:bg-slate-50 disabled:opacity-60"
                   disabled={mutations.generatePage.isPending}
                   onClick={() => {
                     const pageId = id();
@@ -351,8 +332,9 @@ export default function CmsPageEditorPage() {
                 >
                   {mutations.generatePage.isPending ? "Generating…" : "Draft with Baiko"}
                 </button>
-              </div>
-            </Show>
+              </Show>
+            </div>
+            <p class="text-xs text-text-secondary">PNG, JPEG, GIF, WebP, or PDF. Max 25 MB. Upload inserts into the body and sets the featured image when none is set.</p>
             <ModalField settings={byKey} fieldKey="body" fallbackLabel="Body" as="div">
               {(m) => (
                 <CmsBodyEditor

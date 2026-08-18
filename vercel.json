@@ -4,6 +4,12 @@
   "buildCommand": "npm run build --prefix web",
   "outputDirectory": "web/dist",
   "framework": null,
+  "functions": {
+    "web/api/cms-public.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
   "headers": [
     {
       "source": "/app/(.*)",
