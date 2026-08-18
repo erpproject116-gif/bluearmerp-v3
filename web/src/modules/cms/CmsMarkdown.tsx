@@ -1,17 +1,10 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { parseHelpMarkdown, helpMarkdownHasExternalLink } from "../help-assistant/HelpMarkdown";
+import { helpMarkdownHasExternalLink } from "../help-assistant/HelpMarkdown";
 import { safeAppPath } from "../help-assistant/safeAppPath";
 import { fetchCmsMediaObjectUrl } from "../../shared/cmsMedia";
+import { escapeHtml, parseCmsMarkdown } from "./cmsMarkdownCodec";
 
 const mediaToken = /!\[([^\]]*)\]\(cms-media:(\d+)\)/g;
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 function inlineMarkdown(raw: string, mediaUrls: Record<number, string>): string {
   let s = escapeHtml(raw);
@@ -87,7 +80,7 @@ export function CmsMarkdown(props: { content: string; class?: string }) {
 
   return (
     <div class={`cms-md space-y-2.5 text-sm leading-relaxed text-text-primary ${props.class ?? ""}`}>
-      <For each={parseHelpMarkdown(props.content || "")}>
+      <For each={parseCmsMarkdown(props.content || "")}>
         {(block) => {
           if (block.type === "p") {
             return <p class="m-0" innerHTML={inlineMarkdown(block.text, urls())} />;
@@ -109,6 +102,11 @@ export function CmsMarkdown(props: { content: string; class?: string }) {
           if (block.type === "h") {
             const cls = block.level === 2 ? "m-0 text-base font-semibold" : "m-0 text-sm font-medium";
             return <h3 class={cls} innerHTML={inlineMarkdown(block.text, urls())} />;
+          }
+          if (block.type === "quote") {
+            return (
+              <blockquote class="m-0 border-l-2 border-stroke pl-3 text-text-secondary" innerHTML={inlineMarkdown(block.text, urls())} />
+            );
           }
           return (
             <pre class="m-0 overflow-x-auto rounded-lg bg-slate-50 p-2 text-xs">{block.text}</pre>

@@ -10,6 +10,7 @@ This module is **not** Help & guides, SOP, or document attachments on quotations
 - Upload allowlist: PNG, JPEG, GIF, WebP, PDF. Max 25 MB. SVG/HTML/JS are rejected.
 - Download path is `/api/v1/cms/media/{id}/download` so gzip middleware skips compression.
 - SEO columns (`seo_title`, `seo_description`) set the in-app browser tab and reader chrome. They are **not** exposed to crawlers.
+- Page editor is Visual (toolbar) + Markdown source. Storage is markdown. Paste a generated `docs/content/blog/*.md` file to fill title/SEO and body. Format those files with `cd web && npm run format:cms-articles`.
 
 ## Routes
 

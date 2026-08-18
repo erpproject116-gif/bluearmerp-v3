@@ -14,7 +14,8 @@
     "test:e2e:routes:full": "node e2e/scripts/run-full-route-smoke.mjs",
     "e2e:routes:extract": "node e2e/scripts/extract-app-routes.mjs",
     "dead-code": "ts-prune -p tsconfig.app.json",
-    "export:help-corpus": "vitest run src/modules/help-assistant/exportHelpCorpus.test.ts src/modules/help-assistant/exportGoldenQueries.test.ts"
+    "export:help-corpus": "vitest run src/modules/help-assistant/exportHelpCorpus.test.ts src/modules/help-assistant/exportGoldenQueries.test.ts",
+    "format:cms-articles": "vitest run src/modules/cms/formatCmsArticles.export.test.ts"
   },
   "dependencies": {
     "@solidjs/router": "^0.16.1",

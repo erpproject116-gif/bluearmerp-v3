@@ -11,8 +11,10 @@ import { hasPermission, useAuth } from "../../shared/auth-context";
 import { CMS_ENTITY } from "../../shared/entityTypes";
 import { useCmsMedia, useCmsMutations, useCmsPage } from "../../shared/useCms";
 import { uploadCmsMedia } from "../../shared/cmsMedia";
-import { CmsMarkdown, insertCmsMediaToken } from "./CmsMarkdown";
+import { insertCmsMediaToken } from "./CmsMarkdown";
+import { CmsBodyEditor } from "./CmsBodyEditor";
 import { formatFileSize } from "../../shared/attachments";
+import type { CmsArticlePaste } from "./cmsMarkdownCodec";
 
 export default function CmsPageEditorPage() {
   const params = useParams();
@@ -35,7 +37,6 @@ export default function CmsPageEditorPage() {
   const [seoTitle, setSeoTitle] = createSignal("");
   const [seoDesc, setSeoDesc] = createSignal("");
   const [featuredId, setFeaturedId] = createSignal<number | null>(null);
-  const [preview, setPreview] = createSignal(false);
 
   createEffect(() => {
     const d = doc.data;
@@ -86,8 +87,15 @@ export default function CmsPageEditorPage() {
       return;
     }
     setBody((b) => insertCmsMediaToken(b, res.data!.id, res.data!.alt_text || res.data!.file_name));
-    toast.success("Image inserted. Use ![alt](cms-media:id) in markdown.");
+    toast.success("Image inserted.");
     void media.refetch();
+  };
+
+  const applyPastedArticle = (meta: CmsArticlePaste) => {
+    if (meta.title) setTitle(meta.title);
+    if (meta.slug) setSlug(meta.slug);
+    if (meta.seoTitle) setSeoTitle(meta.seoTitle);
+    if (meta.seoDescription) setSeoDesc(meta.seoDescription);
   };
 
   return (
@@ -99,19 +107,13 @@ export default function CmsPageEditorPage() {
       <Show when={doc.data}>
         {(d) => (
           <div class="mt-3 space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-sm text-text-secondary">
-                Status: {d().status}
-                <Show when={d().status === "published"}>
-                  {" "}
-                  · <A class="text-brand-600 hover:underline" href={`/app/cms/p/${d().slug}`}>Open published</A>
-                </Show>
-              </p>
-              <label class="text-sm text-text-secondary">
-                <input type="checkbox" class="mr-1" checked={preview()} onChange={(e) => setPreview(e.currentTarget.checked)} />
-                Preview
-              </label>
-            </div>
+            <p class="text-sm text-text-secondary">
+              Status: {d().status}
+              <Show when={d().status === "published"}>
+                {" "}
+                · <A class="text-brand-600 hover:underline" href={`/app/cms/p/${d().slug}`}>Open published</A>
+              </Show>
+            </p>
             <ModalField settings={byKey} fieldKey="title" fallbackLabel="Title" fallbackRequired>
               {(m) => (
                 <input class={`${inputClass} text-lg font-semibold`} value={title()} disabled={m.disabled || !canWrite()} onInput={(e) => setTitle(e.currentTarget.value)} />
@@ -149,23 +151,16 @@ export default function CmsPageEditorPage() {
                 </select>
               )}
             </ModalField>
-            <Show when={!preview()}>
-              <ModalField settings={byKey} fieldKey="body" fallbackLabel="Body">
-                {(m) => (
-                  <textarea
-                    class={`${inputClass} min-h-[280px] font-mono text-sm`}
-                    value={body()}
-                    disabled={m.disabled || !canWrite()}
-                    onInput={(e) => setBody(e.currentTarget.value)}
-                  />
-                )}
-              </ModalField>
-            </Show>
-            <Show when={preview()}>
-              <div class="rounded-lg border border-stroke bg-white p-4">
-                <CmsMarkdown content={body()} />
-              </div>
-            </Show>
+            <ModalField settings={byKey} fieldKey="body" fallbackLabel="Body">
+              {() => (
+                <CmsBodyEditor
+                  markdown={body()}
+                  onMarkdown={setBody}
+                  onPasteArticle={applyPastedArticle}
+                  disabled={!canWrite()}
+                />
+              )}
+            </ModalField>
             <Show when={canWrite()}>
               <Field label="Insert image from file">
                 <input
@@ -177,7 +172,7 @@ export default function CmsPageEditorPage() {
                     if (f) void insertMedia(f);
                   }}
                 />
-                <p class="mt-1 text-xs text-text-secondary">PNG, JPEG, GIF, WebP, or PDF. Max 25 MB. Inserts a cms-media token in the body.</p>
+                <p class="mt-1 text-xs text-text-secondary">PNG, JPEG, GIF, WebP, or PDF. Max 25 MB. Shown as an image chip in Visual; stored as markdown.</p>
               </Field>
               <CustomFieldsSection entityType={CMS_ENTITY.page} values={customValues} onChange={setCustom} />
               <div class="flex flex-wrap gap-2">

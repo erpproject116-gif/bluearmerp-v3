@@ -1,0 +1,233 @@
+import { Show, createEffect, createSignal, on, type JSX } from "solid-js";
+import {
+  extractCmsArticlePaste,
+  htmlToMarkdown,
+  looksLikeMarkdown,
+  markdownToSafeHtml,
+  type CmsArticlePaste,
+} from "./cmsMarkdownCodec";
+
+export type CmsBodyEditorProps = {
+  markdown: string;
+  onMarkdown: (md: string) => void;
+  onPasteArticle?: (meta: CmsArticlePaste) => void;
+  disabled?: boolean;
+};
+
+type Mode = "visual" | "markdown";
+
+const btn =
+  "rounded border border-stroke px-2 py-1 text-xs font-medium text-text-secondary hover:bg-slate-50 disabled:opacity-40";
+
+export function CmsBodyEditor(props: CmsBodyEditorProps) {
+  const [mode, setMode] = createSignal<Mode>("visual");
+  let editor: HTMLDivElement | undefined;
+  let lastExternal = "";
+
+  const applyVisual = (md: string) => {
+    if (!editor) return;
+    const html = markdownToSafeHtml(md);
+    lastExternal = md;
+    if (editor.innerHTML !== html) editor.innerHTML = html;
+  };
+
+  createEffect(
+    on(
+      () => props.markdown,
+      (md) => {
+        if (mode() !== "visual" || !editor) return;
+        if (md === lastExternal) return;
+        if (document.activeElement === editor) return;
+        applyVisual(md);
+      },
+    ),
+  );
+
+  createEffect(
+    on(mode, (m) => {
+      if (m === "visual") applyVisual(props.markdown);
+    }),
+  );
+
+  const emitFromVisual = () => {
+    if (!editor) return;
+    const md = htmlToMarkdown(editor.innerHTML);
+    lastExternal = md;
+    props.onMarkdown(md);
+  };
+
+  const run = (cmd: string, value?: string) => {
+    if (props.disabled) return;
+    editor?.focus();
+    document.execCommand(cmd, false, value);
+    emitFromVisual();
+  };
+
+  const applyPastedMarkdown = (raw: string, replaceAll: boolean) => {
+    const parsed = extractCmsArticlePaste(raw);
+    if (replaceAll) {
+      props.onPasteArticle?.(parsed);
+      props.onMarkdown(parsed.body);
+      lastExternal = parsed.body;
+      if (mode() === "visual") applyVisual(parsed.body);
+      return;
+    }
+    if (mode() === "visual") {
+      document.execCommand("insertHTML", false, markdownToSafeHtml(parsed.body));
+      emitFromVisual();
+      return;
+    }
+    const cur = props.markdown;
+    const next = cur.trim() ? `${cur.trimEnd()}\n\n${parsed.body}` : parsed.body;
+    lastExternal = next;
+    props.onMarkdown(next);
+  };
+
+  const shouldReplaceAll = (text: string) => text.trimStart().startsWith("---") || !props.markdown.trim();
+
+  const onVisualPaste: JSX.EventHandlerUnion<HTMLDivElement, ClipboardEvent> = (e) => {
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    if (looksLikeMarkdown(text) || text.trimStart().startsWith("---")) {
+      e.preventDefault();
+      applyPastedMarkdown(text, shouldReplaceAll(text));
+      return;
+    }
+    e.preventDefault();
+    const html = e.clipboardData?.getData("text/html") ?? "";
+    if (html && /<(p|h[1-6]|li|strong|b|em|i|ul|ol)\b/i.test(html)) {
+      document.execCommand("insertHTML", false, markdownToSafeHtml(htmlToMarkdown(html)));
+      emitFromVisual();
+      return;
+    }
+    document.execCommand("insertText", false, text);
+    emitFromVisual();
+  };
+
+  const tabCls = (m: Mode) =>
+    `rounded-md px-3 py-1 text-sm ${mode() === m ? "bg-white font-medium text-text-primary shadow-sm" : "text-text-secondary hover:text-text-primary"}`;
+
+  return (
+    <div class="overflow-hidden rounded-lg border border-stroke bg-white">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stroke bg-slate-50 px-2 py-1.5">
+        <div class="flex rounded-lg bg-slate-200/70 p-0.5" role="tablist" aria-label="Editor mode">
+          <button type="button" class={tabCls("visual")} onClick={() => setMode("visual")}>
+            Visual
+          </button>
+          <button type="button" class={tabCls("markdown")} onClick={() => setMode("markdown")}>
+            Markdown
+          </button>
+        </div>
+        <p class="text-[11px] text-text-secondary">Paste a generated .md file — frontmatter fills title/SEO, body stays markdown.</p>
+      </div>
+      <Show when={mode() === "visual"} fallback={
+        <textarea
+          class="min-h-[320px] w-full resize-y border-0 bg-white px-3 py-3 font-mono text-sm leading-relaxed outline-none"
+          value={props.markdown}
+          disabled={props.disabled}
+          spellcheck={true}
+          onInput={(e) => {
+            const v = e.currentTarget.value;
+            lastExternal = v;
+            props.onMarkdown(v);
+          }}
+          onPaste={(e) => {
+            const text = e.clipboardData?.getData("text/plain") ?? "";
+            if (!looksLikeMarkdown(text) && !text.trimStart().startsWith("---")) return;
+            e.preventDefault();
+            applyPastedMarkdown(text, shouldReplaceAll(text));
+          }}
+        />
+      }>
+        <>
+          <div class="flex flex-wrap gap-1 border-b border-stroke bg-slate-50 px-2 py-1.5" role="toolbar" aria-label="Formatting">
+            <button type="button" class={btn} disabled={props.disabled} title="Bold" onMouseDown={(e) => e.preventDefault()} onClick={() => run("bold")}>
+              <strong>B</strong>
+            </button>
+            <button type="button" class={btn} disabled={props.disabled} title="Italic" onMouseDown={(e) => e.preventDefault()} onClick={() => run("italic")}>
+              <em>I</em>
+            </button>
+            <button type="button" class={btn} disabled={props.disabled} title="Heading" onMouseDown={(e) => e.preventDefault()} onClick={() => run("formatBlock", "h2")}>
+              H2
+            </button>
+            <button type="button" class={btn} disabled={props.disabled} title="Subheading" onMouseDown={(e) => e.preventDefault()} onClick={() => run("formatBlock", "h3")}>
+              H3
+            </button>
+            <button type="button" class={btn} disabled={props.disabled} title="Quote" onMouseDown={(e) => e.preventDefault()} onClick={() => run("formatBlock", "blockquote")}>
+              Quote
+            </button>
+            <button type="button" class={btn} disabled={props.disabled} title="Bulleted list" onMouseDown={(e) => e.preventDefault()} onClick={() => run("insertUnorderedList")}>
+              • List
+            </button>
+            <button type="button" class={btn} disabled={props.disabled} title="Numbered list" onMouseDown={(e) => e.preventDefault()} onClick={() => run("insertOrderedList")}>
+              1. List
+            </button>
+            <button
+              type="button"
+              class={btn}
+              disabled={props.disabled}
+              title="Insert link"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const url = window.prompt("Link URL (/app/… or https://)");
+                if (url) run("createLink", url);
+              }}
+            >
+              Link
+            </button>
+            <button type="button" class={btn} disabled={props.disabled} title="Remove formatting" onMouseDown={(e) => e.preventDefault()} onClick={() => run("removeFormat")}>
+              Clear
+            </button>
+          </div>
+          <div class="relative">
+            <div
+              ref={(el) => {
+                editor = el;
+                applyVisual(props.markdown);
+              }}
+              class="cms-rte relative z-[1] min-h-[320px] max-w-none px-3 py-3 text-sm leading-relaxed text-text-primary outline-none"
+              contentEditable={!props.disabled}
+              role="textbox"
+              aria-multiline="true"
+              aria-label="Page body"
+              data-placeholder="Write like WordPress, or paste a markdown article…"
+              onInput={() => emitFromVisual()}
+              onBlur={() => emitFromVisual()}
+              onPaste={onVisualPaste}
+            />
+            <style>{`
+              .cms-rte:empty:before {
+                content: attr(data-placeholder);
+                color: var(--color-text-secondary, #64748b);
+                pointer-events: none;
+                position: absolute;
+                left: 0.75rem;
+                top: 0.75rem;
+              }
+              .cms-rte h2 { font-size: 1.125rem; font-weight: 600; margin: 1em 0 0.4em; }
+              .cms-rte h3 { font-size: 1rem; font-weight: 600; margin: 0.9em 0 0.35em; }
+              .cms-rte p { margin: 0 0 0.75em; }
+              .cms-rte ul, .cms-rte ol { margin: 0 0 0.75em; padding-left: 1.35rem; }
+              .cms-rte li { margin: 0.15em 0; }
+              .cms-rte blockquote {
+                margin: 0 0 0.75em;
+                padding-left: 0.75rem;
+                border-left: 3px solid #cbd5e1;
+                color: #475569;
+              }
+              .cms-rte a { color: #2563eb; text-decoration: underline; }
+              .cms-rte .cms-media-chip {
+                display: inline-block;
+                padding: 0.1rem 0.4rem;
+                border-radius: 0.25rem;
+                background: #f1f5f9;
+                font-size: 0.75rem;
+                color: #475569;
+              }
+              .cms-rte p:last-child { margin-bottom: 0; }
+            `}</style>
+          </div>
+        </>
+      </Show>
+    </div>
+  );
+}
