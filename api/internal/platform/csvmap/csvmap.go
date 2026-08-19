@@ -10,7 +10,7 @@ import (
 )
 
 const DefaultMaxBytes = 5 << 20
-const DefaultMaxRows = 500
+const DefaultMaxRows = 5000
 
 // Remap rewrites CSV rows so headers become canonical keys.
 // columnMap maps canonical key → source CSV header name in the uploaded file.
@@ -100,6 +100,20 @@ func ReadUpload(r *http.Request, maxBytes int64, loadProfile func(profileID int6
 }
 
 func resolveColumnMap(r *http.Request, loadProfile func(profileID int64) (map[string]string, error)) (map[string]string, error) {
+	rawMap := strings.TrimSpace(r.FormValue("column_map"))
+	if rawMap != "" {
+		var colMap map[string]string
+		if err := json.Unmarshal([]byte(rawMap), &colMap); err != nil {
+			return nil, fmt.Errorf("column_map must be valid JSON object")
+		}
+		if colMap == nil {
+			colMap = map[string]string{}
+		}
+		// Live map wins when both profile_id and column_map are sent.
+		if len(colMap) > 0 {
+			return colMap, nil
+		}
+	}
 	if rawID := strings.TrimSpace(r.FormValue("profile_id")); rawID != "" {
 		profileID, err := strconv.ParseInt(rawID, 10, 64)
 		if err != nil || profileID <= 0 {
@@ -110,18 +124,7 @@ func resolveColumnMap(r *http.Request, loadProfile func(profileID int64) (map[st
 		}
 		return loadProfile(profileID)
 	}
-	rawMap := strings.TrimSpace(r.FormValue("column_map"))
-	if rawMap == "" {
-		return nil, fmt.Errorf("profile_id or column_map is required")
-	}
-	var colMap map[string]string
-	if err := json.Unmarshal([]byte(rawMap), &colMap); err != nil {
-		return nil, fmt.Errorf("column_map must be valid JSON object")
-	}
-	if colMap == nil {
-		colMap = map[string]string{}
-	}
-	return colMap, nil
+	return nil, fmt.Errorf("profile_id or column_map is required")
 }
 
 // RowsToMaps converts remapped CSV (header + rows) into maps keyed by header.

@@ -16,8 +16,8 @@ const STEP_HINTS: Record<string, string> = {
   currency_tax: "Confirm PHP currency and VAT types for quotations and invoices.",
   process_policies: "Review which documents are required before the next step in your workflow.",
   location: "Confirm your stock location (HQ / branches) before moving inventory.",
-  partners: "Add at least one customer or supplier before quotes and purchases.",
-  items: "Add products or services you sell or buy.",
+  partners: "Add at least one customer or supplier before quotes and purchases. CSV import is optional.",
+  items: "Add products or services you sell or buy. CSV import is optional.",
   team: "Invite teammates when you are ready — you can finish setup first.",
 };
 

@@ -13,11 +13,11 @@ import (
 // Keep both sides in sync when Migration Center gains fields.
 var migEntityFields = map[string][]string{
 	"items": {
-		"item_name", "purchase_price", "sales_price", "vip_price", "status",
+		"item_code", "item_name", "purchase_price", "sales_price", "vip_price", "status",
 		"track_serial", "track_lot", "serial_policy", "lot_policy", "track_inventory_qty", "warranty_duration_months",
 		"spec_name", "unit", "item_category", "item_type", "oe_price",
 	},
-	"partners": {"company_name", "partner_kind", "ceo_name", "phone", "mobile", "email", "address", "tin", "status"},
+	"partners": {"partner_code", "company_name", "partner_kind", "ceo_name", "phone", "mobile", "email", "address", "tin", "status"},
 	"accounts": {"account_code", "account_name", "account_type", "is_group", "is_active", "sort_order"},
 }
 

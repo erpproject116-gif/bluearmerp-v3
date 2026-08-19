@@ -21,8 +21,8 @@ Setting **Root Directory** to `web` is the most important step — Vercel will n
 | `SUPABASE_URL` | `https://YOUR_REF.supabase.co` |
 | `SUPABASE_ANON_KEY` | Supabase anon public key |
 | `VITE_API_BASE_URL` | Render API URL, e.g. `https://bluearm-api.onrender.com` |
-| `CMS_API_BASE_URL` | Same Render API URL for `/articles` HTML (serverless; no `VITE_` prefix). No trailing slash. |
-| `PUBLIC_SITE_URL` | Canonical site origin, e.g. `https://YOUR-APP.vercel.app`. No trailing slash. |
+| `CMS_API_BASE_URL` | **Same Render API URL** — not `app.bluearmerp.com`. Serverless `/articles` calls this at runtime (no `VITE_` prefix). No trailing slash. |
+| `PUBLIC_SITE_URL` | Canonical site origin, e.g. `https://app.bluearmerp.com`. No trailing slash. |
 | `CMS_SITE_NAME` | Optional. Default `Bluearm`. |
 | `VITE_CMS_PUBLIC_TENANT_CODE` | Optional. Company code that may use Draft with Baiko (default `BLUEARM`). Must match Render `CMS_PUBLIC_TENANT_CODE`. |
 

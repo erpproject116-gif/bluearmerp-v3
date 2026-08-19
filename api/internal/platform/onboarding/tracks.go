@@ -41,6 +41,7 @@ var onboardingTracks = []trackDef{
 			{ID: "process_policies", Label: "Review process policies", Href: "/app/user-management/process-policies", Description: "Set quotation-before-SO, GR-before-invoice, attachment requirements, and release mode gates.", KbArticleID: "process-policies-foundation", Required: false},
 			{ID: "tenant_modules", Label: "Review modules & features", Href: "/app/user-management/tenant-modules", Description: "Enable POS, WMS, Data Center, Quality, and other optional modules.", Required: false},
 			{ID: "mapping_center", Label: "Review Mapping Center", Href: "/app/user-management/mapping-center", Description: "Configure Generate Other Slips rules between documents.", Required: false},
+			{ID: "cutover_import", Label: "Optional: import from another system", Href: "/app/user-management/migration-center", Description: "Skip this if you will enter data in Bluearm. Mapped CSV/XLSX is for opening stock and remaining unpaid documents only — not paid history.", KbArticleID: "migration-center", Required: false},
 			{ID: "invite_team", Label: "Invite your team", Href: "/app/user-management/users", Description: "Add colleagues with roles and permissions.", KbArticleID: "user-management-admin", Required: false},
 		},
 	},
@@ -158,51 +159,53 @@ var onboardingTracks = []trackDef{
 }
 
 type extendedAck struct {
-	ProcessPoliciesAck bool `json:"process_policies_ack"`
-	MappingCenterAck   bool `json:"mapping_center_ack"`
-	ModulesReviewAck   bool `json:"modules_review_ack"`
+	ProcessPoliciesAck   bool `json:"process_policies_ack"`
+	MappingCenterAck     bool `json:"mapping_center_ack"`
+	CutoverImportAck     bool `json:"cutover_import_ack"`
+	ModulesReviewAck     bool `json:"modules_review_ack"`
 	BusinessDashboardAck bool `json:"business_dashboard_ack"`
-	PosManageAck       bool `json:"pos_manage_ack"`
-	StockReconAck      bool `json:"stock_reconciliation_ack"`
+	PosManageAck         bool `json:"pos_manage_ack"`
+	StockReconAck        bool `json:"stock_reconciliation_ack"`
 	ReportCatalogAck     bool `json:"report_catalog_ack"`
 	ReportsPracticeAck   bool `json:"reports_practice_ack"`
 	TrialBalanceAck      bool `json:"trial_balance_ack"`
 }
 
 type detectionSnapshot struct {
-	Quotation          bool
-	SalesOrder         bool
-	SORelease          bool
-	DeliveryNote       bool
-	SalesInvoice       bool
-	OfficialReceipt    bool
-	PurchaseRequest    bool
-	RFQ                bool
-	PurchaseOrder      bool
-	GoodsReceipt       bool
-	GRSerial           bool
-	SupplierInvoice    bool
-	PaymentVoucher     bool
-	SerialItem         bool
-	SerialReceive      bool
-	SerialSale         bool
-	PosLocationSet     bool
-	PosCategories      bool
-	PosCatalogItems    bool
-	PosSession         bool
-	PosCheckout        bool
-	PosSerialCheckout  bool
-	PosShiftClosed     bool
-	JournalEntry       bool
-	BankRecon          bool
-	FollowUpTask       bool
-	RepairOrder        bool
-	SupportTicket      bool
-	QualityNCR         bool
-	TeamInvited        bool
+	Quotation           bool
+	SalesOrder          bool
+	SORelease           bool
+	DeliveryNote        bool
+	SalesInvoice        bool
+	OfficialReceipt     bool
+	PurchaseRequest     bool
+	RFQ                 bool
+	PurchaseOrder       bool
+	GoodsReceipt        bool
+	GRSerial            bool
+	SupplierInvoice     bool
+	PaymentVoucher      bool
+	SerialItem          bool
+	SerialReceive       bool
+	SerialSale          bool
+	PosLocationSet      bool
+	PosCategories       bool
+	PosCatalogItems     bool
+	PosSession          bool
+	PosCheckout         bool
+	PosSerialCheckout   bool
+	PosShiftClosed      bool
+	JournalEntry        bool
+	BankRecon           bool
+	FollowUpTask        bool
+	RepairOrder         bool
+	SupportTicket       bool
+	QualityNCR          bool
+	TeamInvited         bool
+	CutoverImport       bool
 	OperationsWorkspace bool
 	OperationsWorkItem  bool
-	CommsSent          bool
+	CommsSent           bool
 }
 
 func buildTracks(ctx context.Context, pool *pgxpool.Pool, tenantID int64, readiness setupreadiness.Payload) ([]map[string]any, int, map[string]any) {
@@ -266,7 +269,7 @@ func buildTracks(ctx context.Context, pool *pgxpool.Pool, tenantID int64, readin
 		overall = (doneSteps * 100) / totalSteps
 	}
 	return tracks, overall, map[string]any{
-		"pos_enabled": modules["pos"],
+		"pos_enabled":                  modules["pos"],
 		"foundation_required_complete": readiness.RequiredComplete,
 	}
 }
@@ -300,6 +303,8 @@ func stepDone(trackID, stepID string, readiness setupreadiness.Payload, ack exte
 		return ack.ModulesReviewAck
 	case "mapping_center":
 		return ack.MappingCenterAck
+	case "cutover_import":
+		return ack.CutoverImportAck || snap.CutoverImport
 	case "invite_team":
 		return snap.TeamInvited
 	case "quotation":
@@ -389,7 +394,7 @@ func stepDone(trackID, stepID string, readiness setupreadiness.Payload, ack exte
 
 func isAckStep(stepID string) bool {
 	switch stepID {
-	case "process_policies", "tenant_modules", "mapping_center", "pos_manage",
+	case "process_policies", "tenant_modules", "mapping_center", "cutover_import", "pos_manage",
 		"business_dashboard", "stock_reconciliation", "report_catalog", "trial_balance",
 		"purchase_pre_invoicing", "receivable_payable", "customer_vendor_book":
 		return true
@@ -399,18 +404,19 @@ func isAckStep(stepID string) bool {
 }
 
 var ackStepKeys = map[string]string{
-	"process_policies":      "process_policies_ack",
-	"tenant_modules":        "modules_review_ack",
-	"mapping_center":        "mapping_center_ack",
-	"pos_manage":            "pos_manage_ack",
-	"business_dashboard":    "business_dashboard_ack",
-	"stock_reconciliation":  "stock_reconciliation_ack",
-	"report_catalog":        "report_catalog_ack",
-	"reports_practice":      "reports_practice_ack",
+	"process_policies":       "process_policies_ack",
+	"tenant_modules":         "modules_review_ack",
+	"mapping_center":         "mapping_center_ack",
+	"cutover_import":         "cutover_import_ack",
+	"pos_manage":             "pos_manage_ack",
+	"business_dashboard":     "business_dashboard_ack",
+	"stock_reconciliation":   "stock_reconciliation_ack",
+	"report_catalog":         "report_catalog_ack",
+	"reports_practice":       "reports_practice_ack",
 	"purchase_pre_invoicing": "reports_practice_ack",
-	"receivable_payable":    "reports_practice_ack",
-	"customer_vendor_book":  "reports_practice_ack",
-	"trial_balance":         "trial_balance_ack",
+	"receivable_payable":     "reports_practice_ack",
+	"customer_vendor_book":   "reports_practice_ack",
+	"trial_balance":          "trial_balance_ack",
 }
 
 func AckOnboardingStep(ctx context.Context, pool *pgxpool.Pool, tenantID int64, stepID string) error {
@@ -545,6 +551,8 @@ func detectSnapshot(ctx context.Context, pool *pgxpool.Pool, tenantID int64) det
 	s.TeamInvited = count(`
 		select count(*)::int from public.users
 		where tenant_id=$1 and status='active'`, tenantID) > 1
+	s.CutoverImport = exists(`select count(*)::int from public.mig_import_keys where tenant_id=$1`, tenantID) ||
+		exists(`select count(*)::int from public.mig_import_profiles where tenant_id=$1`, tenantID)
 
 	return s
 }

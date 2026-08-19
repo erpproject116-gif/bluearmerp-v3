@@ -1,60 +1,46 @@
 package migration
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/csvmap"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
 var partnerCanonical = []string{
-	"company_name", "partner_kind", "ceo_name", "phone", "mobile", "email", "address", "tin", "status",
+	"partner_code", "company_name", "partner_kind", "ceo_name", "phone", "mobile", "email", "address", "tin", "status",
 }
 var partnerRequired = []string{"company_name", "partner_kind"}
 
 func importPartnersMapped(pool *pgxpool.Pool) http.HandlerFunc {
+	return mappedPartnersHandler(pool, false)
+}
+
+func previewPartnersMapped(pool *pgxpool.Pool) http.HandlerFunc {
+	return mappedPartnersHandler(pool, true)
+}
+
+func mappedPartnersHandler(pool *pgxpool.Pool, forcePreview bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		records, colMap, err := csvmap.ReadUpload(r, csvmap.DefaultMaxBytes, func(profileID int64) (map[string]string, error) {
-			m, e := loadProfileColumnMap(r.Context(), pool, tu.TenantID, profileID, "partners")
-			if e == errKindMismatch {
-				return nil, fmt.Errorf("import profile kind does not match partners")
-			}
-			return m, e
-		})
-		if err != nil {
-			response.Validation(w, map[string]string{"file": err.Error()})
+		rows, ok := readMapped(w, r, pool, "partners", partnerRequired, partnerCanonical)
+		if !ok {
 			return
 		}
-		remapped, err := csvmap.Remap(records, colMap, partnerRequired, partnerCanonical)
-		if err != nil {
-			response.Validation(w, map[string]string{"column_map": err.Error()})
-			return
-		}
-		rows := csvmap.RowsToMaps(remapped)
-		if len(rows) > csvmap.DefaultMaxRows {
-			response.Validation(w, map[string]string{"file": fmt.Sprintf("Maximum %d rows per import.", csvmap.DefaultMaxRows)})
-			return
-		}
-
+		dry := forcePreview || parseJobDefaults(r).DryRun
 		result := importResult{}
 		for i, row := range rows {
 			rowNum := i + 2
 			name := strings.TrimSpace(row["company_name"])
 			kind := strings.ToLower(strings.TrimSpace(row["partner_kind"]))
 			if name == "" {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, importRowError{Row: rowNum, Message: "company_name is required"})
+				failRow(&result, rowNum, "company_name is required")
 				continue
 			}
 			if kind != "customer" && kind != "vendor" && kind != "both" {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, importRowError{Row: rowNum, Message: "partner_kind must be customer, vendor, or both"})
+				failRow(&result, rowNum, "partner_kind must be customer, vendor, or both")
 				continue
 			}
 			status := strings.ToLower(strings.TrimSpace(row["status"]))
@@ -62,11 +48,42 @@ func importPartnersMapped(pool *pgxpool.Pool) http.HandlerFunc {
 				status = "active"
 			}
 			if status != "active" && status != "inactive" {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, importRowError{Row: rowNum, Message: "status must be active or inactive"})
+				failRow(&result, rowNum, "status must be active or inactive")
 				continue
 			}
 
+			existingID, matchErr := lookupPartner(r.Context(), pool, tu.TenantID, "", strings.TrimSpace(row["tin"]), kind)
+			if existingID == 0 {
+				existingID, matchErr = lookupPartner(r.Context(), pool, tu.TenantID, name, "", kind)
+			}
+			if matchErr != "" && !strings.HasPrefix(matchErr, "unmatched") {
+				failRow(&result, rowNum, matchErr)
+				continue
+			}
+			if existingID > 0 {
+				if dry {
+					result.Updated++
+					continue
+				}
+				_, err := pool.Exec(r.Context(), `
+					update public.inv_partners set
+					  partner_kind = $2, company_name = $3, ceo_name = $4,
+					  phone = $5, mobile = $6, email = $7, address = $8, tin = $9, status = $10, updated_at = now()
+					where id = $1 and tenant_id = $11`,
+					existingID, kind, name, nullIfEmpty(row["ceo_name"]),
+					nullIfEmpty(row["phone"]), nullIfEmpty(row["mobile"]), nullIfEmpty(row["email"]),
+					nullIfEmpty(row["address"]), nullIfEmpty(row["tin"]), status, tu.TenantID)
+				if err != nil {
+					failRow(&result, rowNum, err.Error())
+					continue
+				}
+				result.Updated++
+				continue
+			}
+			if dry {
+				result.Created++
+				continue
+			}
 			var id int64
 			err := pool.QueryRow(r.Context(), `
 				insert into public.inv_partners (
@@ -81,12 +98,11 @@ func importPartnersMapped(pool *pgxpool.Pool) http.HandlerFunc {
 				nullIfEmpty(row["address"]), nullIfEmpty(row["tin"]), status,
 			).Scan(&id)
 			if err != nil {
-				result.Failed++
-				result.RowErrors = append(result.RowErrors, importRowError{Row: rowNum, Message: err.Error()})
+				failRow(&result, rowNum, err.Error())
 				continue
 			}
 			result.Created++
 		}
-		response.OK(w, result, "Import finished.")
+		writeImportResult(w, result, dry)
 	}
 }

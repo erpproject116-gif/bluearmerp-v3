@@ -33,12 +33,46 @@ function previewTokenFrom(req: IncomingMessage, url: URL): string {
   return q ? new URLSearchParams(q).get("preview") || "" : "";
 }
 
+function trimSlash(s: string): string {
+  return (s || "").replace(/\/+$/, "");
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function resolveApiBase(siteUrl: string): string {
+  const siteHost = hostOf(siteUrl);
+  const cms = trimSlash(process.env.CMS_API_BASE_URL || "");
+  if (cms) {
+    if (siteHost && hostOf(cms) === siteHost) {
+      throw new Error(
+        "CMS_API_BASE_URL must be your Render API URL (e.g. https://bluearmerp-v3.onrender.com), not PUBLIC_SITE_URL.",
+      );
+    }
+    return cms;
+  }
+  const vite = trimSlash(process.env.VITE_API_BASE_URL || "");
+  if (vite) {
+    if (siteHost && hostOf(vite) === siteHost) {
+      throw new Error(
+        "Set CMS_API_BASE_URL to your Render API URL on Vercel. VITE_API_BASE_URL points at the web app, which returns HTML for /api.",
+      );
+    }
+    return vite;
+  }
+  return "";
+}
+
 function envOf(): { siteUrl: string; apiBase: string; siteName: string } {
-  const apiBase = (process.env.CMS_API_BASE_URL || process.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
-  const siteUrl = (process.env.PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+  const siteUrl = trimSlash(process.env.PUBLIC_SITE_URL || "") || "https://bluearmerp.com";
   return {
-    apiBase,
-    siteUrl: siteUrl || "https://bluearmerp.com",
+    apiBase: resolveApiBase(siteUrl),
+    siteUrl,
     siteName: process.env.CMS_SITE_NAME || "Bluearm",
   };
 }
@@ -52,7 +86,11 @@ async function fetchJson<T>(url: string): Promise<Envelope<T>> {
   try {
     return JSON.parse(text) as Envelope<T>;
   } catch {
-    throw new Error(`CMS API returned non-JSON from ${url}`);
+    const hint =
+      text.trimStart().startsWith("<!") || text.trimStart().startsWith("<html")
+        ? " Got HTML — CMS_API_BASE_URL is probably set to the Vercel app URL instead of Render."
+        : "";
+    throw new Error(`CMS API returned non-JSON from ${url}.${hint}`);
   }
 }
 
@@ -72,7 +110,14 @@ function redirect(res: ServerResponse, location: string) {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  const env = envOf();
+  let env: ReturnType<typeof envOf>;
+  try {
+    env = envOf();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Invalid CMS_API_BASE_URL.";
+    send(res, 503, "text/plain; charset=utf-8", msg);
+    return;
+  }
   const host = req.headers.host || "localhost";
   const proto = (req.headers["x-forwarded-proto"] as string) || "https";
   const url = new URL(req.url || "/", `${proto}://${host}`);

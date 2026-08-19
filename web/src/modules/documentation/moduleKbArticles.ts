@@ -1383,24 +1383,24 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "migration-center",
-    title: "Migration Center — import CSV from other systems",
-    scenario: "You are moving partners, items, or chart of accounts from another platform into Bluearm.",
+    title: "Migration Center — optional cutover from another system",
+    scenario: "You are new to Bluearm and may be moving partners, items, opening stock, or unpaid invoices from another platform.",
     intro:
-      "Migration Center lets you upload CSV files, map foreign column names to Bluearm fields, save mapping profiles for reuse, and import into partners, items, or GL accounts.",
+      "Migration Center is optional. Skip it if you will enter data in Bluearm. If you do import, upload CSV or Excel, map columns, Preview (no writes), then Import. Use remaining unpaid amounts and current on-hand only — not paid history.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open User Management → Migration Center.",
-          "Choose Chart of accounts, Customers & suppliers, or Products.",
-          "Upload a CSV, map each Bluearm field to a source column (required fields are marked).",
-          "Optionally save the mapping as a named profile for the next import.",
-          "Run Import, then open the destination list to review created rows.",
+          "Open User Management → Migration Center. Every card is optional.",
+          "Masters first if needed: Chart of accounts, then partners, then items. Re-import updates matches (TIN/code/name) instead of duplicating.",
+          "Set bank opening balances under Banking. Import opening stock as current on-hand (serial/lot items fail — receive those separately).",
+          "Optionally import remaining unpaid sales invoices and supplier invoices. These stay unconfirmed and do not move stock.",
+          "Do not import Official Receipts or paid history. New BIR-facing numbers start at go-live.",
         ],
       },
       {
         type: "tip",
-        text: "Recommended order: accounts → partners → items. Profiles are per tenant and entity kind, so you can keep separate maps for QuickBooks, Xero, or spreadsheet exports.",
+        text: "Mapping Center is a different product (document-generation rules such as quotation → sales order). CSV/Excel column mapping lives only in Migration Center. Preview before Import. Second import of the same source document number is skipped.",
       },
     ],
     primaryHref: "/app/user-management/migration-center",
