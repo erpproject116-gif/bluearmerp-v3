@@ -1,7 +1,8 @@
 import { createSignal, For, onMount, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { MigrationMappedImportModal } from "./MigrationMappedImportModal";
-import { takeMigImportSeed, type MigImportSeed, type MigKind } from "../../shared/migrationCsvImport";
+import { takeMigImportSeed, downloadMigImportTemplate, type MigImportSeed, type MigKind } from "../../shared/migrationCsvImport";
+import { useToast } from "../../shared/toast";
 
 type EntityCard = {
   kind: MigKind;
@@ -77,6 +78,7 @@ const OPEN_DOCS: EntityCard[] = [
 ];
 
 function CardGrid(props: { items: EntityCard[]; onImport: (kind: MigKind) => void }) {
+  const toast = useToast();
   return (
     <div class="grid gap-4 md:grid-cols-3">
       <For each={props.items}>
@@ -98,6 +100,13 @@ function CardGrid(props: { items: EntityCard[]; onImport: (kind: MigKind) => voi
                 onClick={() => props.onImport(e.kind)}
               >
                 Import file
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
+                onClick={() => void downloadMigImportTemplate(e.kind).catch(() => toast.error("Could not download template."))}
+              >
+                Download template
               </button>
               <A href={e.href} class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50">
                 Open list

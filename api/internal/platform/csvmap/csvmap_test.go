@@ -72,3 +72,20 @@ func TestResolveColumnMapLiveWins(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+func TestRemapStripsUTF8BOM(t *testing.T) {
+	records := [][]string{
+		{"\ufeffItem Name", "SRP"},
+		{"Pen", "10"},
+	}
+	got, err := Remap(records, map[string]string{
+		"item_name":   "Item Name",
+		"sales_price": "SRP",
+	}, []string{"item_name"}, []string{"item_name", "sales_price"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[1][0] != "Pen" || got[1][1] != "10" {
+		t.Fatalf("row1 = %v", got[1])
+	}
+}
