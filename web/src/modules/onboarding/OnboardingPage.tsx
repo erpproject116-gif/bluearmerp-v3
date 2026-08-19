@@ -8,7 +8,7 @@ import { useOnboarding } from "../../shared/usePlatform";
 const PLAYBOOK_WEEKS = [
   {
     title: "Week 1 — Foundation & admin",
-    body: "Complete workspace setup, review process policies (including attachment rules), enable modules, and invite your team.",
+    body: "Complete workspace setup, review process policies (including attachment rules), enable modules, and invite your team. Importing from another system is optional — skip Migration Center if you will enter data in Bluearm.",
     tracks: ["foundation", "admin"],
   },
   {

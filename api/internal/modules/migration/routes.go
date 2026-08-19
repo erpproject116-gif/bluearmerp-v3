@@ -48,8 +48,21 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Put("/import-profiles", upsertProfile(pool))
 		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Delete("/import-profiles/{id}", deleteProfile(pool))
 		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/items/import-mapped", importItemsMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/items/preview-mapped", previewItemsMapped(pool))
 		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/partners/import-mapped", importPartnersMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/partners/preview-mapped", previewPartnersMapped(pool))
 		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/accounts/import-mapped", importAccountsMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/accounts/preview-mapped", previewAccountsMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/opening-stock/import-mapped", importOpeningStockMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/opening-stock/preview-mapped", previewOpeningStockMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/open-si/import-mapped", importOpenSIMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/open-si/preview-mapped", previewOpenSIMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/open-ap/import-mapped", importOpenAPMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/open-ap/preview-mapped", previewOpenAPMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/open-po/import-mapped", importOpenPOMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/open-po/preview-mapped", previewOpenPOMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/in-transit/import-mapped", importInTransitMapped(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/in-transit/preview-mapped", previewInTransitMapped(pool))
 	})
 }
 
@@ -106,8 +119,8 @@ func upsertProfile(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		kind := strings.TrimSpace(body.Kind)
 		name := strings.TrimSpace(body.Name)
-		if kind != "items" && kind != "partners" && kind != "accounts" {
-			response.Validation(w, map[string]string{"kind": "Kind must be items, partners, or accounts."})
+		if !allowedKinds[kind] {
+			response.Validation(w, map[string]string{"kind": "Unknown import kind."})
 			return
 		}
 		if name == "" {

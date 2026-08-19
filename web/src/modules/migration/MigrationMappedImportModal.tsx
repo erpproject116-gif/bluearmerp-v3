@@ -6,12 +6,18 @@ import {
   importMigMapped,
   listMigImportProfiles,
   MIG_ENTITY_FIELDS,
+  MIG_NEEDS_JOB_DEFAULTS,
   MIG_REQUIRED,
+  previewMigMapped,
+  spreadsheetToCsvFile,
   upsertMigImportProfile,
   type MigImportProfile,
+  type MigImportResult,
   type MigImportSeed,
   type MigKind,
 } from "../../shared/migrationCsvImport";
+import { useActiveCurrencies, useActiveTaxTypes, fetchLocationOptions } from "../../shared/useDocumentLookups";
+import type { LookupOption } from "../../shared/LookupCombo";
 
 type Props = {
   open: boolean;
@@ -19,7 +25,6 @@ type Props = {
   title: string;
   onClose: () => void;
   onImported: () => void;
-  /** Optional Baiko attachment seed: prefills the file and column map for review. */
   seed?: MigImportSeed | null;
 };
 
@@ -32,6 +37,10 @@ export function MigrationMappedImportModal(props: Props) {
   const toast = useToast();
   const fields = () => MIG_ENTITY_FIELDS[props.kind];
   const required = () => MIG_REQUIRED[props.kind];
+  const needsJob = () => MIG_NEEDS_JOB_DEFAULTS[props.kind];
+  const taxTypes = useActiveTaxTypes(() => props.open && needsJob());
+  const currencies = useActiveCurrencies(() => props.open && needsJob());
+  const [locations, setLocations] = createSignal<LookupOption[]>([]);
   const [file, setFile] = createSignal<File | null>(null);
   const [headers, setHeaders] = createSignal<string[]>([]);
   const [map, setMap] = createSignal<Record<string, string>>({});
@@ -40,6 +49,10 @@ export function MigrationMappedImportModal(props: Props) {
   const [selectedProfileId, setSelectedProfileId] = createSignal<number | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [seedNote, setSeedNote] = createSignal("");
+  const [taxTypeId, setTaxTypeId] = createSignal<number | null>(null);
+  const [currencyId, setCurrencyId] = createSignal<number | null>(null);
+  const [locationId, setLocationId] = createSignal<number | null>(null);
+  const [preview, setPreview] = createSignal<MigImportResult | null>(null);
 
   createEffect(() => {
     if (!props.open) return;
@@ -49,9 +62,16 @@ export function MigrationMappedImportModal(props: Props) {
     setProfileName("");
     setSelectedProfileId(null);
     setSeedNote("");
+    setPreview(null);
+    setTaxTypeId(null);
+    setCurrencyId(null);
+    setLocationId(null);
     void listMigImportProfiles(props.kind).then((res) => {
       if (res.success && res.data) setProfiles(res.data);
     });
+    if (needsJob()) {
+      void fetchLocationOptions("").then(setLocations);
+    }
     const seed = props.seed;
     if (seed && seed.kind === props.kind && seed.csv_text?.trim()) {
       void applySeed(seed);
@@ -71,23 +91,29 @@ export function MigrationMappedImportModal(props: Props) {
     }
     setSeedNote(
       seed.truncated
-        ? "Prefilled from your Baiko attachment, but the extracted text was truncated — pick the original file above before importing."
-        : "Prefilled from your Baiko attachment. Review the mapping, then Import.",
+        ? "Prefilled from your Baiko attachment, but the extracted text was truncated — pick the original CSV or Excel file above before importing."
+        : "Prefilled from your Baiko attachment. Review the mapping, Preview, then Import.",
     );
     if (seed.truncated) setFile(null);
   };
 
   const onPickFile = async (f: File) => {
-    setFile(f);
-    const text = await f.text();
-    const hdrs = parseHeaders(text);
-    setHeaders(hdrs);
-    const next: Record<string, string> = {};
-    for (const field of fields()) {
-      const hit = hdrs.find((h) => h.toLowerCase() === field.toLowerCase());
-      if (hit) next[field] = hit;
+    try {
+      const csv = await spreadsheetToCsvFile(f);
+      setFile(csv);
+      const text = await csv.text();
+      const hdrs = parseHeaders(text);
+      setHeaders(hdrs);
+      const next: Record<string, string> = {};
+      for (const field of fields()) {
+        const hit = hdrs.find((h) => h.toLowerCase() === field.toLowerCase());
+        if (hit) next[field] = hit;
+      }
+      setMap(next);
+      setPreview(null);
+    } catch (err) {
+      toast.warning(err instanceof Error ? err.message : "Could not read spreadsheet.");
     }
-    setMap(next);
   };
 
   const applyProfile = (id: number) => {
@@ -99,29 +125,65 @@ export function MigrationMappedImportModal(props: Props) {
     }
   };
 
-  const run = async () => {
+  const jobOpts = () => ({
+    tax_type_id: taxTypeId(),
+    currency_id: currencyId(),
+    location_id: locationId(),
+  });
+
+  const validateMaps = () => {
     const f = file();
     if (!f) {
-      toast.warning("Choose a CSV file first.");
-      return;
+      toast.warning("Choose a CSV or Excel file first.");
+      return null;
     }
     const columnMap = map();
     for (const req of required()) {
       if (!columnMap[req]) {
         toast.warning(`Map required field: ${req}`);
-        return;
+        return null;
       }
     }
+    if (needsJob()) {
+      if (!taxTypeId() || !currencyId() || !locationId()) {
+        toast.warning("Choose tax type, currency, and warehouse for this import.");
+        return null;
+      }
+    }
+    return { file: f, columnMap };
+  };
+
+  const runPreview = async () => {
+    const ready = validateMaps();
+    if (!ready) return;
+    setBusy(true);
+    try {
+      const res = await previewMigMapped(props.kind, ready.file, { columnMap: ready.columnMap, job: jobOpts() });
+      if (!res.success || !res.data) {
+        toast.warning(res.message ?? "Preview failed.");
+        return;
+      }
+      setPreview(res.data);
+      if (res.data.failed > 0) {
+        toast.warning(`${res.data.failed} row(s) would fail. Fix the file or mapping before Import.`);
+      } else {
+        toast.success(`Preview: ${res.data.created} would be created${res.data.updated ? `, ${res.data.updated} updated` : ""}.`);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const run = async () => {
+    const ready = validateMaps();
+    if (!ready) return;
     setBusy(true);
     try {
       const name = profileName().trim();
       if (name) {
-        await upsertMigImportProfile({ kind: props.kind, name, column_map: columnMap });
+        await upsertMigImportProfile({ kind: props.kind, name, column_map: ready.columnMap });
       }
-      const res = await importMigMapped(props.kind, f, {
-        profileId: selectedProfileId(),
-        columnMap,
-      });
+      const res = await importMigMapped(props.kind, ready.file, { columnMap: ready.columnMap, job: jobOpts() });
       if (!res.success || !res.data) {
         toast.warning(res.message ?? "Import failed.");
         return;
@@ -142,15 +204,16 @@ export function MigrationMappedImportModal(props: Props) {
     <Modal open={props.open} title={props.title} onClose={props.onClose} wide>
       <div class="space-y-4">
         <p class="text-sm text-text-secondary">
-          Upload a CSV from another system, map columns to Bluearm fields, optionally save a mapping profile, then import.
+          Upload a CSV or Excel file from another system, map columns, Preview (no writes), then Import. This step is
+          optional — cancel if you will enter data in Bluearm instead.
         </p>
         <Show when={seedNote()}>
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">{seedNote()}</p>
         </Show>
-        <Field label="CSV file">
+        <Field label="CSV or Excel file">
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             class={inputClass}
             onChange={(e) => {
               const f = e.currentTarget.files?.[0];
@@ -158,6 +221,40 @@ export function MigrationMappedImportModal(props: Props) {
             }}
           />
         </Field>
+        <Show when={needsJob()}>
+          <div class="grid gap-3 md:grid-cols-3">
+            <Field label="Tax type *">
+              <select
+                class={inputClass}
+                value={taxTypeId() ?? ""}
+                onChange={(e) => setTaxTypeId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+              >
+                <option value="">—</option>
+                <For each={taxTypes.data ?? []}>{(t) => <option value={t.id}>{t.name}</option>}</For>
+              </select>
+            </Field>
+            <Field label="Currency *">
+              <select
+                class={inputClass}
+                value={currencyId() ?? ""}
+                onChange={(e) => setCurrencyId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+              >
+                <option value="">—</option>
+                <For each={currencies.data ?? []}>{(c) => <option value={c.id}>{c.currency_code}</option>}</For>
+              </select>
+            </Field>
+            <Field label="Warehouse *">
+              <select
+                class={inputClass}
+                value={locationId() ?? ""}
+                onChange={(e) => setLocationId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+              >
+                <option value="">—</option>
+                <For each={locations()}>{(l) => <option value={l.id}>{l.label}</option>}</For>
+              </select>
+            </Field>
+          </div>
+        </Show>
         <Show when={profiles().length > 0}>
           <Field label="Saved profile">
             <select
@@ -182,7 +279,10 @@ export function MigrationMappedImportModal(props: Props) {
                   <select
                     class={inputClass}
                     value={map()[field] ?? ""}
-                    onChange={(e) => setMap((prev) => ({ ...prev, [field]: e.currentTarget.value }))}
+                    onChange={(e) => {
+                      setMap((prev) => ({ ...prev, [field]: e.currentTarget.value }));
+                      setPreview(null);
+                    }}
                   >
                     <option value="">— skip —</option>
                     <For each={headers()}>{(h) => <option value={h}>{h}</option>}</For>
@@ -192,12 +292,35 @@ export function MigrationMappedImportModal(props: Props) {
             </For>
           </div>
           <Field label="Save mapping as profile (optional)">
-            <input class={inputClass} value={profileName()} onInput={(e) => setProfileName(e.currentTarget.value)} placeholder="e.g. QuickBooks items" />
+            <input class={inputClass} value={profileName()} onInput={(e) => setProfileName(e.currentTarget.value)} placeholder="e.g. Utak sales" />
           </Field>
+        </Show>
+        <Show when={preview()}>
+          {(p) => (
+            <p class="rounded-lg border border-stroke bg-slate-50 px-3 py-2 text-sm text-text-secondary">
+              Preview: {p().created} would be created{p().updated ? `, ${p().updated} updated` : ""}, {p().failed} failed.
+              <Show when={p().row_errors?.length}>
+                <span class="mt-1 block text-xs">
+                  {p()
+                    .row_errors!.slice(0, 8)
+                    .map((e) => `Row ${e.row}: ${e.message}`)
+                    .join(" · ")}
+                </span>
+              </Show>
+            </p>
+          )}
         </Show>
         <div class="flex justify-end gap-2">
           <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={props.onClose}>
             Cancel
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-4 py-2 text-sm disabled:opacity-50"
+            disabled={busy() || !file()}
+            onClick={() => void runPreview()}
+          >
+            {busy() ? "Working…" : "Preview"}
           </button>
           <button
             type="button"
