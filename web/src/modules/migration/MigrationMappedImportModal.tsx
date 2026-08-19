@@ -84,7 +84,7 @@ export function MigrationMappedImportModal(props: Props) {
     if (seed.column_map) {
       const hdrs = new Set(parseHeaders(seed.csv_text ?? ""));
       const valid: Record<string, string> = {};
-      for (const [field, header] of Object.Entries(seed.column_map)) {
+      for (const [field, header] of Object.entries(seed.column_map)) {
         if (fields().includes(field) && hdrs.has(header)) valid[field] = header;
       }
       setMap((prev) => ({ ...prev, ...valid }));
