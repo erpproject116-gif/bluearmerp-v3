@@ -30,7 +30,7 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
   const navigate = useNavigate();
   const toast = useToast();
   const invalidate = useInvalidateDeliveryReceipts();
-  const listHref = () => props.listHref ?? "/app/sales/sales?view=history";
+  const listHref = () => props.listHref ?? "/app/sales-order/delivery-receipts";
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
     "delivery_date",
     25,
