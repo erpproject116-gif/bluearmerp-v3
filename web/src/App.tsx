@@ -482,8 +482,10 @@ export default function App() {
           <Route path="/plans/:id" component={PlatformPlanEditPage} />
         </Route>
         <Route path="/app" component={AppLayout}>
+          <Route path="/dashboard/getting-started" component={DashboardPage} />
+          <Route path="/dashboard/recent-updates" component={DashboardPage} />
           <Route path="/dashboard" component={DashboardPage} />
-          <Route path="/dashboard/period-summary" component={() => <Navigate href="/app/reports" />} />
+          <Route path="/dashboard/period-summary" component={() => <Navigate href="/app/reports#reports-bi" />} />
           <Route path="/thank-you-activated" component={ThankYouActivatedPage} />
           <Route path="/dashboard/approvals" component={ApprovalsQueuePage} />
           <Route path="/dashboard/site-map" component={SiteMapPage} />

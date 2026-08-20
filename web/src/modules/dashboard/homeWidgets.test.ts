@@ -13,7 +13,7 @@ describe("normalizeHomeWidgets", () => {
     ]);
   });
 
-  it("keeps recent activity on the allowlist", () => {
-    expect(normalizeHomeWidgets(["recent_activity"])).toEqual(["finance", "recent_activity"]);
+  it("strips legacy tab widget ids", () => {
+    expect(normalizeHomeWidgets(["getting_started", "day_jobs"])).toEqual(["finance", "day_jobs"]);
   });
 });

@@ -1,15 +1,13 @@
 export type HomeWidgetId =
   | "finance"
   | "day_jobs"
-  | "getting_started"
   | "shortcuts"
   | "sales_trend"
   | "inventory_trend"
   | "top_customers"
   | "top_items"
   | "cash_in_out"
-  | "overdue"
-  | "recent_activity";
+  | "overdue";
 
 export type HomeWidgetDef = {
   id: HomeWidgetId;
@@ -32,12 +30,6 @@ export const HOME_WIDGET_CATALOG: HomeWidgetDef[] = [
     id: "day_jobs",
     label: "My day",
     blurb: "Common jobs for your role, plus items that need a next step.",
-    defaultOn: true,
-  },
-  {
-    id: "getting_started",
-    label: "Getting started",
-    blurb: "A short checklist to finish workspace setup. Hides itself when you are done.",
     defaultOn: true,
   },
   {
@@ -75,22 +67,20 @@ export const HOME_WIDGET_CATALOG: HomeWidgetDef[] = [
     label: "Overdue invoices",
     blurb: "Customer invoices past due — collect these first.",
   },
-  {
-    id: "recent_activity",
-    label: "Recent activity",
-    blurb: "Latest sales, payments, and stock moves in this workspace.",
-    defaultOn: true,
-  },
 ];
 
-export const DEFAULT_HOME_WIDGETS: HomeWidgetId[] = ["finance", "day_jobs", "getting_started", "recent_activity"];
+export const DEFAULT_HOME_WIDGETS: HomeWidgetId[] = ["finance", "day_jobs"];
 
 const ALLOWED = new Set(HOME_WIDGET_CATALOG.map((w) => w.id));
+
+/** Legacy widget ids moved to dedicated Home tabs. */
+const LEGACY_TAB_WIDGETS = new Set(["getting_started", "recent_activity"]);
 
 export function normalizeHomeWidgets(ids: string[] | undefined | null): HomeWidgetId[] {
   const out: HomeWidgetId[] = [];
   const seen = new Set<string>();
   for (const id of ids ?? []) {
+    if (LEGACY_TAB_WIDGETS.has(id)) continue;
     if (!ALLOWED.has(id as HomeWidgetId) || seen.has(id)) continue;
     seen.add(id);
     out.push(id as HomeWidgetId);

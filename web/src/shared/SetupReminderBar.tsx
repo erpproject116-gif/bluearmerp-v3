@@ -50,7 +50,7 @@ export function SetupReminderBar() {
           </div>
           <div class="flex shrink-0 flex-wrap items-center gap-2">
             <A
-              href={data()!.next_step?.href ?? "/app/setup"}
+              href="/app/dashboard/getting-started"
               class="rounded-md bg-amber-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-800"
             >
               Continue setup

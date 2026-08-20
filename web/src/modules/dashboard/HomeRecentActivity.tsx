@@ -16,6 +16,14 @@ const FEED_TYPES = new Set([
   "quo_quotation",
 ]);
 
+/** Home feed: business documents only — no API noise, auth, or support tickets. */
+export function isHomeFeedRow(row: ActivityLogRow): boolean {
+  if (!FEED_TYPES.has(row.target_type)) return false;
+  const code = row.action_code.toLowerCase();
+  if (code.startsWith("api.") || code.startsWith("auth.")) return false;
+  return true;
+}
+
 function friendlyLine(row: ActivityLogRow): string {
   const ref = row.reference_no || row.reference_label || row.entity_label || "";
   switch (row.target_type) {
@@ -56,56 +64,67 @@ function formatWhen(iso: string): string {
   }
 }
 
-export function HomeRecentActivity() {
+export function HomeRecentActivity(props: { mode?: "page" | "embed" } = {}) {
   const auth = useAuth();
+  const page = () => props.mode === "page";
+  const limit = () => (page() ? 20 : 8);
   const canRead = () => hasPermission(auth.me, "activity_logs.logs", "read") || hasPermission(auth.me, "dashboard.view", "read");
   const list = useActivityLogList(() => ({
     page: 1,
-    pageSize: 12,
+    pageSize: 48,
     sort: "created_at",
     order: "desc",
     enabled: Boolean(auth.me) && canRead(),
   }));
 
-  const rows = () => {
-    const all = list.data?.rows ?? [];
-    const preferred = all.filter((r) => FEED_TYPES.has(r.target_type));
-    return (preferred.length > 0 ? preferred : all).slice(0, 8);
-  };
+  const rows = () => (list.data?.rows ?? []).filter(isHomeFeedRow).slice(0, limit());
+  const showSection = () => page() || list.isFetching || rows().length > 0;
 
   return (
-    <section class="rounded-xl border border-stroke bg-surface p-5 shadow-sm">
-      <div class="mb-3 flex items-center justify-between gap-2">
-        <div>
-          <h3 class="text-sm font-semibold text-text-primary">Recent activity</h3>
-          <p class="mt-0.5 text-xs text-text-secondary">Sales, payments, and stock in this workspace.</p>
+    <Show when={showSection()}>
+      <section
+        class="rounded-xl border border-stroke bg-surface p-5 shadow-sm"
+        classList={{ "max-w-3xl": page() }}
+      >
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-semibold text-text-primary">Recent updates</h3>
+            <p class="mt-0.5 text-xs text-text-secondary">Sales, payments, and stock in this workspace.</p>
+          </div>
+          <A href="/app/activity-logs" class="text-xs font-medium text-brand-600 hover:underline">
+            View all
+          </A>
         </div>
-        <A href="/app/activity-logs" class="text-xs font-medium text-brand-600 hover:underline">
-          View all
-        </A>
-      </div>
-      <Show when={!list.isFetching && rows().length === 0}>
-        <p class="text-sm text-text-secondary">Nothing recorded yet. New sales, payments, and stock moves will show up here.</p>
-      </Show>
-      <Show when={list.isFetching && rows().length === 0}>
-        <p class="text-sm text-text-secondary">Loading activity…</p>
-      </Show>
-      <ul class="divide-y divide-stroke/70">
-        <For each={rows()}>
-          {(row) => {
-            const href = () =>
-              row.target_id ? entityRecordHref(row.target_type, row.target_id) : "/app/activity-logs";
-            return (
-              <li class="py-2">
-                <A href={href() ?? "/app/activity-logs"} class="flex items-baseline justify-between gap-3 hover:text-brand-700">
-                  <span class="min-w-0 truncate text-sm text-text-primary">{friendlyLine(row)}</span>
-                  <span class="shrink-0 text-xs text-text-secondary">{formatWhen(row.created_at)}</span>
-                </A>
-              </li>
-            );
-          }}
-        </For>
-      </ul>
-    </section>
+        <Show when={!canRead()}>
+          <p class="text-sm text-text-secondary">You don&apos;t have permission to view activity logs.</p>
+        </Show>
+        <Show when={canRead() && list.isFetching && rows().length === 0}>
+          <p class="text-sm text-text-secondary">Loading activity…</p>
+        </Show>
+        <Show when={canRead() && !list.isFetching && rows().length === 0}>
+          <p class="text-sm text-text-secondary">
+            No business activity yet. Sales, payments, and stock moves will show up here.
+          </p>
+        </Show>
+        <Show when={rows().length > 0}>
+          <ul class="divide-y divide-stroke/70">
+            <For each={rows()}>
+              {(row) => {
+                const href = () =>
+                  row.target_id ? entityRecordHref(row.target_type, row.target_id) : "/app/activity-logs";
+                return (
+                  <li class="py-2">
+                    <A href={href() ?? "/app/activity-logs"} class="flex items-baseline justify-between gap-3 hover:text-brand-700">
+                      <span class="min-w-0 truncate text-sm text-text-primary">{friendlyLine(row)}</span>
+                      <span class="shrink-0 text-xs text-text-secondary">{formatWhen(row.created_at)}</span>
+                    </A>
+                  </li>
+                );
+              }}
+            </For>
+          </ul>
+        </Show>
+      </section>
+    </Show>
   );
 }

@@ -51,7 +51,9 @@ export const appModules: AppModule[] = [
     href: "/app/dashboard",
     basePath: "/app/dashboard",
     features: [
-      { label: "Home", href: "/app/dashboard", settingsHref: "/app/dashboard" },
+      { label: "Dashboard", href: "/app/dashboard", settingsHref: "/app/dashboard" },
+      { label: "Getting started", href: "/app/dashboard/getting-started", settingsHref: "/app/dashboard/getting-started" },
+      { label: "Recent updates", href: "/app/dashboard/recent-updates", settingsHref: "/app/dashboard/recent-updates" },
     ],
   },
   {
@@ -60,7 +62,8 @@ export const appModules: AppModule[] = [
     href: "/app/reports",
     basePath: "/app/reports",
     features: [
-      { label: "Catalog", href: "/app/reports", settingsHref: "/app/reports" },
+      { label: "Dashboard & charts", href: "/app/reports#reports-bi", settingsHref: "/app/reports" },
+      { label: "Catalog", href: "/app/reports#report-catalog", settingsHref: "/app/reports" },
       { label: "Saved Views", href: "/app/reports/saved-views", settingsHref: "/app/reports" },
     ],
   },

@@ -86,13 +86,13 @@ export default function OnboardingPage() {
               Same checklist as Home — {gettingStarted().percent}% done. Finish company, tax, products, first invoice, and a bank account.
             </p>
             <A
-              href={gettingStarted().next?.href ?? "/app/dashboard"}
+              href={gettingStarted().next?.href ?? "/app/dashboard/getting-started"}
               class="mt-2 inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
             >
               Continue: {gettingStarted().next?.label ?? "Next step"}
             </A>
-            <A href="/app/dashboard" class="ml-3 inline-block text-sm font-medium text-brand-700 hover:underline">
-              Open Home
+            <A href="/app/dashboard/getting-started" class="ml-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+              Open getting started
             </A>
           </div>
         </Show>

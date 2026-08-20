@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
+import { ReportsBiDashboard } from "./ReportsBiDashboard";
 
 type ReportCatalogEntry = {
   key: string;
@@ -329,13 +330,19 @@ export default function ReportsIndexPage() {
 
   return (
     <div class="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+      {/* BI dashboard — period summary + ops intelligence charts (formerly ?tab=intel / period-summary) */}
+      <section id="reports-bi" class="scroll-mt-4 rounded-xl border border-brand-200 bg-surface p-5 shadow-sm">
+        <ReportsBiDashboard opsVariant="full" />
+      </section>
+
       {/* Hero + search */}
-      <section class="rounded-xl border border-stroke bg-surface p-5 shadow-sm">
+      <section id="report-catalog" class="scroll-mt-4 rounded-xl border border-stroke bg-surface p-5 shadow-sm">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 class="text-2xl font-semibold tracking-tight text-text-primary">Reports</h1>
+            <h1 class="text-2xl font-semibold tracking-tight text-text-primary">Report catalog</h1>
             <p class="mt-1 max-w-xl text-sm text-text-secondary">
-              Find any report fast — search, pin favorites, or jump by category. Press <kbd class="rounded border border-stroke bg-panel px-1.5 py-0.5 text-xs">/</kbd> to focus search.
+              Find any operational report — search, pin favorites, or jump by category. Charts and KPIs are above. Press{" "}
+              <kbd class="rounded border border-stroke bg-panel px-1.5 py-0.5 text-xs">/</kbd> to focus search.
             </p>
           </div>
           <label class="block w-full max-w-lg">

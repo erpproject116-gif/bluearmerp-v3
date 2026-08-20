@@ -255,10 +255,10 @@ export default function BookkeepingHubPage() {
             <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
               <h2 class="text-sm font-semibold text-text-primary">Exception queue</h2>
               <Show when={(h().exceptions ?? []).length > 0} fallback={<p class="mt-2 text-sm text-text-secondary">No exceptions — books look clear for this as-of date.</p>}>
-                <ul class="mt-3 divide-y divide-stroke">
+                <ul class="mt-3 grid gap-2 sm:grid-cols-2">
                   <For each={h().exceptions as BooksHealthException[]}>
                     {(ex) => (
-                      <li class="flex flex-wrap items-center justify-between gap-2 py-3">
+                      <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-stroke px-3 py-2">
                         <div>
                           <p class="text-sm font-medium text-text-primary">{ex.label}</p>
                           <p class="text-xs text-text-secondary">
@@ -282,7 +282,7 @@ export default function BookkeepingHubPage() {
                 {([section, items]) => (
                   <div class="mt-4">
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-text-secondary">{section}</h3>
-                    <ul class="mt-2 space-y-2">
+                    <ul class="mt-2 grid gap-2 sm:grid-cols-2">
                       <For each={items}>
                         {(item) => {
                           const st = () => (health.data ? item.status(health.data) : "na");
