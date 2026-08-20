@@ -33,11 +33,17 @@ export const PURCHASE_RECEIVE_LIST_VIEWS: DocumentListView[] = [
   { id: "history", label: "History" },
 ];
 
+/** Solid search params may be a string or string[]. */
+export function listViewParam(view: string | string[] | undefined): string {
+  if (Array.isArray(view)) return view[0] ?? "";
+  return typeof view === "string" ? view : "";
+}
+
 /** In-page List / Status / Outstanding switcher. First view is the default (no query). */
 export function DocumentListViewBar(props: { basePath: string; views: DocumentListView[] }) {
   const [params] = useSearchParams();
   const current = () => {
-    const v = typeof params.view === "string" ? params.view : "";
+    const v = listViewParam(params.view);
     if (props.views.some((x) => x.id === v)) return v;
     return props.views[0]?.id ?? "list";
   };
