@@ -3,6 +3,11 @@ import { For, Show, createMemo } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { formatPeso } from "../../shared/money";
+import {
+  reportsDateRangeFromQuery,
+  type ReportDatePresetId,
+} from "../../shared/reports/ReportDatePresets";
+import { ReportDateRangePicker } from "../../shared/reports/ReportDateRangePicker";
 import { OpsIntelligencePanel } from "../dashboard/OpsIntelligencePanel";
 
 type NamedAmount = {
@@ -80,18 +85,37 @@ function Kpi(props: { label: string; value: string; href?: string; warn?: boolea
 /** Period KPIs + ops intelligence charts — shown at the top of /app/reports. */
 export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
   const [params, setParams] = useSearchParams();
-  const period = createMemo(() => (params.period === "monthly" ? "monthly" : "weekly"));
   const opsVariant = () => props.opsVariant ?? "full";
 
+  const range = createMemo(() => reportsDateRangeFromQuery(params));
+
   const q = createQuery(() => ({
-    queryKey: ["dashboard-period-summary", period()],
+    queryKey: ["dashboard-period-summary", range().from, range().to],
     queryFn: async () => {
-      const res = await apiFetch<PeriodSummary>(`/api/v1/dashboard/period-summary?period=${period()}`);
+      const qs = new URLSearchParams({
+        period: "monthly",
+        date_from: range().from,
+        date_to: range().to,
+      });
+      const res = await apiFetch<PeriodSummary>(`/api/v1/dashboard/period-summary?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load period summary");
       return res.data!;
     },
     staleTime: 60_000,
   }));
+
+  const applyRange = (preset: ReportDatePresetId, next: { date_from: string; date_to: string }) => {
+    setParams(
+      {
+        filter_by: preset,
+        from_date: next.date_from,
+        to_date: next.date_to,
+        date_from: next.date_from,
+        date_to: next.date_to,
+      },
+      { replace: true },
+    );
+  };
 
   return (
     <div class="space-y-6">
@@ -108,21 +132,14 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
             )}
           </Show>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class={`rounded-lg px-3 py-1.5 text-sm font-semibold ${period() === "weekly" ? "bg-brand-600 text-white" : "border border-stroke bg-white text-text-primary"}`}
-            onClick={() => setParams({ period: "weekly" }, { replace: true })}
-          >
-            Weekly
-          </button>
-          <button
-            type="button"
-            class={`rounded-lg px-3 py-1.5 text-sm font-semibold ${period() === "monthly" ? "bg-brand-600 text-white" : "border border-stroke bg-white text-text-primary"}`}
-            onClick={() => setParams({ period: "monthly" }, { replace: true })}
-          >
-            Monthly
-          </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-sm text-text-secondary">Filters :</span>
+          <ReportDateRangePicker
+            from={range().from}
+            to={range().to}
+            preset={range().preset}
+            onApply={applyRange}
+          />
           <A href="/app/dashboard" class="rounded-lg border border-stroke bg-white px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-slate-50">
             Home
           </A>
@@ -144,13 +161,8 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
             <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Kpi label="Sales in window" value={money(d().sales_in_window)} href="/app/sales/sales" />
               <Kpi label="Sales MTD" value={money(d().sales_mtd)} href="/app/sales/sales" />
-              <Show when={period() === "monthly"}>
-                <Kpi label="Sales YTD" value={money(d().sales_ytd)} href="/app/sales/sales" />
-                <Kpi label="Cash net YTD" value={money(d().cash_net_ytd)} href="/app/finance/collections" />
-              </Show>
-              <Show when={period() === "weekly"}>
-                <Kpi label="Cash net MTD" value={money(d().cash_net_mtd)} href="/app/finance/collections" />
-              </Show>
+              <Kpi label="Sales YTD" value={money(d().sales_ytd)} href="/app/sales/sales" />
+              <Kpi label="Cash net YTD" value={money(d().cash_net_ytd)} href="/app/finance/collections" />
               <Kpi
                 label="Cash in / out MTD"
                 value={`${money(d().cash_inflow_mtd)} / ${money(d().cash_outflow_mtd)}`}
@@ -184,7 +196,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
               />
             </section>
 
-            <Show when={period() === "monthly" && d().has_journal_pnl}>
+            <Show when={d().has_journal_pnl}>
               <section>
                 <h3 class="mb-2 text-sm font-semibold text-text-primary">Profit &amp; loss (posted journals)</h3>
                 <div class="grid gap-3 sm:grid-cols-3">
@@ -268,7 +280,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
               </section>
             </Show>
 
-            <Show when={period() === "monthly" && (d().profit_products?.length ?? 0) > 0}>
+            <Show when={(d().profit_products?.length ?? 0) > 0}>
               <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
                 <h3 class="mb-3 text-sm font-semibold text-text-primary">Margin by product (90d)</h3>
                 <ul class="space-y-2">
@@ -285,7 +297,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
             </Show>
 
             <p class="text-xs text-text-secondary">
-              Weekly and monthly snapshots are emailed to owners and store admins. Charts below show live operations data.
+              Snapshot uses the selected date range. Charts below show live operations data.
             </p>
           </>
         )}

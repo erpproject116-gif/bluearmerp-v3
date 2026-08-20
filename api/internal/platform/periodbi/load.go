@@ -83,21 +83,42 @@ func sumFloat(ctx context.Context, pool *pgxpool.Pool, q string, args ...any) fl
 
 // Load builds a weekly or monthly BI snapshot from existing operational tables.
 func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64, kind Kind) Report {
+	return LoadWindow(ctx, pool, tenantID, kind, time.Time{}, time.Time{})
+}
+
+// LoadWindow builds a BI snapshot. When from/to are zero, weekly/monthly windows are used.
+func LoadWindow(ctx context.Context, pool *pgxpool.Pool, tenantID int64, kind Kind, from, to time.Time) Report {
 	if kind != Monthly {
 		kind = Weekly
 	}
 	today := todayUTC()
-	lookback := 7
-	windowLabel := "Last 7 days"
-	if kind == Monthly {
-		start := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)
-		lookback = int(today.Sub(start).Hours()/24) + 1
-		windowLabel = today.Format("January 2006") + " (MTD)"
+	if to.IsZero() {
+		to = today
+	}
+	if from.IsZero() {
+		if kind == Monthly {
+			from = time.Date(to.Year(), to.Month(), 1, 0, 0, 0, 0, time.UTC)
+		} else {
+			from = to.AddDate(0, 0, -6)
+		}
+	}
+	if to.Before(from) {
+		from, to = to, from
+	}
+	lookback := int(to.Sub(from).Hours()/24) + 1
+	if lookback < 1 {
+		lookback = 1
+	}
+	windowLabel := from.Format("Jan 2, 2006") + " – " + to.Format("Jan 2, 2006")
+	if kind == Monthly && from.Day() == 1 && from.Month() == to.Month() && from.Year() == to.Year() && to.Equal(today) {
+		windowLabel = to.Format("January 2006") + " (MTD)"
+	} else if kind == Weekly && lookback == 7 && to.Equal(today) && from.Equal(to.AddDate(0, 0, -6)) {
+		windowLabel = "Last 7 days"
 	}
 
 	out := Report{
 		Period:         string(kind),
-		AsOf:           today.Format("2006-01-02"),
+		AsOf:           to.Format("2006-01-02"),
 		WindowLabel:    windowLabel,
 		LookbackDays:   lookback,
 		RedFlags:       []NamedAmount{},
@@ -110,16 +131,16 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64, kind Kind) Re
 	out.SalesMTD = sumFloat(ctx, pool, `
 		select coalesce(sum(grand_total), 0)::float8 from public.sa_sales
 		where tenant_id = $1 and deleted_at is null
-		  and order_date >= date_trunc('month', $2::date)::date and order_date <= $2::date`, tenantID, today)
+		  and order_date >= date_trunc('month', $2::date)::date and order_date <= $2::date`, tenantID, to)
 	out.SalesYTD = sumFloat(ctx, pool, `
 		select coalesce(sum(grand_total), 0)::float8 from public.sa_sales
 		where tenant_id = $1 and deleted_at is null
-		  and order_date >= date_trunc('year', $2::date)::date and order_date <= $2::date`, tenantID, today)
-	out.SalesInWindow = sumFloat(ctx, pool, `
+		  and order_date >= date_trunc('year', $2::date)::date and order_date <= $2::date`, tenantID, to)
+  out.SalesInWindow = sumFloat(ctx, pool, `
 		select coalesce(sum(grand_total), 0)::float8 from public.sa_sales
 		where tenant_id = $1 and deleted_at is null
-		  and order_date >= ($2::date - make_interval(days => $3 - 1))::date
-		  and order_date <= $2::date`, tenantID, today, lookback)
+		  and order_date >= $2::date
+		  and order_date <= $3::date`, tenantID, from, to)
 
 	out.CashInflowMTD = sumFloat(ctx, pool, `
 		select coalesce(sum(amount_total), 0)::float8 from public.fin_official_receipts
@@ -256,34 +277,31 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64, kind Kind) Re
 	for _, f := range out.RedFlags {
 		out.RedFlagTotal += f.Count
 	}
-	out.TopCustomers = loadTops(ctx, pool, `
+	out.TopCustomers = loadTopsRange(ctx, pool, `
 		select p.company_name, coalesce(sum(s.grand_total), 0)::float8
 		from public.sa_sales s
 		join public.inv_partners p on p.id = s.partner_id
 		where s.tenant_id = $1 and s.deleted_at is null
-		  and s.order_date >= (current_date - make_interval(days => $2))::date
-		group by p.company_name order by 2 desc limit $3`, tenantID, lookback, 5, "/app/sales/sales")
-	out.TopItems = loadTops(ctx, pool, `
+		  and s.order_date >= $2::date and s.order_date <= $3::date
+		group by p.company_name order by 2 desc limit $4`, tenantID, from, to, 5, "/app/sales/sales")
+	out.TopItems = loadTopsRange(ctx, pool, `
 		select coalesce(nullif(trim(ln.item_name), ''), nullif(trim(ln.item_code), ''), 'Item'),
 		  coalesce(sum(ln.qty), 0)::float8
 		from public.sa_sales_lines ln
 		join public.sa_sales s on s.id = ln.sales_id
 		where s.tenant_id = $1 and s.deleted_at is null
-		  and s.order_date >= (current_date - make_interval(days => $2))::date
-		group by 1 order by 2 desc limit $3`, tenantID, lookback, 5, "/app/sales/sales")
+		  and s.order_date >= $2::date and s.order_date <= $3::date
+		group by 1 order by 2 desc limit $4`, tenantID, from, to, 5, "/app/sales/sales")
 	out.OverdueAlerts = loadOverdueAlerts(ctx, pool, tenantID, today, 5)
 
-	if kind == Monthly {
-		monthStart := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)
-		out.PnLIncome, out.PnLExpense, out.HasJournalPnL = loadPnL(ctx, pool, tenantID, monthStart, today)
-		out.PnLNet = out.PnLIncome - out.PnLExpense
-		out.ProfitProducts = loadProfitProducts(ctx, pool, tenantID, 5)
-	}
+	out.PnLIncome, out.PnLExpense, out.HasJournalPnL = loadPnL(ctx, pool, tenantID, from, to)
+	out.PnLNet = out.PnLIncome - out.PnLExpense
+	out.ProfitProducts = loadProfitProducts(ctx, pool, tenantID, 5)
 	return out
 }
 
-func loadTops(ctx context.Context, pool *pgxpool.Pool, q string, tenantID int64, days, limit int, href string) []NamedAmount {
-	rows, err := pool.Query(ctx, q, tenantID, days, limit)
+func loadTopsRange(ctx context.Context, pool *pgxpool.Pool, q string, tenantID int64, from, to time.Time, limit int, href string) []NamedAmount {
+	rows, err := pool.Query(ctx, q, tenantID, from, to, limit)
 	if err != nil {
 		return nil
 	}

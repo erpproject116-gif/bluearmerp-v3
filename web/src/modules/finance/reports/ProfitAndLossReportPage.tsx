@@ -1,5 +1,7 @@
 import { createSignal, For, onMount, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { defaultReportDateRange, ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
+import { queryParamFirst } from "../../../shared/reports/ReportDatePresets";
 import {
   profitAndLossExportUrl,
   useProfitAndLossReport,
@@ -11,11 +13,16 @@ import { MoneyCell } from "../../../shared/MoneyCell";
 import { formatMoney } from "../../../shared/money";
 
 export default function ProfitAndLossReportPage() {
+  const [params] = useSearchParams();
   const defaults = defaultReportDateRange();
+  const initial = {
+    date_from: queryParamFirst(params.date_from) || queryParamFirst(params.from_date) || defaults.date_from,
+    date_to: queryParamFirst(params.date_to) || queryParamFirst(params.to_date) || defaults.date_to,
+  };
   const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
+  const [filters, setFilters] = createSignal<DateRangeFilters>(initial);
   const pageSize = 50;
 
   const report = useProfitAndLossReport(() => ({
