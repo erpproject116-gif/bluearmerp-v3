@@ -29,6 +29,7 @@ export const PURCHASE_ORDER_LIST_VIEWS: DocumentListView[] = [
 export const PURCHASE_RECEIVE_LIST_VIEWS: DocumentListView[] = [
   { id: "list", label: "List" },
   { id: "status", label: "Status" },
+  { id: "history", label: "History" },
 ];
 
 /** In-page List / Status / Outstanding switcher. First view is the default (no query). */

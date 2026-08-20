@@ -311,7 +311,6 @@ export const appModules: AppModule[] = [
         prefix: "/app/purchase-order/rfq",
       },
       { label: "Returns", href: "/app/purchase-order/purchase-returns", settingsHref: "/app/purchase-order/purchase-orders/settings" },
-      { label: "Receive history", href: "/app/purchase-order/goods-receipt", settingsHref: "/app/purchase-order/goods-receipt/settings", headerPriority: "overflow" },
       { label: "PO analysis", href: "/app/purchase-order/reports/po-analysis", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       { label: "To receive", href: "/app/purchase-order/reports/items-to-receive", settingsHref: "/app/purchase-order/purchase-orders/settings" },
       setupFeatureTab("/app/purchase-order"),

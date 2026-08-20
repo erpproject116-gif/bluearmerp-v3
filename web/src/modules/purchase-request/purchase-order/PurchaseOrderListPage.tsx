@@ -380,7 +380,7 @@ export default function PurchaseOrderListPage() {
           New Purchase Receive
         </A>
         <A
-          href="/app/purchase-order/goods-receipt"
+          href="/app/purchases/purchase-receive?view=history"
           class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
           title="Legacy receive history — prefer Purchase Receive for stock + serials"
         >
@@ -395,12 +395,6 @@ export default function PurchaseOrderListPage() {
           { key: "partner_name", header: "Vendor" },
           { key: "pic_name", header: "PIC" },
           { key: "item_name_summary", header: "Item" },
-          {
-            key: "pct_received",
-            header: "% Received",
-            sortable: false,
-            render: (r) => <span>{r.pct_received ?? 0}%</span>,
-          },
           {
             key: "grand_total",
             header: "Total Amount",

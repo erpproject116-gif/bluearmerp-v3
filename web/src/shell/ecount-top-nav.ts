@@ -361,16 +361,6 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         hint: "Primary buy path — stock + AP on confirm",
       },
       {
-        id: "purchase_receive",
-        label: "Receive history",
-        href: "/app/purchase-order/goods-receipt",
-        iconId: "goods_receipt",
-        topId: "inv1",
-        expandGroupId: "procurement_process",
-        moduleId: "purchase_order",
-        hint: "Legacy receive history — prefer Purchase Receive",
-      },
-      {
         id: "expenses",
         label: "Expenses",
         href: "/app/purchases/expenses",
