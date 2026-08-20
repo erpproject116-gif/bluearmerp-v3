@@ -120,6 +120,11 @@ func mappedItemsHandler(pool *pgxpool.Pool, forcePreview bool) http.HandlerFunc 
 				result.Created++
 				continue
 			}
+			itemCode, codeErr := resolveEntityCode(r.Context(), pool, tu.TenantID, "item", strings.TrimSpace(row["item_code"]))
+			if codeErr != nil {
+				failRow(&result, rowNum, codeErr.Error())
+				continue
+			}
 			var id int64
 			err := pool.QueryRow(r.Context(), `
 				insert into public.inv_items (
@@ -127,10 +132,10 @@ func mappedItemsHandler(pool *pgxpool.Pool, forcePreview bool) http.HandlerFunc 
 				  purchase_price, sales_price, vip_price, oe_price,
 				  warranty_duration_months, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status
 				) values (
-				  $1, public.allocate_tenant_code($1, 'item'), $2, $3, $4, $5, $6,
-				  $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+				  $1, $2, $3, $4, $5, $6, $7,
+				  $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
 				) returning id`,
-				tu.TenantID, name, nullIfEmpty(row["spec_name"]), nullIfEmpty(row["unit"]),
+				tu.TenantID, itemCode, name, nullIfEmpty(row["spec_name"]), nullIfEmpty(row["unit"]),
 				itemCategory, itemType, purchase, sales, vip, oe, warranty, trackSerial, trackLot,
 				serialPolicy, lotPolicy, trackQty, status,
 			).Scan(&id)

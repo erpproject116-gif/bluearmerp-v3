@@ -1,4 +1,4 @@
-import { type Accessor, type JSX, Show } from "solid-js";
+import { type Accessor, createSignal, type JSX, Show } from "solid-js";
 import { useAuth } from "../auth-context";
 import { PrintBrandingFooter } from "../branding/PrintBrandingFooter";
 import { PrintBrandingHeader } from "../branding/PrintBrandingHeader";
@@ -6,6 +6,11 @@ import { uiLabel } from "../branding/uiLabel";
 import { CollapsibleFilterPanel } from "../CollapsibleFilterPanel";
 import { GridExportButtons } from "../gridExport";
 import { PageJumpControl } from "../PageJumpControl";
+import {
+  inferReportDatePreset,
+  ReportDatePresets,
+  type ReportDatePresetId,
+} from "./ReportDatePresets";
 
 export type ReportPageLayoutProps = {
   title: string;
@@ -36,6 +41,13 @@ export type ReportPageLayoutProps = {
 export function ReportPageLayout(props: ReportPageLayoutProps) {
   const auth = useAuth();
   const showDates = () => props.showDateFilters !== false && props.dateFrom && props.dateTo;
+  const initialPreset = (): ReportDatePresetId => {
+    if (props.dateFrom && props.dateTo) {
+      return inferReportDatePreset(props.dateFrom(), props.dateTo());
+    }
+    return "custom";
+  };
+  const [datePreset, setDatePreset] = createSignal<ReportDatePresetId>(initialPreset());
   let reportBodyEl: HTMLDivElement | undefined;
 
   const exportName = () =>
@@ -67,25 +79,45 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
           <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Filters</p>
         </Show>
         <Show when={showDates()}>
-          <div class="mt-2 flex flex-wrap items-end gap-3">
-            <label class="text-sm">
-              <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
-              <input
-                type="date"
-                class="rounded-lg border border-stroke px-3 py-2"
-                value={props.dateFrom!()}
-                onInput={(e) => props.onDateFromChange!(e.currentTarget.value)}
-              />
-            </label>
-            <label class="text-sm">
-              <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_to")}</span>
-              <input
-                type="date"
-                class="rounded-lg border border-stroke px-3 py-2"
-                value={props.dateTo!()}
-                onInput={(e) => props.onDateToChange!(e.currentTarget.value)}
-              />
-            </label>
+          <div class="mt-2 space-y-3">
+            <ReportDatePresets
+              value={datePreset()}
+              onChange={(preset, range) => {
+                setDatePreset(preset);
+                if (range && props.onDateFromChange && props.onDateToChange) {
+                  props.onDateFromChange(range.date_from);
+                  props.onDateToChange(range.date_to);
+                }
+              }}
+            />
+            <Show when={datePreset() === "custom"}>
+              <div class="flex flex-wrap items-end gap-3">
+                <label class="text-sm">
+                  <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
+                  <input
+                    type="date"
+                    class="rounded-lg border border-stroke px-3 py-2"
+                    value={props.dateFrom!()}
+                    onInput={(e) => {
+                      props.onDateFromChange!(e.currentTarget.value);
+                      setDatePreset("custom");
+                    }}
+                  />
+                </label>
+                <label class="text-sm">
+                  <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_to")}</span>
+                  <input
+                    type="date"
+                    class="rounded-lg border border-stroke px-3 py-2"
+                    value={props.dateTo!()}
+                    onInput={(e) => {
+                      props.onDateToChange!(e.currentTarget.value);
+                      setDatePreset("custom");
+                    }}
+                  />
+                </label>
+              </div>
+            </Show>
           </div>
         </Show>
         <Show when={props.filterExtra}>{props.filterExtra}</Show>

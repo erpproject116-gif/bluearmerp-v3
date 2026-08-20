@@ -100,7 +100,7 @@ func mappedOpenDocHandler(pool *pgxpool.Pool, kind string, forcePreview bool) ht
 			}
 			first := doc.Rows[0]
 			firstRow := doc.RowNums[0]
-			partnerID, pErr := lookupPartner(r.Context(), pool, tu.TenantID, first["partner"], "", wantKind)
+			partnerID, pErr := lookupPartner(r.Context(), pool, tu.TenantID, "", first["partner"], "", wantKind)
 			if pErr != "" {
 				failRow(&result, firstRow, pErr)
 				continue

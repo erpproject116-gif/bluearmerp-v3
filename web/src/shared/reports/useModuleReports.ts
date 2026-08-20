@@ -72,6 +72,68 @@ export function useSOAnalysisReport(params: () => ReportParams<DateRangeFilters>
   });
 }
 
+// --- Fulfillment Progress ---
+
+export type FulfillmentProgressRow = {
+  sales_order_id: number;
+  sales_order_no: string;
+  order_date: string;
+  customer_name: string;
+  progress_status: string;
+  pct_delivered: number;
+  pct_billed: number;
+  grand_total: number;
+};
+
+export type FulfillmentProgressSummary = {
+  fully_delivered: number;
+  partially_delivered: number;
+  not_delivered: number;
+  fully_billed: number;
+  partially_billed: number;
+  not_billed: number;
+};
+
+type FulfillmentProgressPayload = {
+  rows: FulfillmentProgressRow[];
+  summary: FulfillmentProgressSummary;
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export function fulfillmentProgressExportUrl(filters: DateRangeFilters): string {
+  return exportUrl("/api/v1/sales-order/reports/fulfillment-progress/export", filters);
+}
+
+export function useFulfillmentProgressReport(params: () => ReportParams<DateRangeFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-fulfillment-progress", p],
+      enabled: p.enabled,
+      queryFn: async () => {
+        const res = await apiFetch<FulfillmentProgressPayload>(
+          `/api/v1/sales-order/reports/fulfillment-progress?${qs}`,
+        );
+        if (!res.success || !res.data) throw new Error(res.message ?? "Failed to load report");
+        return {
+          rows: res.data.rows ?? [],
+          summary: res.data.summary,
+          total: res.data.total ?? 0,
+        };
+      },
+      staleTime: 15_000,
+    };
+  });
+}
+
 // --- PO Analysis ---
 
 export type POAnalysisRow = {

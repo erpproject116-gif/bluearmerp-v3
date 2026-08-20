@@ -103,7 +103,8 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
   }
   if (
     pathname.startsWith("/app/finance/acct-i") ||
-    pathname.startsWith("/app/finance/journal") ||
+    pathname.startsWith("/app/finance/acct-i/journal-entries") ||
+    pathname.startsWith("/app/finance/journal-entries") ||
     pathname.startsWith("/app/finance/official-receipts") ||
     pathname.startsWith("/app/finance/reports")
   ) {
@@ -128,7 +129,7 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
     pathname.startsWith("/app/user-management") ||
     pathname.startsWith("/app/activity-logs") ||
     pathname.startsWith("/app/documentation") ||
-    pathname.startsWith("/app/branding")
+    pathname.startsWith("/app/settings/branding")
   ) {
     return "setup";
   }
@@ -154,7 +155,8 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
     pathname.startsWith("/app/quotation") ||
     pathname.startsWith("/app/sales-order") ||
     pathname.startsWith("/app/buying") ||
-    pathname.startsWith("/app/purchase") ||
+    pathname.startsWith("/app/purchase-request") ||
+    pathname.startsWith("/app/purchase-order") ||
     pathname.startsWith("/app/purchases") ||
     pathname.startsWith("/app/after-sales") ||
     pathname.startsWith("/app/job-costing")
@@ -217,22 +219,6 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         topId: "inv1",
         expandGroupId: "stocks_management",
       },
-      {
-        id: "warehouse",
-        label: "Warehouse",
-        href: "/app/inventory/wms/scheduled-receipts",
-        iconId: "sub_warehouse",
-        topId: "inv2",
-        expandGroupId: "stocks_management",
-      },
-      {
-        id: "serial_lot",
-        label: "Serial / Lot",
-        href: "/app/inventory/serial-lot/registry",
-        iconId: "sub_serial_lot",
-        topId: "inv2",
-        expandGroupId: "stocks_management",
-      },
     ],
   },
   {
@@ -242,10 +228,11 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "selling",
     topId: "inv1",
     expandGroupId: "sales_process",
+    defaultExpanded: false,
     children: [
       {
         id: "customers",
-        label: "Customers",
+        label: "Customers & vendors",
         href: "/app/inventory/partners",
         iconId: "customers",
         topId: "inv1",
@@ -334,10 +321,11 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "buying",
     topId: "inv1",
     expandGroupId: "procurement_process",
+    defaultExpanded: false,
     children: [
       {
         id: "vendors",
-        label: "Vendors",
+        label: "Customers & vendors",
         href: "/app/inventory/partners",
         iconId: "vendors",
         topId: "inv1",
@@ -347,7 +335,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "purchase_request",
         label: "Purchase Request",
-        href: "/app/purchase-request/purchase-requests",
+        href: "/app/purchase-request/purchase-requests/new",
         iconId: "purchase_request",
         topId: "inv1",
         expandGroupId: "procurement_process",
@@ -428,6 +416,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "finance",
     topId: "acct1",
     expandGroupId: "accounting_dept",
+    defaultExpanded: false,
     children: [
       {
         id: "bookkeeping",

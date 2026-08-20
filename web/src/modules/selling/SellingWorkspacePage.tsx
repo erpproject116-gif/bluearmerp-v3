@@ -12,21 +12,22 @@ type KpiTile = {
 };
 
 const tiles: KpiTile[] = [
-  { label: "Open sales orders", value: (s) => s.open_sales_orders, href: "/app/sales-order/sales-orders/outstanding", accent: "text-brand-600" },
-  { label: "Open quotations", value: (s) => s.open_quotations, href: "/app/quotation/quotations/outstanding" },
+  { label: "Open sales orders", value: (s) => s.open_sales_orders, href: "/app/sales-order/sales-orders?view=outstanding", accent: "text-brand-600" },
+  { label: "Open quotations", value: (s) => s.open_quotations, href: "/app/quotation/quotations?view=outstanding" },
   { label: "Expired quotations", value: (s) => s.expired_quotations, href: "/app/crm/reports/expired-quotations", accent: "text-red-600" },
   { label: "Pending delivery lines", value: (s) => s.pending_delivery_lines, href: "/app/sales-order/reports/so-analysis", accent: "text-amber-600" },
   { label: "Low stock SKUs", value: (s) => s.low_stock_skus, href: "/app/crm/reports/low-stock", accent: "text-amber-600" },
 ];
 
 const reportLinks = [
+  { label: "Fulfillment progress", href: "/app/sales-order/reports/fulfillment-progress" },
   { label: "New Receivable Payment", href: "/app/finance/receivables" },
   { label: "Sales Status", href: "/app/selling/reports" },
   { label: "Receivable Status", href: "/app/selling/reports/receivable-status" },
   { label: "Commissions", href: "/app/selling/commissions" },
   { label: "SO Analysis", href: "/app/sales-order/reports/so-analysis" },
-  { label: "Sales Order Status", href: "/app/sales-order/sales-orders/status" },
-  { label: "Sales Invoice Status", href: "/app/sales/sales/status" },
+  { label: "Sales Order Status", href: "/app/sales-order/sales-orders?view=status" },
+  { label: "Sales Invoice Status", href: "/app/sales/sales?view=status" },
   { label: "A/R by Customer", href: "/app/sales/reports/ar-by-customer" },
   { label: "Expired Quotations", href: "/app/crm/reports/expired-quotations" },
   { label: "Conversion Funnel", href: "/app/crm/reports/conversion" },
@@ -41,6 +42,41 @@ export default function SellingWorkspacePage() {
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-1 text-sm text-text-secondary">Quote-to-cash shortcuts and selling reports.</p>
+      </section>
+
+      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <A
+          href="/app/quotation/quotations/new"
+          class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Start a deal</p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">New quotation</h2>
+          <p class="mt-2 text-sm text-text-secondary">Price items and send a quote to your customer.</p>
+        </A>
+        <A
+          href="/app/sales-order/sales-orders/new"
+          class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Commit demand</p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">New sales order</h2>
+          <p class="mt-2 text-sm text-text-secondary">Reserve stock and plan delivery from a confirmed order.</p>
+        </A>
+        <A
+          href="/app/sales/sales/new"
+          class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Bill &amp; ship</p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">New sales invoice</h2>
+          <p class="mt-2 text-sm text-text-secondary">Invoice delivered goods and post revenue.</p>
+        </A>
+        <A
+          href="/app/finance/receivables"
+          class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Collect cash</p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">New receivable payment</h2>
+          <p class="mt-2 text-sm text-text-secondary">Apply collections against open customer balances.</p>
+        </A>
       </section>
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

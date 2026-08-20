@@ -3,7 +3,8 @@ import { For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import { OnboardingTrackPanel } from "../../shared/OnboardingChecklist";
 import { apiFetch } from "../../shared/api";
-import { useOnboarding } from "../../shared/usePlatform";
+import { useOnboarding, useSetupReadiness } from "../../shared/usePlatform";
+import { resolveGettingStarted } from "../../shared/setupProgress";
 
 const PLAYBOOK_WEEKS = [
   {
@@ -41,12 +42,14 @@ const KB_QUICK_LINKS: { label: string; articleId: string }[] = [
 
 export default function OnboardingPage() {
   const q = useOnboarding();
+  const setup = useSetupReadiness();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const data = () => q.data;
   const tracks = () => data()?.tracks ?? [];
   const overall = () => data()?.overall_percent ?? 0;
   const showPlaybook = () => data()?.show_playbook ?? false;
+  const gettingStarted = () => resolveGettingStarted(setup.data);
 
   const dismiss = async (snoozeOnly: boolean) => {
     await apiFetch(
@@ -76,6 +79,23 @@ export default function OnboardingPage() {
       </Show>
 
       <Show when={data()}>
+        <Show when={gettingStarted().visible}>
+          <div class="mb-6 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Getting started</p>
+            <p class="mt-1 text-sm text-text-primary">
+              Same checklist as Home — {gettingStarted().percent}% done. Finish company, tax, products, first invoice, and a bank account.
+            </p>
+            <A
+              href={gettingStarted().next?.href ?? "/app/dashboard"}
+              class="mt-2 inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+            >
+              Continue: {gettingStarted().next?.label ?? "Next step"}
+            </A>
+            <A href="/app/dashboard" class="ml-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+              Open Home
+            </A>
+          </div>
+        </Show>
         <div class="mb-6 rounded-xl border border-stroke bg-white p-5 shadow-sm">
           <div class="flex flex-wrap items-end justify-between gap-3">
             <div>

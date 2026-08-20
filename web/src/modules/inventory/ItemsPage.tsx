@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onMount, Show, onCleanup } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { formatAmount } from "../../shared/money";
 import { PRICE_LEVEL_KEYS, SAFETY_DOC_TYPES } from "../../shared/itemMasterConstants";
@@ -9,6 +9,7 @@ import {
   type BulkTrackingAction,
   type BulkTrackingOutcome,
 } from "../../shared/BulkItemTrackingModal";
+import { BulkItemEditModal } from "../../shared/BulkItemEditModal";
 import { validateCustomFields } from "../../shared/CustomFieldsSection";
 import { requireFields, submitEntity } from "../../shared/handleSaveResult";
 import { useToast } from "../../shared/toast";
@@ -126,6 +127,9 @@ export default function ItemsPage() {
   const [trackAction, setTrackAction] = createSignal<BulkTrackingAction>("enable_serial");
   const [trackSubmitting, setTrackSubmitting] = createSignal(false);
   const [trackOutcome, setTrackOutcome] = createSignal<BulkTrackingOutcome | null>(null);
+  const [bulkEditOpen, setBulkEditOpen] = createSignal(false);
+  const [bulkEditSubmitting, setBulkEditSubmitting] = createSignal(false);
+  const [moreOpen, setMoreOpen] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const lifecycle = useMasterLifecycle({
@@ -135,6 +139,7 @@ export default function ItemsPage() {
     onChanged: () => invalidate("items"),
   });
   const canManageItems = () => hasPermission(auth.me, "inventory.items", "write");
+  const canBulkEdit = () => hasPermission(auth.me, "inventory.items_bulk_edit", "write");
 
   const openBulkTracking = (action: BulkTrackingAction) => {
     if (!canManageItems() || lifecycle.selectedIds().size === 0) return;
@@ -178,6 +183,41 @@ export default function ItemsPage() {
       toast.warning("No items were updated.");
     }
   };
+  const submitBulkEdit = async (patch: {
+    item_name?: string;
+    spec_name?: string;
+    purchase_price?: number;
+    sales_price?: number;
+    vip_price?: number;
+  }) => {
+    const ids = [...lifecycle.selectedIds()];
+    if (ids.length === 0) return;
+    if (Object.keys(patch).length === 0) {
+      toast.warning("Enter at least one field to update.");
+      return;
+    }
+    setBulkEditSubmitting(true);
+    const res = await apiFetch<{ updated: number; skipped: number }>(
+      "/api/v1/inventory/items/bulk",
+      { method: "PATCH", body: JSON.stringify({ ids, ...patch }) },
+      { silent: true },
+    );
+    setBulkEditSubmitting(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Bulk edit failed.");
+      return;
+    }
+    toast.success(`Updated ${res.data.updated} item(s); ${res.data.skipped} skipped.`);
+    setBulkEditOpen(false);
+    lifecycle.onSelectionChange(new Set());
+    invalidate("items");
+  };
+
+  const openBulkEdit = () => {
+    if (!canBulkEdit() || lifecycle.selectedIds().size === 0) return;
+    setBulkEditOpen(true);
+  };
+
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.items);
 
@@ -210,9 +250,18 @@ export default function ItemsPage() {
         e.preventDefault();
         setAdvancedOpen(true);
       }
+      if (e.key === "Escape") setMoreOpen(false);
+    };
+    const onDocClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest("[data-items-more-menu]")) setMoreOpen(false);
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("click", onDocClick);
+    onCleanup(() => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", onDocClick);
+    });
   });
 
   const openNew = async () => {
@@ -379,6 +428,8 @@ export default function ItemsPage() {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={openEdit}
         onNew={() => void openNew()}
+        newLabel="Add product"
+        hideExport
         codeKey="item_code"
         nameKey="item_name"
         sortKey={sort()}
@@ -394,16 +445,28 @@ export default function ItemsPage() {
         status={statusFilter()}
         onStatusChange={setStatusFilter}
         itemsCsvImport
+        itemsImportExportMenu
+        onExportCsv={exportItems}
         onImportComplete={() => invalidate("items")}
         settingsHref={INVENTORY_SETTINGS_HREF.items}
         toolbarExtra={
           <>
             <lifecycle.BulkToolbar />
+            <Show when={canBulkEdit() && lifecycle.filter() !== "deleted"}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+                disabled={lifecycle.selectedIds().size === 0}
+                onClick={openBulkEdit}
+              >
+                Bulk edit{lifecycle.selectedIds().size > 0 ? ` (${lifecycle.selectedIds().size})` : ""}
+              </button>
+            </Show>
             <Show when={canManageItems() && lifecycle.filter() !== "deleted"}>
-              <div class="flex items-end gap-2">
+              <div class="flex flex-wrap items-end gap-1 rounded-lg border border-stroke px-1 py-0.5">
                 <button
                   type="button"
-                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+                  class="rounded-md px-2.5 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
                   disabled={lifecycle.selectedIds().size === 0}
                   onClick={() => openBulkTracking("enable_serial")}
                   title="Enable Track serial numbers on selected items"
@@ -412,7 +475,7 @@ export default function ItemsPage() {
                 </button>
                 <button
                   type="button"
-                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel disabled:opacity-40"
+                  class="rounded-md px-2.5 py-1.5 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-40"
                   disabled={lifecycle.selectedIds().size === 0}
                   onClick={() => openBulkTracking("disable_serial")}
                 >
@@ -420,47 +483,83 @@ export default function ItemsPage() {
                 </button>
                 <button
                   type="button"
-                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel disabled:opacity-40"
+                  class="rounded-md px-2.5 py-1.5 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-40"
                   disabled={lifecycle.selectedIds().size === 0}
                   onClick={() => openBulkTracking("enable_lot")}
                 >
                   Enable lot
                 </button>
+                <button
+                  type="button"
+                  class="rounded-md px-2.5 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+                  onClick={openGenerateSerials}
+                >
+                  Generate serials
+                </button>
               </div>
             </Show>
             <lifecycle.FilterControl />
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
-              onClick={() => setAdvancedOpen(true)}
-            >
-              Advanced (F3)
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
-              onClick={openBarcode}
-            >
-              Barcode (Item)
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
-              onClick={openGenerateSerials}
-            >
-              Generate serials
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
-              onClick={exportItems}
-            >
-              Export CSV
-            </button>
+            <div class="relative" data-items-more-menu>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
+                aria-expanded={moreOpen()}
+                aria-haspopup="menu"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMoreOpen((v) => !v);
+                }}
+              >
+                More
+                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path
+                    fill-rule="evenodd"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+              <Show when={moreOpen()}>
+                <div
+                  role="menu"
+                  class="absolute right-0 z-20 mt-1 min-w-[10rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      setAdvancedOpen(true);
+                    }}
+                  >
+                    Advanced (F3)
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      openBarcode();
+                    }}
+                  >
+                    Barcode (Item)
+                  </button>
+                </div>
+              </Show>
+            </div>
           </>
         }
       />
       <lifecycle.BulkDialog />
+      <BulkItemEditModal
+        open={bulkEditOpen()}
+        count={lifecycle.selectedIds().size}
+        submitting={bulkEditSubmitting()}
+        onClose={() => setBulkEditOpen(false)}
+        onConfirm={(patch) => void submitBulkEdit(patch)}
+      />
       <BulkItemTrackingModal
         open={trackOpen()}
         action={trackAction()}

@@ -23,14 +23,14 @@ const MASTERS: EntityCard[] = [
   {
     kind: "partners",
     title: "Customers & suppliers",
-    blurb: "Optional. Map company, kind, contacts, TIN. Re-import updates matches instead of duplicating.",
+    blurb: "Optional. Map company, kind, contacts, TIN. Match by partner_code, TIN, or exact name. Re-import updates matches.",
     href: "/app/inventory/partners",
     optional: true,
   },
   {
     kind: "items",
     title: "Products / items",
-    blurb: "Optional. Map names, prices, and tracking flags. Match existing items by code or exact name.",
+    blurb: "Optional. Map names, prices, and tracking flags. Match existing items by item_code or exact name.",
     href: "/app/inventory/items",
     optional: true,
   },

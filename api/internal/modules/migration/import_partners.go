@@ -52,9 +52,9 @@ func mappedPartnersHandler(pool *pgxpool.Pool, forcePreview bool) http.HandlerFu
 				continue
 			}
 
-			existingID, matchErr := lookupPartner(r.Context(), pool, tu.TenantID, "", strings.TrimSpace(row["tin"]), kind)
+			existingID, matchErr := lookupPartner(r.Context(), pool, tu.TenantID, strings.TrimSpace(row["partner_code"]), "", strings.TrimSpace(row["tin"]), kind)
 			if existingID == 0 {
-				existingID, matchErr = lookupPartner(r.Context(), pool, tu.TenantID, name, "", kind)
+				existingID, matchErr = lookupPartner(r.Context(), pool, tu.TenantID, "", name, "", kind)
 			}
 			if matchErr != "" && !strings.HasPrefix(matchErr, "unmatched") {
 				failRow(&result, rowNum, matchErr)
@@ -84,16 +84,21 @@ func mappedPartnersHandler(pool *pgxpool.Pool, forcePreview bool) http.HandlerFu
 				result.Created++
 				continue
 			}
+			partnerCode, codeErr := resolveEntityCode(r.Context(), pool, tu.TenantID, "partner", strings.TrimSpace(row["partner_code"]))
+			if codeErr != nil {
+				failRow(&result, rowNum, codeErr.Error())
+				continue
+			}
 			var id int64
 			err := pool.QueryRow(r.Context(), `
 				insert into public.inv_partners (
 				  tenant_id, partner_code, partner_kind, company_name, ceo_name,
 				  phone, mobile, email, address, tin, status
 				) values (
-				  $1, public.allocate_tenant_code($1, 'partner'), $2, $3, $4,
-				  $5, $6, $7, $8, $9, $10
+				  $1, $2, $3, $4, $5,
+				  $6, $7, $8, $9, $10, $11
 				) returning id`,
-				tu.TenantID, kind, name, nullIfEmpty(row["ceo_name"]),
+				tu.TenantID, partnerCode, kind, name, nullIfEmpty(row["ceo_name"]),
 				nullIfEmpty(row["phone"]), nullIfEmpty(row["mobile"]), nullIfEmpty(row["email"]),
 				nullIfEmpty(row["address"]), nullIfEmpty(row["tin"]), status,
 			).Scan(&id)

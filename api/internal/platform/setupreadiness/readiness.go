@@ -34,6 +34,8 @@ var WizardSteps = []StepDef{
 	{ID: "partners", Label: "Add a customer or supplier", Href: "/app/setup/partners", Required: true},
 	{ID: "items", Label: "Add your first product", Href: "/app/setup/items", Required: true},
 	{ID: "team", Label: "Invite your team", Href: "/app/setup/team", Required: false},
+	{ID: "first_sale", Label: "Create your first invoice", Href: "/app/sales/sales/new", Required: false},
+	{ID: "bank", Label: "Add a bank or cash account", Href: "/app/finance/banking", Required: false},
 	{ID: "ready", Label: "You are ready", Href: "/app/setup/ready", Required: false},
 }
 
@@ -121,7 +123,7 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Payload, err
 		}
 		if isDone {
 			doneCount++
-		} else if next == nil && def.ID != "ready" {
+		} else if next == nil && def.ID != "ready" && def.ID != "first_sale" && def.ID != "bank" {
 			next = &NextStep{ID: def.ID, Label: def.Label, Href: def.Href}
 		}
 		steps = append(steps, Step{
@@ -254,6 +256,18 @@ func detect(ctx context.Context, pool *pgxpool.Pool, tenantID int64, store progr
 		select count(*)::int from public.users
 		where tenant_id = $1 and status = 'active'`, tenantID).Scan(&users)
 	out["team"] = users > 1
+
+	var sales int
+	_ = pool.QueryRow(ctx, `
+		select count(*)::int from public.sa_sales
+		where tenant_id = $1 and deleted_at is null`, tenantID).Scan(&sales)
+	out["first_sale"] = sales >= 1
+
+	var banks int
+	_ = pool.QueryRow(ctx, `
+		select count(*)::int from public.fin_bank_accounts
+		where tenant_id = $1 and is_active = true`, tenantID).Scan(&banks)
+	out["bank"] = banks >= 1
 
 	requiredDone := out["company"] && out["chart_of_accounts"] && out["currency_tax"] &&
 		out["process_policies"] && out["location"] && out["partners"] && out["items"]

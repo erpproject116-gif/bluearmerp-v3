@@ -75,6 +75,13 @@ func listExpenses(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, status)
 			n++
 		}
+		if rid := strings.TrimSpace(r.URL.Query().Get("recurring_expense_id")); rid != "" {
+			if id, err := strconv.ParseInt(rid, 10, 64); err == nil && id > 0 {
+				where += fmt.Sprintf(" and e.recurring_expense_id = $%d", n)
+				args = append(args, id)
+				n++
+			}
+		}
 		if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
 			where += fmt.Sprintf(" and (e.expense_no ilike $%d or e.vendor_name ilike $%d or e.description ilike $%d)", n, n, n)
 			args = append(args, "%"+q+"%")

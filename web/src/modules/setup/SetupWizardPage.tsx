@@ -3,6 +3,12 @@ import { For, Show, createSignal } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useSetupReadiness } from "../../shared/usePlatform";
+import {
+  GETTING_STARTED_COPY,
+  resolveGettingStarted,
+  wizardFoundationPercent,
+  wizardFoundationSteps,
+} from "../../shared/setupProgress";
 
 const STEP_COPY: Record<string, { title: string; why: string; action: string; link?: string; ackStep?: string }> = {
   company: {
@@ -91,8 +97,13 @@ export default function SetupWizardPage() {
 
   const currentId = () => stepFromPath(loc.pathname);
   const copy = () => STEP_COPY[currentId()] ?? STEP_COPY.company;
-  const steps = () => readiness.data?.steps.filter((s) => s.id !== "ready") ?? [];
+  const steps = () =>
+    wizardFoundationSteps(readiness.data).map((s) => ({
+      ...s,
+      label: GETTING_STARTED_COPY[s.id]?.label ?? s.label,
+    }));
   const currentStep = () => steps().find((s) => s.id === currentId());
+  const homeProgress = () => resolveGettingStarted(readiness.data);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["setup-readiness"] });
@@ -126,8 +137,9 @@ export default function SetupWizardPage() {
     refresh();
     const data = readiness.data;
     if (!data) return;
-    const idx = data.steps.findIndex((s) => s.id === currentId());
-    const next = data.steps[idx + 1];
+    const wizard = [...wizardFoundationSteps(data), ...(data.steps ?? []).filter((s) => s.id === "ready")];
+    const idx = wizard.findIndex((s) => s.id === currentId());
+    const next = wizard[idx + 1];
     if (next) {
       navigate(next.href);
     } else if (data.required_complete) {
@@ -152,7 +164,7 @@ export default function SetupWizardPage() {
       <div class="mb-6 h-2 overflow-hidden rounded-full bg-slate-100">
         <div
           class="h-full rounded-full bg-brand-600 transition-all"
-          style={{ width: `${readiness.data?.percent ?? 0}%` }}
+          style={{ width: `${wizardFoundationPercent(readiness.data)}%` }}
         />
       </div>
 
@@ -254,6 +266,14 @@ export default function SetupWizardPage() {
             >
               Configure POS
             </A>
+            <Show when={homeProgress().visible}>
+              <A
+                href={homeProgress().next?.href ?? "/app/dashboard"}
+                class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
+              >
+                Home: {homeProgress().next?.label ?? "Getting started"}
+              </A>
+            </Show>
             <A href="/app/dashboard" class="text-sm text-brand-700 hover:underline">
               Open dashboard
             </A>

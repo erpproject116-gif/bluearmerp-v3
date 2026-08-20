@@ -2,6 +2,7 @@ import {
   createSignal,
   createContext,
   useContext,
+  onMount,
   type ParentProps,
   type Accessor,
   type JSX,
@@ -10,15 +11,38 @@ import {
 
 const STORAGE_KEY = "bluearm:ui.inline_guides";
 const DISMISSED_KEY = "bluearm:ui.inline_tips_dismissed";
+const VISIT_COUNT_KEY = "bluearm:ui.visit_count";
+
+function readVisitCount(): number {
+  try {
+    const raw = localStorage.getItem(VISIT_COUNT_KEY);
+    if (!raw) return 0;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function incrementUiVisitCount(): number {
+  try {
+    const next = readVisitCount() + 1;
+    localStorage.setItem(VISIT_COUNT_KEY, String(next));
+    return next;
+  } catch {
+    return 0;
+  }
+}
 
 function readEnabled(): boolean {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw === "0") return false;
     if (raw === "1") return true;
-    return true; // default on
+    // Returning users: default tips off after enough sessions.
+    return readVisitCount() <= 10;
   } catch {
-    return true;
+    return readVisitCount() <= 10;
   }
 }
 
@@ -105,6 +129,9 @@ function getSharedFallback(): InlineGuidesCtx {
 
 /** Global Tips on/off for ModalFormGuide, InlineTip, StocksHowItFits — not workflow step n of n. */
 export function InlineGuidesProvider(props: ParentProps) {
+  onMount(() => {
+    incrementUiVisitCount();
+  });
   const [enabled, setEnabledSignal] = createSignal(readEnabled());
   const [dismissed, setDismissed] = createSignal(readDismissed());
   const value = buildCtx(enabled, setEnabledSignal, dismissed, setDismissed);

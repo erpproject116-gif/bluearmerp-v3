@@ -331,7 +331,8 @@ export function SidebarNav() {
     }
     if (area.id === "ledger") {
       return pathStarts(p, [
-        "/app/finance/journal",
+        "/app/finance/acct-i/journal-entries",
+        "/app/finance/journal-entries",
         "/app/finance/official-receipts",
         "/app/finance/reports",
       ]);
@@ -372,7 +373,7 @@ export function SidebarNav() {
     if (area.id === "documentation") return pathStarts(p, ["/app/documentation"]);
     if (area.id === "user_management") {
       return (
-        (pathStarts(p, ["/app/user-management"]) || pathStarts(p, ["/app/branding"])) &&
+        (pathStarts(p, ["/app/user-management"]) || pathStarts(p, ["/app/settings/branding"])) &&
         !p.startsWith("/app/user-management/process-policies")
       );
     }

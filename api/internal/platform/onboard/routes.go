@@ -72,7 +72,9 @@ func (s *service) getOnboardingStatus(w http.ResponseWriter, r *http.Request) {
 		"pending_invite":   nil,
 		"pending_approval": nil,
 	}
-	if inviteTenantID, inviteCode, hasInvite := auth.PendingInviteTenant(ctx, s.pool, email); hasInvite {
+	var hasInvite bool
+	if inviteTenantID, inviteCode, ok := auth.PendingInviteTenant(ctx, s.pool, email); ok {
+		hasInvite = true
 		info, _ := auth.PendingInviteTenantInfo(ctx, s.pool, email)
 		out["pending_invite"] = map[string]any{
 			"tenant_id":    inviteTenantID,
@@ -84,6 +86,20 @@ func (s *service) getOnboardingStatus(w http.ResponseWriter, r *http.Request) {
 		out["pending_approval"] = map[string]any{
 			"tenant_id":    tid,
 			"company_code": code,
+		}
+	}
+	if !hasInvite {
+		if occ, err := auth.CustomerEmailOccupancy(ctx, s.pool, email); err == nil {
+			if occ.Occupied {
+				out["email_occupancy"] = map[string]any{
+					"occupied":     true,
+					"company_name": occ.CompanyName,
+					"company_code": occ.CompanyCode,
+					"tenant_id":    occ.TenantID,
+				}
+			} else {
+				out["email_occupancy"] = map[string]any{"occupied": false}
+			}
 		}
 	}
 	response.OK(w, out, "OK")

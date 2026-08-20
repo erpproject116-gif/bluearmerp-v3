@@ -15,7 +15,7 @@ import { defaultStatusFilters, type SalesStatusFilters } from "../../sales/sales
 import type { SalesTemplateCode } from "../../sales/sales/SalesLineGrid";
 
 const reportLinks = [
-  { label: "Sales invoice status", href: "/app/sales/sales/status" },
+  { label: "Sales invoice status", href: "/app/sales/sales?view=status" },
   { label: "A/R by customer (Accounting)", href: "/app/sales/reports/ar-by-customer" },
   { label: "Customer credit (Accounting)", href: "/app/sales/reports/customer-credit-balance" },
   { label: "SI receipt status (Accounting)", href: "/app/sales/reports/si-receipt-status" },
@@ -25,7 +25,7 @@ const reportLinks = [
   { label: "SO analysis", href: "/app/sales-order/reports/so-analysis" },
   { label: "Discount status", href: "/app/sales/reports/discount-status" },
   { label: "Print slips", href: "/app/sales/reports/print-slips" },
-  { label: "Quotation status", href: "/app/quotation/quotations/status" },
+  { label: "Quotation status", href: "/app/quotation/quotations?view=status" },
 ];
 
 export default function SellingReportsPage() {

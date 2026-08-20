@@ -9,6 +9,14 @@ export function entityRecordHref(targetType: string, targetId: number): string |
       return `/app/sales/sales?open=${targetId}`;
     case "fin_official_receipt":
       return `/app/finance/official-receipts?open=${targetId}`;
+    case "fin_payment_voucher":
+      return `/app/finance/payment-vouchers?open=${targetId}`;
+    case "inv_stock_adjustment_request":
+      return "/app/inventory/stock-adjustments";
+    case "po_purchase_order":
+      return `/app/purchase-order/purchase-orders?open=${targetId}`;
+    case "fin_supplier_invoice":
+      return `/app/purchases/purchase-receive?openId=${targetId}`;
     case "inv_repair_order":
       return `/app/after-sales/repair-orders?open=${targetId}`;
     case "inv_repair_registration":

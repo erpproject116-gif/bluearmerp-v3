@@ -85,6 +85,7 @@ func registerItemRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/items/actions/bulk-delete", bulkSoftDeleteHandler(pool, "inv_items", "inventory.item.delete", "inv_item"))
 	r.Post("/items/actions/bulk-restore", bulkSoftRestoreHandler(pool, "inv_items", "inventory.item.restore", "inv_item"))
 	r.Post("/items/actions/bulk-tracking", bulkSetItemTracking(pool))
+	r.With(auth.RequirePermission("inventory.items_bulk_edit", auth.AccessWrite)).Patch("/items/bulk", bulkEditItems(pool))
 	r.Patch("/items/{id}", updateItem(pool))
 	r.Post("/items/{id}/restore", softRestoreHandler(pool, "inv_items", "inventory.item.restore", "inv_item"))
 	r.Delete("/items/{id}", deleteItem(pool))

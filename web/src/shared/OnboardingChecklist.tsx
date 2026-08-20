@@ -2,22 +2,29 @@ import { A } from "@solidjs/router";
 import { For, Show, createSignal } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
-import { useOnboarding, type OnboardingTrack, type OnboardingTrackStep } from "./usePlatform";
+import { resolveGettingStarted } from "./setupProgress";
+import { useOnboarding, useSetupReadiness, type OnboardingTrack, type OnboardingTrackStep } from "./usePlatform";
 
 export function OnboardingChecklist(props: { compact?: boolean }) {
   const q = useOnboarding();
+  const setup = useSetupReadiness();
   const data = () => q.data;
+  const gettingStarted = () => resolveGettingStarted(setup.data);
   const showSetup = () => data()?.show_setup_checklist ?? false;
   const showPlaybook = () => data()?.show_playbook ?? false;
-  const show = () => showSetup() || showPlaybook();
-  const progressPercent = () =>
-    showPlaybook() ? (data()?.overall_percent ?? 0) : (data()?.percent ?? 0);
+  const show = () => showSetup() || showPlaybook() || gettingStarted().visible;
+  const progressPercent = () => {
+    if (gettingStarted().visible) return gettingStarted().percent;
+    return showPlaybook() ? (data()?.overall_percent ?? 0) : (data()?.percent ?? 0);
+  };
 
   const nextHref = () => {
+    if (gettingStarted().visible) return gettingStarted().next?.href ?? "/app/setup";
     if (showSetup()) return data()!.next_step?.href ?? "/app/setup";
     return data()!.next_extended_step?.href ?? "/app/onboarding";
   };
   const nextLabel = () => {
+    if (gettingStarted().visible) return gettingStarted().next?.label ?? "Continue setup";
     if (showSetup()) return data()!.next_step?.label ?? "Continue setup";
     const ext = data()!.next_extended_step;
     if (ext) return `${ext.track_title}: ${ext.label}`;
@@ -54,9 +61,9 @@ export function OnboardingChecklist(props: { compact?: boolean }) {
           />
         </div>
 
-        <Show when={showSetup()}>
+        <Show when={showSetup() || gettingStarted().visible}>
           <ul class="mt-4 space-y-2">
-            <For each={data()!.steps.slice(0, props.compact ? 3 : undefined)}>
+            <For each={(gettingStarted().steps.length > 0 ? gettingStarted().steps : (data()?.steps ?? [])).slice(0, props.compact ? 3 : undefined)}>
               {(step) => <OnboardingStepRow step={step} />}
             </For>
           </ul>

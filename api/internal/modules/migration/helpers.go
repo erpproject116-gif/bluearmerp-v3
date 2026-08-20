@@ -159,13 +159,18 @@ func lookupItem(ctx context.Context, q interface {
 
 func lookupPartner(ctx context.Context, q interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
-}, tenantID int64, name, tin, wantKind string) (int64, string) {
+}, tenantID int64, code, name, tin, wantKind string) (int64, string) {
+	code = strings.TrimSpace(code)
 	name = strings.TrimSpace(name)
 	tin = strings.TrimSpace(tin)
 	wantKind = strings.ToLower(strings.TrimSpace(wantKind))
 	var rows pgx.Rows
 	var err error
-	if tin != "" {
+	if code != "" {
+		rows, err = q.Query(ctx, `
+			select id from public.inv_partners
+			where tenant_id = $1 and deleted_at is null and partner_code = $2`, tenantID, code)
+	} else if tin != "" {
 		rows, err = q.Query(ctx, `
 			select id from public.inv_partners
 			where tenant_id = $1 and deleted_at is null and lower(coalesce(tin,'')) = lower($2)`, tenantID, tin)
@@ -196,6 +201,9 @@ func lookupPartner(ctx context.Context, q interface {
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
+		if code != "" {
+			return 0, fmt.Sprintf("unmatched partner_code: %s", code)
+		}
 		if tin != "" {
 			return 0, fmt.Sprintf("unmatched TIN: %s", tin)
 		}
@@ -205,6 +213,42 @@ func lookupPartner(ctx context.Context, q interface {
 		return 0, fmt.Sprintf("ambiguous partner: %s", name)
 	}
 	return ids[0], ""
+}
+
+type entityCodeChecker interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+// resolveEntityCode uses explicitCode when provided and unused; otherwise allocates via allocate_tenant_code.
+func resolveEntityCode(ctx context.Context, q entityCodeChecker, tenantID int64, entityType, explicitCode string) (string, error) {
+	explicitCode = strings.TrimSpace(explicitCode)
+	if explicitCode != "" {
+		var exists bool
+		var checkSQL string
+		switch entityType {
+		case "item":
+			checkSQL = `select exists(
+			  select 1 from public.inv_items
+			  where tenant_id = $1 and deleted_at is null and item_code = $2)`
+		case "partner":
+			checkSQL = `select exists(
+			  select 1 from public.inv_partners
+			  where tenant_id = $1 and deleted_at is null and partner_code = $2)`
+		default:
+			return "", fmt.Errorf("unknown entity type %q", entityType)
+		}
+		if err := q.QueryRow(ctx, checkSQL, tenantID, explicitCode).Scan(&exists); err != nil {
+			return "", err
+		}
+		if !exists {
+			return explicitCode, nil
+		}
+	}
+	var code string
+	if err := q.QueryRow(ctx, `select public.allocate_tenant_code($1, $2)`, tenantID, entityType).Scan(&code); err != nil {
+		return "", err
+	}
+	return code, nil
 }
 
 func lookupLocation(ctx context.Context, q interface {

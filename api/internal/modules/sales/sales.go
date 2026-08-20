@@ -169,6 +169,7 @@ type computedLine struct {
 
 func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	registerCommissionRoutes(r, pool)
+	registerSalesCategoryRoutes(r, pool)
 	registerAttachmentRoutes(r, pool)
 	registerCollectiveInvoiceRoutes(r, pool)
 	registerCollectiveInvoiceLinkRoutes(r, pool)
@@ -524,6 +525,10 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmart(w, errs)
 			return
 		}
+		if body.SalesCategory != nil && *body.SalesCategory != "" && !salesCategoryActive(r.Context(), pool, tu.TenantID, *body.SalesCategory) {
+			response.Validation(w, map[string]string{"sales_category": "Unknown or inactive sales category."})
+			return
+		}
 
 		orderDate, err := parseDate(body.OrderDate)
 		if err != nil {
@@ -736,6 +741,10 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if errs := validateSaleBody(body, false); errs != nil {
 			response.ValidationSmart(w, errs)
+			return
+		}
+		if body.SalesCategory != nil && *body.SalesCategory != "" && !salesCategoryActive(r.Context(), pool, tu.TenantID, *body.SalesCategory) {
+			response.Validation(w, map[string]string{"sales_category": "Unknown or inactive sales category."})
 			return
 		}
 
@@ -1096,9 +1105,8 @@ func validateSaleBody(b saleBody, create bool) map[string]string {
 		*b.TermsOfPayment != "30_days_terms" && *b.TermsOfPayment != "cash" {
 		errs["terms_of_payment"] = "Must be 30_days_terms or cash."
 	}
-	if b.SalesCategory != nil && *b.SalesCategory != "" &&
-		*b.SalesCategory != "general" && *b.SalesCategory != "returns" {
-		errs["sales_category"] = "Must be general or returns."
+	if b.SalesCategory != nil && strings.TrimSpace(*b.SalesCategory) == "" {
+		b.SalesCategory = nil
 	}
 	if len(errs) > 0 {
 		return errs

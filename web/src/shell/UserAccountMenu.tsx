@@ -1,11 +1,15 @@
 import { A, useNavigate } from "@solidjs/router";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
-import { useAuth, canManageBranding } from "../shared/auth-context";
+import { useAuth, canManageBranding, canViewCrm } from "../shared/auth-context";
 import { AvatarUploadButton } from "../shared/AvatarUploadButton";
 import { signOutWithPresenceClear } from "../shared/PresenceHeartbeat";
 import { UserAvatar } from "../shared/UserAvatar";
 import { brandingLabel } from "../shared/branding/brandingStore";
 import { useShell } from "./shell-context";
+import { useInlineGuides } from "../shared/inlineGuides";
+import { ThemeSwitcher } from "../shared/ThemeSwitcher";
+import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
+import { useCrmTaskModal } from "../shared/CrmTaskModal";
 
 function BookIcon() {
   return (
@@ -36,6 +40,8 @@ export function UserAccountMenu() {
   const auth = useAuth();
   const shell = useShell();
   const navigate = useNavigate();
+  const guides = useInlineGuides();
+  const crmTask = useCrmTaskModal();
   const [open, setOpen] = createSignal(false);
 
   const signOut = async () => {
@@ -121,6 +127,39 @@ export function UserAccountMenu() {
                 </div>
               </div>
               <div class="flex flex-col gap-1 p-2">
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition hover:erp-panel"
+                  classList={{
+                    "text-brand-700": guides.enabled(),
+                    "text-text-secondary hover:text-text-primary": !guides.enabled(),
+                  }}
+                  onClick={() => {
+                    guides.toggle();
+                  }}
+                >
+                  Tips {guides.enabled() ? "on" : "off"}
+                </button>
+                <div class="px-3 py-1">
+                  <ThemeSwitcher />
+                </div>
+                <div class="px-1">
+                  <WorkflowGuideHeaderControl class="w-full justify-center rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 transition hover:bg-brand-50" compact />
+                </div>
+                <Show when={canViewCrm(auth.me)}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                    onClick={() => {
+                      setOpen(false);
+                      crmTask.open();
+                    }}
+                  >
+                    + CRM task
+                  </button>
+                </Show>
                 <A
                   href="/app/documentation"
                   role="menuitem"

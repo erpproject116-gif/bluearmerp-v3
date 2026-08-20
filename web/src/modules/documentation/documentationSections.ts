@@ -107,15 +107,15 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "The Business Dashboard opens with Financial health: cash in vs out, overdue invoice alerts, profit by product/project, recurring expense burn, and sales pipeline. Below that, receivables/payables cards and operations tiles summarize sales, stock warnings, open purchase orders, and other alerts. While workspace setup is incomplete, a Start here checklist appears at the top for administrators.",
+        text: "Home opens with a greeting, receivables and payables, cash flow, and your day jobs. Use Customize on Home to add extra charts (sales by month, top customers) — they stay off until you choose them. Detailed analytics live under Reports.",
       },
       {
         type: "paragraph",
-        text: "Receivables and payables cards use aging totals — click through to A/R or A/P aging for detail. Cash flow summarizes posted cash journals (incoming, outgoing, net). Bank account registers are a separate concern from the general ledger chart of accounts.",
+        text: "Receivables and payables use aging totals — click Collect or Pay. Cash flow is posted cash journals, not the bank register. Getting started shows for admins until foundation setup is done.",
       },
       {
         type: "paragraph",
-        text: "Operations tiles and charts show how sales and stock movement changed month by month. The red flags section lists items that need attention—such as stock counts that do not match serial numbers, purchase orders not fully received, or delivery receipts without invoices.",
+        text: "Leave Home uncluttered. Day jobs and Needs attention stay on by default. Extra charts belong in Customize or Reports — not stacked on every visit.",
       },
       {
         type: "tip",

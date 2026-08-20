@@ -48,7 +48,6 @@ export const navGroups: NavGroup[] = [
     entries: [
       { kind: "module", moduleId: "inventory" },
       { kind: "module", moduleId: "after_sales" },
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.wms", branchLabel: "Warehouse" },
       { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Serial / Lot" },
     ],
   },
@@ -61,7 +60,7 @@ export const navGroups: NavGroup[] = [
       {
         kind: "link",
         moduleId: "inventory",
-        label: "Customers",
+        label: "Customers & vendors",
         href: "/app/inventory/partners",
         basePath: "/app/inventory/partners",
       },
@@ -93,7 +92,7 @@ export const navGroups: NavGroup[] = [
       {
         kind: "link",
         moduleId: "inventory",
-        label: "Vendors",
+        label: "Customers & vendors",
         href: "/app/inventory/partners",
         basePath: "/app/inventory/partners",
       },

@@ -10,6 +10,8 @@ import (
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/dashboard", func(dr chi.Router) {
 		dr.Use(auth.RequirePermission("dashboard.view", auth.AccessRead))
+		dr.Get("/home-layout", getHomeLayout(pool))
+		dr.Put("/home-layout", putHomeLayout(pool))
 
 		dr.Group(func(kpi chi.Router) {
 			kpi.Use(auth.RequirePermission("dashboard.kpis", auth.AccessRead))

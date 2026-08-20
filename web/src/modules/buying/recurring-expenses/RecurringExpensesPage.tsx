@@ -1,5 +1,6 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
@@ -22,6 +23,9 @@ type RecurringExpense = {
   is_active: boolean;
   notes: string;
   partner_id?: number | null;
+  generated_count: number;
+  last_expense_id?: number | null;
+  last_expense_no?: string | null;
 };
 
 export default function RecurringExpensesPage() {
@@ -199,12 +203,13 @@ export default function RecurringExpensesPage() {
               <th class="px-3 py-2 text-right">Amount</th>
               <th class="px-3 py-2 text-left">Frequency</th>
               <th class="px-3 py-2 text-left">Next due</th>
+              <th class="px-3 py-2 text-left">Generated</th>
               <th class="px-3 py-2 text-left">Active</th>
               <th class="px-3 py-2 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <For each={list.data ?? []} fallback={<tr><td class="px-3 py-6 text-center text-text-secondary" colSpan={7}>No recurring expenses yet.</td></tr>}>
+            <For each={list.data ?? []} fallback={<tr><td class="px-3 py-6 text-center text-text-secondary" colSpan={8}>No recurring expenses yet.</td></tr>}>
               {(row) => (
                 <tr class="border-t border-stroke/60">
                   <td class="px-3 py-2 font-medium">{row.name}</td>
@@ -212,6 +217,17 @@ export default function RecurringExpensesPage() {
                   <td class="px-3 py-2 text-right">{formatPeso(row.amount)}</td>
                   <td class="px-3 py-2 capitalize">{row.frequency}</td>
                   <td class="px-3 py-2">{row.next_due_date ?? "—"}</td>
+                  <td class="px-3 py-2">
+                    <span>{row.generated_count}</span>
+                    <Show when={row.generated_count > 0}>
+                      <A
+                        href={`/app/buying/expenses?recurring_expense_id=${row.id}`}
+                        class="ml-2 text-xs text-brand-600 hover:underline"
+                      >
+                        View
+                      </A>
+                    </Show>
+                  </td>
                   <td class="px-3 py-2">{row.is_active ? "Yes" : "No"}</td>
                   <td class="px-3 py-2">
                     <div class="flex flex-wrap gap-2">

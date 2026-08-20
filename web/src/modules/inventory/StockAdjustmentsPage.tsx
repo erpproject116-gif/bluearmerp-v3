@@ -25,6 +25,7 @@ export type StockAdjustmentRequestRow = {
   decision?: string;
   created_at: string;
   updated_at: string;
+  line_count?: number;
 };
 
 function formatWhen(iso: string) {
@@ -211,7 +212,7 @@ export default function StockAdjustmentsPage() {
       <SpreadsheetGrid<StockAdjustmentRequestRow>
         columns={[
           { key: "created_at", header: "When", render: (r) => formatWhen(r.created_at) },
-          { key: "item_code", header: "Item" },
+          { key: "item_code", header: "Item", render: (r) => (r.line_count && r.line_count > 1 ? `${r.item_code} (+${r.line_count - 1})` : r.item_code) },
           { key: "item_name", header: "Item name" },
           { key: "location_name", header: "Location / branch" },
           {

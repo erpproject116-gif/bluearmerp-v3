@@ -23,6 +23,7 @@ export type AttachmentScope =
   | "finance/supplier-invoices"
   | "finance/official-receipts"
   | "finance/payment-vouchers"
+  | "inventory/stock-adjustment-requests"
   | "support/tickets";
 
 async function authHeaders(): Promise<Record<string, string>> {

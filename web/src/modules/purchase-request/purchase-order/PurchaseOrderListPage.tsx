@@ -402,12 +402,6 @@ export default function PurchaseOrderListPage() {
             render: (r) => <span>{r.pct_received ?? 0}%</span>,
           },
           {
-            key: "pct_billed",
-            header: "% Billed",
-            sortable: false,
-            render: (r) => <span>{r.pct_billed ?? 0}%</span>,
-          },
-          {
             key: "grand_total",
             header: "Total Amount",
             render: (r) => formatMoney(r.grand_total, r.currency_code),

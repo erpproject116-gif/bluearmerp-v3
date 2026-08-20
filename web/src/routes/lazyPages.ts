@@ -23,6 +23,7 @@ export const UnitsPage = lazy(() => import("../modules/inventory/UnitsPage"));
 export const ProjectsPage = lazy(() => import("../modules/inventory/ProjectsPage"));
 export const DepartmentsPage = lazy(() => import("../modules/inventory/DepartmentsPage"));
 export const ItemsPage = lazy(() => import("../modules/inventory/ItemsPage"));
+export const ItemCategoriesPage = lazy(() => import("../modules/inventory/ItemCategoriesPage"));
 export const PartnersSettingsPage = lazy(() => import("../modules/inventory/PartnersSettingsPage"));
 export const LocationsSettingsPage = lazy(() => import("../modules/inventory/LocationsSettingsPage"));
 export const ProjectsSettingsPage = lazy(() => import("../modules/inventory/ProjectsSettingsPage"));
@@ -60,6 +61,7 @@ export const TaxTypeListPage = lazy(() => import("../modules/quotation/tax-mngt/
 export const TaxTypeSettingsPage = lazy(() => import("../modules/quotation/tax-mngt/TaxTypeSettingsPage"));
 export const CurrencyListPage = lazy(() => import("../modules/quotation/tax-mngt/CurrencyListPage"));
 export const CurrencySettingsPage = lazy(() => import("../modules/quotation/tax-mngt/CurrencySettingsPage"));
+export const QuotationHubPage = lazy(() => import("../modules/quotation/QuotationHubPage"));
 export const QuotationListPage = lazy(() => import("../modules/quotation/quotation/QuotationListPage"));
 export const QuotationNewPage = lazy(() => import("../modules/quotation/quotation/QuotationNewPage"));
 export const QuotationSettingsPage = lazy(() => import("../modules/quotation/quotation/QuotationSettingsPage"));
@@ -67,6 +69,7 @@ export const QuotationStatusPage = lazy(() => import("../modules/quotation/quota
 export const OutstandingQuoteStatusPage = lazy(() => import("../modules/quotation/quotation/OutstandingQuoteStatusPage"));
 export const QuotationPrintPage = lazy(() => import("../modules/quotation/quotation/QuotationPrintPage"));
 export const QuotationStatusPrintPage = lazy(() => import("../modules/quotation/quotation/QuotationStatusPrintPage"));
+export const SalesOrderHubPage = lazy(() => import("../modules/sales-order/SalesOrderHubPage"));
 export const SalesOrderListPage = lazy(() => import("../modules/sales-order/sales-order/SalesOrderListPage"));
 export const SalesOrderNewPage = lazy(() => import("../modules/sales-order/sales-order/SalesOrderNewPage"));
 export const SalesOrderSettingsPage = lazy(() => import("../modules/sales-order/sales-order/SalesOrderSettingsPage"));
@@ -92,12 +95,15 @@ export const SupplierQuotationPrintPage = lazy(() => import("../modules/purchase
 export const SupplierInvoiceDocPrintPage = lazy(() =>
   import("../shared/InvoiceVoucherPrintPage").then((m) => ({ default: m.PurchaseInvoiceDocPrintPage })),
 );
+export const PurchaseOrderHubPage = lazy(() => import("../modules/purchase-order/PurchaseOrderHubPage"));
 export const PurchaseOrderListPage = lazy(() => import("../modules/purchase-request/purchase-order/PurchaseOrderListPage"));
 export const PurchaseReturnsPage = lazy(() => import("../modules/purchase-request/purchase-order/PurchaseReturnsPage"));
 export const RfqListPage = lazy(() => import("../modules/purchase-request/purchase-order/RfqListPage"));
 export const RfqDetailPage = lazy(() => import("../modules/purchase-request/purchase-order/RfqDetailPage"));
 export const GoodsReceiptListPage = lazy(() => import("../modules/purchase-request/goods-receipt/GoodsReceiptListPage"));
+export const SalesHubPage = lazy(() => import("../modules/sales/SalesHubPage"));
 export const SalesListPage = lazy(() => import("../modules/sales/sales/SalesListPage"));
+export const SalesCategoriesPage = lazy(() => import("../modules/sales/SalesCategoriesPage"));
 export const SalesNewPage = lazy(() => import("../modules/sales/sales/SalesNewPage"));
 export const SalesSettingsPage = lazy(() => import("../modules/sales/sales/SalesSettingsPage"));
 export const SalesStatusPage = lazy(() => import("../modules/sales/sales/SalesStatusPage"));
@@ -121,6 +127,7 @@ export const CustomerVendorBookApPage = lazy(() => import("../modules/finance/re
 export const SupplierPaymentStatusPage = lazy(() => import("../modules/finance/reports/SupplierPaymentStatusPage"));
 export const ReceiptStatusPage = lazy(() => import("../modules/finance/reports/ReceiptStatusPage"));
 export const OfficialReceiptStatusPage = lazy(() => import("../modules/finance/reports/OfficialReceiptStatusPage"));
+export const PurchaseReceiveHubPage = lazy(() => import("../modules/finance/supplier-invoices/PurchaseReceiveHubPage"));
 export const SupplierInvoiceListPage = lazy(() => import("../modules/finance/supplier-invoices/SupplierInvoiceListPage"));
 export const SupplierInvoiceNewPage = lazy(() => import("../modules/finance/supplier-invoices/SupplierInvoiceNewPage"));
 export const PaymentVoucherListPage = lazy(() => import("../modules/finance/payment-vouchers/PaymentVoucherListPage"));
@@ -248,6 +255,7 @@ export const CapaPage = lazy(() => import("../modules/quality/CapaPage"));
 export const QcRequestsPage = lazy(() => import("../modules/quality/QcRequestsPage"));
 export const CommissionRulesPage = lazy(() => import("../modules/sales/CommissionRulesPage"));
 export const SOAnalysisReportPage = lazy(() => import("../modules/sales-order/reports/SOAnalysisReportPage"));
+export const FulfillmentProgressReportPage = lazy(() => import("../modules/sales-order/reports/FulfillmentProgressReportPage"));
 export const ShipmentStatusPage = lazy(() => import("../modules/sales-order/reports/ShipmentStatusPage"));
 export const PendingShipmentPage = lazy(() => import("../modules/sales-order/reports/PendingShipmentPage"));
 export const ShippingOrderStatusPage = lazy(() => import("../modules/sales-order/reports/ShippingOrderStatusPage"));
