@@ -13,7 +13,7 @@ export const moduleKbArticles: KbArticle[] = [
         type: "steps",
         items: [
           "Finish required workspace setup at /app/setup (confirm seeds + partners + products).",
-          "Open /app/onboarding — the Dashboard also shows a Start here checklist until foundation is done.",
+          "Open /app/dashboard/onboarding — the Dashboard also shows a Start here checklist until foundation is done.",
           "Week 1: admin — process policies (including attachment rules), modules, Mapping Center, team.",
           "Week 2: selling — quote, SO, pick list, delivery note, invoice (Load Slip), official receipt.",
           "Week 3: buying + finance — PR, RFQ, PO, GR, supplier invoice, pre-invoicing report, payment voucher.",
@@ -25,7 +25,7 @@ export const moduleKbArticles: KbArticle[] = [
         text: "Click How to — step-by-step guide under any playbook step for plain-language instructions. Use Mark reviewed on review-only steps such as process policies and reports.",
       },
     ],
-    primaryHref: "/app/onboarding",
+    primaryHref: "/app/dashboard/onboarding",
     primaryLabel: "Open onboarding playbook",
     relatedGuideIds: ["setup-wizard", "first-week", "process-policies"],
   },

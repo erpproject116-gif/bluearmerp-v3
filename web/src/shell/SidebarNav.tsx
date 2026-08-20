@@ -49,6 +49,7 @@ function NavAreaLink(props: {
       return (
         loc.pathname === "/app/dashboard" ||
         loc.pathname === "/app/dashboard/" ||
+        loc.pathname.startsWith("/app/dashboard/onboarding") ||
         loc.pathname.startsWith("/app/dashboard/getting-started") ||
         loc.pathname.startsWith("/app/dashboard/recent-updates")
       );
@@ -85,8 +86,8 @@ function NavAreaLink(props: {
       title={shell.collapsed() ? props.area.label : undefined}
       class="flex items-center rounded-lg text-sm font-medium transition-colors"
       classList={{
-        "justify-center px-2 py-2.5": shell.collapsed(),
-        "gap-3 px-3 py-2.5": !shell.collapsed() && !props.nested,
+        "justify-center px-2": shell.collapsed(),
+        "gap-3 px-3": !shell.collapsed() && !props.nested,
         "gap-2 px-3 py-2": !shell.collapsed() && props.nested,
         "bg-brand-50 text-brand-600": active(),
         "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),

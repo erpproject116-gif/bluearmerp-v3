@@ -1,7 +1,7 @@
 /** Maps app routes to permission_registry codes (must match migration 020). */
 export const hrefPermissionCode: Record<string, string> = {
   "/app/dashboard": "dashboard.view",
-  "/app/dashboard/getting-started": "dashboard.view",
+  "/app/dashboard/onboarding": "dashboard.view",
   "/app/dashboard/recent-updates": "dashboard.view",
   "/app/dashboard/approvals": "dashboard.view",
   "/app/dashboard/period-summary": "dashboard.view",

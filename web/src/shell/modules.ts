@@ -52,7 +52,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/dashboard",
     features: [
       { label: "Dashboard", href: "/app/dashboard", settingsHref: "/app/dashboard" },
-      { label: "Getting started", href: "/app/dashboard/getting-started", settingsHref: "/app/dashboard/getting-started" },
+      { label: "Onboarding", href: "/app/dashboard/onboarding", settingsHref: "/app/dashboard/onboarding" },
       { label: "Recent updates", href: "/app/dashboard/recent-updates", settingsHref: "/app/dashboard/recent-updates" },
     ],
   },
