@@ -1,10 +1,16 @@
-import { A } from "@solidjs/router";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { A, useSearchParams } from "@solidjs/router";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { buildCatalog, searchCatalog } from "../../shell/navCatalog";
 
 export default function SiteMapPage() {
   const catalog = buildCatalog();
+  const [searchParams] = useSearchParams();
   const [q, setQ] = createSignal("");
+
+  createEffect(() => {
+    const fromUrl = typeof searchParams.q === "string" ? searchParams.q : "";
+    if (fromUrl.trim()) setQ(fromUrl);
+  });
   const filtered = createMemo(() => {
     const needle = q().trim();
     if (!needle) return catalog.slice(0, 80);
@@ -18,7 +24,7 @@ export default function SiteMapPage() {
         Find screens by name across the BluearmERP menu catalog.
       </p>
       <input
-        type="search"
+        type="text"
         class="mt-4 w-full rounded-lg border border-stroke px-3 py-2 text-sm shadow-sm outline-none focus:border-brand-400"
         placeholder="Search Menu (e.g. Sales List, New Receivable Payment, Serial)"
         value={q()}

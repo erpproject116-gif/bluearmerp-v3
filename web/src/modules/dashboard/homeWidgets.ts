@@ -78,12 +78,11 @@ export const HOME_WIDGET_CATALOG: HomeWidgetDef[] = [
   {
     id: "recent_activity",
     label: "Recent activity",
-    blurb: "Latest sales, payments, and stock moves in this workspace.",
-    defaultOn: true,
+    blurb: "Latest sales, payments, and stock moves (optional — off by default).",
   },
 ];
 
-export const DEFAULT_HOME_WIDGETS: HomeWidgetId[] = ["finance", "day_jobs", "getting_started", "recent_activity"];
+export const DEFAULT_HOME_WIDGETS: HomeWidgetId[] = ["finance", "day_jobs", "getting_started"];
 
 const ALLOWED = new Set(HOME_WIDGET_CATALOG.map((w) => w.id));
 

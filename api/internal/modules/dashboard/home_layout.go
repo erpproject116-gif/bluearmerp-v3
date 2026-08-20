@@ -26,7 +26,7 @@ var homeWidgetAllowlist = map[string]struct{}{
 	"recent_activity": {},
 }
 
-var defaultHomeWidgets = []string{"finance", "day_jobs", "getting_started", "recent_activity"}
+var defaultHomeWidgets = []string{"finance", "day_jobs", "getting_started"}
 
 const maxHomeWidgets = 12
 

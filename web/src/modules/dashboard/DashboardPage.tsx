@@ -84,7 +84,7 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <Show when={tab() === "intel"}>
-        <Navigate href="/app/reports" />
+        <Navigate href="/app/reports#reports-bi" />
       </Show>
       <Show when={tab() === "mypage"}>
         <Navigate href="/app/onboarding" />
