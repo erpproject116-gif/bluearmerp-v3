@@ -1,5 +1,6 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -82,12 +83,31 @@ export function SalesOrderStatusFilter(props: Props) {
   });
 
   return (
-    <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-      <div class="mb-4">
-        <h2 class="text-lg font-semibold text-text-primary">Sales Order Status</h2>
-        <p class="text-sm text-text-secondary">Details · by Line — set filters, then Search (F8).</p>
-      </div>
-
+    <CollapsibleFilterPanel
+      title="Sales Order Status"
+      description="Details · by Line — set filters, then Search (F8)."
+      actions={
+        <>
+          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => props.onSearch()}>
+            Search (F8)
+          </button>
+          <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={() => props.onReset()}>
+            Reset
+          </button>
+          <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => patch({ date_from: todayISO(), date_to: todayISO() })}>
+            Today
+          </button>
+          <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => { const { from, to } = thisMonthRange(); patch({ date_from: from, date_to: to }); }}>
+            This Month (~ Today)
+          </button>
+          <Show when={props.value().date_from && props.value().date_to}>
+            <span class="ml-auto text-xs text-text-secondary">
+              {formatDisplayDate(props.value().date_from)} – {formatDisplayDate(props.value().date_to)}
+            </span>
+          </Show>
+        </>
+      }
+    >
       <div class="grid gap-4 md:grid-cols-2">
         <Field label="Date from">
           <DateInput value={props.value().date_from} onInput={(e) => patch({ date_from: e.currentTarget.value })} />
@@ -110,26 +130,6 @@ export function SalesOrderStatusFilter(props: Props) {
         <LookupCombo label="Item" value={itemLabel} selectedId={() => props.value().item_id ?? null} onInput={setItemLabel} onSelect={(o) => { patch({ item_id: o.id }); setItemLabel(o.label); }} onClear={() => { patch({ item_id: null }); setItemLabel(""); }} fetchOptions={fetchItems} />
         <LookupCombo label="Transaction type" value={taxTypeLabel} selectedId={() => props.value().tax_type_id ?? null} onInput={setTaxTypeLabel} onSelect={(o) => { patch({ tax_type_id: o.id }); setTaxTypeLabel(o.label); }} onClear={() => { patch({ tax_type_id: null }); setTaxTypeLabel(""); }} fetchOptions={fetchTaxTypes} />
       </div>
-
-      <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-stroke pt-4">
-        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => props.onSearch()}>
-          Search (F8)
-        </button>
-        <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={() => props.onReset()}>
-          Reset
-        </button>
-        <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => patch({ date_from: todayISO(), date_to: todayISO() })}>
-          Today
-        </button>
-        <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => { const { from, to } = thisMonthRange(); patch({ date_from: from, date_to: to }); }}>
-          This Month (~ Today)
-        </button>
-        <Show when={props.value().date_from && props.value().date_to}>
-          <span class="ml-auto text-xs text-text-secondary">
-            {formatDisplayDate(props.value().date_from)} – {formatDisplayDate(props.value().date_to)}
-          </span>
-        </Show>
-      </div>
-    </section>
+    </CollapsibleFilterPanel>
   );
 }

@@ -396,12 +396,6 @@ export default function PurchaseOrderListPage() {
           { key: "pic_name", header: "PIC" },
           { key: "item_name_summary", header: "Item" },
           {
-            key: "pct_received",
-            header: "% Received",
-            sortable: false,
-            render: (r) => <span>{r.pct_received ?? 0}%</span>,
-          },
-          {
             key: "grand_total",
             header: "Total Amount",
             render: (r) => formatMoney(r.grand_total, r.currency_code),
