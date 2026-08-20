@@ -16,7 +16,7 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
   { query: "which screen for sales cash in", path: "/app/dashboard", expectArticleId: "mypage-flow-chart" },
   { query: "bluearmerp home navigation flow chart", path: "/app/dashboard", expectArticleId: "mypage-flow-chart" },
   { query: "what is load slip", path: "/app/sales-order", expectArticleId: "load-slip-overview" },
-  { query: "onboarding playbook", path: "/app/onboarding", expectArticleId: "onboarding-playbook" },
+  { query: "onboarding playbook", path: "/app/dashboard/onboarding", expectArticleId: "onboarding-playbook" },
 
   // P0
   { query: "cannot confirm missing attachment", path: "/app/quotation/quotations", expectArticleId: "cannot-confirm-document" },

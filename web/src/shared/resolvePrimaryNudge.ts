@@ -34,7 +34,13 @@ function isCommercialLocked(me: MeData | null | undefined): boolean {
 export function resolvePrimaryNudge(input: ResolvePrimaryNudgeInput): PrimaryNudgeKind {
   const { me, setup, onboarding, pathname } = input;
   if (!me || !pathname.startsWith("/app")) return "none";
-  if (pathname.startsWith("/app/setup") || pathname.startsWith("/app/onboarding")) return "none";
+  if (
+    pathname.startsWith("/app/setup") ||
+    pathname.startsWith("/app/onboarding") ||
+    pathname.startsWith("/app/dashboard/onboarding")
+  ) {
+    return "none";
+  }
 
   const foundationIncomplete = setup != null && !setup.required_complete;
 

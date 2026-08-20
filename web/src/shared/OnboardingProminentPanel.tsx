@@ -46,7 +46,9 @@ export function OnboardingProminentPanel() {
   const me = () => auth.me;
   const canManage = () => canManageWorkspaceSetup(me());
   const onOnboardingRoute = () =>
-    loc.pathname.startsWith("/app/setup") || loc.pathname.startsWith("/app/onboarding");
+    loc.pathname.startsWith("/app/setup") ||
+    loc.pathname.startsWith("/app/onboarding") ||
+    loc.pathname.startsWith("/app/dashboard/onboarding");
 
   const showSetupChecklist = () => onboarding.data?.show_setup_checklist ?? false;
   const showPlaybook = () => onboarding.data?.show_playbook ?? false;
@@ -78,7 +80,7 @@ export function OnboardingProminentPanel() {
 
   const nextHref = () => {
     if (gettingStarted().visible) {
-      return "/app/dashboard/getting-started";
+      return "/app/dashboard/onboarding";
     }
     if (showSetupChecklist() || foundationIncomplete()) {
       return setup.data?.next_step?.href ?? onboarding.data?.next_step?.href ?? "/app/setup";
@@ -87,7 +89,7 @@ export function OnboardingProminentPanel() {
     if (commercial && commercial !== "unlocked" && !auth.me?.tenant?.is_demo) {
       return "/app/inventory";
     }
-    return onboarding.data?.next_extended_step?.href ?? "/app/onboarding";
+    return onboarding.data?.next_extended_step?.href ?? "/app/dashboard/onboarding";
   };
 
   const nextLabel = () => {
@@ -205,7 +207,7 @@ export function OnboardingProminentPanel() {
             <div class="bg-gradient-to-br from-brand-600 to-brand-700 px-4 py-3 text-white">
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
-                  <p class="text-xs font-medium uppercase tracking-wide text-brand-100">Getting started</p>
+                  <p class="text-xs font-medium uppercase tracking-wide text-brand-100">Onboarding</p>
                   <h2 class="mt-0.5 text-base font-semibold leading-snug">{title()}</h2>
                 </div>
                 <button
@@ -286,7 +288,7 @@ export function OnboardingProminentPanel() {
                 </Show>
                 <Show when={showPlaybook()}>
                   <A
-                    href="/app/onboarding"
+                    href="/app/dashboard/onboarding"
                     class="inline-flex items-center justify-center rounded-lg border border-stroke px-3 py-2 text-xs font-medium text-text-primary hover:bg-slate-50"
                   >
                     Full playbook

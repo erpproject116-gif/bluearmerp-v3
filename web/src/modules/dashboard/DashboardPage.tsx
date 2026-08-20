@@ -10,14 +10,14 @@ import { DashboardLayout } from "./DashboardLayout";
 import { HomeCustomizePanel } from "./HomeCustomizePanel";
 import { HomeExtraWidget } from "./HomeExtraWidgets";
 import { HomeFinanceOverview } from "./HomeFinanceOverview";
-import { HomeGettingStarted } from "./HomeGettingStarted";
-import { HomeRecentActivity } from "./HomeRecentActivity";
+import { HomeOnboarding } from "./HomeOnboarding";
+import { HomeProductUpdates } from "./HomeProductUpdates";
 import { HomeShortcuts } from "./HomeShortcuts";
 import { DEFAULT_HOME_WIDGETS, normalizeHomeWidgets, type HomeWidgetId } from "./homeWidgets";
-import { resolveHomeTab } from "./homeTabs";
+import { HOME_ONBOARDING_HREF, resolveHomeTab } from "./homeTabs";
 import { useHomeLayout, useSaveHomeLayout } from "./useHomeLayout";
 
-/** Home: Dashboard tab (widgets), Getting started tab, Recent updates tab — Zoho-style split. */
+/** Home: Dashboard · Onboarding · Recent updates (product releases). */
 export default function DashboardPage() {
   const [params] = useSearchParams();
   const loc = useLocation();
@@ -93,7 +93,7 @@ export default function DashboardPage() {
         <Navigate href="/app/reports#reports-bi" />
       </Show>
       <Show when={tab() === "mypage"}>
-        <Navigate href="/app/onboarding" />
+        <Navigate href={HOME_ONBOARDING_HREF} />
       </Show>
       <Show when={tab() !== "intel" && tab() !== "mypage"}>
         <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -122,10 +122,10 @@ export default function DashboardPage() {
               </Show>
             </p>
             <A
-              href="/app/dashboard/getting-started"
+              href={HOME_ONBOARDING_HREF}
               class="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
             >
-              Open getting started
+              Open onboarding
             </A>
           </div>
         </Show>
@@ -149,12 +149,12 @@ export default function DashboardPage() {
           </div>
         </Show>
 
-        <Show when={homeTab() === "getting-started"}>
-          <HomeGettingStarted mode="page" />
+        <Show when={homeTab() === "onboarding"}>
+          <HomeOnboarding />
         </Show>
 
         <Show when={homeTab() === "recent-updates"}>
-          <HomeRecentActivity mode="page" />
+          <HomeProductUpdates />
         </Show>
 
         <HomeCustomizePanel

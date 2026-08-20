@@ -31,7 +31,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "New to Bluearm? After a trial, you land on the workspace setup wizard. The Dashboard shows a Start here checklist until foundation is complete. Then open /app/onboarding for the full ERP + POS playbook — each step links to Knowledge base articles for plain-language help.",
+        text: "New to Bluearm? After a trial, you land on the workspace setup wizard. The Dashboard shows a Start here checklist until foundation is complete. Then open /app/dashboard/onboarding for the full ERP + POS playbook — each step links to Knowledge base articles for plain-language help.",
       },
     ],
   },
@@ -40,14 +40,14 @@ export const documentationSections: DocSection[] = [
     title: "Your first week",
     iconId: "documentation",
     intro: "A plain-language playbook for getting your business running in Bluearm.",
-    primaryHref: "/app/onboarding",
+    primaryHref: "/app/dashboard/onboarding",
     primaryLabel: "Open onboarding playbook",
     blocks: [
       {
         type: "steps",
         items: [
           "Complete workspace setup at /app/setup — confirm seeded company, COA, tax, process policies, and location; add partners and products.",
-          "Open /app/onboarding for the full ERP + POS playbook with tracked progress.",
+          "Open /app/dashboard/onboarding for the full ERP + POS playbook with tracked progress.",
           "Week 1: Review process policies again if needed and enable modules (POS, WMS, Quality).",
           "Week 2: First selling flow — quotation, sales order, pick list, invoice (Load Slip), customer payment.",
           "Week 3: First buying flow — purchase request, RFQ, PO, goods receipt, supplier invoice, pre-invoicing report.",
@@ -93,7 +93,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "tip",
-        text: "Invited team members see that setup is in progress; only administrators can finish the wizard. Use the Dashboard checklist or /app/onboarding for the extended playbook after foundation.",
+        text: "Invited team members see that setup is in progress; only administrators can finish the wizard. Use the Dashboard checklist or /app/dashboard/onboarding for the extended playbook after foundation.",
       },
     ],
   },

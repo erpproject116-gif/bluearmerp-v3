@@ -255,7 +255,7 @@ export default function SetupWizardPage() {
               Day 1: open Stocks
             </A>
             <A
-              href="/app/onboarding"
+              href="/app/dashboard/onboarding"
               class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
             >
               Open onboarding playbook
@@ -268,10 +268,10 @@ export default function SetupWizardPage() {
             </A>
             <Show when={homeProgress().visible}>
               <A
-                href={homeProgress().next?.href ?? "/app/dashboard/getting-started"}
+                href={homeProgress().next?.href ?? "/app/dashboard/onboarding"}
                 class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
               >
-                Home: {homeProgress().next?.label ?? "Getting started"}
+                Home: {homeProgress().next?.label ?? "Onboarding"}
               </A>
             </Show>
             <A href="/app/dashboard" class="text-sm text-brand-700 hover:underline">

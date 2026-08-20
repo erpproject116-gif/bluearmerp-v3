@@ -295,7 +295,7 @@ export const knowledgebaseArticles: KbArticle[] = [
           "Open /signup and register with email or Google.",
           "On /welcome, click Start 90-day free trial.",
           "BluearmERP creates your workspace (company code like TRIAL-xxx) and opens the setup wizard.",
-          "Complete foundation setup, then use /app/onboarding for module-by-module guidance.",
+          "Complete foundation setup, then use Home → Onboarding for module-by-module guidance.",
         ],
       },
       {

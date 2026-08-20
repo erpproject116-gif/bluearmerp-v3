@@ -21,7 +21,7 @@ export function OnboardingChecklist(props: { compact?: boolean }) {
   const nextHref = () => {
     if (gettingStarted().visible) return gettingStarted().next?.href ?? "/app/setup";
     if (showSetup()) return data()!.next_step?.href ?? "/app/setup";
-    return data()!.next_extended_step?.href ?? "/app/onboarding";
+    return data()!.next_extended_step?.href ?? "/app/dashboard/onboarding";
   };
   const nextLabel = () => {
     if (gettingStarted().visible) return gettingStarted().next?.label ?? "Continue setup";
@@ -48,7 +48,7 @@ export function OnboardingChecklist(props: { compact?: boolean }) {
             </p>
           </div>
           <Show when={showPlaybook()}>
-            <A href="/app/onboarding" class="text-xs font-medium text-brand-600 hover:underline">
+            <A href="/app/dashboard/onboarding" class="text-xs font-medium text-brand-600 hover:underline">
               Full playbook
             </A>
           </Show>
