@@ -1,7 +1,8 @@
-import { A } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
+import { reportsDateRangeFromQuery, withReportDateQuery } from "../../shared/reports/ReportDatePresets";
 import { ReportsBiDashboard } from "./ReportsBiDashboard";
 
 type ReportCatalogEntry = {
@@ -149,8 +150,10 @@ function ReportRow(props: {
   favorited: boolean;
   onToggleFavorite: () => void;
   onOpen: () => void;
+  href?: string;
 }) {
   const r = () => props.report;
+  const href = () => props.href ?? r().web_path;
   return (
     <li class="group flex flex-wrap items-center gap-3 border-b border-stroke/60 py-3 last:border-0">
       <button
@@ -168,11 +171,11 @@ function ReportRow(props: {
       </button>
       <div class="min-w-0 flex-1">
         <Show
-          when={r().web_path}
+          when={href()}
           fallback={<span class="font-medium text-text-primary">{r().label}</span>}
         >
           <A
-            href={r().web_path!}
+            href={href()!}
             class="font-medium text-brand-600 hover:underline"
             onClick={() => props.onOpen()}
           >
@@ -184,9 +187,9 @@ function ReportRow(props: {
       <span class="hidden shrink-0 text-xs uppercase tracking-wide text-text-secondary sm:inline">
         {moduleLabels[r().module] ?? r().module}
       </span>
-      <Show when={r().web_path}>
+      <Show when={href()}>
         <A
-          href={r().web_path!}
+          href={href()!}
           class="shrink-0 rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-primary transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
           onClick={() => props.onOpen()}
         >
@@ -200,6 +203,10 @@ function ReportRow(props: {
 export default function ReportsIndexPage() {
   const catalog = useReportCatalog();
   const savedViews = useSavedViews();
+  const [params] = useSearchParams();
+  const dateRange = createMemo(() => reportsDateRangeFromQuery(params));
+  const datedHref = (href?: string) =>
+    href ? withReportDateQuery(href, dateRange().from, dateRange().to) : href;
   const [q, setQ] = createSignal("");
   const [group, setGroup] = createSignal<string>("all");
   const [favorites, setFavorites] = createSignal<string[]>(loadKeys(FAV_KEY));
@@ -386,7 +393,7 @@ export default function ReportsIndexPage() {
             <For each={quickReports()}>
               {(item) => (
                 <A
-                  href={item.href!}
+                  href={datedHref(item.href)!}
                   class="rounded-lg border border-stroke px-3 py-2.5 transition hover:border-brand-300 hover:bg-brand-50"
                   onClick={() => markRecent(item.key)}
                 >
@@ -430,7 +437,7 @@ export default function ReportsIndexPage() {
                       fallback={<span class="text-sm text-text-primary">{r.label}</span>}
                     >
                       <A
-                        href={r.web_path!}
+                        href={datedHref(r.web_path)!}
                         class="block rounded-lg px-2 py-1.5 text-sm text-brand-600 hover:bg-brand-50"
                         onClick={() => markRecent(r.key)}
                       >
@@ -454,7 +461,7 @@ export default function ReportsIndexPage() {
                 {(r) => (
                   <li>
                     <A
-                      href={r.web_path!}
+                      href={datedHref(r.web_path)!}
                       class="block rounded-lg px-2 py-1.5 text-sm text-text-primary hover:bg-slate-50"
                       onClick={() => markRecent(r.key)}
                     >
@@ -628,6 +635,7 @@ export default function ReportsIndexPage() {
                           favorited={favorites().includes(report.key)}
                           onToggleFavorite={() => toggleFavorite(report.key)}
                           onOpen={() => markRecent(report.key)}
+                          href={datedHref(report.web_path)}
                         />
                       )}
                     </For>
