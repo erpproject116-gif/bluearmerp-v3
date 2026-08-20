@@ -78,7 +78,7 @@ export function OnboardingProminentPanel() {
 
   const nextHref = () => {
     if (gettingStarted().visible) {
-      return gettingStarted().next?.href ?? "/app/setup";
+      return "/app/dashboard/getting-started";
     }
     if (showSetupChecklist() || foundationIncomplete()) {
       return setup.data?.next_step?.href ?? onboarding.data?.next_step?.href ?? "/app/setup";

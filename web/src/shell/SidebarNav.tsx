@@ -46,7 +46,12 @@ function NavAreaLink(props: {
     if (props.active != null) return props.active;
     const href = props.area.href;
     if (href === "/app/dashboard") {
-      return loc.pathname === "/app/dashboard" || loc.pathname === "/app/dashboard/";
+      return (
+        loc.pathname === "/app/dashboard" ||
+        loc.pathname === "/app/dashboard/" ||
+        loc.pathname.startsWith("/app/dashboard/getting-started") ||
+        loc.pathname.startsWith("/app/dashboard/recent-updates")
+      );
     }
     if (href === "/app/dashboard/site-map") {
       return loc.pathname.startsWith("/app/dashboard/site-map");

@@ -100,7 +100,6 @@ export function CommandPalette(props: { open: boolean; onClose: () => void }) {
   });
 
   const pick = (item: PaletteItem) => {
-    const needle = q().trim();
     props.onClose();
     setQ("");
 

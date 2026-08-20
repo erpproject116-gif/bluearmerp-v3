@@ -268,7 +268,7 @@ export default function SetupWizardPage() {
             </A>
             <Show when={homeProgress().visible}>
               <A
-                href={homeProgress().next?.href ?? "/app/dashboard"}
+                href={homeProgress().next?.href ?? "/app/dashboard/getting-started"}
                 class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
               >
                 Home: {homeProgress().next?.label ?? "Getting started"}
