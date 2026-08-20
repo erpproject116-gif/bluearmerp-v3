@@ -218,6 +218,26 @@ async function startSession(pathname: string) {
   }
 }
 
+/** Fire-and-forget UX metric (command palette, modal mode). Queues a synthetic page visit. */
+export function trackUxEvent(name: "command_palette_open" | "modal_mode_toggle") {
+  if (!clientSessionId || !sessionStarted || ending) return;
+  const path = `/app/ux/${name}`;
+  seqCounter += 1;
+  const now = new Date().toISOString();
+  pendingPages.push({
+    client_visit_id: newId(),
+    seq: seqCounter,
+    path,
+    path_pattern: path,
+    page_label: name.replace(/_/g, " "),
+    entered_at: now,
+    exited_at: now,
+    active_seconds: 0,
+    idle_seconds: 0,
+  });
+  void sendHeartbeat();
+}
+
 /** Ends the current usage session. Safe to call multiple times / without an open session. */
 export async function endUsageSession(reason: "logout" | "idle_timeout" | "tab_closed" | "unknown" = "logout") {
   if (!clientSessionId || !sessionStarted || ending) return;

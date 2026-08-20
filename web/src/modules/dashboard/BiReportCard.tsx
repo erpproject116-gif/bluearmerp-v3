@@ -20,6 +20,7 @@ export function BiReportCard(props: {
   columns: GridExportColumn[];
   rows: Record<string, unknown>[];
   emptyText?: string;
+  hideExport?: boolean;
   registerExport?: (id: string, get: () => BiPdfSection) => () => void;
   children?: JSX.Element;
 }) {
@@ -52,27 +53,29 @@ export function BiReportCard(props: {
           </Show>
         </div>
         <div class="flex flex-wrap gap-1">
-          <button
-            type="button"
-            class="rounded-md border border-stroke bg-white px-2 py-1 text-xs font-medium text-text-primary hover:bg-slate-50"
-            onClick={() => downloadBiCsv(`${slug()}.csv`, props.columns, props.rows)}
-          >
-            CSV
-          </button>
-          <button
-            type="button"
-            class="rounded-md border border-stroke bg-white px-2 py-1 text-xs font-medium text-text-primary hover:bg-slate-50"
-            onClick={() => downloadChartPng(`${slug()}.png`, chart())}
-          >
-            PNG
-          </button>
-          <button
-            type="button"
-            class="rounded-md border border-stroke bg-white px-2 py-1 text-xs font-medium text-text-primary hover:bg-slate-50"
-            onClick={() => downloadBiPdf(`${slug()}.pdf`, [section()])}
-          >
-            PDF
-          </button>
+          <Show when={!props.hideExport}>
+            <button
+              type="button"
+              class="rounded-md border border-stroke bg-white px-2 py-1 text-xs font-medium text-text-primary hover:bg-slate-50"
+              onClick={() => downloadBiCsv(`${slug()}.csv`, props.columns, props.rows)}
+            >
+              CSV
+            </button>
+            <button
+              type="button"
+              class="rounded-md border border-stroke bg-white px-2 py-1 text-xs font-medium text-text-primary hover:bg-slate-50"
+              onClick={() => downloadChartPng(`${slug()}.png`, chart())}
+            >
+              PNG
+            </button>
+            <button
+              type="button"
+              class="rounded-md border border-stroke bg-white px-2 py-1 text-xs font-medium text-text-primary hover:bg-slate-50"
+              onClick={() => downloadBiPdf(`${slug()}.pdf`, [section()])}
+            >
+              PDF
+            </button>
+          </Show>
         </div>
       </div>
       <Show when={hasData()} fallback={<p class="text-sm text-text-secondary">{props.emptyText ?? "No data."}</p>}>

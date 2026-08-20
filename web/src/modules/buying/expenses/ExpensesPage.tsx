@@ -1,11 +1,13 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
+import { hasPermission, useAuth } from "../../../shared/auth-context";
 import {
   PartnerSearchModal,
   type PartnerSearchRow,
@@ -31,9 +33,12 @@ type BankAccount = { id: number; bank_account_name: string; bank_account_code: s
 
 export default function ExpensesPage() {
   const toast = useToast();
+  const auth = useAuth();
   const client = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [status, setStatus] = createSignal("");
-  const [createOpen, setCreateOpen] = createSignal(false);
+  const [formOpen, setFormOpen] = createSignal(false);
+  const [editing, setEditing] = createSignal<Expense | null>(null);
   const [payOpen, setPayOpen] = createSignal<Expense | null>(null);
   const [partnerPickerOpen, setPartnerPickerOpen] = createSignal(false);
   const [partnerId, setPartnerId] = createSignal<number | null>(null);
@@ -50,6 +55,14 @@ export default function ExpensesPage() {
   const [saving, setSaving] = createSignal(false);
   const [busyId, setBusyId] = createSignal<number | null>(null);
 
+  const canWrite = () => hasPermission(auth.me, "finance.expenses_write", "write");
+  const recurringFilter = () => {
+    const raw = searchParams.recurring_expense_id;
+    const v = Array.isArray(raw) ? raw[0] : raw;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
   const bankAccounts = createQuery(() => ({
     queryKey: ["bank-accounts-expenses"],
     queryFn: async () => {
@@ -62,10 +75,12 @@ export default function ExpensesPage() {
   }));
 
   const list = createQuery(() => ({
-    queryKey: ["expenses", status()],
+    queryKey: ["expenses", status(), recurringFilter()],
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (status()) qs.set("payment_status", status());
+      const rid = recurringFilter();
+      if (rid) qs.set("recurring_expense_id", String(rid));
       const res = await apiFetch<Expense[]>(`/api/v1/finance/expenses?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load expenses");
       return res.data ?? [];
@@ -80,6 +95,7 @@ export default function ExpensesPage() {
   };
 
   const resetForm = () => {
+    setEditing(null);
     setPartnerId(null);
     setVendorName("");
     setCategory("general");
@@ -101,45 +117,77 @@ export default function ExpensesPage() {
     return body;
   };
 
-  const create = async () => {
+  const openCreate = () => {
+    resetForm();
+    setFormOpen(true);
+  };
+
+  const openEdit = (row: Expense) => {
+    setEditing(row);
+    setPartnerId(row.partner_id ?? null);
+    setVendorName(row.vendor_name);
+    setCategory(row.category || "general");
+    setDescription(row.description);
+    setAmount(String(row.amount));
+    setTaxAmount(String(row.tax_amount));
+    setExpenseDate(row.expense_date);
+    setPayNow(false);
+    setPaymentMethod("cash");
+    setBankAccountId("");
+    setReferenceNo(row.reference ?? "");
+    setFormOpen(true);
+  };
+
+  const saveExpense = async () => {
     const amt = Number(amount());
     if (!Number.isFinite(amt) || amt < 0) {
       toast.warning("Enter a valid amount.");
       return;
     }
-    if (payNow() && !partnerId()) {
+    const ed = editing();
+    if (!ed && payNow() && !partnerId()) {
       toast.warning("Select a vendor partner to pay immediately.");
       return;
     }
-    if (payNow() && paymentMethod() !== "cash" && !bankAccountId()) {
+    if (!ed && payNow() && paymentMethod() !== "cash" && !bankAccountId()) {
       toast.warning("Select a bank account for check or bank transfer.");
       return;
     }
     setSaving(true);
-    const res = await apiFetch("/api/v1/finance/expenses", {
-      method: "POST",
-      body: JSON.stringify({
-        expense_date: expenseDate(),
-        partner_id: partnerId(),
-        vendor_name: vendorName().trim(),
-        category: category().trim() || "general",
-        description: description().trim(),
-        amount: amt,
-        tax_amount: Number(taxAmount()) || 0,
-        pay_now: payNow(),
-        payment_method: paymentMethod(),
-        bank_account_id: bankAccountId() ? Number(bankAccountId()) : undefined,
-        reference: referenceNo().trim() || undefined,
-      }),
-    });
+    const payload = {
+      expense_date: expenseDate(),
+      partner_id: partnerId(),
+      vendor_name: vendorName().trim(),
+      category: category().trim() || "general",
+      description: description().trim(),
+      amount: amt,
+      tax_amount: Number(taxAmount()) || 0,
+      reference: referenceNo().trim() || undefined,
+      pay_now: payNow(),
+      payment_method: paymentMethod(),
+      bank_account_id: bankAccountId() ? Number(bankAccountId()) : undefined,
+    };
+    const res = ed
+      ? await apiFetch(`/api/v1/finance/expenses/${ed.id}`, { method: "PATCH", body: JSON.stringify(payload) })
+      : await apiFetch("/api/v1/finance/expenses", { method: "POST", body: JSON.stringify(payload) });
     setSaving(false);
     if (!res.success) {
       handleSaveResult(res, toast);
       return;
     }
-    toast.success(payNow() ? "Expense created and paid." : "Expense created.");
+    toast.success(ed ? "Expense updated." : payNow() ? "Expense created and paid." : "Expense created.");
     resetForm();
-    setCreateOpen(false);
+    setFormOpen(false);
+    invalidate();
+  };
+
+  const removeExpense = async (row: Expense) => {
+    if (row.payment_status === "paid") return;
+    if (!confirm(`Delete expense ${row.expense_no}?`)) return;
+    setBusyId(row.id);
+    const res = await apiFetch(`/api/v1/finance/expenses/${row.id}`, { method: "DELETE" });
+    setBusyId(null);
+    if (!handleSaveResult(res, toast, "Expense deleted.")) return;
     invalidate();
   };
 
@@ -194,13 +242,20 @@ export default function ExpensesPage() {
           </select>
           <button
             type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={() => { resetForm(); setCreateOpen(true); }}
+            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            disabled={!canWrite()}
+            onClick={openCreate}
           >
             New expense
           </button>
         </div>
       </div>
+
+      <Show when={recurringFilter()}>
+        <p class="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          Showing expenses generated from recurring schedule #{recurringFilter()}.
+        </p>
+      </Show>
 
       <Show when={!list.isLoading} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
         <Show when={list.isError}>
@@ -231,19 +286,39 @@ export default function ExpensesPage() {
                   <td class="px-3 py-2 text-right">{formatPeso(row.amount + row.tax_amount)}</td>
                   <td class="px-3 py-2 capitalize">{row.payment_status}</td>
                   <td class="px-3 py-2">
-                    <Show when={row.payment_status === "unpaid"}>
-                      <button
-                        type="button"
-                        class="text-brand-600 hover:underline disabled:opacity-50"
-                        disabled={busyId() === row.id}
-                        onClick={() => openPay(row)}
-                      >
-                        Mark paid
-                      </button>
-                    </Show>
-                    <Show when={row.payment_voucher_id}>
-                      <span class="ml-2 text-xs text-text-secondary">PV #{row.payment_voucher_id}</span>
-                    </Show>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <Show when={row.payment_status === "unpaid"}>
+                        <button
+                          type="button"
+                          class="text-brand-600 hover:underline disabled:opacity-50"
+                          disabled={busyId() === row.id}
+                          onClick={() => openPay(row)}
+                        >
+                          Mark paid
+                        </button>
+                        <Show when={canWrite()}>
+                          <button
+                            type="button"
+                            class="text-text-secondary hover:underline disabled:opacity-50"
+                            disabled={busyId() === row.id}
+                            onClick={() => openEdit(row)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            class="text-red-600 hover:underline disabled:opacity-50"
+                            disabled={busyId() === row.id}
+                            onClick={() => void removeExpense(row)}
+                          >
+                            Delete
+                          </button>
+                        </Show>
+                      </Show>
+                      <Show when={row.payment_voucher_id}>
+                        <span class="text-xs text-text-secondary">PV #{row.payment_voucher_id}</span>
+                      </Show>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -252,16 +327,16 @@ export default function ExpensesPage() {
         </table>
       </Show>
 
-      <Show when={createOpen()}>
+      <Show when={formOpen()}>
         <div class="fixed inset-0 z-[55] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center">
           <div class="w-full max-w-lg rounded-2xl border border-stroke bg-white p-6 shadow-xl">
             <div class="mb-4 flex items-center justify-between">
-              <h2 class="text-lg font-semibold">New expense</h2>
-              <button type="button" class={modalDismissClass} onClick={() => setCreateOpen(false)}>Close</button>
+              <h2 class="text-lg font-semibold">{editing() ? `Edit ${editing()!.expense_no}` : "New expense"}</h2>
+              <button type="button" class={modalDismissClass} onClick={() => setFormOpen(false)}>Close</button>
             </div>
             <label class="mb-3 block text-sm">
               <span class="text-text-secondary">Date</span>
-              <input type="date" class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={expenseDate()} onInput={(e) => setExpenseDate(e.currentTarget.value)} />
+              <input type="date" class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={expenseDate()} onInput={(e) => setExpenseDate(e.currentTarget.value)} disabled={Boolean(editing())} />
             </label>
             <label class="mb-3 block text-sm">
               <span class="text-text-secondary">Vendor partner</span>
@@ -296,11 +371,13 @@ export default function ExpensesPage() {
                 <input type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={taxAmount()} onInput={(e) => setTaxAmount(e.currentTarget.value)} />
               </label>
             </div>
-            <label class="mb-3 flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={payNow()} onChange={(e) => setPayNow(e.currentTarget.checked)} />
-              Pay immediately (creates payment voucher)
-            </label>
-            <Show when={payNow()}>
+            <Show when={!editing()}>
+              <label class="mb-3 flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={payNow()} onChange={(e) => setPayNow(e.currentTarget.checked)} />
+                Pay immediately (creates payment voucher)
+              </label>
+            </Show>
+            <Show when={!editing() && payNow()}>
               <label class="mb-3 block text-sm">
                 <span class="text-text-secondary">Payment method</span>
                 <select class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={paymentMethod()} onChange={(e) => setPaymentMethod(e.currentTarget.value)}>
@@ -326,9 +403,9 @@ export default function ExpensesPage() {
               </label>
             </Show>
             <div class="mt-6 flex justify-end gap-2">
-              <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => setCreateOpen(false)}>Cancel</button>
-              <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving()} onClick={() => void create()}>
-                {saving() ? "Saving…" : payNow() ? "Save & pay" : "Save"}
+              <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => setFormOpen(false)}>Cancel</button>
+              <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving() || !canWrite()} onClick={() => void saveExpense()}>
+                {saving() ? "Saving…" : editing() ? "Save changes" : payNow() ? "Save & pay" : "Save"}
               </button>
             </div>
           </div>

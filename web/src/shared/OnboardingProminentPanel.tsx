@@ -5,21 +5,14 @@ import { useAuth } from "./auth-context";
 import { apiFetch } from "./api";
 import { useOnboarding, useSetupReadiness } from "./usePlatform";
 import { canManageWorkspaceSetup } from "./resolveAppEntryPath";
+import { resolvePrimaryNudge } from "./resolvePrimaryNudge";
+import { GETTING_STARTED_COPY, resolveGettingStarted } from "./setupProgress";
 
 const MINIMIZED_KEY = "erp.onboardingPanel.minimized";
 
-const STEP_HINTS: Record<string, string> = {
-  company:
-    "Set your company name in branding — it appears on invoices, purchase slips, and reports.",
-  chart_of_accounts:
-    "Configure your chart of accounts so sales, purchases, and POS can post correctly.",
-  currency_tax: "Confirm PHP currency and VAT types for quotations and invoices.",
-  process_policies: "Review which documents are required before the next step in your workflow.",
-  location: "Confirm your stock location (HQ / branches) before moving inventory.",
-  partners: "Add at least one customer or supplier before quotes and purchases. CSV import is optional.",
-  items: "Add products or services you sell or buy. CSV import is optional.",
-  team: "Invite teammates when you are ready — you can finish setup first.",
-};
+const STEP_HINTS: Record<string, string> = Object.fromEntries(
+  Object.entries(GETTING_STARTED_COPY).map(([id, c]) => [id, c.blurb]),
+);
 
 function storageKey(userId: number, tenantId: number) {
   return `${MINIMIZED_KEY}:${tenantId}:${userId}`;
@@ -61,20 +54,32 @@ export function OnboardingProminentPanel() {
 
   const visible = () => {
     if (!me() || !loc.pathname.startsWith("/app") || onOnboardingRoute()) return false;
-    if (showSetupChecklist() || showPlaybook()) return true;
-    if (foundationIncomplete() && (setup.data?.show_setup_banner || setup.data?.show_breadcrumb_hint)) {
+    const nudge = resolvePrimaryNudge({
+      me: me(),
+      setup: setup.data,
+      onboarding: onboarding.data,
+      pathname: loc.pathname,
+    });
+    if (nudge === "playbook") return true;
+    if (nudge === "setup" && showSetupChecklist() && canManage()) {
+      if (loc.pathname.startsWith("/app/dashboard")) return false;
       return true;
     }
-    if (!canManage() && foundationIncomplete()) return true;
     return false;
   };
 
+  const gettingStarted = () => resolveGettingStarted(setup.data);
+
   const percent = () => {
     if (showPlaybook() && !showSetupChecklist()) return onboarding.data?.overall_percent ?? 0;
+    if (gettingStarted().visible) return gettingStarted().percent;
     return setup.data?.percent ?? onboarding.data?.percent ?? 0;
   };
 
   const nextHref = () => {
+    if (gettingStarted().visible) {
+      return gettingStarted().next?.href ?? "/app/setup";
+    }
     if (showSetupChecklist() || foundationIncomplete()) {
       return setup.data?.next_step?.href ?? onboarding.data?.next_step?.href ?? "/app/setup";
     }
@@ -86,6 +91,9 @@ export function OnboardingProminentPanel() {
   };
 
   const nextLabel = () => {
+    if (gettingStarted().visible) {
+      return gettingStarted().next?.label ?? "Continue setup";
+    }
     if (showSetupChecklist() || foundationIncomplete()) {
       return setup.data?.next_step?.label ?? onboarding.data?.next_step?.label ?? "Continue setup";
     }
@@ -100,6 +108,9 @@ export function OnboardingProminentPanel() {
   };
 
   const nextHint = () => {
+    if (gettingStarted().visible && gettingStarted().next) {
+      return gettingStarted().next!.blurb;
+    }
     const stepId = setup.data?.next_step?.id ?? onboarding.data?.next_step?.id;
     if (stepId && STEP_HINTS[stepId]) return STEP_HINTS[stepId];
     if (showPlaybook()) {
@@ -123,6 +134,8 @@ export function OnboardingProminentPanel() {
   };
 
   const setupSteps = () => {
+    const gs = gettingStarted().steps.filter((s) => !s.done || s.required).slice(0, 6);
+    if (gs.length > 0) return gs.map((s) => ({ id: s.id, label: s.label, done: s.done }));
     const steps = onboarding.data?.steps ?? setup.data?.steps ?? [];
     return steps.filter((s) => s.required !== false).slice(0, 4);
   };

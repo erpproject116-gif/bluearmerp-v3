@@ -3,11 +3,14 @@ import { Modal } from "../../shared/Modal";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import {
+  downloadMigImportTemplate,
   importMigMapped,
   listMigImportProfiles,
   MIG_ENTITY_FIELDS,
+  MIG_NEEDS_ITEM,
   MIG_NEEDS_JOB_DEFAULTS,
   MIG_REQUIRED,
+  parseCsvHeaders,
   previewMigMapped,
   spreadsheetToCsvFile,
   upsertMigImportProfile,
@@ -27,11 +30,6 @@ type Props = {
   onImported: () => void;
   seed?: MigImportSeed | null;
 };
-
-function parseHeaders(text: string): string[] {
-  const first = text.split(/\r?\n/).find((l) => l.trim()) ?? "";
-  return first.split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
-}
 
 export function MigrationMappedImportModal(props: Props) {
   const toast = useToast();
@@ -82,7 +80,7 @@ export function MigrationMappedImportModal(props: Props) {
     const f = new File([seed.csv_text ?? ""], seed.file_name || "copilot-import.csv", { type: "text/csv" });
     await onPickFile(f);
     if (seed.column_map) {
-      const hdrs = new Set(parseHeaders(seed.csv_text ?? ""));
+      const hdrs = new Set(parseCsvHeaders(seed.csv_text ?? ""));
       const valid: Record<string, string> = {};
       for (const [field, header] of Object.entries(seed.column_map)) {
         if (fields().includes(field) && hdrs.has(header)) valid[field] = header;
@@ -102,7 +100,7 @@ export function MigrationMappedImportModal(props: Props) {
       const csv = await spreadsheetToCsvFile(f);
       setFile(csv);
       const text = await csv.text();
-      const hdrs = parseHeaders(text);
+      const hdrs = parseCsvHeaders(text);
       setHeaders(hdrs);
       const next: Record<string, string> = {};
       for (const field of fields()) {
@@ -143,6 +141,10 @@ export function MigrationMappedImportModal(props: Props) {
         toast.warning(`Map required field: ${req}`);
         return null;
       }
+    }
+    if (MIG_NEEDS_ITEM[props.kind] && !columnMap.item_code && !columnMap.item) {
+      toast.warning("Map item_code or item.");
+      return null;
     }
     if (needsJob()) {
       if (!taxTypeId() || !currencyId() || !locationId()) {
@@ -204,9 +206,18 @@ export function MigrationMappedImportModal(props: Props) {
     <Modal open={props.open} title={props.title} onClose={props.onClose} wide>
       <div class="space-y-4">
         <p class="text-sm text-text-secondary">
-          Upload a CSV or Excel file from another system, map columns, Preview (no writes), then Import. This step is
-          optional — cancel if you will enter data in Bluearm instead.
+          Download the template and fill it, or upload a CSV/Excel export from another system and map columns. Preview
+          writes nothing. Replace the EXAMPLE row before Import. Dates must be YYYY-MM-DD. Amounts use a dot, no thousands
+          separators. Serial/lot items cannot go through opening stock or open documents. Open invoices also need tax type,
+          currency, and warehouse below. This step is optional.
         </p>
+        <button
+          type="button"
+          class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
+          onClick={() => void downloadMigImportTemplate(props.kind).catch(() => toast.error("Could not download template."))}
+        >
+          Download template
+        </button>
         <Show when={seedNote()}>
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">{seedNote()}</p>
         </Show>
@@ -275,7 +286,7 @@ export function MigrationMappedImportModal(props: Props) {
           <div class="grid gap-3 md:grid-cols-2">
             <For each={fields()}>
               {(field) => (
-                <Field label={`${field}${required().includes(field) ? " *" : ""}`}>
+                <Field label={`${field}${required().includes(field) || (MIG_NEEDS_ITEM[props.kind] && (field === "item_code" || field === "item")) ? " *" : ""}`}>
                   <select
                     class={inputClass}
                     value={map()[field] ?? ""}

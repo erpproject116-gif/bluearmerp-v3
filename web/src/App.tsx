@@ -28,6 +28,7 @@ import {
   ProjectsPage,
   DepartmentsPage,
   ItemsPage,
+  ItemCategoriesPage,
   PartnersSettingsPage,
   LocationsSettingsPage,
   ProjectsSettingsPage,
@@ -65,18 +66,14 @@ import {
   TaxTypeSettingsPage,
   CurrencyListPage,
   CurrencySettingsPage,
-  QuotationListPage,
+  QuotationHubPage,
   QuotationNewPage,
   QuotationSettingsPage,
-  QuotationStatusPage,
-  OutstandingQuoteStatusPage,
   QuotationPrintPage,
   QuotationStatusPrintPage,
-  SalesOrderListPage,
+  SalesOrderHubPage,
   SalesOrderNewPage,
   SalesOrderSettingsPage,
-  SalesOrderStatusPage,
-  OutstandingSOStatusPage,
   ReleaseSalesOrderPage,
   DeliveryReceiptListPage,
   DeliveryReceiptNewPage,
@@ -95,15 +92,15 @@ import {
   RfqPrintPage,
   SupplierQuotationPrintPage,
   SupplierInvoiceDocPrintPage,
-  PurchaseOrderListPage,
+  PurchaseOrderHubPage,
   PurchaseReturnsPage,
   RfqListPage,
   RfqDetailPage,
   GoodsReceiptListPage,
-  SalesListPage,
+  SalesHubPage,
+  SalesCategoriesPage,
   SalesNewPage,
   SalesSettingsPage,
-  SalesStatusPage,
   PreInvoicingStatusPage,
   ChangeSalesPriceBatchPage,
   SalesReturnsPage,
@@ -120,7 +117,6 @@ import {
   SupplierPaymentStatusPage,
   ReceiptStatusPage,
   OfficialReceiptStatusPage,
-  SupplierInvoiceListPage,
   SupplierInvoiceNewPage,
   PaymentVoucherListPage,
   PaymentVoucherNewPage,
@@ -248,12 +244,11 @@ import {
   QcRequestsPage,
   CommissionRulesPage,
   SOAnalysisReportPage,
+  FulfillmentProgressReportPage,
   ShipmentStatusPage,
   PendingShipmentPage,
   ShippingOrderStatusPage,
   POAnalysisReportPage,
-  PurchaseOrderStatusPage,
-  OutstandingPOStatusPage,
   ItemsToReceiveReportPage,
   StockBalanceReportPage,
   StockLedgerReportPage,
@@ -281,6 +276,7 @@ import {
   BankingAccountPage,
   FiscalYearsPage,
   BuyingWorkspacePage,
+  PurchaseReceiveHubPage,
   PurchaseStatusPage,
   PurchasePreInvoicingPage,
   PayableStatusReportPage,
@@ -305,7 +301,6 @@ import {
   ReportsIndexPage,
   SavedViewsPage,
   DashboardPage,
-  PeriodSummaryPage,
   ApprovalsQueuePage,
   SiteMapPage,
   DocumentationPage,
@@ -488,7 +483,7 @@ export default function App() {
         </Route>
         <Route path="/app" component={AppLayout}>
           <Route path="/dashboard" component={DashboardPage} />
-          <Route path="/dashboard/period-summary" component={PeriodSummaryPage} />
+          <Route path="/dashboard/period-summary" component={() => <Navigate href="/app/reports" />} />
           <Route path="/thank-you-activated" component={ThankYouActivatedPage} />
           <Route path="/dashboard/approvals" component={ApprovalsQueuePage} />
           <Route path="/dashboard/site-map" component={SiteMapPage} />
@@ -515,6 +510,7 @@ export default function App() {
           <Route path="/inventory/departments" component={DepartmentsPage} />
           <Route path="/inventory/departments/settings" component={DepartmentsSettingsPage} />
           <Route path="/inventory/items" component={ItemsPage} />
+          <Route path="/inventory/item-categories" component={ItemCategoriesPage} />
           <Route path="/inventory/items/settings" component={ItemsSettingsPage} />
           <Route path="/inventory/reports/stock-balance" component={StockBalanceReportPage} />
           <Route path="/inventory/reports/stock-ledger" component={StockLedgerReportPage} />
@@ -575,10 +571,10 @@ export default function App() {
           <Route path="/quotation/tax-mngt/currencies/settings" component={CurrencySettingsPage} />
           <Route path="/quotation/tax-mngt/currencies" component={CurrencyListPage} />
           <Route path="/quotation/quotations/new" component={QuotationNewPage} />
-          <Route path="/quotation/quotations/status" component={QuotationStatusPage} />
-          <Route path="/quotation/quotations/outstanding" component={OutstandingQuoteStatusPage} />
+          <Route path="/quotation/quotations/status" component={() => <Navigate href="/app/quotation/quotations?view=status" />} />
+          <Route path="/quotation/quotations/outstanding" component={() => <Navigate href="/app/quotation/quotations?view=outstanding" />} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
-          <Route path="/quotation/quotations" component={QuotationListPage} />
+          <Route path="/quotation/quotations" component={QuotationHubPage} />
           <Route path="/selling/setup" component={ModuleSetupHubPage} />
           <Route path="/selling/commissions" component={CommissionRulesPage} />
           <Route path="/selling/reports/receivable-status" component={ReceivableStatusReportPage} />
@@ -592,27 +588,28 @@ export default function App() {
           <Route path="/buying" component={BuyingWorkspacePage} />
           <Route path="/sales-order/setup" component={ModuleSetupHubPage} />
           <Route path="/sales-order/reports/so-analysis" component={SOAnalysisReportPage} />
+          <Route path="/sales-order/reports/fulfillment-progress" component={FulfillmentProgressReportPage} />
           <Route path="/sales-order/reports/shipment-status" component={ShipmentStatusPage} />
           <Route path="/sales-order/reports/pending-shipment" component={PendingShipmentPage} />
           <Route path="/sales-order/reports/shipping-order-status" component={ShippingOrderStatusPage} />
           <Route path="/sales-order/reports" component={SalesOrderReportsHubPage} />
           <Route path="/sales-order/sales-orders/new" component={SalesOrderNewPage} />
-          <Route path="/sales-order/sales-orders/status" component={SalesOrderStatusPage} />
-          <Route path="/sales-order/sales-orders/outstanding" component={OutstandingSOStatusPage} />
+          <Route path="/sales-order/sales-orders/status" component={() => <Navigate href="/app/sales-order/sales-orders?view=status" />} />
+          <Route path="/sales-order/sales-orders/outstanding" component={() => <Navigate href="/app/sales-order/sales-orders?view=outstanding" />} />
           <Route path="/sales-order/sales-orders/release" component={ReleaseSalesOrderPage} />
           <Route path="/sales-order/delivery-receipts/new" component={DeliveryReceiptNewPage} />
           <Route path="/sales-order/delivery-receipts" component={DeliveryReceiptListPage} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
-          <Route path="/sales-order/sales-orders" component={SalesOrderListPage} />
+          <Route path="/sales-order/sales-orders" component={SalesOrderHubPage} />
           <Route path="/sales-order/shipping/rules" component={ShippingRulesPage} />
           <Route path="/sales-order/shipping/orders" component={ShippingOrdersPage} />
           <Route path="/sales-order/shipping/trips" component={DeliveryTripsPage} />
           <Route path="/purchase-order/setup" component={ModuleSetupHubPage} />
           <Route path="/purchase-order/reports/po-analysis" component={POAnalysisReportPage} />
-          <Route path="/purchase-order/purchase-orders/status" component={PurchaseOrderStatusPage} />
-          <Route path="/purchase-order/purchase-orders/outstanding" component={OutstandingPOStatusPage} />
+          <Route path="/purchase-order/purchase-orders/status" component={() => <Navigate href="/app/purchase-order/purchase-orders?view=status" />} />
+          <Route path="/purchase-order/purchase-orders/outstanding" component={() => <Navigate href="/app/purchase-order/purchase-orders?view=outstanding" />} />
           <Route path="/purchase-order/reports/items-to-receive" component={ItemsToReceiveReportPage} />
-          <Route path="/purchase-order/purchase-orders" component={PurchaseOrderListPage} />
+          <Route path="/purchase-order/purchase-orders" component={PurchaseOrderHubPage} />
           <Route path="/purchase-order/rfq" component={RfqListPage} />
           <Route path="/purchase-order/rfq/:id" component={RfqDetailPage} />
           <Route path="/purchase-order/purchase-returns" component={PurchaseReturnsPage} />
@@ -633,11 +630,12 @@ export default function App() {
           )} />
           <Route path="/sales/setup" component={ModuleSetupHubPage} />
           <Route path="/sales/sales/new" component={SalesNewPage} />
-          <Route path="/sales/sales/status" component={SalesStatusPage} />
+          <Route path="/sales/sales/status" component={() => <Navigate href="/app/sales/sales?view=status" />} />
           <Route path="/sales/sales/pre-invoicing" component={PreInvoicingStatusPage} />
           <Route path="/sales/sales/price-batch" component={ChangeSalesPriceBatchPage} />
           <Route path="/sales/sales/settings" component={SalesSettingsPage} />
-          <Route path="/sales/sales" component={SalesListPage} />
+          <Route path="/sales/sales-categories" component={SalesCategoriesPage} />
+          <Route path="/sales/sales" component={SalesHubPage} />
           <Route path="/sales/reports/official-receipt-status" component={SalesOfficialReceiptStatusPage} />
           <Route path="/sales/reports/si-receipt-status" component={SalesSiReceiptStatusPage} />
           <Route path="/sales/reports/ar-by-customer" component={SalesArByCustomerPage} />
@@ -678,7 +676,8 @@ export default function App() {
           <Route path="/purchases/recurring-expenses" component={RecurringExpensesPage} />
           <Route path="/purchases/vendor-credits" component={VendorCreditsPage} />
           <Route path="/buying/expenses" component={ExpensesPage} />
-          <Route path="/buying/vendor-credits" component={VendorCreditsPage} />          <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
+          <Route path="/buying/vendor-credits" component={VendorCreditsPage} />
+          <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
           <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
           <Route path="/finance/acct-i/reports/cash-flow-statement" component={CashFlowStatementPage} />
           <Route path="/finance/acct-i/reports/cash-book" component={() => <CashBookReportPage />} />
@@ -696,15 +695,15 @@ export default function App() {
           <Route path="/purchases/setup" component={ModuleSetupHubPage} />
           <Route path="/purchases/purchase-receive/new" component={SupplierInvoiceNewPage} />
           <Route path="/purchases/purchase-receive/settings" component={SupplierInvoiceSettingsPage} />
-          <Route path="/purchases/purchase-receive/status" component={PurchaseStatusPage} />
+          <Route path="/purchases/purchase-receive/status" component={() => <Navigate href="/app/purchases/purchase-receive?view=status" />} />
           <Route path="/purchases/purchase-receive/pre-invoicing" component={PurchasePreInvoicingPage} />
           <Route path="/purchases/purchase-receive/payment-status" component={SupplierPaymentStatusPage} />
           <Route path="/purchases/purchase-receive/ap-by-vendor" component={ApByVendorPage} />
-          <Route path="/purchases/purchase-receive" component={SupplierInvoiceListPage} />
+          <Route path="/purchases/purchase-receive" component={PurchaseReceiveHubPage} />
           {/* Legacy Bills slug — keep bookmarks and emails working */}
           <Route path="/purchases/purchases/new" component={() => <Navigate href="/app/purchases/purchase-receive/new" />} />
           <Route path="/purchases/purchases/settings" component={() => <Navigate href="/app/purchases/purchase-receive/settings" />} />
-          <Route path="/purchases/purchases/status" component={() => <Navigate href="/app/purchases/purchase-receive/status" />} />
+          <Route path="/purchases/purchases/status" component={() => <Navigate href="/app/purchases/purchase-receive?view=status" />} />
           <Route path="/purchases/purchases/pre-invoicing" component={() => <Navigate href="/app/purchases/purchase-receive/pre-invoicing" />} />
           <Route path="/purchases/purchases/payment-status" component={() => <Navigate href="/app/purchases/purchase-receive/payment-status" />} />
           <Route path="/purchases/purchases/ap-by-vendor" component={() => <Navigate href="/app/purchases/purchase-receive/ap-by-vendor" />} />

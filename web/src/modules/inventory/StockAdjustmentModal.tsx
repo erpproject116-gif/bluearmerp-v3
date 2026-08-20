@@ -1,14 +1,17 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
-import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { submitEntity } from "../../shared/handleSaveResult";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
-import { hasPermission, useAuth } from "../../shared/auth-context";
-import { QuickLocationModal } from "../../shared/QuickLocationModal";
+import { AttachmentsField } from "../../shared/AttachmentsField";
+import {
+  StockAdjustmentLineGrid,
+  emptyStockAdjustmentLine,
+  type StockAdjustmentLineRow,
+} from "./StockAdjustmentLineGrid";
 
 type Props = {
   open: boolean;
@@ -19,41 +22,24 @@ type Props = {
   requestId?: number | null;
 };
 
-async function fetchItems(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; item_code: string; item_name: string }[]>(`/api/v1/inventory/items?${qs}`);
-  return (res.data ?? []).map((i) => ({ id: i.id, label: `${i.item_code} — ${i.item_name}` }));
-}
-
-async function fetchLocations(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
-  return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
+function linesToPayload(lines: StockAdjustmentLineRow[]) {
+  return lines.map((ln) => ({
+    item_id: ln.item_id!,
+    location_id: ln.location_id!,
+    qty_delta: Number(ln.qty_delta),
+  }));
 }
 
 export function StockAdjustmentModal(props: Props) {
   const toast = useToast();
-  const auth = useAuth();
   const [saving, setSaving] = createSignal(false);
-  const [itemId, setItemId] = createSignal<number | null>(null);
-  const [itemLabel, setItemLabel] = createSignal("");
-  const [locationId, setLocationId] = createSignal<number | null>(null);
-  const [locationLabel, setLocationLabel] = createSignal("");
-  const [showNewLocation, setShowNewLocation] = createSignal(false);
-  const [newLocationName, setNewLocationName] = createSignal("");
-  const [qtyDelta, setQtyDelta] = createSignal("");
+  const [lines, setLines] = createSignal<StockAdjustmentLineRow[]>([emptyStockAdjustmentLine(1)]);
   const [reason, setReason] = createSignal("");
   const [draftRequestId, setDraftRequestId] = createSignal<number | null>(null);
   const [requestStatus, setRequestStatus] = createSignal<string | null>(null);
 
   const reset = () => {
-    setItemId(null);
-    setItemLabel("");
-    setLocationId(null);
-    setLocationLabel("");
-    setQtyDelta("");
+    setLines([emptyStockAdjustmentLine(1)]);
     setReason("");
     setDraftRequestId(null);
     setRequestStatus(null);
@@ -61,9 +47,14 @@ export function StockAdjustmentModal(props: Props) {
 
   createEffect(() => {
     if (!props.open) return;
-    if (props.initialItemId) {
-      setItemId(props.initialItemId);
-      setItemLabel(props.initialItemLabel ?? "");
+    if (props.initialItemId && !props.requestId) {
+      setLines([
+        {
+          ...emptyStockAdjustmentLine(1),
+          item_id: props.initialItemId,
+          item_label: props.initialItemLabel ?? "",
+        },
+      ]);
     }
     if (props.requestId) {
       void loadRequest(props.requestId);
@@ -73,44 +64,62 @@ export function StockAdjustmentModal(props: Props) {
   const loadRequest = async (id: number) => {
     const res = await apiFetch<{
       id: number;
-      item_id: number;
-      item_code: string;
-      item_name: string;
-      location_id: number;
-      location_name: string;
-      qty_delta: number;
       reason: string;
       status: string;
+      lines?: Array<{
+        line_no: number;
+        item_id: number;
+        item_code: string;
+        item_name: string;
+        location_id: number;
+        location_name: string;
+        qty_delta: number;
+      }>;
+      item_id?: number;
+      item_code?: string;
+      item_name?: string;
+      location_id?: number;
+      location_name?: string;
+      qty_delta?: number;
     }>(`/api/v1/inventory/stock-adjustment-requests/${id}`);
     if (!res.success || !res.data) return;
     setDraftRequestId(res.data.id);
     setRequestStatus(res.data.status);
-    setItemId(res.data.item_id);
-    setItemLabel(`${res.data.item_code} — ${res.data.item_name}`);
-    setLocationId(res.data.location_id);
-    setLocationLabel(res.data.location_name);
-    setQtyDelta(String(res.data.qty_delta));
     setReason(res.data.reason);
+    const loaded = res.data.lines?.length
+      ? res.data.lines.map((ln) => ({
+          line_no: ln.line_no,
+          item_id: ln.item_id,
+          item_label: `${ln.item_code} — ${ln.item_name}`,
+          location_id: ln.location_id,
+          location_label: ln.location_name,
+          qty_delta: String(ln.qty_delta),
+        }))
+      : res.data.item_id
+        ? [
+            {
+              ...emptyStockAdjustmentLine(1),
+              item_id: res.data.item_id,
+              item_label: `${res.data.item_code} — ${res.data.item_name}`,
+              location_id: res.data.location_id ?? null,
+              location_label: res.data.location_name ?? "",
+              qty_delta: String(res.data.qty_delta ?? ""),
+            },
+          ]
+        : [emptyStockAdjustmentLine(1)];
+    setLines(loaded);
   };
 
   const draft = useDocumentDraft({
     entityType: DRAFT_ENTITY.invStockAdjustment,
     draftKey: "new",
     getPayload: () => ({
-      item_id: itemId(),
-      item_label: itemLabel(),
-      location_id: locationId(),
-      location_label: locationLabel(),
-      qty_delta: qtyDelta(),
+      lines: lines(),
       reason: reason(),
       request_id: draftRequestId(),
     }),
     onApply: (payload) => {
-      setItemId(payload.item_id);
-      setItemLabel(payload.item_label);
-      setLocationId(payload.location_id);
-      setLocationLabel(payload.location_label);
-      setQtyDelta(payload.qty_delta);
+      setLines(payload.lines?.length ? payload.lines : [emptyStockAdjustmentLine(1)]);
       setReason(payload.reason);
       if (payload.request_id) setDraftRequestId(payload.request_id);
     },
@@ -118,28 +127,40 @@ export function StockAdjustmentModal(props: Props) {
     autoApply: () => props.open && !props.requestId,
   });
 
-  const payload = () => ({
-    item_id: itemId(),
-    location_id: locationId(),
-    qty_delta: Number(qtyDelta()),
-    reason: reason().trim(),
-  });
-
   const validate = () => {
-    if (!itemId() || !locationId()) {
-      toast.warning("Item and location are required.");
-      return false;
-    }
-    const qty = Number(qtyDelta());
-    if (!qtyDelta() || qty === 0 || Number.isNaN(qty)) {
-      toast.warning("Enter a non-zero quantity change.");
-      return false;
-    }
+    const rowLines = lines();
     if (!reason().trim()) {
       toast.warning("Reason is required.");
       return false;
     }
+    for (const ln of rowLines) {
+      if (!ln.item_id || !ln.location_id) {
+        toast.warning("Each line needs an item and location.");
+        return false;
+      }
+      const qty = Number(ln.qty_delta);
+      if (!ln.qty_delta || qty === 0 || Number.isNaN(qty)) {
+        toast.warning("Each line needs a non-zero quantity change.");
+        return false;
+      }
+    }
     return true;
+  };
+
+  const buildBody = () => {
+    const rowLines = lines();
+    const payloadLines = linesToPayload(rowLines);
+    const body: Record<string, unknown> = {
+      reason: reason().trim(),
+      lines: payloadLines,
+    };
+    if (payloadLines.length === 1) {
+      body.item_id = payloadLines[0].item_id;
+      body.location_id = payloadLines[0].location_id;
+      body.qty_delta = payloadLines[0].qty_delta;
+    }
+    if (draftRequestId()) body.id = draftRequestId();
+    return body;
   };
 
   const submitForApproval = async () => {
@@ -169,7 +190,7 @@ export function StockAdjustmentModal(props: Props) {
       () =>
         apiFetch("/api/v1/inventory/stock-adjustments", {
           method: "POST",
-          body: JSON.stringify(payload()),
+          body: JSON.stringify(buildBody()),
         }, { silent: true }),
       toast,
       "Sent for approval. Inventory updates only after an approver confirms.",
@@ -185,11 +206,9 @@ export function StockAdjustmentModal(props: Props) {
   const saveDraftThenClose = async () => {
     if (!validate()) return;
     setSaving(true);
-    const body: Record<string, unknown> = { ...payload() };
-    if (draftRequestId()) body.id = draftRequestId();
     const res = await apiFetch<{ id: number; status: string }>(
       "/api/v1/inventory/stock-adjustments/draft",
-      { method: "POST", body: JSON.stringify(body) },
+      { method: "POST", body: JSON.stringify(buildBody()) },
       { silent: true },
     );
     setSaving(false);
@@ -205,8 +224,9 @@ export function StockAdjustmentModal(props: Props) {
     props.onClose();
   };
 
+  const readOnly = () => requestStatus() != null && requestStatus() !== "draft";
+
   return (
-    <>
     <EntityModal
       open={props.open}
       title="Stock adjustment"
@@ -215,7 +235,7 @@ export function StockAdjustmentModal(props: Props) {
         props.onClose();
       }}
       onSave={() => void submitForApproval()}
-      onSecondarySave={() => void saveDraftThenClose()}
+      onSecondarySave={readOnly() ? undefined : () => void saveDraftThenClose()}
       secondarySaveLabel="Save draft"
       saveLabel="Submit for approval"
       saving={saving()}
@@ -223,76 +243,33 @@ export function StockAdjustmentModal(props: Props) {
       <draft.DraftBanner />
       <ModalFormGuide guideId="stock_adjustment" spanFull />
       <p class="col-span-full text-sm text-text-secondary">
-        Quantity on hand does not change until a store admin or owner approves this request.
+        Document with one or more item/location lines. Quantity on hand does not change until a store admin or owner approves.
       </p>
       <Show when={requestStatus()}>
         <p class="col-span-full text-sm text-text-secondary">
           Status: <span class="font-medium text-text-primary">{requestStatus()}</span>
         </p>
       </Show>
-      <LookupCombo
-        label="Item *"
-        value={itemLabel}
-        selectedId={itemId}
-        onInput={setItemLabel}
-        onSelect={(o) => {
-          setItemId(o.id);
-          setItemLabel(o.label);
-        }}
-        onClear={() => {
-          setItemId(null);
-          setItemLabel("");
-        }}
-        fetchOptions={fetchItems}
-      />
-      <LookupCombo
-        label="Location *"
-        value={locationLabel}
-        selectedId={locationId}
-        onInput={setLocationLabel}
-        onSelect={(o) => {
-          setLocationId(o.id);
-          setLocationLabel(o.label);
-        }}
-        onClear={() => {
-          setLocationId(null);
-          setLocationLabel("");
-        }}
-        fetchOptions={fetchLocations}
-        createLabel="Add location"
-        onCreate={
-          hasPermission(auth.me, "inventory.locations", "write")
-            ? (q) => {
-                setNewLocationName(q);
-                setShowNewLocation(true);
-              }
-            : undefined
-        }
-      />
-      <Field label="Qty change *">
-        <input
-          type="number"
-          step="any"
+      <Field label="Reason *" span="full">
+        <textarea
           class={inputClass}
-          value={qtyDelta()}
-          placeholder="Positive to add, negative to remove"
-          onInput={(e) => setQtyDelta(e.currentTarget.value)}
+          rows={2}
+          value={reason()}
+          disabled={readOnly()}
+          onInput={(e) => setReason(e.currentTarget.value)}
         />
       </Field>
-      <Field label="Reason *" span="full">
-        <textarea class={inputClass} rows={2} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} />
-      </Field>
+      <StockAdjustmentLineGrid lines={lines} onChange={setLines} disabled={readOnly()} />
+      <Show when={draftRequestId()}>
+        <div class="col-span-full">
+          <AttachmentsField
+            scope="inventory/stock-adjustment-requests"
+            formOpen={props.open}
+            docId={draftRequestId() ?? undefined}
+            label="Supporting documents"
+          />
+        </div>
+      </Show>
     </EntityModal>
-
-    <QuickLocationModal
-      open={showNewLocation()}
-      initialName={newLocationName()}
-      onClose={() => setShowNewLocation(false)}
-      onCreated={(l) => {
-        setLocationId(l.id);
-        setLocationLabel(l.location_name);
-      }}
-    />
-    </>
   );
 }

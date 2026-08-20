@@ -75,6 +75,9 @@ type Props<T extends { id: number }> = {
   settingsHref?: string;
   toolbarExtra?: JSX.Element;
   itemsCsvImport?: boolean;
+  /** Collapse template/import (and optional export) into one Import/Export menu. */
+  itemsImportExportMenu?: boolean;
+  onExportCsv?: () => void;
   onImportComplete?: () => void;
   /** When set, shows Print / CSV / Excel / PDF. Defaults to "data-export" so lists always exportable. */
   exportFilename?: string | false;
@@ -100,9 +103,11 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const [focusIdx, setFocusIdx] = createSignal(0);
   const [importing, setImporting] = createSignal(false);
   const [columnsMenuOpen, setColumnsMenuOpen] = createSignal(false);
+  const [importExportMenuOpen, setImportExportMenuOpen] = createSignal(false);
   const toast = useToast();
   let fileInputEl: HTMLInputElement | undefined;
   let columnsMenuEl: HTMLDivElement | undefined;
+  let importExportMenuEl: HTMLDivElement | undefined;
 
   const resolvedColumnPrefsKey = createMemo(() => {
     if (props.columnPrefsKey === false) return undefined;
@@ -338,13 +343,19 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           props.onEdit(row);
         }
       }
-      if (e.key === "Escape") setColumnsMenuOpen(false);
+      if (e.key === "Escape") {
+        setColumnsMenuOpen(false);
+        setImportExportMenuOpen(false);
+      }
     };
     const onDocClick = (e: MouseEvent) => {
-      if (!columnsMenuOpen()) return;
       const t = e.target;
-      if (t instanceof Node && columnsMenuEl?.contains(t)) return;
-      setColumnsMenuOpen(false);
+      if (columnsMenuOpen()) {
+        if (!(t instanceof Node && columnsMenuEl?.contains(t))) setColumnsMenuOpen(false);
+      }
+      if (importExportMenuOpen()) {
+        if (!(t instanceof Node && importExportMenuEl?.contains(t))) setImportExportMenuOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDocClick);
@@ -476,7 +487,74 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               </div>
             </Show>
             {props.toolbarExtra}
-            <Show when={props.itemsCsvImport}>
+            <Show when={props.itemsCsvImport && props.itemsImportExportMenu}>
+              <div class="relative" ref={(el) => (importExportMenuEl = el)}>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                  aria-expanded={importExportMenuOpen()}
+                  aria-haspopup="menu"
+                  disabled={importing()}
+                  onClick={() => setImportExportMenuOpen((o) => !o)}
+                >
+                  Import/Export
+                </button>
+                <Show when={importExportMenuOpen()}>
+                  <div
+                    role="menu"
+                    class="absolute right-0 z-20 mt-1 min-w-[10rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50"
+                      onClick={() => {
+                        setImportExportMenuOpen(false);
+                        void downloadItemsImportTemplate();
+                      }}
+                    >
+                      {uiLabel("common.download_template")}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50 disabled:opacity-50"
+                      disabled={importing()}
+                      onClick={() => {
+                        setImportExportMenuOpen(false);
+                        fileInputEl?.click();
+                      }}
+                    >
+                      {importing() ? uiLabel("common.importing") : uiLabel("common.import_csv")}
+                    </button>
+                    <Show when={props.onExportCsv}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50"
+                        onClick={() => {
+                          setImportExportMenuOpen(false);
+                          props.onExportCsv?.();
+                        }}
+                      >
+                        Export CSV
+                      </button>
+                    </Show>
+                  </div>
+                </Show>
+                <input
+                  ref={fileInputEl}
+                  type="file"
+                  accept=".csv,text/csv"
+                  class="hidden"
+                  onChange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (file) void handleImportFile(file);
+                  }}
+                />
+              </div>
+            </Show>
+            <Show when={props.itemsCsvImport && !props.itemsImportExportMenu}>
               <button
                 type="button"
                 class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"

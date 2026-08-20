@@ -1,7 +1,7 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import { Show, createSignal, For, onCleanup, onMount } from "solid-js";
-import { useAuth, canViewCrm, canViewCrmNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
+import { useAuth, canViewCrmNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
@@ -9,7 +9,6 @@ import { CrmNotificationPoller } from "../shared/CrmNotificationPoller";
 import { PresenceAvatars } from "../shared/PresenceAvatars";
 import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
 import { IdleLogoutGuard } from "../shared/IdleLogoutGuard";
-import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ShellProvider, useShell } from "./shell-context";
 import { resolveFeature, resolveModule, resolveSubBranch, splitHeaderFeatures } from "./modules";
 import type { ModuleFeature } from "./modules";
@@ -49,10 +48,8 @@ import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantCo
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
 import { JoinCompanyConfirm } from "../shared/JoinCompanyConfirm";
-import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
-import { useInlineGuides } from "../shared/inlineGuides";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
-import { ThemeSwitcher } from "../shared/ThemeSwitcher";
+import { CommandPalette, useCommandPaletteHotkey } from "./CommandPalette";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -210,8 +207,9 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const loc = useLocation();
   const auth = useAuth();
   const shell = useShell();
-  const crmTask = useCrmTaskModal();
   const branding = useBranding();
+  const [paletteOpen, setPaletteOpen] = createSignal(false);
+  useCommandPaletteHotkey(() => setPaletteOpen(true));
   useBootstrapDisplayCurrency();
 
   const appTitle = () =>
@@ -404,10 +402,20 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               </Show>
             </div>
             <div class="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
+                title="Search (Ctrl+K)"
+                onClick={() => setPaletteOpen(true)}
+              >
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                </svg>
+                <span class="hidden md:inline">Search</span>
+                <kbd class="hidden rounded border border-stroke px-1 text-[10px] lg:inline">⌘K</kbd>
+              </button>
               <PresenceHeartbeat />
               <IdleLogoutGuard />
-              <InlineGuidesHeaderToggle />
-              <WorkflowGuideHeaderControl />
               <A
                 href="/app/documentation"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
@@ -421,17 +429,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 enabled={canViewCrmNotifications(auth.me)}
                 userId={auth.me?.user?.id ?? null}
               />
-              <Show when={canViewCrm(auth.me)}>
-                <button
-                  type="button"
-                  class="hidden rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 sm:inline-flex"
-                  onClick={() => crmTask.open()}
-                >
-                  + CRM task
-                </button>
-              </Show>
               <CrmNotificationBell enabled={canViewCrmNotifications(auth.me)} />
-              <ThemeSwitcher />
             </div>
           </div>
           <SetupReminderBar />
@@ -465,6 +463,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   return (
     <HelpAssistantProvider>
       {layout}
+      <CommandPalette open={paletteOpen()} onClose={() => setPaletteOpen(false)} />
       <Show when={auth.me}>
         <JoinCompanyConfirm />
         <OnboardingProminentPanel />
@@ -478,24 +477,3 @@ export const AppShell: ParentComponent = (props) => (
     <AppShellInner>{props.children}</AppShellInner>
   </ShellProvider>
 );
-
-/** Tips on/off for ModalFormGuide / StocksHowItFits — separate from workflow step n of n. */
-function InlineGuidesHeaderToggle() {
-  const guides = useInlineGuides();
-  return (
-    <button
-      type="button"
-      class={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium transition ${
-        guides.enabled()
-          ? "border-stroke text-brand-700 hover:bg-brand-50"
-          : "border-stroke bg-slate-50 text-text-secondary hover:bg-slate-100"
-      }`}
-      title={guides.enabled() ? "Hide in-panel tips" : "Show in-panel tips"}
-      aria-pressed={guides.enabled()}
-      onClick={() => guides.toggle()}
-    >
-      <span class="hidden sm:inline">Tips {guides.enabled() ? "on" : "off"}</span>
-      <span class="sm:hidden">Tips</span>
-    </button>
-  );
-}

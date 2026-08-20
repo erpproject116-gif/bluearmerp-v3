@@ -71,6 +71,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/sales-order/delivery-receipts/new": "sales_order.delivery_receipts_new",
   "/app/sales-order/delivery-receipts": "sales_order.delivery_receipts",
   "/app/sales-order/reports/so-analysis": "sales_order.sales_orders_status",
+  "/app/sales-order/reports/fulfillment-progress": "sales_order.sales_orders_status",
   "/app/sales-order/reports/shipment-status": "shipping_order.shipment_status",
   "/app/sales-order/reports/pending-shipment": "shipping_order.pending_shipment",
   "/app/sales-order/reports/shipping-order-status": "shipping_order.shipping_order_status",

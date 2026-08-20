@@ -1392,6 +1392,7 @@ export const moduleKbArticles: KbArticle[] = [
         type: "steps",
         items: [
           "Open User Management → Migration Center. Every card is optional.",
+          "Download the CSV template on a card if you will type rows in Excel, then replace the EXAMPLE row. Dates must be YYYY-MM-DD; amounts use a dot with no thousands separators. Employees use HR → Download template, not this page.",
           "Masters first if needed: Chart of accounts, then partners, then items. Re-import updates matches (TIN/code/name) instead of duplicating.",
           "Set bank opening balances under Banking. Import opening stock as current on-hand (serial/lot items fail — receive those separately).",
           "Optionally import remaining unpaid sales invoices and supplier invoices. These stay unconfirmed and do not move stock.",

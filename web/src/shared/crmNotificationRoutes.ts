@@ -27,7 +27,7 @@ export function crmNotificationHref(n: CrmNotification): string {
       return id ? `/app/comms/chat?messageId=${id}` : "/app/comms/chat";
     case "inv_stock_adjustment_request":
     case "inv_serial_adjustment_request":
-      return "/app/dashboard/approvals";
+      return "/app/inventory/stock-adjustments";
     case "support_ticket":
     case "support_ticket_attachment":
     case "sup_support_ticket":

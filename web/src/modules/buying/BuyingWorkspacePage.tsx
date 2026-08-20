@@ -36,6 +36,42 @@ export default function BuyingWorkspacePage() {
     <div class="space-y-6">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
+        <p class="mt-1 text-sm text-text-secondary">Request-to-pay shortcuts and purchasing reports.</p>
+      </section>
+
+      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <A
+          href="/app/purchase-request/purchase-requests/new"
+          class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Ask to buy</p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">New purchase request</h2>
+          <p class="mt-2 text-sm text-text-secondary">Internal requisition before sending a PO to a vendor.</p>
+        </A>
+        <A
+          href="/app/purchase-order/purchase-orders"
+          class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Order from vendor</p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">Purchase orders</h2>
+          <p class="mt-2 text-sm text-text-secondary">Create or confirm POs and track open lines.</p>
+        </A>
+        <A
+          href="/app/purchases/purchase-receive/new"
+          class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Receive stock</p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">New purchase receive</h2>
+          <p class="mt-2 text-sm text-text-secondary">Primary buy path — increase stock and record AP.</p>
+        </A>
+        <A
+          href="/app/finance/payables"
+          class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Pay vendors</p>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">New payable payment</h2>
+          <p class="mt-2 text-sm text-text-secondary">Settle open supplier balances with a payment voucher.</p>
+        </A>
       </section>
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

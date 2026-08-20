@@ -1,15 +1,27 @@
 import { A } from "@solidjs/router";
 import { Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
+import { useLocation } from "@solidjs/router";
 import { useAuth } from "./auth-context";
 import { apiFetch } from "./api";
-import { useSetupReadiness } from "./usePlatform";
+import { useOnboarding, useSetupReadiness } from "./usePlatform";
+import { resolvePrimaryNudge } from "./resolvePrimaryNudge";
 
 export function SetupReminderBar() {
   const auth = useAuth();
+  const loc = useLocation();
   const q = useSetupReadiness();
+  const onboarding = useOnboarding();
   const qc = useQueryClient();
   const data = () => q.data;
+
+  const nudge = () =>
+    resolvePrimaryNudge({
+      me: auth.me,
+      setup: data(),
+      onboarding: onboarding.data,
+      pathname: loc.pathname,
+    });
 
   const canManage = () =>
     auth.me?.user?.is_tenant_owner ||
@@ -24,7 +36,7 @@ export function SetupReminderBar() {
 
   return (
     <>
-      <Show when={data()?.show_setup_banner}>
+      <Show when={nudge() === "setup" && data()?.show_setup_banner}>
         <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950">
           <div class="min-w-0">
             <p class="font-medium">Workspace setup incomplete ({data()!.percent}%)</p>
@@ -54,15 +66,7 @@ export function SetupReminderBar() {
         </div>
       </Show>
 
-      <Show
-        when={
-          canManage() &&
-          data()?.required_complete &&
-          auth.me?.commercial?.status &&
-          auth.me.commercial.status !== "unlocked" &&
-          !auth.me.tenant?.is_demo
-        }
-      >
+      <Show when={nudge() === "commercial"}>
         <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm text-slate-800">
           <div class="min-w-0">
             <p class="font-medium">
@@ -85,7 +89,7 @@ export function SetupReminderBar() {
         </div>
       </Show>
 
-      <Show when={!canManage() && data() && !data()!.required_complete}>
+      <Show when={nudge() === "setup" && !canManage() && data() && !data()!.required_complete}>
         <div class="mt-3 rounded-lg border border-stroke bg-slate-50 px-4 py-2 text-xs text-text-secondary">
           Workspace setup is still in progress. Your administrator is finishing the initial configuration.
         </div>
@@ -96,10 +100,21 @@ export function SetupReminderBar() {
 
 export function SetupBreadcrumbHint() {
   const q = useSetupReadiness();
+  const onboarding = useOnboarding();
+  const auth = useAuth();
+  const loc = useLocation();
   const data = () => q.data;
 
+  const nudge = () =>
+    resolvePrimaryNudge({
+      me: auth.me,
+      setup: data(),
+      onboarding: onboarding.data,
+      pathname: loc.pathname,
+    });
+
   return (
-    <Show when={data()?.show_breadcrumb_hint}>
+    <Show when={nudge() === "setup" && data()?.show_breadcrumb_hint}>
       <>
         <span class="text-amber-700">
           Setup incomplete ({data()!.percent}%) ·{" "}

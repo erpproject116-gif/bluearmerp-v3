@@ -84,6 +84,7 @@ func registerTicketRoutes(r chi.Router, pool *pgxpool.Pool) {
 	// Auth is enforced inside patchTicket: IT may update all fields; creators may edit subject/description.
 	r.Patch("/tickets/{id}", patchTicket(pool))
 	r.Post("/tickets/{id}/comments", addTicketComment(pool))
+	r.With(auth.RequirePermission("support.tickets", auth.AccessWrite)).Post("/tickets/bulk-status", bulkUpdateTicketStatus(pool))
 	registerTicketAttachmentRoutes(r, pool)
 }
 

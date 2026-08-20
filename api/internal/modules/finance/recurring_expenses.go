@@ -19,16 +19,19 @@ import (
 )
 
 type recurringExpense struct {
-	ID          int64   `json:"id"`
-	Name        string  `json:"name"`
-	Category    string  `json:"category"`
-	VendorName  string  `json:"vendor_name"`
-	Amount      float64 `json:"amount"`
-	Frequency   string  `json:"frequency"`
-	NextDueDate *string `json:"next_due_date,omitempty"`
-	IsActive    bool    `json:"is_active"`
-	Notes       string  `json:"notes"`
-	PartnerID   *int64  `json:"partner_id,omitempty"`
+	ID             int64   `json:"id"`
+	Name           string  `json:"name"`
+	Category       string  `json:"category"`
+	VendorName     string  `json:"vendor_name"`
+	Amount         float64 `json:"amount"`
+	Frequency      string  `json:"frequency"`
+	NextDueDate    *string `json:"next_due_date,omitempty"`
+	IsActive       bool    `json:"is_active"`
+	Notes          string  `json:"notes"`
+	PartnerID      *int64  `json:"partner_id,omitempty"`
+	GeneratedCount int     `json:"generated_count"`
+	LastExpenseID  *int64  `json:"last_expense_id,omitempty"`
+	LastExpenseNo  *string `json:"last_expense_no,omitempty"`
 }
 
 type recurringExpenseBody struct {
@@ -60,11 +63,22 @@ func listRecurringExpenses(pool *pgxpool.Pool) http.HandlerFunc {
 			where += " and is_active = true"
 		}
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
-			select id, name, category, vendor_name, amount::float8, frequency,
-			  next_due_date::text, is_active, coalesce(notes, ''), partner_id
-			from public.fin_recurring_expenses
+			select r.id, r.name, r.category, r.vendor_name, r.amount::float8, r.frequency,
+			  r.next_due_date::text, r.is_active, coalesce(r.notes, ''), r.partner_id,
+			  coalesce(g.cnt, 0)::int,
+			  g.last_id, g.last_no
+			from public.fin_recurring_expenses r
+			left join lateral (
+			  select count(*)::int as cnt,
+			    max(e.id) as last_id,
+			    (array_agg(e.expense_no order by e.id desc))[1] as last_no
+			  from public.fin_expenses e
+			  where e.tenant_id = r.tenant_id
+			    and e.recurring_expense_id = r.id
+			    and e.deleted_at is null
+			) g on true
 			where %s
-			order by is_active desc, amount desc, name`, where), tu.TenantID)
+			order by r.is_active desc, r.amount desc, r.name`, where), tu.TenantID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list recurring expenses.", "ERR_INTERNAL")
 			return
@@ -74,7 +88,8 @@ func listRecurringExpenses(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row recurringExpense
 			if err := rows.Scan(&row.ID, &row.Name, &row.Category, &row.VendorName, &row.Amount, &row.Frequency,
-				&row.NextDueDate, &row.IsActive, &row.Notes, &row.PartnerID); err != nil {
+				&row.NextDueDate, &row.IsActive, &row.Notes, &row.PartnerID,
+				&row.GeneratedCount, &row.LastExpenseID, &row.LastExpenseNo); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read recurring expenses.", "ERR_INTERNAL")
 				return
 			}
@@ -327,11 +342,11 @@ func generateRecurringExpenseInTx(ctx context.Context, tx pgx.Tx, tenantID, user
 	err = tx.QueryRow(ctx, `
 		insert into public.fin_expenses (
 		  tenant_id, expense_date, date_seq, expense_no, partner_id, vendor_name,
-		  category, description, amount, tax_amount, reference, created_by_user_id
-		) values ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11)
+		  category, description, amount, tax_amount, reference, created_by_user_id, recurring_expense_id
+		) values ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11, $12)
 		returning id`,
 		tenantID, expenseDate.Format("2006-01-02"), seq, expenseNo, partnerID, vendor,
-		cat, desc, amount, name, userID,
+		cat, desc, amount, name, userID, recurringID,
 	).Scan(&expenseID)
 	if err != nil {
 		return 0, "", "", false, err

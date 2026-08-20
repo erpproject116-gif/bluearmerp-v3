@@ -1,48 +1,14 @@
 import { A } from "@solidjs/router";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { appModules } from "../../shell/modules";
-import { ECOUNT_TOP_MODULES } from "../../shell/ecount-top-nav";
-
-type CatalogEntry = {
-  label: string;
-  href: string;
-  group: string;
-};
-
-function buildCatalog(): CatalogEntry[] {
-  const out: CatalogEntry[] = [];
-  for (const top of ECOUNT_TOP_MODULES) {
-    out.push({ label: top.label, href: top.href, group: "Top module" });
-  }
-  for (const mod of appModules) {
-    out.push({ label: mod.label, href: mod.href, group: mod.label });
-    for (const f of mod.features) {
-      out.push({ label: `${mod.label} › ${f.label}`, href: f.href, group: mod.label });
-    }
-    for (const b of mod.subBranches ?? []) {
-      out.push({ label: `${mod.label} › ${b.label}`, href: b.href, group: mod.label });
-    }
-  }
-  // Dedupe by href+label
-  const seen = new Set<string>();
-  return out.filter((e) => {
-    const k = `${e.href}|${e.label}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-}
-
-const CATALOG = buildCatalog();
+import { buildCatalog, searchCatalog } from "../../shell/navCatalog";
 
 export default function SiteMapPage() {
+  const catalog = buildCatalog();
   const [q, setQ] = createSignal("");
   const filtered = createMemo(() => {
-    const needle = q().trim().toLowerCase();
-    if (!needle) return CATALOG.slice(0, 80);
-    return CATALOG.filter(
-      (e) => e.label.toLowerCase().includes(needle) || e.href.toLowerCase().includes(needle),
-    ).slice(0, 120);
+    const needle = q().trim();
+    if (!needle) return catalog.slice(0, 80);
+    return searchCatalog(catalog, needle, 120);
   });
 
   return (

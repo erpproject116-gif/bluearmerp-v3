@@ -94,6 +94,29 @@ export const MIG_NEEDS_JOB_DEFAULTS: Record<MigKind, boolean> = {
   in_transit: false,
 };
 
+/** Opening stock / open docs look up an item; mapping neither item_code nor item fails every row. */
+export const MIG_NEEDS_ITEM: Record<MigKind, boolean> = {
+  items: false,
+  partners: false,
+  accounts: false,
+  opening_stock: true,
+  open_si: true,
+  open_ap: true,
+  open_po: true,
+  in_transit: true,
+};
+
+export const MIG_TEMPLATE_FILENAME: Record<MigKind, string> = {
+  items: "mig-items-import-template.csv",
+  partners: "mig-partners-import-template.csv",
+  accounts: "mig-accounts-import-template.csv",
+  opening_stock: "mig-opening-stock-import-template.csv",
+  open_si: "mig-open-si-import-template.csv",
+  open_ap: "mig-open-ap-import-template.csv",
+  open_po: "mig-open-po-import-template.csv",
+  in_transit: "mig-in-transit-import-template.csv",
+};
+
 const MIG_KIND_PATH: Record<MigKind, string> = {
   items: "/items",
   partners: "/partners",
@@ -155,6 +178,17 @@ export function upsertMigImportProfile(body: { kind: MigKind; name: string; colu
   });
 }
 
+export function stripCsvBom(s: string): string {
+  return s.replace(/^\uFEFF/, "");
+}
+
+export function parseCsvHeaders(text: string): string[] {
+  const first = stripCsvBom(text)
+    .split(/\r?\n/)
+    .find((l) => l.trim()) ?? "";
+  return first.split(",").map((h) => stripCsvBom(h.trim().replace(/^"|"$/g, "")));
+}
+
 export async function spreadsheetToCsvFile(file: File): Promise<File> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv") || file.type === "text/csv") return file;
@@ -163,12 +197,27 @@ export async function spreadsheetToCsvFile(file: File): Promise<File> {
   }
   const XLSX = await import("xlsx");
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
+  const wb = XLSX.read(buf, { type: "array", cellDates: true, dateNF: "yyyy-mm-dd" });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error("Workbook has no sheets.");
-  const csv = XLSX.utils.sheet_to_csv(wb.Sheets[sheetName] ?? {});
+  const csv = XLSX.utils.sheet_to_csv(wb.Sheets[sheetName] ?? {}, { dateNF: "yyyy-mm-dd" });
   const base = file.name.replace(/\.(xlsx|xls)$/i, "") || "import";
   return new File([csv], `${base}.csv`, { type: "text/csv" });
+}
+
+export async function downloadMigImportTemplate(kind: MigKind) {
+  const token = await getAccessToken();
+  const res = await fetch(`${migBase}${MIG_KIND_PATH[kind]}/import-template`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error("Could not download template.");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = MIG_TEMPLATE_FILENAME[kind];
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function postMigMapped(

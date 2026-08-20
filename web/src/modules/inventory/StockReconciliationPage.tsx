@@ -268,7 +268,7 @@ export default function StockReconciliationPage() {
       return;
     }
     if (code === "ap_over_application" && typeof row.supplier_invoice_id === "number") {
-      navigate(`/app/purchases/supplier-invoices?highlight=${row.supplier_invoice_id}`);
+      navigate(`/app/finance/supplier-invoices?highlight=${row.supplier_invoice_id}`);
     }
   };
 

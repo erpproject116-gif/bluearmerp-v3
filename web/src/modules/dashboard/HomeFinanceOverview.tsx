@@ -178,7 +178,7 @@ function CashFlowCard() {
  * AR = sales grand_total − (OR + credit note + retainer applications as-of date);
  * AP = supplier invoice grand_total − (payment + vendor credit applications as-of date).
  */
-export function HomeFinanceOverview() {
+export function HomeFinanceOverview(props: { hideIntro?: boolean }) {
   const auth = useAuth();
   const asOf = todayISO();
 
@@ -221,11 +221,13 @@ export function HomeFinanceOverview() {
   };
 
   return (
-    <div class="mb-6 space-y-4">
-      <div>
-        <h2 class="text-xl font-semibold text-text-primary">{hello()}</h2>
-        <p class="text-sm text-text-secondary">{company()}</p>
-      </div>
+    <div class="space-y-4">
+      <Show when={!props.hideIntro}>
+        <div>
+          <h2 class="text-xl font-semibold text-text-primary">{hello()}</h2>
+          <p class="text-sm text-text-secondary">{company()}</p>
+        </div>
+      </Show>
       <div class="grid gap-4 lg:grid-cols-2">
         <AgingSplitBar
           title="Total receivables"

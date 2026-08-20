@@ -26,15 +26,15 @@ func Remap(records [][]string, columnMap map[string]string, required, canonicalH
 	}
 	fileIdx := map[string]int{}
 	for i, h := range records[0] {
-		key := strings.ToLower(strings.TrimSpace(h))
+		key := strings.ToLower(strings.TrimSpace(stripBOM(h)))
 		if key != "" {
 			fileIdx[key] = i
 		}
 	}
 	srcIdx := map[string]int{}
 	for canonical, sourceHeader := range columnMap {
-		canonical = strings.ToLower(strings.TrimSpace(canonical))
-		sourceHeader = strings.TrimSpace(sourceHeader)
+		canonical = strings.ToLower(strings.TrimSpace(stripBOM(canonical)))
+		sourceHeader = strings.TrimSpace(stripBOM(sourceHeader))
 		if canonical == "" || sourceHeader == "" {
 			continue
 		}
@@ -73,6 +73,10 @@ func isEmptyRow(row []string) bool {
 		}
 	}
 	return true
+}
+
+func stripBOM(s string) string {
+	return strings.TrimPrefix(s, "\ufeff")
 }
 
 // ReadUpload parses multipart file + optional profile_id / column_map JSON.

@@ -161,7 +161,7 @@ export function DayJobsPanel() {
 
   const redFlagLinks: Record<string, string> = {
     low_stock: "/app/crm/reports/low-stock",
-    expired_quotes: "/app/quotation/quotations/outstanding",
+    expired_quotes: "/app/quotation/quotations?view=outstanding",
     serial_qty_mismatch: "/app/inventory/serial-lot/registry",
     reserved_stale: "/app/inventory/serial-lot/registry",
     open_po: "/app/purchase-order/purchase-orders",

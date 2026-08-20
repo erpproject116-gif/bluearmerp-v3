@@ -15,6 +15,12 @@ type OnboardingStatus = {
     company_name?: string;
   } | null;
   pending_approval?: { tenant_id?: number; company_code?: string } | null;
+  email_occupancy?: {
+    occupied?: boolean;
+    company_name?: string;
+    company_code?: string;
+    tenant_id?: number;
+  } | null;
 };
 
 export default function WelcomePage() {
@@ -25,6 +31,8 @@ export default function WelcomePage() {
   const [statusLoading, setStatusLoading] = createSignal(true);
   const [inviteCode, setInviteCode] = createSignal<string | null>(null);
   const [inviteName, setInviteName] = createSignal<string | null>(null);
+  const [emailOccupied, setEmailOccupied] = createSignal(false);
+  const [occupiedCompany, setOccupiedCompany] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
 
   onMount(() => {
@@ -56,6 +64,9 @@ export default function WelcomePage() {
         if (body.data.pending_invite?.company_code) {
           setInviteCode(body.data.pending_invite.company_code);
           setInviteName(body.data.pending_invite.company_name ?? null);
+        } else if (body.data.email_occupancy?.occupied) {
+          setEmailOccupied(true);
+          setOccupiedCompany(body.data.email_occupancy.company_name ?? body.data.email_occupancy.company_code ?? null);
         }
       } catch {
         // Keep default Welcome layout if status probe fails.
@@ -164,6 +175,7 @@ export default function WelcomePage() {
   };
 
   const hasInvite = () => Boolean(inviteCode());
+  const blockedOwnBusiness = () => emailOccupied() && !hasInvite();
 
   return (
     <AuthShell
@@ -216,7 +228,7 @@ export default function WelcomePage() {
               : "Uses your signed-in Google email. If an invite is ready, you enter that workspace as a member."}
           </p>
 
-          <Show when={!hasInvite()}>
+          <Show when={!hasInvite() && !blockedOwnBusiness()}>
             <div class="flex items-center gap-3 text-xs text-text-secondary">
               <span class="h-px flex-1 bg-stroke" />
               <span>or start your own company</span>
@@ -243,6 +255,14 @@ export default function WelcomePage() {
             >
               Start a free demo (sample data, ~14 days)
             </button>
+          </Show>
+
+          <Show when={blockedOwnBusiness()}>
+            <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              This Google email already belongs to{" "}
+              <strong class="font-medium">{occupiedCompany() ?? "another company"}</strong>. To open your own
+              business, sign out and sign in with a different Google email.
+            </p>
           </Show>
 
           <Show when={hasInvite()}>

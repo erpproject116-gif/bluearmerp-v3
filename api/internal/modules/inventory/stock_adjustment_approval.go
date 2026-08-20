@@ -26,25 +26,27 @@ const (
 )
 
 type stockAdjustmentRequestRow struct {
-	ID              int64    `json:"id"`
-	ItemID          int64    `json:"item_id"`
-	ItemCode        string   `json:"item_code"`
-	ItemName        string   `json:"item_name"`
-	LocationID      int64    `json:"location_id"`
-	LocationName    string   `json:"location_name"`
-	QtyBefore       *float64 `json:"qty_before,omitempty"`
-	QtyDelta        float64  `json:"qty_delta"`
-	QtyAfter        *float64 `json:"qty_after,omitempty"`
-	Reason          string   `json:"reason"`
-	Status          string   `json:"status"`
-	CreatedByUserID *int64   `json:"created_by_user_id,omitempty"`
-	CreatedByName   string   `json:"created_by_name,omitempty"`
-	DecidedByName   string   `json:"decided_by_name,omitempty"`
-	DecidedAt       *string  `json:"decided_at,omitempty"`
-	Decision        string   `json:"decision,omitempty"` // approve | reject when decided
-	CreatedAt       string   `json:"created_at"`
-	UpdatedAt       string   `json:"updated_at"`
-	Actions         []any    `json:"actions,omitempty"`
+	ID              int64                      `json:"id"`
+	ItemID          int64                      `json:"item_id"`
+	ItemCode        string                     `json:"item_code"`
+	ItemName        string                     `json:"item_name"`
+	LocationID      int64                      `json:"location_id"`
+	LocationName    string                     `json:"location_name"`
+	QtyBefore       *float64                   `json:"qty_before,omitempty"`
+	QtyDelta        float64                    `json:"qty_delta"`
+	QtyAfter        *float64                   `json:"qty_after,omitempty"`
+	Reason          string                     `json:"reason"`
+	Status          string                     `json:"status"`
+	LineCount       int                        `json:"line_count,omitempty"`
+	Lines           []stockAdjustmentLineRow     `json:"lines,omitempty"`
+	CreatedByUserID *int64                     `json:"created_by_user_id,omitempty"`
+	CreatedByName   string                     `json:"created_by_name,omitempty"`
+	DecidedByName   string                     `json:"decided_by_name,omitempty"`
+	DecidedAt       *string                    `json:"decided_at,omitempty"`
+	Decision        string                     `json:"decision,omitempty"` // approve | reject when decided
+	CreatedAt       string                     `json:"created_at"`
+	UpdatedAt       string                     `json:"updated_at"`
+	Actions         []any                      `json:"actions,omitempty"`
 }
 
 type stockAdjActionRow struct {
@@ -65,6 +67,7 @@ func registerStockAdjustmentApprovalRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/stock-adjustment-requests/{id}/approve", approveStockAdjustmentRequest(pool))
 	r.Post("/stock-adjustment-requests/{id}/reject", rejectStockAdjustmentRequest(pool))
 	r.Post("/stock-adjustment-requests/{id}/comments", commentStockAdjustmentRequest(pool))
+	registerStockAdjustmentAttachmentRoutes(r, pool)
 }
 
 func parseStockAdjRequestID(r *http.Request) (int64, error) {
@@ -252,16 +255,17 @@ func notifyStockAdjApproversInApp(ctx context.Context, pool *pgxpool.Pool, tenan
 func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		var body stockAdjustmentBody
+		var body stockAdjustmentCreateBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if errs := validateStockAdjustmentBody(body); len(errs) > 0 {
+		if errs := validateStockAdjustmentCreate(body); len(errs) > 0 {
 			response.Validation(w, errs)
 			return
 		}
-		if errs := ensureItemLocation(r.Context(), pool, tu.TenantID, body.ItemID, body.LocationID); errs != nil {
+		lines := normalizedStockAdjLines(body)
+		if errs := ensureStockAdjLines(r.Context(), pool, tu.TenantID, lines); errs != nil {
 			response.Validation(w, errs)
 			return
 		}
@@ -274,16 +278,25 @@ func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 
 		reason := strings.TrimSpace(body.Reason)
-		qtyBefore, qtyAfter := proposedQtySnapshot(r.Context(), tx, tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta)
+		first := lines[0]
+		var totalQty float64
+		for _, ln := range lines {
+			totalQty += ln.QtyDelta
+		}
+		qtyBefore, qtyAfter := proposedQtySnapshot(r.Context(), tx, tu.TenantID, first.ItemID, first.LocationID, totalQty)
 		var requestID int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.inv_stock_adjustment_requests
 			  (tenant_id, item_id, location_id, qty_delta, qty_before, qty_after, reason, status, created_by_user_id)
 			values ($1, $2, $3, $4, $5, $6, $7, 'e_approval', $8)
 			returning id`,
-			tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta, qtyBefore, qtyAfter, reason, tu.AppUserID).Scan(&requestID)
+			tu.TenantID, first.ItemID, first.LocationID, totalQty, qtyBefore, qtyAfter, reason, tu.AppUserID).Scan(&requestID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create adjustment request.", "ERR_INTERNAL")
+			return
+		}
+		if err := insertStockAdjustmentLines(r.Context(), tx, requestID, tu.TenantID, lines); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save adjustment lines.", "ERR_INTERNAL")
 			return
 		}
 		if err := submitStockAdjForApproval(r.Context(), tx, tu, requestID, reason); err != nil {
@@ -308,23 +321,29 @@ func saveStockAdjustmentDraft(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		var body struct {
-			stockAdjustmentBody
+			stockAdjustmentCreateBody
 			ID *int64 `json:"id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if errs := validateStockAdjustmentBody(body.stockAdjustmentBody); len(errs) > 0 {
+		if errs := validateStockAdjustmentCreate(body.stockAdjustmentCreateBody); len(errs) > 0 {
 			response.Validation(w, errs)
 			return
 		}
-		if errs := ensureItemLocation(r.Context(), pool, tu.TenantID, body.ItemID, body.LocationID); errs != nil {
+		lines := normalizedStockAdjLines(body.stockAdjustmentCreateBody)
+		if errs := ensureStockAdjLines(r.Context(), pool, tu.TenantID, lines); errs != nil {
 			response.Validation(w, errs)
 			return
 		}
 		reason := strings.TrimSpace(body.Reason)
-		qtyBefore, qtyAfter := proposedQtySnapshot(r.Context(), pool, tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta)
+		first := lines[0]
+		var totalQty float64
+		for _, ln := range lines {
+			totalQty += ln.QtyDelta
+		}
+		qtyBefore, qtyAfter := proposedQtySnapshot(r.Context(), pool, tu.TenantID, first.ItemID, first.LocationID, totalQty)
 
 		if body.ID != nil && *body.ID > 0 {
 			var status string
@@ -344,37 +363,67 @@ func saveStockAdjustmentDraft(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusForbidden, "You can only edit your own drafts.", "ERR_FORBIDDEN")
 				return
 			}
-			_, err = pool.Exec(r.Context(), `
+			tx, err := pool.Begin(r.Context())
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
+				return
+			}
+			defer tx.Rollback(r.Context())
+			_, err = tx.Exec(r.Context(), `
 				update public.inv_stock_adjustment_requests
 				set item_id = $1, location_id = $2, qty_delta = $3, qty_before = $4, qty_after = $5,
 				    reason = $6, updated_at = now()
 				where id = $7 and tenant_id = $8`,
-				body.ItemID, body.LocationID, body.QtyDelta, qtyBefore, qtyAfter, reason, *body.ID, tu.TenantID)
+				first.ItemID, first.LocationID, totalQty, qtyBefore, qtyAfter, reason, *body.ID, tu.TenantID)
 			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
+				return
+			}
+			if err := replaceStockAdjustmentLines(r.Context(), tx, *body.ID, tu.TenantID, lines); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to save draft lines.", "ERR_INTERNAL")
+				return
+			}
+			if err := tx.Commit(r.Context()); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
 				return
 			}
 			response.OK(w, map[string]any{
 				"id": *body.ID, "status": "draft",
 				"qty_before": qtyBefore, "qty_after": qtyAfter,
+				"line_count": len(lines),
 			}, "Draft saved.")
 			return
 		}
 
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
 		var id int64
-		err := pool.QueryRow(r.Context(), `
+		err = tx.QueryRow(r.Context(), `
 			insert into public.inv_stock_adjustment_requests
 			  (tenant_id, item_id, location_id, qty_delta, qty_before, qty_after, reason, status, created_by_user_id)
 			values ($1, $2, $3, $4, $5, $6, $7, 'draft', $8)
 			returning id`,
-			tu.TenantID, body.ItemID, body.LocationID, body.QtyDelta, qtyBefore, qtyAfter, reason, tu.AppUserID).Scan(&id)
+			tu.TenantID, first.ItemID, first.LocationID, totalQty, qtyBefore, qtyAfter, reason, tu.AppUserID).Scan(&id)
 		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
+			return
+		}
+		if err := insertStockAdjustmentLines(r.Context(), tx, id, tu.TenantID, lines); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save draft lines.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
 			return
 		}
 		response.OK(w, map[string]any{
 			"id": id, "status": "draft",
 			"qty_before": qtyBefore, "qty_after": qtyAfter,
+			"line_count": len(lines),
 		}, "Draft saved.")
 	}
 }
@@ -439,9 +488,9 @@ func listStockAdjustmentRequests(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		order := orderSQL(p.Order)
 		q := fmt.Sprintf(`
-			select r.id, r.item_id, i.item_code, i.item_name,
-			  r.location_id, l.location_name,
-			  r.qty_before::float8, r.qty_delta::float8, r.qty_after::float8,
+			select r.id, coalesce(r.item_id, 0), coalesce(i.item_code, ''), coalesce(i.item_name, ''),
+			  coalesce(r.location_id, 0), coalesce(l.location_name, ''),
+			  r.qty_before::float8, coalesce(r.qty_delta, 0)::float8, r.qty_after::float8,
 			  r.reason, r.status, r.created_by_user_id,
 			  coalesce(nullif(trim(su.full_name), ''), coalesce(su.email, '')),
 			  coalesce(nullif(trim(du.full_name), ''), coalesce(du.email, '')),
@@ -451,10 +500,12 @@ func listStockAdjustmentRequests(pool *pgxpool.Pool) http.HandlerFunc {
 			    when r.status = 'rejected' then 'reject'
 			    else ''
 			  end,
-			  r.created_at, r.updated_at, count(*) over()
+			  r.created_at, r.updated_at,
+			  coalesce((select count(*)::int from public.inv_stock_adjustment_request_lines ln where ln.request_id = r.id), 0),
+			  count(*) over()
 			from public.inv_stock_adjustment_requests r
-			join public.inv_items i on i.id = r.item_id
-			join public.inv_locations l on l.id = r.location_id
+			left join public.inv_items i on i.id = r.item_id
+			left join public.inv_locations l on l.id = r.location_id
 			left join public.users su on su.id = r.created_by_user_id
 			left join public.approval_requests ar
 			  on ar.tenant_id = r.tenant_id
@@ -484,7 +535,7 @@ func listStockAdjustmentRequests(pool *pgxpool.Pool) http.HandlerFunc {
 				&qtyBefore, &row.QtyDelta, &qtyAfter,
 				&row.Reason, &row.Status, &row.CreatedByUserID, &row.CreatedByName,
 				&row.DecidedByName, &decidedAt, &row.Decision,
-				&createdAt, &updatedAt, &totalCount); err != nil {
+				&createdAt, &updatedAt, &row.LineCount, &totalCount); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read requests.", "ERR_INTERNAL")
 				return
 			}
@@ -550,9 +601,9 @@ func getStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		var decidedAt *time.Time
 		var qtyBefore, qtyAfter *float64
 		err = pool.QueryRow(r.Context(), `
-			select r.id, r.item_id, i.item_code, i.item_name,
-			  r.location_id, l.location_name,
-			  r.qty_before::float8, r.qty_delta::float8, r.qty_after::float8,
+			select r.id, coalesce(r.item_id, 0), coalesce(i.item_code, ''), coalesce(i.item_name, ''),
+			  coalesce(r.location_id, 0), coalesce(l.location_name, ''),
+			  r.qty_before::float8, coalesce(r.qty_delta, 0)::float8, r.qty_after::float8,
 			  r.reason, r.status, r.created_by_user_id,
 			  coalesce(nullif(trim(su.full_name), ''), coalesce(su.email, '')),
 			  coalesce(nullif(trim(du.full_name), ''), coalesce(du.email, '')),
@@ -564,8 +615,8 @@ func getStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			  end,
 			  r.created_at, r.updated_at
 			from public.inv_stock_adjustment_requests r
-			join public.inv_items i on i.id = r.item_id
-			join public.inv_locations l on l.id = r.location_id
+			left join public.inv_items i on i.id = r.item_id
+			left join public.inv_locations l on l.id = r.location_id
 			left join public.users su on su.id = r.created_by_user_id
 			left join public.approval_requests ar
 			  on ar.tenant_id = r.tenant_id
@@ -591,6 +642,13 @@ func getStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			s := decidedAt.Format(time.RFC3339)
 			row.DecidedAt = &s
 		}
+		lines, err := loadStockAdjustmentLines(r.Context(), pool, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load lines.", "ERR_INTERNAL")
+			return
+		}
+		row.Lines = lines
+		row.LineCount = len(lines)
 		actions, err := loadStockAdjActions(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load timeline.", "ERR_INTERNAL")
@@ -627,13 +685,11 @@ func submitStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var status, reason string
 		var createdBy *int64
-		var itemID, locationID int64
-		var qtyDelta float64
 		err = tx.QueryRow(r.Context(), `
-			select status, reason, created_by_user_id, item_id, location_id, qty_delta::float8
+			select status, reason, created_by_user_id
 			from public.inv_stock_adjustment_requests
 			where id = $1 and tenant_id = $2 for update`, id, tu.TenantID).Scan(
-			&status, &reason, &createdBy, &itemID, &locationID, &qtyDelta)
+			&status, &reason, &createdBy)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Request not found.", "ERR_NOT_FOUND")
 			return
@@ -650,11 +706,14 @@ func submitStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		if body.Remarks != nil && strings.TrimSpace(*body.Remarks) != "" {
 			remarks = strings.TrimSpace(*body.Remarks)
 		}
-		qtyBefore, qtyAfter := proposedQtySnapshot(r.Context(), tx, tu.TenantID, itemID, locationID, qtyDelta)
+		if err := refreshStockAdjLineSnapshots(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to submit.", "ERR_INTERNAL")
+			return
+		}
 		_, err = tx.Exec(r.Context(), `
 			update public.inv_stock_adjustment_requests
-			set status = 'e_approval', qty_before = $2, qty_after = $3, updated_at = now()
-			where id = $1`, id, qtyBefore, qtyAfter)
+			set status = 'e_approval', updated_at = now()
+			where id = $1`, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to submit.", "ERR_INTERNAL")
 			return
@@ -714,7 +773,7 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		var qtyDelta float64
 		var reason, status string
 		err = tx.QueryRow(r.Context(), `
-			select item_id, location_id, qty_delta::float8, reason, status
+			select coalesce(item_id, 0), coalesce(location_id, 0), coalesce(qty_delta, 0)::float8, reason, status
 			from public.inv_stock_adjustment_requests
 			where id = $1 and tenant_id = $2 for update`, id, tu.TenantID).Scan(
 			&itemID, &locationID, &qtyDelta, &reason, &status)
@@ -727,7 +786,16 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		movementID, qtyBefore, qtyAfter, validation, err := postStockAdjustment(r.Context(), tx, tu.TenantID, tu.AppUserID, itemID, locationID, qtyDelta, reason)
+		lines, err := stockAdjLinesForRequest(r.Context(), tx, tu.TenantID, id, itemID, locationID, qtyDelta)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load adjustment lines.", "ERR_INTERNAL")
+			return
+		}
+		if len(lines) == 0 {
+			response.Validation(w, map[string]string{"lines": "No adjustment lines found."})
+			return
+		}
+		validation, err := postStockAdjustmentLines(r.Context(), tx, tu.TenantID, tu.AppUserID, reason, lines)
 		if validation != nil {
 			response.Validation(w, validation)
 			return
@@ -740,10 +808,14 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"status": err.Error()})
 			return
 		}
+		if err := refreshStockAdjLineSnapshots(r.Context(), tx, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to complete request.", "ERR_INTERNAL")
+			return
+		}
 		_, err = tx.Exec(r.Context(), `
 			update public.inv_stock_adjustment_requests
-			set status = 'completed', qty_before = $2, qty_after = $3, updated_at = now()
-			where id = $1`, id, qtyBefore, qtyAfter)
+			set status = 'completed', updated_at = now()
+			where id = $1`, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to complete request.", "ERR_INTERNAL")
 			return
@@ -753,10 +825,10 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_adjustment.approve", entityStockAdjustmentRequest, &id, nil, map[string]any{
-			"movement_id": movementID,
-			"remarks":     remarks,
+			"line_count": len(lines),
+			"remarks":    remarks,
 		})
-		response.OK(w, map[string]any{"request_id": id, "movement_id": movementID}, "Stock adjustment approved and inventory updated.")
+		response.OK(w, map[string]any{"request_id": id, "line_count": len(lines)}, "Stock adjustment approved and inventory updated.")
 	}
 }
 
