@@ -32,7 +32,6 @@ import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActi
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { tryAutoSaveSalesInvoice, type InvoiceAutoSaveResult } from "../../../shared/invoiceApi";
-import { trackUxEvent } from "../../../shared/UsageTracker";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
@@ -281,7 +280,6 @@ export function SalesModal(props: Props) {
   const [progressStatus, setProgressStatus] = createSignal("unconfirmed");
   const [salesCategory, setSalesCategory] = createSignal("");
   const [salesCategories, setSalesCategories] = createSignal<Array<{ code: string; name: string }>>([]);
-  const [formMode, setFormMode] = createSignal<"simple" | "advanced">("simple");
   const [sourceSalesOrderId, setSourceSalesOrderId] = createSignal<number | null>(null);
   const [lines, setLines] = createSignal<SalesLineRow[]>([emptySalesLine(1)]);
   const [commissions, setCommissions] = createSignal<SaleCommissionRow[]>([]);
@@ -1128,29 +1126,6 @@ export function SalesModal(props: Props) {
           </Show>
         </div>
         <draft.DraftBanner />
-        <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">
-          <span class="text-sm text-text-secondary">Form mode</span>
-          <button
-            type="button"
-            class={`rounded-lg border px-3 py-1.5 text-sm ${formMode() === "simple" ? "border-brand bg-brand-50 text-brand-800" : "border-stroke"}`}
-            onClick={() => {
-              setFormMode("simple");
-              trackUxEvent("modal_mode_toggle");
-            }}
-          >
-            Simple
-          </button>
-          <button
-            type="button"
-            class={`rounded-lg border px-3 py-1.5 text-sm ${formMode() === "advanced" ? "border-brand bg-brand-50 text-brand-800" : "border-stroke"}`}
-            onClick={() => {
-              setFormMode("advanced");
-              trackUxEvent("modal_mode_toggle");
-            }}
-          >
-            Advanced
-          </button>
-        </div>
         <Show when={activeTab() === "invoice"}>
           <InvoicePanel
             kind="sales"
@@ -1248,7 +1223,6 @@ export function SalesModal(props: Props) {
             setShowNewCustomer(true);
           }}
         />
-        <Show when={formMode() === "advanced"}>
         <ModalLookupField
           settings={byKey}
           fieldKey="pic_name"
@@ -1266,7 +1240,6 @@ export function SalesModal(props: Props) {
           }}
           fetchOptions={fetchUsers}
         />
-        </Show>
         <ModalLookupField
           settings={byKey}
           fieldKey="location_id"
@@ -1314,7 +1287,6 @@ export function SalesModal(props: Props) {
             <For each={salesCategories()}>{(c) => <option value={c.code}>{c.name}</option>}</For>
           </select>
         </Field>
-        <Show when={formMode() === "advanced"}>
         <ModalField settings={byKey} fieldKey="si_dr_no" fallbackLabel="SI/DR No.">
           {(m) => (
             <input
@@ -1421,9 +1393,7 @@ export function SalesModal(props: Props) {
           values={customValues}
           onChange={setCustom}
         />
-        </Show>
         </div>
-        <Show when={formMode() === "advanced"}>
         <div class="col-span-full mb-2 flex flex-wrap items-center gap-2">
           <LoadSlipMenu
             options={filterLoadSlipOptions(SALES_LOAD_SLIP_OPTIONS, auth.me)}
@@ -1451,7 +1421,6 @@ export function SalesModal(props: Props) {
             </button>
           </Show>
         </div>
-        </Show>
         <SalesLineGrid
           lines={lines}
           onChange={setLines}
@@ -1465,7 +1434,6 @@ export function SalesModal(props: Props) {
           partnerId={partnerId}
           onCreateShippingOrder={(line) => void createShippingFromLine(line)}
         />
-        <Show when={formMode() === "advanced"}>
         <SalesCommissionPanel
           rows={commissions}
           onChange={setCommissions}
@@ -1483,7 +1451,6 @@ export function SalesModal(props: Props) {
           fetchUsers={fetchUsers}
           disabled={progressStatus() === "e_approval"}
         />
-        </Show>
         <Show when={effectiveEditing()?.id}>
           <SalesApprovalPanel
             salesId={effectiveEditing()!.id}

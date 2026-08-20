@@ -75,7 +75,6 @@ import {
   SalesOrderNewPage,
   SalesOrderSettingsPage,
   ReleaseSalesOrderPage,
-  DeliveryReceiptListPage,
   DeliveryReceiptNewPage,
   SalesOrderPrintPage,
   SalesOrderStatusPrintPage,
@@ -600,7 +599,7 @@ export default function App() {
           <Route path="/sales-order/sales-orders/outstanding" component={() => <Navigate href="/app/sales-order/sales-orders?view=outstanding" />} />
           <Route path="/sales-order/sales-orders/release" component={ReleaseSalesOrderPage} />
           <Route path="/sales-order/delivery-receipts/new" component={DeliveryReceiptNewPage} />
-          <Route path="/sales-order/delivery-receipts" component={DeliveryReceiptListPage} />
+          <Route path="/sales-order/delivery-receipts" component={() => <Navigate href="/app/sales/sales?view=history" />} />
           <Route path="/sales-order/sales-orders/settings" component={SalesOrderSettingsPage} />
           <Route path="/sales-order/sales-orders" component={SalesOrderHubPage} />
           <Route path="/sales-order/shipping/rules" component={ShippingRulesPage} />

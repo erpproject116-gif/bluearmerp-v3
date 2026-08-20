@@ -74,7 +74,7 @@ export const workflowGuides: WorkflowGuide[] = [
         href: "/app/sales-order/sales-orders/release",
         routePrefixes: [
           "/app/sales-order/sales-orders/release",
-          "/app/sales-order/delivery-receipts",
+          "/app/sales/sales?view=history",
           "/app/sales-order/shipping",
         ],
         moduleCode: "sales_order",
