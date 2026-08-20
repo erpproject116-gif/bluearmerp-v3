@@ -8,16 +8,17 @@ import {
   type DateRangeFilters,
 } from "../../../shared/reports/useModuleReports";
 import { formatMoney } from "../../../shared/money";
+import type { GridExportColumn } from "../../../shared/gridExport";
 import { SalesOrderLayout } from "../SalesOrderLayout";
 
-const deliveryCols = [
-  { key: "label", header: "Delivery status" },
-  { key: "count", header: "Orders" },
+const deliveryCols: GridExportColumn[] = [
+  { key: "label", header: "Delivery status", value: (r: Record<string, unknown>) => String(r.label ?? "") },
+  { key: "count", header: "Orders", value: (r: Record<string, unknown>) => Number(r.count ?? 0) },
 ];
 
-const billingCols = [
-  { key: "label", header: "Billing status" },
-  { key: "count", header: "Orders" },
+const billingCols: GridExportColumn[] = [
+  { key: "label", header: "Billing status", value: (r: Record<string, unknown>) => String(r.label ?? "") },
+  { key: "count", header: "Orders", value: (r: Record<string, unknown>) => Number(r.count ?? 0) },
 ];
 
 export default function FulfillmentProgressReportPage() {

@@ -301,7 +301,6 @@ import {
   ReportsIndexPage,
   SavedViewsPage,
   DashboardPage,
-  PeriodSummaryPage,
   ApprovalsQueuePage,
   SiteMapPage,
   DocumentationPage,

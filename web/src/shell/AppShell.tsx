@@ -1,7 +1,7 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import { Show, createSignal, For, onCleanup, onMount } from "solid-js";
-import { useAuth, canViewCrm, canViewCrmNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
+import { useAuth, canViewCrmNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
@@ -9,7 +9,6 @@ import { CrmNotificationPoller } from "../shared/CrmNotificationPoller";
 import { PresenceAvatars } from "../shared/PresenceAvatars";
 import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
 import { IdleLogoutGuard } from "../shared/IdleLogoutGuard";
-import { useCrmTaskModal } from "../shared/CrmTaskModal";
 import { ShellProvider, useShell } from "./shell-context";
 import { resolveFeature, resolveModule, resolveSubBranch, splitHeaderFeatures } from "./modules";
 import type { ModuleFeature } from "./modules";
@@ -208,7 +207,6 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const loc = useLocation();
   const auth = useAuth();
   const shell = useShell();
-  const crmTask = useCrmTaskModal();
   const branding = useBranding();
   const [paletteOpen, setPaletteOpen] = createSignal(false);
   useCommandPaletteHotkey(() => setPaletteOpen(true));
