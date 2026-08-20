@@ -380,7 +380,7 @@ export default function PurchaseOrderListPage() {
           New Purchase Receive
         </A>
         <A
-          href="/app/purchase-order/goods-receipt"
+          href="/app/purchases/purchase-receive?view=history"
           class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
           title="Legacy receive history — prefer Purchase Receive for stock + serials"
         >

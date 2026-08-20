@@ -2,6 +2,7 @@ import { useSearchParams } from "@solidjs/router";
 import { Show } from "solid-js";
 import { DocumentListViewBar, PURCHASE_RECEIVE_LIST_VIEWS } from "../../../shared/DocumentListViewBar";
 import PurchaseStatusPage from "../../buying/reports/PurchaseStatusPage";
+import GoodsReceiptListPage from "../../purchase-request/goods-receipt/GoodsReceiptListPage";
 import { SupplierInvoiceListPageInner } from "./SupplierInvoiceListPage";
 
 export default function PurchaseReceiveHubPage() {
@@ -13,7 +14,10 @@ export default function PurchaseReceiveHubPage() {
       <Show when={view() === "status"}>
         <PurchaseStatusPage />
       </Show>
-      <Show when={view() !== "status"}>
+      <Show when={view() === "history"}>
+        <GoodsReceiptListPage />
+      </Show>
+      <Show when={view() !== "status" && view() !== "history"}>
         <SupplierInvoiceListPageInner />
       </Show>
     </>

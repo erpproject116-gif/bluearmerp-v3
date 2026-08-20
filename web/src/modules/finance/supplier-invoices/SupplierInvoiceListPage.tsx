@@ -284,7 +284,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
             Payables hub
           </A>
           . Optional history:{" "}
-          <A href="/app/purchase-order/goods-receipt" class="font-medium text-brand-700 hover:underline">
+          <A href="/app/purchases/purchase-receive?view=history" class="font-medium text-brand-700 hover:underline">
             Receive history
           </A>{" "}
           before billing when items track qty or use serials/lots. Pre-invoicing lists received lines not yet billed —
