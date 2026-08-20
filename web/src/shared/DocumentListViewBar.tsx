@@ -18,6 +18,7 @@ export const SALES_ORDER_LIST_VIEWS: DocumentListView[] = [
 export const SALES_LIST_VIEWS: DocumentListView[] = [
   { id: "list", label: "List" },
   { id: "status", label: "Status" },
+  { id: "history", label: "History" },
 ];
 
 export const PURCHASE_ORDER_LIST_VIEWS: DocumentListView[] = [

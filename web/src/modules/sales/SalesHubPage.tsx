@@ -1,6 +1,7 @@
 import { useSearchParams } from "@solidjs/router";
 import { Show } from "solid-js";
 import { DocumentListViewBar, SALES_LIST_VIEWS } from "../../shared/DocumentListViewBar";
+import { DeliveryReceiptListPageInner } from "../sales-order/delivery-receipt/DeliveryReceiptListPage";
 import { SalesListPageInner } from "./sales/SalesListPage";
 import SalesStatusPage from "./sales/SalesStatusPage";
 
@@ -13,7 +14,10 @@ export default function SalesHubPage() {
       <Show when={view() === "status"}>
         <SalesStatusPage />
       </Show>
-      <Show when={view() !== "status"}>
+      <Show when={view() === "history"}>
+        <DeliveryReceiptListPageInner listHref="/app/sales/sales?view=history" />
+      </Show>
+      <Show when={view() !== "status" && view() !== "history"}>
         <SalesListPageInner />
       </Show>
     </>

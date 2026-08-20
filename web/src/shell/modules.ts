@@ -271,7 +271,7 @@ export const appModules: AppModule[] = [
       },
       {
         label: "Delivery notes",
-        href: "/app/sales-order/delivery-receipts",
+        href: "/app/sales/sales?view=history",
         settingsHref: "/app/sales-order/sales-orders/settings",
       },
       { label: "Fulfillment progress", href: "/app/sales-order/reports/fulfillment-progress", settingsHref: "/app/sales-order/sales-orders/settings" },

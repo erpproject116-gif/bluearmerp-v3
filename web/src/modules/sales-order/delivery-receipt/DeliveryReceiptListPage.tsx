@@ -23,13 +23,14 @@ function statusLabel(status: string): string {
   return STATUS_TABS.find((t) => t.value === status)?.label ?? status.replace(/_/g, " ");
 }
 
-type PageOptions = { openNewOnMount?: boolean };
+type PageOptions = { openNewOnMount?: boolean; listHref?: string };
 
 export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
   const invalidate = useInvalidateDeliveryReceipts();
+  const listHref = () => props.listHref ?? "/app/sales/sales?view=history";
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
     "delivery_date",
     25,
@@ -54,7 +55,7 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
   const openNew = () => setModalOpen(true);
   const closeModal = () => {
     setModalOpen(false);
-    if (loc.pathname.endsWith("/new")) navigate("/app/sales-order/delivery-receipts", { replace: true });
+    if (loc.pathname.endsWith("/new")) navigate(listHref(), { replace: true });
   };
 
   onMount(() => {
@@ -90,8 +91,16 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
   return (
     <SalesOrderLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="text-sm text-text-secondary">Deliver released sales order quantities to customers.</p>
+        <div class="space-y-2 text-sm text-text-secondary">
+          <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
+            <span class="font-medium">Delivery history.</span> Posted and draft delivery notes against sales orders.
+            For new invoices use{" "}
+            <A href="/app/sales/sales/new" class="font-medium text-brand-700 hover:underline">
+              New Sales
+            </A>
+            .
+          </p>
+          <p>Deliver released sales order quantities to customers.</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <button
