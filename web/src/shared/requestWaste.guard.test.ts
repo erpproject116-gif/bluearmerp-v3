@@ -53,6 +53,20 @@ describe("mutation invalidation fetches once", () => {
   });
 });
 
+describe("query client avoids focus storms", () => {
+  it("defaults refetchOnWindowFocus to false", () => {
+    expect(read("queryClient.ts")).toMatch(/refetchOnWindowFocus:\s*false/);
+  });
+});
+
+describe("dashboard polls stay under the auth RPM budget", () => {
+  it("summary and red-flags poll at most every 120s", () => {
+    const src = read("useDashboard.ts");
+    expect(src).toMatch(/refetchInterval:.*120_000/);
+    expect(src).not.toMatch(/refetchInterval:.*\? 60_000/);
+  });
+});
+
 describe("shell polling", () => {
   it("bell and toast poller share one notification feed", () => {
     expect(read("CrmNotificationBell.tsx")).toContain("useCrmNotificationFeed");

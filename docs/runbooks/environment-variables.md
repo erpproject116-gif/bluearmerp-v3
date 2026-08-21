@@ -101,6 +101,19 @@ Fill values from the Supabase Dashboard.
 | `AUDIT_FLUSH_INTERVAL_MS` | `75` | Audit flush interval |
 | `GZIP_ENABLED` | `false` | Compress responses ≥ 8KB |
 
+### Rate limits (API)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RATE_LIMIT_ENABLED` | `true` | Fixed-window limiter (`false` disables) |
+| `RATE_LIMIT_WINDOW_SECONDS` | `60` | Window length |
+| `RATE_LIMIT_PUBLIC_STRICT_RPM` | `10` | Signup / invite / portal magic-link (by IP) |
+| `RATE_LIMIT_PUBLIC_PROVISION_RPM` | `30` | Trial / demo provision (by IP) |
+| `RATE_LIMIT_AUTHENTICATED_RPM` | `200` | Normal `/api/v1/*` (by user + tenant); use `300` on Alibaba SPA hosts if needed |
+| `RATE_LIMIT_EXPENSIVE_RPM` | `60` | AI, export, scan, copilot approve |
+
+Health, OPTIONS, jobs, presence, and usage paths are exempt. See `api/internal/platform/ratelimit`.
+
 Every cache above is **process-local** — there is no Redis or shared tier. With more
 than one API instance, a change made on one instance can be up to that instance's TTL
 stale on the others, except where an explicit invalidation hook runs in the same

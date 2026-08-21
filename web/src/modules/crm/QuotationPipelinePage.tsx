@@ -1,5 +1,6 @@
 import { A } from "@solidjs/router";
 import { createMemo, createSignal, Show } from "solid-js";
+import { apiFetch } from "../../shared/api";
 import { KanbanBoard } from "../../shared/KanbanBoard";
 import { KanbanCard, type KanbanDetailRow } from "../../shared/KanbanCard";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
@@ -16,6 +17,10 @@ import {
 import { useListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
 import { formatMoney } from "../../shared/money";
+import {
+  QuotationModal,
+  type QuotationDetail,
+} from "../quotation/quotation/QuotationModal";
 import { CrmLayout } from "./CrmLayout";
 
 const STORAGE_KEY = "crm-quotation-pipeline-view";
@@ -50,10 +55,28 @@ function stageToProgress(stage: QuotationPipelineStage): string | null {
 export default function QuotationPipelinePage() {
   const [viewMode, setViewMode] = createSignal<ViewMode>(loadViewMode(STORAGE_KEY, "board"));
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [modalOpen, setModalOpen] = createSignal(false);
+  const [editing, setEditing] = createSignal<QuotationDetail | null>(null);
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("order_date");
   const toast = useToast();
   const invalidate = useInvalidateQuotationPipeline();
   const pipeline = useQuotationPipeline();
+
+  const openEdit = async (card: QuotationPipelineCard) => {
+    setSelectedId(card.id);
+    const res = await apiFetch<QuotationDetail>(`/api/v1/quotation/quotations/${card.id}`);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Could not open quotation.");
+      return;
+    }
+    setEditing(res.data);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditing(null);
+  };
 
   const allCards = createMemo(() => {
     const stages = pipeline.data?.stages;
@@ -137,7 +160,7 @@ export default function QuotationPipelinePage() {
           loading={pipeline.isFetching}
           selectedId={selectedId()}
           onSelect={setSelectedId}
-          onEdit={() => {}}
+          onEdit={(row) => void openEdit(row)}
           onNew={() => {}}
           codeKey="date_no_display"
           nameKey="customer_name"
@@ -171,10 +194,18 @@ export default function QuotationPipelinePage() {
                     ? "info"
                     : "info"
               }
+              onClick={() => void openEdit(c)}
             />
           )}
         />
       </Show>
+
+      <QuotationModal
+        open={modalOpen()}
+        editing={editing()}
+        onClose={closeModal}
+        onSaved={invalidate}
+      />
     </CrmLayout>
   );
 }

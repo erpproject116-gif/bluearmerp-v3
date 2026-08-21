@@ -96,7 +96,8 @@ export function useFinancialHealth(enabled = true) {
       if (!res.success) throw new Error(res.message ?? "Failed to load financial health");
       return res.data!;
     },
-    staleTime: 30_000,
-    refetchInterval: enabled ? 60_000 : false,
+    staleTime: 60_000,
+    refetchInterval: enabled ? 120_000 : false,
+    refetchOnWindowFocus: false,
   }));
 }
