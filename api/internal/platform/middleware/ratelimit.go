@@ -31,6 +31,7 @@ func configureRateLimit(cfg config.RateLimitConfig) {
 }
 
 func denyRateLimit(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "60")
 	response.Err(w, http.StatusTooManyRequests,
 		"Too many requests. Please try again later.", "ERR_RATE_LIMITED")
 }

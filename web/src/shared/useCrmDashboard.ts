@@ -34,7 +34,8 @@ export function useCrmDashboard(enabled = true) {
       return res.data ?? ({} as CrmDashboardSummary);
     },
     staleTime: 60_000,
-    refetchInterval: enabled ? 60_000 : false,
+    refetchInterval: enabled ? 120_000 : false,
+    refetchOnWindowFocus: false,
   }));
 }
 
@@ -77,7 +78,8 @@ export function useCrmLeadsDashboard(enabled = true) {
       );
     },
     staleTime: 60_000,
-    refetchInterval: enabled ? 60_000 : false,
+    refetchInterval: enabled ? 120_000 : false,
+    refetchOnWindowFocus: false,
   }));
 }
 

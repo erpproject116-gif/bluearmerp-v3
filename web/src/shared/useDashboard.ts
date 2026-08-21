@@ -62,8 +62,9 @@ export function useDashboardSummary(enabled: boolean | (() => boolean) = true) {
       if (!res.success) throw new Error(res.message ?? "Failed to load dashboard summary");
       return res.data ?? ({} as DashboardSummary);
     },
-    staleTime: 30_000,
-    refetchInterval: (typeof enabled === "function" ? enabled() : enabled) ? 60_000 : false,
+    staleTime: 60_000,
+    refetchInterval: (typeof enabled === "function" ? enabled() : enabled) ? 120_000 : false,
+    refetchOnWindowFocus: false,
   }));
 }
 
@@ -77,6 +78,7 @@ export function useDashboardSalesTrend(months = 12, enabled = true) {
       return res.data ?? { months, points: [] };
     },
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   }));
 }
 
@@ -90,6 +92,7 @@ export function useDashboardInventoryTrend(months = 12, enabled = true) {
       return res.data ?? { months, points: [] };
     },
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   }));
 }
 
@@ -105,6 +108,7 @@ export function useDashboardTopCustomers(days = 90, limit = 10, enabled = true) 
       return res.data ?? [];
     },
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   }));
 }
 
@@ -120,6 +124,7 @@ export function useDashboardTopVendors(days = 90, limit = 10, enabled = true) {
       return res.data ?? [];
     },
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   }));
 }
 
@@ -133,6 +138,7 @@ export function useDashboardTopItems(days = 90, limit = 10, enabled = true) {
       return res.data ?? [];
     },
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   }));
 }
 
@@ -145,8 +151,9 @@ export function useDashboardRedFlags(enabled = true) {
       if (!res.success) throw new Error(res.message ?? "Failed to load red flags");
       return res.data ?? { total_count: 0, categories: [] };
     },
-    staleTime: 30_000,
-    refetchInterval: enabled ? 60_000 : false,
+    staleTime: 60_000,
+    refetchInterval: enabled ? 120_000 : false,
+    refetchOnWindowFocus: false,
   }));
 }
 

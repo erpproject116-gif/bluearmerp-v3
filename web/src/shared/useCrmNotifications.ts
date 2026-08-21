@@ -52,8 +52,9 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
         };
       },
       staleTime: 30_000,
-      refetchInterval: p.enabled !== false ? 60_000 : false,
-      refetchOnWindowFocus: true,
+      refetchInterval: p.enabled !== false ? 90_000 : false,
+      /** Inherit global false; badge still refreshes on the interval above. */
+      refetchOnWindowFocus: false,
       retry: shouldRetryQuery,
     };
   });
@@ -65,7 +66,7 @@ const SHELL_FEED_PAGE_SIZE = 15;
 /**
  * The one notification query the app shell polls. Both the bell (badge +
  * dropdown) and the toast poller call this with identical params so TanStack
- * dedupes them into a single 60s request instead of two.
+ * dedupes them into a single ~90s request instead of two.
  */
 export function useCrmNotificationFeed(enabled: () => boolean) {
   return useCrmNotifications(() => ({

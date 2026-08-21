@@ -367,6 +367,19 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
+  /** Single-flight /auth/me — drops overlapping TOKEN_REFRESHED while bootstrap is in flight. */
+  let refreshInflight: Promise<void> | null = null;
+  const refreshCoalesced = async (options?: { background?: boolean }) => {
+    if (refreshInflight) {
+      await refreshInflight;
+      if (options?.background) return;
+    }
+    refreshInflight = refresh(options).finally(() => {
+      refreshInflight = null;
+    });
+    await refreshInflight;
+  };
+
   const setActiveTenant = async (tenantId: number) => {
     if (!tenantId || tenantId === state.me?.tenant?.id) return;
     const res = await apiFetch<{ tenant_id: number }>("/api/v1/auth/switch-tenant", {
@@ -375,19 +388,19 @@ export const AuthProvider: ParentComponent = (props) => {
     });
     if (!res.success) return;
     setActiveTenantId(tenantId);
-    await refresh();
+    await refreshCoalesced();
   };
 
   onMount(() => {
-    void refresh();
+    void refreshCoalesced();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "TOKEN_REFRESHED") {
-        void refresh({ background: true });
+        void refreshCoalesced({ background: true });
         return;
       }
       if (event === "SIGNED_IN") {
-        void refresh({ background: state.me != null });
+        void refreshCoalesced({ background: state.me != null });
         return;
       }
       if (event === "SIGNED_OUT" || (event === "INITIAL_SESSION" && !session)) {
@@ -416,7 +429,7 @@ export const AuthProvider: ParentComponent = (props) => {
         get bootstrapMessage() {
           return state.bootstrapMessage;
         },
-        refresh,
+        refresh: refreshCoalesced,
         setActiveTenant,
       }}
     >
